@@ -1,0 +1,63 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34031.279
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Games", "Games", "{427FFDCB-7D57-476F-842C-38BD7BF9E468}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameSandbox", "GameSandbox\GameSandbox.csproj", "{BFBA276F-AE9C-42F9-8F90-09BFBC903CE6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CharacterGenerator", "CharacterGenerator\CharacterGenerator.csproj", "{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RelationshipsGame", "RelationshipsGame\RelationshipsGame.csproj", "{333E59D0-D969-4B56-80E7-7B5CED47512A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Engine", "Engine", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{ABA92169-3963-4908-88D4-FFDC5BCE8974}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Generators", "Generators", "{6058A643-4401-49AA-8383-09983A5D1100}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EngineTests", "EngineTests\EngineTests.csproj", "{BA435300-7123-BAE1-AFFC-BC54B062B3A5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameEngineTools", "GameEngineTools\GameEngineTools.csproj", "{F63F3301-D1BE-2B84-9D92-E19572248ADE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BFBA276F-AE9C-42F9-8F90-09BFBC903CE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFBA276F-AE9C-42F9-8F90-09BFBC903CE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFBA276F-AE9C-42F9-8F90-09BFBC903CE6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA435300-7123-BAE1-AFFC-BC54B062B3A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA435300-7123-BAE1-AFFC-BC54B062B3A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA435300-7123-BAE1-AFFC-BC54B062B3A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA435300-7123-BAE1-AFFC-BC54B062B3A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F63F3301-D1BE-2B84-9D92-E19572248ADE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F63F3301-D1BE-2B84-9D92-E19572248ADE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F63F3301-D1BE-2B84-9D92-E19572248ADE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F63F3301-D1BE-2B84-9D92-E19572248ADE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{BFBA276F-AE9C-42F9-8F90-09BFBC903CE6} = {427FFDCB-7D57-476F-842C-38BD7BF9E468}
+		{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D} = {6058A643-4401-49AA-8383-09983A5D1100}
+		{333E59D0-D969-4B56-80E7-7B5CED47512A} = {427FFDCB-7D57-476F-842C-38BD7BF9E468}
+		{BA435300-7123-BAE1-AFFC-BC54B062B3A5} = {ABA92169-3963-4908-88D4-FFDC5BCE8974}
+		{F63F3301-D1BE-2B84-9D92-E19572248ADE} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {568A774F-A99D-4CC4-BE74-F37C90684526}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,56 @@
+{
+    "perfective": [
+        "do",
+        "na",
+        "po",
+        "pře",
+        "vy",
+        "z",
+        "ze",
+        "za",
+        "s",
+        "se",
+        "od",
+        "roz",
+        "u",
+        "v",
+        "ve"
+    ],
+    "directional": [
+        "do",
+        "na",
+        "vy",
+        "z",
+        "ze",
+        "od",
+        "při",
+        "v",
+        "ve",
+        "ob",
+        "pro",
+        "pod",
+        "nad"
+    ],
+    "modifying": [
+        "po",
+        "za",
+        "pře",
+        "roz",
+        "u",
+        "ob",
+        "pro",
+        "pod",
+        "nad"
+    ],
+    "intensifying": [
+        "roz",
+        "z",
+        "vy",
+        "pře",
+        "do",
+        "na"
+    ],
+    "negation": [
+        "ne"
+    ]
+}

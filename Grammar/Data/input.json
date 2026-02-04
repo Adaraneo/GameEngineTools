@@ -1,0 +1,153 @@
+[
+    {
+        "lemma": "žena",
+        "category": "Substantive",
+        "gender": "Feminine",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "žena"
+    },
+    {
+        "lemma": "růže",
+        "category": "Substantive",
+        "gender": "Feminine",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "růže"
+    },
+    {
+        "lemma": "píseň",
+        "category": "Substantive",
+        "gender": "Feminine",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "píseň"
+    },
+    {
+        "lemma": "kost",
+        "category": "Substantive",
+        "gender": "Feminine",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "kost"
+    },
+    {
+        "lemma": "hrad",
+        "category": "Substantive",
+        "gender": "MasculineInanimate",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "hrad"
+    },
+    {
+        "lemma": "stroj",
+        "category": "Substantive",
+        "gender": "MasculineInanimate",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "stroj"
+    },
+    {
+        "lemma": "pán",
+        "category": "Substantive",
+        "gender": "MasculineAnimate",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "pán"
+    },
+    {
+        "lemma": "muž",
+        "category": "Substantive",
+        "gender": "MasculineAnimate",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "muž"
+    },
+    {
+        "lemma": "předseda",
+        "category": "Substantive",
+        "gender": "MasculineAnimate",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "předseda"
+    },
+    {
+        "lemma": "soudce",
+        "category": "Substantive",
+        "gender": "MasculineAnimate",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "soudce"
+    },
+    {
+        "lemma": "město",
+        "category": "Substantive",
+        "gender": "Neuter",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "město"
+    },
+    {
+        "lemma": "moře",
+        "category": "Substantive",
+        "gender": "Neuter",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "moře"
+    },
+    {
+        "lemma": "kuře",
+        "category": "Substantive",
+        "gender": "Neuter",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "kuře"
+    },
+    {
+        "lemma": "stavení",
+        "category": "Substantive",
+        "gender": "Neuter",
+        "number": "Singular",
+        "case": 1,
+        "pattern": "stavení"
+    },
+    {
+        "lemma": "mladý",
+        "category": "Adjective",
+        "gender": "MasculineAnimate",
+        "number": "Singular",
+        "case": 4,
+        "pattern": "mladý"
+    },
+    {
+        "lemma": "nést",
+        "category": "Verb",
+        "tense": "Present",
+        "person": 1,
+        "number": "Singular",
+        "gender": "MasculineAnimate",
+        "pattern": "nese",
+        "aspect": "Imperfective"
+    },
+    {
+        "lemma": "donést",
+        "category": "Verb",
+        "tense": "Past",
+        "person": 3,
+        "number": "Singular",
+        "gender": "Feminine",
+        "pattern": "nese",
+        "aspect": "Perfective"
+    },
+    {
+        "lemma": "být",
+        "category": "Verb",
+        "tense": "Past",
+        "person": 3,
+        "number": "Singular",
+        "gender": "Feminine",
+        "pattern": "být",
+        "aspect": "Imperfective"
+    }
+
+]

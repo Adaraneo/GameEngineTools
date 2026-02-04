@@ -1,0 +1,27 @@
+{
+    "oko": {
+        "inheritsFrom": "město",
+        "overrides": {
+            "singular": {
+                "6": "oku"
+            },
+            "plural": {
+                "1": "oči",
+                "2": "očí",
+                "3": "očím",
+                "4": "oči",
+                "5": "oči",
+                "6": "očích",
+                "7": "očima"
+            }
+        }
+    },
+    "chlapec": {
+        "inheritsFrom": "muž",
+        "overrides": {
+            "signular": {
+                "5": "-e"
+            }
+        }
+    }
+}

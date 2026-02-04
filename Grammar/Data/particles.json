@@ -1,0 +1,18 @@
+{
+    "conditional": {
+        "singular": {
+            "1": "bych",
+            "2": "bys",
+            "3": "by"
+        },
+        "plural": {
+            "1": "bychom",
+            "2": "byste",
+            "3": "by"
+        }
+    },
+    "reflexive": {
+        "standard": "si",
+        "dative": "se"
+    }
+}

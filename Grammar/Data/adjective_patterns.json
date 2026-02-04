@@ -1,0 +1,70 @@
+{
+    "mladý": {
+        "type": "hard",
+        "endings": {
+            "singular": {
+                "MasculineAnimate": [ "-ý", "-ého", "-ému", "-ého", "-ý", "-ém", "-ým" ],
+                "MasculineInanimate": [ "-ý", "-ého", "-ému", "-ý", "-ý", "-ém", "-ým" ],
+                "Feminine": [ "-á", "-é", "-é", "-ou", "-á", "-é", "-ou" ],
+                "Neuter": [ "-é", "-ého", "-ému", "-é", "-é", "-ém", "-ým" ]
+            },
+            "plural": {
+                "MasculineAnimate": [ "-í", "-ých", "-ým", "-é", "-í", "-ých", "-ými" ],
+                "MasculineInanimate": [ "-é", "-ých", "-ým", "-é", "-é", "-ých", "-ými" ],
+                "Feminine": [ "-é", "-ých", "-ým", "-é", "-é", "-ých", "-ými" ],
+                "Neuter": [ "-á", "-ých", "-ým", "-á", "-á", "-ých", "-ými" ]
+            }
+        }
+    },
+    "jarní": {
+        "type": "soft",
+        "endings": {
+            "singular": {
+                "MasculineAnimate": [ "-í", "-ího", "-ímu", "-ího", "-í", "-ím", "-ím" ],
+                "MasculineInanimate": [ "-í", "-ího", "-ímu", "-í", "-í", "-ím", "-ím" ],
+                "Feminine": [ "-í", "-í", "-í", "-í", "-í", "-í", "-í" ],
+                "Neuter": [ "-í", "-ího", "-ímu", "-í", "-í", "-ím", "ím" ]
+            },
+            "plural": {
+                "MasculineAnimate": [ "-í", "-ích", "-ím", "-í", "-í", "-ích", "-ími" ],
+                "MasculineInanimate": [ "-í", "-ích", "-ím", "-í", "-í", "-ích", "-ími" ],
+                "Feminine": [ "-í", "-ích", "-ím", "-í", "-í", "-ích", "-ími" ],
+                "Neuter": [ "-í", "-ích", "-ím", "-í", "-í", "-ích", "-ími" ]
+            }
+        }
+    },
+    "otcův": {
+        "type": "possessive",
+        "endings": {
+            "singular": {
+                "MasculineAnimate": [ "-ův", "-ova", "-ovu", "-ova", "-ův", "-ově", "-ovým" ],
+                "MasculineInanimate": [ "-ův", "-ova", "-ovu", "-ův", "-ův", "-ově", "-ovým" ],
+                "Feminine": [ "-ova", "-ovy", "-ově", "-ovu", "-ova", "-ově", "-ovou" ],
+                "Neuter": [ "-ovo", "-ova", "-ovu", "-ovo", "-ovo", "-ově", "-ovým" ]
+            },
+            "plural": {
+                "MasculineAnimate": [ "-ovi", "-ových", "-ovým", "-ovy", "-ovi", "-ových", "-ovými" ],
+                "MasculineInanimate": [ "-ovy", "-ových", "-ovým", "-ovy", "-ovy", "ových", "-ovými" ],
+                "Feminine": [ "-ovy", "-ových", "-ovým", "-ovy", "-ovy", "-ových", "-ovými" ],
+                "Neuter": [ "-ova", "-ových", "-ovým", "-ova", "-ova", "-ových", "-ovými" ]
+            }
+        }
+    },
+    "matčin": {
+        "type": "possessive",
+        "endings": {
+            "singular": {
+                "MasculineAnimate": [ "-in", "-ina", "-ině", "-ina", "-in", "-ině", "-iným" ],
+                "MasculineInanimate": [ "-in", "-ina", "-ině", "-in", "-in", "-ině", "-iným" ],
+                "Feminine": [ "-ina", "-iny", "-ině", "-inu", "-ina", "-ině", "-inu" ],
+                "Neuter": [ "-ino", "-ina", "-inu", "-ino", "-ino", "-ině", "-iným" ]
+            },
+            "plural": {
+                "MasculineAnimate": [ "-ini", "-iných", "-iným", "-iny", "-ini", "-iných", "-inými" ],
+                "MasculineInanimate": [ "-iny", "-iných", "-iným", "-iny", "-iny", "-iných", "-inými" ],
+                "Feminine": [ "-iny", "-iných", "-iným", "-iny", "-iny", "-iných", "-inými" ],
+                "Neuter": [ "-ina", "-iných", "-iným", "-ina", "-ina", "-iných", "-inými" ]
+            }
+        }
+    }
+}
