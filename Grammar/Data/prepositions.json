@@ -1,9 +1,0 @@
-{
-    "do": { "allowedCases": [ 2 ] },
-    "bez": { "allowedCases": [ 2 ] },
-    "k": { "allowedCases": [ 3 ] },
-    "ke": { "allowedCases": [ 3 ] },
-    "na": { "allowedCases": [ 4, 6 ] },
-    "s": { "allowedCases": [ 7 ] },
-    "v": { "allowedCases": [ 6 ] }
-}
