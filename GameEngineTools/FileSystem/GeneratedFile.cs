@@ -89,13 +89,11 @@ namespace GameEngineTools.FileSystem
             var person = npc!.Person;
             npc.Person = person;
 
-            CharacterBase.People.Add(npc.Person);
             return npc;
         }
 
         public void ImportNPPCs(string pathToRootDirectory = null)
         {
-            CharacterBase.People.Clear();
             _characterManager.NPPCs.Clear();
             GenerateFileSystem generateFileSystem = new GenerateFileSystem(pathToRootDirectory);
             try
@@ -125,7 +123,6 @@ namespace GameEngineTools.FileSystem
             var person = pc!.Person;
             pc.Person = person;
 
-            CharacterBase.People.Add(pc.Person);
             return pc;
         }
     }
