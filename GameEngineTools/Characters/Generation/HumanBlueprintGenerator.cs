@@ -20,10 +20,11 @@ namespace GameEngineTools.Characters.Generation
 
     public sealed record HumanBlueprintSpec((double Female, double Male, double Intersex, double Unknown) SexWeights, WDateOnly DefaultMinBirthDate, WDateOnly DefaultMaxBirthDate)
     {
-        public static HumanBlueprintSpec Default(WDateOnly now)
+        public static HumanBlueprintSpec Default(WDateOnly now, int minAgeYears = 0, int maxAgeYears = 100)
         {
-            var minAgeDays = 0 * WDateTime.Spec.Calendar.DaysInYear(now.Year);
-            var maxAgeDays = 100 * WDateTime.Spec.Calendar.DaysInYear(now.Year);
+            var daysInYear = WDateTime.Spec.Calendar.DaysInYear(now.Year);
+            var minAgeDays = minAgeYears * daysInYear;
+            var maxAgeDays = maxAgeYears * daysInYears;
 
             var minBirth = now.AddDays(-maxAgeDays);
             var maxBirth = now.AddDays(-minAgeDays);
