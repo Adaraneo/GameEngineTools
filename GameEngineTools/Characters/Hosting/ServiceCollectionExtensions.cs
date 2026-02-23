@@ -46,7 +46,20 @@ namespace GameEngineTools.Characters.Hosting
             services.AddSingleton(humanBlueprintSpec);
             services.AddSingleton<IHumanBlueprintGenerator, HumanBlueprintGenerator>();
             services.AddSingleton<IIdentityGenerator>(_ =>
-                new SimpleIdentityGenerator());
+                                                      {
+                                                          var sourceFile = new SourceFile();
+                                                            sourceFile.SetFilenames(
+                                                                FileSystemConstant.SourceFilePath.femaleNames,
+                                                                FileSystemConstant.SourceFilePath.maleNames,
+                                                                FileSystemConstant.SourceFilePath.surnames);
+                                                            sourceFile.Load<Name>(out var femaleNames, 0);
+                                                            sourceFile.Load<Name>(out var maleNames, 1);
+                                                            sourceFile.Load<Surname>(out var surnames, 2);
+                                                          return new SimpleIdentityGenerator(
+                                                              femaleNames.ToArray(),
+                                                              maleNames.ToArray(),
+                                                              surnames.toArray());
+                                                      });
             services.AddAppearanceGenerator();
             services.AddPersonalityGenerator();
             return services;
