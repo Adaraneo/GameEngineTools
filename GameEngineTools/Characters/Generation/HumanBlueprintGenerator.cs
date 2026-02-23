@@ -24,7 +24,7 @@ namespace GameEngineTools.Characters.Generation
         {
             var daysInYear = WDateTime.Spec.Calendar.DaysInYear(now.Year);
             var minAgeDays = minAgeYears * daysInYear;
-            var maxAgeDays = maxAgeYears * daysInYears;
+            var maxAgeDays = maxAgeYears * daysInYear;
 
             var minBirth = now.AddDays(-maxAgeDays);
             var maxBirth = now.AddDays(-minAgeDays);
