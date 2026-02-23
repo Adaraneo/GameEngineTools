@@ -31,11 +31,7 @@ namespace GameEngineTools.Characters.GameObjects
             MaxHealth = maxHealth;
             Health = MaxHealth;
             this.Person = person;
-            People.Add(person);
         }
-
-        [JsonIgnore]
-        public static List<IHuman> People { get; } = new();
 
         [JsonIgnore]
         public ArmorSet Armor
