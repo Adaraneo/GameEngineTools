@@ -12,17 +12,19 @@ namespace EngineTests.Utils
     internal class TestClock : IClock
     {
         private readonly System.Timers.Timer timer;
+        private readonly double timeScale;
         public TestClock(IWorldClock worldClock)
         {
+            timeScale = worldClock.TimeScale;
             timer = new System.Timers.Timer();
-            timer.Interval = worldClock.TimeScale * 10;
+            timer.Interval = 10;
             timer.Elapsed += Timer_Elapsed;
             Now = WDateTime.Now;
         }
 
         private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
         {
-            Advance(WTimeSpan.FromSeconds(1));
+            Advance(WTimeSpan.FromSeconds(timeScale));
         }
 
         public void Start()
