@@ -49,14 +49,9 @@ namespace GameEngineTools.Characters.Hosting
             services.AddSingleton<IHumanBlueprintGenerator, HumanBlueprintGenerator>();
             services.AddSingleton<IIdentityGenerator>(_ =>
                                                       {
-                                                          var sourceFile = new SourceFile();
-                                                            sourceFile.SetFilenames(
-                                                                FileSystemConstant.SourceFilePath.femaleNames,
-                                                                FileSystemConstant.SourceFilePath.maleNames,
-                                                                FileSystemConstant.SourceFilePath.surnames);
-                                                            sourceFile.Load<Name>(out var femaleNames, 0);
-                                                            sourceFile.Load<Name>(out var maleNames, 1);
-                                                            sourceFile.Load<Surname>(out var surnames, 2);
+                                                          var femaleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.femaleNames, v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
+                                                          var maleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.maleNames, v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
+                                                          var surnames = CsvLoader.Load(FileSystemConstant.SourceFilePath.surnames, v => new Surname { Male = v[0], Female = v[1] });
                                                           return new SimpleIdentityGenerator(
                                                               femaleNames.ToArray(),
                                                               maleNames.ToArray(),

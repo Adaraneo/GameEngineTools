@@ -3,6 +3,7 @@
 
 namespace GameEngineTools
 {
+    using System.Globalization;
     using GameEngineTools.Armory;
     using GameEngineTools.Characters;
     using GameEngineTools.Characters.Core;
@@ -33,13 +34,8 @@ namespace GameEngineTools
         
         private void LoadResources()
         {
-            SourceFile file = new SourceFile();
-            file.SetFilenames(FileSystemConstant.SourceFilePath.maleNames, FileSystemConstant.SourceFilePath.femaleNames, FileSystemConstant.SourceFilePath.surnames, FileSystemConstant.SourceFilePath.weapons, FileSystemConstant.SourceFilePath.armorParts);
-            //file.Load(out _maleNames, 0);
-            //file.Load(out _femaleNames, 1);
-            //file.Load(out _surnames, 2);
-            file.Load(out _weapons, 3);
-            file.Load(out _armorParts, 4);
+            _weapons = CsvLoader.Load(FileSystemConstant.SourceFilePath.weapons, v => new Weapon(v[0], Enum.Parse<Weapon.WeaponType>(v[1]), double.Parse(v[2], CultureInfo.InvariantCulture)));
+            _armorParts = CsvLoader.Load(FileSystemConstant.SourceFilePath.armorParts, v => new ArmorPart(v[0], Enum.Parse<ArmorPart.PartType>(v[1]), double.Parse(v[2], CultureInfo.InvariantCulture)));
             //_log.LogInformation("Names loaded: male={Male}, female={Female}, surnames={Surnames}", _maleNames.Count, _femaleNames.Count, _surnames.Count);
         }
 

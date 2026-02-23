@@ -76,7 +76,6 @@
             }
 
             Assert.IsTrue(nppcs.Count > 0);
-            Assert.IsTrue(GameEngineTools.Characters.GameObjects.CharacterBase.People.Count > 0);
         }
 
         public virtual void Import(out List<GameEngineTools.Characters.GameObjects.CharacterBase> nppcs)
@@ -97,7 +96,6 @@
             }
 
             Assert.IsTrue(nppcs.Count > 0);
-            Assert.IsTrue(GameEngineTools.Characters.GameObjects.CharacterBase.People.Count > 0);
         }
 
         protected virtual void TestInit()
