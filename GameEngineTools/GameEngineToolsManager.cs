@@ -90,7 +90,7 @@ namespace GameEngineTools
         {
             var now = _clock.Now;
 
-            var rng = _serviceProvider.GetRequiredService<IRandomSource>();
+            var rng = _serviceProvider.GetRequiredService<IRandomSource>().Create();
 
             var minBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - maxAge, rng.Next(0, (WDateTime.Spec.Calendar as FixedMonthsCalendar)!.MonthsInYear), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
             var maxBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - minAge, rng.Next(0, (WDateTime.Spec.Calendar as FixedMonthsCalendar)!.MonthsInYear), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
@@ -109,7 +109,7 @@ namespace GameEngineTools
             new HumanBlueprintRequest(
                 MinBirthDate: player.Person.Identity.BirthDate.AddYears(-5),
                 MaxBirthDate: player.Person.Identity.BirthDate.AddYears(5),
-                Sex: player.Person.Biology == SexBiology.Male ? SexBiology.Female : SexBiology.Female));
+                Sex: player.Person.Biology == SexBiology.Male ? SexBiology.Female : SexBiology.Male));
 
             return characterFactory.Create(hpb);
         }
