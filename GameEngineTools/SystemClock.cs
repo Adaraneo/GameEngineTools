@@ -11,16 +11,18 @@ namespace GameEngineTools
     public sealed class SystemClock : IClock, IDisposable
     {
         private Timer timer;
+        private readonly double timeScale;
 
         private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
         {
-            Now = Now.AddSeconds(1);
+            Now = Now.AddSeconds(timeScale);
         }
 
         public SystemClock(IWorldClock worldClock)
         {
+            this.timeScale = worldClock.TimeScale;
             this.timer = new Timer();
-            this.timer.Interval = worldClock.TimeScale * 1000;
+            this.timer.Interval = 1000;
             this.timer.Elapsed += Timer_Elapsed;
         }
 
