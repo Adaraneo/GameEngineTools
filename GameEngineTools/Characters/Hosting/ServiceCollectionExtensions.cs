@@ -58,7 +58,7 @@ namespace GameEngineTools.Characters.Hosting
                                                           return new SimpleIdentityGenerator(
                                                               femaleNames.ToArray(),
                                                               maleNames.ToArray(),
-                                                              surnames.toArray());
+                                                              surnames.ToArray());
                                                       });
             services.AddAppearanceGenerator();
             services.AddPersonalityGenerator();
