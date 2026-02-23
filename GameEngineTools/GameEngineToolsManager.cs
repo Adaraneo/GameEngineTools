@@ -28,6 +28,7 @@ namespace GameEngineTools
         //private List<Surname> _surnames = new List<Surname>();
         private List<Weapon> _weapons = new List<Weapon>();
         private IServiceProvider _serviceProvider = default!;
+        private readonly IRandomSourceFactory _rngFactory;
         
         private void LoadResources()
         {
@@ -43,6 +44,7 @@ namespace GameEngineTools
 
         public GameEngineToolsManager(
             IClock clock,
+            IRandomSourceFactory rngFactory,
             IOptions<GameEngineToolsManagerOptions> opt,
             ILogger<GameEngineToolsManager> log,
             IServiceProvider serviceProvider)
@@ -50,6 +52,7 @@ namespace GameEngineTools
             _opt = opt.Value;
             _log = log;
             _clock = clock;
+            _rngFactory = rngFactory;
             _serviceProvider = serviceProvider;
         }
 
@@ -90,7 +93,7 @@ namespace GameEngineTools
         {
             var now = _clock.Now;
 
-            var rng = _serviceProvider.GetRequiredService<IRandomSource>().Create();
+            var rng = _rngFactory.Create(Environment.TickCount);
 
             var minBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - maxAge, rng.Next(0, (WDateTime.Spec.Calendar as FixedMonthsCalendar)!.MonthsInYear), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
             var maxBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - minAge, rng.Next(0, (WDateTime.Spec.Calendar as FixedMonthsCalendar)!.MonthsInYear), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
