@@ -72,7 +72,7 @@ namespace GameEngineTools
             _log.LogInformation("Initializing CharacterManager...");
             _log.LogInformation("CharacterManager init (logs: {0})", _opt.LogsRoot);
             _log.LogInformation("Initializing...");
-            CharacterBase.People.Clear();
+            _people.Clear();
             NPPCs.Clear();
             Items.Clear();
             _log.LogInformation("Initialized");
