@@ -28,6 +28,8 @@ namespace GameEngineTools
         //private List<Surname> _surnames = new List<Surname>();
         private List<Weapon> _weapons = new List<Weapon>();
         private IServiceProvider _serviceProvider = default!;
+        private readonly List<IHuman> _people = new();
+        
         private void LoadResources()
         {
             SourceFile file = new SourceFile();
@@ -51,6 +53,8 @@ namespace GameEngineTools
             _clock = clock;
             _serviceProvider = serviceProvider;
         }
+
+        public IReadOnlyList<IHuman> People => _people;
 
         /// <summary>
         /// For test purposes!
@@ -83,7 +87,10 @@ namespace GameEngineTools
         {
             var characterFactory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate();
-            return characterFactory.Create(hpb);
+            var human = characterFactory.Create(hpb);
+            _people.Add(human);
+
+            return human;
         }
 
         public IHuman RandomizePerson(int minAge = 0, int maxAge = 100)
@@ -99,7 +106,10 @@ namespace GameEngineTools
                 new HumanBlueprintRequest(
                     MinBirthDate: minBirth,
                     MaxBirthDate: maxBirth));
-            return characterFactory.Create(hpb);
+            var human = characterFactory.Create(hpb);
+            _people.Add(human);
+
+            return human;
         }
 
         public IHuman RandomizePerson(PC player)
@@ -111,7 +121,10 @@ namespace GameEngineTools
                 MaxBirthDate: player.Person.Identity.BirthDate.AddYears(5),
                 Sex: player.Person.Biology == SexBiology.Male ? SexBiology.Female : SexBiology.Male));
 
-            return characterFactory.Create(hpb);
+            var human = characterFactory.Create(hpb);
+            _people.Add(human);
+
+            return human;
         }
     }
 }
