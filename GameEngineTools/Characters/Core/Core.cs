@@ -86,7 +86,7 @@ namespace GameEngineTools.Characters.Core
     public interface IScheduler
     {
         ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null);
-        ScheduledId ScheduleAfter(WTimeSpan delay, ScheduledAction action, string? tag = null);
+        ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null);
         bool Cancel(ScheduledId id);
         // Pull model pro orchestrátor, aby spouštěl akce v Ticku
         IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now);

@@ -9,6 +9,7 @@ namespace GameEngineTools
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
+    using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
     using GameEngineTools.World.Core.Calendars;

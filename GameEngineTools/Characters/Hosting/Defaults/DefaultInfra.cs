@@ -82,7 +82,7 @@ internal sealed class SimpleScheduler : IScheduler
         return id;
     }
 
-    public ScheduledId ScheduleAfter(WTimeSpan delay, ScheduledAction action, string? tag = null)
+    public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
     {
         return ScheduleAt(now + delay, action, tag);
     }
