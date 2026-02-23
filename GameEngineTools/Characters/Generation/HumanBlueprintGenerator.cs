@@ -51,22 +51,11 @@ namespace GameEngineTools.Characters.Generation
         private readonly Name[] _maleNames;
         private readonly Surname[] _surnames;
 
-        public SimpleIdentityGenerator()
+        public SimpleIdentityGenerator(Name[] femaleNames, Name[] maleNames, Surname[] surnames)
         {
-            var sourceFile = new SourceFile();
-            sourceFile.SetFilenames(
-                FileSystemConstant.SourceFilePath.femaleNames,
-                FileSystemConstant.SourceFilePath.maleNames,
-                FileSystemConstant.SourceFilePath.surnames);
-            var femaleNames = new List<Name>();
-            var maleNames = new List<Name>();
-            var surnames = new List<Surname>();
-            sourceFile.Load<Name>(out femaleNames, 0);
-            sourceFile.Load<Name>(out maleNames, 1);
-            sourceFile.Load<Surname>(out surnames, 2);
-            _femaleNames = femaleNames.ToArray();
-            _maleNames = maleNames.ToArray();
-            _surnames = surnames.ToArray();
+            _femaleNames = femaleNames;
+            _maleNames = maleNames;
+            _surnames = surnames;
         }
 
         public Identity Generate(SexBiology sex, WDateOnly birthDate, IRandomSource rng)
