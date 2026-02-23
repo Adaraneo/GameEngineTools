@@ -84,12 +84,7 @@ internal sealed class SimpleScheduler : IScheduler
 
     public ScheduledId ScheduleAfter(WTimeSpan delay, ScheduledAction action, string? tag = null)
     {
-        // Zde předpokládáme, že orchestrátor volá Due(now) a předává now – takže "after"
-        // se překládá až při volání ScheduleAfter volajícím s aktuálním now. Pokud máš vlastní "now",
-        // raději používej ScheduleAt zvenku.
-        // Pro základní default to necháme jako ScheduleAt s when = default (není k dispozici "now").
-        // Prakticky: tenhle default používej jen pro testy; v plné app preferuj ScheduleAt.
-        return ScheduleAt(default, action, tag);
+        return ScheduleAt(now + delay, action, tag);
     }
 
     public bool Cancel(ScheduledId id)
