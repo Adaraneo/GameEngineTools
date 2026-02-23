@@ -28,7 +28,6 @@ namespace GameEngineTools
         //private List<Surname> _surnames = new List<Surname>();
         private List<Weapon> _weapons = new List<Weapon>();
         private IServiceProvider _serviceProvider = default!;
-        private readonly List<IHuman> _people = new();
         
         private void LoadResources()
         {
@@ -54,8 +53,6 @@ namespace GameEngineTools
             _serviceProvider = serviceProvider;
         }
 
-        public IReadOnlyList<IHuman> People => _people;
-
         /// <summary>
         /// For test purposes!
         /// </summary>
@@ -72,7 +69,6 @@ namespace GameEngineTools
             _log.LogInformation("Initializing CharacterManager...");
             _log.LogInformation("CharacterManager init (logs: {0})", _opt.LogsRoot);
             _log.LogInformation("Initializing...");
-            _people.Clear();
             NPPCs.Clear();
             Items.Clear();
             _log.LogInformation("Initialized");
@@ -87,10 +83,7 @@ namespace GameEngineTools
         {
             var characterFactory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate();
-            var human = characterFactory.Create(hpb);
-            _people.Add(human);
-
-            return human;
+            return characterFactory.Create(hpb);
         }
 
         public IHuman RandomizePerson(int minAge = 0, int maxAge = 100)
@@ -106,10 +99,7 @@ namespace GameEngineTools
                 new HumanBlueprintRequest(
                     MinBirthDate: minBirth,
                     MaxBirthDate: maxBirth));
-            var human = characterFactory.Create(hpb);
-            _people.Add(human);
-
-            return human;
+            return characterFactory.Create(hpb);
         }
 
         public IHuman RandomizePerson(PC player)
@@ -121,10 +111,7 @@ namespace GameEngineTools
                 MaxBirthDate: player.Person.Identity.BirthDate.AddYears(5),
                 Sex: player.Person.Biology == SexBiology.Male ? SexBiology.Female : SexBiology.Male));
 
-            var human = characterFactory.Create(hpb);
-            _people.Add(human);
-
-            return human;
+            return characterFactory.Create(hpb);
         }
     }
 }
