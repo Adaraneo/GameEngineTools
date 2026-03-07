@@ -94,7 +94,7 @@ namespace GameEngineTools.FileSystem
                 ReferenceHandler = ReferenceHandler.IgnoreCycles,
             };
 
-            var jsonObj = JsonSerializer.Serialize(npc, jsonOptions);
+            var jsonObj = JsonSerializer.Serialize(data, jsonOptions);
             using var file = new StreamWriter(File.Create($"{Path.Combine(NPCDirectory, filename)}"));
             file.Write(jsonObj);
 
