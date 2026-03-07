@@ -37,6 +37,14 @@ namespace GameEngineTools.FileSystem
             //    PlayerDirectory = GD.player;
             //}
         }
+
+        private readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            WriteIndented = true,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            Converters = { new HumanIdJsonConverter() }
+        };
+
         public string NPCDirectory { get; set; }
         public string PlayerDirectory { get; set; }
 
@@ -58,13 +66,7 @@ namespace GameEngineTools.FileSystem
                 Protection = player.Protection
             };
 
-            var jsonOptions = new JsonSerializerOptions()
-            {
-                WriteIndented = true,
-                ReferenceHandler = ReferenceHandler.IgnoreCycles
-            };
-
-            var jsonObj = JsonSerializer.Serialize(data, jsonOptions);
+            var jsonObj = JsonSerializer.Serialize(data, _jsonOptions);
             using var file = new StreamWriter(File.Create($"{Path.Combine(PlayerDirectory, filename)}"));
             file.Write(jsonObj);
 
@@ -88,13 +90,7 @@ namespace GameEngineTools.FileSystem
                 Protection = npc.Protection
             };
 
-            var jsonOptions = new JsonSerializerOptions()
-            {
-                WriteIndented = true,
-                ReferenceHandler = ReferenceHandler.IgnoreCycles,
-            };
-
-            var jsonObj = JsonSerializer.Serialize(data, jsonOptions);
+            var jsonObj = JsonSerializer.Serialize(data, _jsonOptions);
             using var file = new StreamWriter(File.Create($"{Path.Combine(NPCDirectory, filename)}"));
             file.Write(jsonObj);
 
@@ -116,9 +112,8 @@ namespace GameEngineTools.FileSystem
 
         public NPC ImportNPC(string filename)
         {
-            var jsonOptions = new JsonSerializerOptions();
             using var  file = new StreamReader(File.OpenRead($"{Path.Combine(NPCDirectory, filename)}"));
-            var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), jsonOptions);
+            var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions);
 
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality);
             var person = _humanFactory.Create(blueprint);
@@ -156,9 +151,8 @@ namespace GameEngineTools.FileSystem
 
         public PC ImportPC(string filename)
         {
-            var jsonOptions = new JsonSerializerOptions();
             using var file = new StreamReader(File.OpenRead($"{Path.Combine(PlayerDirectory, filename)}"));
-            var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), jsonOptions);
+            var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions);
 
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality);
             var person = _humanFactory.Create(blueprint);

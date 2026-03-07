@@ -197,6 +197,7 @@ namespace GameEngineTools.Characters.Core
         {
             const int maxPasses = 8;
             int pass = 0;
+            var toPublish = new EventCollector();
 
             while (pass++ < maxPasses)
             {
@@ -205,10 +206,13 @@ namespace GameEngineTools.Characters.Core
                     break;
 
                 foreach (var ev in events)
+                {
+                    toPublish.Add(ev);
                     SafeHandle(ev, collector);
+                }
             }
 
-            PublishOutbox(collector);
+            PublishOutbox(toPublish);
         }
 
         private void PublishOutbox(IEventCollector collector)

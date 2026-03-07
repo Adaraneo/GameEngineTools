@@ -5,6 +5,8 @@ namespace GameEngineTools.Characters.Core
 {
 
     using System;
+    using System.Text.Json;
+    using System.Text.Json.Serialization;
     using Characters.Engines.Behavior;
     using Characters.Engines.Interactions;
     using Characters.Engines.Physiology;
@@ -14,6 +16,23 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+
+
+    public sealed class HumanIdJsonConverter : JsonConverter<HumanId>
+    {
+        public override HumanId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            => new HumanId(Guid.Parse(reader.GetString()!));
+
+        public override void Write(Utf8JsonWriter writer, HumanId value, JsonSerializerOptions options)
+            => writer.WriteStringValue(value.Value.ToString());
+
+        // Tyhle dvě metody umožní použití jako klíč slovníku
+        public override HumanId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            => new HumanId(Guid.Parse(reader.GetString()!));
+
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, HumanId value, JsonSerializerOptions options)
+            => writer.WritePropertyName(value.Value.ToString());
+    }
 
     public interface IHuman
     {
