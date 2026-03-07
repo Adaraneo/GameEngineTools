@@ -11,6 +11,14 @@ namespace GameEngineTools.Characters.Engines.Interactions
         public InteractionConfig() : this(0.15) { }
     }
 
+    public sealed record ContextChanged(
+        WDateTime OccurredAt,
+        HumanId Human,
+        string Location,
+        bool HasPrivacy,
+        double Noise,
+        double Crowding) : IDomainEvent;
+
     public sealed record InteractionSurface( // co je „po ruce“
         string Location, bool HasPrivacy, double Noise, double Crowding);
 

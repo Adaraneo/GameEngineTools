@@ -50,7 +50,19 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 ("InviteIntimacy", Util(needInti, ctx.Personality.Motivation.Sexuality), Hours(1.0))
             };
 
-            // setrvačnost
+            // Je aktuální akce stále rozdělaná? Pokud ano, nerozhodujeme se.
+            if (State.CurrentPlan is { } running)
+            {
+                var elapsed = now - running.Start;
+                if (elapsed < running.ExpectedDuration)
+                {
+                    State = new BehaviorState(needRest, needFood, needWater, needBel, needComp, needInti, running);
+                    return;
+                }
+            }
+
+            //Akce je dokončena nebo žádná neexistuje -> vybereme novou
+            // Setrvačnost: pokud jsme právě dokončili akci, lehce zvýhodníme stejnou volbu
             if (State.CurrentPlan is { } cp)
             {
                 for (int i = 0; i < candidates.Count; i++)

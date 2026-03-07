@@ -26,33 +26,43 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
-            if (@event is InteractionProposed p)
+            switch (@event)
             {
-                // P(X = přijetí) ~ vztah + nálada + kontext - stres - šum
-                var rels = ctx.Snapshot.Relationships.Edges;
-                rels.TryGetValue(p.To, out var edge);
+                case ContextChanged cc:
+                    State = new InteractionSurface(
+                        Location: cc.Location,
+                        HasPrivacy: cc.HasPrivacy,
+                        Noise: Math.Clamp(cc.Noise, 0, 1),
+                        Crowding: Math.Clamp(cc.Crowding, 0, 1));
+                    break;
 
-                var closeness = edge?.Closeness ?? 30;
-                var comfort = edge?.Comfort ?? 30;
-                var trust = edge?.Trust ?? 30;
+                case InteractionProposed p:
+                    // P(X = přijetí) ~ vztah + nálada + kontext - stres - šum
+                    var rels = ctx.Snapshot.Relationships.Edges;
+                    rels.TryGetValue(p.To, out var edge);
 
-                var psych = ctx.Snapshot.Psychology;
-                var baseP = 0.30
-                            + 0.0025 * closeness
-                            + 0.0020 * comfort
-                            + 0.0020 * trust
-                            + 0.10 * Math.Max(0, psych.Valence)
-                            + (State.HasPrivacy ? 0.05 : 0)
-                            - 0.05 * State.Crowding
-                            - 0.0015 * psych.Stress;
+                    var closeness = edge?.Closeness ?? 30;
+                    var comfort = edge?.Comfort ?? 30;
+                    var trust = edge?.Trust ?? 30;
 
-                var misattrib = Config.MisattributionRateBase * (psych.Stress / 100.0);
-                baseP -= misattrib;
+                    var psych = ctx.Snapshot.Psychology;
+                    var baseP = 0.30
+                                + 0.0025 * closeness
+                                + 0.0020 * comfort
+                                + 0.0020 * trust
+                                + 0.10 * Math.Max(0, psych.Valence)
+                                + (State.HasPrivacy ? 0.05 : 0)
+                                - 0.05 * State.Crowding
+                                - 0.0015 * psych.Stress;
 
-                var pAcc = Math.Clamp(baseP, 0.05, 0.95);
-                var accepted = ctx.Random.Chance(pAcc);
+                    var misattrib = Config.MisattributionRateBase * (psych.Stress / 100.0);
+                    baseP -= misattrib;
 
-                outbox.Add(new InteractionOutcome((p.OccurredAt), p.From, p.To, accepted, accepted ? "accepted" : "declined"));
+                    var pAcc = Math.Clamp(baseP, 0.05, 0.95);
+                    var accepted = ctx.Random.Chance(pAcc);
+
+                    outbox.Add(new InteractionOutcome((p.OccurredAt), p.From, p.To, accepted, accepted ? "accepted" : "declined"));
+                    break;
             }
         }
 

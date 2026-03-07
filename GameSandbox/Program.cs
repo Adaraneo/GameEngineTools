@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using GameEngineTools;
+using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Extensions;
@@ -65,8 +66,10 @@ Console.WriteLine("==========================================================");
 PressAnyKeyToContinueM();
 //clock.Start();
 
+playerPerson.ReceiveEvent(new ContextChanged(clock.Now, playerPerson.Id, "Tavern", false, 0.8, 0.7));
 playerPerson.Tick(clock.Now, WTimeSpan.FromMinutes(2));
 significantOtherPerson.Tick(clock.Now, WTimeSpan.FromMinutes(2));
+
 
 PressAnyKeyToContinueM(true);
 
