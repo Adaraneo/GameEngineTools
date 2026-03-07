@@ -8,7 +8,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using GameEngineTools.World.Utils.Time;
 
     public sealed record BehaviorConfig(
-        double InertiaWeight, double NoveltyPenalty, double PlanningHorizonHours);
+        double InertiaWeight = 0.25,
+        double NoveltyPenalty = 0.1,
+        double PlanningHorizonHours = 2)
+    {
+        public BehaviorConfig() : this(0.25, 0.1, 2) { }
+    }
 
     public sealed record BehaviorState(
         // Deficity „drivů“ 0..100 (vyšší = silnější potřeba)

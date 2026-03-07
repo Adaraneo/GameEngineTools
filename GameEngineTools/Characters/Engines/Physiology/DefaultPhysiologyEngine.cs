@@ -24,21 +24,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private double _accHours;
         private bool _mensesOn;
 
-        internal DefaultPhysiologyEngine(
+        public DefaultPhysiologyEngine(
             IOptions<PhysiologyConfig> cfg,
-            IOptions<MenstrualCycleConfig>? cycleCfg,
+            IOptions<MenstrualCycleConfig> cycleCfg,
             ILoggerFactory loggerFactory,
             IRandomSource rng,
             SexBiology biology)
         {
             Config = cfg.Value;
-            _cycleCfg = (cycleCfg?.Value) ?? new MenstrualCycleConfig(
-                MeanCycleLengthDays: 28,
-                VariabilityDaysStdDev: 1.8,
-                MensesMeanDays: 5,
-                PmsRisk: 0.35,
-                EnableOvulationWindowEvents: true,
-                EnableSymptoms: true);
+            _cycleCfg = cycleCfg.Value;
 
             _log = loggerFactory.CreateLogger("Characters.Physiology");
             _rng = rng;

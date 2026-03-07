@@ -6,7 +6,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
-    public sealed record InteractionConfig(double MisattributionRateBase);
+    public sealed record InteractionConfig(double MisattributionRateBase = 0.15)
+    {
+        public InteractionConfig() : this(0.15) { }
+    }
 
     public sealed record InteractionSurface( // co je „po ruce“
         string Location, bool HasPrivacy, double Noise, double Crowding);

@@ -8,9 +8,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using GameEngineTools.World.Utils.Time;
 
     public sealed record PhysiologyConfig(
-        double RestingMetabolicRate,
-        double MaxSleepDebtHours,
-        bool EnableMenstrualCycle);
+        double RestingMetabolicRate = 1600,
+        double MaxSleepDebtHours = 12,
+        bool EnableMenstrualCycle = true)
+    {
+        public PhysiologyConfig() : this(1600, 12, true) { }
+    }
 
     public sealed record PhysiologyState(
         double Energy,          // 0..100
@@ -28,12 +31,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
     public enum CyclePhase { Menses, Follicular, Ovulation, Luteal, Paused /* např. těhotenství/antiko */ }
 
     public sealed record MenstrualCycleConfig(
-        int MeanCycleLengthDays,        // typicky 21–35
-        double VariabilityDaysStdDev,   // individuální rozptyl
-        int MensesMeanDays,
-        double PmsRisk,                 // 0..1
-        bool EnableOvulationWindowEvents,
-        bool EnableSymptoms);
+        int MeanCycleLengthDays = 28,
+        double VariabilityDaysStdDev = 2.0,
+        int MensesMeanDays = 5,
+        double PmsRisk = 0.35,
+        bool EnableOvulationWindowEvents = true,
+        bool EnableSymptoms = true)
+    {
+        public MenstrualCycleConfig() : this(28, 2.0, 5, 0.35, true, true) { }
+    }
 
     public sealed record MenstrualCycleState(
         CyclePhase Phase,

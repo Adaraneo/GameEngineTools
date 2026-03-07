@@ -7,7 +7,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
-    public sealed record RelationshipsConfig(double DecayPerDay, double RepairGain, double RupturePenalty);
+    public sealed record RelationshipsConfig(
+        double DecayPerDay = 1.5,
+        double RepairGain = 6,
+        double RupturePenalty = 8)
+    {
+        public RelationshipsConfig() : this(1.5, 6, 8) { }
+    }
 
     public sealed record RelationshipEdge(
         HumanId A, HumanId B,

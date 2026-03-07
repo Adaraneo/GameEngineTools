@@ -28,18 +28,18 @@ namespace GameEngineTools.FileSystem
                 NPCDirectory = options.Value.NPCDirectory;
                 PlayerDirectory = options.Value.PlayerDirectory;
             }
-            else
-            {
-                NPCDirectory = GD.npcs;
-                PlayerDirectory = GD.player;
-            }
+            //else
+            //{
+            //    NPCDirectory = GD.npcs;
+            //    PlayerDirectory = GD.player;
+            //}
         }
         public string NPCDirectory { get; set; }
         public string PlayerDirectory { get; set; }
 
         public string Export(PC player)
         {
-            var filename = string.Format("{0}.json", player.Person.Id);
+            var filename = string.Format("{0}.json", player.Person.Id.Value);
             var jsonOptions = new JsonSerializerOptions()
             {
                 WriteIndented = true,
@@ -57,7 +57,7 @@ namespace GameEngineTools.FileSystem
 
         public string Export(NPC npc)
         {
-            var filename = string.Format("{0}.json", npc.Person.Id);
+            var filename = string.Format("{0}.json", npc.Person.Id.Value);
             var jsonOptions = new JsonSerializerOptions()
             {
                 WriteIndented = true,

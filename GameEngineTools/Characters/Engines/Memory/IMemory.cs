@@ -6,7 +6,13 @@ namespace GameEngineTools.Characters.Engines.Memory
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
-    public sealed record MemoryConfig(double BaseEncoding, double SleepConsolidationBoost, double ForgettingRate);
+    public sealed record MemoryConfig(
+        double BaseEncoding = 0.5,
+        double SleepConsolidationBoost = 0.12,
+        double ForgettingRate = 0.06)
+    {
+        public MemoryConfig() : this(0.5, 0.12, 0.06) { }
+    }
 
     public sealed record MemoryIndex(
         IReadOnlyList<EpisodicMemory> Episodes,

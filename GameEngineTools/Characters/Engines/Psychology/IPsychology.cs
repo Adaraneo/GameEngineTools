@@ -8,9 +8,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using GameEngineTools.World.Utils.Time;
 
     public sealed record PsychologyConfig(
-        double BaselineAffectVariance,    // kolik „šumu“ denně
-        double StressRecoveryRatePerHour, // návrat k baseline
-        double SleepQualityAffectWeight);
+        double BaselineAffectVariance = 0.02,
+        double StressRecoveryRatePerHour = 1.5,
+        double SleepQualityAffectWeight = 0.5)
+    {
+        public PsychologyConfig() : this(0.02, 1.5, 0.5) { }
+    }
 
     public sealed record PsychologyState(
         double Valence,    // -1..+1
