@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using GameEngineTools;
+using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.Characters.Generation;
@@ -15,7 +16,7 @@ using TFSC = GameEngineTools.Constants.TestFSConstatns;
 
 const int maxHealth = 100;
 
-await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(1312,1,1)), generatedFileOptions: new GeneratedFileOptions
+await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(132,1,1)), generatedFileOptions: new GeneratedFileOptions
 {
     PlayerDirectory = TFSC.player,
     NPCDirectory = TFSC.NPCs
@@ -66,8 +67,9 @@ Console.WriteLine("==========================================================");
 PressAnyKeyToContinueM();
 //clock.Start();
 
-var now = WDateTime.FromParts(132, 1, 2);
+var now = clock.Now;
 var dt = WTimeSpan.FromHours(0.5);
+var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
 
 for (int i = 0; i < 48; i++) // 48 hours 
 {
@@ -75,6 +77,13 @@ for (int i = 0; i < 48; i++) // 48 hours
     significantOtherPerson.Tick(now, dt);
     now = now + dt;
 }
+
+significantOtherPerson.ReceiveEvent(smallTalk);
+
+now = now + dt;
+playerPerson.Tick(now, dt);
+significantOtherPerson.Tick(now, dt);
+now = now + dt;
 
 PressAnyKeyToContinueM(true);
 

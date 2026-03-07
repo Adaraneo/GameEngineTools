@@ -121,9 +121,9 @@ namespace GameEngineTools.Characters.Core
             // Události dočasně ukládáme do outboxu; publikujeme/předáme až po dokončení fáze.
             var outbox = new EventCollector();
 
+            _behavior.Tick(now, dt, _ctx, outbox);
             _physio.Tick(now, dt, _ctx, outbox);
             _psych.Tick(now, dt, _ctx, outbox);
-            _behavior.Tick(now, dt, _ctx, outbox);
             _interact.Tick(now, dt, _ctx, outbox);
             _relations.Tick(now, dt, _ctx, outbox);
             _memory.Tick(now, dt, _ctx, outbox);
@@ -139,6 +139,10 @@ namespace GameEngineTools.Characters.Core
 
             Snapshot = newSnapshot;
             _ctx.Snapshot = Snapshot; // kontext dál vždy nese poslední dokončený stav
+
+            // *** FÁZE C: vlastní eventy doručíme sami sobě ***
+            // Postava reaguje na to, co sama udělala (paměť, vztahy, atd.)
+            SelfDeliver(outbox);
 
             // Publikace událostí vzniklých během fáze B (dorazí ostatním až v dalším ticku)
             PublishOutbox(outbox);
@@ -232,6 +236,28 @@ namespace GameEngineTools.Characters.Core
             _interact.RestoreState(snapshot.InteractionSurface);
             _relations.RestoreState(snapshot.Relationships);
             _memory.RestoreState(snapshot.Memory);
+        }
+
+        private void SelfDeliver(IEventCollector collector)
+        {
+            const int maxPasses = 8;
+            int pass = 0;
+
+            var localOutbox = new EventCollector();
+
+            while (pass++ < maxPasses)
+            {
+                var events = collector.Drain();
+                if (events.Count == 0)
+                    break;
+
+                foreach (var ev in events)
+                    SafeHandle(ev, localOutbox);
+
+                var secondary = localOutbox.Drain();
+                foreach (var ev in secondary)
+                    collector.Add(ev);
+            }
         }
 
         public override bool Equals(object? obj)

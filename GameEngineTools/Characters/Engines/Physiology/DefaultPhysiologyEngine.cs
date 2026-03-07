@@ -57,28 +57,62 @@ namespace GameEngineTools.Characters.Engines.Physiology
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
             var h = SafeHours(dt);
-
-            // --- Základní drift ---
-            var energyDropPerHour = 2.0;                 // % za hod
-            var hungerRisePerHour = 6.0;                 // % za hod
-            var thirstRisePerHour = 8.0;                 // % za hod
-            var sleepDebtRisePerHour = 0.6;              // hod/hod
-            var immuneRecoveryPerHour = 0.3;             // % za hod
-            var tempNormalizePerHour = 0.1;              // °C/hod
-
             var s = State;
+
+            var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
+
+            // Modifikátory driftu podle akce
+            var energyDelta = action switch
+            {
+                "Sleep" => 15 * h,
+                "SelfCare" => -0.5 * h,
+                _ => -2 * h
+            };
+
+            var sleepDeptDelta = action switch
+            {
+                "Sleep" => -0.9 * h,
+                _ => 0.6 * h
+            };
+
+            var hungerDelta = action switch
+            {
+                "Eat" => -40 * h,
+                "Sleep" => 2 * h,
+                _ => 6 * h
+            };
+
+            var thirstDelta = action switch
+            {
+                "Drink" => -50 * h,
+                "Sleep" => 1 * h,
+                _ => 8 * h
+            };
+
+            var painDelta = action switch
+            {
+                "SelfCare" => -10 * h,
+                _ => 0
+            };
+
+            var immuneDelta = action switch
+            {
+                "Sleep" => -0.5 * h,
+                "SelfCare" => -0.5 * h,
+                _ => -0.3
+            };
 
             s = s with
             {
-                Energy = Clamp01p(s.Energy - energyDropPerHour * h),
-                Hunger = Clamp01p(s.Hunger + hungerRisePerHour * h),
-                Thirst = Clamp01p(s.Thirst + thirstRisePerHour * h),
-                SleepDebtHours = Math.Max(0, s.SleepDebtHours + sleepDebtRisePerHour * h),
-                ImmuneLoad = Clamp01p(s.ImmuneLoad - immuneRecoveryPerHour * h),
-                BodyTempDelta = Approach(s.BodyTempDelta, 0, tempNormalizePerHour * h)
+                Energy = Clamp01p(s.Energy + energyDelta),
+                Hunger = Clamp01p(s.Hunger + hungerDelta),
+                Thirst = Clamp01p(s.Thirst + thirstDelta),
+                Pain = Clamp01p(s.Pain + painDelta),
+                SleepDebtHours = Math.Max(0, s.SleepDebtHours + sleepDeptDelta),
+                ImmuneLoad = Clamp01p(s.ImmuneLoad + immuneDelta),
+                BodyTempDelta = Approach(s.BodyTempDelta, 0, 0.1 * h)
             };
 
-            // --- Menstruační cyklus (pokud aktivní) ---
             if (s.Cycle is not null)
             {
                 _accHours += h;
