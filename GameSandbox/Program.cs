@@ -70,25 +70,25 @@ PressAnyKeyToContinueM();
 var now = clock.Now;
 var dt = WTimeSpan.FromHours(0.5);
 
-for (int i = 0; i < 48; i++) // 48 hours 
+for (int d = 0; d < 30; d++)
 {
-    significantOtherPerson.Tick(now, dt);
-    playerPerson.Tick(now, dt);
-    now = now + dt;
+    for (int i = 0; i < 24; i++) 
+    {
+        if (d == 2 && i == 8)
+        {
+            var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
+            significantOtherPerson.ReceiveEvent(smallTalk);
+        }
+
+        significantOtherPerson.Tick(now, dt);
+
+        var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+        if (outcome != null)
+            playerPerson.ReceiveEvent(outcome);
+        playerPerson.Tick(now, dt);
+        now += dt;
+    }
 }
-var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
-significantOtherPerson.ReceiveEvent(smallTalk);
-
-now = now + dt;
-significantOtherPerson.Tick(now, dt);
-
-var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
-if (outcome != null)
-    playerPerson.ReceiveEvent(outcome);
-
-playerPerson.Tick(now, dt);
-
-now += dt;
 
 PressAnyKeyToContinueM(true);
 

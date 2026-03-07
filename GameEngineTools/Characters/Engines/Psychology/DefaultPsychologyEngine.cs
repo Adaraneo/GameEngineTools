@@ -47,7 +47,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             s = s with
             {
                 Valence = Clampm1p1(s.Valence - 0.004 * ph.Hunger * h - 0.003 * ph.Pain * h + 0.0015 * ph.Energy * h),
-                Stress = Clamp01p(s.Stress + 0.5 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * h),
+                Stress = Clamp01p(s.Stress + 0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * h),
                 Arousal = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h)
             };
 
@@ -100,8 +100,30 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     break;
 
                 case Characters.Engines.Interactions.InteractionOutcome io:
-                    if (io.Accepted) s = s with { Valence = Math.Min(1, s.Valence + 0.07) };
-                    else s = s with { Valence = Math.Max(-1, s.Valence - 0.07), Stress = Math.Min(100, s.Stress + 3) };
+                    var self = ctx.Id;
+                    bool wasRejected = io.From == self && !io.Accepted;
+                    bool didReject = io.To == self && !io.Accepted;
+
+                    if (io.Accepted)
+                    {
+                        s = s with { Valence = Math.Min(1, s.Valence + 0.07) };
+                    }
+                    else if (wasRejected)
+                    {
+                        var n = ctx.Personality.BigFive.Neuroticism;
+                        var att = (int)ctx.Personality.Attachment;
+                        var impact = 0.05 + 0.10 * n + (att == 1 ? 0.05 : 0);
+                        s = s with
+                        {
+                            Valence = Math.Max(-1, s.Valence - impact),
+                            Stress = Math.Min(100, s.Stress + 3 + 5 * n)
+                        };
+                    }
+                    else if (didReject)
+                    {
+                        var guilt = 0.02 * ctx.Personality.BigFive.Agreeableness;
+                        s = s with { Valence = Math.Max(-1, s.Valence - guilt) };
+                    }
                     break;
 
                 case Characters.Engines.Psychology.StressSpiked sp:

@@ -47,6 +47,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                     break;
 
                 case Characters.Engines.Interactions.InteractionOutcome io:
+                    var tag = $"Interaction:{io.From}->{io.To}:{io.Reason}";
+                    if (State.Episodes.Any(e => e.What == tag && e.When == io.OccurredAt)) break;
                     var sal = 0.7 + (io.Accepted ? 0.2 : 0.0);
                     Encode(new EpisodicMemory(Guid.NewGuid(), io.OccurredAt, $"Interaction:{io.From}->{io.To}:{io.Reason}", sal, io.Accepted ? EmotionalTag.Positive : EmotionalTag.Negative, 0.7), ctx, outbox);
                     break;

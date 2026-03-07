@@ -72,13 +72,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 case Interactions.InteractionOutcome io:
                     var otherId = io.From == self ? io.To : io.From;
-                    var delta = io.Accepted ? +2.0 : -2.0;
-                    Upsert(self, otherId, e => e with
-                    {
-                        Closeness = Bump(e.Closeness, delta),
-                        Like = Bump(e.Like, io.Accepted ? +1.0 : -1.5),
-                        Comfort = Bump(e.Comfort, io.Accepted ? +1.5 : -2.0)
-                    });
+                    if (!State.Edges.ContainsKey(otherId))
+                        Upsert(self, otherId, e => e);
                     break;
             }
         }
@@ -102,7 +97,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 var respect = Approach(e.Respect, 55, d * 0.3);
                 var comfort = Approach(e.Comfort, 45, d * 0.6);
 
-                dict[kv.Key] = e with { Like = Clamp(like), Trust = Clamp(trust), Attraction = Clamp(attraction), Closeness = Clamp(close), Respect = Clamp(respect), Comfort = Clamp(comfort) };
+                var psych = ctx.Snapshot.Psychology;
+                var valenceEffect = psych.Valence * 0.3 * days;
+                var stressEffect = psych.Stress * 0.02 * days;
+
+                dict[kv.Key] = e with
+                {
+                    Like = Clamp(like + valenceEffect - stressEffect),
+                    Trust = Clamp(trust),
+                    Attraction = Clamp(attraction),
+                    Closeness = Clamp(close),
+                    Respect = Clamp(respect),
+                    Comfort = Clamp(comfort + valenceEffect * 0.5 - stressEffect * 0.5)
+                };
             }
 
             State = new RelationshipState(dict);
