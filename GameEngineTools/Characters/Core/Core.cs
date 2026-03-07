@@ -33,7 +33,7 @@ namespace GameEngineTools.Characters.Core
 
         void RestoreSnapshot(EnginesSnapshot snapshot);
 
-        bool Equals(IHuman? other) => other is not null && Id == other.Id;
+        bool EqualsByIdentity(IHuman? other) => other is not null && Id == other.Id;
     }
 
     public readonly record struct HumanId(Guid Value);
