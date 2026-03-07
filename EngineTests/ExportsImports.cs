@@ -99,6 +99,14 @@ namespace GameTester
             this.AssertImports(this.DoImport(false), nppcs);
             this.AssertImports(this.DoImport(), nppcs);
         }
+
+        [TestMethod]
+        public void DoBasicExport()
+        {
+            var nppcs = new List<CharacterBase>();
+            var player = new PC(MaxHealth, CharacterManager.RandomizePerson());
+
+        }
     }
 
     [TestClass]

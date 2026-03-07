@@ -55,6 +55,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 outbox.Add(new InteractionOutcome((p.OccurredAt), p.From, p.To, accepted, accepted ? "accepted" : "declined"));
             }
         }
+
+        public void RestoreState(InteractionSurface state) => State = state;
     }
 }
 

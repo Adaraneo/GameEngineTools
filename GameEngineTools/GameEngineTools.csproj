@@ -30,7 +30,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Characters\Persistence\" />
 	  <Folder Include="FileSystem\JsonConverters\" />
 	</ItemGroup>
 </Project>

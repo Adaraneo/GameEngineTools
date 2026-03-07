@@ -209,5 +209,17 @@ namespace GameEngineTools.Characters.Core
                 catch (Exception ex) { _log.LogError(ex, "[{Human}] EventBus.Publish failed for {EventType}.", Id.Value, ev.GetType().Name); }
             }
         }
+
+        public void RestoreSnapshot(EnginesSnapshot snapshot)
+        {
+            Snapshot = snapshot;
+            _ctx.Snapshot = snapshot;
+            _physio.RestoreState(snapshot.Physiology);
+            _psych.RestoreState(snapshot.Psychology);
+            _behavior.RestoreState(snapshot.Behavior);
+            _interact.RestoreState(snapshot.InteractionSurface);
+            _relations.RestoreState(snapshot.Relationships);
+            _memory.RestoreState(snapshot.Memory);
+        }
     }
 }

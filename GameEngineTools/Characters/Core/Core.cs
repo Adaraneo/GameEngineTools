@@ -30,6 +30,8 @@ namespace GameEngineTools.Characters.Core
 
         // Příjem externích podnětů (environment, jiné postavy)
         void ReceiveEvent(IDomainEvent @event);
+
+        void RestoreSnapshot(EnginesSnapshot snapshot);
     }
 
     public readonly record struct HumanId(Guid Value);
@@ -49,6 +51,7 @@ namespace GameEngineTools.Characters.Core
 
         // Reakce na doménové události (z jiných enginů / prostředí)
         void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox);
+        void RestoreState(TState state);
     }
 
     // Kontext postavy, který enginy potřebují: pouze read-only rozhraní + služby

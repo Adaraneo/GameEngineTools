@@ -128,6 +128,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
             State = s;
         }
+
+        public void RestoreState(PsychologyState state) => State = state;
     }
 }
 

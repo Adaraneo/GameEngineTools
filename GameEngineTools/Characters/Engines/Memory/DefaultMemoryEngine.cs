@@ -120,5 +120,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 _ => EmotionalTag.Neutral
             };
         }
+
+        public void RestoreState(MemoryIndex state) => State = state;
     }
 }

@@ -12,17 +12,19 @@ namespace GameEngineTools.FileSystem
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.Characters.Core;
     using GD = GameEngineTools.Constants.FileSystemConstant.GeneratedDirectory;
-
-    //TODO: Solve the persistence!!!
+    using GameEngineTools.Characters.Persistence;
+    using GameEngineTools.Characters.Hosting;
 
     public sealed class GeneratedFile : IGeneratedFile
     {
         private IClock _clock;
         private IGameEngineToolsManager _characterManager;
-        public GeneratedFile(IClock clock, IGameEngineToolsManager characterManager, IOptions<GeneratedFileOptions> options = null)
+        private readonly IHumanFactory _humanFactory;
+        public GeneratedFile(IClock clock, IGameEngineToolsManager characterManager, IHumanFactory humanFactory, IOptions<GeneratedFileOptions> options = null)
         {
             _clock = clock;
             this._characterManager = characterManager;
+            _humanFactory = humanFactory;
             if (options != null)
             {
                 NPCDirectory = options.Value.NPCDirectory;
@@ -46,12 +48,10 @@ namespace GameEngineTools.FileSystem
                 ReferenceHandler = ReferenceHandler.IgnoreCycles
             };
 
-            var hc = player.Person;
-
-            var jsonObj = JsonSerializer.Serialize<IHuman>(hc, jsonOptions);
-            StreamWriter file = new StreamWriter(File.Create($"{Path.Combine(PlayerDirectory, filename)}"));
+            var jsonObj = JsonSerializer.Serialize<PC>(player, jsonOptions);
+            using var file = new StreamWriter(File.Create($"{Path.Combine(PlayerDirectory, filename)}"));
             file.Write(jsonObj);
-            file.Close();
+
             return filename;
         }
 
@@ -64,10 +64,10 @@ namespace GameEngineTools.FileSystem
                 ReferenceHandler = ReferenceHandler.IgnoreCycles,
             };
 
-            var jsonObj = JsonSerializer.Serialize(npc.Person, jsonOptions);
-            StreamWriter file = new StreamWriter(File.Create($"{Path.Combine(NPCDirectory, filename)}"));
+            var jsonObj = JsonSerializer.Serialize(npc, jsonOptions);
+            using var file = new StreamWriter(File.Create($"{Path.Combine(NPCDirectory, filename)}"));
             file.Write(jsonObj);
-            file.Close();
+
             return filename;
         }
 
@@ -87,15 +87,15 @@ namespace GameEngineTools.FileSystem
         public NPC ImportNPC(string filename)
         {
             var jsonOptions = new JsonSerializerOptions();
-            StreamReader file = new StreamReader(File.OpenRead($"{Path.Combine(NPCDirectory, filename)}"));
-            var npc = JsonSerializer.Deserialize<NPC>(file.ReadToEnd(), jsonOptions);
-            file.Close();
+            using var  file = new StreamReader(File.OpenRead($"{Path.Combine(NPCDirectory, filename)}"));
+            var data = JsonSerializer.Deserialize<NPC>(file.ReadToEnd(), jsonOptions);
 
-            var dna = filename.Substring(0, (filename.Length - new FileInfo(filename).Extension.Length));
-            var person = npc!.Person;
-            npc.Person = person;
+            var dataPerson = data.Person;
+            var blueprint = new HumanBlueprint(dataPerson.Id, dataPerson.Identity, dataPerson.Biology, dataPerson.Personality);
+            var person = _humanFactory.Create(blueprint);
+            person.RestoreSnapshot(dataPerson.Snapshot);
 
-            return npc;
+            return new NPC((int)data.MaxHealth, person);
         }
 
         public void ImportNPPCs(string pathToRootDirectory = null)
@@ -121,15 +121,16 @@ namespace GameEngineTools.FileSystem
         public PC ImportPC(string filename)
         {
             var jsonOptions = new JsonSerializerOptions();
-            StreamReader file = new StreamReader(File.OpenRead($"{Path.Combine(PlayerDirectory, filename)}"));
-            var pc = JsonSerializer.Deserialize<PC>(file.ReadToEnd(), jsonOptions);
-            file.Close();
+            using var file = new StreamReader(File.OpenRead($"{Path.Combine(PlayerDirectory, filename)}"));
+            var data = JsonSerializer.Deserialize<PC>(file.ReadToEnd(), jsonOptions);
 
-            var dna = filename.Substring(0, (filename.Length - new FileInfo(filename).Extension.Length));
-            var person = pc!.Person;
-            pc.Person = person;
+            var dataPerson = data.Person;
+            var blueprint = new HumanBlueprint(dataPerson.Id, dataPerson.Identity, dataPerson.Biology, dataPerson.Personality);
+            var person = _humanFactory.Create(blueprint);
+            person.RestoreSnapshot(dataPerson.Snapshot);
 
-            return pc;
+
+            return new PC((int)data.MaxHealth, person);
         }
     }
 }

@@ -178,6 +178,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private static double Approach(double value, double target, double by) =>
             (value < target) ? Math.Min(target, value + by) : Math.Max(target, value - by);
         private static double Clamp01p(double v) => Math.Max(0, Math.Min(100, v));
+
+        public void RestoreState(PhysiologyState state) => State = state;
     }
 }
 

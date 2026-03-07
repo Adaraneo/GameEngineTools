@@ -122,5 +122,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
         static double Bump(double v, double by) => Math.Max(0, Math.Min(100, v + by));
         static double Lerp(double a, double b, double t) => a + (b - a) * Math.Clamp(t, 0, 1);
+
+        public void RestoreState(RelationshipState state) => State = state;
     }
 }

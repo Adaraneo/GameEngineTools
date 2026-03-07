@@ -103,6 +103,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return top;
             }
         }
+
+        public void RestoreState(BehaviorState state) => State = state;
     }
 }
 
