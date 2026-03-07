@@ -58,7 +58,7 @@ File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFold
 
 Console.WriteLine("Now: {0}", clock.Now);
 Console.WriteLine("Player: {0}", player.PrintInfo(false));
-Console.WriteLine("SO: {0}", significantOther.PrintInfo(false));
+Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(false));
 
 Console.WriteLine("==========================================================");
 

@@ -98,11 +98,40 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
-            // Pro jednoduchost zatím nereagujeme; fyzio si jede drift.
-            // (Volitelně: reagovat na ActionCommitted: "Sleep", "Eat", "Drink"…)
+            if (@event is not Behavior.ActionCommitted ac) return;
+
+            var h = Math.Max(0, ac.Duration.TotalHours);
+            var s = State;
+
+            s = ac.ActionName switch
+            {
+                "Sleep" => s with
+                {
+                    SleepDebtHours = Math.Max(0, s.SleepDebtHours - h * 0.9),
+                    Energy = Clamp01p(s.Energy + 15 * h),
+                    Hunger = Clamp01p(s.Hunger + 2 * h),
+                    Thirst = Clamp01p(s.Thirst + 1 * h)
+                },
+                "Eat" => s with
+                {
+                    Hunger = Clamp01p(s.Hunger - 40 * h),
+                    Energy = Clamp01p(s.Energy + 5 * h),
+                },
+                "Drink" => s with
+                {
+                    Thirst = Clamp01p(s.Thirst - 50 * h)
+                },
+                "SelfCare" => s with
+                {
+                    Pain = Clamp01p(s.Pain - 10 * h),
+                    ImmuneLoad = Clamp01p(s.ImmuneLoad - 5 * h)
+                },
+                _ => s
+            };
+
+            State = s;
         }
 
-        // ---- helpers ----
         private PhysiologyState AdvanceCycleDay(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box)
         {
             var c = s.Cycle!;

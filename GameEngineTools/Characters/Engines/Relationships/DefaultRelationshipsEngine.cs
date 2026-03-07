@@ -29,7 +29,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             switch (@event)
             {
                 case FirstImpressionFormed fi:
-                    Upsert(fi.B, e => e with
+                    Upsert(ctx.Id, fi.B, e => e with
                     {
                         Like = Lerp(e.Like, fi.Like, 0.7),
                         Attraction = Lerp(e.Attraction, fi.Attraction, 0.7),
@@ -39,7 +39,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     break;
 
                 case MicroPositive mp:
-                    Upsert(mp.B, e => e with
+                    Upsert(ctx.Id, mp.B, e => e with
                     {
                         Like = Bump(e.Like, +2.0),
                         Trust = Bump(e.Trust, +1.0),
@@ -49,7 +49,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     break;
 
                 case MicroNegative mn:
-                    Upsert(mn.B, e => e with
+                    Upsert(ctx.Id, mn.B, e => e with
                     {
                         Like = Bump(e.Like, -2.5),
                         Trust = Bump(e.Trust, -2.0),
@@ -58,7 +58,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     break;
 
                 case RepairAttempt ra:
-                    Upsert(ra.B, e => e with
+                    Upsert(ctx.Id, ra.B, e => e with
                     {
                         Trust = Bump(e.Trust, ra.Accepted ? +4.0 : -4.0),
                         Closeness = Bump(e.Closeness, ra.Accepted ? +3.0 : -3.0)
@@ -67,7 +67,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 case Interactions.InteractionOutcome io:
                     var delta = io.Accepted ? +2.0 : -2.0;
-                    Upsert(io.To, e => e with
+                    Upsert(ctx.Id, io.To, e => e with
                     {
                         Closeness = Bump(e.Closeness, delta),
                         Like = Bump(e.Like, io.Accepted ? +1.0 : -1.5),
@@ -106,13 +106,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 (cur < target) ? Math.Min(target, cur + amount) : Math.Max(target, cur - amount);
         }
 
-        void Upsert(HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
+        void Upsert(HumanId self, HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
         {
             var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
             if (!dict.TryGetValue(other, out var e))
             {
                 e = new RelationshipEdge(
-                    A: e.A, B: other,
+                    A: self, B: other,
                     Like: 45, Trust: 45, Attraction: 35, Closeness: 10, Respect: 55, Comfort: 40,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
             }
