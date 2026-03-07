@@ -74,11 +74,15 @@ namespace GameEngineTools.Characters.Hosting
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State);
 
-            return new OrchestratedHuman(
+            var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality,
                 bus, scheduler, rng, logger,
                 physio, psych, behav, inter, rel, mem,
                 snapshot);
+
+            bus.SubscribeAll(human.ReceiveEvent);
+
+            return human;
         }
 
         private static int DeriveSeed(HumanId id)

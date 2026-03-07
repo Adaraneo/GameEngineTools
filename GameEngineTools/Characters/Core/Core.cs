@@ -105,6 +105,7 @@ namespace GameEngineTools.Characters.Core
     {
         void Publish(IDomainEvent @event);
         IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent;
+        IDisposable SubscribeAll(Action<IDomainEvent> handler);
     }
 
     public interface IScheduler

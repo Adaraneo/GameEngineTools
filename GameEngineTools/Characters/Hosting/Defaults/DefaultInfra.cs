@@ -4,6 +4,8 @@
 namespace GameEngineTools.Characters.Hosting.Defaults
 {
     using System.Collections.Concurrent;
+    using System.Reflection.Metadata.Ecma335;
+    using System.Runtime.CompilerServices;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -31,6 +33,28 @@ namespace GameEngineTools.Characters.Hosting.Defaults
     {
         private readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
         private readonly ILogger _log;
+
+        private readonly List<Action<IDomainEvent>> _wildcardHandlers = new();
+
+        public IDisposable SubscribeAll(Action<IDomainEvent> handler)
+        {
+            lock(_wildcardHandlers)
+            {
+                _wildcardHandlers.Add(handler);
+            }
+
+            return new ActionDisposable(() =>
+            {
+                lock (_wildcardHandlers) _wildcardHandlers.Remove(handler);
+            });
+        }
+
+        private sealed class ActionDisposable : IDisposable
+        {
+            private readonly Action _action;
+            public ActionDisposable(Action action) => _action = action;
+            public void Dispose() => _action();
+        }
 
         public InMemoryEventBus(ILogger<InMemoryEventBus> log)
         {
