@@ -221,5 +221,15 @@ namespace GameEngineTools.Characters.Core
             _relations.RestoreState(snapshot.Relationships);
             _memory.RestoreState(snapshot.Memory);
         }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is IHuman other && Id == other.Id;
+        }
+
+        public override int GetHashCode()
+        {
+            return Id.GetHashCode();
+        }
     }
 }

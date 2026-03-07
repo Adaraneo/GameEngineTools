@@ -32,6 +32,8 @@ namespace GameEngineTools.Characters.Core
         void ReceiveEvent(IDomainEvent @event);
 
         void RestoreSnapshot(EnginesSnapshot snapshot);
+
+        bool Equals(IHuman? other) => other is not null && Id == other.Id;
     }
 
     public readonly record struct HumanId(Guid Value);

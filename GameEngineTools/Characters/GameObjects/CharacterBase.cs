@@ -91,14 +91,7 @@ namespace GameEngineTools.Characters.GameObjects
                 return false;
             }
 
-            if (this.Person.Equals(other.Person))
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            return this.Person.Equals(other.Person);
         }
 
         public override bool Equals(object? obj)
