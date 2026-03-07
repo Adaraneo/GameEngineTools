@@ -19,7 +19,8 @@ namespace GameEngineTools.Characters.Hosting
 
     /// <summary>
     /// Továrna vytváří OrchestratedHuman a per-postava instance služeb.
-    /// Enginy jsou resolvované jako Transient – jejich životnost sváže objekt postavy.
+    /// Enginy jsou vytvářeny přes jejich vlastní factory — runtime parametry (rng, biology)
+    /// jsou tak předány čistě přes konstruktor, bez nutnosti mít IHumanContext v DI kontejneru.
     /// </summary>
     public interface IHumanFactory
     {
@@ -39,11 +40,16 @@ namespace GameEngineTools.Characters.Hosting
         private readonly IRandomSourceFactory _rngFactory;
         private readonly ILoggerFactory _loggerFactory;
 
-        public DefaultHumanFactory(IServiceProvider sp, IRandomSourceFactory rngFactory, ILoggerFactory loggerFactory)
+        private readonly IPhysiologyEngineFactory _physioFactory;
+        private readonly IPsychologyEngineFactory _psychFactory;
+
+        public DefaultHumanFactory(IServiceProvider sp, IRandomSourceFactory rngFactory, ILoggerFactory loggerFactory, IPhysiologyEngineFactory physioFactory, IPsychologyEngineFactory psychFactory)
         {
             _sp = sp;
             _rngFactory = rngFactory;
             _loggerFactory = loggerFactory;
+            _physioFactory = physioFactory;
+            _psychFactory = psychFactory;
         }
 
         public IHuman Create(HumanBlueprint b)
@@ -54,15 +60,17 @@ namespace GameEngineTools.Characters.Hosting
             var rng = _rngFactory.Create(b.Seed ?? DeriveSeed(b.Id));
             var logger = _loggerFactory.CreateLogger($"Characters.Human[{b.Id.Value}]");
 
-            // Enginy (transient)
-            var physio = _sp.GetRequiredService<IPhysiologyEngine>();
-            var psych = _sp.GetRequiredService<IPsychologyEngine>();
+            // Engines vytvořené přes factories
+            var physio = _physioFactory.Create(rng, b.Biology);
+            var psych = _psychFactory.Create(rng);
+
+            // Engines bez runtime parametrů - stačí DI
             var behav = _sp.GetRequiredService<IBehaviorEngine>();
             var inter = _sp.GetRequiredService<IInteractionEngine>();
             var rel = _sp.GetRequiredService<IRelationshipsEngine>();
             var mem = _sp.GetRequiredService<IMemoryEngine>();
 
-            // Počáteční snapshot složený z výchozích stavů engine (před prvním Tickem)
+            // Počáteční snapshot - State je vždy platný, factory to zaručuje
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State);
 

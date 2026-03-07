@@ -68,7 +68,7 @@ namespace GameEngineTools.Characters.Hosting
             Action<PhysiologyConfig>? configure = null)
             where TImpl : class, IPhysiologyEngine
         {
-            services.AddTransient<IPhysiologyEngine, TImpl>();
+            services.AddSingleton<IPhysiologyEngineFactory, PhysiologyEngineFactory<TImpl>>();
             var ob = services.AddOptions<PhysiologyConfig>();
             if (configure != null) ob.Configure(configure);
             else ob.BindConfiguration("Characters:Physiology");
@@ -81,7 +81,7 @@ namespace GameEngineTools.Characters.Hosting
             Action<PsychologyConfig>? configure = null)
             where TImpl : class, IPsychologyEngine
         {
-            services.AddTransient<IPsychologyEngine, TImpl>();
+            services.AddSingleton<IPsychologyEngineFactory, PsychologyEngineFactory<TImpl>>();
             var ob = services.AddOptions<PsychologyConfig>();
             if (configure != null) ob.Configure(configure);
             else ob.BindConfiguration("Characters:Psychology");

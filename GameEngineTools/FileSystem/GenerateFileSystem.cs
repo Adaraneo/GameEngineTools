@@ -49,8 +49,8 @@ namespace GameEngineTools.FileSystem
         public GenerateFileSystem(string root = null)
         {
             root ??= Directory.GetCurrentDirectory();
-            var playerDirectory = $@"{root.Trim('\\')}\{GD.player}";
-            var npcsDirectory = $@"{root.Trim('\\')}\{GD.npcs}";
+            var playerDirectory = Path.Combine(root, GD.player);
+            var npcsDirectory = Path.Combine(root, GD.npcs); ;
             if (!Directory.Exists(playerDirectory) || !Directory.Exists(npcsDirectory))
             {
                 Directory.CreateDirectory(playerDirectory);

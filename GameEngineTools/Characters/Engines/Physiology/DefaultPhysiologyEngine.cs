@@ -24,11 +24,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private double _accHours;
         private bool _mensesOn;
 
-        public DefaultPhysiologyEngine(
+        internal DefaultPhysiologyEngine(
             IOptions<PhysiologyConfig> cfg,
             IOptions<MenstrualCycleConfig>? cycleCfg,
             ILoggerFactory loggerFactory,
-            IHumanContext ctx)
+            IRandomSource rng,
+            SexBiology biology)
         {
             Config = cfg.Value;
             _cycleCfg = (cycleCfg?.Value) ?? new MenstrualCycleConfig(
@@ -40,9 +41,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 EnableSymptoms: true);
 
             _log = loggerFactory.CreateLogger("Characters.Physiology");
-            _rng = ctx.Random;
+            _rng = rng;
 
-            var initialCycle = (Config.EnableMenstrualCycle && ctx.Biology == SexBiology.Female)
+            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female)
                 ? SeedCycle(_cycleCfg)
                 : null;
 

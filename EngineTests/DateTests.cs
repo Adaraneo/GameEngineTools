@@ -2,10 +2,10 @@ using GameTester;
 
 namespace EngineTests;
 
-[TestClass]
+//[TestClass]
 public class DateTests : TestBase
 {
-    [TestMethod]
+    //[TestMethod]
     public void WDateTime_()
     {
     }

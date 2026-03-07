@@ -11,6 +11,7 @@ namespace GameEngineTools.FileSystem
     using GameEngineTools.Extensions;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.Characters.Core;
+    using GD = GameEngineTools.Constants.FileSystemConstant.GeneratedDirectory;
 
     //TODO: Solve the persistence!!!
 
@@ -26,6 +27,11 @@ namespace GameEngineTools.FileSystem
             {
                 NPCDirectory = options.Value.NPCDirectory;
                 PlayerDirectory = options.Value.PlayerDirectory;
+            }
+            else
+            {
+                NPCDirectory = GD.npcs;
+                PlayerDirectory = GD.player;
             }
         }
         public string NPCDirectory { get; set; }

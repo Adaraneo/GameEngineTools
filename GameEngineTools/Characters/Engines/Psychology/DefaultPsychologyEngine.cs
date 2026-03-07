@@ -17,11 +17,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
 
-        public DefaultPsychologyEngine(IOptions<PsychologyConfig> cfg, ILoggerFactory loggerFactory, IHumanContext ctx)
+        public DefaultPsychologyEngine(IOptions<PsychologyConfig> cfg, ILoggerFactory loggerFactory, IRandomSource rng)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger("Characters.Psychology");
-            _rng = ctx.Random;
+            _rng = rng;
 
             State = new PsychologyState(
                 Valence: 0.1, Arousal: 0.4, Dominance: 0.5,
