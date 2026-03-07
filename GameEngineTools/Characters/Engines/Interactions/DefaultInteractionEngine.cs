@@ -43,7 +43,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 case InteractionProposed p:
                     if (p.To != ctx.Id) break;
                     var rels = ctx.Snapshot.Relationships.Edges;
-                    rels.TryGetValue(p.To, out var edge);
+                    rels.TryGetValue(p.From, out var edge);
 
                     var closeness = edge?.Closeness ?? 30;
                     var comfort = edge?.Comfort ?? 30;

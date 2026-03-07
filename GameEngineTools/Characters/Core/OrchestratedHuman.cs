@@ -31,7 +31,8 @@ namespace GameEngineTools.Characters.Core
         public Personality Personality { get; }
 
         public EnginesSnapshot Snapshot { get; private set; }
-        public IReadOnlyList<IDomainEvent> LastOutbox { get; private set; } = [];
+        private readonly List<IDomainEvent> _lastOutboxAccumulator = new();
+        public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutboxAccumulator;
 
         // Služby
         private readonly IEventBus _bus;
@@ -113,6 +114,7 @@ namespace GameEngineTools.Characters.Core
 
         public void Tick(WDateTime now, WTimeSpan dt)
         {
+            _lastOutboxAccumulator.Clear();
             // FÁZE A: nejdřív splatné plánované akce a všechny frontované události
             // — doručíme je do Handle() enginů na základě „minulého“ snapshotu.
             PhaseA_HandleScheduled(now);
@@ -219,7 +221,7 @@ namespace GameEngineTools.Characters.Core
         private void PublishOutbox(IEventCollector collector)
         {
             var events = collector.Drain();
-            LastOutbox = events;
+            _lastOutboxAccumulator.AddRange(events);
             foreach (var ev in events)
             {
                 try {
