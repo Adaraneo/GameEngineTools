@@ -80,6 +80,15 @@ namespace GameEngineTools.Characters.Hosting.Defaults
                     _log.LogError(ex, "EventBus handler failed for event {0}", t.Name);
                 }
             }
+
+            // Wildcard handlers — každá postava dostane každý event
+            Action<IDomainEvent>[] wildcards;
+            lock (_wildcardHandlers) { wildcards = _wildcardHandlers.ToArray(); }
+            foreach (var h in wildcards)
+            {
+                try { h(@event); }
+                catch (Exception ex) { _log.LogError(ex, "EventBus wildcard handler failed for event {0}", t.Name); }
+            }
         }
 
         public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent

@@ -72,21 +72,17 @@ var dt = WTimeSpan.FromHours(0.5);
 
 for (int i = 0; i < 48; i++) // 48 hours 
 {
-    playerPerson.Tick(now, dt);
     significantOtherPerson.Tick(now, dt);
+    playerPerson.Tick(now, dt);
     now = now + dt;
 }
 var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
 significantOtherPerson.ReceiveEvent(smallTalk);
-//playerPerson.ReceiveEvent(smallTalk);
 
 now = now + dt;
-playerPerson.Tick(now, dt);
 significantOtherPerson.Tick(now, dt);
+playerPerson.Tick(now, dt);
 now += dt;
-
-//playerPerson.Tick(now, dt);
-//now += dt;
 
 PressAnyKeyToContinueM(true);
 
