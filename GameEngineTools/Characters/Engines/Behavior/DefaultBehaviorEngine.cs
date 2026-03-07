@@ -45,8 +45,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var candidates = new List<(string Name, double Utility, WTimeSpan Dur)>
             {
                 ("Sleep",     Util(needRest,     ctx.Personality.Motivation.Rest),        Hours(Math.Max(1.0, ph.SleepDebtHours * 0.6))),
-                ("Eat",       Util(needFood,     0.6),                                   Minutes(30)),
-                ("Drink",     Util(needWater,    0.5),                                   Minutes(10)),
+                ("Eat",       Util(needFood,     1.2),                                   Minutes(30)),
+                ("Drink",     Util(needWater,    1.1),                                   Minutes(10)),
                 ("ReachOut",  Util(needBel,      ctx.Personality.Motivation.Affiliation),Hours(1.0)),
                 ("Work",      Util(needComp,     ctx.Personality.Motivation.Competence), Hours(2.0)),
                 ("Create",    Util(needComp,     ctx.Personality.Motivation.Curiosity),  Hours(1.5)),
