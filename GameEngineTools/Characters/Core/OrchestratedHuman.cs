@@ -10,6 +10,7 @@ using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Traits;
+using GameEngineTools.Logging;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Logging;
 
@@ -205,8 +206,14 @@ namespace GameEngineTools.Characters.Core
             var events = collector.Drain();
             foreach (var ev in events)
             {
-                try { _bus.Publish(ev); }
-                catch (Exception ex) { _log.LogError(ex, "[{Human}] EventBus.Publish failed for {EventType}.", Id.Value, ev.GetType().Name); }
+                try {
+                    _bus.Publish(ev);
+                    LogState();
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "[{Human}] EventBus.Publish failed for {EventType}.", Id.Value, ev.GetType().Name);
+                }
             }
         }
 
@@ -230,6 +237,33 @@ namespace GameEngineTools.Characters.Core
         public override int GetHashCode()
         {
             return Id.GetHashCode();
+        }
+
+        private void LogState()
+        {
+            var s = Snapshot;
+            _log.PhysiologySnapshot(Id.Value.ToString(),
+                s.Physiology.Energy, s.Physiology.Hunger, s.Physiology.Thirst,
+                s.Physiology.Pain, s.Physiology.SleepDebtHours,
+                s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad);
+
+            if (s.Physiology.Cycle is { } c)
+                _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle);
+
+            _log.PsychologySnapshot(Id.Value.ToString(),
+                s.Psychology.DominantEmotion.ToString(),
+                s.Psychology.Valence, s.Psychology.Arousal, s.Psychology.Dominance,
+                s.Psychology.Stress, s.Psychology.CognitiveLoad);
+
+            var plan = s.Behavior.CurrentPlan;
+            _log.BehaviorSnapshot(Id.Value.ToString(),
+                plan?.Name ?? "—",
+                s.Behavior.NeedRest, s.Behavior.NeedFood, s.Behavior.NeedWater,
+                s.Behavior.NeedBelonging, s.Behavior.NeedCompetence, s.Behavior.NeedIntimacy);
+
+            if (plan is not null)
+                _log.BehaviorPlan(Id.Value.ToString(),
+                    plan.Name, plan.Start.ToString(), plan.ExpectedDuration.ToString(), plan.Utility);
         }
     }
 }

@@ -60,7 +60,8 @@ namespace GameEngineTools.Extensions
             var sbResult = new StringBuilder();
             var person = nppc.Person;
             var name = person.Identity.FirstName;
-            sbResult.AppendLine($"Name: {(string.IsNullOrEmpty(name.Familiar[0]) ? name.Original : name.Familiar[new Random().Next(0, name.Familiar.Length)])} {person.Identity.LastName}");
+            var surname = person.Biology == Characters.Core.SexBiology.Female ? person.Identity.LastName.Female : person.Identity.LastName.Male;
+            sbResult.AppendLine($"Name: {(string.IsNullOrEmpty(name.Familiar[0]) ? name.Original : name.Familiar[new Random().Next(0, name.Familiar.Length)])} {surname}");
             sbResult.AppendLine($"Born in: {person.Identity.BirthDate.Year}");
 
             if (!basicInfo)

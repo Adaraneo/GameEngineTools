@@ -1,4 +1,5 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using GameEngineTools;
 using GameEngineTools.Characters.GameObjects;
@@ -17,7 +18,7 @@ await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprint
 {
     PlayerDirectory = TFSC.player,
     NPCDirectory = TFSC.NPCs
-}, timescale: 0.005);
+}, timescale: 1);
 var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 
 var manager = runtime.GameEngineToolsManager as GameEngineToolsManager;
@@ -30,7 +31,7 @@ foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
 {
     manager.NPPCs.Add(gf.ImportNPC(new FileInfo(filename).Name));
 }
-
+var playerPerson = player.Person;
 
 var significantOther = manager.NPPCs.First(x => x is NPC);
 var significantOtherPerson = significantOther.Person;
@@ -62,8 +63,8 @@ Console.WriteLine("==========================================================");
 PressAnyKeyToContinueM();
 //clock.Start();
 
-
-
+playerPerson.Tick(clock.Now, WTimeSpan.FromMinutes(2));
+significantOtherPerson.Tick(clock.Now, WTimeSpan.FromMinutes(2));
 
 PressAnyKeyToContinueM(true);
 
