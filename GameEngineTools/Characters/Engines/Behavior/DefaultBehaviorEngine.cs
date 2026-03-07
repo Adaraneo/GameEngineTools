@@ -37,7 +37,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var needRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2);
             var needFood = Clamp01p(ph.Hunger);
             var needWater = Clamp01p(ph.Thirst);
-            var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 30));
+            var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15));
             var needComp = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2);
             var needInti = ComputeIntimacyNeed(ctx, ph, rel, ps);
 
@@ -101,7 +101,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
-            // Můžeme snižovat potřeby podle vykonaných akcí ex-post, ale držíme jednoduché jádro.
+            switch (@event)
+            {
+                case ActionCommitted ac when ac.ActionName == "ReachOut":
+                    // Po ReachOut dočasně snížíme NeedBelonging
+                    var reduced = State with { NeedBelonging = Math.Max(0, State.NeedBelonging - 20) };
+                    State = reduced;
+                    break;
+            }
         }
 
         // --- helpers ---
