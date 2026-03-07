@@ -191,15 +191,19 @@ namespace GameEngineTools.Characters.Core
 
         private void Deliver(IEventCollector collector)
         {
-            var events = collector.Drain();
-            if (events.Count == 0) return;
+            const int maxPasses = 8;
+            int pass = 0;
 
-            // 1) Pošleme do lokálního Handle(), aby se navazující reakce dostaly ještě ve fázi A
-            foreach (var ev in events)
+            while (pass++ < maxPasses)
             {
-                SafeHandle(ev, collector); // pozor: SafeHandle může Add() další eventy do collectoru
+                var events = collector.Drain();
+                if (events.Count == 0)
+                    break;
+
+                foreach (var ev in events)
+                    SafeHandle(ev, collector);
             }
-            // 2) Vše co zůstalo v collector po rekurzivním doručení → publish na bus
+
             PublishOutbox(collector);
         }
 
