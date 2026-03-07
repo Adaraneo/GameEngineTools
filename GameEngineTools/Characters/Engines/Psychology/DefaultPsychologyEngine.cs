@@ -38,7 +38,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             s = s with
             {
                 Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * h),
-                Valence = Approach(s.Valence, 0, 0.05 * h),
+                Valence = Approach(s.Valence, 0, 0.15 * h),
                 Arousal = Approach(s.Arousal, 0.5, 0.05 * h),
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)
             };
@@ -46,7 +46,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Fyzio modulace
             s = s with
             {
-                Valence = Clampm1p1(s.Valence - 0.004 * ph.Hunger * h - 0.003 * ph.Pain * h + 0.0015 * ph.Energy * h),
+                Valence = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * h + 0.0015 * ph.Energy * h),
                 Stress = Clamp01p(s.Stress + 0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * h),
                 Arousal = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h)
             };
