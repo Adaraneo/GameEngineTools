@@ -142,6 +142,8 @@ namespace GameEngineTools.Characters.Core
 
             // Publikace událostí vzniklých během fáze B (dorazí ostatním až v dalším ticku)
             PublishOutbox(outbox);
+
+            LogState();
         }
 
         private void PhaseA_HandleScheduled(WDateTime now)
@@ -208,7 +210,6 @@ namespace GameEngineTools.Characters.Core
             {
                 try {
                     _bus.Publish(ev);
-                    LogState();
                 }
                 catch (Exception ex)
                 {

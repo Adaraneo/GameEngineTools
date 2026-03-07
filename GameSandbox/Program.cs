@@ -56,7 +56,9 @@ var significantOtherPerson = significantOther.Person;
 
 File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.ToString()}.log.txt"), player.PrintInfo(false));
 
-
+Console.WriteLine("Now: {0}", clock.Now);
+Console.WriteLine("Player: {0}", player.PrintInfo(false));
+Console.WriteLine("SO: {0}", significantOther.PrintInfo(false));
 
 Console.WriteLine("==========================================================");
 

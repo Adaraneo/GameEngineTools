@@ -1,19 +1,25 @@
 ﻿namespace GameEngineTools.World.Utils.Time
 {
+    using System.Text.Json.Serialization;
+
     /// <summary>Datum bez času. 0 = 1/1/1 (světová epocha). Bez BCL DateOnly.</summary>
     public readonly struct WDateOnly :
         IEquatable<WDateOnly>, IComparable<WDateOnly>, IFormattable
     {
+        [JsonConstructor]
         public WDateOnly(long dayIndex)
         {
             if (dayIndex < 0) throw new ArgumentOutOfRangeException(nameof(dayIndex));
             DayIndex = dayIndex;
         }
 
+        [JsonIgnore]
         public int Day { get { Deconstruct(out _, out _, out var d); return d; } }
         public long DayIndex { get; } // 0-based dny od světové epochy
+        [JsonIgnore]
         public int Month { get { Deconstruct(out _, out var m, out _); return m; } }
 
+        [JsonIgnore]
         public int Year { get { Deconstruct(out var y, out _, out _); return y; } }
 
         public static WDateOnly FromDateTime(WDateTime dt) => dt.DateOnly;
