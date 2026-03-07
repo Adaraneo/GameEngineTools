@@ -44,6 +44,8 @@ namespace GameEngineTools.Characters.Core
         // Přístup ke stavům (read-only snapshoty)
         EnginesSnapshot Snapshot { get; }
 
+        IReadOnlyList<IDomainEvent> LastOutbox { get; }
+
         // Orchestrace jednoho kroku simulace
         void Tick(WDateTime now, WTimeSpan dt);
 

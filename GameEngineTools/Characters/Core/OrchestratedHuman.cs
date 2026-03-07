@@ -31,6 +31,7 @@ namespace GameEngineTools.Characters.Core
         public Personality Personality { get; }
 
         public EnginesSnapshot Snapshot { get; private set; }
+        public IReadOnlyList<IDomainEvent> LastOutbox { get; private set; } = [];
 
         // Služby
         private readonly IEventBus _bus;
@@ -218,6 +219,7 @@ namespace GameEngineTools.Characters.Core
         private void PublishOutbox(IEventCollector collector)
         {
             var events = collector.Drain();
+            LastOutbox = events;
             foreach (var ev in events)
             {
                 try {

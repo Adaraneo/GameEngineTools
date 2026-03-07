@@ -81,7 +81,13 @@ significantOtherPerson.ReceiveEvent(smallTalk);
 
 now = now + dt;
 significantOtherPerson.Tick(now, dt);
+
+var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+if (outcome != null)
+    playerPerson.ReceiveEvent(outcome);
+
 playerPerson.Tick(now, dt);
+
 now += dt;
 
 PressAnyKeyToContinueM(true);

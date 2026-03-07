@@ -64,20 +64,22 @@ namespace GameEngineTools.Characters.Hosting.Defaults
         public void Publish(IDomainEvent @event)
         {
             var t = @event.GetType();
-            if (!_handlers.TryGetValue(t, out var list)) return;
 
-            Delegate[] snapshot;
-            lock (list) { snapshot = list.ToArray(); }
-
-            foreach (var h in snapshot)
+            if (_handlers.TryGetValue(t, out var list))
             {
-                try
+                Delegate[] snapshot;
+                lock (list) { snapshot = list.ToArray(); }
+
+                foreach (var h in snapshot)
                 {
-                    h.DynamicInvoke(@event);
-                }
-                catch (Exception ex)
-                {
-                    _log.LogError(ex, "EventBus handler failed for event {0}", t.Name);
+                    try
+                    {
+                        h.DynamicInvoke(@event);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError(ex, "EventBus handler failed for event {0}", t.Name);
+                    }
                 }
             }
 

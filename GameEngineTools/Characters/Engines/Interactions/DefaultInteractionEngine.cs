@@ -41,7 +41,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     break;
 
                 case InteractionProposed p:
-                    // P(X = přijetí) ~ vztah + nálada + kontext - stres - šum
+                    if (p.To != ctx.Id) break;
                     var rels = ctx.Snapshot.Relationships.Edges;
                     rels.TryGetValue(p.To, out var edge);
 
