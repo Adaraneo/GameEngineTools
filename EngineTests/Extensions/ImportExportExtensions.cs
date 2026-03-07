@@ -26,7 +26,7 @@ namespace GameTester.Extensions
             Assert.AreEqual(importedNPPCs.Count, exportedNPPCs.Count);
             foreach ((var nppc, var exnppc) in importedNPPCs.Zip(exportedNPPCs))
             {
-                Assert.AreEqual(nppc, exnppc);
+                Assert.AreEqual(nppc, exnppc, $"Imported:{nppc.Person.ToString()}\nExported:{exnppc.Person.ToString()}");
             }
         }
         public static List<CharacterBase> DoImport(this TestBase abstractTest, bool useGameManagerInstance = true)

@@ -105,7 +105,11 @@ namespace GameTester
         {
             var nppcs = new List<CharacterBase>();
             var player = new PC(MaxHealth, CharacterManager.RandomizePerson());
+            nppcs.Add(player);
+            Filenames.Add(GeneratedFile.Export(player));
 
+            this.AssertImports(this.DoImport(false), nppcs);
+            this.AssertImports(this.DoImport(), nppcs);
         }
     }
 

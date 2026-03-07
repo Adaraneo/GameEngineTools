@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Persistence
     using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
+    using GameEngineTools.Armory;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
 
@@ -18,5 +19,11 @@ namespace GameEngineTools.Characters.Persistence
         public SexBiology Biology { get; init; }
         public Personality Personality { get; init; }
         public EnginesSnapshot Snapshot { get; init; }
+
+        public double MaxHealth { get; init; }
+        public double Health { get; init; }
+        public ArmorSet? Armor { get; init; }
+        public Weapon? Weapon { get; init; }
+        public double Protection { get; init; }
     }
 }

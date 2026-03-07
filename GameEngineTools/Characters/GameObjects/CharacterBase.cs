@@ -14,7 +14,7 @@ namespace GameEngineTools.Characters.GameObjects
     {
         [JsonInclude]
         [JsonPropertyName("Armor")]
-        private ArmorSet armor;
+        private ArmorSet? armor;
 
         private double health;
 
@@ -34,7 +34,7 @@ namespace GameEngineTools.Characters.GameObjects
         }
 
         [JsonIgnore]
-        public ArmorSet Armor
+        public ArmorSet? Armor
         {
             get
             {
@@ -43,7 +43,7 @@ namespace GameEngineTools.Characters.GameObjects
             set
             {
                 this.armor = value;
-                this.protection = armor.Protection;
+                this.protection = armor?.Protection ?? 0;
             }
         }
 
@@ -54,7 +54,7 @@ namespace GameEngineTools.Characters.GameObjects
             {
                 return this.health;
             }
-            private set
+            internal set
             {
                 this.health = value;
             }
@@ -73,7 +73,7 @@ namespace GameEngineTools.Characters.GameObjects
             }
         }
 
-        public Weapon Weapon { get; set; }
+        public Weapon? Weapon { get; set; }
 
         public virtual void DecreaseHealth(double amount)
         {

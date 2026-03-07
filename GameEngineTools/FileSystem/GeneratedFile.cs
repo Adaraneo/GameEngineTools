@@ -14,6 +14,7 @@ namespace GameEngineTools.FileSystem
     using GD = GameEngineTools.Constants.FileSystemConstant.GeneratedDirectory;
     using GameEngineTools.Characters.Persistence;
     using GameEngineTools.Characters.Hosting;
+    using System.Net.Http.Headers;
 
     public sealed class GeneratedFile : IGeneratedFile
     {
@@ -42,13 +43,28 @@ namespace GameEngineTools.FileSystem
         public string Export(PC player)
         {
             var filename = string.Format("{0}.json", player.Person.Id.Value);
+
+            var data = new CharacterData
+            {
+                Id = player.Person.Id,
+                Identity = player.Person.Identity,
+                Biology = player.Person.Biology,
+                Personality = player.Person.Personality,
+                Snapshot = player.Person.Snapshot,
+                MaxHealth = player.MaxHealth,
+                Health = player.Health,
+                Armor = player.Armor,
+                Weapon = player.Weapon,
+                Protection = player.Protection
+            };
+
             var jsonOptions = new JsonSerializerOptions()
             {
                 WriteIndented = true,
                 ReferenceHandler = ReferenceHandler.IgnoreCycles
             };
 
-            var jsonObj = JsonSerializer.Serialize<PC>(player, jsonOptions);
+            var jsonObj = JsonSerializer.Serialize(data, jsonOptions);
             using var file = new StreamWriter(File.Create($"{Path.Combine(PlayerDirectory, filename)}"));
             file.Write(jsonObj);
 
@@ -58,6 +74,20 @@ namespace GameEngineTools.FileSystem
         public string Export(NPC npc)
         {
             var filename = string.Format("{0}.json", npc.Person.Id.Value);
+            var data = new CharacterData
+            {
+                Id = npc.Person.Id,
+                Identity = npc.Person.Identity,
+                Biology = npc.Person.Biology,
+                Personality = npc.Person.Personality,
+                Snapshot = npc.Person.Snapshot,
+                MaxHealth = npc.MaxHealth,
+                Health = npc.Health,
+                Armor = npc.Armor,
+                Weapon = npc.Weapon,
+                Protection = npc.Protection
+            };
+
             var jsonOptions = new JsonSerializerOptions()
             {
                 WriteIndented = true,
@@ -88,14 +118,20 @@ namespace GameEngineTools.FileSystem
         {
             var jsonOptions = new JsonSerializerOptions();
             using var  file = new StreamReader(File.OpenRead($"{Path.Combine(NPCDirectory, filename)}"));
-            var data = JsonSerializer.Deserialize<NPC>(file.ReadToEnd(), jsonOptions);
+            var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), jsonOptions);
 
-            var dataPerson = data.Person;
-            var blueprint = new HumanBlueprint(dataPerson.Id, dataPerson.Identity, dataPerson.Biology, dataPerson.Personality);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality);
             var person = _humanFactory.Create(blueprint);
-            person.RestoreSnapshot(dataPerson.Snapshot);
+            person.RestoreSnapshot(data.Snapshot);
 
-            return new NPC((int)data.MaxHealth, person);
+            return new NPC
+            {
+                MaxHealth = (int)data.MaxHealth,
+                Armor = data.Armor,
+                Weapon = data.Weapon,
+                Person = person,
+                Health = data.Health
+            };
         }
 
         public void ImportNPPCs(string pathToRootDirectory = null)
@@ -122,15 +158,20 @@ namespace GameEngineTools.FileSystem
         {
             var jsonOptions = new JsonSerializerOptions();
             using var file = new StreamReader(File.OpenRead($"{Path.Combine(PlayerDirectory, filename)}"));
-            var data = JsonSerializer.Deserialize<PC>(file.ReadToEnd(), jsonOptions);
+            var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), jsonOptions);
 
-            var dataPerson = data.Person;
-            var blueprint = new HumanBlueprint(dataPerson.Id, dataPerson.Identity, dataPerson.Biology, dataPerson.Personality);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality);
             var person = _humanFactory.Create(blueprint);
-            person.RestoreSnapshot(dataPerson.Snapshot);
+            person.RestoreSnapshot(data.Snapshot);
 
-
-            return new PC((int)data.MaxHealth, person);
+            return new PC
+            {
+                MaxHealth = (int)data.MaxHealth,
+                Armor = data.Armor,
+                Weapon = data.Weapon,
+                Person = person,
+                Health = data.Health
+            };
         }
     }
 }

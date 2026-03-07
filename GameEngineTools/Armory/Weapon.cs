@@ -19,13 +19,14 @@ namespace GameEngineTools.Armory
         }
 
         public enum WeaponType
-        { OneHandedSword, TwoHandedSword, OneHandedAxe, Polearm, BigAxe }
+        { OneHandedSword, TwoHandedSword, OneHandedAxe, Polearm, BigAxe, Dagger }
 
         public double HitPoints { get; set; }
 
         [JsonInclude]
         public double MaxHitPoints { get; internal set; }
 
+        [JsonInclude]
         public string Name { get; internal set; }
         public WeaponType Type { get; set; }
 
