@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using System.Collections.Generic;
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
     internal sealed class DefaultBehaviorEngine : IBehaviorEngine
@@ -14,9 +15,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         public BehaviorState State { get; private set; }
         public BehaviorConfig Config { get; }
 
-        public DefaultBehaviorEngine(IOptions<BehaviorConfig> cfg)
+        private readonly ILogger _log;
+
+        public DefaultBehaviorEngine(IOptions<BehaviorConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
+            _log = loggerFactory.CreateLogger("Characters.Behavior");
             State = new BehaviorState(
                 NeedRest: 40, NeedFood: 30, NeedWater: 25, NeedBelonging: 50, NeedCompetence: 50, NeedIntimacy: 35,
                 CurrentPlan: null);
@@ -57,6 +61,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 if (elapsed < running.ExpectedDuration)
                 {
                     State = new BehaviorState(needRest, needFood, needWater, needBel, needComp, needInti, running);
+                    _log.LogDebug("[Behavior] Akce '{Action}' stále běží, zbývá {Remaining}.", running.Name, running.ExpectedDuration - elapsed);
                     return;
                 }
             }
@@ -78,6 +83,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             outbox.Add(new ActionCommitted(now, ctx.Id, chosen.Name, chosen.Dur));
 
             State = new BehaviorState(needRest, needFood, needWater, needBel, needComp, needInti, plan);
+            _log.LogInformation("[Behavior] Nová akce: '{Action}' (utility={Utility:F2}, trvání={Duration}).", chosen.Name, chosen.Utility, chosen.Dur);
 
             // ---- locals ----
             static WTimeSpan Hours(double h) => WTimeSpan.FromHours(h);

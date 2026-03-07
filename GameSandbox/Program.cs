@@ -66,10 +66,15 @@ Console.WriteLine("==========================================================");
 PressAnyKeyToContinueM();
 //clock.Start();
 
-playerPerson.ReceiveEvent(new ContextChanged(clock.Now, playerPerson.Id, "Tavern", false, 0.8, 0.7));
-playerPerson.Tick(clock.Now, WTimeSpan.FromMinutes(2));
-significantOtherPerson.Tick(clock.Now, WTimeSpan.FromMinutes(2));
+var now = WDateTime.FromParts(132, 1, 2);
+var dt = WTimeSpan.FromHours(0.5);
 
+for (int i = 0; i < 48; i++) // 48 hours 
+{
+    playerPerson.Tick(now, dt);
+    significantOtherPerson.Tick(now, dt);
+    now = now + dt;
+}
 
 PressAnyKeyToContinueM(true);
 

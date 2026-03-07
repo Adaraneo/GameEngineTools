@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
     internal sealed class DefaultRelationshipsEngine : IRelationshipsEngine
@@ -18,9 +19,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
         public RelationshipsConfig Config { get; }
 
-        public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg)
+        private readonly ILogger _log;
+
+        public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
+            _log = loggerFactory.CreateLogger("Characters.Relationships");
             State = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>());
         }
 
@@ -115,8 +119,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     A: self, B: other,
                     Like: 45, Trust: 45, Attraction: 35, Closeness: 10, Respect: 55, Comfort: 40,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
+                _log.LogInformation("[Relationships] Nová hrana: {A} → {B}.", self.Value, other.Value);
             }
-            dict[other] = mut(e);
+            var updated = mut(e);
+            _log.LogDebug("[Relationships] Hrana {A}→{B}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}.", self.Value, other.Value, updated.Like, updated.Trust, updated.Closeness);
+            dict[other] = updated;
             State = new RelationshipState(dict);
         }
 

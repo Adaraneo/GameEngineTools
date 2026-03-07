@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
     internal sealed class DefaultMemoryEngine : IMemoryEngine
@@ -19,15 +20,18 @@ namespace GameEngineTools.Characters.Engines.Memory
         public MemoryConfig Config { get; }
 
         private double _accHours;
+        private readonly ILogger _log;
 
-        public DefaultMemoryEngine(IOptions<MemoryConfig> cfg)
+        public DefaultMemoryEngine(IOptions<MemoryConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
+            _log = loggerFactory.CreateLogger("Characters.Memory");
             State = new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>());
         }
 
         public void Encode(EpisodicMemory episode, IHumanContext ctx, IEventCollector outbox)
         {
+            _log.LogDebug("[Memory] Zakódována epizoda: '{Tag}' (salience={Salience:F2}, emotion={Emotion}).", episode.What, episode.Salience, episode.Emotion);
             var list = State.Episodes.ToList();
             list.Add(episode);
             State = new MemoryIndex(list, State.Semantics);
@@ -93,6 +97,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 episodes = set.Values.ToList();
 
                 outbox.Add(new MemoryConsolidated(now, ctx.Id, boosted.Count));
+                _log.LogInformation("[Memory] Konsolidace: posíleno {Count} epizod.", boosted.Count);
             }
 
             State = new MemoryIndex(episodes, State.Semantics);
