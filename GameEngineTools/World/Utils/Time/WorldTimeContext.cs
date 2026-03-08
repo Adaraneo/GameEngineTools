@@ -26,8 +26,10 @@ namespace GameEngineTools.World.Core.Time
     /// services.AddSingleton&lt;WorldTimeContext&gt;();
     ///
     /// // Použití
-    /// var tomorrow = _ctx.AddDays(_ctx.Today(), 1);
-    /// var twoHours = _ctx.Hours(2);
+    /// var now       = _ctx.Now();
+    /// var tomorrow  = _ctx.CreateDate(1322, 7, 5);
+    /// var twoHours  = _ctx.Hours(2);
+    /// var label     = _ctx.Format(tomorrow);
     /// </code>
     /// </para>
     /// </remarks>
@@ -47,7 +49,7 @@ namespace GameEngineTools.World.Core.Time
         /// </param>
         public WorldTimeContext(WorldTimeSpec spec, IWorldClock clock)
         {
-            Spec = spec;
+            Spec  = spec;
             _clock = clock;
         }
 
@@ -64,6 +66,8 @@ namespace GameEngineTools.World.Core.Time
         public WorldTimeSpec Spec { get; }
 
         #endregion
+
+        // =====================================================================
 
         #region WTimeSpan — factory (z lidských jednotek na ticky)
 
@@ -155,11 +159,11 @@ namespace GameEngineTools.World.Core.Time
         public (long days, int hours, int minutes, int seconds, long subTicks)
             DeconstructSpan(WTimeSpan span)
         {
-            long at  = Math.Abs(span.Ticks);
-            long d   = at / Spec.TicksPerDay;           at %= Spec.TicksPerDay;
-            int  hh  = (int)(at / Spec.TicksPerHour);   at %= Spec.TicksPerHour;
-            int  mm  = (int)(at / Spec.TicksPerMinute);  at %= Spec.TicksPerMinute;
-            int  ss  = (int)(at / Spec.TicksPerSecond);  at %= Spec.TicksPerSecond;
+            long at = Math.Abs(span.Ticks);
+            long d  = at / Spec.TicksPerDay;           at %= Spec.TicksPerDay;
+            int  hh = (int)(at / Spec.TicksPerHour);   at %= Spec.TicksPerHour;
+            int  mm = (int)(at / Spec.TicksPerMinute);  at %= Spec.TicksPerMinute;
+            int  ss = (int)(at / Spec.TicksPerSecond);  at %= Spec.TicksPerSecond;
             return (d, hh, mm, ss, at);
         }
 
@@ -180,7 +184,7 @@ namespace GameEngineTools.World.Core.Time
         /// </example>
         public string Format(WTimeSpan span)
         {
-            var sign          = span.Ticks < 0 ? "-" : "";
+            var sign             = span.Ticks < 0 ? "-" : "";
             var (d, hh, mm, ss, sub) = DeconstructSpan(span);
 
             if (d != 0)
@@ -194,6 +198,8 @@ namespace GameEngineTools.World.Core.Time
         }
 
         #endregion
+
+        // =====================================================================
 
         #region WDateOnly — factory
 
@@ -210,6 +216,17 @@ namespace GameEngineTools.World.Core.Time
         public WDateOnly CreateDate(int year, int month, int day)
         {
             long dayIndex = Spec.Calendar.DaysFromDate(year, month, day);
+            return new WDateOnly(dayIndex);
+        }
+
+        /// <summary>
+        /// Extrahuje datovou složku z <see cref="WDateTime"/> a vrátí ji jako <see cref="WDateOnly"/>.
+        /// Časová složka (hodiny, minuty, sekundy) je zahozena.
+        /// </summary>
+        /// <param name="dt">Zdrojový okamžik.</param>
+        public WDateOnly DateOf(WDateTime dt)
+        {
+            long dayIndex = dt.WorldTicks / Spec.TicksPerDay;
             return new WDateOnly(dayIndex);
         }
 
@@ -292,6 +309,71 @@ namespace GameEngineTools.World.Core.Time
 
         #endregion
 
+        #region WDateOnly — konverze na WDateTime
+
+        /// <summary>
+        /// Kombinuje datum s časem dne a vrátí plný okamžik <see cref="WDateTime"/>.
+        /// </summary>
+        /// <param name="date">Datum.</param>
+        /// <param name="time">Čas dne.</param>
+        /// <returns>Okamžik odpovídající datu v zadaný čas dne.</returns>
+        /// <exception cref="OverflowException">Pokud výsledek přeteče <c>long</c>.</exception>
+        public WDateTime At(WDateOnly date, WTimeOnly time)
+            => new(checked(date.DayIndex * Spec.TicksPerDay + time.TicksOfDay));
+
+        /// <summary>
+        /// Vrátí okamžik odpovídající začátku dne (00:00:00) pro zadané datum.
+        /// </summary>
+        /// <param name="date">Datum.</param>
+        /// <returns><see cref="WDateTime"/> na začátku dne (čas 00:00:00).</returns>
+        /// <exception cref="OverflowException">Pokud výsledek přeteče <c>long</c>.</exception>
+        public WDateTime StartOfDay(WDateOnly date)
+            => new(checked(date.DayIndex * Spec.TicksPerDay));
+
+        #endregion
+
+        #region WDateOnly — parsování
+
+        /// <summary>
+        /// Parsuje datum ze řetězce ve formátu <c>YYYY-MM-DD</c>.
+        /// </summary>
+        /// <param name="text">Řetězec k parsování.</param>
+        /// <returns>Odpovídající <see cref="WDateOnly"/>.</returns>
+        /// <exception cref="FormatException">Pokud řetězec nemá platný formát nebo datum neexistuje v kalendáři.</exception>
+        public WDateOnly ParseDate(string text)
+            => TryParseDate(text, out var v)
+                ? v
+                : throw new FormatException($"Neplatný WDateOnly: '{text}'.");
+
+        /// <summary>
+        /// Pokusí se parsovat datum ze řetězce ve formátu <c>YYYY-MM-DD</c>.
+        /// </summary>
+        /// <param name="text">Řetězec k parsování.</param>
+        /// <param name="value">
+        /// Výstupní datum, pokud parsování uspělo; jinak <c>default</c>.
+        /// </param>
+        /// <returns><c>true</c> pokud parsování uspělo, jinak <c>false</c>.</returns>
+        public bool TryParseDate(string? text, out WDateOnly value)
+        {
+            value = default;
+            if (string.IsNullOrWhiteSpace(text)) return false;
+
+            var s = text.AsSpan().Trim();
+
+            // Minimální formát: "YYYY-MM-DD" = 10 znaků, oddělovače na pozicích 4 a 7
+            if (s.Length < 10 || s[4] != '-' || s[7] != '-') return false;
+
+            // Rok — čteme všechny cifry před prvním '-' (podporuje roky > 9999)
+            if (!TryParseInt(s[..4],        min: 1, max: int.MaxValue, out int y))  return false;
+            if (!TryParseInt(s.Slice(5, 2), min: 1, max: 99,           out int mo)) return false;
+            if (!TryParseInt(s.Slice(8, 2), min: 1, max: 99,           out int da)) return false;
+
+            try   { value = CreateDate(y, mo, da); return true; }
+            catch { return false; }
+        }
+
+        #endregion
+
         #region WDateOnly — formátování
 
         /// <summary>
@@ -303,6 +385,29 @@ namespace GameEngineTools.World.Core.Time
         {
             var (y, m, d) = GetDateParts(date);
             return $"{y:0000}-{m:00}-{d:00}";
+        }
+
+        #endregion
+
+        // =====================================================================
+
+        #region Interní pomocné metody
+
+        /// <summary>
+        /// Parsuje celé číslo ze span znaků a ověří rozsah [<paramref name="min"/>, <paramref name="max"/>].
+        /// </summary>
+        private static bool TryParseInt(ReadOnlySpan<char> sp, int min, int max, out int v)
+        {
+            long acc = 0;
+            for (int i = 0; i < sp.Length; i++)
+            {
+                char c = sp[i];
+                if (c < '0' || c > '9') { v = 0; return false; }
+                acc = acc * 10 + (c - '0');
+                if (acc > int.MaxValue)  { v = 0; return false; }
+            }
+            v = (int)acc;
+            return v >= min && v <= max;
         }
 
         #endregion

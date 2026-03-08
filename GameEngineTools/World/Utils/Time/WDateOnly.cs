@@ -1,11 +1,56 @@
-﻿namespace GameEngineTools.World.Utils.Time
-{
-    using System.Text.Json.Serialization;
+// WDateOnly.cs
+// Copyright (c) 50PSoftware
 
-    /// <summary>Datum bez času. 0 = 1/1/1 (světová epocha). Bez BCL DateOnly.</summary>
+using System.Text.Json.Serialization;
+
+namespace GameEngineTools.World.Utils.Time
+{
+    /// <summary>
+    /// Reprezentuje datum bez časové složky, uložené jako počet dní od světové epochy
+    /// (0 = 1. den 1. měsíce 1. roku).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Čistý datový typ.</b> Struct neobsahuje žádnou závislost na <c>WorldTimeSpec</c>
+    /// ani jiném externím stavu. Jediným zdrojem pravdy je <see cref="DayIndex"/>.
+    /// </para>
+    /// <para>
+    /// Operace vyžadující znalost kalendáře (rozklad na rok/měsíc/den, přičítání měsíců,
+    /// parsování, formátování) patří do
+    /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext"/>.
+    /// </para>
+    /// <para>
+    /// Příklady:
+    /// <code>
+    /// // Vytvoření
+    /// var date = _ctx.CreateDate(1322, 7, 4);
+    ///
+    /// // Čistá matematika přímo na strukturách
+    /// var tomorrow   = date.AddDays(1);
+    /// var daysLeft   = date.DaysUntil(deadline);
+    /// bool isPast    = date &lt; today;
+    ///
+    /// // Operace závislé na kalendáři přes context
+    /// var nextMonth  = _ctx.AddMonths(date, 1);
+    /// var (y, m, d)  = _ctx.GetDateParts(date);
+    /// string label   = _ctx.Format(date);
+    /// </code>
+    /// </para>
+    /// </remarks>
     public readonly struct WDateOnly :
-        IEquatable<WDateOnly>, IComparable<WDateOnly>, IFormattable
+        IEquatable<WDateOnly>, IComparable<WDateOnly>
     {
+        #region Konstrukce
+
+        /// <summary>
+        /// Inicializuje nové datum z 0-based indexu dne od světové epochy.
+        /// </summary>
+        /// <param name="dayIndex">
+        /// Počet dní od světové epochy (0 = 1/1/1). Nesmí být záporný.
+        /// </param>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Pokud je <paramref name="dayIndex"/> záporný.
+        /// </exception>
         [JsonConstructor]
         public WDateOnly(long dayIndex)
         {
@@ -13,124 +58,92 @@
             DayIndex = dayIndex;
         }
 
-        [JsonIgnore]
-        public int Day { get { Deconstruct(out _, out _, out var d); return d; } }
-        public long DayIndex { get; } // 0-based dny od světové epochy
-        [JsonIgnore]
-        public int Month { get { Deconstruct(out _, out var m, out _); return m; } }
+        #endregion
 
-        [JsonIgnore]
-        public int Year { get { Deconstruct(out var y, out _, out _); return y; } }
+        #region Vlastnosti
 
-        public static WDateOnly FromDateTime(WDateTime dt) => dt.DateOnly;
+        /// <summary>
+        /// Počet dní od světové epochy (0-based).
+        /// Jediný zdroj pravdy — veškeré ostatní hodnoty se dopočítávají přes
+        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext"/>.
+        /// </summary>
+        public long DayIndex { get; }
 
-        public static WDateOnly FromParts(int year, int month, int day)
-        {
-            var di = WDateTime.Spec.Calendar.DaysFromDate(year, month, day);
-            return new WDateOnly(di);
-        }
+        #endregion
 
-        public static bool operator !=(WDateOnly a, WDateOnly b) => !a.Equals(b);
+        #region Aritmetika (čistá matematika)
 
-        public static bool operator <(WDateOnly a, WDateOnly b) => a.DayIndex < b.DayIndex;
+        /// <summary>
+        /// Přičte zadaný počet dní k datu.
+        /// Čistá matematika — nevyžaduje <c>WorldTimeSpec</c>.
+        /// </summary>
+        /// <param name="days">Počet dní (může být záporný pro posun zpět).</param>
+        /// <returns>Nové datum posunuté o <paramref name="days"/> dní.</returns>
+        /// <exception cref="OverflowException">Pokud výsledek přeteče <c>long</c>.</exception>
+        public WDateOnly AddDays(long days) => new(checked(DayIndex + days));
 
-        public static bool operator <=(WDateOnly a, WDateOnly b) => a.DayIndex <= b.DayIndex;
-
-        public static bool operator ==(WDateOnly a, WDateOnly b) => a.Equals(b);
-
-        public static bool operator >(WDateOnly a, WDateOnly b) => a.DayIndex > b.DayIndex;
-
-        public static bool operator >=(WDateOnly a, WDateOnly b) => a.DayIndex >= b.DayIndex;
-
-        public static WDateOnly Parse(string text)
-                    => TryParse(text, out var v) ? v : throw new FormatException($"Neplatný WDateOnly: '{text}'.");
-
-        public static bool TryParse(string? text, out WDateOnly value)
-        {
-            value = default;
-            if (string.IsNullOrWhiteSpace(text)) return false;
-            var s = text.AsSpan().Trim();
-            if (s.Length < 10 || s[4] != '-' || s[7] != '-') return false;
-
-            if (!TryInt(s[..4], 1, int.MaxValue, out int y)) return false;
-            if (!TryInt(s.Slice(5, 2), 1, 99, out int mo)) return false;
-            if (!TryInt(s.Slice(8, 2), 1, 99, out int da)) return false;
-
-            try { value = FromParts(y, mo, da); return true; }
-            catch { return false; }
-
-            static bool TryInt(ReadOnlySpan<char> sp, int min, int max, out int v)
-            {
-                long acc = 0;
-                for (int i = 0; i < sp.Length; i++)
-                {
-                    char c = sp[i]; if (c < '0' || c > '9') { v = 0; return false; }
-                    acc = acc * 10 + (c - '0'); if (acc > int.MaxValue) { v = 0; return false; }
-                }
-                v = (int)acc; return v >= min && v <= max;
-            }
-        }
-
-        // Aritmetika
-        public WDateOnly AddDays(long days) => new WDateOnly(checked(DayIndex + days));
-
-        public WDateOnly AddMonths(int months)
-        {
-            Deconstruct(out var y, out var m, out var d);
-            var calendar = WDateTime.Spec.Calendar;
-            m += months;
-            while (m < 1)
-            {
-                y -= 1;
-                m += calendar.MonthsInYear(y);
-            }
-            while (m > calendar.MonthsInYear(y))
-            {
-                m -= calendar.MonthsInYear(y);
-                y += 1;
-            }
-            var daysInMonth = WDateTime.Spec.Calendar.DaysInMonth(y, m);
-            if (d > daysInMonth) d = daysInMonth;
-            return FromParts(y, m, d);
-        }
-
-        public WDateOnly AddYears(int years)
-        {
-            Deconstruct(out var y, out var m, out var d);
-            y += years;
-            var daysInMonth = WDateTime.Spec.Calendar.DaysInMonth(y, m);
-            if (d > daysInMonth) d = daysInMonth;
-            return FromParts(y, m, d);
-        }
-
-        public WDateTime At(WTimeOnly time) =>
-                    new WDateTime(checked(DayIndex * WDateTime.Spec.TicksPerDay + time.TicksOfDay));
-
-        // Převody
-        public WDateTime AtStartOfDay() => new WDateTime(checked(DayIndex * WDateTime.Spec.TicksPerDay));
-
-        // Porovnání
-        public int CompareTo(WDateOnly other) => DayIndex.CompareTo(other.DayIndex);
-
+        /// <summary>
+        /// Vrátí počet dní mezi tímto datem a <paramref name="other"/>.
+        /// Kladný výsledek znamená, že <paramref name="other"/> je v budoucnosti.
+        /// </summary>
+        /// <param name="other">Cílové datum.</param>
+        /// <returns>
+        /// Počet dní jako <c>other.DayIndex - this.DayIndex</c>.
+        /// Může být záporný pokud je <paramref name="other"/> v minulosti.
+        /// </returns>
         public long DaysUntil(WDateOnly other) => other.DayIndex - DayIndex;
 
-        // Komponenty
-        public void Deconstruct(out int year, out int month, out int day)
-            => (year, month, day) = WDateTime.Spec.Calendar.DateFromDays(DayIndex);
+        #endregion
 
+        #region Porovnávací operátory
+
+        /// <summary>Vrátí <c>true</c> pokud obě data reprezentují stejný den.</summary>
+        public static bool operator ==(WDateOnly a, WDateOnly b) => a.DayIndex == b.DayIndex;
+
+        /// <summary>Vrátí <c>true</c> pokud data reprezentují různé dny.</summary>
+        public static bool operator !=(WDateOnly a, WDateOnly b) => a.DayIndex != b.DayIndex;
+
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve než <paramref name="b"/>.</summary>
+        public static bool operator < (WDateOnly a, WDateOnly b) => a.DayIndex <  b.DayIndex;
+
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejný den jako <paramref name="b"/>.</summary>
+        public static bool operator <=(WDateOnly a, WDateOnly b) => a.DayIndex <= b.DayIndex;
+
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později než <paramref name="b"/>.</summary>
+        public static bool operator > (WDateOnly a, WDateOnly b) => a.DayIndex >  b.DayIndex;
+
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později nebo ve stejný den jako <paramref name="b"/>.</summary>
+        public static bool operator >=(WDateOnly a, WDateOnly b) => a.DayIndex >= b.DayIndex;
+
+        #endregion
+
+        #region Rovnost a hashování
+
+        /// <inheritdoc/>
+        public int CompareTo(WDateOnly other) => DayIndex.CompareTo(other.DayIndex);
+
+        /// <inheritdoc/>
         public bool Equals(WDateOnly other) => DayIndex == other.DayIndex;
 
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is WDateOnly d && Equals(d);
 
+        /// <inheritdoc/>
         public override int GetHashCode() => DayIndex.GetHashCode();
 
-        // Formátování/parsování: "YYYY-MM-DD"
-        public override string ToString() => ToString("O", null);
+        #endregion
 
-        public string ToString(string? format, IFormatProvider? _)
-        {
-            var (y, m, d) = WDateTime.Spec.Calendar.DateFromDays(DayIndex);
-            return $"{y:0000}-{m:00}-{d:00}";
-        }
+        #region Formátování
+
+        /// <summary>
+        /// Vrátí raw <see cref="DayIndex"/> jako řetězec.
+        /// <para>
+        /// Pro čitelný formát (např. <c>1322-07-04</c>) použij
+        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.Format(WDateOnly)"/>.
+        /// </para>
+        /// </summary>
+        public override string ToString() => DayIndex.ToString();
+
+        #endregion
     }
 }
