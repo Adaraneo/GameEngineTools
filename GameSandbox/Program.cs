@@ -32,7 +32,7 @@ await using var runtime = await GameEngineToolsRuntime.StartAsync(initNow, gener
     NPCDirectory = TFSC.NPCs
 }, timescale: 1);
 
-var wtctx = runtime.Services.GetRequiredService<WorldTimeContext>();
+var wtctx = runtime.WorldTimeContext;
 var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
@@ -67,11 +67,11 @@ var significantOtherPerson = significantOther.Person;
 //PrintSymbolicRelationsInfoAccordingToPlayer(manager.NPPCs.ToArray());
 //PrintSymbolicRelationsInfo(families.ToArray());
 
-File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(false));
+File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(wtctx, false));
 
-Console.WriteLine("Now: {0}", clock.Now);
-Console.WriteLine("Player: {0}", player.PrintInfo(true));
-Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(true));
+Console.WriteLine("Now: {0}", wtctx.Format(clock.Now));
+Console.WriteLine("Player: {0}", player.PrintInfo(wtctx, true));
+Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(wtctx, true));
 
 Console.WriteLine("==========================================================");
 
@@ -137,9 +137,9 @@ gf.Export(player);
 gf.Export((NPC)significantOther);
 
 //clock.Stop();
-Console.WriteLine(player.PrintInfo(false));
+Console.WriteLine(player.PrintInfo(wtctx, false));
 
-Console.WriteLine(significantOther.PrintInfo(false));
+Console.WriteLine(significantOther.PrintInfo(wtctx, false));
 
 PressAnyKeyToContinueM();
 

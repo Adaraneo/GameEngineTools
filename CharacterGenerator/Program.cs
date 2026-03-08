@@ -21,6 +21,7 @@
 
     internal class Program
     {
+        private static WorldTimeContext _wtctx;
         private static void ClearDirectoryForRegeneration(string playerDirectory, string npcDirectory)
         {
             var playerDir = new DirectoryInfo(playerDirectory);
@@ -44,7 +45,7 @@
                 var dirinfo = new DirectoryInfo(directory);
                 dirinfo.CreateSubdirectory("Logs");
                 var path = Path.Combine(directory, "Logs", filename);
-                File.WriteAllText(path, nppc.PrintInfo(false));
+                File.WriteAllText(path, nppc.PrintInfo(_wtctx, false));
             }
         }
 
@@ -62,6 +63,7 @@
                 NPCDirectory = GFC.npc,
                 PlayerDirectory = GFC.pc
             });
+            _wtctx = runtime.WorldTimeContext;
             var genFile = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
             var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 

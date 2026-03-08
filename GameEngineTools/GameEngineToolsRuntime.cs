@@ -255,6 +255,11 @@ namespace GameEngineTools
         /// <summary>DI provider pro přímý resolve libovolné služby.</summary>
         public IServiceProvider Services => _host.Services;
 
+        /// <summary>
+        /// WordTimeContext pro utils pro práci s časem.
+        /// </summary>
+        public WorldTimeContext WorldTimeContext => _host.Services.GetRequiredService<WorldTimeContext>();
+
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
