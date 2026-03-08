@@ -102,6 +102,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                 _log.LogInformation("[Memory] Konsolidace: posíleno {Count} epizod.", boosted.Count);
             }
 
+            episodes = episodes
+                .Where(e => e.Strength >= Config.PruneThreshold)
+                .ToList();
+
             State = new MemoryIndex(episodes, State.Semantics);
         }
 

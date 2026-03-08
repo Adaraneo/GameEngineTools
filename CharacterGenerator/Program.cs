@@ -53,7 +53,7 @@
             var pcFolderPath = GFC.pc;
             var npcFolderPath = GFC.npc;
 
-            await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(132, 1, 1)), generatedFileOptions: new GeneratedFileOptions
+            await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(132, 1, 1)), consoleLogs: false, generatedFileOptions: new GeneratedFileOptions
             {
                 NPCDirectory = GFC.npc,
                 PlayerDirectory = GFC.pc
