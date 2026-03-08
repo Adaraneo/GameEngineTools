@@ -166,11 +166,10 @@ namespace GameTester
 
             var clock = (TestClock)ServiceProvider.GetRequiredService<IClock>();
 
-
             GeneratedFile.Export(player);
             GeneratedFile.Export(significantOther);
 
-            clock.Advance(WTimeSpan.FromDays(352));
+            clock.Advance(WorldTimeContext.Days(352));
 
 
             GeneratedFile.Export(player);
