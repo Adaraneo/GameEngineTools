@@ -8,8 +8,16 @@
     using GameEngineTools.Extensions;
     using GameEngineTools.FileSystem;
     using GameEngineTools.World.Core.Time;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GFC = GameEngineTools.Constants.FileSystemConstantsForTest;
     using Microsoft.Extensions.Configuration;
+    using GameEngineTools.Config;
+    using Microsoft.Extensions.Options;
+    using GameEngineTools.World.Core.Calendars;
+    using GameEngineTools.World.Utils.Time;
+    using System.Runtime.CompilerServices;
+    using GameEngineTools.Characters.Hosting;
+    using GameEngineTools.Characters.Generation;
 
     internal class Program
     {
@@ -45,36 +53,13 @@
             var pcFolderPath = GFC.pc;
             var npcFolderPath = GFC.npc;
 
-            var host = Host.CreateDefaultBuilder(args)
-            .ConfigureServices(s =>
+            await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(132, 1, 1)), generatedFileOptions: new GeneratedFileOptions
             {
-                var configProvider = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json")
-                .AddJsonFile("appsettings.Relationships.json")
-                .Build();
-
-                s.AddSingleton<IClock, SystemClock>();
-                s.AddSingleton<IGeneratedFile, GeneratedFile>();
-                s.Configure<GeneratedFileOptions>(opt =>
-                {
-                    opt.NPCDirectory = npcFolderPath;
-                    opt.PlayerDirectory = pcFolderPath;
-                });
-
-                s.AddSingleton<IGameEngineToolsManager, GameEngineToolsManager>();
-                s.Configure<GameEngineToolsManagerOptions>(opt =>
-                {
-                    opt.UseConsoleLogging = true;
-                });
-                s.AddHostedService<GameEngineToolsManagerInitializer>();
-                s.AddHostedService<SubscribersActivator>();
-            })
-            .Build();
-
-            await host.RunAsync();
-
-            var genFile = host.Services.GetRequiredService<IGeneratedFile>();
-            var manager = (GameEngineToolsManager)host.Services.GetRequiredService<IGameEngineToolsManager>();
+                NPCDirectory = GFC.npc,
+                PlayerDirectory = GFC.pc
+            });
+            var genFile = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
+            var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 
             try
             {
