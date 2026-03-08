@@ -227,7 +227,7 @@ namespace GameTester
                 lb.AddCharactersFile(opt =>
                 {
                     opt.FilePath         = "logs/Characters/characters.log";
-                    opt.MinLevel         = LogLevel.Information;
+                    opt.MinLevel         = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                 });
             });
