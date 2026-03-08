@@ -122,14 +122,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     _accHours -= 24.0;
                     s = AdvanceCycleDay(s, now, ctx, outbox);
                 }
-
-                // Symptomy a libido podle fáze (jemné modulace)
-                var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle);
-                s = s with { Pain = Clamp01p(s.Pain + pain), Cycle = s.Cycle with
-                {
-                    SymptomBloat = Clamp01p(s.Cycle.SymptomBloat + bloat),
-                    SymptomBreastTender = Clamp01p(s.Cycle.SymptomBreastTender + tender),
-                    LibidoMod = libido} };
             }
 
             State = s;
@@ -195,7 +187,22 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
 
             var next = c with { DayInCycle = day, Phase = phase, OvulationWindow = ovulWindow };
-            return s with { Cycle = next };
+            s = s with { Cycle = next };
+
+            // Symptomy jednou za den
+            var (pain, bloat, tender, libido) = SymptomsFor(next);
+            s = s with
+            {
+                Pain = Clamp01p(s.Pain + pain),
+                Cycle = s.Cycle with
+                {
+                    SymptomBloat = Clamp01p(s.Cycle.SymptomBloat + bloat),
+                    SymptomBreastTender = Clamp01p(s.Cycle.SymptomBreastTender + tender),
+                    LibidoMod = libido
+                }
+            };
+
+            return s;
         }
 
         private static (double pain, double bloat, double tender, double libidoMod) SymptomsFor(MenstrualCycleState c)
