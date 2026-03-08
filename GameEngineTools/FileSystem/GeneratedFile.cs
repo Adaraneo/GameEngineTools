@@ -58,6 +58,7 @@ namespace GameEngineTools.FileSystem
                 Identity = player.Person.Identity,
                 Biology = player.Person.Biology,
                 Personality = player.Person.Personality,
+                PhysicalAppearance = player.Person.PhysicalAppearance,
                 Snapshot = player.Person.Snapshot,
                 MaxHealth = player.MaxHealth,
                 Health = player.Health,
@@ -82,6 +83,7 @@ namespace GameEngineTools.FileSystem
                 Identity = npc.Person.Identity,
                 Biology = npc.Person.Biology,
                 Personality = npc.Person.Personality,
+                PhysicalAppearance = npc.Person.PhysicalAppearance,
                 Snapshot = npc.Person.Snapshot,
                 MaxHealth = npc.MaxHealth,
                 Health = npc.Health,
@@ -115,7 +117,7 @@ namespace GameEngineTools.FileSystem
             using var  file = new StreamReader(File.OpenRead($"{Path.Combine(NPCDirectory, filename)}"));
             var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions);
 
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
@@ -154,7 +156,7 @@ namespace GameEngineTools.FileSystem
             using var file = new StreamReader(File.OpenRead($"{Path.Combine(PlayerDirectory, filename)}"));
             var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions);
 
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 

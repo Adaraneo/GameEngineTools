@@ -32,6 +32,7 @@ namespace GameEngineTools.Characters.Hosting
         Identity Identity,
         SexBiology Biology,
         Personality Personality,
+        PhysicalAppearance PhysicalAppearance,
         int? Seed = null);
 
     public sealed class DefaultHumanFactory : IHumanFactory
@@ -75,7 +76,7 @@ namespace GameEngineTools.Characters.Hosting
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State);
 
             var human = new OrchestratedHuman(
-                b.Id, b.Identity, b.Biology, b.Personality,
+                b.Id, b.Identity, b.Biology, b.Personality, b.PhysicalAppearance,
                 bus, scheduler, rng, logger,
                 physio, psych, behav, inter, rel, mem,
                 snapshot);

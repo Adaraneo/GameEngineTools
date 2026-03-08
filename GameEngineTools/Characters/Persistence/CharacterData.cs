@@ -18,6 +18,7 @@ namespace GameEngineTools.Characters.Persistence
         public Identity Identity { get; init; }
         public SexBiology Biology { get; init; }
         public Personality Personality { get; init; }
+        public PhysicalAppearance PhysicalAppearance { get; init; }
         public EnginesSnapshot Snapshot { get; init; }
 
         public double MaxHealth { get; init; }

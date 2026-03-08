@@ -30,6 +30,8 @@ namespace GameEngineTools.Characters.Core
         public SexBiology Biology { get; }
         public Personality Personality { get; }
 
+        public PhysicalAppearance PhysicalAppearance { get; }
+
         public EnginesSnapshot Snapshot { get; private set; }
         private readonly List<IDomainEvent> _lastOutboxAccumulator = new();
         public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutboxAccumulator;
@@ -59,6 +61,7 @@ namespace GameEngineTools.Characters.Core
             Identity identity,
             SexBiology biology,
             Traits.Personality personality,
+            PhysicalAppearance appearance,
             // služby
             IEventBus bus,
             IScheduler scheduler,
@@ -78,6 +81,7 @@ namespace GameEngineTools.Characters.Core
             Identity = identity;
             Biology = biology;
             Personality = personality;
+            PhysicalAppearance = appearance;
 
             _bus = bus;
             _scheduler = scheduler;
@@ -213,6 +217,11 @@ namespace GameEngineTools.Characters.Core
                     toPublish.Add(ev);
                     SafeHandle(ev, collector);
                 }
+            }
+
+            if (pass > maxPasses && collector.Drain().Count > 0)
+            {
+                _log.LogWarning("[{Human}] Deliver: dosažen maxPasses={Max}, eventy zahozeny!", Id.Value, maxPasses);
             }
 
             PublishOutbox(toPublish);

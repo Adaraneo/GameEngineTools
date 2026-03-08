@@ -87,12 +87,14 @@ namespace GameEngineTools.Characters.Generation
         private readonly IRandomSourceFactory _rngFactory;
         private readonly IPersonalityGenerator _personalityGenerator;
         private readonly IIdentityGenerator _identityGenerator;
+        private readonly IAppearanceGenerator _appearanceGenerator;
         private readonly HumanBlueprintSpec _spec;
-        public HumanBlueprintGenerator(IRandomSourceFactory rngFactory, IPersonalityGenerator personalityGenerator, IIdentityGenerator identityGenerator, HumanBlueprintSpec spec)
+        public HumanBlueprintGenerator(IRandomSourceFactory rngFactory, IPersonalityGenerator personalityGenerator, IIdentityGenerator identityGenerator, IAppearanceGenerator appearanceGenerator, HumanBlueprintSpec spec)
         {
             _rngFactory = rngFactory;
             _personalityGenerator = personalityGenerator;
             _identityGenerator = identityGenerator;
+            _appearanceGenerator = appearanceGenerator;
             _spec = spec;
         }
 
@@ -117,7 +119,9 @@ namespace GameEngineTools.Characters.Generation
             var id = new HumanId(Guid.NewGuid());
             var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
 
-            return new HumanBlueprint(id, identity, sex, personality, runtimeSeed);
+            var appearance = _appearanceGenerator.Generate(sex, seed);
+
+            return new HumanBlueprint(id, identity, sex, personality, appearance, runtimeSeed);
         }
 
         private static SexBiology PickSex((double Female, double Male, double Intersex, double Unknown) w, IRandomSource rng)

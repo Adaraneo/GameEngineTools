@@ -40,6 +40,7 @@ namespace GameEngineTools.Characters.Core
         Identity Identity { get; }
         SexBiology Biology { get; }   // Female/Male/Intersex etc.
         Personality Personality { get; } // Trait modul (nemění se rychle)
+        PhysicalAppearance PhysicalAppearance { get; }
 
         // Přístup ke stavům (read-only snapshoty)
         EnginesSnapshot Snapshot { get; }
