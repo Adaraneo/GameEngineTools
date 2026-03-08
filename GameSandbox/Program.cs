@@ -82,10 +82,24 @@ for (int d = 0; d < 30; d++)
 
         significantOtherPerson.Tick(now, dt);
 
+        var reachOut = significantOtherPerson.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == "ReachOut");
+        if (reachOut != null)
+        {
+            var initialized = new InteractionProposed(now, significantOtherPerson.Id, playerPerson.Id, SpeechAct.SmallTalk, "Ehm... Ahoj");
+            playerPerson.ReceiveEvent(initialized);
+        }
+
         var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
         if (outcome != null)
             playerPerson.ReceiveEvent(outcome);
+
         playerPerson.Tick(now, dt);
+
+        // ── Outcome z playera → significantOther ──
+        var playerOutcome = playerPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+        if (playerOutcome != null)
+            significantOtherPerson.ReceiveEvent(playerOutcome);
+
         now += dt;
     }
 }

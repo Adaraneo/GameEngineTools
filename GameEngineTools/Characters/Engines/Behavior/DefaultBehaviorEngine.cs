@@ -44,7 +44,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             // Volba akce (utility = potřeba * váha motivace; setrvačnost + penalizace monotónnosti)
             var candidates = new List<(string Name, double Utility, WTimeSpan Dur)>
             {
-                ("Sleep",     Util(needRest,     ctx.Personality.Motivation.Rest),        Hours(Math.Max(1.0, ph.SleepDebtHours * 0.6))),
+                ("Sleep",     Util(needRest,     ctx.Personality.Motivation.Rest * 1.3),        Hours(Math.Max(1.0, ph.SleepDebtHours * 0.6))),
                 ("Eat",       Util(needFood,     1.2),                                   Minutes(30)),
                 ("Drink",     Util(needWater,    1.1),                                   Minutes(10)),
                 ("ReachOut",  Util(needBel,      ctx.Personality.Motivation.Affiliation),Hours(1.0)),

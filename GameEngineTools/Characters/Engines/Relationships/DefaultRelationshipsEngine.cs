@@ -70,10 +70,23 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     });
                     break;
 
-                case Interactions.InteractionOutcome io:
+                case Interactions.InteractionOutcome io when io.Accepted:
                     var otherId = io.From == self ? io.To : io.From;
                     if (!State.Edges.ContainsKey(otherId))
                         Upsert(self, otherId, e => e);
+
+                    Upsert(self, otherId, e => e with
+                    {
+                        Closeness = Math.Min(100, e.Closeness + 1.5),
+                        Like = Math.Min(100, e.Like + 0.5),
+                        Comfort = Math.Min(100, e.Comfort + 0.8)
+                    });
+                    break;
+
+                case Interactions.InteractionOutcome io when !io.Accepted:
+                    var otherId2 = io.From == self ? io.To : io.From;
+                    if (!State.Edges.ContainsKey(otherId2))
+                        Upsert(self, otherId2, e => e);
                     break;
             }
         }
