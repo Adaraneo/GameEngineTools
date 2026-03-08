@@ -69,7 +69,8 @@ var significantOtherPerson = significantOther.Person;
 
 File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(wtctx, false));
 
-Console.WriteLine("Now: {0}", wtctx.Format(clock.Now));
+//var bound = clock.Now.Bind(wtctx);
+Console.WriteLine("Now: {0}, vs Now {1}", wtctx.Now().WorldTicks, clock.Now.WorldTicks);
 Console.WriteLine("Player: {0}", player.PrintInfo(wtctx, true));
 Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(wtctx, true));
 
