@@ -1,172 +1,142 @@
-﻿namespace GameEngineTools.World.Utils.Time
+// WTimeOnly.cs
+// Copyright (c) 50PSoftware
+
+namespace GameEngineTools.World.Utils.Time
 {
-    /// <summary>Čas dne bez data. 0..TicksPerDay-1. Bez BCL TimeOnly.</summary>
+    /// <summary>
+    /// Reprezentuje čas dne bez datové složky, uložený jako počet worldTicks
+    /// od začátku dne (půlnoci).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Čistý datový typ.</b> Struct neobsahuje žádnou závislost na <c>WorldTimeSpec</c>
+    /// ani jiném externím stavu. Jediným zdrojem pravdy je <see cref="TicksOfDay"/>.
+    /// </para>
+    /// <para>
+    /// Operace vyžadující znalost časové soustavy (rozklad na hodiny/minuty/sekundy,
+    /// přičítání hodin, parsování, formátování, wrap přes půlnoc) patří do
+    /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext"/>.
+    /// </para>
+    /// <para>
+    /// Příklady:
+    /// <code>
+    /// // Vytvoření
+    /// var time = _ctx.CreateTime(hour: 6, minute: 30, second: 0);
+    ///
+    /// // Čistá matematika přímo na strukturách
+    /// var diff     = timeA.Diff(timeB);   // WTimeSpan (bez wrapu)
+    /// bool isEarly = time &lt; _ctx.CreateTime(8, 0, 0);
+    ///
+    /// // Operace závislé na spec přes context
+    /// var later        = _ctx.AddTime(time, _ctx.Hours(2));
+    /// var (h, m, s, _) = _ctx.GetTimeParts(time);
+    /// string label     = _ctx.Format(time);
+    /// </code>
+    /// </para>
+    /// </remarks>
     public readonly struct WTimeOnly :
-        IEquatable<WTimeOnly>, IComparable<WTimeOnly>, IFormattable
+        IEquatable<WTimeOnly>, IComparable<WTimeOnly>
     {
-        public WTimeOnly(long ticksOfDay)
-        {
-            long tpd = WDateTime.Spec.TicksPerDay;
-            if ((uint)ticksOfDay >= (uint)tpd) throw new ArgumentOutOfRangeException(nameof(ticksOfDay));
-            TicksOfDay = ticksOfDay;
-        }
+        #region Konstrukce
 
-        // Komponenty
-        public int Hour
-        {
-            get
-            {
-                var s = WDateTime.Spec;
-                return (int)(TicksOfDay / s.TicksPerHour);
-            }
-        }
+        /// <summary>
+        /// Inicializuje nový čas dne z počtu worldTicks od půlnoci.
+        /// </summary>
+        /// <param name="ticksOfDay">
+        /// Počet worldTicks od začátku dne (0 = půlnoc).
+        /// Musí být v rozsahu [0, TicksPerDay).
+        /// Rozsah je validován v <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.CreateTime"/>.
+        /// </param>
+        /// <remarks>
+        /// Konstruktor sám o sobě nevaliduje rozsah vůči <c>TicksPerDay</c>,
+        /// protože by potřeboval <c>WorldTimeSpec</c>. Validaci zajišťuje
+        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.CreateTime"/>.
+        /// </remarks>
+        public WTimeOnly(long ticksOfDay) => TicksOfDay = ticksOfDay;
 
-        public int Millisecond => (int)((SubTick * 1000L) / WDateTime.Spec.TicksPerSecond);
+        #endregion
 
-        public int Minute
-        {
-            get
-            {
-                var s = WDateTime.Spec;
-                return (int)((TicksOfDay % s.TicksPerHour) / s.TicksPerMinute);
-            }
-        }
+        #region Vlastnosti
 
-        public int Second
-        {
-            get
-            {
-                var s = WDateTime.Spec;
-                return (int)((TicksOfDay % s.TicksPerMinute) / s.TicksPerSecond);
-            }
-        }
+        /// <summary>
+        /// Počet worldTicks od začátku dne (půlnoci).
+        /// Platný rozsah je [0, TicksPerDay) kde TicksPerDay závisí na <c>WorldTimeSpec</c>.
+        /// Jediný zdroj pravdy — veškeré ostatní hodnoty se dopočítávají přes
+        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext"/>.
+        /// </summary>
+        public long TicksOfDay { get; }
 
-        public long SubTick => TicksOfDay % WDateTime.Spec.TicksPerSecond;
-        public long TicksOfDay { get; } // [0, TicksPerDay)
+        #endregion
 
-        public static WTimeOnly FromParts(int hour, int minute, int second, long subTick = 0)
-        {
-            var s = WDateTime.Spec;
-            if (hour < 0 || hour >= s.HoursPerDay) throw new ArgumentOutOfRangeException(nameof(hour));
-            if (minute < 0 || minute >= s.MinutesPerHour) throw new ArgumentOutOfRangeException(nameof(minute));
-            if (second < 0 || second >= s.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
-            if (subTick < 0 || subTick >= s.TicksPerSecond) throw new ArgumentOutOfRangeException(nameof(subTick));
+        #region Aritmetika (čistá matematika)
 
-            long ticks = hour * s.TicksPerHour
-                       + minute * s.TicksPerMinute
-                       + second * s.TicksPerSecond
-                       + subTick;
-            return new WTimeOnly(ticks);
-        }
+        /// <summary>
+        /// Vrátí hrubý rozdíl dvou časů dne jako <see cref="WTimeSpan"/>.
+        /// </summary>
+        /// <param name="other">Čas dne, od kterého se odečítá.</param>
+        /// <returns>
+        /// <c>this.TicksOfDay - other.TicksOfDay</c> jako interval.
+        /// Výsledek může být záporný pokud je <paramref name="other"/> později.
+        /// </returns>
+        /// <remarks>
+        /// <b>Pozor:</b> tato metoda neprovádí wrap přes půlnoc.
+        /// Pokud potřebuješ nejkratší vzdálenost mezi dvěma časy v rámci dne
+        /// (s wraparoundem), použij
+        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.TimeDiff"/>.
+        /// </remarks>
+        public WTimeSpan Diff(WTimeOnly other) => new(TicksOfDay - other.TicksOfDay);
 
-        public static bool operator !=(WTimeOnly a, WTimeOnly b) => !a.Equals(b);
+        #endregion
 
-        public static bool operator <(WTimeOnly a, WTimeOnly b) => a.TicksOfDay < b.TicksOfDay;
+        #region Porovnávací operátory
 
+        /// <summary>Vrátí <c>true</c> pokud oba časy reprezentují stejný okamžik dne.</summary>
+        public static bool operator ==(WTimeOnly a, WTimeOnly b) => a.TicksOfDay == b.TicksOfDay;
+
+        /// <summary>Vrátí <c>true</c> pokud časy reprezentují různé okamžiky dne.</summary>
+        public static bool operator !=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay != b.TicksOfDay;
+
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve než <paramref name="b"/>.</summary>
+        public static bool operator < (WTimeOnly a, WTimeOnly b) => a.TicksOfDay <  b.TicksOfDay;
+
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
         public static bool operator <=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay <= b.TicksOfDay;
 
-        public static bool operator ==(WTimeOnly a, WTimeOnly b) => a.Equals(b);
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později než <paramref name="b"/>.</summary>
+        public static bool operator > (WTimeOnly a, WTimeOnly b) => a.TicksOfDay >  b.TicksOfDay;
 
-        public static bool operator >(WTimeOnly a, WTimeOnly b) => a.TicksOfDay > b.TicksOfDay;
-
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
         public static bool operator >=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay >= b.TicksOfDay;
 
-        public static WTimeOnly Parse(string text)
-                    => TryParse(text, out var v) ? v : throw new FormatException($"Neplatný WTimeOnly: '{text}'.");
+        #endregion
 
-        public static bool TryParse(string? text, out WTimeOnly value)
-        {
-            value = default;
-            if (string.IsNullOrWhiteSpace(text)) return false;
-            var s = text.AsSpan().Trim();
+        #region Rovnost a hashování
 
-            var dot = s.IndexOf('.');
-            ReadOnlySpan<char> main = dot >= 0 ? s[..dot] : s;
-            ReadOnlySpan<char> frac = dot >= 0 ? s[(dot + 1)..] : ReadOnlySpan<char>.Empty;
-
-            if (main.Length < 8 || main[2] != ':' || main[5] != ':') return false;
-
-            if (!TryInt(main[..2], 0, WDateTime.Spec.HoursPerDay - 1, out int hh)) return false;
-            if (!TryInt(main.Slice(3, 2), 0, WDateTime.Spec.MinutesPerHour - 1, out int mm)) return false;
-            if (!TryInt(main.Slice(6, 2), 0, WDateTime.Spec.SecondsPerMinute - 1, out int ss)) return false;
-
-            long sub = 0;
-            if (!frac.IsEmpty)
-            {
-                // bereme subticky v surové podobě (round-trip s ToString)
-                for (int i = 0; i < frac.Length; i++)
-                {
-                    char c = frac[i]; if (c < '0' || c > '9') return false;
-                }
-                if (!TryInt64(frac, 0, WDateTime.Spec.TicksPerSecond - 1, out sub)) return false;
-            }
-
-            try { value = FromParts(hh, mm, ss, sub); return true; }
-            catch { return false; }
-
-            static bool TryInt(ReadOnlySpan<char> sp, int min, int max, out int v)
-            {
-                long acc = 0;
-                for (int i = 0; i < sp.Length; i++)
-                {
-                    char c = sp[i]; if (c < '0' || c > '9') { v = 0; return false; }
-                    acc = acc * 10 + (c - '0'); if (acc > int.MaxValue) { v = 0; return false; }
-                }
-                v = (int)acc; return v >= min && v <= max;
-            }
-            static bool TryInt64(ReadOnlySpan<char> sp, long min, long max, out long v)
-            {
-                long acc = 0;
-                for (int i = 0; i < sp.Length; i++)
-                {
-                    char c = sp[i]; if (c < '0' || c > '9') { v = 0; return false; }
-                    long d = c - '0';
-                    if (acc > (long.MaxValue - d) / 10) { v = 0; return false; }
-                    acc = acc * 10 + d;
-                }
-                v = acc; return v >= min && v <= max;
-            }
-        }
-
-        // Aritmetika (wrap přes den)
-        public WTimeOnly Add(WTimeSpan span)
-        {
-            long t = TicksOfDay + span.Ticks;
-            long tpd = WDateTime.Spec.TicksPerDay;
-            t %= tpd; if (t < 0) t += tpd;
-            return new WTimeOnly(t);
-        }
-
-        public WTimeOnly AddHours(double h) => Add(WTimeSpan.FromHours(h));
-
-        public WTimeOnly AddMinutes(double m) => Add(WTimeSpan.FromMinutes(m));
-
-        public WTimeOnly AddSeconds(double s) => Add(WTimeSpan.FromSeconds(s));
-
-        // Porovnání
+        /// <inheritdoc/>
         public int CompareTo(WTimeOnly other) => TicksOfDay.CompareTo(other.TicksOfDay);
 
-        /// <summary>Hrubý rozdíl (bez wrapu): this - other, v tickách dne.</summary>
-        public WTimeSpan Diff(WTimeOnly other) => new WTimeSpan(this.TicksOfDay - other.TicksOfDay);
-
+        /// <inheritdoc/>
         public bool Equals(WTimeOnly other) => TicksOfDay == other.TicksOfDay;
 
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is WTimeOnly t && Equals(t);
 
+        /// <inheritdoc/>
         public override int GetHashCode() => TicksOfDay.GetHashCode();
 
-        // Formátování/parsování: "HH:MM:SS[.sub]" nebo ".sub" vynechej
-        public override string ToString() => ToString("O", null);
+        #endregion
 
-        public string ToString(string? format, IFormatProvider? _)
-        {
-            var s = WDateTime.Spec;
-            long rem = TicksOfDay;
-            int hh = (int)(rem / s.TicksPerHour); rem -= (long)hh * s.TicksPerHour;
-            int mm = (int)(rem / s.TicksPerMinute); rem -= (long)mm * s.TicksPerMinute;
-            int ss = (int)(rem / s.TicksPerSecond); rem -= (long)ss * s.TicksPerSecond;
-            if (rem != 0) return $"{hh:00}:{mm:00}:{ss:00}.{rem}";
-            return $"{hh:00}:{mm:00}:{ss:00}";
-        }
+        #region Formátování
+
+        /// <summary>
+        /// Vrátí raw <see cref="TicksOfDay"/> jako řetězec.
+        /// <para>
+        /// Pro čitelný formát (např. <c>06:30:00</c>) použij
+        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.Format(WTimeOnly)"/>.
+        /// </para>
+        /// </summary>
+        public override string ToString() => TicksOfDay.ToString();
+
+        #endregion
     }
 }
