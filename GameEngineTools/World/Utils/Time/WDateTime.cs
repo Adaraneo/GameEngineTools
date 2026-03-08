@@ -25,17 +25,17 @@ namespace GameEngineTools.World.Utils.Time
     /// Příklady:
     /// <code>
     /// // Vytvoření
-    /// var now  = _ctx.Now();
-    /// var dt   = _ctx.Create(1322, 7, 4, hour: 6);
+    /// var now  = _wtctx.Now();
+    /// var dt   = _wtctx.Create(1322, 7, 4, hour: 6);
     ///
     /// // Čistá matematika přímo na strukturách
-    /// var later   = now + _ctx.Hours(2);
+    /// var later   = now + _wtctx.Hours(2);
     /// var diff    = later - now;          // WTimeSpan
     /// bool isPast = dt &lt; now;
     ///
     /// // Operace závislé na kalendáři přes context
-    /// var (y, mo, d, h, m, s, _) = _ctx.GetParts(now);
-    /// string label                = _ctx.Format(now);
+    /// var (y, mo, d, h, m, s, _) = _wtctx.GetParts(now);
+    /// string label                = _wtctx.Format(now);
     /// </code>
     /// </para>
     /// </remarks>

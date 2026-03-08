@@ -21,16 +21,16 @@ namespace GameEngineTools.World.Utils.Time
     /// Příklady:
     /// <code>
     /// // Vytvoření
-    /// var time = _ctx.CreateTime(hour: 6, minute: 30, second: 0);
+    /// var time = _wtctx.CreateTime(hour: 6, minute: 30, second: 0);
     ///
     /// // Čistá matematika přímo na strukturách
     /// var diff     = timeA.Diff(timeB);   // WTimeSpan (bez wrapu)
-    /// bool isEarly = time &lt; _ctx.CreateTime(8, 0, 0);
+    /// bool isEarly = time &lt; _wtctx.CreateTime(8, 0, 0);
     ///
     /// // Operace závislé na spec přes context
-    /// var later        = _ctx.AddTime(time, _ctx.Hours(2));
-    /// var (h, m, s, _) = _ctx.GetTimeParts(time);
-    /// string label     = _ctx.Format(time);
+    /// var later        = _wtctx.AddTime(time, _wtctx.Hours(2));
+    /// var (h, m, s, _) = _wtctx.GetTimeParts(time);
+    /// string label     = _wtctx.Format(time);
     /// </code>
     /// </para>
     /// </remarks>

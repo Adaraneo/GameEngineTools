@@ -27,11 +27,11 @@ namespace GameEngineTools.World.Core.Time
     /// services.AddSingleton&lt;WorldTimeContext&gt;();
     ///
     /// // Použití
-    /// var now      = _ctx.Now();
-    /// var dt       = _ctx.Create(1322, 7, 4, hour: 6);
-    /// var twoHours = _ctx.Hours(2);
+    /// var now      = _wtctx.Now();
+    /// var dt       = _wtctx.Create(1322, 7, 4, hour: 6);
+    /// var twoHours = _wtctx.Hours(2);
     /// var later    = dt + twoHours;
-    /// string label = _ctx.Format(dt);    // "1322-07-04T06:00:00"
+    /// string label = _wtctx.Format(dt);    // "1322-07-04T06:00:00"
     /// </code>
     /// </para>
     /// </remarks>

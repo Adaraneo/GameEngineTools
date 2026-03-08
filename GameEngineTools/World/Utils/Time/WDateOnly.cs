@@ -23,7 +23,7 @@ namespace GameEngineTools.World.Utils.Time
     /// Příklady:
     /// <code>
     /// // Vytvoření
-    /// var date = _ctx.CreateDate(1322, 7, 4);
+    /// var date = _wtctx.CreateDate(1322, 7, 4);
     ///
     /// // Čistá matematika přímo na strukturách
     /// var tomorrow   = date.AddDays(1);
@@ -31,9 +31,9 @@ namespace GameEngineTools.World.Utils.Time
     /// bool isPast    = date &lt; today;
     ///
     /// // Operace závislé na kalendáři přes context
-    /// var nextMonth  = _ctx.AddMonths(date, 1);
-    /// var (y, m, d)  = _ctx.GetDateParts(date);
-    /// string label   = _ctx.Format(date);
+    /// var nextMonth  = _wtctx.AddMonths(date, 1);
+    /// var (y, m, d)  = _wtctx.GetDateParts(date);
+    /// string label   = _wtctx.Format(date);
     /// </code>
     /// </para>
     /// </remarks>
