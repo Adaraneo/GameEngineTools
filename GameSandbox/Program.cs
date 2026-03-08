@@ -100,6 +100,24 @@ for (int d = 0; d < 30; d++)
         if (playerOutcome != null)
             significantOtherPerson.ReceiveEvent(playerOutcome);
 
+        #region ToRemove?
+        // ── Player's ReachOut → NPC ──
+        var playerReachOut = playerPerson.LastOutbox
+            .OfType<ActionCommitted>()
+            .FirstOrDefault(a => a.ActionName == "ReachOut");
+
+        if (playerReachOut != null)
+        {
+            var initiated = new InteractionProposed(now, playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ehm... ahoj.");
+            significantOtherPerson.ReceiveEvent(initiated);
+            significantOtherPerson.Tick(now, dt);
+            var npcOutcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+            if (npcOutcome != null)
+                playerPerson.ReceiveEvent(npcOutcome);
+        }
+
+        #endregion
+
         now += dt;
     }
 }
