@@ -43,7 +43,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             switch (@event)
             {
                 case Characters.Engines.Behavior.ActionCommitted ac:
-                    Encode(new EpisodicMemory(Guid.NewGuid(), ac.OccurredAt, $"Action:{ac.ActionName}", SalienceForAction(ac.ActionName, ctx), EmotionFromValence(ctx.Snapshot.Psychology.Valence), Strength: 0.6), ctx, outbox);
+                    Encode(new EpisodicMemory(Guid.NewGuid(), ac.OccurredAt, $"Action:{ac.ActionName}", SalienceForAction(ac.ActionName, ctx), EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence), Strength: 0.6), ctx, outbox);
                     break;
 
                 case Characters.Engines.Interactions.InteractionOutcome io:
@@ -122,13 +122,18 @@ namespace GameEngineTools.Characters.Engines.Memory
             };
         }
 
-        private EmotionalTag EmotionFromValence(double v)
+        private static EmotionalTag EmotionFor(string actionName, double valence)
         {
-            return v switch
+            return actionName switch
             {
-                > 0.2 => EmotionalTag.Positive,
-                < -0.2 => EmotionalTag.Negative,
-                _ => EmotionalTag.Neutral
+                "InviteIntimacy" or "ReachOut" or "SelfCare" => EmotionalTag.Positive,
+                "Flee" or "Fight" => EmotionalTag.Negative,
+                _ => valence switch
+                {
+                    > 0.05 => EmotionalTag.Positive,
+                    < -0.05 => EmotionalTag.Negative,
+                    _ => EmotionalTag.Neutral
+                }
             };
         }
 

@@ -40,7 +40,7 @@
         {
             foreach (var nppc in nppcs)
             {
-                var filename = string.Format("{2}_{0}_{1}.txt", nppc.Person.ToString(), nppc.Person.Id, nppc.GetType().Name);
+                var filename = string.Format("{2}_{0}_{1}.txt", nppc.Person.ToString(), nppc.Person.Id.Value, nppc.GetType().Name);
                 var dirinfo = new DirectoryInfo(directory);
                 dirinfo.CreateSubdirectory("Logs");
                 var path = Path.Combine(directory, "Logs", filename);
