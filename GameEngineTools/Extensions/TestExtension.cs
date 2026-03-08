@@ -48,7 +48,7 @@ namespace GameEngineTools.Extensions
                 ?? firstName.Original;
 
             sb.AppendLine($"Name: {displayName} {surname}");
-            sb.AppendLine($"Born in year: {identity.BirthDate.Year}");
+            sb.AppendLine($"Born in year: {identity.BirthDate}");
 
             if (basicInfo) return sb.ToString();
 

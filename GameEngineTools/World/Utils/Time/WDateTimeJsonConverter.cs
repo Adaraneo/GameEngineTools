@@ -10,19 +10,23 @@ namespace GameEngineTools.World.Utils.Time
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using System.Threading.Tasks;
+    using GameEngineTools.World.Core.Time;
 
     public sealed class WDateTimeJsonConverter : JsonConverter<WDateTime>
     {
+        private readonly WorldTimeContext _wtctx;
+
+        public WDateTimeJsonConverter(WorldTimeContext wtctx) => _wtctx = wtctx;
         public override WDateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.String) throw new JsonException("WDateTime očekává JSON string.");
             var s = reader.GetString();
-            if (s is null || !WDateTime.TryParse(s, out var v))
+            if (s is null || !_wtctx.TryParse(s, out var v))
                 throw new JsonException($"Neplatný WDateTime: '{s}'.");
             return v;
         }
 
         public override void Write(Utf8JsonWriter writer, WDateTime value, JsonSerializerOptions options)
-            => writer.WriteStringValue(value.ToString());
+            => writer.WriteStringValue(_wtctx.Format(value));
     }
 }

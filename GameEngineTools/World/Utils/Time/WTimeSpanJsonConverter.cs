@@ -1,11 +1,15 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using GameEngineTools.World.Core.Time;
 
 namespace GameEngineTools.World.Utils.Time
 {
     public sealed class WTimeSpanJsonConverter : JsonConverter<WTimeSpan>
     {
-        private static bool TryParseGeneral(string s, out WTimeSpan span)
+        private readonly WorldTimeContext _wtctx;
+
+        public WTimeSpanJsonConverter(WorldTimeContext wtctx) => _wtctx = wtctx;
+        private bool TryParseGeneral(string s, out WTimeSpan span)
         {
             span = default;
             s = s.Trim();
@@ -40,7 +44,7 @@ namespace GameEngineTools.World.Utils.Time
             }
 
             // validace v rámci spec
-            var spec = WDateTime.Spec;
+            var spec = _wtctx.Spec;
             if (hh < 0 || hh >= spec.HoursPerDay) return false;
             if (mm < 0 || mm >= spec.MinutesPerHour) return false;
             if (ss < 0 || ss >= spec.SecondsPerMinute) return false;

@@ -9,6 +9,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using System.Text;
     using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -21,11 +22,13 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         private double _accHours;
         private readonly ILogger _log;
+        private readonly WorldTimeContext _wtctx;
 
-        public DefaultMemoryEngine(IOptions<MemoryConfig> cfg, ILoggerFactory loggerFactory)
+        public DefaultMemoryEngine(IOptions<MemoryConfig> cfg, ILoggerFactory loggerFactory, WorldTimeContext wtctx)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger("Characters.Memory");
+            _wtctx = wtctx;
             State = new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>());
         }
 
@@ -70,7 +73,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
-            var h = Math.Max(0, dt.TotalHours);
+            var h = Math.Max(0, _wtctx.TotalHours(dt));
             _accHours += h;
 
             // Zapomínání – lineární jednoduché (pro start)

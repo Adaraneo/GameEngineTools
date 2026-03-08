@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -16,12 +17,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
+        private readonly WorldTimeContext _wtctx;
 
-        public DefaultPsychologyEngine(IOptions<PsychologyConfig> cfg, ILoggerFactory loggerFactory, IRandomSource rng)
+        public DefaultPsychologyEngine(IOptions<PsychologyConfig> cfg, ILoggerFactory loggerFactory, IRandomSource rng, WorldTimeContext wtctx)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger("Characters.Psychology");
             _rng = rng;
+            _wtctx = wtctx;
 
             State = new PsychologyState(
                 Valence: 0.1, Arousal: 0.4, Dominance: 0.5,
@@ -30,7 +33,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
-            var h = Math.Max(0, dt.TotalHours);
+            var h = Math.Max(0, _wtctx.TotalHours(dt));
             var s = State;
             var ph = ctx.Snapshot.Physiology;
 

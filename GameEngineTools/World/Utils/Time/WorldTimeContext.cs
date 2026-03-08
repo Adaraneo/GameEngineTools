@@ -553,7 +553,7 @@ namespace GameEngineTools.World.Core.Time
         /// <summary>
         /// Vrátí aktuální herní čas z připojeného <see cref="IWorldClock"/>.
         /// </summary>
-        public WDateTime Now() => _clock.Now;
+        public WDateTime Now() => new WDateTime(_clock.NowWorldTicks());
 
         /// <summary>
         /// Maximální bezpečně reprezentovatelná hodnota — největší násobek

@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -20,6 +21,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
         private readonly MenstrualCycleConfig _cycleCfg;
+        private readonly WorldTimeContext _wtctx;
 
         private double _accHours;
         private bool _mensesOn;
@@ -30,13 +32,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
             ILoggerFactory loggerFactory,
             IRandomSource rng,
             SexBiology biology,
-            WDateOnly now)
+            WDateOnly now,
+            WorldTimeContext wtctx)
         {
             Config = cfg.Value;
             _cycleCfg = cycleCfg.Value;
 
             _log = loggerFactory.CreateLogger("Characters.Physiology");
             _rng = rng;
+            _wtctx = wtctx;
 
             var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female)
                 ? SeedCycle(_cycleCfg, rng, now)
@@ -131,7 +135,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             if (@event is not Behavior.ActionCommitted ac) return;
 
-            var h = Math.Max(0, ac.Duration.TotalHours);
+            var h = Math.Max(0, _wtctx.TotalHours(ac.Duration));
             var s = State;
 
             s = ac.ActionName switch
@@ -244,7 +248,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 LastMensesStart: lastMensesStart);
         }
 
-        private static double SafeHours(WTimeSpan dt) => Math.Max(0, dt.TotalHours);
+        private double SafeHours(WTimeSpan dt) => Math.Max(0, _wtctx.TotalHours(dt));
         private static double Normal(IRandomSource r, double mean, double std)
         {
             // Box-Muller

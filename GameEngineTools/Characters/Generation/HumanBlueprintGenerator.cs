@@ -14,15 +14,17 @@ namespace GameEngineTools.Characters.Generation
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
 
     public sealed record HumanBlueprintRequest(SexBiology? Sex = null, WDateOnly? MinBirthDate = null, WDateOnly? MaxBirthDate = null, PersonalityHints? PersonalityHints = null, PersonalitySpec? PersonalitySpec = null, int? Seed = null);
 
     public sealed record HumanBlueprintSpec((double Female, double Male, double Intersex, double Unknown) SexWeights, WDateOnly DefaultMinBirthDate, WDateOnly DefaultMaxBirthDate)
     {
-        public static HumanBlueprintSpec Default(WDateOnly now, int minAgeYears = 0, int maxAgeYears = 100)
+        public static HumanBlueprintSpec Default(WDateOnly now, WorldTimeContext wtctx, int minAgeYears = 0, int maxAgeYears = 100)
         {
-            var daysInYear = WDateTime.Spec.Calendar.DaysInYear(now.Year);
+            var (year, _, _) = wtctx.GetDateParts(now);
+            var daysInYear = wtctx.Spec.Calendar.DaysInYear(year);
             var minAgeDays = minAgeYears * daysInYear;
             var maxAgeDays = maxAgeYears * daysInYear;
 

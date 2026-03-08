@@ -31,6 +31,7 @@ namespace GameEngineTools
         private List<Weapon> _weapons = new List<Weapon>();
         private IServiceProvider _serviceProvider = default!;
         private readonly IRandomSourceFactory _rngFactory;
+        private readonly WorldTimeContext _wtctx;
         
         private void LoadResources()
         {
@@ -44,13 +45,15 @@ namespace GameEngineTools
             IRandomSourceFactory rngFactory,
             IOptions<GameEngineToolsManagerOptions> opt,
             ILogger<GameEngineToolsManager> log,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            WorldTimeContext wtctx)
         {
             _opt = opt.Value;
             _log = log;
             _clock = clock;
             _rngFactory = rngFactory;
             _serviceProvider = serviceProvider;
+            _wtctx = wtctx;
         }
 
         /// <summary>
@@ -59,8 +62,6 @@ namespace GameEngineTools
         public Dictionary<Type, object> Items { get; } = new Dictionary<Type, object>();
 
         public List<CharacterBase> NPPCs { get; } = new List<CharacterBase>();
-
-        //public IServiceProvider ServiceProvider { get; private set; } = default!;
 
         private IClock _clock;
 
@@ -92,8 +93,18 @@ namespace GameEngineTools
 
             var rng = _rngFactory.Create(Environment.TickCount);
 
-            var minBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - maxAge, rng.Next(1, (WDateTime.Spec.Calendar.MonthsInYear(now.Year))), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
-            var maxBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - minAge, rng.Next(1, (WDateTime.Spec.Calendar.MonthsInYear(now.Year))), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
+            var (year, _, day, hour, minute, second, _) = _wtctx.GetParts(now);
+            var monthsInYear = _wtctx.Spec.Calendar.MonthsInYear(year);
+            var minBirth = _wtctx.GetDate(_wtctx.Create(
+                year - maxAge,
+                rng.Next(1, monthsInYear),
+                rng.Next(1, day),
+                hour, minute, second));
+            var maxBirth = _wtctx.GetDate(_wtctx.Create(
+                year - maxAge,
+                rng.Next(1, monthsInYear),
+                rng.Next(1, day),
+                hour, minute, second));
             var characterFactory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
                 new HumanBlueprintRequest(
