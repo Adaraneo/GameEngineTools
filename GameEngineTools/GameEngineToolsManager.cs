@@ -115,11 +115,12 @@ namespace GameEngineTools
 
         public IHuman RandomizePerson(PC player)
         {
+            var birth = player.Person.Identity.BirthDate.Bind(_wtctx);
             var characterFactory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
             new HumanBlueprintRequest(
-                MinBirthDate: player.Person.Identity.BirthDate.AddYears(-5),
-                MaxBirthDate: player.Person.Identity.BirthDate.AddYears(5),
+                MinBirthDate: birth.AddYears(-5),
+                MaxBirthDate: birth.AddYears(5),
                 Sex: player.Person.Biology == SexBiology.Male ? SexBiology.Female : SexBiology.Male));
 
             return characterFactory.Create(hpb);
