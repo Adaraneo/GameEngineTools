@@ -3,34 +3,38 @@ using GameEngineTools;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Generation;
+using GameEngineTools.Config;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
+using GameEngineTools.World.Core.Calendars;
+using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
 
 const int maxHealth = 100;
 
-var gamteTimePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GameTime.txt");
+var gameTimePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GameTime.txt");
 
-WDateTime initNow = new WDateTime(1,1,1,0,0,0);
-if (File.Exists(gamteTimePath))
-{
-    if (!WDateTime.TryParse(File.ReadAllText(gamteTimePath), out initNow))
-    {
-        throw new InvalidOperationException("Unable to parse WDateTime");
-    }
-}
+var spec = GameEngineToolsRuntime.LoadSpec();
 
-await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(initNow.DateOnly), initNow, generatedFileOptions: new GeneratedFileOptions
+var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(gameTimePath), out var saved)
+    ? saved
+    : spec.Calendar.DaysFromDate(1324, 1, 1) * spec.TicksPerDay;
+
+var initNow = new WDateTime(initTicks);
+
+await using var runtime = await GameEngineToolsRuntime.StartAsync(initNow, generatedFileOptions: new GeneratedFileOptions
 {
     PlayerDirectory = TFSC.player,
     NPCDirectory = TFSC.NPCs
 }, timescale: 1);
-var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 
-var manager = runtime.GameEngineToolsManager as GameEngineToolsManager;
+var wtctx = runtime.Services.GetRequiredService<WorldTimeContext>();
+var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
+var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
 
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
@@ -63,7 +67,7 @@ var significantOtherPerson = significantOther.Person;
 //PrintSymbolicRelationsInfoAccordingToPlayer(manager.NPPCs.ToArray());
 //PrintSymbolicRelationsInfo(families.ToArray());
 
-File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.ToString()}.log.txt"), player.PrintInfo(false));
+File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(false));
 
 Console.WriteLine("Now: {0}", clock.Now);
 Console.WriteLine("Player: {0}", player.PrintInfo(true));
@@ -75,7 +79,7 @@ PressAnyKeyToContinueM();
 //clock.Start();
 
 var now = clock.Now;
-var dt = WTimeSpan.FromHours(0.5);
+var dt = wtctx.Hours(0.5);
 
 for (int d = 0; d < 30; d++)
 {
@@ -83,7 +87,7 @@ for (int d = 0; d < 30; d++)
     {
         if (d == 2 && i == 8)
         {
-            var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
+            var smallTalk = new InteractionProposed(now + wtctx.Minutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
             significantOtherPerson.ReceiveEvent(smallTalk);
         }
 
@@ -139,7 +143,7 @@ Console.WriteLine(significantOther.PrintInfo(false));
 
 PressAnyKeyToContinueM();
 
-File.WriteAllText(gamteTimePath, clock.Now.ToString());
+File.WriteAllText(gameTimePath, clock.Now.WorldTicks.ToString());
 
 void PressAnyKeyToContinueM(bool clear = false)
 {
