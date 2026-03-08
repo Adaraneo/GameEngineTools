@@ -1,4 +1,4 @@
-﻿// ServiceCollectionExtensions.cs
+// ServiceCollectionExtensions.cs
 // Copyright (c) 50PSoftware
 
 using GameEngineTools.Characters.Core;
@@ -12,6 +12,7 @@ using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Constants;
 using GameEngineTools.FileSystem;
+using GameEngineTools.World.Core.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -19,50 +20,110 @@ using Microsoft.Extensions.Options;
 
 namespace GameEngineTools.Characters.Hosting
 {
-
+    /// <summary>
+    /// Extension metody pro <see cref="IServiceCollection"/> — registrace herních systémů do DI.
+    /// </summary>
     public static class ServiceCollectionExtensions
     {
+        #region Core
+
         /// <summary>
         /// Zaregistruje jádro (EventBus, Scheduler, RNG factory, HumanFactory).
-        /// Defaulty jsou "in-memory" a dají se přepsat vlastními implementacemi dřív/nebo později v pipeline.
+        /// Defaulty jsou "in-memory" a dají se přepsat vlastními implementacemi dřív nebo
+        /// později v pipeline přes <c>TryAdd*</c> sémantiku.
         /// </summary>
         public static IServiceCollection AddCharactersCore(this IServiceCollection services)
         {
             services.TryAddTransient<IEventBus, InMemoryEventBus>();
             services.TryAddTransient<IScheduler, SimpleScheduler>();
             services.TryAddSingleton<IRandomSourceFactory, RandomSourceFactory>();
-
             services.TryAddSingleton<IHumanFactory, DefaultHumanFactory>();
-
             return services;
         }
 
-        private static IServiceCollection AddPersonalityGenerator(this IServiceCollection services)
-        => services.AddSingleton<IPersonalityGenerator, PersonalityGenerator>();
+        #endregion
 
-        private static IServiceCollection AddAppearanceGenerator(this IServiceCollection services)
-        => services.AddSingleton<IAppearanceGenerator, AppearanceGenerator>();
+        #region CharacterGeneration
 
-        public static IServiceCollection AddCharacterGeneration(this IServiceCollection services, HumanBlueprintSpec humanBlueprintSpec)
+        /// <summary>
+        /// Zaregistruje generátor postav s předem vytvořeným <see cref="HumanBlueprintSpec"/>.
+        /// </summary>
+        /// <param name="services">DI kolekce.</param>
+        /// <param name="humanBlueprintSpec">Specifikace blueprintu — váhy pohlaví, výchozí rozsah věku.</param>
+        /// <remarks>
+        /// Pokud potřebuješ spec sestavit až po startu DI (např. z <see cref="WorldTimeContext"/>),
+        /// použij overload <see cref="AddCharacterGeneration(IServiceCollection, Func{IServiceProvider, HumanBlueprintSpec})"/>.
+        /// </remarks>
+        public static IServiceCollection AddCharacterGeneration(
+            this IServiceCollection services,
+            HumanBlueprintSpec humanBlueprintSpec)
         {
             services.AddSingleton(humanBlueprintSpec);
+            return services.AddCharacterGenerationCore();
+        }
+
+        /// <summary>
+        /// Zaregistruje generátor postav s lazy factory pro <see cref="HumanBlueprintSpec"/>.
+        /// Factory je vyhodnocena až při prvním resolve — v té době je DI kontejner plně sestaven,
+        /// takže může záviset na libovolném singletons (typicky <see cref="WorldTimeContext"/>).
+        /// </summary>
+        /// <param name="services">DI kolekce.</param>
+        /// <param name="specFactory">
+        /// Factory funkce pro sestavení <see cref="HumanBlueprintSpec"/> z DI provideru.
+        /// </param>
+        /// <example>
+        /// <code>
+        /// s.AddCharacterGeneration(sp =>
+        /// {
+        ///     var ctx = sp.GetRequiredService&lt;WorldTimeContext&gt;();
+        ///     return HumanBlueprintSpec.Default(ctx.GetDate(ctx.Now()), ctx);
+        /// });
+        /// </code>
+        /// </example>
+        public static IServiceCollection AddCharacterGeneration(
+            this IServiceCollection services,
+            Func<IServiceProvider, HumanBlueprintSpec> specFactory)
+        {
+            services.AddSingleton(specFactory);
+            return services.AddCharacterGenerationCore();
+        }
+
+        /// <summary>
+        /// Sdílená registrace generátorů — volaná oběma overloady <c>AddCharacterGeneration</c>.
+        /// </summary>
+        private static IServiceCollection AddCharacterGenerationCore(this IServiceCollection services)
+        {
             services.AddSingleton<IHumanBlueprintGenerator, HumanBlueprintGenerator>();
             services.AddSingleton<IIdentityGenerator>(_ =>
-                                                      {
-                                                          var femaleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.femaleNames, v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
-                                                          var maleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.maleNames, v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
-                                                          var surnames = CsvLoader.Load(FileSystemConstant.SourceFilePath.surnames, v => new Surname { Male = v[0], Female = v[1] });
-                                                          return new SimpleIdentityGenerator(
-                                                              femaleNames.ToArray(),
-                                                              maleNames.ToArray(),
-                                                              surnames.ToArray());
-                                                      });
+            {
+                var femaleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.femaleNames,
+                    v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
+                var maleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.maleNames,
+                    v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
+                var surnames = CsvLoader.Load(FileSystemConstant.SourceFilePath.surnames,
+                    v => new Surname { Male = v[0], Female = v[1] });
+
+                return new SimpleIdentityGenerator(
+                    femaleNames.ToArray(),
+                    maleNames.ToArray(),
+                    surnames.ToArray());
+            });
             services.AddAppearanceGenerator();
             services.AddPersonalityGenerator();
             return services;
         }
 
-        /// <summary>Registrace implementace Physiology engine + jeho Configu přes Options.</summary>
+        private static IServiceCollection AddPersonalityGenerator(this IServiceCollection services)
+            => services.AddSingleton<IPersonalityGenerator, PersonalityGenerator>();
+
+        private static IServiceCollection AddAppearanceGenerator(this IServiceCollection services)
+            => services.AddSingleton<IAppearanceGenerator, AppearanceGenerator>();
+
+        #endregion
+
+        #region Engine registrace
+
+        /// <summary>Registrace implementace Physiology engine + jeho konfigurace přes Options.</summary>
         public static IServiceCollection AddPhysiologyEngine<TImpl>(
             this IServiceCollection services,
             Action<PhysiologyConfig>? configure = null)
@@ -75,7 +136,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Psychology engine + jeho Configu přes Options.</summary>
+        /// <summary>Registrace implementace Psychology engine + jeho konfigurace přes Options.</summary>
         public static IServiceCollection AddPsychologyEngine<TImpl>(
             this IServiceCollection services,
             Action<PsychologyConfig>? configure = null)
@@ -88,7 +149,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Behavior engine + jeho Configu přes Options.</summary>
+        /// <summary>Registrace implementace Behavior engine + jeho konfigurace přes Options.</summary>
         public static IServiceCollection AddBehaviorEngine<TImpl>(
             this IServiceCollection services,
             Action<BehaviorConfig>? configure = null)
@@ -101,7 +162,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Interactions engine + jeho Configu přes Options.</summary>
+        /// <summary>Registrace implementace Interactions engine + jeho konfigurace přes Options.</summary>
         public static IServiceCollection AddInteractionEngine<TImpl>(
             this IServiceCollection services,
             Action<InteractionConfig>? configure = null)
@@ -114,7 +175,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Relationships engine + jeho Configu přes Options.</summary>
+        /// <summary>Registrace implementace Relationships engine + jeho konfigurace přes Options.</summary>
         public static IServiceCollection AddRelationshipsEngine<TImpl>(
             this IServiceCollection services,
             Action<RelationshipsConfig>? configure = null)
@@ -127,7 +188,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Memory engine + jeho Configu přes Options.</summary>
+        /// <summary>Registrace implementace Memory engine + jeho konfigurace přes Options.</summary>
         public static IServiceCollection AddMemoryEngine<TImpl>(
             this IServiceCollection services,
             Action<MemoryConfig>? configure = null)
@@ -140,24 +201,39 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
+        #endregion
+
+        #region Zkrácená registrace všeho najednou
+
         /// <summary>
-        /// Kompletní registrace „všeho“ najednou (krom tvých konkrétních implementací enginů, ty předáš generiky).
-        /// Příklad použití viz XML doc summary u <see cref="IHumanFactory"/>.
+        /// Zkrácená registrace všech enginů najednou.
+        /// Konkrétní implementace předáváš jako generické parametry.
         /// </summary>
+        /// <example>
+        /// <code>
+        /// services.AddCharacters&lt;
+        ///     DefaultPhysiologyEngine,
+        ///     DefaultPsychologyEngine,
+        ///     DefaultBehaviorEngine,
+        ///     DefaultInteractionEngine,
+        ///     DefaultRelationshipsEngine,
+        ///     DefaultMemoryEngine&gt;();
+        /// </code>
+        /// </example>
         public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem>(
             this IServiceCollection services,
-            Action<PhysiologyConfig>? physio = null,
-            Action<PsychologyConfig>? psych = null,
-            Action<BehaviorConfig>? behav = null,
-            Action<InteractionConfig>? inter = null,
-            Action<RelationshipsConfig>? rel = null,
-            Action<MemoryConfig>? mem = null)
+            Action<PhysiologyConfig>?   physio = null,
+            Action<PsychologyConfig>?   psych  = null,
+            Action<BehaviorConfig>?     behav  = null,
+            Action<InteractionConfig>?  inter  = null,
+            Action<RelationshipsConfig>? rel   = null,
+            Action<MemoryConfig>?       mem    = null)
             where TPhysio : class, IPhysiologyEngine
-            where TPsych : class, IPsychologyEngine
-            where TBehav : class, IBehaviorEngine
-            where TInter : class, IInteractionEngine
-            where TRel : class, IRelationshipsEngine
-            where TMem : class, IMemoryEngine
+            where TPsych  : class, IPsychologyEngine
+            where TBehav  : class, IBehaviorEngine
+            where TInter  : class, IInteractionEngine
+            where TRel    : class, IRelationshipsEngine
+            where TMem    : class, IMemoryEngine
         {
             services.AddCharactersCore()
                     .AddPhysiologyEngine<TPhysio>(physio)
@@ -169,5 +245,7 @@ namespace GameEngineTools.Characters.Hosting
 
             return services;
         }
+
+        #endregion
     }
 }
