@@ -12,7 +12,18 @@ using TFSC = GameEngineTools.Constants.TestFSConstatns;
 
 const int maxHealth = 100;
 
-await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(132, 1, 1)), generatedFileOptions: new GeneratedFileOptions
+var gamteTimePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GameTime.txt");
+
+WDateTime initNow = new WDateTime(1,1,1,0,0,0);
+if (File.Exists(gamteTimePath))
+{
+    if (!WDateTime.TryParse(File.ReadAllText(gamteTimePath), out initNow))
+    {
+        throw new InvalidOperationException("Unable to parse WDateTime");
+    }
+}
+
+await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(initNow.DateOnly), initNow, generatedFileOptions: new GeneratedFileOptions
 {
     PlayerDirectory = TFSC.player,
     NPCDirectory = TFSC.NPCs
@@ -96,7 +107,6 @@ for (int d = 0; d < 30; d++)
         if (playerOutcome != null)
             significantOtherPerson.ReceiveEvent(playerOutcome);
 
-        #region ToRemove?
         // ── Player's ReachOut → NPC ──
         var playerReachOut = playerPerson.LastOutbox
             .OfType<ActionCommitted>()
@@ -112,9 +122,8 @@ for (int d = 0; d < 30; d++)
                 playerPerson.ReceiveEvent(npcOutcome);
         }
 
-        #endregion
-
         now += dt;
+        clock.SetNow(now);
     }
 }
 
@@ -129,6 +138,8 @@ Console.WriteLine(player.PrintInfo(false));
 Console.WriteLine(significantOther.PrintInfo(false));
 
 PressAnyKeyToContinueM();
+
+File.WriteAllText(gamteTimePath, clock.Now.ToString());
 
 void PressAnyKeyToContinueM(bool clear = false)
 {

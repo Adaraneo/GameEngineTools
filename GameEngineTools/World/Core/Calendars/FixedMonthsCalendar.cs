@@ -57,6 +57,6 @@
 
         public bool IsLeapYear(int y) => _leapExtraDays(y) > 0;
 
-        public int MonthsInYear => _months.Length;
+        public int MonthsInYear(int year) => _months.Length;
     }
 }

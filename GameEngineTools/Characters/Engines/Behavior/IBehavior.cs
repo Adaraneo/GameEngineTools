@@ -16,9 +16,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
     }
 
     public sealed record BehaviorState(
-        // Deficity „drivů“ 0..100 (vyšší = silnější potřeba)
         double NeedRest, double NeedFood, double NeedWater, double NeedBelonging, double NeedCompetence, double NeedIntimacy,
-        PlannedAction? CurrentPlan);
+        PlannedAction? CurrentPlan,
+        IReadOnlyDictionary<string, double>? Cooldowns = null);
 
     public interface IBehaviorEngine : IEngine<BehaviorState, BehaviorConfig> { }
 

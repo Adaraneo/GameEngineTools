@@ -92,8 +92,8 @@ namespace GameEngineTools
 
             var rng = _rngFactory.Create(Environment.TickCount);
 
-            var minBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - maxAge, rng.Next(1, (WDateTime.Spec.Calendar as FixedMonthsCalendar)!.MonthsInYear), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
-            var maxBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - minAge, rng.Next(1, (WDateTime.Spec.Calendar as FixedMonthsCalendar)!.MonthsInYear), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
+            var minBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - maxAge, rng.Next(1, (WDateTime.Spec.Calendar.MonthsInYear(now.Year))), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
+            var maxBirth = WDateOnly.FromDateTime(new WDateTime(now.Year - minAge, rng.Next(1, (WDateTime.Spec.Calendar.MonthsInYear(now.Year))), rng.Next(1, now.Day), now.Hour, now.Minute, now.Second));
             var characterFactory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
                 new HumanBlueprintRequest(

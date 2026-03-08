@@ -77,9 +77,18 @@
         public WDateOnly AddMonths(int months)
         {
             Deconstruct(out var y, out var m, out var d);
+            var calendar = WDateTime.Spec.Calendar;
             m += months;
-            while (m < 1) { m += 12; y -= 1; }
-            while (m > 12) { m -= 12; y += 1; }
+            while (m < 1)
+            {
+                y -= 1;
+                m += calendar.MonthsInYear(y);
+            }
+            while (m > calendar.MonthsInYear(y))
+            {
+                m -= calendar.MonthsInYear(y);
+                y += 1;
+            }
             var daysInMonth = WDateTime.Spec.Calendar.DaysInMonth(y, m);
             if (d > daysInMonth) d = daysInMonth;
             return FromParts(y, m, d);

@@ -25,19 +25,19 @@ namespace GameEngineTools
 {
     public static class GameEngineToolsRuntime
     {
-        private static IWorldClock DefaultWorldClock(IOptions<InitWorldClockConfig> opt, double timescale = 1) => InitWorldClock(opt, timescale);
+        private static IWorldClock DefaultWorldClock(IOptions<InitWorldClockConfig> opt, WDateTime now, double timescale = 1) => InitWorldClock(opt, now, timescale);
 
-        private static IWorldClock InitWorldClock(IOptions<InitWorldClockConfig> opts, double timescale = 1)
+        private static IWorldClock InitWorldClock(IOptions<InitWorldClockConfig> opts, WDateTime now, double timescale = 1)
         {
             var calendar = new FixedMonthsCalendar(opts.Value.DaysInMonths, y => y % opts.Value.LeapYearInterval == 0 ? opts.Value.LeapExtraDays : 0);
             var spec = new WorldTimeSpec(opts.Value.TicksPerSecond, opts.Value.SecondsPerMinute, opts.Value.MinutesPerHour, opts.Value.HoursPerDay, calendar);
             WDateTime.Use(spec);
-            var worldClock = WorldClock.AlignNow(spec, WDateTime.FromParts(1322, 10, 12, 6), timescale);
+            var worldClock = WorldClock.AlignNow(spec, now, timescale);
             WDateTime.UseClock(worldClock);
             return worldClock;
         }
 
-        public static async Task<GameEngineToolsRuntimeHandle> StartAsync(HumanBlueprintSpec humanBlueprintSpec, bool consoleLogs = true, string logsRoot = "logs", GeneratedFileOptions? generatedFileOptions = null, double timescale = 1)
+        public static async Task<GameEngineToolsRuntimeHandle> StartAsync(HumanBlueprintSpec humanBlueprintSpec, WDateTime beginning, bool consoleLogs = true, string logsRoot = "logs", GeneratedFileOptions? generatedFileOptions = null, double timescale = 1)
         {
             var host = Host.CreateDefaultBuilder()
                 .ConfigureLogging(lb =>
@@ -65,7 +65,7 @@ namespace GameEngineTools
                         cfg.GetSection($"InitWorldClock:{worldTypeConfig}").Bind(opt);
                     });
 
-                    s.AddSingleton<IWorldClock>(sp => DefaultWorldClock(sp.GetRequiredService<IOptions<InitWorldClockConfig>>(), timescale));
+                    s.AddSingleton<IWorldClock>(sp => DefaultWorldClock(sp.GetRequiredService<IOptions<InitWorldClockConfig>>(), beginning, timescale));
                     s.AddSingleton<IClock, SystemClock>();
                     s.AddSingleton<IGeneratedFile, GeneratedFile>();
                     s.Configure<GeneratedFileOptions>(opt =>

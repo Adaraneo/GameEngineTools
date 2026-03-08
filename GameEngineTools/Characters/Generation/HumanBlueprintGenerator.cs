@@ -26,8 +26,18 @@ namespace GameEngineTools.Characters.Generation
             var minAgeDays = minAgeYears * daysInYear;
             var maxAgeDays = maxAgeYears * daysInYear;
 
-            var minBirth = now.AddDays(-maxAgeDays);
+            WDateOnly minBirth;
+            try
+            {
+                minBirth = now.AddDays(-maxAgeDays);    
+            }
+            catch (ArgumentOutOfRangeException outOfRangeEx)
+            {
+                minBirth = now.AddDays(30); // TODO, change to lunar.
+            }
+
             var maxBirth = now.AddDays(-minAgeDays);
+
 
             return new HumanBlueprintSpec(
                 (Female: 0.49, Male: 0.49, Intersex: 0.01, Unknown: 0.01),

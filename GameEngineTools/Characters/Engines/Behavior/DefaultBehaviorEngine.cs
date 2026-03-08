@@ -23,23 +23,41 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _log = loggerFactory.CreateLogger("Characters.Behavior");
             State = new BehaviorState(
                 NeedRest: 40, NeedFood: 30, NeedWater: 25, NeedBelonging: 50, NeedCompetence: 50, NeedIntimacy: 35,
-                CurrentPlan: null);
+                CurrentPlan: null,
+                Cooldowns: new Dictionary<string, double>());
         }
+
+        private void SetCooldown(string action, double hours)
+        {
+            var dict = new Dictionary<string, double>(State.Cooldowns ?? new Dictionary<string,double>());
+            dict[action] = hours;
+            State = State with { Cooldowns = dict };
+            _log.LogDebug("[COOLDOWN] new Cooldown for {Action}:{Hours}", action, hours);
+        }
+
+        private static double CooldownFor(IReadOnlyDictionary<string, double> cd, string action)
+            => cd.TryGetValue(action, out var v) ? v : 0;
 
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
             var h = Math.Max(0, dt.TotalHours);
+
+            var updatedCooldowns = (State.Cooldowns ?? new Dictionary<string, double>()).ToDictionary(kv => kv.Key, kv => Math.Max(0, kv.Value - h));
+
             var ph = ctx.Snapshot.Physiology;
             var ps = ctx.Snapshot.Psychology;
             var rel = ctx.Snapshot.Relationships;
+
+            var belCd = CooldownFor(updatedCooldowns, "ReachOut");
+            var intiCd = CooldownFor(updatedCooldowns, "InviteInimacy");
 
             // Přepočet potřeb z aktuálního stavu
             var needRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2);
             var needFood = Clamp01p(ph.Hunger);
             var needWater = Clamp01p(ph.Thirst);
-            var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15));
+            var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15) - belCd * 5);
             var needComp = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2);
-            var needInti = ComputeIntimacyNeed(ctx, ph, rel, ps);
+            var needInti = ComputeIntimacyNeed(ctx, ph, rel, ps) - intiCd * 8;
 
             // Volba akce (utility = potřeba * váha motivace; setrvačnost + penalizace monotónnosti)
             var candidates = new List<(string Name, double Utility, WTimeSpan Dur)>
@@ -82,7 +100,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             outbox.Add(new ActionProposed(now, ctx.Id, chosen.Name, chosen.Utility));
             outbox.Add(new ActionCommitted(now, ctx.Id, chosen.Name, chosen.Dur));
 
-            State = new BehaviorState(needRest, needFood, needWater, needBel, needComp, needInti, plan);
+            State = new BehaviorState(needRest, needFood, needWater, needBel, needComp, needInti, plan, updatedCooldowns);
             _log.LogInformation("[Behavior] Nová akce: '{Action}' (utility={Utility:F2}, trvání={Duration}).", chosen.Name, chosen.Utility, chosen.Dur);
 
             // ---- locals ----
@@ -104,9 +122,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
             switch (@event)
             {
                 case ActionCommitted ac when ac.ActionName == "ReachOut":
-                    // Po ReachOut dočasně snížíme NeedBelonging
-                    var reduced = State with { NeedBelonging = Math.Max(0, State.NeedBelonging - 20) };
-                    State = reduced;
+                    SetCooldown("ReachOut", 4);
+                    break;
+
+                case ActionCommitted ac when ac.ActionName == "InviteIntimacy":
+                    SetCooldown("InviteIntimacy", 6);
                     break;
             }
         }
