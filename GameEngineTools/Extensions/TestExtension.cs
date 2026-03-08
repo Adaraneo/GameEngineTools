@@ -3,42 +3,17 @@
 
 namespace GameEngineTools.Extensions
 {
+    using System.Collections;
     using System.Data;
+    using System.Reflection;
     using System.Text;
     using GameEngineTools;
+    using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.World.Utils.Time;
 
     public static class TestExtension
     {
-        //internal static string WithWho(this CivilStatus status, in IHuman person, bool withDNA = false)
-        //{
-        //    string information = null;
-        //    Person other = null;
-        //    string fullName = null;
-        //    RelationshipModel relations = null;
-        //    foreach (var relation in person.Relationships.Values)
-        //    {
-        //        if (relation.BondKind == BondKind.RomanticInterest)
-        //        {
-        //            relations = relation;
-        //        }
-        //    }
-
-        //    switch (status)
-        //    {
-        //        case CivilStatus.InRelationship:
-        //        case CivilStatus.Engaged:
-        //        case CivilStatus.Married:
-        //            other = NPPC.People.FindByDNA(relations!.TargetId);
-        //            break;
-        //    }
-
-        //    fullName = other == null ? string.Empty : other.Name.ToString() + " " + other.Surname;
-        //    information = other == null ? string.Empty : (withDNA ? fullName + "\n\tDNA: " + other.Body.DNA : fullName);
-        //    return information;
-        //}
-
         public static List<CharacterBase> CreateFamilyForPlayer(this GameEngineToolsManager instance, PC player)
         {
             throw new NotImplementedException();
@@ -55,21 +30,119 @@ namespace GameEngineTools.Extensions
             }
         }
 
+        #region ByClaude
+
         public static string PrintInfo(this CharacterBase nppc, bool basicInfo = true, bool withDNA = false)
         {
-            var sbResult = new StringBuilder();
             var person = nppc.Person;
-            var name = person.Identity.FirstName;
-            var surname = person.Biology == Characters.Core.SexBiology.Female ? person.Identity.LastName.Female : person.Identity.LastName.Male;
-            sbResult.AppendLine($"Name: {(string.IsNullOrEmpty(name.Familiar[0]) ? name.Original : name.Familiar[new Random().Next(0, name.Familiar.Length)])} {surname}");
-            sbResult.AppendLine($"Born in: {person.Identity.BirthDate.Year}");
+            var identity = person.Identity;
+            var sb = new StringBuilder();
 
-            if (!basicInfo)
+            // --- Základní info ---
+            var firstName = identity.FirstName;
+            var surname = person.Biology == SexBiology.Female
+                ? identity.LastName.Female
+                : identity.LastName.Male;
+
+            var displayName = firstName.Familiar.FirstOrDefault(f => !string.IsNullOrEmpty(f))
+                ?? firstName.Original;
+
+            sb.AppendLine($"Name: {displayName} {surname}");
+            sb.AppendLine($"Born in year: {identity.BirthDate.Year}");
+
+            if (basicInfo) return sb.ToString();
+
+            // --- Snapshot ---
+            sb.AppendLine();
+            foreach (var snapshotProp in person.Snapshot.GetType().GetProperties())
             {
-
+                sb.AppendLine($"[{snapshotProp.Name.ToUpperInvariant()}]");
+                var stateObj = snapshotProp.GetValue(person.Snapshot);
+                AppendValue(sb, stateObj, indent: 1);
+                sb.AppendLine();
             }
 
-            return sbResult.ToString();
+            return sb.ToString();
         }
+
+        private static void AppendValue(StringBuilder sb, object? obj, int indent, HashSet<object>? visited = null)
+        {
+            if (obj is null) return;
+
+            var pad = new string(' ', indent * 2);
+            var type = obj.GetType();
+
+            // Primitivy, string, enum, Guid — rovnou vypíšeme
+            if (type.IsPrimitive || type.IsEnum || obj is string || obj is Guid)
+            {
+                sb.AppendLine($"{pad}{obj}");
+                return;
+            }
+
+            // ✅ Tvoje W-typy mají hezký ToString() — použijeme ho
+            if (type.Namespace == "GameEngineTools.World.Utils.Time")
+            {
+                sb.AppendLine($"{pad}{obj}");
+                return;
+            }
+
+            // Cyklus pro referenční typy
+            if (!type.IsValueType)
+            {
+                visited ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
+                if (!visited.Add(obj))
+                {
+                    sb.AppendLine($"{pad}[circular reference]");
+                    return;
+                }
+            }
+
+            // Dictionary
+            if (obj is IDictionary dict)
+            {
+                foreach (DictionaryEntry entry in dict)
+                {
+                    sb.AppendLine($"{pad}[{entry.Key}]");
+                    AppendValue(sb, entry.Value, indent + 1, visited);
+                }
+                return;
+            }
+
+            // Kolekce
+            if (obj is IEnumerable enumerable && obj is not string)
+            {
+                int i = 0;
+                foreach (var item in enumerable)
+                {
+                    sb.AppendLine($"{pad}[{i++}]");
+                    AppendValue(sb, item, indent + 1, visited);
+                }
+                return;
+            }
+
+            // Record / komplexní objekt
+            foreach (var prop in type.GetProperties())
+            {
+                var value = prop.GetValue(obj);
+                var valueType = value?.GetType();
+
+                bool isSimple = value is null
+                    || value is string
+                    || value is Guid
+                    || (valueType?.IsPrimitive ?? false)
+                    || (valueType?.IsEnum ?? false)
+                    || valueType?.Namespace == "GameEngineTools.World.Utils.Time";
+
+                if (isSimple)
+                    sb.AppendLine($"{pad}{prop.Name}: {value ?? "null"}");
+                else
+                {
+                    sb.AppendLine($"{pad}{prop.Name}:");
+                    AppendValue(sb, value, indent + 1, visited);
+                }
+            }
+        }
+
+        #endregion
     }
 }

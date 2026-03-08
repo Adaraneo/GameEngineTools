@@ -1,14 +1,10 @@
 ﻿// See https://aka.ms/new-console-template for more information
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using GameEngineTools;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
-using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
-using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
@@ -16,7 +12,7 @@ using TFSC = GameEngineTools.Constants.TestFSConstatns;
 
 const int maxHealth = 100;
 
-await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(132,1,1)), generatedFileOptions: new GeneratedFileOptions
+await using var runtime = await GameEngineToolsRuntime.StartAsync(HumanBlueprintSpec.Default(WDateOnly.FromParts(132, 1, 1)), generatedFileOptions: new GeneratedFileOptions
 {
     PlayerDirectory = TFSC.player,
     NPCDirectory = TFSC.NPCs
@@ -59,8 +55,8 @@ var significantOtherPerson = significantOther.Person;
 File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.ToString()}.log.txt"), player.PrintInfo(false));
 
 Console.WriteLine("Now: {0}", clock.Now);
-Console.WriteLine("Player: {0}", player.PrintInfo(false));
-Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(false));
+Console.WriteLine("Player: {0}", player.PrintInfo(true));
+Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(true));
 
 Console.WriteLine("==========================================================");
 
@@ -72,7 +68,7 @@ var dt = WTimeSpan.FromHours(0.5);
 
 for (int d = 0; d < 30; d++)
 {
-    for (int i = 0; i < 24; i++) 
+    for (int i = 0; i < 24; i++)
     {
         if (d == 2 && i == 8)
         {
