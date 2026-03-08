@@ -22,7 +22,7 @@ var spec = GameEngineToolsRuntime.LoadSpec();
 
 var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(gameTimePath), out var saved)
     ? saved
-    : spec.Calendar.DaysFromDate(1324, 1, 1) * spec.TicksPerDay;
+    : spec.Calendar.DaysFromDate(100, 1, 1) * spec.TicksPerDay;
 
 var initNow = new WDateTime(initTicks);
 
@@ -70,7 +70,7 @@ var significantOtherPerson = significantOther.Person;
 File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(wtctx, false));
 
 //var bound = clock.Now.Bind(wtctx);
-Console.WriteLine("Now: {0}, vs Now {1}", wtctx.Now().WorldTicks, clock.Now.WorldTicks);
+Console.WriteLine("Now: {0}, now: {1}", wtctx.Format(clock.Now), wtctx.Format(initNow));
 Console.WriteLine("Player: {0}", player.PrintInfo(wtctx, true));
 Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(wtctx, true));
 

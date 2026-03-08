@@ -46,7 +46,6 @@ namespace GameEngineTools
             _timeScale = worldClock.TimeScale;
             _ctx = ctx;
 
-            // Počáteční čas bereme přímo z worldClock — WDateTime.Now (statika) bylo odstraněno
             Now = new WDateTime(worldClock.NowWorldTicks());
 
             _timer = new Timer { Interval = 1000 };
