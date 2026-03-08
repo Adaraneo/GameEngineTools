@@ -59,6 +59,7 @@ namespace GameEngineTools
                     var configProvider = ConfigProvider.Configuration;
                     var worldTypeConfig = configProvider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
                     s.AddSingleton<IConfiguration>(configProvider);
+                    s.AddSingleton<WorldTimeContext>();
                     s.AddOptionsWithValidateOnStart<InitWorldClockConfig>().Configure<IConfiguration>((opt, cfg) =>
                     {
                         opt.DaysInMonths = Array.Empty<int>();

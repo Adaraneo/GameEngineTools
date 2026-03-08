@@ -147,6 +147,7 @@
             var cprovider = Config.ConfigProvider.Configuration;
             var useWorldType = cprovider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             services.AddSingleton<IConfiguration>(cprovider);
+            services.AddSingleton<WorldTimeContext>();
             services.AddOptionsWithValidateOnStart<InitWorldClockConfig>().Configure<IConfiguration>((opt, cfg) =>
             {
                 opt.DaysInMonths = Array.Empty<int>();
