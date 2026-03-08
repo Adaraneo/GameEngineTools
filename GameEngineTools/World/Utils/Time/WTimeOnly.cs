@@ -97,13 +97,13 @@ namespace GameEngineTools.World.Utils.Time
         public static bool operator !=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay != b.TicksOfDay;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve než <paramref name="b"/>.</summary>
-        public static bool operator < (WTimeOnly a, WTimeOnly b) => a.TicksOfDay <  b.TicksOfDay;
+        public static bool operator <(WTimeOnly a, WTimeOnly b) => a.TicksOfDay < b.TicksOfDay;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
         public static bool operator <=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay <= b.TicksOfDay;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později než <paramref name="b"/>.</summary>
-        public static bool operator > (WTimeOnly a, WTimeOnly b) => a.TicksOfDay >  b.TicksOfDay;
+        public static bool operator >(WTimeOnly a, WTimeOnly b) => a.TicksOfDay > b.TicksOfDay;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
         public static bool operator >=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay >= b.TicksOfDay;

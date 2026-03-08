@@ -133,7 +133,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
-            if (@event is not Behavior.ActionCommitted ac) return;
+            if (@event is not Behavior.ActionCommitted ac)
+            {
+                return;
+            }
 
             var h = Math.Max(0, _wtctx.TotalHours(ac.Duration));
             var s = State;
@@ -172,7 +175,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var c = s.Cycle!;
             var length = Math.Max(21, Math.Min(35, _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
             var day = c.DayInCycle + 1;
-            if (day > length) day = 1;
+            if (day > length)
+            {
+                day = 1;
+            }
 
             var phase = PhaseFor(day, length, _cycleCfg.MensesMeanDays);
 
@@ -188,7 +194,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Ovulation window (jednoduše den 13–15)
             var ovulWindow = phase == CyclePhase.Ovulation;
             if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && c.OvulationWindow == false)
+            {
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
+            }
 
             var next = c with { DayInCycle = day, Phase = phase, OvulationWindow = ovulWindow };
             s = s with { Cycle = next };
@@ -225,9 +233,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private static CyclePhase PhaseFor(int day, int length, int mensesDays)
         {
             var ovulDay = 14;
-            if (day <= mensesDays) return CyclePhase.Menses;
-            if (day < ovulDay) return CyclePhase.Follicular;
-            if (day >= ovulDay && day <= ovulDay + 1) return CyclePhase.Ovulation;
+            if (day <= mensesDays)
+            {
+                return CyclePhase.Menses;
+            }
+
+            if (day < ovulDay)
+            {
+                return CyclePhase.Follicular;
+            }
+
+            if (day >= ovulDay && day <= ovulDay + 1)
+            {
+                return CyclePhase.Ovulation;
+            }
+
             return CyclePhase.Luteal;
         }
 

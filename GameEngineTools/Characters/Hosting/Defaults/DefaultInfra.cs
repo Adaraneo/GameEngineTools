@@ -4,8 +4,6 @@
 namespace GameEngineTools.Characters.Hosting.Defaults
 {
     using System.Collections.Concurrent;
-    using System.Reflection.Metadata.Ecma335;
-    using System.Runtime.CompilerServices;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -38,14 +36,17 @@ namespace GameEngineTools.Characters.Hosting.Defaults
 
         public IDisposable SubscribeAll(Action<IDomainEvent> handler)
         {
-            lock(_wildcardHandlers)
+            lock (_wildcardHandlers)
             {
                 _wildcardHandlers.Add(handler);
             }
 
             return new ActionDisposable(() =>
             {
-                lock (_wildcardHandlers) _wildcardHandlers.Remove(handler);
+                lock (_wildcardHandlers)
+                {
+                    _wildcardHandlers.Remove(handler);
+                }
             });
         }
 
@@ -96,11 +97,17 @@ namespace GameEngineTools.Characters.Hosting.Defaults
         public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
         {
             var list = _handlers.GetOrAdd(typeof(TEvent), _ => new List<Delegate>());
-            lock (list) list.Add(handler);
+            lock (list)
+            {
+                list.Add(handler);
+            }
 
             return new Unsubscriber(() =>
             {
-                lock (list) list.Remove(handler);
+                lock (list)
+                {
+                    list.Remove(handler);
+                }
             });
         }
 
@@ -120,14 +127,20 @@ namespace GameEngineTools.Characters.Hosting.Defaults
         public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
         {
             var id = new ScheduledId(Guid.NewGuid());
-            lock (_lock) _items.Add(new ScheduledItem(id, when, action, tag));
+            lock (_lock)
+            {
+                _items.Add(new ScheduledItem(id, when, action, tag));
+            }
+
             return id;
         }
 
         public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
         {
             if (now == default)
+            {
                 throw new ArgumentException("'now' must not be defaul(WDateTime).", nameof(now));
+            }
 
             return ScheduleAt(now + delay, action, tag);
         }
@@ -148,10 +161,15 @@ namespace GameEngineTools.Characters.Hosting.Defaults
             lock (_lock)
             {
                 due = _items.Where(i => Compare(i.When, now) <= 0).ToList();
-                foreach (var d in due) _items.Remove(d);
+                foreach (var d in due)
+                {
+                    _items.Remove(d);
+                }
             }
             foreach (var d in due)
+            {
                 yield return (d.Id, d.Action);
+            }
         }
 
         private static int Compare(WDateTime a, WDateTime b)

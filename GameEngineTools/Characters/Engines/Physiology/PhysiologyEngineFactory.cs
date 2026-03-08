@@ -1,18 +1,12 @@
-﻿// DefaultPhysiologyEngineFactory.cs
+﻿// PhysiologyEngineFactory.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.Engines.Physiology
 {
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.Logging;
-    using Microsoft.Extensions.Options;
 
     internal sealed class PhysiologyEngineFactory<TImpl> : IPhysiologyEngineFactory where TImpl : class, IPhysiologyEngine
     {

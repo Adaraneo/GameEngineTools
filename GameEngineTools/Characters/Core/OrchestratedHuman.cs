@@ -2,7 +2,6 @@
 // Copyright (c) 50PSoftware
 
 using System.Collections.Concurrent;
-using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
@@ -160,7 +159,10 @@ namespace GameEngineTools.Characters.Core
         private void PhaseA_HandleScheduled(WDateTime now)
         {
             var due = _scheduler.Due(now);
-            if (due is null) return;
+            if (due is null)
+            {
+                return;
+            }
 
             var outbox = new EventCollector();
             foreach (var (_, action) in due)
@@ -179,7 +181,10 @@ namespace GameEngineTools.Characters.Core
 
         private void PhaseA_HandleInbox()
         {
-            if (_inbox.IsEmpty) return;
+            if (_inbox.IsEmpty)
+            {
+                return;
+            }
 
             var outbox = new EventCollector();
             while (_inbox.TryDequeue(out var ev))
@@ -210,7 +215,9 @@ namespace GameEngineTools.Characters.Core
             {
                 var events = collector.Drain();
                 if (events.Count == 0)
+                {
                     break;
+                }
 
                 foreach (var ev in events)
                 {
@@ -233,7 +240,8 @@ namespace GameEngineTools.Characters.Core
             _lastOutboxAccumulator.AddRange(events);
             foreach (var ev in events)
             {
-                try {
+                try
+                {
                     _bus.Publish(ev);
                 }
                 catch (Exception ex)
@@ -266,14 +274,20 @@ namespace GameEngineTools.Characters.Core
             {
                 var events = collector.Drain();
                 if (events.Count == 0)
+                {
                     break;
+                }
 
                 foreach (var ev in events)
+                {
                     SafeHandle(ev, localOutbox);
+                }
 
                 var secondary = localOutbox.Drain();
                 foreach (var ev in secondary)
+                {
                     collector.Add(ev);
+                }
             }
         }
 
@@ -296,7 +310,9 @@ namespace GameEngineTools.Characters.Core
                 s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad);
 
             if (s.Physiology.Cycle is { } c)
+            {
                 _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle);
+            }
 
             _log.PsychologySnapshot(Id.Value.ToString(),
                 s.Psychology.DominantEmotion.ToString(),
@@ -310,8 +326,10 @@ namespace GameEngineTools.Characters.Core
                 s.Behavior.NeedBelonging, s.Behavior.NeedCompetence, s.Behavior.NeedIntimacy);
 
             if (plan is not null)
+            {
                 _log.BehaviorPlan(Id.Value.ToString(),
                     plan.Name, plan.Start.ToString(), plan.ExpectedDuration.ToString(), plan.Utility);
+            }
         }
     }
 }

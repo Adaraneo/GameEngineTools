@@ -1,12 +1,8 @@
-﻿// CharacterManagerInitializer.cs
+﻿// GameEngineToolsManagerInitializer.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
     using System.Threading.Tasks;
 
     using Microsoft.Extensions.Hosting;

@@ -4,8 +4,6 @@
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Characters.Traits;
-using GameEngineTools.World.Utils.Time;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEngineTools.Characters.Generation;
 
@@ -73,7 +71,11 @@ public sealed record AppearanceGenSpec(
     public static double[] Uniform(int n)
     {
         var a = new double[n];
-        for (int i = 0; i < n; i++) a[i] = 1.0 / n;
+        for (int i = 0; i < n; i++)
+        {
+            a[i] = 1.0 / n;
+        }
+
         return a;
     }
 }
@@ -129,16 +131,24 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
 
         static double SoftClamp(double v, double min, double max, double k = 0.2)
         {
-            if (v < min) return min + (v - min) * k;
-            if (v > max) return max + (v - max) * k;
+            if (v < min)
+            {
+                return min + (v - min) * k;
+            }
+
+            if (v > max)
+            {
+                return max + (v - max) * k;
+            }
+
             return v;
         }
 
         var shr = shoulder / height; // shoulder/height
         var hhr = hip / height; // hip/height
-        var(shrMin, shrMax) = (sex == SexBiology.Female ? 0.20 : 0.22,
+        var (shrMin, shrMax) = (sex == SexBiology.Female ? 0.20 : 0.22,
         sex == SexBiology.Female ? 0.26 : 0.28);
-        var(hhrMin, hhrMax) = (sex == SexBiology.Female ? 0.20 : 0.19,
+        var (hhrMin, hhrMax) = (sex == SexBiology.Female ? 0.20 : 0.19,
         sex == SexBiology.Female ? 0.27 : 0.26);
         shoulder = SoftClamp(shoulder, shrMin * height, shrMax * height);
         hip = SoftClamp(hip, hhrMin * height, hhrMax * height);
@@ -198,7 +208,13 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
     private static T Pick<T>(IReadOnlyList<T> values, IReadOnlyList<double> weights, IRandomSource rng)
     {
         double s = 0, r = rng.Unit();
-        for (int i = 0; i < values.Count; i++) { s += weights[i]; if (r <= s) return values[i]; }
+        for (int i = 0; i < values.Count; i++)
+        {
+            s += weights[i]; if (r <= s)
+            {
+                return values[i];
+            }
+        }
         return values[^1];
     }
 
@@ -218,9 +234,16 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
 
     private static void Normalize(double[] w)
     {
-        var sum = 0.0; foreach (var x in w) sum += x;
-        if (sum <= 0) { var u = 1.0 / w.Length; for (int i = 0; i < w.Length; i++) w[i] = u; return; }
-        for (int i = 0; i < w.Length; i++) w[i] /= sum;
+        var sum = 0.0; foreach (var x in w)
+        {
+            sum += x;
+        }
+
+        if (sum <= 0) { var u = 1.0 / w.Length; for (int i = 0; i < w.Length; i++) { w[i] = u; } return; }
+        for (int i = 0; i < w.Length; i++)
+        {
+            w[i] /= sum;
+        }
     }
 }
 

@@ -1,13 +1,10 @@
 ﻿// PhysicalAppearance.cs
-// Trait (stálé rysy) + projekce aktuálního vzhledu odvozená z fyziologie a stylu.
-// Bez zásahu do orchestrátoru; projekci spočítáš on-demand a můžeš ji serializovat.
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.Traits
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
-    using GameEngineTools.World.Utils.Time;
 
     // --- Trait: stabilní rysy (genetika/morfologie) ---
     public sealed record PhysicalAppearance(
@@ -25,7 +22,9 @@ namespace GameEngineTools.Characters.Traits
         IReadOnlyList<string>? DistinctiveMarks = null);
 
     public enum BodyFrame { Petite, Medium, Large, Strong }
-    public enum SkinTone { VeryFair, Fair, Light, LightMedium, Medium, Tan, Dark, VeryDark,
+    public enum SkinTone
+    {
+        VeryFair, Fair, Light, LightMedium, Medium, Tan, Dark, VeryDark,
         Olive
     }
     public enum EyeColor { Brown, Hazel, Green, Blue, Gray, Amber }
@@ -82,8 +81,14 @@ namespace GameEngineTools.Characters.Traits
                     _ => BloatingLevel.None
                 };
                 // Pokud máš v State už symptom bloat 0..100, přemapuj:
-                if (c.SymptomBloat >= 66) bloat = BloatingLevel.High;
-                else if (c.SymptomBloat >= 33) bloat = BloatingLevel.Medium;
+                if (c.SymptomBloat >= 66)
+                {
+                    bloat = BloatingLevel.High;
+                }
+                else if (c.SymptomBloat >= 33)
+                {
+                    bloat = BloatingLevel.Medium;
+                }
             }
 
             // Držení těla a kvalita „vzhledu“ klesá s únavou/bolestí

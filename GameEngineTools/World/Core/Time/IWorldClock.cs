@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// IWorldClock.cs
+// Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Core.Time
 {

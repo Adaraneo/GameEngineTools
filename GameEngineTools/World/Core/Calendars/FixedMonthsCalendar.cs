@@ -1,4 +1,7 @@
-﻿namespace GameEngineTools.World.Core.Calendars
+﻿// FixedMonthsCalendar.cs
+// Copyright (c) 50PSoftware
+
+namespace GameEngineTools.World.Core.Calendars
 {
     public sealed class FixedMonthsCalendar : IWorldCalendar
     {
@@ -14,19 +17,31 @@
 
         public (int year, int month, int day) DateFromDays(long days)
         {
-            if (days < 0) throw new ArgumentOutOfRangeException(nameof(days));
+            if (days < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(days));
+            }
+
             int year = 1;
             while (true)
             {
                 long diy = DaysInYear(year);
-                if (days < diy) break;
+                if (days < diy)
+                {
+                    break;
+                }
+
                 days -= diy; year++;
             }
             int month = 1;
             while (true)
             {
                 int dim = DaysInMonth(year, month);
-                if (days < dim) break;
+                if (days < dim)
+                {
+                    break;
+                }
+
                 days -= dim; month++;
             }
             int day = (int)days + 1;
@@ -35,20 +50,39 @@
 
         public long DaysFromDate(int year, int month, int day)
         {
-            if (year < 1) throw new ArgumentOutOfRangeException(nameof(year));
+            if (year < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(year));
+            }
+
             int dim = DaysInMonth(year, month);
-            if (day < 1 || day > dim) throw new ArgumentOutOfRangeException(nameof(day));
+            if (day < 1 || day > dim)
+            {
+                throw new ArgumentOutOfRangeException(nameof(day));
+            }
 
             long days = 0;
-            for (int y = 1; y < year; y++) days += DaysInYear(y);
-            for (int m = 1; m < month; m++) days += DaysInMonth(year, m);
+            for (int y = 1; y < year; y++)
+            {
+                days += DaysInYear(y);
+            }
+
+            for (int m = 1; m < month; m++)
+            {
+                days += DaysInMonth(year, m);
+            }
+
             days += (day - 1);
             return days; // 0 = 1/1/1
         }
 
         public int DaysInMonth(int year, int month)
         {
-            if (month < 1 || month > _months.Length) throw new ArgumentOutOfRangeException(nameof(month));
+            if (month < 1 || month > _months.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(month));
+            }
+
             return _months[month - 1];
         }
 

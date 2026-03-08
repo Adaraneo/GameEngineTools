@@ -8,11 +8,9 @@ using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
-using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Characters.Traits;
 using GameEngineTools.World.Core.Time;
-using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -99,7 +97,11 @@ namespace GameEngineTools.Characters.Hosting
             unchecked
             {
                 int hash = 17;
-                foreach (var bt in bytes) hash = hash * 31 + bt;
+                foreach (var bt in bytes)
+                {
+                    hash = hash * 31 + bt;
+                }
+
                 return hash;
             }
         }

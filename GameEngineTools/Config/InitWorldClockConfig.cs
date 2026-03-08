@@ -3,18 +3,12 @@
 
 namespace GameEngineTools.Config
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
-
     public sealed class InitWorldClockConfig
     {
         /// <summary>
         /// Each entry represents number of days in the corresponding month.
         /// </summary>
-        public int[] DaysInMonths { get ; set; } = new[] { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+        public int[] DaysInMonths { get; set; } = new[] { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
         /// <summary>
         /// Gets or sets the number of ticks that represent one second.

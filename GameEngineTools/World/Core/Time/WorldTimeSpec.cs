@@ -1,4 +1,7 @@
-﻿using GameEngineTools.World.Core.Calendars;
+﻿// WorldTimeSpec.cs
+// Copyright (c) 50PSoftware
+
+using GameEngineTools.World.Core.Calendars;
 
 namespace GameEngineTools.World.Core.Time
 {

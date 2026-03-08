@@ -4,13 +4,10 @@
 namespace GameEngineTools.Extensions
 {
     using System.Collections;
-    using System.Data;
-    using System.Reflection;
     using System.Text;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.GameObjects;
-    using GameEngineTools.World.Utils.Time;
 
     public static class TestExtension
     {
@@ -50,7 +47,10 @@ namespace GameEngineTools.Extensions
             sb.AppendLine($"Name: {displayName} {surname}");
             sb.AppendLine($"Born in year: {identity.BirthDate}");
 
-            if (basicInfo) return sb.ToString();
+            if (basicInfo)
+            {
+                return sb.ToString();
+            }
 
             // --- Snapshot ---
             sb.AppendLine();
@@ -67,7 +67,10 @@ namespace GameEngineTools.Extensions
 
         private static void AppendValue(StringBuilder sb, object? obj, int indent, HashSet<object>? visited = null)
         {
-            if (obj is null) return;
+            if (obj is null)
+            {
+                return;
+            }
 
             var pad = new string(' ', indent * 2);
             var type = obj.GetType();
@@ -134,7 +137,9 @@ namespace GameEngineTools.Extensions
                     || valueType?.Namespace == "GameEngineTools.World.Utils.Time";
 
                 if (isSimple)
+                {
                     sb.AppendLine($"{pad}{prop.Name}: {value ?? "null"}");
+                }
                 else
                 {
                     sb.AppendLine($"{pad}{prop.Name}:");

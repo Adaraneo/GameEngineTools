@@ -1,11 +1,10 @@
-﻿// ICharacterManager.cs
+﻿// IGameEngineToolsManager.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools
 {
     using System.Collections.Generic;
     using GameEngineTools.Characters.GameObjects;
-    using GameEngineTools.World.Core.Time;
 
     public interface IGameEngineToolsManager
     {

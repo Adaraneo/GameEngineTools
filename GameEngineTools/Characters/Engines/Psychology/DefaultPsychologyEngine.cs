@@ -78,9 +78,21 @@ namespace GameEngineTools.Characters.Engines.Psychology
             double Clampm1p1(double v) => Math.Max(-1, Math.Min(1, v));
             static DiscreteEmotion InferEmotion(PsychologyState ps)
             {
-                if (ps.Stress > 70) return ps.Valence < 0 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
-                if (ps.Valence > 0.4) return DiscreteEmotion.Joy;
-                if (ps.Valence < -0.4) return DiscreteEmotion.Sadness;
+                if (ps.Stress > 70)
+                {
+                    return ps.Valence < 0 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
+                }
+
+                if (ps.Valence > 0.4)
+                {
+                    return DiscreteEmotion.Joy;
+                }
+
+                if (ps.Valence < -0.4)
+                {
+                    return DiscreteEmotion.Sadness;
+                }
+
                 return DiscreteEmotion.Neutral;
             }
             double RandomSym() => (_rng.NextUnit() - 0.5) * 2.0 * 0.05; // ±5% šum

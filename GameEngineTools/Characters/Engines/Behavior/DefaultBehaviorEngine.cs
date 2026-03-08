@@ -32,7 +32,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         private void SetCooldown(string action, double hours)
         {
-            var dict = new Dictionary<string, double>(State.Cooldowns ?? new Dictionary<string,double>());
+            var dict = new Dictionary<string, double>(State.Cooldowns ?? new Dictionary<string, double>());
             dict[action] = hours;
             State = State with { Cooldowns = dict };
             _log.LogDebug("[COOLDOWN] new Cooldown for {Action}:{Hours}", action, hours);
@@ -92,8 +92,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
             if (State.CurrentPlan is { } cp)
             {
                 for (int i = 0; i < candidates.Count; i++)
+                {
                     if (candidates[i].Name == cp.Name)
+                    {
                         candidates[i] = (cp.Name, candidates[i].Utility * (1.0 + Config.InertiaWeight), candidates[i].Dur);
+                    }
+                }
             }
 
             candidates.Sort((a, b) => b.Utility.CompareTo(a.Utility));
@@ -110,7 +114,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
             static double Util(double need, double weight) => (need * (0.5 + weight));
             static double MeanCloseness(Relationships.RelationshipState rs)
             {
-                if (rs.Edges is null || rs.Edges.Count == 0) return 50;
+                if (rs.Edges is null || rs.Edges.Count == 0)
+                {
+                    return 50;
+                }
+
                 double sum = 0; int n = 0;
                 foreach (var e in rs.Edges.Values) { sum += e.Closeness; n++; }
                 return sum / n;
@@ -145,7 +153,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
             static double TopAttraction(Relationships.RelationshipState rs)
             {
                 double top = 0;
-                foreach (var e in rs.Edges.Values) top = Math.Max(top, e.Attraction);
+                foreach (var e in rs.Edges.Values)
+                {
+                    top = Math.Max(top, e.Attraction);
+                }
+
                 return top;
             }
         }

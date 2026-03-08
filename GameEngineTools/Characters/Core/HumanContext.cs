@@ -3,11 +3,6 @@
 
 namespace GameEngineTools.Characters.Core
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
     using Microsoft.Extensions.Logging;
 
     public sealed class HumanContext : IHumanContext

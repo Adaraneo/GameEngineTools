@@ -5,7 +5,6 @@ namespace GameEngineTools
 {
     using System.Globalization;
     using GameEngineTools.Armory;
-    using GameEngineTools.Characters;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
@@ -28,14 +27,14 @@ namespace GameEngineTools
         #region Soukromá pole
 
         private readonly ILogger<GameEngineToolsManager> _log;
-        private readonly GameEngineToolsManagerOptions   _opt;
-        private readonly IClock                          _clock;
-        private readonly WorldTimeContext                _wtctx;
-        private readonly IRandomSourceFactory            _rngFactory;
-        private readonly IServiceProvider                _serviceProvider;
+        private readonly GameEngineToolsManagerOptions _opt;
+        private readonly IClock _clock;
+        private readonly WorldTimeContext _wtctx;
+        private readonly IRandomSourceFactory _rngFactory;
+        private readonly IServiceProvider _serviceProvider;
 
         private List<ArmorPart> _armorParts = new();
-        private List<Weapon>    _weapons    = new();
+        private List<Weapon> _weapons = new();
 
         #endregion
 
@@ -55,18 +54,18 @@ namespace GameEngineTools
         /// <param name="log">Logger.</param>
         /// <param name="serviceProvider">DI provider pro lazy-resolve factories.</param>
         public GameEngineToolsManager(
-            IClock                                    clock,
-            WorldTimeContext                          wtctx,
-            IRandomSourceFactory                      rngFactory,
-            IOptions<GameEngineToolsManagerOptions>   opt,
-            ILogger<GameEngineToolsManager>           log,
-            IServiceProvider                          serviceProvider)
+            IClock clock,
+            WorldTimeContext wtctx,
+            IRandomSourceFactory rngFactory,
+            IOptions<GameEngineToolsManagerOptions> opt,
+            ILogger<GameEngineToolsManager> log,
+            IServiceProvider serviceProvider)
         {
-            _clock           = clock;
-            _wtctx             = wtctx;
-            _rngFactory      = rngFactory;
-            _opt             = opt.Value;
-            _log             = log;
+            _clock = clock;
+            _wtctx = wtctx;
+            _rngFactory = rngFactory;
+            _opt = opt.Value;
+            _log = log;
             _serviceProvider = serviceProvider;
         }
 
@@ -104,7 +103,7 @@ namespace GameEngineTools
             _log.LogInformation("Loading content...");
             LoadResources();
 
-            Items.Add(typeof(Weapon),    _weapons);
+            Items.Add(typeof(Weapon), _weapons);
             Items.Add(typeof(ArmorPart), _armorParts);
 
             _log.LogInformation("Loaded");
@@ -121,7 +120,7 @@ namespace GameEngineTools
         public IHuman RandomizePerson()
         {
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
-            var hpb     = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate();
+            var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate();
             return factory.Create(hpb);
         }
 
@@ -146,19 +145,19 @@ namespace GameEngineTools
 
             // Datum = rok ± věk, náhodný měsíc a den v rozsahu aktuálního dne
             var minBirth = _wtctx.GetDate(_wtctx.Create(
-                year  - maxAge,
+                year - maxAge,
                 rng.Next(1, monthsInYear),
                 rng.Next(1, day),
                 hour, minute, second));
 
             var maxBirth = _wtctx.GetDate(_wtctx.Create(
-                year  - minAge,
+                year - minAge,
                 rng.Next(1, monthsInYear),
                 rng.Next(1, day),
                 hour, minute, second));
 
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
-            var hpb     = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
+            var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
                 new HumanBlueprintRequest(
                     MinBirthDate: minBirth,
                     MaxBirthDate: maxBirth));
@@ -178,7 +177,7 @@ namespace GameEngineTools
             var birth = player.Person.Identity.BirthDate.Bind(_wtctx);
 
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
-            var hpb     = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
+            var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
                 new HumanBlueprintRequest(
                     MinBirthDate: birth.AddYears(-5),
                     MaxBirthDate: birth.AddYears(5),
@@ -198,7 +197,7 @@ namespace GameEngineTools
         /// </summary>
         private void LoadResources()
         {
-            _weapons    = CsvLoader.Load(FileSystemConstant.SourceFilePath.weapons,
+            _weapons = CsvLoader.Load(FileSystemConstant.SourceFilePath.weapons,
                 v => new Weapon(v[0], Enum.Parse<Weapon.WeaponType>(v[1]),
                     double.Parse(v[2], CultureInfo.InvariantCulture)));
 

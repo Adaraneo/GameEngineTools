@@ -7,8 +7,6 @@ namespace GameEngineTools.Characters.Generation
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Hosting.Defaults;
-    using GameEngineTools.Constants;
-    using GameEngineTools.FileSystem;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
 
@@ -22,12 +20,12 @@ namespace GameEngineTools.Characters.Generation
     /// hodnoty z <see cref="HumanBlueprintSpec"/>.
     /// </summary>
     public sealed record HumanBlueprintRequest(
-        SexBiology?        Sex              = null,
-        WDateOnly?         MinBirthDate     = null,
-        WDateOnly?         MaxBirthDate     = null,
-        PersonalityHints?  PersonalityHints = null,
-        PersonalitySpec?   PersonalitySpec  = null,
-        int?               Seed             = null);
+        SexBiology? Sex = null,
+        WDateOnly? MinBirthDate = null,
+        WDateOnly? MaxBirthDate = null,
+        PersonalityHints? PersonalityHints = null,
+        PersonalitySpec? PersonalitySpec = null,
+        int? Seed = null);
 
     /// <summary>
     /// Specifikace generátoru postav — váhy pohlaví a výchozí věkový rozsah.
@@ -69,9 +67,9 @@ namespace GameEngineTools.Characters.Generation
         {
             // Délka roku závisí na kalendáři — přistupujeme přes ctx, ne přes WDateTime.Spec
             var (year, _, _) = ctx.GetDateParts(now);
-            var daysInYear   = ctx.Spec.Calendar.DaysInYear(year);
-            var minAgeDays   = minAgeYears * daysInYear;
-            var maxAgeDays   = maxAgeYears * daysInYear;
+            var daysInYear = ctx.Spec.Calendar.DaysInYear(year);
+            var minAgeDays = minAgeYears * daysInYear;
+            var maxAgeDays = maxAgeYears * daysInYear;
 
             WDateOnly minBirth;
             try
@@ -88,9 +86,9 @@ namespace GameEngineTools.Characters.Generation
             var maxBirth = new WDateOnly(now.DayIndex - minAgeDays);
 
             return new HumanBlueprintSpec(
-                SexWeights:           (Female: 0.49, Male: 0.49, Intersex: 0.01, Unknown: 0.01),
-                DefaultMinBirthDate:  minBirth,
-                DefaultMaxBirthDate:  maxBirth);
+                SexWeights: (Female: 0.49, Male: 0.49, Intersex: 0.01, Unknown: 0.01),
+                DefaultMinBirthDate: minBirth,
+                DefaultMaxBirthDate: maxBirth);
         }
     }
 
@@ -132,8 +130,8 @@ namespace GameEngineTools.Characters.Generation
     {
         #region Soukromá pole
 
-        private readonly Name[]    _femaleNames;
-        private readonly Name[]    _maleNames;
+        private readonly Name[] _femaleNames;
+        private readonly Name[] _maleNames;
         private readonly Surname[] _surnames;
 
         #endregion
@@ -149,8 +147,8 @@ namespace GameEngineTools.Characters.Generation
         public SimpleIdentityGenerator(Name[] femaleNames, Name[] maleNames, Surname[] surnames)
         {
             _femaleNames = femaleNames;
-            _maleNames   = maleNames;
-            _surnames    = surnames;
+            _maleNames = maleNames;
+            _surnames = surnames;
         }
 
         #endregion
@@ -160,7 +158,7 @@ namespace GameEngineTools.Characters.Generation
         /// <inheritdoc/>
         public Identity Generate(SexBiology sex, WDateOnly birthDate, IRandomSource rng)
         {
-            var first   = sex == SexBiology.Female ? Pick(_femaleNames, rng) : Pick(_maleNames, rng);
+            var first = sex == SexBiology.Female ? Pick(_femaleNames, rng) : Pick(_maleNames, rng);
             var surname = Pick(_surnames, rng);
             return new Identity(first, surname, birthDate);
         }
@@ -172,7 +170,10 @@ namespace GameEngineTools.Characters.Generation
         private static T Pick<T>(T[] values, IRandomSource rng)
         {
             if (values.Length == 0)
+            {
                 throw new InvalidOperationException("No values to pick from.");
+            }
+
             return values[rng.Next(0, values.Length)];
         }
 
@@ -191,11 +192,11 @@ namespace GameEngineTools.Characters.Generation
     {
         #region Soukromá pole
 
-        private readonly IRandomSourceFactory    _rngFactory;
-        private readonly IPersonalityGenerator   _personalityGenerator;
-        private readonly IIdentityGenerator      _identityGenerator;
-        private readonly IAppearanceGenerator    _appearanceGenerator;
-        private readonly HumanBlueprintSpec      _spec;
+        private readonly IRandomSourceFactory _rngFactory;
+        private readonly IPersonalityGenerator _personalityGenerator;
+        private readonly IIdentityGenerator _identityGenerator;
+        private readonly IAppearanceGenerator _appearanceGenerator;
+        private readonly HumanBlueprintSpec _spec;
 
         #endregion
 
@@ -205,17 +206,17 @@ namespace GameEngineTools.Characters.Generation
         /// Inicializuje generátor se všemi potřebnými závislostmi.
         /// </summary>
         public HumanBlueprintGenerator(
-            IRandomSourceFactory  rngFactory,
+            IRandomSourceFactory rngFactory,
             IPersonalityGenerator personalityGenerator,
-            IIdentityGenerator    identityGenerator,
-            IAppearanceGenerator  appearanceGenerator,
-            HumanBlueprintSpec    spec)
+            IIdentityGenerator identityGenerator,
+            IAppearanceGenerator appearanceGenerator,
+            HumanBlueprintSpec spec)
         {
-            _rngFactory           = rngFactory;
+            _rngFactory = rngFactory;
             _personalityGenerator = personalityGenerator;
-            _identityGenerator    = identityGenerator;
-            _appearanceGenerator  = appearanceGenerator;
-            _spec                 = spec;
+            _identityGenerator = identityGenerator;
+            _appearanceGenerator = appearanceGenerator;
+            _spec = spec;
         }
 
         #endregion
@@ -228,23 +229,23 @@ namespace GameEngineTools.Characters.Generation
             request ??= new HumanBlueprintRequest();
 
             var seed = request.Seed ?? Environment.TickCount;
-            var rng  = _rngFactory.Create(seed);
+            var rng = _rngFactory.Create(seed);
 
-            var sex       = request.Sex ?? PickSex(_spec.SexWeights, rng);
+            var sex = request.Sex ?? PickSex(_spec.SexWeights, rng);
             var birthDate = PickBirthDate(
                 request.MinBirthDate ?? _spec.DefaultMinBirthDate,
                 request.MaxBirthDate ?? _spec.DefaultMaxBirthDate,
                 rng);
 
-            var identity    = _identityGenerator.Generate(sex, birthDate, rng);
+            var identity = _identityGenerator.Generate(sex, birthDate, rng);
             var personality = _personalityGenerator.Generate(
                 rng.Next(int.MinValue, int.MaxValue),
                 request.PersonalityHints,
                 request.PersonalitySpec);
 
-            var id          = new HumanId(Guid.NewGuid());
+            var id = new HumanId(Guid.NewGuid());
             var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
-            var appearance  = _appearanceGenerator.Generate(sex, seed);
+            var appearance = _appearanceGenerator.Generate(sex, seed);
 
             return new HumanBlueprint(id, identity, sex, personality, appearance, runtimeSeed);
         }
@@ -258,14 +259,29 @@ namespace GameEngineTools.Characters.Generation
             IRandomSource rng)
         {
             var total = w.Female + w.Male + w.Intersex + w.Unknown;
-            if (total <= 0) throw new InvalidOperationException("Invalid sex weights.");
+            if (total <= 0)
+            {
+                throw new InvalidOperationException("Invalid sex weights.");
+            }
 
             var r = rng.NextUnit() * total;
-            if (r < w.Female)  return SexBiology.Female;
+            if (r < w.Female)
+            {
+                return SexBiology.Female;
+            }
+
             r -= w.Female;
-            if (r < w.Male)    return SexBiology.Male;
+            if (r < w.Male)
+            {
+                return SexBiology.Male;
+            }
+
             r -= w.Male;
-            if (r < w.Intersex) return SexBiology.Intersex;
+            if (r < w.Intersex)
+            {
+                return SexBiology.Intersex;
+            }
+
             return SexBiology.Unknown;
         }
 
@@ -274,9 +290,12 @@ namespace GameEngineTools.Characters.Generation
             var minIdx = minDate.DayIndex;
             var maxIdx = maxDate.DayIndex;
 
-            if (maxIdx < minIdx) throw new ArgumentException("MaxBirthDate < MinBirthDate");
+            if (maxIdx < minIdx)
+            {
+                throw new ArgumentException("MaxBirthDate < MinBirthDate");
+            }
 
-            var span   = maxIdx - minIdx + 1;
+            var span = maxIdx - minIdx + 1;
             var offset = (long)(rng.NextUnit() * span);
             return new WDateOnly(minIdx + offset);
         }
@@ -287,9 +306,12 @@ namespace GameEngineTools.Characters.Generation
         private static int DeriveSeedFromId(HumanId id)
         {
             var bytes = id.Value.ToByteArray();
-            int hash  = 17;
+            int hash = 17;
             foreach (var b in bytes)
+            {
                 hash = hash * 31 + b;
+            }
+
             return hash;
         }
 

@@ -1,4 +1,7 @@
-﻿using GameEngineTools.World.Utils.Time;
+﻿// SunModel.cs
+// Copyright (c) 50PSoftware
+
+using GameEngineTools.World.Utils.Time;
 
 namespace GameEngineTools.World.Core.Astro
 {
@@ -16,7 +19,11 @@ namespace GameEngineTools.World.Core.Astro
         {
             var spec = WDateTime.Spec;
             long dayTicks = worldTicks % spec.TicksPerDay;
-            if (dayTicks < 0) dayTicks += spec.TicksPerDay;
+            if (dayTicks < 0)
+            {
+                dayTicks += spec.TicksPerDay;
+            }
+
             return (double)dayTicks / spec.TicksPerDay;
         }
 
@@ -100,7 +107,11 @@ namespace GameEngineTools.World.Core.Astro
 
         private static double WrapAngle(double a)
         {
-            a %= TwoPi; if (a < 0) a += TwoPi;
+            a %= TwoPi; if (a < 0)
+            {
+                a += TwoPi;
+            }
+
             return a;
         }
 
@@ -108,7 +119,11 @@ namespace GameEngineTools.World.Core.Astro
         private static double WrapHours(double h)
         {
             double d = WDateTime.Spec.HoursPerDay;
-            h %= d; if (h < 0) h += d;
+            h %= d; if (h < 0)
+            {
+                h += d;
+            }
+
             return h;
         }
 
@@ -140,9 +155,14 @@ namespace GameEngineTools.World.Core.Astro
                         - eotFrac * spec.HoursPerDay;
 
             if (polarNight)
+            {
                 return (WrapHours(noon), double.NaN, double.NaN, 0.0);
+            }
+
             if (polarDay)
+            {
                 return (WrapHours(noon), 0.0, spec.HoursPerDay, spec.HoursPerDay);
+            }
 
             double H0h = AngleToHours(H0);
             double sunrise = WrapHours(noon - H0h);
@@ -178,7 +198,10 @@ namespace GameEngineTools.World.Core.Astro
             double cosAz = (Math.Sin(DegToRad(delta)) - Math.Sin(phi) * sinAlt) / (Math.Cos(phi) * Math.Cos(DegToRad(alt)));
             cosAz = Math.Clamp(cosAz, -1, 1);
             double az = RadToDeg(Math.Acos(cosAz));
-            if (Math.Sin(H) > 0) az = 360 - az;
+            if (Math.Sin(H) > 0)
+            {
+                az = 360 - az;
+            }
 
             return (az, alt, delta);
         }
@@ -198,8 +221,16 @@ namespace GameEngineTools.World.Core.Astro
             {
                 bool pd, pn;
                 var H0 = HourAngleForAltitude(latitudeDeg, delta, h0, out pd, out pn);
-                if (pn) return (double.NaN, double.NaN);
-                if (pd) return (0.0, spec.HoursPerDay);
+                if (pn)
+                {
+                    return (double.NaN, double.NaN);
+                }
+
+                if (pd)
+                {
+                    return (0.0, spec.HoursPerDay);
+                }
+
                 var H0h = AngleToHours(H0);
                 double dawnH = WrapHours(noon - H0h);
                 double duskH = WrapHours(noon + H0h);

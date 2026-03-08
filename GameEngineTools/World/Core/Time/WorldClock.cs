@@ -86,10 +86,10 @@ namespace GameEngineTools.World.Core.Time
         /// </param>
         public WorldClock(WorldTimeSpec spec, long earthEpochUnixTicks, long worldEpochTicks, double timeScale = 1.0)
         {
-            _spec               = spec;
+            _spec = spec;
             EarthEpochUnixTicks = earthEpochUnixTicks;
-            WorldEpochTicks     = worldEpochTicks;
-            TimeScale           = timeScale;
+            WorldEpochTicks = worldEpochTicks;
+            TimeScale = timeScale;
         }
 
         #endregion
@@ -165,7 +165,7 @@ namespace GameEngineTools.World.Core.Time
         public long EarthToWorldTicks(long earthUnixTicks)
         {
             // Delta reálného času v 100 ns → převod na sekundy → škálování → světové ticky
-            long   deltaUnix         = earthUnixTicks - EarthEpochUnixTicks;
+            long deltaUnix = earthUnixTicks - EarthEpochUnixTicks;
             double deltaWorldSeconds = (deltaUnix / 10_000_000.0) * TimeScale;
             return WorldEpochTicks + (long)(deltaWorldSeconds * _spec.TicksPerSecond);
         }
@@ -177,9 +177,9 @@ namespace GameEngineTools.World.Core.Time
         /// <returns>Odpovídající reálný čas v 100 ns UNIX tickách.</returns>
         public long WorldToEarthUnixTicks(long worldTicks)
         {
-            long   deltaWorldTicks   = worldTicks - WorldEpochTicks;
+            long deltaWorldTicks = worldTicks - WorldEpochTicks;
             double deltaWorldSeconds = deltaWorldTicks / (double)_spec.TicksPerSecond;
-            long   deltaUnix         = (long)(deltaWorldSeconds / TimeScale * 10_000_000.0);
+            long deltaUnix = (long)(deltaWorldSeconds / TimeScale * 10_000_000.0);
             return EarthEpochUnixTicks + deltaUnix;
         }
 
@@ -211,7 +211,9 @@ namespace GameEngineTools.World.Core.Time
             }
 
             if (clock_gettime(0, out var ts) == 0)
+            {
                 return ts.tv_sec * 10_000_000L + (ts.tv_nsec / 100);
+            }
 
             throw new PlatformNotSupportedException("Nepodařilo se získat systémový čas.");
         }

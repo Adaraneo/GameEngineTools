@@ -45,7 +45,7 @@ namespace GameEngineTools.World.Utils.Time
     {
         #region Soukromá pole
 
-        private readonly WDateTime        _dt;
+        private readonly WDateTime _dt;
         private readonly WorldTimeContext _ctx;
 
         #endregion
@@ -60,7 +60,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <param name="ctx">Kontext s kalendářem a spec.</param>
         public BoundWDateTime(WDateTime dt, WorldTimeContext ctx)
         {
-            _dt  = dt;
+            _dt = dt;
             _ctx = ctx;
         }
 
@@ -82,13 +82,13 @@ namespace GameEngineTools.World.Utils.Time
         #region Properties — datum
 
         /// <summary>Rok okamžiku podle světového kalendáře.</summary>
-        public int Year  => _ctx.GetParts(_dt).year;
+        public int Year => _ctx.GetParts(_dt).year;
 
         /// <summary>Měsíc okamžiku (1-based) podle světového kalendáře.</summary>
         public int Month => _ctx.GetParts(_dt).month;
 
         /// <summary>Den v měsíci (1-based) podle světového kalendáře.</summary>
-        public int Day   => _ctx.GetParts(_dt).day;
+        public int Day => _ctx.GetParts(_dt).day;
 
         /// <summary>Den v roce (1-based) podle světového kalendáře.</summary>
         public int DayOfYear => _ctx.GetDayOfYear(_dt);
@@ -98,7 +98,7 @@ namespace GameEngineTools.World.Utils.Time
         #region Properties — čas
 
         /// <summary>Hodina dne (0-based) podle spec.</summary>
-        public int Hour   => _ctx.GetParts(_dt).hour;
+        public int Hour => _ctx.GetParts(_dt).hour;
 
         /// <summary>Minuta hodiny (0-based) podle spec.</summary>
         public int Minute => _ctx.GetParts(_dt).minute;
@@ -226,7 +226,7 @@ namespace GameEngineTools.World.Utils.Time
     {
         #region Soukromá pole
 
-        private readonly WDateOnly        _date;
+        private readonly WDateOnly _date;
         private readonly WorldTimeContext _ctx;
 
         #endregion
@@ -240,7 +240,7 @@ namespace GameEngineTools.World.Utils.Time
         public BoundWDateOnly(WDateOnly date, WorldTimeContext ctx)
         {
             _date = date;
-            _ctx  = ctx;
+            _ctx = ctx;
         }
 
         #endregion
@@ -258,13 +258,13 @@ namespace GameEngineTools.World.Utils.Time
         #region Properties
 
         /// <summary>Rok data podle světového kalendáře.</summary>
-        public int Year  => _ctx.GetDateParts(_date).year;
+        public int Year => _ctx.GetDateParts(_date).year;
 
         /// <summary>Měsíc data (1-based) podle světového kalendáře.</summary>
         public int Month => _ctx.GetDateParts(_date).month;
 
         /// <summary>Den v měsíci (1-based) podle světového kalendáře.</summary>
-        public int Day   => _ctx.GetDateParts(_date).day;
+        public int Day => _ctx.GetDateParts(_date).day;
 
         #endregion
 
@@ -363,7 +363,7 @@ namespace GameEngineTools.World.Utils.Time
     {
         #region Soukromá pole
 
-        private readonly WTimeOnly        _time;
+        private readonly WTimeOnly _time;
         private readonly WorldTimeContext _ctx;
 
         #endregion
@@ -377,7 +377,7 @@ namespace GameEngineTools.World.Utils.Time
         public BoundWTimeOnly(WTimeOnly time, WorldTimeContext ctx)
         {
             _time = time;
-            _ctx  = ctx;
+            _ctx = ctx;
         }
 
         #endregion
@@ -395,13 +395,13 @@ namespace GameEngineTools.World.Utils.Time
         #region Properties
 
         /// <summary>Hodina dne (0-based).</summary>
-        public int Hour        => _ctx.GetTimeParts(_time).hour;
+        public int Hour => _ctx.GetTimeParts(_time).hour;
 
         /// <summary>Minuta hodiny (0-based).</summary>
-        public int Minute      => _ctx.GetTimeParts(_time).minute;
+        public int Minute => _ctx.GetTimeParts(_time).minute;
 
         /// <summary>Sekunda minuty (0-based).</summary>
-        public int Second      => _ctx.GetTimeParts(_time).second;
+        public int Second => _ctx.GetTimeParts(_time).second;
 
         /// <summary>Milisekunda v rámci sekundy (0..999).</summary>
         public int Millisecond => _ctx.GetMillisecond(_time);
@@ -485,7 +485,7 @@ namespace GameEngineTools.World.Utils.Time
     {
         #region Soukromá pole
 
-        private readonly WTimeSpan        _span;
+        private readonly WTimeSpan _span;
         private readonly WorldTimeContext _ctx;
 
         #endregion
@@ -499,7 +499,7 @@ namespace GameEngineTools.World.Utils.Time
         public BoundWTimeSpan(WTimeSpan span, WorldTimeContext ctx)
         {
             _span = span;
-            _ctx  = ctx;
+            _ctx = ctx;
         }
 
         #endregion
@@ -523,19 +523,19 @@ namespace GameEngineTools.World.Utils.Time
         public double TotalMinutes => _ctx.TotalMinutes(_span);
 
         /// <summary>Celkový počet hodin (může být záporný).</summary>
-        public double TotalHours   => _ctx.TotalHours(_span);
+        public double TotalHours => _ctx.TotalHours(_span);
 
         /// <summary>Celkový počet dní (může být záporný).</summary>
-        public double TotalDays    => _ctx.TotalDays(_span);
+        public double TotalDays => _ctx.TotalDays(_span);
 
         /// <summary>Absolutní celkový počet sekund (vždy kladné).</summary>
         public double AbsTotalSeconds => _ctx.AbsTotalSeconds(_span);
 
         /// <summary>Absolutní celkový počet hodin (vždy kladné).</summary>
-        public double AbsTotalHours   => _ctx.AbsTotalHours(_span);
+        public double AbsTotalHours => _ctx.AbsTotalHours(_span);
 
         /// <summary>Absolutní celkový počet dní (vždy kladné).</summary>
-        public double AbsTotalDays    => _ctx.AbsTotalDays(_span);
+        public double AbsTotalDays => _ctx.AbsTotalDays(_span);
 
         #endregion
 

@@ -3,11 +3,6 @@
 
 namespace GameEngineTools.Characters.Persistence
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
@@ -15,11 +10,11 @@ namespace GameEngineTools.Characters.Persistence
     public sealed record CharacterData
     {
         public HumanId Id { get; init; }
-        public Identity Identity { get; init; }
+        public required Identity Identity { get; init; }
         public SexBiology Biology { get; init; }
-        public Personality Personality { get; init; }
-        public PhysicalAppearance PhysicalAppearance { get; init; }
-        public EnginesSnapshot Snapshot { get; init; }
+        public required Personality Personality { get; init; }
+        public required PhysicalAppearance PhysicalAppearance { get; init; }
+        public required EnginesSnapshot Snapshot { get; init; }
 
         public double MaxHealth { get; init; }
         public double Health { get; init; }

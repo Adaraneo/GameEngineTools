@@ -46,7 +46,7 @@ namespace GameEngineTools.FileSystem
             }
         }
 
-        public GenerateFileSystem(string root = null)
+        public GenerateFileSystem(string? root = null)
         {
             root ??= Directory.GetCurrentDirectory();
             var playerDirectory = Path.Combine(root, GD.player);

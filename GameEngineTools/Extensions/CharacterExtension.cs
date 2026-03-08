@@ -4,7 +4,6 @@
 namespace GameEngineTools.Extensions
 {
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.World.Utils.Time;
 
     public static class CharacterExtension
     {

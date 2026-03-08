@@ -1,4 +1,4 @@
-﻿// NonPlayablePlayableCharacter.cs
+﻿// CharacterBase.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.GameObjects
@@ -113,6 +113,11 @@ namespace GameEngineTools.Characters.GameObjects
             {
                 this.health = MaxHealth;
             }
+        }
+
+        public override int GetHashCode()
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -65,11 +65,11 @@ namespace GameEngineTools
         /// </param>
         /// <returns>Handle na běžící runtime — disposable, při dispose zastaví host.</returns>
         public static async Task<GameEngineToolsRuntimeHandle> StartAsync(
-            WDateTime              beginning,
-            bool                   consoleLogs           = true,
-            string                 logsRoot              = "logs",
-            GeneratedFileOptions?  generatedFileOptions  = null,
-            double                 timescale             = 1)
+            WDateTime beginning,
+            bool consoleLogs = true,
+            string logsRoot = "logs",
+            GeneratedFileOptions? generatedFileOptions = null,
+            double timescale = 1)
         {
             // Uložíme tiky před vstupem do DI lambdy — closure capture hodnoty, ne referenci
             var beginningTicks = beginning.WorldTicks;
@@ -79,18 +79,20 @@ namespace GameEngineTools
                 {
                     lb.ClearProviders();
                     if (consoleLogs)
+                    {
                         lb.AddConsole();
+                    }
 
                     lb.AddCharactersFile(opt =>
                     {
-                        opt.FilePath         = "logs/Characters/characters.log";
-                        opt.MinLevel         = LogLevel.Debug;
+                        opt.FilePath = "logs/Characters/characters.log";
+                        opt.MinLevel = LogLevel.Debug;
                         opt.UseUtcTimestamps = true;
                     });
                 })
                 .ConfigureServices(s =>
                 {
-                    var configProvider  = ConfigProvider.Configuration;
+                    var configProvider = ConfigProvider.Configuration;
                     var worldTypeConfig = configProvider
                         .GetSection("InitWorldClock")
                         .GetValue<string>("UseWorldType");
@@ -144,7 +146,7 @@ namespace GameEngineTools
                     {
                         if (generatedFileOptions is not null)
                         {
-                            opt.NPCDirectory   = generatedFileOptions.NPCDirectory;
+                            opt.NPCDirectory = generatedFileOptions.NPCDirectory;
                             opt.PlayerDirectory = generatedFileOptions.PlayerDirectory;
                         }
                     });
@@ -166,7 +168,7 @@ namespace GameEngineTools
                     //    Teď:  spec se sestaví až při prvním resolve, kdy DI má vše k dispozici
                     s.AddCharacterGeneration(sp =>
                     {
-                        var ctx         = sp.GetRequiredService<WorldTimeContext>();
+                        var ctx = sp.GetRequiredService<WorldTimeContext>();
                         var beginningDt = new WDateTime(beginningTicks);
                         return HumanBlueprintSpec.Default(ctx.GetDate(beginningDt), ctx);
                     });
@@ -176,7 +178,7 @@ namespace GameEngineTools
                     s.Configure<GameEngineToolsManagerOptions>(opt =>
                     {
                         opt.UseConsoleLogging = consoleLogs;
-                        opt.LogsRoot          = logsRoot;
+                        opt.LogsRoot = logsRoot;
                     });
                     s.AddHostedService<GameEngineToolsManagerInitializer>();
                     s.AddHostedService<SubscribersActivator>();

@@ -5,9 +5,7 @@ namespace GameEngineTools.FileSystem
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Text;
-    using System.Threading.Tasks;
 
     internal static class CsvLoader
     {
@@ -19,7 +17,7 @@ namespace GameEngineTools.FileSystem
 
             reader.ReadLine();
             string? line;
-            while((line = reader.ReadLine()) != null)
+            while ((line = reader.ReadLine()) != null)
             {
                 var values = line.Split(';');
                 result.Add(parser(values));

@@ -1,4 +1,7 @@
-﻿using GameEngineTools.World.Utils.Time;
+﻿// IClock.cs
+// Copyright (c) 50PSoftware
+
+using GameEngineTools.World.Utils.Time;
 
 namespace GameEngineTools.World.Core.Time
 {

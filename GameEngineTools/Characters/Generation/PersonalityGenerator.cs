@@ -4,7 +4,6 @@
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Characters.Traits;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace GameEngineTools.Characters.Generation;
 
@@ -134,11 +133,30 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         var (O, C, E, A, N) = GenerateBigFive(rng, spec);
 
         // 2) aplikuj hinty (fixy); clamp do [0..1]
-        if (hints.Openness is double o) O = Clamp01(o);
-        if (hints.Conscientiousness is double c) C = Clamp01(c);
-        if (hints.Extraversion is double e) E = Clamp01(e);
-        if (hints.Agreeableness is double a) A = Clamp01(a);
-        if (hints.Neuroticism is double n) N = Clamp01(n);
+        if (hints.Openness is double o)
+        {
+            O = Clamp01(o);
+        }
+
+        if (hints.Conscientiousness is double c)
+        {
+            C = Clamp01(c);
+        }
+
+        if (hints.Extraversion is double e)
+        {
+            E = Clamp01(e);
+        }
+
+        if (hints.Agreeableness is double a)
+        {
+            A = Clamp01(a);
+        }
+
+        if (hints.Neuroticism is double n)
+        {
+            N = Clamp01(n);
+        }
 
         // 3) ostatní volby – losování z vah nebo hint fix
         var attach = hints.Attachment ?? PickWeighted(
@@ -193,7 +211,10 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             => (r.NextUnit() + r.NextUnit() + r.NextUnit() + r.NextUnit() + r.NextUnit() - 2.5) / 0.612372; // ~N(0,1)
 
         var z = new double[5];
-        for (int i = 0; i < 5; i++) z[i] = G(rng);
+        for (int i = 0; i < 5; i++)
+        {
+            z[i] = G(rng);
+        }
 
         // 2) zavedeme korelace lineárním mixem (Cholesky approx – tady rychlý Gram-Schmidt)
         // Pozn.: pro malé korelace stačí; pokud budeš chtít přesný Cholesky, můžeme doplnit.
@@ -201,7 +222,11 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         var y = new double[5];
         for (int i = 0; i < 5; i++)
         {
-            double s = 0; for (int j = 0; j <= i; j++) s += L[i, j] * z[j];
+            double s = 0; for (int j = 0; j <= i; j++)
+            {
+                s += L[i, j] * z[j];
+            }
+
             y[i] = s; // ~N(0,1) s korelacemi
         }
 
@@ -227,11 +252,19 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             for (int j = 0; j <= i; j++)
             {
                 double sum = corr[i, j];
-                for (int k = 0; k < j; k++) sum -= L[i, k] * L[j, k];
+                for (int k = 0; k < j; k++)
+                {
+                    sum -= L[i, k] * L[j, k];
+                }
+
                 if (i == j)
+                {
                     L[i, j] = Math.Sqrt(Math.Max(sum, 1e-6));
+                }
                 else
+                {
                     L[i, j] = sum / L[j, j];
+                }
             }
         }
         return L;
@@ -245,9 +278,17 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
     {
         var r = rng.NextUnit();
         var s = a.w;
-        if (r <= s) return a.item;
+        if (r <= s)
+        {
+            return a.item;
+        }
+
         s += b.w;
-        if (r <= s) return b.item;
+        if (r <= s)
+        {
+            return b.item;
+        }
+
         return c.item;
     }
 
@@ -260,9 +301,21 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
     {
         var r = rng.NextUnit();
         var s = a.w;
-        if (r <= s) return a.item;
-        s += b.w; if (r <= s) return b.item;
-        s += c.w; if (r <= s) return c.item;
+        if (r <= s)
+        {
+            return a.item;
+        }
+
+        s += b.w; if (r <= s)
+        {
+            return b.item;
+        }
+
+        s += c.w; if (r <= s)
+        {
+            return c.item;
+        }
+
         return d.item;
     }
 

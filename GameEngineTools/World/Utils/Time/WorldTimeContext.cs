@@ -51,7 +51,7 @@ namespace GameEngineTools.World.Core.Time
         /// </param>
         public WorldTimeContext(WorldTimeSpec spec, IWorldClock clock)
         {
-            Spec   = spec;
+            Spec = spec;
             _clock = clock;
         }
 
@@ -131,10 +131,10 @@ namespace GameEngineTools.World.Core.Time
         public double AbsTotalSeconds(WTimeSpan span) => Math.Abs(TotalSeconds(span));
 
         /// <summary>Absolutní hodnota <see cref="TotalHours"/>. Vždy kladná nebo nulová.</summary>
-        public double AbsTotalHours(WTimeSpan span)   => Math.Abs(TotalHours(span));
+        public double AbsTotalHours(WTimeSpan span) => Math.Abs(TotalHours(span));
 
         /// <summary>Absolutní hodnota <see cref="TotalDays"/>. Vždy kladná nebo nulová.</summary>
-        public double AbsTotalDays(WTimeSpan span)    => Math.Abs(TotalDays(span));
+        public double AbsTotalDays(WTimeSpan span) => Math.Abs(TotalDays(span));
 
         #endregion
 
@@ -157,10 +157,10 @@ namespace GameEngineTools.World.Core.Time
             DeconstructSpan(WTimeSpan span)
         {
             long at = Math.Abs(span.Ticks);
-            long d  = at / Spec.TicksPerDay;           at %= Spec.TicksPerDay;
-            int  hh = (int)(at / Spec.TicksPerHour);   at %= Spec.TicksPerHour;
-            int  mm = (int)(at / Spec.TicksPerMinute);  at %= Spec.TicksPerMinute;
-            int  ss = (int)(at / Spec.TicksPerSecond);  at %= Spec.TicksPerSecond;
+            long d = at / Spec.TicksPerDay; at %= Spec.TicksPerDay;
+            int hh = (int)(at / Spec.TicksPerHour); at %= Spec.TicksPerHour;
+            int mm = (int)(at / Spec.TicksPerMinute); at %= Spec.TicksPerMinute;
+            int ss = (int)(at / Spec.TicksPerSecond); at %= Spec.TicksPerSecond;
             return (d, hh, mm, ss, at);
         }
 
@@ -184,13 +184,17 @@ namespace GameEngineTools.World.Core.Time
             var (d, hh, mm, ss, sub) = DeconstructSpan(span);
 
             if (d != 0)
+            {
                 return sub != 0
                     ? $"{sign}{d}.{hh:00}:{mm:00}:{ss:00}.{sub}"
                     : $"{sign}{d}.{hh:00}:{mm:00}:{ss:00}";
+            }
             else
+            {
                 return sub != 0
                     ? $"{sign}{hh:00}:{mm:00}:{ss:00}.{sub}"
                     : $"{sign}{hh:00}:{mm:00}:{ss:00}";
+            }
         }
 
         #endregion
@@ -269,7 +273,10 @@ namespace GameEngineTools.World.Core.Time
             }
 
             var dim = cal.DaysInMonth(y, m);
-            if (d > dim) d = dim;
+            if (d > dim)
+            {
+                d = dim;
+            }
 
             return CreateDate(y, m, d);
         }
@@ -288,7 +295,10 @@ namespace GameEngineTools.World.Core.Time
             y += years;
 
             var dim = Spec.Calendar.DaysInMonth(y, m);
-            if (d > dim) d = dim;
+            if (d > dim)
+            {
+                d = dim;
+            }
 
             return CreateDate(y, m, d);
         }
@@ -335,16 +345,33 @@ namespace GameEngineTools.World.Core.Time
         public bool TryParseDate(string? text, out WDateOnly value)
         {
             value = default;
-            if (string.IsNullOrWhiteSpace(text)) return false;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
 
             var s = text.AsSpan().Trim();
-            if (s.Length < 10 || s[4] != '-' || s[7] != '-') return false;
+            if (s.Length < 10 || s[4] != '-' || s[7] != '-')
+            {
+                return false;
+            }
 
-            if (!TryParseInt(s[..4],        min: 1, max: int.MaxValue, out int y))  return false;
-            if (!TryParseInt(s.Slice(5, 2), min: 1, max: 99,           out int mo)) return false;
-            if (!TryParseInt(s.Slice(8, 2), min: 1, max: 99,           out int da)) return false;
+            if (!TryParseInt(s[..4], min: 1, max: int.MaxValue, out int y))
+            {
+                return false;
+            }
 
-            try   { value = CreateDate(y, mo, da); return true; }
+            if (!TryParseInt(s.Slice(5, 2), min: 1, max: 99, out int mo))
+            {
+                return false;
+            }
+
+            if (!TryParseInt(s.Slice(8, 2), min: 1, max: 99, out int da))
+            {
+                return false;
+            }
+
+            try { value = CreateDate(y, mo, da); return true; }
             catch { return false; }
         }
 
@@ -383,12 +410,27 @@ namespace GameEngineTools.World.Core.Time
         /// </exception>
         public WTimeOnly CreateTime(int hour, int minute, int second, long subTick = 0)
         {
-            if (hour    < 0 || hour    >= Spec.HoursPerDay)      throw new ArgumentOutOfRangeException(nameof(hour));
-            if (minute  < 0 || minute  >= Spec.MinutesPerHour)   throw new ArgumentOutOfRangeException(nameof(minute));
-            if (second  < 0 || second  >= Spec.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
-            if (subTick < 0 || subTick >= Spec.TicksPerSecond)   throw new ArgumentOutOfRangeException(nameof(subTick));
+            if (hour < 0 || hour >= Spec.HoursPerDay)
+            {
+                throw new ArgumentOutOfRangeException(nameof(hour));
+            }
 
-            long ticks = hour   * Spec.TicksPerHour
+            if (minute < 0 || minute >= Spec.MinutesPerHour)
+            {
+                throw new ArgumentOutOfRangeException(nameof(minute));
+            }
+
+            if (second < 0 || second >= Spec.SecondsPerMinute)
+            {
+                throw new ArgumentOutOfRangeException(nameof(second));
+            }
+
+            if (subTick < 0 || subTick >= Spec.TicksPerSecond)
+            {
+                throw new ArgumentOutOfRangeException(nameof(subTick));
+            }
+
+            long ticks = hour * Spec.TicksPerHour
                        + minute * Spec.TicksPerMinute
                        + second * Spec.TicksPerSecond
                        + subTick;
@@ -404,7 +446,11 @@ namespace GameEngineTools.World.Core.Time
         public WTimeOnly TimeOf(WDateTime dt)
         {
             long rem = dt.WorldTicks % Spec.TicksPerDay;
-            if (rem < 0) rem += Spec.TicksPerDay;
+            if (rem < 0)
+            {
+                rem += Spec.TicksPerDay;
+            }
+
             return new WTimeOnly(rem);
         }
 
@@ -419,10 +465,10 @@ namespace GameEngineTools.World.Core.Time
         /// <returns>Tuple (hour, minute, second, subTick).</returns>
         public (int hour, int minute, int second, long subTick) GetTimeParts(WTimeOnly time)
         {
-            long rem    = time.TicksOfDay;
-            int  hour   = (int)(rem / Spec.TicksPerHour);   rem %= Spec.TicksPerHour;
-            int  minute = (int)(rem / Spec.TicksPerMinute);  rem %= Spec.TicksPerMinute;
-            int  second = (int)(rem / Spec.TicksPerSecond);  rem %= Spec.TicksPerSecond;
+            long rem = time.TicksOfDay;
+            int hour = (int)(rem / Spec.TicksPerHour); rem %= Spec.TicksPerHour;
+            int minute = (int)(rem / Spec.TicksPerMinute); rem %= Spec.TicksPerMinute;
+            int second = (int)(rem / Spec.TicksPerSecond); rem %= Spec.TicksPerSecond;
             return (hour, minute, second, rem);
         }
 
@@ -449,18 +495,22 @@ namespace GameEngineTools.World.Core.Time
         {
             long t = time.TicksOfDay + span.Ticks;
             t %= Spec.TicksPerDay;
-            if (t < 0) t += Spec.TicksPerDay;
+            if (t < 0)
+            {
+                t += Spec.TicksPerDay;
+            }
+
             return new WTimeOnly(t);
         }
 
         /// <summary>Přičte hodiny k času dne s wraparoundem.</summary>
-        public WTimeOnly AddHours(WTimeOnly time, double hours)     => AddTime(time, Hours(hours));
+        public WTimeOnly AddHours(WTimeOnly time, double hours) => AddTime(time, Hours(hours));
 
         /// <summary>Přičte minuty k času dne s wraparoundem.</summary>
-        public WTimeOnly AddMinutes(WTimeOnly time, double minutes)  => AddTime(time, Minutes(minutes));
+        public WTimeOnly AddMinutes(WTimeOnly time, double minutes) => AddTime(time, Minutes(minutes));
 
         /// <summary>Přičte sekundy k času dne s wraparoundem.</summary>
-        public WTimeOnly AddSeconds(WTimeOnly time, double seconds)  => AddTime(time, Seconds(seconds));
+        public WTimeOnly AddSeconds(WTimeOnly time, double seconds) => AddTime(time, Seconds(seconds));
 
         /// <summary>
         /// Vrátí nejkratší vzdálenost mezi dvěma časy dne jako <see cref="WTimeSpan"/>,
@@ -474,8 +524,16 @@ namespace GameEngineTools.World.Core.Time
         {
             long diff = b.TicksOfDay - a.TicksOfDay;
             long half = Spec.TicksPerDay / 2;
-            if (diff >   half) diff -= Spec.TicksPerDay;
-            if (diff <= -half) diff += Spec.TicksPerDay;
+            if (diff > half)
+            {
+                diff -= Spec.TicksPerDay;
+            }
+
+            if (diff <= -half)
+            {
+                diff += Spec.TicksPerDay;
+            }
+
             return new WTimeSpan(diff);
         }
 
@@ -501,27 +559,47 @@ namespace GameEngineTools.World.Core.Time
         public bool TryParseTime(string? text, out WTimeOnly value)
         {
             value = default;
-            if (string.IsNullOrWhiteSpace(text)) return false;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
 
-            var s   = text.AsSpan().Trim();
+            var s = text.AsSpan().Trim();
             var dot = s.IndexOf('.');
 
             ReadOnlySpan<char> main = dot >= 0 ? s[..dot] : s;
             ReadOnlySpan<char> frac = dot >= 0 ? s[(dot + 1)..] : ReadOnlySpan<char>.Empty;
 
-            if (main.Length < 8 || main[2] != ':' || main[5] != ':') return false;
+            if (main.Length < 8 || main[2] != ':' || main[5] != ':')
+            {
+                return false;
+            }
 
-            if (!TryParseInt(main[..2],        min: 0, max: Spec.HoursPerDay      - 1, out int hh)) return false;
-            if (!TryParseInt(main.Slice(3, 2), min: 0, max: Spec.MinutesPerHour   - 1, out int mm)) return false;
-            if (!TryParseInt(main.Slice(6, 2), min: 0, max: Spec.SecondsPerMinute - 1, out int ss)) return false;
+            if (!TryParseInt(main[..2], min: 0, max: Spec.HoursPerDay - 1, out int hh))
+            {
+                return false;
+            }
+
+            if (!TryParseInt(main.Slice(3, 2), min: 0, max: Spec.MinutesPerHour - 1, out int mm))
+            {
+                return false;
+            }
+
+            if (!TryParseInt(main.Slice(6, 2), min: 0, max: Spec.SecondsPerMinute - 1, out int ss))
+            {
+                return false;
+            }
 
             long sub = 0;
             if (!frac.IsEmpty)
             {
-                if (!TryParseInt64(frac, min: 0, max: Spec.TicksPerSecond - 1, out sub)) return false;
+                if (!TryParseInt64(frac, min: 0, max: Spec.TicksPerSecond - 1, out sub))
+                {
+                    return false;
+                }
             }
 
-            try   { value = CreateTime(hh, mm, ss, sub); return true; }
+            try { value = CreateTime(hh, mm, ss, sub); return true; }
             catch { return false; }
         }
 
@@ -590,14 +668,29 @@ namespace GameEngineTools.World.Core.Time
             int hour = 0, int minute = 0, int second = 0, long subTick = 0)
         {
             // Validace časových složek (kalendářní validace je v DaysFromDate)
-            if (hour    < 0 || hour    >= Spec.HoursPerDay)      throw new ArgumentOutOfRangeException(nameof(hour));
-            if (minute  < 0 || minute  >= Spec.MinutesPerHour)   throw new ArgumentOutOfRangeException(nameof(minute));
-            if (second  < 0 || second  >= Spec.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
-            if (subTick < 0 || subTick >= Spec.TicksPerSecond)   throw new ArgumentOutOfRangeException(nameof(subTick));
+            if (hour < 0 || hour >= Spec.HoursPerDay)
+            {
+                throw new ArgumentOutOfRangeException(nameof(hour));
+            }
 
-            long days  = Spec.Calendar.DaysFromDate(year, month, day);
-            long ticks = days   * Spec.TicksPerDay
-                       + hour   * Spec.TicksPerHour
+            if (minute < 0 || minute >= Spec.MinutesPerHour)
+            {
+                throw new ArgumentOutOfRangeException(nameof(minute));
+            }
+
+            if (second < 0 || second >= Spec.SecondsPerMinute)
+            {
+                throw new ArgumentOutOfRangeException(nameof(second));
+            }
+
+            if (subTick < 0 || subTick >= Spec.TicksPerSecond)
+            {
+                throw new ArgumentOutOfRangeException(nameof(subTick));
+            }
+
+            long days = Spec.Calendar.DaysFromDate(year, month, day);
+            long ticks = days * Spec.TicksPerDay
+                       + hour * Spec.TicksPerHour
                        + minute * Spec.TicksPerMinute
                        + second * Spec.TicksPerSecond
                        + subTick;
@@ -636,9 +729,9 @@ namespace GameEngineTools.World.Core.Time
             long dayIndex = Math.DivRem(dt.WorldTicks, Spec.TicksPerDay, out long rest);
             var (year, month, day) = Spec.Calendar.DateFromDays(dayIndex);
 
-            int hour   = (int)(rest / Spec.TicksPerHour);   rest %= Spec.TicksPerHour;
-            int minute = (int)(rest / Spec.TicksPerMinute);  rest %= Spec.TicksPerMinute;
-            int second = (int)(rest / Spec.TicksPerSecond);  rest %= Spec.TicksPerSecond;
+            int hour = (int)(rest / Spec.TicksPerHour); rest %= Spec.TicksPerHour;
+            int minute = (int)(rest / Spec.TicksPerMinute); rest %= Spec.TicksPerMinute;
+            int second = (int)(rest / Spec.TicksPerSecond); rest %= Spec.TicksPerSecond;
 
             return (year, month, day, hour, minute, second, rest);
         }
@@ -657,7 +750,11 @@ namespace GameEngineTools.World.Core.Time
         public WTimeOnly GetTime(WDateTime dt)
         {
             long rem = dt.WorldTicks % Spec.TicksPerDay;
-            if (rem < 0) rem += Spec.TicksPerDay;
+            if (rem < 0)
+            {
+                rem += Spec.TicksPerDay;
+            }
+
             return new WTimeOnly(rem);
         }
 
@@ -667,9 +764,9 @@ namespace GameEngineTools.World.Core.Time
         /// </summary>
         public int GetDayOfYear(WDateTime dt)
         {
-            long dayIndex              = dt.WorldTicks / Spec.TicksPerDay;
-            var (year, _, _)           = Spec.Calendar.DateFromDays(dayIndex);
-            long firstDayOfYear        = Spec.Calendar.DaysFromDate(year, 1, 1);
+            long dayIndex = dt.WorldTicks / Spec.TicksPerDay;
+            var (year, _, _) = Spec.Calendar.DateFromDays(dayIndex);
+            long firstDayOfYear = Spec.Calendar.DaysFromDate(year, 1, 1);
             return (int)(dayIndex - firstDayOfYear) + 1;
         }
 
@@ -757,16 +854,30 @@ namespace GameEngineTools.World.Core.Time
 
             // Trim bez alokací
             int start = 0, end = input.Length;
-            while (start < end && char.IsWhiteSpace(input[start])) start++;
-            while (end > start && char.IsWhiteSpace(input[end - 1])) end--;
+            while (start < end && char.IsWhiteSpace(input[start]))
+            {
+                start++;
+            }
+
+            while (end > start && char.IsWhiteSpace(input[end - 1]))
+            {
+                end--;
+            }
+
             var s = input.Slice(start, end - start);
-            if (s.Length == 0) return false;
+            if (s.Length == 0)
+            {
+                return false;
+            }
 
             // Volitelný suffix Z/z (UTC marker pro Zemi — v herním čase ignorujeme)
-            if (s.Length > 0 && (s[^1] == 'Z' || s[^1] == 'z')) s = s[..^1];
+            if (s.Length > 0 && (s[^1] == 'Z' || s[^1] == 'z'))
+            {
+                s = s[..^1];
+            }
 
             // Rozdělení na datovou a časovou část podle 'T' nebo mezery
-            int iT  = s.IndexOf('T');
+            int iT = s.IndexOf('T');
             int iSP = s.IndexOf(' ');
             int sep = (iT >= 0 && iSP >= 0) ? Math.Min(iT, iSP) : Math.Max(iT, iSP);
 
@@ -777,18 +888,35 @@ namespace GameEngineTools.World.Core.Time
             if (hasTime)
             {
                 timePart = s[(sep + 1)..].Trim();
-                if (timePart.Length == 0) hasTime = false;
+                if (timePart.Length == 0)
+                {
+                    hasTime = false;
+                }
             }
 
             // --- Datum: "YYYY-MM-DD" -----------------------------------------
-            if (datePart.Length < 10 || datePart[4] != '-' || datePart[7] != '-') return false;
+            if (datePart.Length < 10 || datePart[4] != '-' || datePart[7] != '-')
+            {
+                return false;
+            }
 
-            if (!TryParseInt(datePart[..4],        min: 1, max: int.MaxValue, out int year))  return false;
-            if (!TryParseInt(datePart.Slice(5, 2), min: 1, max: 99,           out int month)) return false;
-            if (!TryParseInt(datePart.Slice(8, 2), min: 1, max: 99,           out int day))   return false;
+            if (!TryParseInt(datePart[..4], min: 1, max: int.MaxValue, out int year))
+            {
+                return false;
+            }
+
+            if (!TryParseInt(datePart.Slice(5, 2), min: 1, max: 99, out int month))
+            {
+                return false;
+            }
+
+            if (!TryParseInt(datePart.Slice(8, 2), min: 1, max: 99, out int day))
+            {
+                return false;
+            }
 
             // --- Čas: "HH:MM:SS[.frac[W]]" -----------------------------------
-            int  hour = 0, minute = 0, second = 0;
+            int hour = 0, minute = 0, second = 0;
             long subTick = 0;
 
             if (hasTime)
@@ -797,48 +925,81 @@ namespace GameEngineTools.World.Core.Time
                 ReadOnlySpan<char> main = dot >= 0 ? timePart[..dot] : timePart;
                 ReadOnlySpan<char> frac = dot >= 0 ? timePart[(dot + 1)..] : ReadOnlySpan<char>.Empty;
 
-                if (main.Length < 8 || main[2] != ':' || main[5] != ':') return false;
+                if (main.Length < 8 || main[2] != ':' || main[5] != ':')
+                {
+                    return false;
+                }
 
-                if (!TryParseInt(main[..2],        min: 0, max: Spec.HoursPerDay      - 1, out hour))   return false;
-                if (!TryParseInt(main.Slice(3, 2), min: 0, max: Spec.MinutesPerHour   - 1, out minute)) return false;
-                if (!TryParseInt(main.Slice(6, 2), min: 0, max: Spec.SecondsPerMinute - 1, out second)) return false;
+                if (!TryParseInt(main[..2], min: 0, max: Spec.HoursPerDay - 1, out hour))
+                {
+                    return false;
+                }
+
+                if (!TryParseInt(main.Slice(3, 2), min: 0, max: Spec.MinutesPerHour - 1, out minute))
+                {
+                    return false;
+                }
+
+                if (!TryParseInt(main.Slice(6, 2), min: 0, max: Spec.SecondsPerMinute - 1, out second))
+                {
+                    return false;
+                }
 
                 if (!frac.IsEmpty)
                 {
                     // Suffix 'W' = raw worldTicks (round-trip); bez = desetinné zlomky sekundy
                     bool rawTicks = frac[^1] == 'W';
-                    if (rawTicks) frac = frac[..^1];
-                    if (frac.Length == 0) return false;
+                    if (rawTicks)
+                    {
+                        frac = frac[..^1];
+                    }
+
+                    if (frac.Length == 0)
+                    {
+                        return false;
+                    }
 
                     // Validace: jen číslice
                     for (int i = 0; i < frac.Length; i++)
-                        if (frac[i] < '0' || frac[i] > '9') return false;
+                    {
+                        if (frac[i] < '0' || frac[i] > '9')
+                        {
+                            return false;
+                        }
+                    }
 
                     if (rawTicks)
                     {
                         if (!TryParseInt64(frac, min: 0, max: Spec.TicksPerSecond - 1, out subTick))
+                        {
                             return false;
+                        }
                     }
                     else
                     {
                         int n = Math.Min(frac.Length, 18);
                         if (!TryParseInt64(frac[..n], min: 0, max: long.MaxValue, out long fracVal))
+                        {
                             return false;
+                        }
 
                         long pow10 = Pow10(n);
                         subTick = (fracVal * Spec.TicksPerSecond) / pow10;
-                        if (subTick >= Spec.TicksPerSecond) subTick = Spec.TicksPerSecond - 1;
+                        if (subTick >= Spec.TicksPerSecond)
+                        {
+                            subTick = Spec.TicksPerSecond - 1;
+                        }
                     }
                 }
             }
 
             // --- Sestavení výsledku ------------------------------------------
             long days;
-            try   { days = Spec.Calendar.DaysFromDate(year, month, day); }
+            try { days = Spec.Calendar.DaysFromDate(year, month, day); }
             catch { return false; }
 
-            long ticks = days   * Spec.TicksPerDay
-                       + hour   * Spec.TicksPerHour
+            long ticks = days * Spec.TicksPerDay
+                       + hour * Spec.TicksPerHour
                        + minute * Spec.TicksPerMinute
                        + second * Spec.TicksPerSecond
                        + subTick;
@@ -865,9 +1026,9 @@ namespace GameEngineTools.World.Core.Time
             var (y, mo, d, hh, mm, ss, sub) = GetParts(dt);
             var sb = new StringBuilder(32);
 
-            Append4(sb, y);  sb.Append('-');
+            Append4(sb, y); sb.Append('-');
             Append2(sb, mo); sb.Append('-');
-            Append2(sb, d);  sb.Append('T');
+            Append2(sb, d); sb.Append('T');
             Append2(sb, hh); sb.Append(':');
             Append2(sb, mm); sb.Append(':');
             Append2(sb, ss);
@@ -928,7 +1089,11 @@ namespace GameEngineTools.World.Core.Time
         private static long Pow10(int n)
         {
             long p = 1;
-            for (int i = 0; i < n; i++) p *= 10;
+            for (int i = 0; i < n; i++)
+            {
+                p *= 10;
+            }
+
             return p;
         }
 
@@ -947,9 +1112,9 @@ namespace GameEngineTools.World.Core.Time
         {
             if (v >= 10000) { sb.Append(v); return; } // rok > 9999 — vypíšeme celý
             sb.Append((char)('0' + (v / 1000) % 10));
-            sb.Append((char)('0' + (v / 100)  % 10));
-            sb.Append((char)('0' + (v / 10)   % 10));
-            sb.Append((char)('0' +  v          % 10));
+            sb.Append((char)('0' + (v / 100) % 10));
+            sb.Append((char)('0' + (v / 10) % 10));
+            sb.Append((char)('0' + v % 10));
         }
 
         #endregion

@@ -5,9 +5,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
@@ -75,7 +72,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case Interactions.InteractionOutcome io when io.Accepted:
                     var otherId = io.From == self ? io.To : io.From;
                     if (!State.Edges.ContainsKey(otherId))
+                    {
                         Upsert(self, otherId, e => e);
+                    }
 
                     Upsert(self, otherId, e => e with
                     {
@@ -88,7 +87,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case Interactions.InteractionOutcome io when !io.Accepted:
                     var otherId2 = io.From == self ? io.To : io.From;
                     if (!State.Edges.ContainsKey(otherId2))
+                    {
                         Upsert(self, otherId2, e => e);
+                    }
+
                     break;
             }
         }
@@ -96,9 +98,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
             var days = Math.Max(0, _wtctx.TotalDays(dt));
-            if (days == 0) return;
+            if (days == 0)
+            {
+                return;
+            }
 
-            if (State.Edges.Count == 0) return;
+            if (State.Edges.Count == 0)
+            {
+                return;
+            }
 
             var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
             foreach (var kv in State.Edges)

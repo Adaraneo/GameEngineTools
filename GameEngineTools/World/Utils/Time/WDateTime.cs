@@ -130,13 +130,13 @@ namespace GameEngineTools.World.Utils.Time
         public static bool operator !=(WDateTime a, WDateTime b) => a.WorldTicks != b.WorldTicks;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve než <paramref name="b"/>.</summary>
-        public static bool operator < (WDateTime a, WDateTime b) => a.WorldTicks <  b.WorldTicks;
+        public static bool operator <(WDateTime a, WDateTime b) => a.WorldTicks < b.WorldTicks;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejný okamžik jako <paramref name="b"/>.</summary>
         public static bool operator <=(WDateTime a, WDateTime b) => a.WorldTicks <= b.WorldTicks;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později než <paramref name="b"/>.</summary>
-        public static bool operator > (WDateTime a, WDateTime b) => a.WorldTicks >  b.WorldTicks;
+        public static bool operator >(WDateTime a, WDateTime b) => a.WorldTicks > b.WorldTicks;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později nebo ve stejný okamžik jako <paramref name="b"/>.</summary>
         public static bool operator >=(WDateTime a, WDateTime b) => a.WorldTicks >= b.WorldTicks;

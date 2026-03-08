@@ -39,7 +39,11 @@ namespace GameEngineTools.Logging
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
                                     Func<TState, Exception?, string> formatter)
             {
-                if (!IsEnabled(logLevel)) return;
+                if (!IsEnabled(logLevel))
+                {
+                    return;
+                }
+
                 var msg = formatter(state, exception);
                 List<string>? scopes = null;
                 _provider._scopes?.ForEachScope((s, list) =>
@@ -54,22 +58,34 @@ namespace GameEngineTools.Logging
 
         internal void Write(LogLevel level, string category, EventId eventId, string message, Exception? ex, List<string>? scopes)
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             var ts = _opt.UseUtcTimestamps ? DateTimeOffset.UtcNow : DateTimeOffset.Now;
             var sb = new StringBuilder()
                 .Append(ts.ToString("yyyy-MM-ddTHH:mm:ss.fffK"))
                 .Append(" [").Append(level).Append("] ")
                 .Append(category);
 
-            if (eventId.Id != 0) sb.Append(" (").Append(eventId.Id).Append(')');
+            if (eventId.Id != 0)
+            {
+                sb.Append(" (").Append(eventId.Id).Append(')');
+            }
+
             sb.Append(" :: ").Append(message);
 
             if (scopes is { Count: > 0 })
+            {
                 sb.Append(" | scopes: ").Append(string.Join(" > ", scopes));
+            }
 
             if (ex is not null)
+            {
                 sb.Append(" | ex: ").Append(ex.GetType().Name).Append(": ").Append(ex.Message)
                   .AppendLine().Append(ex.StackTrace);
+            }
 
             lock (_sync)
             {
@@ -94,7 +110,11 @@ namespace GameEngineTools.Logging
 
         public void Dispose()
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
             lock (_sync)
             {

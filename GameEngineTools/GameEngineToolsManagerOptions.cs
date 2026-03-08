@@ -1,4 +1,4 @@
-﻿// CharacterManagerOptions.cs
+﻿// GameEngineToolsManagerOptions.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools
@@ -8,7 +8,7 @@ namespace GameEngineTools
 
     public sealed class GameEngineToolsManagerOptions
     {
-        public Func<WorldClock> InitializeWorldClock { get; set; }
+        public required Func<WorldClock> InitializeWorldClock { get; set; }
         public string LogsRoot { get; set; } = "logs";
         public bool UseConsoleLogging { get; set; } = true;
     }

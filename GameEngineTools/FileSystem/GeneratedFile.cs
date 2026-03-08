@@ -5,23 +5,20 @@ namespace GameEngineTools.FileSystem
 {
     using System.Text.Json;
     using System.Text.Json.Serialization;
-    using Microsoft.Extensions.Options;
     using GameEngineTools;
-    using GameEngineTools.Characters.GameObjects;
-    using GameEngineTools.Extensions;
-    using GameEngineTools.World.Core.Time;
     using GameEngineTools.Characters.Core;
-    using GD = GameEngineTools.Constants.FileSystemConstant.GeneratedDirectory;
-    using GameEngineTools.Characters.Persistence;
+    using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Hosting;
-    using System.Net.Http.Headers;
+    using GameEngineTools.Characters.Persistence;
+    using GameEngineTools.World.Core.Time;
+    using Microsoft.Extensions.Options;
 
     public sealed class GeneratedFile : IGeneratedFile
     {
         private IClock _clock;
         private IGameEngineToolsManager _characterManager;
         private readonly IHumanFactory _humanFactory;
-        public GeneratedFile(IClock clock, IGameEngineToolsManager characterManager, IHumanFactory humanFactory, IOptions<GeneratedFileOptions> options = null)
+        public GeneratedFile(IClock clock, IGameEngineToolsManager characterManager, IHumanFactory humanFactory, IOptions<GeneratedFileOptions>? options = null)
         {
             _clock = clock;
             this._characterManager = characterManager;
@@ -99,7 +96,7 @@ namespace GameEngineTools.FileSystem
             return filename;
         }
 
-        public void ExportNPPCs(string pathToRootDirectory = null)
+        public void ExportNPPCs(string? pathToRootDirectory = null)
         {
             _ = new GenerateFileSystem(pathToRootDirectory);
             var nppcs = _characterManager.NPPCs.GetEnumerator();
@@ -114,7 +111,7 @@ namespace GameEngineTools.FileSystem
 
         public NPC ImportNPC(string filename)
         {
-            using var  file = new StreamReader(File.OpenRead($"{Path.Combine(NPCDirectory, filename)}"));
+            using var file = new StreamReader(File.OpenRead($"{Path.Combine(NPCDirectory, filename)}"));
             var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions);
 
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance);
@@ -131,7 +128,7 @@ namespace GameEngineTools.FileSystem
             };
         }
 
-        public void ImportNPPCs(string pathToRootDirectory = null)
+        public void ImportNPPCs(string? pathToRootDirectory = null)
         {
             _characterManager.NPPCs.Clear();
             GenerateFileSystem generateFileSystem = new GenerateFileSystem(pathToRootDirectory);

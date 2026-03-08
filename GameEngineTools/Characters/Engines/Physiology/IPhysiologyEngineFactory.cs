@@ -3,11 +3,6 @@
 
 namespace GameEngineTools.Characters.Engines.Physiology
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
 

@@ -3,15 +3,9 @@
 
 namespace GameEngineTools.Characters.Core
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
-
     public class Name
     {
-        public string Original { get; set; }
-        public string[] Familiar { get; set; }
+        public required string Original { get; set; }
+        public required string[] Familiar { get; set; }
     }
 }

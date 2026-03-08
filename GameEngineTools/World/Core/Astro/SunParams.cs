@@ -1,4 +1,7 @@
-﻿namespace GameEngineTools.World.Core.Astro
+﻿// SunParams.cs
+// Copyright (c) 50PSoftware
+
+namespace GameEngineTools.World.Core.Astro
 {
     /// <summary>
     /// Parametry slunce / oběhu – vol je podle svého světa.

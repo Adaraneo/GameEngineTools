@@ -1,4 +1,4 @@
-﻿// Traits.cs
+﻿// Personality.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.Traits

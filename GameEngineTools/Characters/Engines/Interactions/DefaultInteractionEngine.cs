@@ -41,7 +41,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     break;
 
                 case InteractionProposed p:
-                    if (p.To != ctx.Id) break;
+                    if (p.To != ctx.Id)
+                    {
+                        break;
+                    }
+
                     var rels = ctx.Snapshot.Relationships.Edges;
                     rels.TryGetValue(p.From, out var edge);
 

@@ -54,7 +54,11 @@ namespace GameEngineTools.World.Utils.Time
         [JsonConstructor]
         public WDateOnly(long dayIndex)
         {
-            if (dayIndex < 0) throw new ArgumentOutOfRangeException(nameof(dayIndex));
+            if (dayIndex < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(dayIndex));
+            }
+
             DayIndex = dayIndex;
         }
 
@@ -104,13 +108,13 @@ namespace GameEngineTools.World.Utils.Time
         public static bool operator !=(WDateOnly a, WDateOnly b) => a.DayIndex != b.DayIndex;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve než <paramref name="b"/>.</summary>
-        public static bool operator < (WDateOnly a, WDateOnly b) => a.DayIndex <  b.DayIndex;
+        public static bool operator <(WDateOnly a, WDateOnly b) => a.DayIndex < b.DayIndex;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejný den jako <paramref name="b"/>.</summary>
         public static bool operator <=(WDateOnly a, WDateOnly b) => a.DayIndex <= b.DayIndex;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později než <paramref name="b"/>.</summary>
-        public static bool operator > (WDateOnly a, WDateOnly b) => a.DayIndex >  b.DayIndex;
+        public static bool operator >(WDateOnly a, WDateOnly b) => a.DayIndex > b.DayIndex;
 
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později nebo ve stejný den jako <paramref name="b"/>.</summary>
         public static bool operator >=(WDateOnly a, WDateOnly b) => a.DayIndex >= b.DayIndex;

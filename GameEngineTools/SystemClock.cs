@@ -21,8 +21,8 @@ namespace GameEngineTools
     {
         #region Soukromá pole
 
-        private readonly Timer            _timer;
-        private readonly double           _timeScale;
+        private readonly Timer _timer;
+        private readonly double _timeScale;
         private readonly WorldTimeContext _ctx;
 
         #endregion
@@ -44,12 +44,12 @@ namespace GameEngineTools
         public SystemClock(IWorldClock worldClock, WorldTimeContext ctx)
         {
             _timeScale = worldClock.TimeScale;
-            _ctx       = ctx;
+            _ctx = ctx;
 
             // Počáteční čas bereme přímo z worldClock — WDateTime.Now (statika) bylo odstraněno
             Now = new WDateTime(worldClock.NowWorldTicks());
 
-            _timer          = new Timer { Interval = 1000 };
+            _timer = new Timer { Interval = 1000 };
             _timer.Elapsed += Timer_Elapsed;
         }
 
