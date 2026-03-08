@@ -9,9 +9,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using System.Text;
     using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Utils.Time;
 
     public interface IPhysiologyEngineFactory
     {
-        IPhysiologyEngine Create(IRandomSource rng, SexBiology biology);
+        IPhysiologyEngine Create(IRandomSource rng, SexBiology biology, WDateOnly now);
     }
 }

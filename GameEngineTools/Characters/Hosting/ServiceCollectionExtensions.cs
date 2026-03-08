@@ -69,7 +69,6 @@ namespace GameEngineTools.Characters.Hosting
             where TImpl : class, IPhysiologyEngine
         {
             services.AddSingleton<IPhysiologyEngineFactory, PhysiologyEngineFactory<TImpl>>();
-            //services.AddSingleton<IPhysiologyEngineFactory, DefaultPhysiologyEngineFactory>();
             var ob = services.AddOptions<PhysiologyConfig>();
             if (configure != null) ob.Configure(configure);
             else ob.BindConfiguration("Characters:Physiology");
@@ -83,7 +82,6 @@ namespace GameEngineTools.Characters.Hosting
             where TImpl : class, IPsychologyEngine
         {
             services.AddSingleton<IPsychologyEngineFactory, PsychologyEngineFactory<TImpl>>();
-            //services.AddSingleton<IPsychologyEngineFactory, DefaultPsychologyEngineFactory>();
             var ob = services.AddOptions<PsychologyConfig>();
             if (configure != null) ob.Configure(configure);
             else ob.BindConfiguration("Characters:Psychology");

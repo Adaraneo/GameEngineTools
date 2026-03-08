@@ -9,6 +9,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using System.Text;
     using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -19,6 +20,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         public PhysiologyEngineFactory(IServiceProvider sp) => _sp = sp;
 
-        public IPhysiologyEngine Create(IRandomSource rng, SexBiology biology) => ActivatorUtilities.CreateInstance<TImpl>(_sp, rng, biology);
+        public IPhysiologyEngine Create(IRandomSource rng, SexBiology biology, WDateOnly now) => ActivatorUtilities.CreateInstance<TImpl>(_sp, rng, biology, now);
     }
 }

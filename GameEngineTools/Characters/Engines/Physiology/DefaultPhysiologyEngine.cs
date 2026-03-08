@@ -29,7 +29,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             IOptions<MenstrualCycleConfig> cycleCfg,
             ILoggerFactory loggerFactory,
             IRandomSource rng,
-            SexBiology biology)
+            SexBiology biology,
+            WDateOnly now)
         {
             Config = cfg.Value;
             _cycleCfg = cycleCfg.Value;
@@ -38,7 +39,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             _rng = rng;
 
             var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female)
-                ? SeedCycle(_cycleCfg)
+                ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 
             State = new PhysiologyState(
@@ -124,7 +125,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                 // Symptomy a libido podle fáze (jemné modulace)
                 var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle);
-                s = s with { Pain = Clamp01p(s.Pain + pain), Cycle = s.Cycle with { SymptomBloat = bloat, SymptomBreastTender = tender, LibidoMod = libido } };
+                s = s with { Pain = Clamp01p(s.Pain + pain), Cycle = s.Cycle with
+                {
+                    SymptomBloat = Clamp01p(s.Cycle.SymptomBloat + bloat),
+                    SymptomBreastTender = Clamp01p(s.Cycle.SymptomBreastTender + tender),
+                    LibidoMod = libido} };
             }
 
             State = s;
@@ -215,18 +220,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return CyclePhase.Luteal;
         }
 
-        private static MenstrualCycleState SeedCycle(MenstrualCycleConfig cfg)
+        private static MenstrualCycleState SeedCycle(MenstrualCycleConfig cfg, IRandomSource rng, WDateOnly now)
         {
-            // Výchozí náhodný den; poslední začátek menses necháme default (není-li k dispozici WDateOnly now)
-            var day = Math.Clamp(new Random().Next(1, Math.Max(2, cfg.MeanCycleLengthDays)), 1, 35);
-            var phase = CyclePhase.Follicular;
+            var day = rng.Next(1, Math.Max(2, cfg.MeanCycleLengthDays));
+            day = Math.Clamp(day, 1, 35);
+            var phase = PhaseFor(day, cfg.MeanCycleLengthDays, cfg.MensesMeanDays);
+
+            // Zpětný odhad, kdy začala menstruace
+            var lastMensesStart = now.AddDays(-(day - 1));
             return new MenstrualCycleState(
                 Phase: phase,
                 DayInCycle: day,
                 OvulationWindow: false,
                 SymptomPain: 0, SymptomBreastTender: 0, SymptomBloat: 0,
                 LibidoMod: 1.0,
-                LastMensesStart: default);
+                LastMensesStart: lastMensesStart);
         }
 
         private static double SafeHours(WTimeSpan dt) => Math.Max(0, dt.TotalHours);
