@@ -9,6 +9,7 @@ using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
+using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
@@ -16,145 +17,146 @@ using NPC = GameEngineTools.Characters.GameObjects.NPC;
 namespace GameSandbox.Scenes
 {
     /// <summary>
-    /// Sandbox scéna simulující interakce mezi hráčem a NPC v průběhu herního času.
+    /// Obecná sandbox scéna pro simulaci interakcí mezi postavami.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Tato scéna obaluje simulační smyčku, která v každém ticku:
-    /// <list type="number">
-    ///   <item>Rozesílá plánované herní eventy (SmallTalk, Validation...)</item>
-    ///   <item>Tickuje NPC a hráče (engine zpracuje eventy a posune stavy)</item>
-    ///   <item>Přeposílá výstupy (InteractionOutcome, ReachOut) mezi postavami</item>
-    ///   <item>Zpracovává sleep prompty (NPC automaticky, hráč zatím taky)</item>
+    /// Scéna sama o sobě neví NIC o tom, jaké interakce mají proběhnout.
+    /// Veškerý "scénář" (co se stane v jaký okamžik) předáváš zvenku přes
+    /// <see cref="InteractionSceneOptions.OnTick"/> callback.
+    /// </para>
+    /// <para>
+    /// Scéna se stará pouze o:
+    /// <list type="bullet">
+    ///   <item>Správné pořadí tickování (NPC → hráč)</item>
+    ///   <item>Přeposílání výstupů mezi postavami (InteractionOutcome, ReachOut)</item>
+    ///   <item>Sleep handling dle zvolené strategie</item>
+    ///   <item>Export výsledků po skončení simulace</item>
     /// </list>
     /// </para>
     /// <para>
-    /// Po skončení simulace exportuje stav obou postav do souborů a na plochu.
+    /// Příklad použití:
+    /// <code>
+    /// var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOptions
+    /// {
+    ///     Player          = player,
+    ///     Npc             = significantOther,
+    ///     SimulationYears = 2,
+    ///     OnTick = (now, p, npc) =>
+    ///     {
+    ///         if (now.Day is 2 or 6 or 12)
+    ///             npc.ReceiveEvent(new InteractionProposed(now, p.Id, npc.Id, SpeechAct.SmallTalk, "Ahoj!"));
+    ///     },
+    ///     PlayerSleepHandling = SleepHandling.Manual,
+    ///     OnSleepPrompt = _ => {
+    ///         Console.WriteLine("Jít spát? (A/N)");
+    ///         return Console.ReadKey(true).Key == ConsoleKey.A;
+    ///     }
+    /// });
+    /// await scene.RunAsync();
+    /// </code>
     /// </para>
     /// </remarks>
     internal sealed class InteractionScene
     {
         #region Privátní pole
 
-        /// <summary>Herní runtime — drží DI kontejner, clock, manager postav.</summary>
+        /// <summary>Herní runtime — DI kontejner, clock, manager.</summary>
         private readonly GameEngineToolsRuntimeHandle _runtime;
 
-        /// <summary>Systémové hodiny — umožňují ručně posouvat herní čas.</summary>
+        /// <summary>Systémové hodiny — ruční posun herního času.</summary>
         private readonly SystemClock _clock;
 
-        /// <summary>Správce postav — eviduje všechny NPC a hráče.</summary>
-        private readonly GameEngineToolsManager _manager;
-
-        /// <summary>Generátor a importér/exportér postav.</summary>
+        /// <summary>Generátor/importér/exportér postav.</summary>
         private readonly GeneratedFile _gf;
 
-        /// <summary>Cesta k souboru s uloženým herním časem na ploše.</summary>
+        /// <summary>Cesta k souboru s uloženým herním časem.</summary>
         private readonly string _gameTimePath;
 
-        #endregion Privátní pole
+        /// <summary>Konfigurace scény předaná zvenku.</summary>
+        private readonly InteractionSceneOptions _options;
+
+        #endregion
 
         #region Konstruktor
 
         /// <summary>
         /// Vytvoří novou instanci <see cref="InteractionScene"/>.
         /// </summary>
-        /// <param name="runtime">Běžící herní runtime s nakonfigurovanými službami.</param>
-        /// <param name="gameTimePath">Cesta k souboru pro persistenci herního času.</param>
-        public InteractionScene(GameEngineToolsRuntimeHandle runtime, string gameTimePath)
+        /// <param name="runtime">Běžící herní runtime.</param>
+        /// <param name="gameTimePath">Cesta pro persistenci herního času.</param>
+        /// <param name="options">
+        /// Konfigurace scény — účastníci, délka simulace, scénář a sleep handling.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Pokud je <paramref name="options"/> null.
+        /// </exception>
+        public InteractionScene(
+            GameEngineToolsRuntimeHandle runtime,
+            string gameTimePath,
+            InteractionSceneOptions options)
         {
-            _runtime = runtime;
-            _clock = (SystemClock)runtime.Clock;
-            _manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
-            _gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
+            ArgumentNullException.ThrowIfNull(options);
+
+            _runtime      = runtime;
+            _clock        = (SystemClock)runtime.Clock;
+            _gf           = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
             _gameTimePath = gameTimePath;
+            _options      = options;
         }
 
-        #endregion Konstruktor
+        #endregion
 
         #region Veřejné metody
 
         /// <summary>
-        /// Spustí celou interakční scénu — načte postavy, simuluje čas a exportuje výsledky.
+        /// Spustí scénu — vypíše hlavičku, simuluje čas a exportuje výsledky.
         /// </summary>
         public async Task RunAsync()
         {
-            var (player, significantOther) = LoadCharacters();
+            var playerPerson = _options.Player.Person;
+            var npcPerson = _options.Npc.Person;
 
-            PrintHeader(player, significantOther);
+            PrintHeader();
             PressAnyKeyToContinue();
 
-            await SimulateAsync(player, significantOther);
+            await SimulateAsync(playerPerson, npcPerson);
 
-            Export(player, significantOther);
+            Export();
         }
 
-        #endregion Veřejné metody
-
-        #region Načítání postav
-
-        /// <summary>
-        /// Načte hráčskou postavu a prvního NPC z disku do manageru.
-        /// </summary>
-        /// <returns>
-        /// Tuple obsahující hráče a jeho "significant other" NPC.
-        /// </returns>
-        private (CharacterBase player, CharacterBase significantOther) LoadCharacters()
-        {
-            // Načteme hráče z jeho adresáře a přidáme do manageru
-            var player = _gf.ImportPC(new FileInfo(Directory.GetFiles(_gf.PlayerDirectory).First()).Name);
-            _manager.NPPCs.Add(player);
-
-            // Nastavíme herní čas na 16. narozeniny hráče (pokud spouštíme poprvé)
-            // jinak obnovíme uložený čas
-            var savedTicks = File.Exists(_gameTimePath) && long.TryParse(File.ReadAllText(_gameTimePath), out var t)
-                ? t
-                : (long?)null;
-
-            _clock.SetNow(savedTicks.HasValue
-                ? new WDateTime(savedTicks.Value)
-                : WDateTime.New(player.Person.Identity.BirthDate.AddYears(16)));
-
-            // Načteme všechna NPC z jejich adresáře
-            foreach (var filename in Directory.GetFiles(_gf.NPCDirectory))
-                _manager.NPPCs.Add(_gf.ImportNPC(new FileInfo(filename).Name));
-
-            var significantOther = _manager.NPPCs.First(x => x is NPC);
-
-            return (player, significantOther);
-        }
-
-        #endregion Načítání postav
+        #endregion
 
         #region Simulační smyčka
 
         /// <summary>
-        /// Hlavní simulační smyčka — iteruje po herních tickách po dobu 2 herních let.
+        /// Hlavní simulační smyčka — iteruje tickem dokud neuplyne <see cref="InteractionSceneOptions.SimulationYears"/> herních let.
         /// </summary>
-        /// <param name="player">Hráčská postava.</param>
-        /// <param name="significantOther">NPC s nímž probíhají interakce.</param>
-        private Task SimulateAsync(CharacterBase player, CharacterBase significantOther)
+        /// <param name="playerPerson">Orchestrovaná osoba hráče.</param>
+        /// <param name="npcPerson">Orchestrovaná osoba NPC.</param>
+        private Task SimulateAsync(IHuman playerPerson, IHuman npcPerson)
         {
-            var playerPerson = player.Person;
-            var npcPerson = significantOther.Person;
-
-            var dt = WTimeSpan.FromHours(0.5);
-            var endTime = _clock.Now.AddYears(2);
+            var endTime = _clock.Now.AddYears(_options.SimulationYears);
 
             while (_clock.Now < endTime)
             {
                 var now = _clock.Now;
 
-                DispatchScheduledEvents(now, playerPerson, npcPerson);
+                // 1. Zavolej uživatelský scénář — tam jsou všechny plánované eventy
+                _options.OnTick?.Invoke(now, playerPerson, npcPerson);
 
-                TickNpc(now, dt, playerPerson, npcPerson);
+                // 2. Tick NPC → výstupy přeposli hráči
+                TickNpc(now, _options.TickStep, playerPerson, npcPerson);
 
-                TickPlayer(now, dt, playerPerson, npcPerson);
+                // 3. Tick hráče → výstupy přeposli NPC
+                TickPlayer(now, _options.TickStep, playerPerson, npcPerson);
 
+                // 4. Sleep handling dle zvolené strategie
                 HandleNpcSleepPrompt(now, npcPerson);
-
                 HandlePlayerSleepPrompt(now, playerPerson);
 
-                _clock.Advance(WTimeSpan.FromHours(1));
+                // 5. Posuň hodiny o nakonfigurovaný krok
+                _clock.Advance(_options.ClockAdvance);
                 Console.WriteLine("now: {0}", _clock.Now.ToString());
             }
 
@@ -162,74 +164,32 @@ namespace GameSandbox.Scenes
         }
 
         /// <summary>
-        /// Rozesílá eventy naplánované na konkrétní dny herního měsíce.
-        /// </summary>
-        /// <remarks>
-        /// Toto je místo, kde definuješ "scénář" — co se stane v jaký den.
-        /// Den 2, 6, 12 → hráč iniciuje SmallTalk s NPC.
-        /// Den 10 → NPC pošle hráči Validation.
-        /// </remarks>
-        /// <param name="now">Aktuální herní čas.</param>
-        /// <param name="playerPerson">Osoba hráče.</param>
-        /// <param name="npcPerson">Osoba NPC.</param>
-        private static void DispatchScheduledEvents(WDateTime now, IHuman playerPerson, IHuman npcPerson)
-        {
-            // Dny 2, 6, 12 v měsíci → hráč zahajuje small talk
-            if (now.Day is 2 or 6 or 12)
-            {
-                var smallTalk = new InteractionProposed(
-                    OccurredAt: now + WTimeSpan.FromMinutes(30),
-                    From: playerPerson.Id,
-                    To: npcPerson.Id,
-                    Act: SpeechAct.SmallTalk,
-                    Content: "Ahoooj");
-
-                npcPerson.ReceiveEvent(smallTalk);
-            }
-
-            // Den 10 → NPC posílá hráči validaci
-            if (now.Day is 10)
-            {
-                var validation = new InteractionProposed(
-                    OccurredAt: now + WTimeSpan.FromMinutes(12),
-                    From: npcPerson.Id,
-                    To: playerPerson.Id,
-                    Act: SpeechAct.Validation,
-                    Content: "Sluší ti to.");
-
-                playerPerson.ReceiveEvent(validation);
-            }
-        }
-
-        /// <summary>
         /// Tickuje NPC a přeposílá jeho výstupy hráči.
         /// </summary>
         /// <param name="now">Aktuální herní čas.</param>
         /// <param name="dt">Délka herního kroku.</param>
-        /// <param name="playerPerson">Osoba hráče — příjemce výstupů NPC.</param>
-        /// <param name="npcPerson">Osoba NPC — tickuje jako první.</param>
+        /// <param name="playerPerson">Příjemce výstupů NPC.</param>
+        /// <param name="npcPerson">NPC ke tickování.</param>
         private static void TickNpc(WDateTime now, WTimeSpan dt, IHuman playerPerson, IHuman npcPerson)
         {
             npcPerson.Tick(now, dt);
 
-            // Pokud NPC samo od sebe zahájilo ReachOut → přepošleme hráči jako SmallTalk
+            // NPC samo iniciuje ReachOut → přepošleme hráči jako SmallTalk
             var reachOut = npcPerson.LastOutbox
                 .OfType<ActionCommitted>()
                 .FirstOrDefault(a => a.ActionName == "ReachOut");
 
             if (reachOut != null)
             {
-                var initiated = new InteractionProposed(
+                playerPerson.ReceiveEvent(new InteractionProposed(
                     OccurredAt: now,
-                    From: npcPerson.Id,
-                    To: playerPerson.Id,
-                    Act: SpeechAct.SmallTalk,
-                    Content: "Ehm... Ahoj");
-
-                playerPerson.ReceiveEvent(initiated);
+                    From:       npcPerson.Id,
+                    To:         playerPerson.Id,
+                    Act:        SpeechAct.SmallTalk,
+                    Content:    "Ehm... Ahoj"));
             }
 
-            // Výsledek interakce z NPC → přepošleme hráči
+            // Výsledek interakce NPC → hráč
             var outcome = npcPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
             if (outcome != null)
                 playerPerson.ReceiveEvent(outcome);
@@ -240,35 +200,33 @@ namespace GameSandbox.Scenes
         /// </summary>
         /// <param name="now">Aktuální herní čas.</param>
         /// <param name="dt">Délka herního kroku.</param>
-        /// <param name="playerPerson">Osoba hráče — tickuje jako druhý.</param>
-        /// <param name="npcPerson">Osoba NPC — příjemce výstupů hráče.</param>
+        /// <param name="playerPerson">Hráč ke tickování.</param>
+        /// <param name="npcPerson">Příjemce výstupů hráče.</param>
         private static void TickPlayer(WDateTime now, WTimeSpan dt, IHuman playerPerson, IHuman npcPerson)
         {
             playerPerson.Tick(now, dt);
 
-            // Výsledek interakce z hráče → přepošleme NPC
+            // Výsledek interakce hráče → NPC
             var playerOutcome = playerPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
             if (playerOutcome != null)
                 npcPerson.ReceiveEvent(playerOutcome);
 
-            // Hráčův ReachOut → NPC dostane SmallTalk a hned ho tickneme
+            // Hráčův ReachOut → NPC dostane SmallTalk, okamžitě tickneme
             var playerReachOut = playerPerson.LastOutbox
                 .OfType<ActionCommitted>()
                 .FirstOrDefault(a => a.ActionName == "ReachOut");
 
             if (playerReachOut != null)
             {
-                var initiated = new InteractionProposed(
+                npcPerson.ReceiveEvent(new InteractionProposed(
                     OccurredAt: now,
-                    From: playerPerson.Id,
-                    To: npcPerson.Id,
-                    Act: SpeechAct.SmallTalk,
-                    Content: "Ehm... ahoj.");
+                    From:       playerPerson.Id,
+                    To:         npcPerson.Id,
+                    Act:        SpeechAct.SmallTalk,
+                    Content:    "Ehm... ahoj."));
 
-                npcPerson.ReceiveEvent(initiated);
                 npcPerson.Tick(now, dt);
 
-                // Reakce NPC na iniciaci od hráče → vrátíme hráči
                 var npcOutcome = npcPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
                 if (npcOutcome != null)
                     playerPerson.ReceiveEvent(npcOutcome);
@@ -276,122 +234,106 @@ namespace GameSandbox.Scenes
         }
 
         /// <summary>
-        /// Zpracuje sleep prompt pro NPC — NPC spánek vždy automaticky potvrdí.
+        /// Zpracuje sleep prompt NPC — vždy automaticky potvrdí.
         /// </summary>
         /// <param name="now">Aktuální herní čas.</param>
-        /// <param name="npcPerson">Osoba NPC.</param>
+        /// <param name="npcPerson">NPC jehož sleep prompt zpracováváme.</param>
         private static void HandleNpcSleepPrompt(WDateTime now, IHuman npcPerson)
         {
-            var sleepPrompt = npcPerson.LastOutbox
-                .OfType<SleepPromptRequested>()
-                .FirstOrDefault();
+            var prompt = npcPerson.LastOutbox.OfType<SleepPromptRequested>().FirstOrDefault();
+            if (prompt == null) return;
 
-            if (sleepPrompt == null) return;
-
-            // NPC nemá UI — spánek vždy automaticky potvrdíme
-            // default PlannedWakeUp = engine vypočítá délku sám
-            var confirmed = new SleepConfirmed(
-                OccurredAt: now,
-                Human: sleepPrompt.Human,
-                PlannedWakeUp: default);
-
-            npcPerson.ReceiveEvent(confirmed);
+            // NPC nemá UI — spánek vždy potvrdíme, engine vypočítá délku sám (default)
+            npcPerson.ReceiveEvent(new SleepConfirmed(
+                OccurredAt:    now,
+                Human:         prompt.Human,
+                PlannedWakeUp: default));
         }
 
         /// <summary>
-        /// Zpracuje sleep prompt pro hráče.
+        /// Zpracuje sleep prompt hráče dle <see cref="InteractionSceneOptions.PlayerSleepHandling"/>.
         /// </summary>
-        /// <remarks>
-        /// Zatím automaticky potvrzuje jako NPC.
-        /// Až budeš mít UI, odkomentuj konzolový prompt níže a připoj svůj input systém.
-        /// </remarks>
         /// <param name="now">Aktuální herní čas.</param>
-        /// <param name="playerPerson">Osoba hráče.</param>
-        private static void HandlePlayerSleepPrompt(WDateTime now, IHuman playerPerson)
+        /// <param name="playerPerson">Hráč jehož sleep prompt zpracováváme.</param>
+        private void HandlePlayerSleepPrompt(WDateTime now, IHuman playerPerson)
         {
-            var sleepPrompt = playerPerson.LastOutbox
-                .OfType<SleepPromptRequested>()
-                .FirstOrDefault();
+            var prompt = playerPerson.LastOutbox.OfType<SleepPromptRequested>().FirstOrDefault();
+            if (prompt == null) return;
 
-            if (sleepPrompt == null) return;
+            IDomainEvent response;
 
-            // TODO: až budeš mít UI, nahraď toto skutečným vstupem hráče:
-            //
-            // Console.WriteLine($"\n[SPÁNEK] Postava je unavená. Jít spát? (A/N)");
-            // var key = Console.ReadKey(intercept: true).Key;
-            // IDomainEvent response = key == ConsoleKey.A
-            //     ? new SleepConfirmed(now, sleepPrompt.Human, default)
-            //     : new SleepDeclined(now, sleepPrompt.Human, DeclineCount: playerPerson.Snapshot.Behavior.SleepDeclineCount);
+            if (_options.PlayerSleepHandling == SleepHandling.Manual && _options.OnSleepPrompt != null)
+            {
+                // Předáme rozhodnutí volajícímu — ten má UI, konzoli, co chce
+                var goToSleep = _options.OnSleepPrompt(prompt);
 
-            var response = new SleepConfirmed(now, sleepPrompt.Human, default);
+                response = goToSleep
+                    ? new SleepConfirmed(now, prompt.Human, default)
+                    : new SleepDeclined(now, prompt.Human, DeclineCount: playerPerson.Snapshot.Behavior.SleepDeclineCount);
+            }
+            else
+            {
+                // Auto režim — potvrdíme automaticky (sandbox bez UI)
+                response = new SleepConfirmed(now, prompt.Human, default);
+            }
+
             playerPerson.ReceiveEvent(response);
         }
 
-        #endregion Simulační smyčka
+        #endregion
 
         #region Export a výstup
 
         /// <summary>
-        /// Exportuje postavy na disk, vypíše výsledky do konzole a uloží herní čas.
+        /// Exportuje obě postavy, vypíše výsledky do konzole a persistuje herní čas.
         /// </summary>
-        /// <param name="player">Hráčská postava k exportu.</param>
-        /// <param name="significantOther">NPC k exportu.</param>
-        private void Export(CharacterBase player, CharacterBase significantOther)
+        private void Export()
         {
             PressAnyKeyToContinue(clear: true);
 
-            _gf.Export((PC)player);
-            _gf.Export((NPC)significantOther);
+            _gf.Export((PC)_options.Player);
+            _gf.Export((NPC)_options.Npc);
 
-            Console.WriteLine(player.PrintInfo(false));
-            Console.WriteLine(significantOther.PrintInfo(false));
+            Console.WriteLine(_options.Player.PrintInfo(false));
+            Console.WriteLine(_options.Npc.PrintInfo(false));
 
             PressAnyKeyToContinue();
 
-            // Uloží logy na plochu pro snadnou analýzu
             var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
             File.WriteAllText(
-                Path.Combine(desktop, $"player.{player.Person.Id.Value}.log.txt"),
-                player.PrintInfo(false));
+                Path.Combine(desktop, $"player.{_options.Player.Person.Id.Value}.log.txt"),
+                _options.Player.PrintInfo(false));
 
             File.WriteAllText(
-                Path.Combine(desktop, $"significantOther.{significantOther.Person.Id.Value}.log.txt"),
-                significantOther.PrintInfo(false));
+                Path.Combine(desktop, $"npc.{_options.Npc.Person.Id.Value}.log.txt"),
+                _options.Npc.PrintInfo(false));
 
-            // Persistuje herní čas pro příští spuštění
             File.WriteAllText(_gameTimePath, _clock.Now.WorldTicks.ToString());
         }
 
-        #endregion Export a výstup
+        #endregion
 
         #region Konzolové utility
 
-        /// <summary>
-        /// Vypíše hlavičku scény — aktuální čas a základní info o postavách.
-        /// </summary>
-        /// <param name="player">Hráčská postava.</param>
-        /// <param name="significantOther">NPC.</param>
-        private void PrintHeader(CharacterBase player, CharacterBase significantOther)
+        /// <summary>Vypíše hlavičku — aktuální čas a info o postavách.</summary>
+        private void PrintHeader()
         {
             Console.WriteLine("Now: {0}", _clock.Now.ToString());
-            Console.WriteLine("Player: {0}", player.PrintInfo(true));
-            Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(true));
+            Console.WriteLine("Player: {0}", _options.Player.PrintInfo(true));
+            Console.WriteLine("Npc: {0}", _options.Npc.PrintInfo(true));
             Console.WriteLine("==========================================================");
         }
 
-        /// <summary>
-        /// Pozastaví běh a čeká na stisk klávesy.
-        /// </summary>
-        /// <param name="clear">Pokud <c>true</c>, vymaže konzoli po stisku klávesy.</param>
+        /// <summary>Pozastaví běh a čeká na stisk klávesy.</summary>
+        /// <param name="clear">Pokud <c>true</c>, vymaže konzoli po stisku.</param>
         private static void PressAnyKeyToContinue(bool clear = false)
         {
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
-            if (clear)
-                Console.Clear();
+            if (clear) Console.Clear();
         }
 
-        #endregion Konzolové utility
+        #endregion
     }
 }
