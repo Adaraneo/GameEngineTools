@@ -3,6 +3,7 @@
 
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Behavior;
+using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Physiology;
@@ -161,22 +162,30 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Behavior engine + jeho konfigurace přes Options.</summary>
+        /// <summary>
+        /// Registrace implementace Behavior engine + jeho konfigurace přes Options.
+        /// Zároveň registruje <see cref="SleepConfig"/>, která je potřebná pro
+        /// <see cref="DefaultBehaviorEngine"/> a <see cref="DefaultSleepSession"/>.
+        /// </summary>
         public static IServiceCollection AddBehaviorEngine<TImpl>(
             this IServiceCollection services,
-            Action<BehaviorConfig>? configure = null)
+            Action<BehaviorConfig>? configure = null,
+            Action<SleepConfig>? sleepConfigure = null)
             where TImpl : class, IBehaviorEngine
         {
             services.AddTransient<IBehaviorEngine, TImpl>();
-            var ob = services.AddOptions<BehaviorConfig>();
+
+            var behavOb = services.AddOptions<BehaviorConfig>();
             if (configure != null)
-            {
-                ob.Configure(configure);
-            }
+                behavOb.Configure(configure);
             else
-            {
-                ob.BindConfiguration("Characters:Behavior");
-            }
+                behavOb.BindConfiguration("Characters:Behavior");
+
+            var sleepOb = services.AddOptions<SleepConfig>();
+            if (sleepConfigure != null)
+                sleepOb.Configure(sleepConfigure);
+            else
+                sleepOb.BindConfiguration("Characters:Sleep");
 
             return services;
         }
@@ -262,23 +271,24 @@ namespace GameEngineTools.Characters.Hosting
         /// </example>
         public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem>(
             this IServiceCollection services,
-            Action<PhysiologyConfig>? physio = null,
-            Action<PsychologyConfig>? psych = null,
-            Action<BehaviorConfig>? behav = null,
-            Action<InteractionConfig>? inter = null,
-            Action<RelationshipsConfig>? rel = null,
-            Action<MemoryConfig>? mem = null)
+            Action<PhysiologyConfig>?    physio = null,
+            Action<PsychologyConfig>?    psych  = null,
+            Action<BehaviorConfig>?      behav  = null,
+            Action<SleepConfig>?         sleep  = null,
+            Action<InteractionConfig>?   inter  = null,
+            Action<RelationshipsConfig>? rel    = null,
+            Action<MemoryConfig>?        mem    = null)
             where TPhysio : class, IPhysiologyEngine
-            where TPsych : class, IPsychologyEngine
-            where TBehav : class, IBehaviorEngine
-            where TInter : class, IInteractionEngine
-            where TRel : class, IRelationshipsEngine
-            where TMem : class, IMemoryEngine
+            where TPsych  : class, IPsychologyEngine
+            where TBehav  : class, IBehaviorEngine
+            where TInter  : class, IInteractionEngine
+            where TRel    : class, IRelationshipsEngine
+            where TMem    : class, IMemoryEngine
         {
             services.AddCharactersCore()
                     .AddPhysiologyEngine<TPhysio>(physio)
                     .AddPsychologyEngine<TPsych>(psych)
-                    .AddBehaviorEngine<TBehav>(behav)
+                    .AddBehaviorEngine<TBehav>(behav, sleep)
                     .AddInteractionEngine<TInter>(inter)
                     .AddRelationshipsEngine<TRel>(rel)
                     .AddMemoryEngine<TMem>(mem);
