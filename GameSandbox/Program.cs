@@ -95,6 +95,12 @@ while(clock.Now < endTime)
         significantOtherPerson.ReceiveEvent(smallTalk);
     }
 
+    if (now.Day is 10)
+    {
+        var action = new InteractionProposed(now + WTimeSpan.FromMinutes(12), significantOtherPerson.Id, playerPerson.Id, SpeechAct.Validation, "Sluší ti to.");
+        playerPerson.ReceiveEvent(action);
+    }
+
     significantOtherPerson.Tick(now, dt);
 
     var reachOut = significantOtherPerson.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == "ReachOut");

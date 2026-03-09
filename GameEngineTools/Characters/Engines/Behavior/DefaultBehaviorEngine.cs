@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using static Behavior.ActionNames;
 
     internal sealed class DefaultBehaviorEngine : IBehaviorEngine
     {
@@ -49,8 +50,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var ps = ctx.Snapshot.Psychology;
             var rel = ctx.Snapshot.Relationships;
 
-            var belCd = CooldownFor(updatedCooldowns, "ReachOut");
-            var intiCd = CooldownFor(updatedCooldowns, "InviteInimacy");
+            var belCd = CooldownFor(updatedCooldowns, ReachOut);
+            var intiCd = CooldownFor(updatedCooldowns, InviteIntimacy);
 
             // Přepočet potřeb z aktuálního stavu
             var needRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2);
@@ -59,18 +60,25 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15) - belCd * 5);
             var needComp = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2);
             var needInti = ComputeIntimacyNeed(ctx, ph, rel, ps) - intiCd * 8;
+            var needSelfCare = Clamp01p(ph.Pain * 0.7 + ph.ImmuneLoad * 0.3);
+
+            var sleepDuration = Hours(Math.Clamp(
+                Config.BaseSleepHours + ph.SleepDebtHours * 0.5,
+                Config.MinSleepHours,
+                Config.MaxSleepHours));
 
             // Volba akce (utility = potřeba * váha motivace; setrvačnost + penalizace monotónnosti)
             var candidates = new List<(string Name, double Utility, WTimeSpan Dur)>
             {
-                ("Sleep",     Util(needRest,     ctx.Personality.Motivation.Rest * 1.3), Hours(Math.Max(1.0, ph.SleepDebtHours * 0.6))),
-                ("Eat",       Util(needFood,     1.2),                                   Minutes(30)),
-                ("Drink",     Util(needWater,    1.1),                                   Minutes(10)),
-                ("ReachOut",  Util(needBel,      ctx.Personality.Motivation.Affiliation),Hours(1.0)),
-                ("Work",      Util(needComp,     ctx.Personality.Motivation.Competence), Hours(2.0)),
-                ("Create",    Util(needComp,     ctx.Personality.Motivation.Curiosity),  Hours(1.5)),
-                ("SelfCare",  Util(50,           0.5),                                   Hours(0.5)),
-                ("InviteIntimacy", Util(needInti, ctx.Personality.Motivation.Sexuality), Hours(1.0))
+                (Sleep,     Util(needRest,     ctx.Personality.Motivation.Rest * 1.3), sleepDuration),
+                (Eat,       Util(needFood,     1.2),                                   Minutes(30)),
+                (Drink,     Util(needWater,    1.1),                                   Minutes(10)),
+                (ReachOut,  Util(needBel,      ctx.Personality.Motivation.Affiliation),Hours(1.0)),
+                (Work,      Util(needComp,     ctx.Personality.Motivation.Competence), Hours(2.0)),
+                (Create,    Util(needComp,     ctx.Personality.Motivation.Curiosity),  Hours(1.5)),
+                (SelfCare,  Util(needSelfCare, 0.5),                                   Hours(0.5)),
+                (InviteIntimacy, Util(needInti, ctx.Personality.Motivation.Sexuality), Hours(1.0)),
+                (Idle, Util(10, 0.3), Minutes(30))
             };
 
             // Je aktuální akce stále rozdělaná? Pokud ano, nerozhodujeme se.
@@ -91,7 +99,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
             {
                 for (int i = 0; i < candidates.Count; i++)
                 {
-                    if (candidates[i].Name == cp.Name)
+                    var inertialEligible = new HashSet<string> { ActionNames.Work, ActionNames.Create, ActionNames.ReachOut };
+                    if (inertialEligible.Contains(candidates[i].Name) && candidates[i].Name == cp.Name)
                     {
                         candidates[i] = (cp.Name, candidates[i].Utility * (1.0 + Config.InertiaWeight), candidates[i].Dur);
                     }
@@ -130,12 +139,16 @@ namespace GameEngineTools.Characters.Engines.Behavior
         {
             switch (@event)
             {
-                case ActionCommitted ac when ac.ActionName == "ReachOut":
-                    SetCooldown("ReachOut", 4);
+                case ActionCommitted ac when ac.ActionName == ReachOut:
+                    SetCooldown(ReachOut, 4);
                     break;
 
-                case ActionCommitted ac when ac.ActionName == "InviteIntimacy":
-                    SetCooldown("InviteIntimacy", 6);
+                case ActionCommitted ac when ac.ActionName == InviteIntimacy:
+                    SetCooldown(InviteIntimacy, 6);
+                    break;
+
+                case ActionCommitted ac when ac.ActionName == Sleep:
+                    SetCooldown(Sleep, Config.SleepCooldownHours);
                     break;
             }
         }

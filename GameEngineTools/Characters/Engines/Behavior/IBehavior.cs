@@ -7,12 +7,28 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
+    internal static class ActionNames
+    {
+        public const string Sleep = "Sleep";
+        public const string Eat = "Eat";
+        public const string Drink = "Drink";
+        public const string ReachOut = "ReachOut";
+        public const string Work = "Work";
+        public const string Create = "Create";
+        public const string SelfCare = "SelfCare";
+        public const string InviteIntimacy = "InviteIntimacy";
+        public const string Idle = "Idle";
+    }
     public sealed record BehaviorConfig(
         double InertiaWeight = 0.25,
         double NoveltyPenalty = 0.1,
-        double PlanningHorizonHours = 2)
+        double PlanningHorizonHours = 2,
+        double BaseSleepHours = 8,
+        double MinSleepHours = 4,
+        double MaxSleepHours = 12,
+        double SleepCooldownHours = 16)
     {
-        public BehaviorConfig() : this(0.25, 0.1, 2) { }
+        public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16) { }
     }
 
     public sealed record BehaviorState(
