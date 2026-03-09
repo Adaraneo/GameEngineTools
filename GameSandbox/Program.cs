@@ -35,7 +35,7 @@ await using var runtime = await GameEngineToolsRuntime.StartAsync(initNow, conso
 {
     PlayerDirectory = TFSC.player,
     NPCDirectory = TFSC.NPCs
-}, timescale: 1);
+});
 
 var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;

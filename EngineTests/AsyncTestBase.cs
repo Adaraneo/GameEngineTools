@@ -161,8 +161,6 @@ namespace GameTester
             {
                 opt.UseConsoleLogging = true;
             });
-            s.AddHostedService<GameEngineToolsManagerInitializer>();
-            s.AddHostedService<SubscribersActivator>();
 
             // ── Sestavení ─────────────────────────────────────────────────────
             var provider = s.BuildServiceProvider();
