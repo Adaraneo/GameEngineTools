@@ -3,7 +3,6 @@
 
 namespace GameEngineTools.Characters.Engines.Relationships
 {
-
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
@@ -26,7 +25,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
     public sealed record RelationshipState(
         IReadOnlyDictionary<HumanId, RelationshipEdge> Edges);
 
-    public interface IRelationshipsEngine : IEngine<RelationshipState, RelationshipsConfig> { }
+    public interface IRelationshipsEngine : IEngine<RelationshipState, RelationshipsConfig>
+    { }
 
     // Události
     public sealed record FirstImpressionFormed(WDateTime OccurredAt, HumanId A, HumanId B, double Like, double Attraction) : IDomainEvent;

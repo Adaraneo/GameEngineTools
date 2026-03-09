@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -16,9 +14,10 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using GameTester;
-    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Unit testy spánkového subsystému.
@@ -41,23 +40,23 @@ namespace EngineTests
         // Výchozí konfigurace pro testy — nízký threshold pro snadné spouštění promptu
         private static readonly SleepConfig DefaultSleepCfg = new SleepConfig() with
         {
-            SleepPromptThreshold        = 70.0,
-            SleepGraceHours             = 4.0,
-            MaxDeclineCount             = 3,
+            SleepPromptThreshold = 70.0,
+            SleepGraceHours = 4.0,
+            MaxDeclineCount = 3,
             DeclinePenaltyStressPerHour = 2.0,
-            FallingDurationHours        = 0.25,
-            LightDurationHours          = 0.75,
-            DeepDurationHours           = 2.5,
-            RemDurationHours            = 1.5,
-            AmbushBaseChancePerHour     = 0.0,   // vypnuto — nechceme náhodné přerušení v testech
-            CompanionGuardModifier      = 0.4,
-            NightmareChanceHighStress   = 0.0,   // vypnuto — deterministické testy
-            NightmareChanceNormal       = 0.0
+            FallingDurationHours = 0.25,
+            LightDurationHours = 0.75,
+            DeepDurationHours = 2.5,
+            RemDurationHours = 1.5,
+            AmbushBaseChancePerHour = 0.0,   // vypnuto — nechceme náhodné přerušení v testech
+            CompanionGuardModifier = 0.4,
+            NightmareChanceHighStress = 0.0,   // vypnuto — deterministické testy
+            NightmareChanceNormal = 0.0
         };
 
         private static readonly BehaviorConfig DefaultBehaviorCfg = new BehaviorConfig();
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Setup
 
@@ -68,12 +67,12 @@ namespace EngineTests
         [TestInitialize]
         public void Setup()
         {
-            _now    = new WDateTime(0);
+            _now = new WDateTime(0);
             _outbox = new EventCollector();
-            _ctx    = BuildFakeContext(sleepDebtHours: 0, stress: 0, energy: 70);
+            _ctx = BuildFakeContext(sleepDebtHours: 0, stress: 0, energy: 70);
         }
 
-        #endregion
+        #endregion Setup
 
         #region BehaviorEngine — Sleep Prompt
 
@@ -85,7 +84,7 @@ namespace EngineTests
         public void Tick_WhenNeedRestAboveThreshold_PublishesSleepPromptRequested()
         {
             // Arrange — vysoký spánkový dluh → NeedRest bude > 70
-            _ctx    = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
+            _ctx = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
             var engine = BuildBehaviorEngine();
 
             // Act
@@ -105,7 +104,7 @@ namespace EngineTests
         public void Tick_WhenNeedRestBelowThreshold_DoesNotPublishSleepPrompt()
         {
             // Arrange — malý spánkový dluh → NeedRest pod 70
-            _ctx    = BuildFakeContext(sleepDebtHours: 0, stress: 0, energy: 90);
+            _ctx = BuildFakeContext(sleepDebtHours: 0, stress: 0, energy: 90);
             var engine = BuildBehaviorEngine();
 
             // Act
@@ -125,7 +124,7 @@ namespace EngineTests
         public void Tick_WhenWaitingForConfirmation_DoesNotRepeatPrompt()
         {
             // Arrange
-            _ctx    = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
+            _ctx = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
             var engine = BuildBehaviorEngine();
 
             // Act — první tick vyšle prompt
@@ -142,7 +141,7 @@ namespace EngineTests
                 "Engine nesmí opakovat sleep prompt — čeká na odpověď hráče.");
         }
 
-        #endregion
+        #endregion BehaviorEngine — Sleep Prompt
 
         #region BehaviorEngine — Sleep Confirmed
 
@@ -154,7 +153,7 @@ namespace EngineTests
         public void Handle_SleepConfirmed_StartsSessionAndPublishesPhaseChanged()
         {
             // Arrange
-            _ctx    = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
+            _ctx = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
             var engine = BuildBehaviorEngine();
 
             // Vyslat prompt
@@ -163,8 +162,8 @@ namespace EngineTests
 
             // Act — hráč potvrdil
             var confirmed = new SleepConfirmed(
-                OccurredAt:    _now,
-                Human:         _ctx.Id,
+                OccurredAt: _now,
+                Human: _ctx.Id,
                 PlannedWakeUp: _now + WTimeSpan.FromHours(8));
 
             engine.Handle(confirmed, _ctx, _outbox);
@@ -192,15 +191,15 @@ namespace EngineTests
         public void Tick_DuringSleep_DoesNotSelectNewAction()
         {
             // Arrange
-            _ctx    = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
+            _ctx = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
             var engine = BuildBehaviorEngine();
 
             engine.Tick(_now, WTimeSpan.FromHours(1), _ctx, _outbox);
             _outbox.Drain();
 
             var confirmed = new SleepConfirmed(
-                OccurredAt:    _now,
-                Human:         _ctx.Id,
+                OccurredAt: _now,
+                Human: _ctx.Id,
                 PlannedWakeUp: _now + WTimeSpan.FromHours(8));
             engine.Handle(confirmed, _ctx, _outbox);
             _outbox.Drain();
@@ -218,7 +217,7 @@ namespace EngineTests
                 "Během aktivní sleep session nesmí být vybírána jiná akce.");
         }
 
-        #endregion
+        #endregion BehaviorEngine — Sleep Confirmed
 
         #region BehaviorEngine — Sleep Declined
 
@@ -230,7 +229,7 @@ namespace EngineTests
         public void Handle_SleepDeclined_SetsGracePeriodAndIncrementsDeclineCount()
         {
             // Arrange
-            _ctx    = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
+            _ctx = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
             var engine = BuildBehaviorEngine();
 
             engine.Tick(_now, WTimeSpan.FromHours(1), _ctx, _outbox);
@@ -256,7 +255,7 @@ namespace EngineTests
         public void Handle_SleepDeclinedMultipleTimes_GracePeriodShortensWith_EachDecline()
         {
             // Arrange
-            _ctx    = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
+            _ctx = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
             var engine = BuildBehaviorEngine();
 
             // Act — první odmítnutí
@@ -272,7 +271,7 @@ namespace EngineTests
             // Pozn: engine.State.SleepDeclineCount je nyní 2
             // Grace expiry druhého odmítnutí musí být kratší než první
             var secondGrace = engine.State.SleepGraceExpiresAt!.Value;
-            var firstInterval  = (firstGrace  - _now).TotalHours;
+            var firstInterval = (firstGrace - _now).TotalHours;
             var secondInterval = (secondGrace - afterGrace).TotalHours;
 
             Assert.IsTrue(secondInterval < firstInterval,
@@ -286,7 +285,7 @@ namespace EngineTests
         public void Tick_AfterGraceExpires_RepeatsSleepPrompt()
         {
             // Arrange
-            _ctx    = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
+            _ctx = BuildFakeContext(sleepDebtHours: 9, stress: 0, energy: 20);
             var engine = BuildBehaviorEngine();
 
             engine.Tick(_now, WTimeSpan.FromHours(1), _ctx, _outbox);
@@ -305,7 +304,7 @@ namespace EngineTests
                 "Po expiraci grace periody musí být vyslán nový sleep prompt.");
         }
 
-        #endregion
+        #endregion BehaviorEngine — Sleep Declined
 
         #region SleepSession — fáze a přirozené probuzení
 
@@ -339,8 +338,8 @@ namespace EngineTests
             Assert.IsTrue(phases.Count >= 3,
                 $"Očekáváme alespoň 3 přechody fází, získáno: {phases.Count}");
             Assert.AreEqual(SleepPhase.Falling, phases[0], "První fáze musí být Falling.");
-            Assert.AreEqual(SleepPhase.Light,   phases[1], "Druhá fáze musí být Light.");
-            Assert.AreEqual(SleepPhase.Deep,     phases[2], "Třetí fáze musí být Deep.");
+            Assert.AreEqual(SleepPhase.Light, phases[1], "Druhá fáze musí být Light.");
+            Assert.AreEqual(SleepPhase.Deep, phases[2], "Třetí fáze musí být Deep.");
         }
 
         /// <summary>
@@ -351,7 +350,7 @@ namespace EngineTests
         public void Session_AfterPlannedWakeUp_PublishesSleepEndedNotInterrupted()
         {
             // Arrange
-            var session       = BuildSession();
+            var session = BuildSession();
             var plannedWakeUp = _now + WTimeSpan.FromHours(8);
             session.Begin(_now, plannedWakeUp, _ctx, _outbox);
             _outbox.Drain();
@@ -362,7 +361,7 @@ namespace EngineTests
 
             // Assert
             var events = _outbox.Drain();
-            var ended  = events.OfType<SleepEnded>().FirstOrDefault();
+            var ended = events.OfType<SleepEnded>().FirstOrDefault();
 
             Assert.IsNotNull(ended, "Očekáván event SleepEnded.");
             Assert.IsFalse(ended.WasInterrupted, "Přirozené probuzení nesmí mít WasInterrupted = true.");
@@ -376,8 +375,8 @@ namespace EngineTests
         public void Session_SleepQuality_IsHigherForUninterruptedSleep()
         {
             // Arrange — plný spánek
-            var fullSession   = BuildSession();
-            var fullOutbox    = new EventCollector();
+            var fullSession = BuildSession();
+            var fullOutbox = new EventCollector();
             var plannedWakeUp = _now + WTimeSpan.FromHours(8);
             fullSession.Begin(_now, plannedWakeUp, _ctx, fullOutbox);
             fullOutbox.Drain();
@@ -390,7 +389,7 @@ namespace EngineTests
 
             // Arrange — přerušený spánek (po 30 minutách)
             var interruptedSession = BuildSession();
-            var intOutbox          = new EventCollector();
+            var intOutbox = new EventCollector();
             interruptedSession.Begin(_now, plannedWakeUp, _ctx, intOutbox);
             intOutbox.Drain();
 
@@ -407,7 +406,7 @@ namespace EngineTests
                 $"Plný spánek musí mít vyšší kvalitu než přerušený. Plný={fullQuality:F1}, Přerušený={interruptedQuality:F1}");
         }
 
-        #endregion
+        #endregion SleepSession — fáze a přirozené probuzení
 
         #region SleepSession — přerušení
 
@@ -419,7 +418,7 @@ namespace EngineTests
         public void Session_Interrupt_PublishesBothInterruptedAndEnded()
         {
             // Arrange
-            var session       = BuildSession();
+            var session = BuildSession();
             var plannedWakeUp = _now + WTimeSpan.FromHours(8);
             session.Begin(_now, plannedWakeUp, _ctx, _outbox);
             _outbox.Drain();
@@ -444,7 +443,7 @@ namespace EngineTests
         public void Session_InterruptAfterEnded_IsIgnored()
         {
             // Arrange — session nejdříve přirozeně skončí
-            var session       = BuildSession();
+            var session = BuildSession();
             var plannedWakeUp = _now + WTimeSpan.FromHours(8);
             session.Begin(_now, plannedWakeUp, _ctx, _outbox);
             _outbox.Drain();
@@ -461,7 +460,7 @@ namespace EngineTests
                 "Přerušení ukončené session nesmí vyslat žádné eventy.");
         }
 
-        #endregion
+        #endregion SleepSession — přerušení
 
         #region SleepSession — sdílený spánek
 
@@ -472,25 +471,25 @@ namespace EngineTests
         public void Session_WithCompanion_PublishesSharedSleepBegan()
         {
             // Arrange
-            var session       = BuildSession();
-            var companionId   = new HumanId(Guid.NewGuid());
+            var session = BuildSession();
+            var companionId = new HumanId(Guid.NewGuid());
             var plannedWakeUp = _now + WTimeSpan.FromHours(8);
 
             // Act
             session.Begin(_now, plannedWakeUp, _ctx, _outbox,
-                companion:   companionId,
-                sharedType:  SharedSleepType.Camp);
+                companion: companionId,
+                sharedType: SharedSleepType.Camp);
 
             // Assert
             var events = _outbox.Drain();
             var shared = events.OfType<SharedSleepBegan>().FirstOrDefault();
 
             Assert.IsNotNull(shared, "Očekáván event SharedSleepBegan.");
-            Assert.AreEqual(companionId,           shared.Companion, "Companion ID musí sedět.");
-            Assert.AreEqual(SharedSleepType.Camp,  shared.Type,      "Typ sdíleného spánku musí být Camp.");
+            Assert.AreEqual(companionId, shared.Companion, "Companion ID musí sedět.");
+            Assert.AreEqual(SharedSleepType.Camp, shared.Type, "Typ sdíleného spánku musí být Camp.");
         }
 
-        #endregion
+        #endregion SleepSession — sdílený spánek
 
         #region Pomocné metody (factory)
 
@@ -527,22 +526,22 @@ namespace EngineTests
         private static IHumanContext BuildFakeContext(double sleepDebtHours, double stress, double energy)
         {
             var physio = new PhysiologyState(
-                Energy:          energy,
-                SleepDebtHours:  sleepDebtHours,
-                Hunger:          20,
-                Thirst:          15,
-                Pain:            0,
-                ImmuneLoad:      5,
-                BodyTempDelta:   0,
-                Cycle:           null);
+                Energy: energy,
+                SleepDebtHours: sleepDebtHours,
+                Hunger: 20,
+                Thirst: 15,
+                Pain: 0,
+                ImmuneLoad: 5,
+                BodyTempDelta: 0,
+                Cycle: null);
 
             var psych = new PsychologyState(
-                Valence:          0.1,
-                Arousal:          0.4,
-                Dominance:        0.5,
-                Stress:           stress,
-                CognitiveLoad:    10,
-                DominantEmotion:  DiscreteEmotion.Neutral);
+                Valence: 0.1,
+                Arousal: 0.4,
+                Dominance: 0.5,
+                Stress: stress,
+                CognitiveLoad: 10,
+                DominantEmotion: DiscreteEmotion.Neutral);
 
             var behavior = new BehaviorState(
                 NeedRest: 40, NeedFood: 20, NeedWater: 15,
@@ -561,33 +560,33 @@ namespace EngineTests
                 memory);
 
             var personality = new Personality(
-                BigFive:       new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                Attachment:    AttachmentStyle.Secure,
+                BigFive: new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                Attachment: AttachmentStyle.Secure,
                 Communication: CommunicationStyle.Direct,
-                Motivation:    new MotivationWeights(
+                Motivation: new MotivationWeights(
                     Affiliation: 0.5, Achievement: 0.5, Power: 0.3,
                     Altruism: 0.4, Competence: 0.5, Autonomy: 0.5,
                     Curiosity: 0.5, Rest: 0.6, Sexuality: 0.4),
                 Sociosexuality: Sociosexuality.Intermediate,
-                Chronotype:     Chronotype.Neutral);
+                Chronotype: Chronotype.Neutral);
 
             return new HumanContext
             {
-                Id          = new HumanId(Guid.NewGuid()),
-                Biology     = SexBiology.Female,
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = personality,
-                Snapshot    = snapshot,
-                Random      = new AlwaysFalseRandom(),
-                Logger      = BuildLoggerFactory().CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler()
+                Snapshot = snapshot,
+                Random = new AlwaysFalseRandom(),
+                Logger = BuildLoggerFactory().CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
         private static ILoggerFactory BuildLoggerFactory()
             => LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));
 
-        #endregion
+        #endregion Pomocné metody (factory)
 
         #region Fake / Stub implementace
 
@@ -597,9 +596,11 @@ namespace EngineTests
         /// </summary>
         private sealed class AlwaysFalseRandom : IRandomSource
         {
-            public int    Next(int min, int max) => min;
-            public double NextUnit()             => 0.0;
-            public bool   Chance(double p)       => false; // nikdy nenastane náhodný event
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => false; // nikdy nenastane náhodný event
         }
 
         /// <summary>
@@ -607,9 +608,12 @@ namespace EngineTests
         /// </summary>
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
+
             public IDisposable SubscribeAll(Action<IDomainEvent> handler)
                 => new NullDisposable();
         }
@@ -619,18 +623,22 @@ namespace EngineTests
         {
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => true;
+
             public IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now)
                 => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
         private sealed class NullDisposable : IDisposable
         {
-            public void Dispose() { }
+            public void Dispose()
+            { }
         }
 
-        #endregion
+        #endregion Fake / Stub implementace
     }
 }

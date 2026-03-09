@@ -36,7 +36,7 @@ namespace GameEngineTools.World.Core.Astro
 
         private const double TwoPi = Math.PI * 2.0;
 
-        #endregion
+        #endregion Konstanty
 
         #region Konstrukce
 
@@ -44,9 +44,10 @@ namespace GameEngineTools.World.Core.Astro
         /// Inicializuje model slunce.
         /// Vyžaduje nakonfigurovaný <see cref="WWorld"/> před prvním voláním metod.
         /// </summary>
-        public SunModel() { }
+        public SunModel()
+        { }
 
-        #endregion
+        #endregion Konstrukce
 
         #region Veřejné metody — ozáření
 
@@ -68,20 +69,20 @@ namespace GameEngineTools.World.Core.Astro
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public double IrradianceFactor(
             WDateTime instant,
-            double    latitudeDeg,
-            double    longitudeDeg,
+            double latitudeDeg,
+            double longitudeDeg,
             in SunParams p,
             double vernalPhase = 0.0)
         {
-            var (_, alt, _)    = SolarPosition(instant, latitudeDeg, longitudeDeg, in p, vernalPhase);
+            var (_, alt, _) = SolarPosition(instant, latitudeDeg, longitudeDeg, in p, vernalPhase);
             var (_, _, _, rAu) = SolarDeclinationEOT(instant, in p, vernalPhase);
 
-            double mu    = Math.Max(0.0, Math.Sin(DegToRad(alt))); // ~ cos(zenit)
+            double mu = Math.Max(0.0, Math.Sin(DegToRad(alt))); // ~ cos(zenit)
             double invR2 = 1.0 / (rAu * rAu);
             return mu * invR2;
         }
 
-        #endregion
+        #endregion Veřejné metody — ozáření
 
         #region Veřejné metody — sluneční den
 
@@ -103,8 +104,8 @@ namespace GameEngineTools.World.Core.Astro
         public (double solarNoonHour, double sunriseHour, double sunsetHour, double daylightHours)
             SolarDay(
                 WDateTime date,
-                double    latitudeDeg,
-                double    longitudeDeg,
+                double latitudeDeg,
+                double longitudeDeg,
                 in SunParams p,
                 double vernalPhase = 0.0)
         {
@@ -124,15 +125,15 @@ namespace GameEngineTools.World.Core.Astro
             if (polarDay)
                 return (WrapHours(noon, spec.HoursPerDay), 0.0, spec.HoursPerDay, spec.HoursPerDay);
 
-            double H0h      = AngleToHours(H0, spec.HoursPerDay);
-            double sunrise  = WrapHours(noon - H0h, spec.HoursPerDay);
-            double sunset   = WrapHours(noon + H0h, spec.HoursPerDay);
+            double H0h = AngleToHours(H0, spec.HoursPerDay);
+            double sunrise = WrapHours(noon - H0h, spec.HoursPerDay);
+            double sunset = WrapHours(noon + H0h, spec.HoursPerDay);
             double daylight = 2 * H0h;
 
             return (noon, sunrise, sunset, daylight);
         }
 
-        #endregion
+        #endregion Veřejné metody — sluneční den
 
         #region Veřejné metody — sluneční pozice
 
@@ -154,35 +155,35 @@ namespace GameEngineTools.World.Core.Astro
         public (double azimuthDeg, double altitudeDeg, double declinationDeg)
             SolarPosition(
                 WDateTime instant,
-                double    latitudeDeg,
-                double    longitudeDeg,
+                double latitudeDeg,
+                double longitudeDeg,
                 in SunParams p,
                 double vernalPhase = 0.0)
         {
             var spec = WWorld.Spec;
             var (delta, eotFrac, _, _) = SolarDeclinationEOT(instant, in p, vernalPhase);
 
-            double fracDay  = FractionOfDay(instant.WorldTicks, spec);
+            double fracDay = FractionOfDay(instant.WorldTicks, spec);
             double lstHours = fracDay * spec.HoursPerDay
                             + LongitudeHours(longitudeDeg, spec.HoursPerDay)
                             + eotFrac * spec.HoursPerDay;
 
-            double H      = HoursToAngle(lstHours - spec.HoursPerDay * 0.5, spec.HoursPerDay);
-            double phi    = DegToRad(latitudeDeg);
+            double H = HoursToAngle(lstHours - spec.HoursPerDay * 0.5, spec.HoursPerDay);
+            double phi = DegToRad(latitudeDeg);
             double sinAlt = Math.Sin(DegToRad(delta)) * Math.Sin(phi)
                           + Math.Cos(DegToRad(delta)) * Math.Cos(phi) * Math.Cos(H);
-            double alt    = RadToDeg(Math.Asin(sinAlt));
+            double alt = RadToDeg(Math.Asin(sinAlt));
 
-            double cosAz  = (Math.Sin(DegToRad(delta)) - Math.Sin(phi) * sinAlt)
+            double cosAz = (Math.Sin(DegToRad(delta)) - Math.Sin(phi) * sinAlt)
                           / (Math.Cos(phi) * Math.Cos(DegToRad(alt)));
-            cosAz        = Math.Clamp(cosAz, -1, 1);
-            double az     = RadToDeg(Math.Acos(cosAz));
+            cosAz = Math.Clamp(cosAz, -1, 1);
+            double az = RadToDeg(Math.Acos(cosAz));
             if (Math.Sin(H) > 0) az = 360 - az;
 
             return (az, alt, delta);
         }
 
-        #endregion
+        #endregion Veřejné metody — sluneční pozice
 
         #region Veřejné metody — soumraky
 
@@ -201,19 +202,19 @@ namespace GameEngineTools.World.Core.Astro
         /// Hodnota <c>double.NaN</c> = polární noc nebo polární den (daný práh nenastane).
         /// </returns>
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
-        public (double civilDawn,    double sunrise,      double solarNoon, double sunset,     double civilDusk,
+        public (double civilDawn, double sunrise, double solarNoon, double sunset, double civilDusk,
                 double nauticalDawn, double nauticalDusk,
-                double astroDawn,    double astroDusk)
+                double astroDawn, double astroDusk)
             Twilights(
                 WDateTime date,
-                double    latitudeDeg,
-                double    longitudeDeg,
+                double latitudeDeg,
+                double longitudeDeg,
                 in SunParams p,
                 double vernalPhase = 0.0)
         {
             var spec = WWorld.Spec;
             var (noon, sunrise, sunset, _) = SolarDay(date, latitudeDeg, longitudeDeg, in p, vernalPhase);
-            var (delta, eotFrac, _, _)     = SolarDeclinationEOT(date, in p, vernalPhase);
+            var (delta, eotFrac, _, _) = SolarDeclinationEOT(date, in p, vernalPhase);
 
             // Lokální pomocná funkce — vypočítá úsvit/soumrak pro libovolný prah výšky
             (double dawn, double dusk) Edge(double h0)
@@ -226,16 +227,16 @@ namespace GameEngineTools.World.Core.Astro
                         WrapHours(noon + H0h, spec.HoursPerDay));
             }
 
-            var (civilDawn,  civilDusk)  = Edge(-p.TwilightCivilDeg);
-            var (nautDawn,   nautDusk)   = Edge(-p.TwilightNauticalDeg);
-            var (astroDawn,  astroDusk)  = Edge(-p.TwilightAstronomicalDeg);
+            var (civilDawn, civilDusk) = Edge(-p.TwilightCivilDeg);
+            var (nautDawn, nautDusk) = Edge(-p.TwilightNauticalDeg);
+            var (astroDawn, astroDusk) = Edge(-p.TwilightAstronomicalDeg);
 
             return (civilDawn, sunrise, noon, sunset, civilDusk,
-                    nautDawn,  nautDusk,
+                    nautDawn, nautDusk,
                     astroDawn, astroDusk);
         }
 
-        #endregion
+        #endregion Veřejné metody — soumraky
 
         #region Privátní výpočetní metody
 
@@ -249,24 +250,24 @@ namespace GameEngineTools.World.Core.Astro
         private static (double deltaDeg, double eotFracOfDay, double lambdaDeg, double rAu)
             SolarDeclinationEOT(WDateTime t, in SunParams p, double vernalPhase)
         {
-            var spec     = WWorld.Spec;
-            long dayIdx  = t.WorldTicks / spec.TicksPerDay;
+            var spec = WWorld.Spec;
+            long dayIdx = t.WorldTicks / spec.TicksPerDay;
             var (y, _, _) = spec.Calendar.DateFromDays(dayIdx);
-            long doy     = dayIdx - spec.Calendar.DaysFromDate(y, 1, 1);
-            double Y     = spec.Calendar.DaysInYear(y);
+            long doy = dayIdx - spec.Calendar.DaysFromDate(y, 1, 1);
+            double Y = spec.Calendar.DaysInYear(y);
 
-            double phase  = (doy / Y + vernalPhase)      * TwoPi;
-            double M      = (doy / Y + p.PeriapsisPhase) * TwoPi;
+            double phase = (doy / Y + vernalPhase) * TwoPi;
+            double M = (doy / Y + p.PeriapsisPhase) * TwoPi;
 
             // Rovnice středu — eliptická korekce na skutečnou polohu
-            double C      = 2 * p.Eccentricity * Math.Sin(M)
+            double C = 2 * p.Eccentricity * Math.Sin(M)
                           + 1.25 * p.Eccentricity * p.Eccentricity * Math.Sin(2 * M);
             double lambda = WrapAngle(phase + C);
 
             // Deklinace ze sklonu osy a ekliptické délky
-            double eps      = DegToRad(p.AxialTiltDeg);
+            double eps = DegToRad(p.AxialTiltDeg);
             double sinDelta = Math.Sin(eps) * Math.Sin(lambda);
-            double delta    = RadToDeg(Math.Asin(sinDelta));
+            double delta = RadToDeg(Math.Asin(sinDelta));
 
             // Rovnice času (Spencer/Fourier aproximace)
             double yv = Math.Tan(eps / 2.0); yv *= yv;
@@ -279,7 +280,7 @@ namespace GameEngineTools.World.Core.Astro
                - 1.25 * p.Eccentricity * p.Eccentricity * Math.Sin(2 * M);
 
             double eotFrac = eotRad / TwoPi;
-            double r       = 1 - p.Eccentricity * Math.Cos(M); // relativní vzdálenost [AU]
+            double r = 1 - p.Eccentricity * Math.Cos(M); // relativní vzdálenost [AU]
 
             return (delta, eotFrac, RadToDeg(lambda), r);
         }
@@ -335,14 +336,14 @@ namespace GameEngineTools.World.Core.Astro
             double latDeg, double declDeg, double h0Deg,
             out bool polarDay, out bool polarNight)
         {
-            double phi   = DegToRad(latDeg);
+            double phi = DegToRad(latDeg);
             double delta = DegToRad(declDeg);
-            double h0    = DegToRad(h0Deg);
+            double h0 = DegToRad(h0Deg);
             double cosH0 = (Math.Sin(h0) - Math.Sin(phi) * Math.Sin(delta))
                          / (Math.Cos(phi) * Math.Cos(delta));
 
-            if (cosH0 < -1.0) { polarDay   = true;  polarNight = false; return 0; }
-            if (cosH0 >  1.0) { polarDay   = false; polarNight = true;  return 0; }
+            if (cosH0 < -1.0) { polarDay = true; polarNight = false; return 0; }
+            if (cosH0 > 1.0) { polarDay = false; polarNight = true; return 0; }
 
             polarDay = polarNight = false;
             return Math.Acos(Math.Clamp(cosH0, -1, 1));
@@ -362,6 +363,6 @@ namespace GameEngineTools.World.Core.Astro
         /// <summary>Převede radiány na stupně.</summary>
         private static double RadToDeg(double rad) => rad * 180.0 / Math.PI;
 
-        #endregion
+        #endregion Privátní výpočetní metody
     }
 }

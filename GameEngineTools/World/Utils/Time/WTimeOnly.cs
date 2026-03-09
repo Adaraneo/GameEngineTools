@@ -48,7 +48,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </param>
         public WTimeOnly(long ticksOfDay) => TicksOfDay = ticksOfDay;
 
-        #endregion
+        #endregion Konstrukce
 
         #region Vlastnosti — raw data
 
@@ -58,7 +58,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </summary>
         public long TicksOfDay { get; }
 
-        #endregion
+        #endregion Vlastnosti — raw data
 
         #region Ambient vlastnosti — složky času (vyžadují WWorld.Configure)
 
@@ -97,7 +97,7 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        #endregion
+        #endregion Ambient vlastnosti — složky času (vyžadují WWorld.Configure)
 
         #region Static factory
 
@@ -115,19 +115,19 @@ namespace GameEngineTools.World.Utils.Time
         {
             var spec = WWorld.Spec;
 
-            if (hour    < 0 || hour    >= spec.HoursPerDay)     throw new ArgumentOutOfRangeException(nameof(hour));
-            if (minute  < 0 || minute  >= spec.MinutesPerHour)  throw new ArgumentOutOfRangeException(nameof(minute));
-            if (second  < 0 || second  >= spec.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
-            if (subTick < 0 || subTick >= spec.TicksPerSecond)  throw new ArgumentOutOfRangeException(nameof(subTick));
+            if (hour < 0 || hour >= spec.HoursPerDay) throw new ArgumentOutOfRangeException(nameof(hour));
+            if (minute < 0 || minute >= spec.MinutesPerHour) throw new ArgumentOutOfRangeException(nameof(minute));
+            if (second < 0 || second >= spec.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
+            if (subTick < 0 || subTick >= spec.TicksPerSecond) throw new ArgumentOutOfRangeException(nameof(subTick));
 
             return new WTimeOnly(
-                hour   * spec.TicksPerHour
+                hour * spec.TicksPerHour
               + minute * spec.TicksPerMinute
               + second * spec.TicksPerSecond
               + subTick);
         }
 
-        #endregion
+        #endregion Static factory
 
         #region Aritmetika — čistá matematika (nevyžaduje WWorld)
 
@@ -140,7 +140,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </remarks>
         public WTimeSpan Diff(WTimeOnly other) => new(TicksOfDay - other.TicksOfDay);
 
-        #endregion
+        #endregion Aritmetika — čistá matematika (nevyžaduje WWorld)
 
         #region Aritmetika s wraparoundem (vyžadují WWorld.Configure)
 
@@ -170,7 +170,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public WTimeOnly AddSeconds(double seconds) => Add(WTimeSpan.FromSeconds(seconds));
 
-        #endregion
+        #endregion Aritmetika s wraparoundem (vyžadují WWorld.Configure)
 
         #region Porovnávací operátory
 
@@ -192,7 +192,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
         public static bool operator >=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay >= b.TicksOfDay;
 
-        #endregion
+        #endregion Porovnávací operátory
 
         #region Rovnost a hashování
 
@@ -208,7 +208,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <inheritdoc/>
         public override int GetHashCode() => TicksOfDay.GetHashCode();
 
-        #endregion
+        #endregion Rovnost a hashování
 
         #region Formátování
 
@@ -222,13 +222,13 @@ namespace GameEngineTools.World.Utils.Time
 
             var spec = WWorld.Spec;
             long rem = TicksOfDay;
-            int  hh  = (int)(rem / spec.TicksPerHour);  rem %= spec.TicksPerHour;
-            int  mm  = (int)(rem / spec.TicksPerMinute); rem %= spec.TicksPerMinute;
-            int  ss  = (int)(rem / spec.TicksPerSecond);
+            int hh = (int)(rem / spec.TicksPerHour); rem %= spec.TicksPerHour;
+            int mm = (int)(rem / spec.TicksPerMinute); rem %= spec.TicksPerMinute;
+            int ss = (int)(rem / spec.TicksPerSecond);
 
             return $"{hh:00}:{mm:00}:{ss:00}";
         }
 
-        #endregion
+        #endregion Formátování
     }
 }

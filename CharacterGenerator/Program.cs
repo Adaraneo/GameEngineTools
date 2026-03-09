@@ -1,22 +1,11 @@
 ﻿namespace CharacterGenerator
 {
     using GameEngineTools;
-    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.GameObjects;
-    using GameEngineTools.Characters.Generation;
-    using GameEngineTools.Characters.Hosting;
-    using GameEngineTools.Config;
     using GameEngineTools.Extensions;
     using GameEngineTools.FileSystem;
-    using GameEngineTools.World.Core.Calendars;
-    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
-    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.Hosting;
-    using Microsoft.Extensions.Options;
-    using System.Runtime.CompilerServices;
-    using System.Runtime.InteropServices;
     using System.Threading.Tasks;
     using GFC = GameEngineTools.Constants.FileSystemConstantsForTest;
 
@@ -65,7 +54,7 @@
             });
 
             var clock = (SystemClock)runtime.Clock;
-            clock.SetNow(WDateTime.New(WDateOnly.New(100,1,1)));
+            clock.SetNow(WDateTime.New(WDateOnly.New(100, 1, 1)));
             var genFile = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
             var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 

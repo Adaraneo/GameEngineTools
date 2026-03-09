@@ -168,6 +168,7 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
                 Bias(faceWeights, FaceShape.Heart, +0.03);
                 Bias(faceWeights, FaceShape.Square, -0.04);
                 break;
+
             case BodyFrame.Large:
             case BodyFrame.Strong:
                 Bias(faceWeights, FaceShape.Square, +0.05);
@@ -202,7 +203,9 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
     // ===== Helpers =====
 
     private static double Lerp(double u, double a, double b) => a + (b - a) * u;
+
     private static double Clamp(double x, double a, double b) => x < a ? a : (x > b ? b : x);
+
     private static double Jitter(IRandomSource rng, double amplitude) => (rng.Unit() - 0.5) * amplitude;
 
     private static T Pick<T>(IReadOnlyList<T> values, IReadOnlyList<double> weights, IRandomSource rng)

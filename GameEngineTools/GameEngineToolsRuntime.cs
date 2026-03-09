@@ -81,9 +81,9 @@ namespace GameEngineTools
         {
             // Načteme konfiguraci stejným způsobem jako StartAsync,
             // aby spec byl zaručeně identický — žádné duplicitní hodnoty.
-            var cfg          = ConfigProvider.Configuration;
-            var worldType    = cfg.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
-            var opts         = new InitWorldClockConfig();
+            var cfg = ConfigProvider.Configuration;
+            var worldType = cfg.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
+            var opts = new InitWorldClockConfig();
             opts.DaysInMonths = Array.Empty<int>();
             cfg.GetSection($"InitWorldClock:{worldType}").Bind(opts);
 
@@ -99,7 +99,7 @@ namespace GameEngineTools
                 calendar);
         }
 
-        #endregion
+        #endregion LoadSpec
 
         #region StartAsync
 
@@ -119,9 +119,9 @@ namespace GameEngineTools
         /// Dispose zastaví všechny služby a uvolní DI kontejner.
         /// </returns>
         public static async Task<GameEngineToolsRuntimeHandle> StartAsync(
-            WDateTime?           startTime            = null,
-            bool                 consoleLogs          = false,
-            string?              logsRoot             = null,
+            WDateTime? startTime = null,
+            bool consoleLogs = false,
+            string? logsRoot = null,
             GeneratedFileOptions? generatedFileOptions = null)
         {
             var services = new ServiceCollection();
@@ -133,16 +133,16 @@ namespace GameEngineTools
                 lb.AddConsole();
                 lb.AddCharactersFile(opt =>
                 {
-                    opt.FilePath         = logsRoot != null
+                    opt.FilePath = logsRoot != null
                         ? Path.Combine(logsRoot, "Characters", "characters.log")
                         : "logs/Characters/characters.log";
-                    opt.MinLevel         = LogLevel.Debug;
+                    opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                 });
             });
 
             // ── Konfigurace ───────────────────────────────────────────────────
-            var configProvider  = ConfigProvider.Configuration;
+            var configProvider = ConfigProvider.Configuration;
             var worldTypeConfig = configProvider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             services.AddSingleton<IConfiguration>(configProvider);
 
@@ -156,7 +156,7 @@ namespace GameEngineTools
             // ── WorldTimeSpec — singleton ─────────────────────────────────────
             services.AddSingleton<WorldTimeSpec>(sp =>
             {
-                var opts     = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
+                var opts = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
                 var calendar = new FixedMonthsCalendar(
                     opts.DaysInMonths,
                     y => y % opts.LeapYearInterval == 0 ? opts.LeapExtraDays : 0);
@@ -192,7 +192,7 @@ namespace GameEngineTools
             {
                 if (generatedFileOptions is not null)
                 {
-                    opt.NPCDirectory    = generatedFileOptions.NPCDirectory;
+                    opt.NPCDirectory = generatedFileOptions.NPCDirectory;
                     opt.PlayerDirectory = generatedFileOptions.PlayerDirectory;
                 }
             });
@@ -221,14 +221,14 @@ namespace GameEngineTools
             services.Configure<GameEngineToolsManagerOptions>(opt =>
             {
                 opt.UseConsoleLogging = consoleLogs;
-                opt.LogsRoot          = logsRoot;
+                opt.LogsRoot = logsRoot;
             });
 
             // ── Sestavení DI kontejneru ───────────────────────────────────────
             var provider = services.BuildServiceProvider();
 
             // ── WWorld.Configure — ambient konfigurace pro W-typy ─────────────
-            var spec  = provider.GetRequiredService<WorldTimeSpec>();
+            var spec = provider.GetRequiredService<WorldTimeSpec>();
             var clock = provider.GetRequiredService<IClock>();
             WWorld.Configure(spec, clock);
 
@@ -239,7 +239,7 @@ namespace GameEngineTools
             return new GameEngineToolsRuntimeHandle(provider);
         }
 
-        #endregion
+        #endregion StartAsync
     }
 
     /// <summary>
@@ -271,7 +271,7 @@ namespace GameEngineTools
         /// </summary>
         private readonly ServiceProvider _provider;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -282,7 +282,7 @@ namespace GameEngineTools
         internal GameEngineToolsRuntimeHandle(ServiceProvider provider)
             => _provider = provider;
 
-        #endregion
+        #endregion Konstrukce
 
         #region Veřejné vlastnosti
 
@@ -304,7 +304,7 @@ namespace GameEngineTools
         /// </summary>
         public IServiceProvider Services => _provider;
 
-        #endregion
+        #endregion Veřejné vlastnosti
 
         #region IAsyncDisposable
 
@@ -316,6 +316,6 @@ namespace GameEngineTools
         public async ValueTask DisposeAsync()
             => await _provider.DisposeAsync().ConfigureAwait(false);
 
-        #endregion
+        #endregion IAsyncDisposable
     }
 }

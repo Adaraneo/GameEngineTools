@@ -24,11 +24,13 @@ namespace GameEngineTools.Characters.Engines.Memory
 
     public sealed record SemanticFact(string Key, string Value, double Confidence);
 
-    public enum EmotionalTag { Neutral, Positive, Negative, Mixed }
+    public enum EmotionalTag
+    { Neutral, Positive, Negative, Mixed }
 
     public interface IMemoryEngine : IEngine<MemoryIndex, MemoryConfig>
     {
         void Encode(EpisodicMemory episode, IHumanContext ctx, IEventCollector outbox);
+
         IReadOnlyList<EpisodicMemory> Recall(Func<EpisodicMemory, bool> predicate);
     }
 

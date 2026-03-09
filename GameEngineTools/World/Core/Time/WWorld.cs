@@ -39,9 +39,9 @@ namespace GameEngineTools.World.Core.Time
         #region Privátní stav
 
         private static WorldTimeSpec? _spec;
-        private static IClock?        _clock;
+        private static IClock? _clock;
 
-        #endregion
+        #endregion Privátní stav
 
         #region Veřejné vlastnosti
 
@@ -71,7 +71,7 @@ namespace GameEngineTools.World.Core.Time
         /// </summary>
         public static bool IsConfigured => _spec != null && _clock != null;
 
-        #endregion
+        #endregion Veřejné vlastnosti
 
         #region Konfigurace
 
@@ -102,11 +102,11 @@ namespace GameEngineTools.World.Core.Time
         {
             ArgumentNullException.ThrowIfNull(spec);
             ArgumentNullException.ThrowIfNull(clock);
-            _spec  = spec;
+            _spec = spec;
             _clock = clock;
         }
 
-        #endregion
+        #endregion Konfigurace
 
         #region Testovací utility
 
@@ -120,10 +120,10 @@ namespace GameEngineTools.World.Core.Time
         /// </remarks>
         internal static void Reset()
         {
-            _spec  = null;
+            _spec = null;
             _clock = null;
         }
 
-        #endregion
+        #endregion Testovací utility
     }
 }

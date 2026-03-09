@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -16,9 +14,10 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using GameTester;
-    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Unit testy pro <see cref="DefaultPsychologyEngine"/>.
@@ -38,22 +37,22 @@ namespace EngineTests
         private WDateTime _now;
 
         private static readonly PsychologyConfig DefaultCfg = new PsychologyConfig(
-            BaselineAffectVariance:      0.0,   // vypnuto — deterministické testy
-            StressRecoveryRatePerHour:   0.0,   // vypnuto — nechceme drift v testech
-            SleepQualityAffectWeight:    0.5);
+            BaselineAffectVariance: 0.0,   // vypnuto — deterministické testy
+            StressRecoveryRatePerHour: 0.0,   // vypnuto — nechceme drift v testech
+            SleepQualityAffectWeight: 0.5);
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Setup
 
         [TestInitialize]
         public void Setup()
         {
-            _now    = new WDateTime(0);
+            _now = new WDateTime(0);
             _outbox = new EventCollector();
         }
 
-        #endregion
+        #endregion Setup
 
         #region SleepEnded — valence
 
@@ -65,8 +64,8 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine(initialValence: 0.0, initialStress: 30);
-            var ctx    = BuildContext(neuroticism: 0.5);
-            var ended  = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var ended = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
 
             // Act
             engine.Handle(ended, ctx, _outbox);
@@ -84,8 +83,8 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine(initialValence: 0.0, initialStress: 30);
-            var ctx    = BuildContext(neuroticism: 0.5);
-            var ended  = MakeSleepEnded(quality: 0, hoursSlept: 2, wasInterrupted: true);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var ended = MakeSleepEnded(quality: 0, hoursSlept: 2, wasInterrupted: true);
 
             // Act
             engine.Handle(ended, ctx, _outbox);
@@ -103,8 +102,8 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine(initialValence: 0.2, initialStress: 30);
-            var ctx    = BuildContext(neuroticism: 0.5);
-            var ended  = MakeSleepEnded(quality: 50, hoursSlept: 6, wasInterrupted: false);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var ended = MakeSleepEnded(quality: 50, hoursSlept: 6, wasInterrupted: false);
 
             var valenceBefore = engine.State.Valence;
 
@@ -116,7 +115,7 @@ namespace EngineTests
                 "Kvalita 50 je neutrální bod — valence se nesmí změnit.");
         }
 
-        #endregion
+        #endregion SleepEnded — valence
 
         #region SleepEnded — stres
 
@@ -127,9 +126,9 @@ namespace EngineTests
         public void Handle_SleepEnded_GoodQuality_DecreasesStress()
         {
             // Arrange
-            var engine     = BuildEngine(initialValence: 0.0, initialStress: 50);
-            var ctx        = BuildContext(neuroticism: 0.5);
-            var ended      = MakeSleepEnded(quality: 90, hoursSlept: 8, wasInterrupted: false);
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 50);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var ended = MakeSleepEnded(quality: 90, hoursSlept: 8, wasInterrupted: false);
             var stressBefore = engine.State.Stress;
 
             // Act
@@ -147,9 +146,9 @@ namespace EngineTests
         public void Handle_SleepEnded_Interrupted_IncreasesStress()
         {
             // Arrange
-            var engine     = BuildEngine(initialValence: 0.0, initialStress: 30);
-            var ctx        = BuildContext(neuroticism: 0.5);
-            var ended      = MakeSleepEnded(quality: 20, hoursSlept: 1, wasInterrupted: true);
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 30);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var ended = MakeSleepEnded(quality: 20, hoursSlept: 1, wasInterrupted: true);
             var stressBefore = engine.State.Stress;
 
             // Act
@@ -169,10 +168,10 @@ namespace EngineTests
             // Arrange — stejný spánek, různý Neuroticism
             var badSleep = MakeSleepEnded(quality: 10, hoursSlept: 2, wasInterrupted: true);
 
-            var stableEngine   = BuildEngine(initialValence: 0.0, initialStress: 30);
-            var neurotiEngine  = BuildEngine(initialValence: 0.0, initialStress: 30);
+            var stableEngine = BuildEngine(initialValence: 0.0, initialStress: 30);
+            var neurotiEngine = BuildEngine(initialValence: 0.0, initialStress: 30);
 
-            var stableCtx  = BuildContext(neuroticism: 0.0);
+            var stableCtx = BuildContext(neuroticism: 0.0);
             var neurotiCtx = BuildContext(neuroticism: 1.0);
 
             // Act
@@ -200,7 +199,7 @@ namespace EngineTests
         {
             // Arrange — stres těsně pod threshold
             var engine = BuildEngine(initialValence: 0.0, initialStress: 68);
-            var ctx    = BuildContext(neuroticism: 1.0);
+            var ctx = BuildContext(neuroticism: 1.0);
 
             // Přerušený spánek + vysoký neuroticism → stres přesáhne 70
             var ended = MakeSleepEnded(quality: 5, hoursSlept: 0.5, wasInterrupted: true);
@@ -223,8 +222,8 @@ namespace EngineTests
         {
             // Arrange — stres již nad prahem
             var engine = BuildEngine(initialValence: 0.0, initialStress: 80);
-            var ctx    = BuildContext(neuroticism: 1.0);
-            var ended  = MakeSleepEnded(quality: 5, hoursSlept: 0.5, wasInterrupted: true);
+            var ctx = BuildContext(neuroticism: 1.0);
+            var ended = MakeSleepEnded(quality: 5, hoursSlept: 0.5, wasInterrupted: true);
 
             // Act
             engine.Handle(ended, ctx, _outbox);
@@ -236,7 +235,7 @@ namespace EngineTests
                 "StressSpiked nesmí být publikován pokud byl stres již nad prahem.");
         }
 
-        #endregion
+        #endregion SleepEnded — stres
 
         #region NightmareTriggered
 
@@ -247,9 +246,9 @@ namespace EngineTests
         public void Handle_NightmareTriggered_AlwaysIncreasesStressAndDecreasesValence()
         {
             // Arrange
-            var engine       = BuildEngine(initialValence: 0.3, initialStress: 20);
-            var ctx          = BuildContext(neuroticism: 0.5);
-            var nightmare    = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 40);
+            var engine = BuildEngine(initialValence: 0.3, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var nightmare = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 40);
             var stressBefore = engine.State.Stress;
             var valenceBefore = engine.State.Valence;
 
@@ -270,9 +269,9 @@ namespace EngineTests
         public void Handle_NightmareTriggered_IncreasesArousal()
         {
             // Arrange
-            var engine      = BuildEngine(initialValence: 0.0, initialStress: 20);
-            var ctx         = BuildContext(neuroticism: 0.5);
-            var nightmare   = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 30);
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var nightmare = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 30);
             var arousalBefore = engine.State.Arousal;
 
             // Act
@@ -290,13 +289,13 @@ namespace EngineTests
         public void Handle_NightmareTriggered_HighNeuroticism_CausesLargerStressSpike()
         {
             // Arrange
-            var nightmare    = new NightmareTriggered(_now, new HumanId(Guid.NewGuid()), StressAtSleepStart: 50);
+            var nightmare = new NightmareTriggered(_now, new HumanId(Guid.NewGuid()), StressAtSleepStart: 50);
 
-            var stableEngine  = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var stableEngine = BuildEngine(initialValence: 0.0, initialStress: 20);
             var neurotiEngine = BuildEngine(initialValence: 0.0, initialStress: 20);
 
             // Act
-            stableEngine.Handle(nightmare,  BuildContext(neuroticism: 0.0), new EventCollector());
+            stableEngine.Handle(nightmare, BuildContext(neuroticism: 0.0), new EventCollector());
             neurotiEngine.Handle(nightmare, BuildContext(neuroticism: 1.0), new EventCollector());
 
             // Assert
@@ -313,8 +312,8 @@ namespace EngineTests
         public void Handle_NightmareTriggered_AlwaysPublishesStressSpiked()
         {
             // Arrange
-            var engine    = BuildEngine(initialValence: 0.0, initialStress: 10);
-            var ctx       = BuildContext(neuroticism: 0.5);
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 10);
+            var ctx = BuildContext(neuroticism: 0.5);
             var nightmare = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 20);
 
             // Act
@@ -327,7 +326,7 @@ namespace EngineTests
                 "Noční můra musí vždy publikovat StressSpiked.");
         }
 
-        #endregion
+        #endregion NightmareTriggered
 
         #region SleepQualityAffectWeight — vliv konfigurace
 
@@ -339,17 +338,17 @@ namespace EngineTests
         public void Handle_SleepEnded_HigherWeight_CausesLargerValenceDelta()
         {
             // Arrange
-            var lowWeightCfg  = DefaultCfg with { SleepQualityAffectWeight = 0.1 };
+            var lowWeightCfg = DefaultCfg with { SleepQualityAffectWeight = 0.1 };
             var highWeightCfg = DefaultCfg with { SleepQualityAffectWeight = 0.9 };
 
-            var lowEngine  = BuildEngine(initialValence: 0.0, initialStress: 20, cfg: lowWeightCfg);
+            var lowEngine = BuildEngine(initialValence: 0.0, initialStress: 20, cfg: lowWeightCfg);
             var highEngine = BuildEngine(initialValence: 0.0, initialStress: 20, cfg: highWeightCfg);
 
-            var ctx   = BuildContext(neuroticism: 0.5);
+            var ctx = BuildContext(neuroticism: 0.5);
             var ended = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
 
             // Act
-            lowEngine.Handle(ended,  ctx, new EventCollector());
+            lowEngine.Handle(ended, ctx, new EventCollector());
             highEngine.Handle(ended, ctx, new EventCollector());
 
             // Assert
@@ -359,7 +358,7 @@ namespace EngineTests
                 $"Low={lowEngine.State.Valence:F4}, High={highEngine.State.Valence:F4}");
         }
 
-        #endregion
+        #endregion SleepQualityAffectWeight — vliv konfigurace
 
         #region Pomocné metody
 
@@ -369,20 +368,20 @@ namespace EngineTests
             double initialStress,
             PsychologyConfig? cfg = null)
         {
-            var opts    = Options.Create(cfg ?? DefaultCfg);
+            var opts = Options.Create(cfg ?? DefaultCfg);
             var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
-            var rng     = new ZeroRandom();
+            var rng = new ZeroRandom();
 
             var engine = new DefaultPsychologyEngine(opts, factory, rng);
 
             // Nastavíme počáteční stav přes RestoreState
             engine.RestoreState(new PsychologyState(
-                Valence:          initialValence,
-                Arousal:          0.4,
-                Dominance:        0.5,
-                Stress:           initialStress,
-                CognitiveLoad:    10,
-                DominantEmotion:  DiscreteEmotion.Neutral));
+                Valence: initialValence,
+                Arousal: 0.4,
+                Dominance: 0.5,
+                Stress: initialStress,
+                CognitiveLoad: 10,
+                DominantEmotion: DiscreteEmotion.Neutral));
 
             return engine;
         }
@@ -408,37 +407,37 @@ namespace EngineTests
                     new Dictionary<string, SemanticFact>()));
 
             var personality = new Personality(
-                BigFive:        new BigFive(0.5, 0.5, 0.5, 0.5, neuroticism),
-                Attachment:     AttachmentStyle.Secure,
-                Communication:  CommunicationStyle.Direct,
-                Motivation:     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                BigFive: new BigFive(0.5, 0.5, 0.5, 0.5, neuroticism),
+                Attachment: AttachmentStyle.Secure,
+                Communication: CommunicationStyle.Direct,
+                Motivation: new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                 Sociosexuality: Sociosexuality.Intermediate,
-                Chronotype:     Chronotype.Neutral);
+                Chronotype: Chronotype.Neutral);
 
             return new HumanContext
             {
-                Id          = new HumanId(Guid.NewGuid()),
-                Biology     = SexBiology.Female,
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = personality,
-                Snapshot    = snapshot,
-                Random      = new ZeroRandom(),
-                Logger      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
                                            .CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
         /// <summary>Vytvoří <see cref="SleepEnded"/> s danými parametry.</summary>
         private SleepEnded MakeSleepEnded(double quality, double hoursSlept, bool wasInterrupted)
             => new SleepEnded(
-                OccurredAt:     _now,
-                Human:          new HumanId(Guid.NewGuid()),
+                OccurredAt: _now,
+                Human: new HumanId(Guid.NewGuid()),
                 TotalHoursSlept: hoursSlept,
-                Quality:        quality,
+                Quality: quality,
                 WasInterrupted: wasInterrupted);
 
-        #endregion
+        #endregion Pomocné metody
 
         #region Fake / Stub implementace
 
@@ -448,16 +447,21 @@ namespace EngineTests
         /// </summary>
         private sealed class ZeroRandom : IRandomSource
         {
-            public int    Next(int min, int max) => min;
-            public double NextUnit()             => 0.0;
-            public bool   Chance(double p)       => false;
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => false;
         }
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
+
             public IDisposable SubscribeAll(Action<IDomainEvent> handler)
                 => new NullDisposable();
         }
@@ -466,15 +470,23 @@ namespace EngineTests
         {
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => true;
+
             public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime now)
                 => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
-        private sealed class NullDisposable : IDisposable { public void Dispose() { } }
+        private sealed class NullDisposable : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
 
-        #endregion
+        #endregion Fake / Stub implementace
     }
 }

@@ -321,4 +321,3 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
 
     private static double Clamp01(double x) => x < 0 ? 0 : (x > 1 ? 1 : x);
 }
-

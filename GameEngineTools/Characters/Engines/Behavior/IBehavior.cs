@@ -3,7 +3,6 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior
 {
-
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
@@ -19,6 +18,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         public const string InviteIntimacy = "InviteIntimacy";
         public const string Idle = "Idle";
     }
+
     public sealed record BehaviorConfig(
         double InertiaWeight = 0.25,
         double NoveltyPenalty = 0.1,
@@ -70,7 +70,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
         int SleepDeclineCount = 0,
         WDateTime? SleepGraceExpiresAt = null);
 
-    public interface IBehaviorEngine : IEngine<BehaviorState, BehaviorConfig> { }
+    public interface IBehaviorEngine : IEngine<BehaviorState, BehaviorConfig>
+    { }
 
     public sealed record PlannedAction(string Name, WDateTime Start, WTimeSpan ExpectedDuration, double Utility);
 

@@ -3,7 +3,6 @@
 
 namespace GameEngineTools.Characters.Core
 {
-
     using System;
     using System.Text.Json;
     using System.Text.Json.Serialization;
@@ -16,7 +15,6 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
-
 
     public sealed class HumanIdJsonConverter : JsonConverter<HumanId>
     {
@@ -61,8 +59,11 @@ namespace GameEngineTools.Characters.Core
     public readonly record struct HumanId(Guid Value);
     public sealed record Identity(Name FirstName, Surname LastName, WDateOnly BirthDate);
 
-    public enum SexBiology { Female, Male, Intersex, Unknown }
-    public enum GenderIdentity { Woman, Man, Nonbinary, Other, Unspecified }
+    public enum SexBiology
+    { Female, Male, Intersex, Unknown }
+
+    public enum GenderIdentity
+    { Woman, Man, Nonbinary, Other, Unspecified }
 
     // Společný kontrakt pro všechny enginy
     public interface IEngine<TState, TConfig>
@@ -75,6 +76,7 @@ namespace GameEngineTools.Characters.Core
 
         // Reakce na doménové události (z jiných enginů / prostředí)
         void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox);
+
         void RestoreState(TState state);
     }
 
@@ -98,36 +100,46 @@ namespace GameEngineTools.Characters.Core
     public interface IEventCollector
     {
         void Add(IDomainEvent @event);
+
         IReadOnlyList<IDomainEvent> Drain(); // použije orchestrátor
     }
 
     // Event bus / plánování
-    public interface IDomainEvent { WDateTime OccurredAt { get; } }
+    public interface IDomainEvent
+    { WDateTime OccurredAt { get; } }
 
     public interface IEventBus
     {
         void Publish(IDomainEvent @event);
+
         IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent;
+
         IDisposable SubscribeAll(Action<IDomainEvent> handler);
     }
 
     public interface IScheduler
     {
         ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null);
+
         ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null);
+
         bool Cancel(ScheduledId id);
+
         // Pull model pro orchestrátor, aby spouštěl akce v Ticku
         IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now);
     }
 
     public readonly record struct ScheduledId(Guid Value);
+
     public delegate void ScheduledAction(IHumanContext ctx, IEventCollector outbox);
 
     // Deterministické RNG (per-postava seed)
     public interface IRandomSource
     {
         int Next(int minInclusive, int maxExclusive);
+
         double NextUnit(); // <0,1)
+
         bool Chance(double p);
     }
 
@@ -139,5 +151,4 @@ namespace GameEngineTools.Characters.Core
         InteractionSurface InteractionSurface,
         RelationshipState Relationships,
         MemoryIndex Memory);
-
 }

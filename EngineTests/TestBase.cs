@@ -3,9 +3,6 @@
 
 namespace GameTester
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using EngineTests.Utils;
     using GameEngineTools;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -22,12 +19,13 @@ namespace GameTester
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Calendars;
     using GameEngineTools.World.Core.Time;
-    using GameEngineTools.World.Utils.Time;
-    using GameTester.Config;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Základní třída pro synchronní integrační testy herního enginu.
@@ -55,11 +53,11 @@ namespace GameTester
     {
         #region Konstanty
 
-        protected const int MaxHealth     = 100;
+        protected const int MaxHealth = 100;
         protected const int PlayersMaxAge = 35;
         protected const int PlayersMinAge = 15;
 
-        #endregion
+        #endregion Konstanty
 
         #region Chráněné vlastnosti
 
@@ -78,7 +76,7 @@ namespace GameTester
         /// <summary>Seznam názvů souborů pro import/export postav.</summary>
         protected List<string> Filenames { get; set; } = new();
 
-        #endregion
+        #endregion Chráněné vlastnosti
 
         #region TestInitialize / TestCleanup
 
@@ -108,7 +106,7 @@ namespace GameTester
             CharacterManager?.NPPCs.Clear();
             CharacterManager?.Items.Clear();
             Filenames.Clear();
-            Random     = null;
+            Random = null;
         }
 
         /// <summary>
@@ -121,7 +119,7 @@ namespace GameTester
             Filenames.Clear();
         }
 
-        #endregion
+        #endregion TestInitialize / TestCleanup
 
         #region Import / Export
 
@@ -139,7 +137,7 @@ namespace GameTester
                     switch (dir)
                     {
                         case "Player": Filenames[0] = f; break;
-                        case "NPCs":   Filenames.Add(f); break;
+                        case "NPCs": Filenames.Add(f); break;
                     }
                 }
             }
@@ -183,7 +181,7 @@ namespace GameTester
             Assert.IsTrue(nppcs.Count > 0);
         }
 
-        #endregion
+        #endregion Import / Export
 
         #region DI inicializace
 
@@ -209,14 +207,14 @@ namespace GameTester
                 lb.AddConsole();
                 lb.AddCharactersFile(opt =>
                 {
-                    opt.FilePath         = "logs/Characters/characters.log";
-                    opt.MinLevel         = LogLevel.Debug;
+                    opt.FilePath = "logs/Characters/characters.log";
+                    opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                 });
             });
 
             // ── Konfigurace ───────────────────────────────────────────────────
-            var cprovider    = Config.ConfigProvider.Configuration;
+            var cprovider = Config.ConfigProvider.Configuration;
             var useWorldType = cprovider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             services.AddSingleton<IConfiguration>(cprovider);
 
@@ -230,7 +228,7 @@ namespace GameTester
             // ── WorldTimeSpec — singleton ──────────────────────────────────────
             services.AddSingleton<WorldTimeSpec>(sp =>
             {
-                var opts     = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
+                var opts = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
                 var calendar = new FixedMonthsCalendar(
                     opts.DaysInMonths,
                     y => y % opts.LeapYearInterval == 0 ? opts.LeapExtraDays : 0);
@@ -245,7 +243,7 @@ namespace GameTester
             // ── IWorldClock — kotva na rok 132, 1. den 1. měsíce ─────────────
             services.AddSingleton<IWorldClock>(sp =>
             {
-                var wSpec          = sp.GetRequiredService<WorldTimeSpec>();
+                var wSpec = sp.GetRequiredService<WorldTimeSpec>();
                 long beginningTicks = wSpec.Calendar.DaysFromDate(132, 1, 1) * wSpec.TicksPerDay;
                 return WorldClock.AlignNow(wSpec, beginningTicks);
             });
@@ -258,7 +256,7 @@ namespace GameTester
             services.AddSingleton<IGeneratedFile, GeneratedFile>();
             services.Configure<GeneratedFileOptions>(opt =>
             {
-                opt.NPCDirectory    = GameEngineTools.Constants.TestFSConstatns.NPCs;
+                opt.NPCDirectory = GameEngineTools.Constants.TestFSConstatns.NPCs;
                 opt.PlayerDirectory = GameEngineTools.Constants.TestFSConstatns.player;
             });
 
@@ -295,17 +293,17 @@ namespace GameTester
 
             // ── WWorld.Configure — ambient konfigurace pro W-typy ──────────────
             // Musí proběhnout před jakýmkoli voláním WDateTime.Now, dt.Year atd.
-            var resolvedSpec  = provider.GetRequiredService<WorldTimeSpec>();
+            var resolvedSpec = provider.GetRequiredService<WorldTimeSpec>();
             var resolvedClock = provider.GetRequiredService<IClock>();
             WWorld.Configure(resolvedSpec, resolvedClock);
 
             CharacterManager = (GameEngineToolsManager)provider.GetRequiredService<IGameEngineToolsManager>();
-            GeneratedFile    = (GeneratedFile)provider.GetRequiredService<IGeneratedFile>();
-            ServiceProvider  = provider;
+            GeneratedFile = (GeneratedFile)provider.GetRequiredService<IGeneratedFile>();
+            ServiceProvider = provider;
 
             Assert.IsNotNull(provider.GetRequiredService<IClock>().Now);
         }
 
-        #endregion
+        #endregion DI inicializace
     }
 }

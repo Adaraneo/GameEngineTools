@@ -35,7 +35,7 @@ namespace GameEngineTools
         private List<ArmorPart> _armorParts = new();
         private List<Weapon> _weapons = new();
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -66,7 +66,7 @@ namespace GameEngineTools
             _serviceProvider = serviceProvider;
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region Veřejné vlastnosti
 
@@ -81,7 +81,7 @@ namespace GameEngineTools
         /// </summary>
         public Dictionary<Type, object> Items { get; } = new();
 
-        #endregion
+        #endregion Veřejné vlastnosti
 
         #region Inicializace
 
@@ -106,7 +106,7 @@ namespace GameEngineTools
             _log.LogInformation("Loaded");
         }
 
-        #endregion
+        #endregion Inicializace
 
         #region RandomizePerson
 
@@ -180,7 +180,7 @@ namespace GameEngineTools
             return factory.Create(hpb);
         }
 
-        #endregion
+        #endregion RandomizePerson
 
         #region Privátní pomocné metody
 
@@ -198,6 +198,6 @@ namespace GameEngineTools
                     double.Parse(v[2], CultureInfo.InvariantCulture)));
         }
 
-        #endregion
+        #endregion Privátní pomocné metody
     }
 }

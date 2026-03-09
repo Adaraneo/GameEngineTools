@@ -6,7 +6,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System;
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -18,6 +17,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         public RelationshipsConfig Config { get; }
 
         private readonly ILogger _log;
+
         public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
@@ -140,7 +140,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 (cur < target) ? Math.Min(target, cur + amount) : Math.Max(target, cur - amount);
         }
 
-        void Upsert(HumanId self, HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
+        private void Upsert(HumanId self, HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
         {
             var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
             if (!dict.TryGetValue(other, out var e))
@@ -157,8 +157,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
             State = new RelationshipState(dict);
         }
 
-        static double Bump(double v, double by) => Math.Max(0, Math.Min(100, v + by));
-        static double Lerp(double a, double b, double t) => a + (b - a) * Math.Clamp(t, 0, 1);
+        private static double Bump(double v, double by) => Math.Max(0, Math.Min(100, v + by));
+
+        private static double Lerp(double a, double b, double t) => a + (b - a) * Math.Clamp(t, 0, 1);
 
         public void RestoreState(RelationshipState state) => State = state;
     }

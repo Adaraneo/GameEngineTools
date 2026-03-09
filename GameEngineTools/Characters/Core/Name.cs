@@ -5,7 +5,7 @@ namespace GameEngineTools.Characters.Core
 {
     public class Name
     {
-        public required string Original { get; set; }
-        public required string[] Familiar { get; set; }
+        public string Original { get; set; }
+        public string[] Familiar { get; set; }
     }
 }

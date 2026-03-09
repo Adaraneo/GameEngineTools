@@ -50,7 +50,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         HumanId Human,
         int DeclineCount) : IDomainEvent;
 
-    #endregion
+    #endregion Prompt a potvrzení
 
     #region Průběh spánku
 
@@ -105,7 +105,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         InterruptCause Cause,
         SleepPhase PhaseAtInterrupt) : IDomainEvent;
 
-    #endregion
+    #endregion Průběh spánku
 
     #region Konec spánku
 
@@ -125,7 +125,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         double Quality,
         bool WasInterrupted) : IDomainEvent;
 
-    #endregion
+    #endregion Konec spánku
 
     #region Sdílený spánek
 
@@ -143,5 +143,5 @@ namespace GameEngineTools.Characters.Engines.Sleep
         HumanId Companion,
         SharedSleepType Type) : IDomainEvent;
 
-    #endregion
+    #endregion Sdílený spánek
 }

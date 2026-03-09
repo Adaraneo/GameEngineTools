@@ -59,7 +59,7 @@ namespace GameEngineTools.World.Utils.Time
             DayIndex = dayIndex;
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region Vlastnosti — raw data
 
@@ -68,7 +68,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </summary>
         public long DayIndex { get; }
 
-        #endregion
+        #endregion Vlastnosti — raw data
 
         #region Ambient vlastnosti — složky data (vyžadují WWorld.Configure)
 
@@ -105,7 +105,7 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        #endregion
+        #endregion Ambient vlastnosti — složky data (vyžadují WWorld.Configure)
 
         #region Static factory
 
@@ -127,7 +127,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public static WDateOnly Today => new(WWorld.Clock.Now.WorldTicks / WWorld.Spec.TicksPerDay);
 
-        #endregion
+        #endregion Static factory
 
         #region Aritmetika — čistá matematika (nevyžaduje WWorld)
 
@@ -145,7 +145,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </summary>
         public long DaysUntil(WDateOnly other) => other.DayIndex - DayIndex;
 
-        #endregion
+        #endregion Aritmetika — čistá matematika (nevyžaduje WWorld)
 
         #region Kalendářní aritmetika (vyžadují WWorld.Configure)
 
@@ -160,8 +160,8 @@ namespace GameEngineTools.World.Utils.Time
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public WDateOnly AddMonths(int months)
         {
-            var spec  = WWorld.Spec;
-            var cal   = spec.Calendar;
+            var spec = WWorld.Spec;
+            var cal = spec.Calendar;
             var (y, m, d) = cal.DateFromDays(DayIndex);
 
             m += months;
@@ -182,7 +182,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public WDateOnly AddYears(int years)
         {
-            var cal   = WWorld.Spec.Calendar;
+            var cal = WWorld.Spec.Calendar;
             var (y, m, d) = cal.DateFromDays(DayIndex);
 
             y += years;
@@ -200,7 +200,7 @@ namespace GameEngineTools.World.Utils.Time
         public WDateTime ToDateTime()
             => new(checked(DayIndex * WWorld.Spec.TicksPerDay));
 
-        #endregion
+        #endregion Kalendářní aritmetika (vyžadují WWorld.Configure)
 
         #region Porovnávací operátory
 
@@ -222,7 +222,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po nebo ve stejný den jako <paramref name="b"/>.</summary>
         public static bool operator >=(WDateOnly a, WDateOnly b) => a.DayIndex >= b.DayIndex;
 
-        #endregion
+        #endregion Porovnávací operátory
 
         #region Rovnost a hashování
 
@@ -238,7 +238,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <inheritdoc/>
         public override int GetHashCode() => DayIndex.GetHashCode();
 
-        #endregion
+        #endregion Rovnost a hashování
 
         #region Formátování
 
@@ -253,6 +253,6 @@ namespace GameEngineTools.World.Utils.Time
             return $"{y:0000}-{m:00}-{d:00}";
         }
 
-        #endregion
+        #endregion Formátování
     }
 }

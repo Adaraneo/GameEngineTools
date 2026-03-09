@@ -3,10 +3,6 @@
 
 namespace GameTester
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Threading;
-    using System.Threading.Tasks;
     using EngineTests.Utils;
     using GameEngineTools;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -22,13 +18,15 @@ namespace GameTester
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Calendars;
     using GameEngineTools.World.Core.Time;
-    using GameEngineTools.World.Utils.Time;
-    using GameTester.Extensions;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Threading;
+    using System.Threading.Tasks;
 
     /// <summary>
     /// Základní třída pro asynchronní integrační testy herního enginu.
@@ -60,7 +58,7 @@ namespace GameTester
         /// </summary>
         private readonly List<IHostedService> _hostedServices = new();
 
-        #endregion
+        #endregion Soukromá pole
 
         #region DI inicializace (override)
 
@@ -80,14 +78,14 @@ namespace GameTester
                 lb.AddConsole();
                 lb.AddCharactersFile(opt =>
                 {
-                    opt.FilePath         = "logs/Characters/characters.log";
-                    opt.MinLevel         = LogLevel.Debug;
+                    opt.FilePath = "logs/Characters/characters.log";
+                    opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                 });
             });
 
             // ── Konfigurace ───────────────────────────────────────────────────
-            var configProvider  = Config.ConfigProvider.Configuration;
+            var configProvider = Config.ConfigProvider.Configuration;
             var worldTypeConfig = configProvider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             s.AddSingleton<IConfiguration>(configProvider);
 
@@ -103,7 +101,7 @@ namespace GameTester
             //    zaregistrován, ale WorldTimeSpec NE → DI by selhal při resolve
             s.AddSingleton<WorldTimeSpec>(sp =>
             {
-                var opts     = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
+                var opts = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
                 var calendar = new FixedMonthsCalendar(
                     opts.DaysInMonths,
                     y => y % opts.LeapYearInterval == 0 ? opts.LeapExtraDays : 0);
@@ -118,7 +116,7 @@ namespace GameTester
             // ── IWorldClock — kotva rok 132, 1. den ───────────────────────────
             s.AddSingleton<IWorldClock>(sp =>
             {
-                var wSpec          = sp.GetRequiredService<WorldTimeSpec>();
+                var wSpec = sp.GetRequiredService<WorldTimeSpec>();
                 long beginningTicks = wSpec.Calendar.DaysFromDate(132, 1, 1) * wSpec.TicksPerDay;
                 return WorldClock.AlignNow(wSpec, beginningTicks);
             });
@@ -130,7 +128,7 @@ namespace GameTester
             s.AddSingleton<IGeneratedFile, GeneratedFile>();
             s.Configure<GeneratedFileOptions>(opt =>
             {
-                opt.NPCDirectory    = GameEngineTools.Constants.TestFSConstatns.NPCs;
+                opt.NPCDirectory = GameEngineTools.Constants.TestFSConstatns.NPCs;
                 opt.PlayerDirectory = GameEngineTools.Constants.TestFSConstatns.player;
             });
 
@@ -170,13 +168,13 @@ namespace GameTester
             WWorld.Configure(resolvedSpec, resolvedClock);
 
             CharacterManager = (GameEngineToolsManager)provider.GetRequiredService<IGameEngineToolsManager>();
-            GeneratedFile    = (GeneratedFile)provider.GetRequiredService<IGeneratedFile>();
-            ServiceProvider  = provider;
+            GeneratedFile = (GeneratedFile)provider.GetRequiredService<IGeneratedFile>();
+            ServiceProvider = provider;
 
             Assert.IsNotNull(provider.GetRequiredService<IClock>().Now);
         }
 
-        #endregion
+        #endregion DI inicializace (override)
 
         #region Async lifecycle hooks
 
@@ -194,7 +192,7 @@ namespace GameTester
         /// <param name="ct">Cancellation token.</param>
         protected virtual Task OnCleanupAsync(CancellationToken ct) => Task.CompletedTask;
 
-        #endregion
+        #endregion Async lifecycle hooks
 
         #region TestInitialize / TestCleanup (async)
 
@@ -237,6 +235,6 @@ namespace GameTester
             _hostedServices.Clear();
         }
 
-        #endregion
+        #endregion TestInitialize / TestCleanup (async)
     }
 }

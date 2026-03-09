@@ -25,9 +25,10 @@ namespace GameEngineTools.World.Utils.Time
         #region Konstrukce
 
         /// <summary>Inicializuje konverter — vyžaduje nakonfigurovaný <see cref="WWorld"/>.</summary>
-        public WTimeSpanJsonConverter() { }
+        public WTimeSpanJsonConverter()
+        { }
 
-        #endregion
+        #endregion Konstrukce
 
         #region JsonConverter<WTimeSpan>
 
@@ -42,21 +43,21 @@ namespace GameEngineTools.World.Utils.Time
                     throw new JsonException("WTimeSpan: neočekávaný číselný formát.");
 
                 case JsonTokenType.String:
-                {
-                    var s = reader.GetString();
-                    if (string.IsNullOrWhiteSpace(s))
-                        throw new JsonException("WTimeSpan: prázdný řetězec.");
+                    {
+                        var s = reader.GetString();
+                        if (string.IsNullOrWhiteSpace(s))
+                            throw new JsonException("WTimeSpan: prázdný řetězec.");
 
-                    // Zkus čisté číslo (ticky)
-                    if (long.TryParse(s, out var asTicks))
-                        return new WTimeSpan(asTicks);
+                        // Zkus čisté číslo (ticky)
+                        if (long.TryParse(s, out var asTicks))
+                            return new WTimeSpan(asTicks);
 
-                    // Zkus [-]d.hh:mm:ss[.sub]
-                    if (TryParseGeneral(s!, out var span))
-                        return span;
+                        // Zkus [-]d.hh:mm:ss[.sub]
+                        if (TryParseGeneral(s!, out var span))
+                            return span;
 
-                    throw new JsonException($"WTimeSpan: neplatný formát '{s}'.");
-                }
+                        throw new JsonException($"WTimeSpan: neplatný formát '{s}'.");
+                    }
 
                 default:
                     throw new JsonException("WTimeSpan: očekáván number nebo string.");
@@ -68,7 +69,7 @@ namespace GameEngineTools.World.Utils.Time
         public override void Write(Utf8JsonWriter writer, WTimeSpan value, JsonSerializerOptions options)
             => writer.WriteNumberValue(value.Ticks);
 
-        #endregion
+        #endregion JsonConverter<WTimeSpan>
 
         #region Privátní parsování
 
@@ -79,14 +80,14 @@ namespace GameEngineTools.World.Utils.Time
         private static bool TryParseGeneral(string s, out WTimeSpan span)
         {
             span = default;
-            s    = s.Trim();
+            s = s.Trim();
 
             int sign = 1;
             if (s.StartsWith("-", StringComparison.Ordinal)) { sign = -1; s = s[1..]; }
 
             // Rozděl na [dny] . [rest]
             string[] partsD = s.Split('.', 2);
-            long   days = 0;
+            long days = 0;
             string rest;
 
             if (partsD.Length == 2)
@@ -116,21 +117,21 @@ namespace GameEngineTools.World.Utils.Time
 
             // Validace vůči WWorld.Spec
             var spec = WWorld.Spec;
-            if (hh       < 0 || hh       >= spec.HoursPerDay)     return false;
-            if (mm       < 0 || mm       >= spec.MinutesPerHour)   return false;
-            if (ss       < 0 || ss       >= spec.SecondsPerMinute) return false;
-            if (subticks < 0 || subticks >= spec.TicksPerSecond)   return false;
+            if (hh < 0 || hh >= spec.HoursPerDay) return false;
+            if (mm < 0 || mm >= spec.MinutesPerHour) return false;
+            if (ss < 0 || ss >= spec.SecondsPerMinute) return false;
+            if (subticks < 0 || subticks >= spec.TicksPerSecond) return false;
 
-            long totalTicks = days     * spec.TicksPerDay
-                            + hh       * spec.TicksPerHour
-                            + mm       * spec.TicksPerMinute
-                            + ss       * spec.TicksPerSecond
+            long totalTicks = days * spec.TicksPerDay
+                            + hh * spec.TicksPerHour
+                            + mm * spec.TicksPerMinute
+                            + ss * spec.TicksPerSecond
                             + subticks;
 
             span = new WTimeSpan(sign * totalTicks);
             return true;
         }
 
-        #endregion
+        #endregion Privátní parsování
     }
 }

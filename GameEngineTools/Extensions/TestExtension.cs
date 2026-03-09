@@ -8,7 +8,6 @@ namespace GameEngineTools.Extensions
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.GameObjects;
-    using GameEngineTools.World.Core.Time;
 
     public static class TestExtension
     {
@@ -74,8 +73,6 @@ namespace GameEngineTools.Extensions
                 AppendValue(sb, stateObj, indent: 1);
                 sb.AppendLine();
             }
-
-            
 
             return sb.ToString();
         }
@@ -163,6 +160,6 @@ namespace GameEngineTools.Extensions
             }
         }
 
-        #endregion
+        #endregion ByClaude
     }
 }

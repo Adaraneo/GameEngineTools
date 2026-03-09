@@ -79,4 +79,3 @@ namespace GameEngineTools.Characters.Engines.Interactions
         public void RestoreState(InteractionSurface state) => State = state;
     }
 }
-

@@ -1,11 +1,6 @@
 ﻿using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.World.Utils.Time;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EngineTests
 {
@@ -25,6 +20,7 @@ namespace EngineTests
     internal static class TestData
     {
         public static Name MakeName(string original) => new Name { Original = original, Familiar = [] };
+
         public static Surname MakeSurname(string male, string female) => new Surname { Male = male, Female = female };
 
         public static WDateOnly SomeBirthDate => new WDateOnly(10000);

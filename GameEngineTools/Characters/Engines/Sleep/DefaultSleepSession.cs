@@ -37,7 +37,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <summary>True pokud byl v průběhu REM fáze již vygenerován dream event.</summary>
         private bool _dreamFiredThisRem;
 
-        #endregion
+        #endregion Privátní pole
 
         #region Veřejné vlastnosti (ISleepSession)
 
@@ -56,7 +56,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <inheritdoc/>
         public double HoursSlept { get; private set; }
 
-        #endregion
+        #endregion Veřejné vlastnosti (ISleepSession)
 
         #region Konstruktor
 
@@ -73,7 +73,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             _rng = rng;
         }
 
-        #endregion
+        #endregion Konstruktor
 
         #region Lifecycle
 
@@ -86,14 +86,14 @@ namespace GameEngineTools.Characters.Engines.Sleep
             HumanId? companion = null,
             SharedSleepType? sharedType = null)
         {
-            _sleepStart        = now;
-            _phaseStart        = now;
+            _sleepStart = now;
+            _phaseStart = now;
             _stressAtSleepStart = ctx.Snapshot.Psychology.Stress;
             _dreamFiredThisRem = false;
-            HoursSlept         = 0;
-            IsActive           = true;
-            Companion          = companion;
-            PlannedWakeUp      = plannedWakeUp;
+            HoursSlept = 0;
+            IsActive = true;
+            Companion = companion;
+            PlannedWakeUp = plannedWakeUp;
 
             EnterPhase(SleepPhase.Falling, now, ctx, outbox);
 
@@ -177,7 +177,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             EndSession(now, wasInterrupted: true, ctx, outbox);
         }
 
-        #endregion
+        #endregion Lifecycle
 
         #region Privátní pomocné metody
 
@@ -187,7 +187,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         private void EnterPhase(SleepPhase phase, WDateTime now, IHumanContext ctx, IEventCollector outbox)
         {
             CurrentPhase = phase;
-            _phaseStart  = now;
+            _phaseStart = now;
             outbox.Add(new SleepPhaseChanged(now, ctx.Id, phase));
             _log.LogDebug("[Sleep] {Id} vstoupil do fáze {Phase}.", ctx.Id, phase);
         }
@@ -203,11 +203,11 @@ namespace GameEngineTools.Characters.Engines.Sleep
             var phaseModifier = CurrentPhase switch
             {
                 SleepPhase.Falling => 1.2,  // snadno přepadnutelný, ještě nespí
-                SleepPhase.Light   => 1.0,
-                SleepPhase.Deep    => 0.6,  // hluboko spí — útočník má výhodu, ale postava hůře reaguje
-                SleepPhase.Rem     => 0.4,  // tělesně uvolněná, psychicky aktivní
-                SleepPhase.Waking  => 0.8,
-                _                  => 1.0
+                SleepPhase.Light => 1.0,
+                SleepPhase.Deep => 0.6,  // hluboko spí — útočník má výhodu, ale postava hůře reaguje
+                SleepPhase.Rem => 0.4,  // tělesně uvolněná, psychicky aktivní
+                SleepPhase.Waking => 0.8,
+                _ => 1.0
             };
 
             var companionModifier = Companion.HasValue ? _cfg.CompanionGuardModifier : 1.0;
@@ -288,17 +288,17 @@ namespace GameEngineTools.Characters.Engines.Sleep
                 quality *= CurrentPhase switch
                 {
                     SleepPhase.Falling => 0.2,  // skoro nic
-                    SleepPhase.Light   => 0.4,
-                    SleepPhase.Deep    => 0.6,
-                    SleepPhase.Rem     => 0.75, // REM je cenný, přerušení bolí
-                    SleepPhase.Waking  => 0.9,  // skoro dospáno
-                    _                  => 0.5
+                    SleepPhase.Light => 0.4,
+                    SleepPhase.Deep => 0.6,
+                    SleepPhase.Rem => 0.75, // REM je cenný, přerušení bolí
+                    SleepPhase.Waking => 0.9,  // skoro dospáno
+                    _ => 0.5
                 };
             }
 
             return Math.Clamp(quality, 0, 100);
         }
 
-        #endregion
+        #endregion Privátní pomocné metody
     }
 }

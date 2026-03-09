@@ -51,7 +51,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// </summary>
         double HoursSlept { get; }
 
-        #endregion
+        #endregion Stav
 
         #region Lifecycle
 
@@ -97,6 +97,6 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <param name="outbox">Sběrač eventů pro tento tick.</param>
         void Interrupt(WDateTime now, InterruptCause cause, IHumanContext ctx, IEventCollector outbox);
 
-        #endregion
+        #endregion Lifecycle
     }
 }

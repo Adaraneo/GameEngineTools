@@ -5,16 +5,14 @@ namespace GameEngineTools.FileSystem
 {
     using System.Text.Json;
     using System.Text.Json.Serialization;
-    using Microsoft.Extensions.Options;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Persistence;
-    using GameEngineTools.Extensions;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
-    using GD = GameEngineTools.Constants.FileSystemConstant.GeneratedDirectory;
+    using Microsoft.Extensions.Options;
 
     /// <summary>
     /// Implementace <see cref="IGeneratedFile"/> — serializace a deserializace postav do/ze JSON souborů.
@@ -23,12 +21,12 @@ namespace GameEngineTools.FileSystem
     {
         #region Soukromá pole
 
-        private readonly IClock                    _clock;
-        private readonly IGameEngineToolsManager   _characterManager;
-        private readonly IHumanFactory             _humanFactory;
-        private readonly JsonSerializerOptions     _jsonOptions;
+        private readonly IClock _clock;
+        private readonly IGameEngineToolsManager _characterManager;
+        private readonly IHumanFactory _humanFactory;
+        private readonly JsonSerializerOptions _jsonOptions;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -44,18 +42,18 @@ namespace GameEngineTools.FileSystem
         /// <param name="humanFactory">Factory pro rekonstrukci postav při importu.</param>
         /// <param name="options">Volitelná konfigurace adresářů pro export souborů.</param>
         public GeneratedFile(
-            IClock                              clock,
-            IGameEngineToolsManager             characterManager,
-            IHumanFactory                       humanFactory,
-            IOptions<GeneratedFileOptions>?     options = null)
+            IClock clock,
+            IGameEngineToolsManager characterManager,
+            IHumanFactory humanFactory,
+            IOptions<GeneratedFileOptions>? options = null)
         {
-            _clock            = clock;
+            _clock = clock;
             _characterManager = characterManager;
-            _humanFactory     = humanFactory;
+            _humanFactory = humanFactory;
 
             if (options is not null)
             {
-                NPCDirectory    = options.Value.NPCDirectory;
+                NPCDirectory = options.Value.NPCDirectory;
                 PlayerDirectory = options.Value.PlayerDirectory;
             }
 
@@ -63,7 +61,7 @@ namespace GameEngineTools.FileSystem
             // vyžadují ctx, který nemáme k dispozici ve field initializeru
             _jsonOptions = new JsonSerializerOptions
             {
-                WriteIndented    = true,
+                WriteIndented = true,
                 ReferenceHandler = ReferenceHandler.IgnoreCycles,
                 Converters =
                 {
@@ -74,7 +72,7 @@ namespace GameEngineTools.FileSystem
             };
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region Vlastnosti
 
@@ -84,7 +82,7 @@ namespace GameEngineTools.FileSystem
         /// <summary>Adresář pro exportované hráčské soubory.</summary>
         public string PlayerDirectory { get; set; }
 
-        #endregion
+        #endregion Vlastnosti
 
         #region Export
 
@@ -96,7 +94,7 @@ namespace GameEngineTools.FileSystem
         public string Export(PC player)
         {
             var filename = $"{player.Person.Id.Value}.json";
-            var data     = BuildCharacterData(player);
+            var data = BuildCharacterData(player);
             WriteJson(Path.Combine(PlayerDirectory, filename), data);
             return filename;
         }
@@ -109,7 +107,7 @@ namespace GameEngineTools.FileSystem
         public string Export(NPC npc)
         {
             var filename = $"{npc.Person.Id.Value}.json";
-            var data     = BuildCharacterData(npc);
+            var data = BuildCharacterData(npc);
             WriteJson(Path.Combine(NPCDirectory, filename), data);
             return filename;
         }
@@ -128,7 +126,7 @@ namespace GameEngineTools.FileSystem
                 Export((NPC)nppcs.Current);
         }
 
-        #endregion
+        #endregion Export
 
         #region Import
 
@@ -139,18 +137,18 @@ namespace GameEngineTools.FileSystem
         /// <returns>Rekonstruovaná NPC postava.</returns>
         public NPC ImportNPC(string filename)
         {
-            var data      = ReadJson(Path.Combine(NPCDirectory, filename));
+            var data = ReadJson(Path.Combine(NPCDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance);
-            var person    = _humanFactory.Create(blueprint);
+            var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
             return new NPC
             {
                 MaxHealth = (int)data.MaxHealth,
-                Armor     = data.Armor,
-                Weapon    = data.Weapon,
-                Person    = person,
-                Health    = data.Health
+                Armor = data.Armor,
+                Weapon = data.Weapon,
+                Person = person,
+                Health = data.Health
             };
         }
 
@@ -161,18 +159,18 @@ namespace GameEngineTools.FileSystem
         /// <returns>Rekonstruovaná hráčská postava.</returns>
         public PC ImportPC(string filename)
         {
-            var data      = ReadJson(Path.Combine(PlayerDirectory, filename));
+            var data = ReadJson(Path.Combine(PlayerDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance);
-            var person    = _humanFactory.Create(blueprint);
+            var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
             return new PC
             {
                 MaxHealth = (int)data.MaxHealth,
-                Armor     = data.Armor,
-                Weapon    = data.Weapon,
-                Person    = person,
-                Health    = data.Health
+                Armor = data.Armor,
+                Weapon = data.Weapon,
+                Person = person,
+                Health = data.Health
             };
         }
 
@@ -184,31 +182,31 @@ namespace GameEngineTools.FileSystem
         {
             _characterManager.NPPCs.Clear();
             var generateFileSystem = new GenerateFileSystem(pathToRootDirectory);
-            var fileName           = generateFileSystem.Filenames.GetEnumerator();
+            var fileName = generateFileSystem.Filenames.GetEnumerator();
             fileName.MoveNext();
             _characterManager.NPPCs.Add(ImportPC(fileName.Current));
             while (fileName.MoveNext())
                 _characterManager.NPPCs.Add(ImportNPC(fileName.Current));
         }
 
-        #endregion
+        #endregion Import
 
         #region Privátní pomocné metody
 
         /// <summary>Sestaví <see cref="CharacterData"/> z libovolné herní postavy.</summary>
         private static CharacterData BuildCharacterData(CharacterBase character) => new()
         {
-            Id                 = character.Person.Id,
-            Identity           = character.Person.Identity,
-            Biology            = character.Person.Biology,
-            Personality        = character.Person.Personality,
+            Id = character.Person.Id,
+            Identity = character.Person.Identity,
+            Biology = character.Person.Biology,
+            Personality = character.Person.Personality,
             PhysicalAppearance = character.Person.PhysicalAppearance,
-            Snapshot           = character.Person.Snapshot,
-            MaxHealth          = character.MaxHealth,
-            Health             = character.Health,
-            Armor              = character.Armor,
-            Weapon             = character.Weapon,
-            Protection         = character.Protection
+            Snapshot = character.Person.Snapshot,
+            MaxHealth = character.MaxHealth,
+            Health = character.Health,
+            Armor = character.Armor,
+            Weapon = character.Weapon,
+            Protection = character.Protection
         };
 
         /// <summary>Zapíše data jako JSON do souboru.</summary>
@@ -226,6 +224,6 @@ namespace GameEngineTools.FileSystem
             return JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions)!;
         }
 
-        #endregion
+        #endregion Privátní pomocné metody
     }
 }

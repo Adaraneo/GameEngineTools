@@ -20,9 +20,13 @@ namespace GameEngineTools.Characters.Hosting.Defaults
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _rng;
+
             public SeededRandom(int seed) => _rng = new Random(seed);
+
             public int Next(int minInclusive, int maxExclusive) => _rng.Next(minInclusive, maxExclusive);
+
             public double NextUnit() => _rng.NextDouble();
+
             public bool Chance(double p) => _rng.NextDouble() < p;
         }
     }
@@ -53,7 +57,9 @@ namespace GameEngineTools.Characters.Hosting.Defaults
         private sealed class ActionDisposable : IDisposable
         {
             private readonly Action _action;
+
             public ActionDisposable(Action action) => _action = action;
+
             public void Dispose() => _action();
         }
 
@@ -114,7 +120,9 @@ namespace GameEngineTools.Characters.Hosting.Defaults
         private sealed class Unsubscriber : IDisposable
         {
             private readonly Action _dispose;
+
             public Unsubscriber(Action dispose) => _dispose = dispose;
+
             public void Dispose() => _dispose();
         }
     }

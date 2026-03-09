@@ -66,7 +66,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </param>
         public WDateTime(long worldTicks) => WorldTicks = worldTicks;
 
-        #endregion
+        #endregion Konstrukce
 
         #region Vlastnosti — raw data
 
@@ -76,14 +76,14 @@ namespace GameEngineTools.World.Utils.Time
         /// </summary>
         public long WorldTicks { get; }
 
-        #endregion
+        #endregion Vlastnosti — raw data
 
         #region Konstanty
 
         /// <summary>Minimální reprezentovatelná hodnota — světová epocha (1/1/1 00:00:00).</summary>
         public static WDateTime MinValue => new(0);
 
-        #endregion
+        #endregion Konstanty
 
         #region Ambient vlastnosti — složky data (vyžadují WWorld.Configure)
 
@@ -190,7 +190,7 @@ namespace GameEngineTools.World.Utils.Time
         {
             get
             {
-                var spec     = WWorld.Spec;
+                var spec = WWorld.Spec;
                 long dayIndex = WorldTicks / spec.TicksPerDay;
                 var (y, _, _) = spec.Calendar.DateFromDays(dayIndex);
                 long firstDay = spec.Calendar.DaysFromDate(y, 1, 1);
@@ -211,7 +211,7 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        #endregion
+        #endregion Ambient vlastnosti — složky data (vyžadují WWorld.Configure)
 
         #region Static factory a aktuální čas
 
@@ -240,14 +240,14 @@ namespace GameEngineTools.World.Utils.Time
         {
             var spec = WWorld.Spec;
 
-            if (hour    < 0 || hour    >= spec.HoursPerDay)      throw new ArgumentOutOfRangeException(nameof(hour));
-            if (minute  < 0 || minute  >= spec.MinutesPerHour)   throw new ArgumentOutOfRangeException(nameof(minute));
-            if (second  < 0 || second  >= spec.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
-            if (subTick < 0 || subTick >= spec.TicksPerSecond)   throw new ArgumentOutOfRangeException(nameof(subTick));
+            if (hour < 0 || hour >= spec.HoursPerDay) throw new ArgumentOutOfRangeException(nameof(hour));
+            if (minute < 0 || minute >= spec.MinutesPerHour) throw new ArgumentOutOfRangeException(nameof(minute));
+            if (second < 0 || second >= spec.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
+            if (subTick < 0 || subTick >= spec.TicksPerSecond) throw new ArgumentOutOfRangeException(nameof(subTick));
 
-            long days  = spec.Calendar.DaysFromDate(year, month, day);
-            long ticks = days   * spec.TicksPerDay
-                       + hour   * spec.TicksPerHour
+            long days = spec.Calendar.DaysFromDate(year, month, day);
+            long ticks = days * spec.TicksPerDay
+                       + hour * spec.TicksPerHour
                        + minute * spec.TicksPerMinute
                        + second * spec.TicksPerSecond
                        + subTick;
@@ -269,7 +269,7 @@ namespace GameEngineTools.World.Utils.Time
         public static WDateTime New(WDateOnly date, WTimeOnly time)
             => new(checked(date.DayIndex * WWorld.Spec.TicksPerDay + time.TicksOfDay));
 
-        #endregion
+        #endregion Static factory a aktuální čas
 
         #region Aritmetika — čistá matematika (nevyžaduje WWorld)
 
@@ -306,7 +306,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <summary>Posune okamžik o jeden worldTick dozadu.</summary>
         public static WDateTime operator --(WDateTime t) => new(t.WorldTicks - 1);
 
-        #endregion
+        #endregion Aritmetika — čistá matematika (nevyžaduje WWorld)
 
         #region Ambient aritmetika — Add* a With* (vyžadují WWorld.Configure)
 
@@ -333,15 +333,15 @@ namespace GameEngineTools.World.Utils.Time
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public WDateTime AddMonths(int months)
         {
-            var spec    = WWorld.Spec;
-            var cal     = spec.Calendar;
-            long tpd    = spec.TicksPerDay;
-            long tod    = WorldTicks % tpd;           // čas dne zachováme
+            var spec = WWorld.Spec;
+            var cal = spec.Calendar;
+            long tpd = spec.TicksPerDay;
+            long tod = WorldTicks % tpd;           // čas dne zachováme
             long dayIdx = WorldTicks / tpd;
 
             var (y, m, d) = cal.DateFromDays(dayIdx);
             m += months;
-            while (m < 1)                       { y -= 1; m += cal.MonthsInYear(y); }
+            while (m < 1) { y -= 1; m += cal.MonthsInYear(y); }
             while (m > cal.MonthsInYear(y)) { m -= cal.MonthsInYear(y); y += 1; }
 
             int dim = cal.DaysInMonth(y, m);
@@ -357,10 +357,10 @@ namespace GameEngineTools.World.Utils.Time
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public WDateTime AddYears(int years)
         {
-            var spec    = WWorld.Spec;
-            var cal     = spec.Calendar;
-            long tpd    = spec.TicksPerDay;
-            long tod    = WorldTicks % tpd;
+            var spec = WWorld.Spec;
+            var cal = spec.Calendar;
+            long tpd = spec.TicksPerDay;
+            long tod = WorldTicks % tpd;
             long dayIdx = WorldTicks / tpd;
 
             var (y, m, d) = cal.DateFromDays(dayIdx);
@@ -381,7 +381,7 @@ namespace GameEngineTools.World.Utils.Time
         public WDateTime WithTime(WTimeOnly time)
             => WDateTime.New(Date, time);
 
-        #endregion
+        #endregion Ambient aritmetika — Add* a With* (vyžadují WWorld.Configure)
 
         #region Porovnávací operátory
 
@@ -403,7 +403,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po nebo ve stejný okamžik jako <paramref name="b"/>.</summary>
         public static bool operator >=(WDateTime a, WDateTime b) => a.WorldTicks >= b.WorldTicks;
 
-        #endregion
+        #endregion Porovnávací operátory
 
         #region Parsování (static — vyžadují WWorld.Configure)
 
@@ -458,9 +458,9 @@ namespace GameEngineTools.World.Utils.Time
 
             // Datum: YYYY-MM-DD
             if (datePart.Length < 10 || datePart[4] != '-' || datePart[7] != '-') return false;
-            if (!SpanParseInt(datePart[..4],        1, int.MaxValue, out int year))  return false;
-            if (!SpanParseInt(datePart.Slice(5, 2), 1, 99,           out int month)) return false;
-            if (!SpanParseInt(datePart.Slice(8, 2), 1, 99,           out int day))   return false;
+            if (!SpanParseInt(datePart[..4], 1, int.MaxValue, out int year)) return false;
+            if (!SpanParseInt(datePart.Slice(5, 2), 1, 99, out int month)) return false;
+            if (!SpanParseInt(datePart.Slice(8, 2), 1, 99, out int day)) return false;
 
             // Čas: HH:MM:SS[.frac]
             int hour = 0, minute = 0, second = 0;
@@ -473,8 +473,8 @@ namespace GameEngineTools.World.Utils.Time
                 var frac = dot >= 0 ? timePart[(dot + 1)..] : ReadOnlySpan<char>.Empty;
 
                 if (main.Length < 8 || main[2] != ':' || main[5] != ':') return false;
-                if (!SpanParseInt(main[..2],        0, spec.HoursPerDay - 1,     out hour))   return false;
-                if (!SpanParseInt(main.Slice(3, 2), 0, spec.MinutesPerHour - 1,  out minute)) return false;
+                if (!SpanParseInt(main[..2], 0, spec.HoursPerDay - 1, out hour)) return false;
+                if (!SpanParseInt(main.Slice(3, 2), 0, spec.MinutesPerHour - 1, out minute)) return false;
                 if (!SpanParseInt(main.Slice(6, 2), 0, spec.SecondsPerMinute - 1, out second)) return false;
 
                 if (!frac.IsEmpty)
@@ -504,8 +504,8 @@ namespace GameEngineTools.World.Utils.Time
             try { days = spec.Calendar.DaysFromDate(year, month, day); }
             catch { return false; }
 
-            long ticks = days   * spec.TicksPerDay
-                       + hour   * spec.TicksPerHour
+            long ticks = days * spec.TicksPerDay
+                       + hour * spec.TicksPerHour
                        + minute * spec.TicksPerMinute
                        + second * spec.TicksPerSecond
                        + subTick;
@@ -514,7 +514,7 @@ namespace GameEngineTools.World.Utils.Time
             return true;
         }
 
-        #endregion
+        #endregion Parsování (static — vyžadují WWorld.Configure)
 
         #region Rovnost a hashování
 
@@ -530,7 +530,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <inheritdoc/>
         public override int GetHashCode() => WorldTicks.GetHashCode();
 
-        #endregion
+        #endregion Rovnost a hashování
 
         #region Formátování
 
@@ -542,18 +542,18 @@ namespace GameEngineTools.World.Utils.Time
         {
             if (!WWorld.IsConfigured) return WorldTicks.ToString();
 
-            var spec     = WWorld.Spec;
+            var spec = WWorld.Spec;
             long dayIndex = Math.DivRem(WorldTicks, spec.TicksPerDay, out long rest);
             var (y, mo, d) = spec.Calendar.DateFromDays(dayIndex);
 
-            int hh = (int)(rest / spec.TicksPerHour);   rest %= spec.TicksPerHour;
-            int mm = (int)(rest / spec.TicksPerMinute);  rest %= spec.TicksPerMinute;
-            int ss = (int)(rest / spec.TicksPerSecond);  rest %= spec.TicksPerSecond;
+            int hh = (int)(rest / spec.TicksPerHour); rest %= spec.TicksPerHour;
+            int mm = (int)(rest / spec.TicksPerMinute); rest %= spec.TicksPerMinute;
+            int ss = (int)(rest / spec.TicksPerSecond); rest %= spec.TicksPerSecond;
 
             var sb = new StringBuilder(32);
-            Append4(sb, y);  sb.Append('-');
+            Append4(sb, y); sb.Append('-');
             Append2(sb, mo); sb.Append('-');
-            Append2(sb, d);  sb.Append('T');
+            Append2(sb, d); sb.Append('T');
             Append2(sb, hh); sb.Append(':');
             Append2(sb, mm); sb.Append(':');
             Append2(sb, ss);
@@ -562,7 +562,7 @@ namespace GameEngineTools.World.Utils.Time
             return sb.ToString();
         }
 
-        #endregion
+        #endregion Formátování
 
         #region Privátní pomocné metody
 
@@ -597,7 +597,8 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>Vrátí 10^n (bez BCL Math.Pow — pracujeme s int).</summary>
-        private static long Pow10(int n) { long p = 1; for (int i = 0; i < n; i++) p *= 10; return p; }
+        private static long Pow10(int n)
+        { long p = 1; for (int i = 0; i < n; i++) p *= 10; return p; }
 
         /// <summary>Zapíše číslo jako přesně 2 číslice (s nulou vlevo).</summary>
         private static void Append2(StringBuilder sb, int v)
@@ -614,11 +615,11 @@ namespace GameEngineTools.World.Utils.Time
         {
             if (v >= 10000) { sb.Append(v); return; }
             sb.Append((char)('0' + (v / 1000) % 10));
-            sb.Append((char)('0' + (v / 100)  % 10));
-            sb.Append((char)('0' + (v / 10)   % 10));
-            sb.Append((char)('0' + v           % 10));
+            sb.Append((char)('0' + (v / 100) % 10));
+            sb.Append((char)('0' + (v / 10) % 10));
+            sb.Append((char)('0' + v % 10));
         }
 
-        #endregion
+        #endregion Privátní pomocné metody
     }
 }

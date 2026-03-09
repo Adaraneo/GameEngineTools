@@ -3,9 +3,6 @@
 
 namespace GameEngineTools
 {
-    using System;
-    using GameEngineTools.World.Core.Time;
-
     public sealed class GameEngineToolsManagerOptions
     {
         public string LogsRoot { get; set; } = "logs";

@@ -3,7 +3,6 @@
 
 namespace GameEngineTools.Characters.Engines.Physiology
 {
-
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
@@ -25,10 +24,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double BodyTempDelta,   // °C deviation
         MenstrualCycleState? Cycle);
 
-    public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig> { }
+    public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
+    { }
 
     // --- Menstruační modul ---
-    public enum CyclePhase { Menses, Follicular, Ovulation, Luteal, Paused /* např. těhotenství/antiko */ }
+    public enum CyclePhase
+    { Menses, Follicular, Ovulation, Luteal, Paused /* např. těhotenství/antiko */ }
 
     public sealed record MenstrualCycleConfig(
         int MeanCycleLengthDays = 28,

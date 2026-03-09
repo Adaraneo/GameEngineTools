@@ -69,7 +69,7 @@ namespace GameEngineTools.World.Core.Astro
         /// </summary>
         public readonly double TwilightAstronomicalDeg;
 
-        #endregion
+        #endregion Vlastnosti
 
         #region Odvozené vlastnosti
 
@@ -81,7 +81,7 @@ namespace GameEngineTools.World.Core.Astro
         /// </summary>
         public double H0DegSunrise => -(RefractionDeg + ApparentRadiusDeg);
 
-        #endregion
+        #endregion Odvozené vlastnosti
 
         #region Konstrukce
 
@@ -108,24 +108,24 @@ namespace GameEngineTools.World.Core.Astro
         /// <param name="twilightAstronomicalDeg">Práh astronomického soumraku. Výchozí <c>18</c>°.</param>
         public SunParams(
             double axialTiltDeg,
-            double eccentricity             = 0.0167,
-            double periapsisPhase           = 0.0,
-            double refractionDeg            = 0.566,
-            double apparentRadiusDeg        = 0.266,
-            double twilightCivilDeg         = 6,
-            double twilightNauticalDeg      = 12,
-            double twilightAstronomicalDeg  = 18)
+            double eccentricity = 0.0167,
+            double periapsisPhase = 0.0,
+            double refractionDeg = 0.566,
+            double apparentRadiusDeg = 0.266,
+            double twilightCivilDeg = 6,
+            double twilightNauticalDeg = 12,
+            double twilightAstronomicalDeg = 18)
         {
-            AxialTiltDeg             = axialTiltDeg;
-            Eccentricity             = Math.Clamp(eccentricity, 0, 0.5);
-            PeriapsisPhase           = periapsisPhase - Math.Floor(periapsisPhase); // wrap do [0,1)
-            RefractionDeg            = refractionDeg;
-            ApparentRadiusDeg        = apparentRadiusDeg;
-            TwilightCivilDeg         = twilightCivilDeg;
-            TwilightNauticalDeg      = twilightNauticalDeg;
-            TwilightAstronomicalDeg  = twilightAstronomicalDeg;
+            AxialTiltDeg = axialTiltDeg;
+            Eccentricity = Math.Clamp(eccentricity, 0, 0.5);
+            PeriapsisPhase = periapsisPhase - Math.Floor(periapsisPhase); // wrap do [0,1)
+            RefractionDeg = refractionDeg;
+            ApparentRadiusDeg = apparentRadiusDeg;
+            TwilightCivilDeg = twilightCivilDeg;
+            TwilightNauticalDeg = twilightNauticalDeg;
+            TwilightAstronomicalDeg = twilightAstronomicalDeg;
         }
 
-        #endregion
+        #endregion Konstrukce
     }
 }

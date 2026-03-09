@@ -29,14 +29,14 @@ namespace GameEngineTools
     {
         #region Soukromá pole
 
-        private readonly Timer  _timer;
+        private readonly Timer _timer;
         private readonly double _timeScale;
 
         // Počet ticků za reálnou sekundu přepočítaný na rychlost světa.
         // Předpočítáme jednou v konstruktoru — nemusíme sahat na spec v každém tiknutí.
         private readonly long _ticksPerRealSecond;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -53,16 +53,16 @@ namespace GameEngineTools
         /// </param>
         public SystemClock(IWorldClock worldClock, WorldTimeSpec spec)
         {
-            _timeScale          = worldClock.TimeScale;
+            _timeScale = worldClock.TimeScale;
             _ticksPerRealSecond = spec.TicksPerSecond;
 
             Now = new WDateTime(worldClock.NowWorldTicks());
 
-            _timer          = new Timer { Interval = 1000 };
+            _timer = new Timer { Interval = 1000 };
             _timer.Elapsed += Timer_Elapsed;
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region IClock
 
@@ -75,7 +75,7 @@ namespace GameEngineTools
         /// <inheritdoc/>
         public void Stop() => _timer.Stop();
 
-        #endregion
+        #endregion IClock
 
         #region Veřejné utility
 
@@ -91,7 +91,7 @@ namespace GameEngineTools
         /// <param name="dt">Interval o který se čas posune.</param>
         public void Advance(WTimeSpan dt) => Now = Now + dt;
 
-        #endregion
+        #endregion Veřejné utility
 
         #region IDisposable
 
@@ -102,7 +102,7 @@ namespace GameEngineTools
             _timer.Dispose();
         }
 
-        #endregion
+        #endregion IDisposable
 
         #region Privátní
 
@@ -113,6 +113,6 @@ namespace GameEngineTools
             Now = new WDateTime(Now.WorldTicks + (long)(_timeScale * _ticksPerRealSecond));
         }
 
-        #endregion
+        #endregion Privátní
     }
 }

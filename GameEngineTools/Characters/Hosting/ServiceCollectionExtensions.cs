@@ -3,17 +3,16 @@
 
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Behavior;
-using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Constants;
 using GameEngineTools.FileSystem;
-using GameEngineTools.World.Core.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -40,7 +39,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        #endregion
+        #endregion Core
 
         #region CharacterGeneration
 
@@ -118,7 +117,7 @@ namespace GameEngineTools.Characters.Hosting
         private static IServiceCollection AddAppearanceGenerator(this IServiceCollection services)
             => services.AddSingleton<IAppearanceGenerator, AppearanceGenerator>();
 
-        #endregion
+        #endregion CharacterGeneration
 
         #region Engine registrace
 
@@ -250,7 +249,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        #endregion
+        #endregion Engine registrace
 
         #region Zkrácená registrace všeho najednou
 
@@ -271,19 +270,19 @@ namespace GameEngineTools.Characters.Hosting
         /// </example>
         public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem>(
             this IServiceCollection services,
-            Action<PhysiologyConfig>?    physio = null,
-            Action<PsychologyConfig>?    psych  = null,
-            Action<BehaviorConfig>?      behav  = null,
-            Action<SleepConfig>?         sleep  = null,
-            Action<InteractionConfig>?   inter  = null,
-            Action<RelationshipsConfig>? rel    = null,
-            Action<MemoryConfig>?        mem    = null)
+            Action<PhysiologyConfig>? physio = null,
+            Action<PsychologyConfig>? psych = null,
+            Action<BehaviorConfig>? behav = null,
+            Action<SleepConfig>? sleep = null,
+            Action<InteractionConfig>? inter = null,
+            Action<RelationshipsConfig>? rel = null,
+            Action<MemoryConfig>? mem = null)
             where TPhysio : class, IPhysiologyEngine
-            where TPsych  : class, IPsychologyEngine
-            where TBehav  : class, IBehaviorEngine
-            where TInter  : class, IInteractionEngine
-            where TRel    : class, IRelationshipsEngine
-            where TMem    : class, IMemoryEngine
+            where TPsych : class, IPsychologyEngine
+            where TBehav : class, IBehaviorEngine
+            where TInter : class, IInteractionEngine
+            where TRel : class, IRelationshipsEngine
+            where TMem : class, IMemoryEngine
         {
             services.AddCharactersCore()
                     .AddPhysiologyEngine<TPhysio>(physio)
@@ -296,6 +295,6 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        #endregion
+        #endregion Zkrácená registrace všeho najednou
     }
 }

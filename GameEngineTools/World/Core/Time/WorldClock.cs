@@ -45,13 +45,15 @@ namespace GameEngineTools.World.Core.Time
         private static extern void GetSystemTimePreciseAsFileTime(out FILETIME ft);
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct FILETIME { public uint dwLowDateTime; public uint dwHighDateTime; }
+        private struct FILETIME
+        { public uint dwLowDateTime; public uint dwHighDateTime; }
 
         /// <remarks>CLOCK_REALTIME = 0</remarks>
         [StructLayout(LayoutKind.Sequential)]
-        private struct timespec { public long tv_sec; public long tv_nsec; }
+        private struct timespec
+        { public long tv_sec; public long tv_nsec; }
 
-        #endregion
+        #endregion OS interop (Windows / POSIX)
 
         #region Soukromá pole
 
@@ -62,7 +64,7 @@ namespace GameEngineTools.World.Core.Time
         /// </summary>
         private readonly WorldTimeSpec _spec;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -92,14 +94,14 @@ namespace GameEngineTools.World.Core.Time
             TimeScale = timeScale;
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region Vlastnosti (IWorldClock)
 
         /// <inheritdoc/>
         public double TimeScale { get; }
 
-        #endregion
+        #endregion Vlastnosti (IWorldClock)
 
         #region Vlastnosti (veřejné)
 
@@ -114,7 +116,7 @@ namespace GameEngineTools.World.Core.Time
         /// </summary>
         public long WorldEpochTicks { get; }
 
-        #endregion
+        #endregion Vlastnosti (veřejné)
 
         #region Factory metody (statické)
 
@@ -145,7 +147,7 @@ namespace GameEngineTools.World.Core.Time
         public static WorldClock AlignNow(WorldTimeSpec spec, long worldEpochTicks, double timeScale = 1.0)
             => new(spec, SystemUnixTicks(), worldEpochTicks, timeScale);
 
-        #endregion
+        #endregion Factory metody (statické)
 
         #region IWorldClock — aktuální čas
 
@@ -153,7 +155,7 @@ namespace GameEngineTools.World.Core.Time
         public long NowWorldTicks()
             => EarthToWorldTicks(SystemUnixTicks());
 
-        #endregion
+        #endregion IWorldClock — aktuální čas
 
         #region Konverze Earth ↔ World
 
@@ -183,7 +185,7 @@ namespace GameEngineTools.World.Core.Time
             return EarthEpochUnixTicks + deltaUnix;
         }
 
-        #endregion
+        #endregion Konverze Earth ↔ World
 
         #region Systémový čas (statický)
 
@@ -218,7 +220,7 @@ namespace GameEngineTools.World.Core.Time
             throw new PlatformNotSupportedException("Nepodařilo se získat systémový čas.");
         }
 
-        #endregion
+        #endregion Systémový čas (statický)
 
         #region Privátní pomocné metody
 
@@ -228,6 +230,6 @@ namespace GameEngineTools.World.Core.Time
         private static long FileTimeToUnixTicks(FILETIME ft)
             => (((long)ft.dwHighDateTime << 32) | ft.dwLowDateTime) - WindowsEpochFileTimeTicks;
 
-        #endregion
+        #endregion Privátní pomocné metody
     }
 }

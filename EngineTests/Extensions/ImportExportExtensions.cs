@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using GameEngineTools.Characters.GameObjects;
+﻿using GameEngineTools.Characters.GameObjects;
 
 namespace GameTester.Extensions
 {
@@ -29,6 +24,7 @@ namespace GameTester.Extensions
                 Assert.AreEqual(nppc, exnppc, $"Imported:{nppc.Person.ToString()}\nExported:{exnppc.Person.ToString()}");
             }
         }
+
         public static List<CharacterBase> DoImport(this TestBase abstractTest, bool useGameManagerInstance = true)
         {
             if (useGameManagerInstance)

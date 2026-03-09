@@ -16,7 +16,6 @@ using Microsoft.Extensions.Logging;
 
 namespace GameEngineTools.Characters.Hosting
 {
-
     /// <summary>
     /// Továrna vytváří OrchestratedHuman a per-postava instance služeb.
     /// Enginy jsou vytvářeny přes jejich vlastní factory — runtime parametry (rng, biology)

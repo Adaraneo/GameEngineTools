@@ -131,7 +131,7 @@ namespace GameEngineTools.Characters.Generation
         private readonly Name[] _maleNames;
         private readonly Surname[] _surnames;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -148,7 +148,7 @@ namespace GameEngineTools.Characters.Generation
             _surnames = surnames;
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region IIdentityGenerator
 
@@ -160,7 +160,7 @@ namespace GameEngineTools.Characters.Generation
             return new Identity(first, surname, birthDate);
         }
 
-        #endregion
+        #endregion IIdentityGenerator
 
         #region Privátní pomocné metody
 
@@ -174,7 +174,7 @@ namespace GameEngineTools.Characters.Generation
             return values[rng.Next(0, values.Length)];
         }
 
-        #endregion
+        #endregion Privátní pomocné metody
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ namespace GameEngineTools.Characters.Generation
         private readonly IAppearanceGenerator _appearanceGenerator;
         private readonly HumanBlueprintSpec _spec;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -216,7 +216,7 @@ namespace GameEngineTools.Characters.Generation
             _spec = spec;
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region IHumanBlueprintGenerator
 
@@ -247,7 +247,7 @@ namespace GameEngineTools.Characters.Generation
             return new HumanBlueprint(id, identity, sex, personality, appearance, runtimeSeed);
         }
 
-        #endregion
+        #endregion IHumanBlueprintGenerator
 
         #region Privátní pomocné metody
 
@@ -312,6 +312,6 @@ namespace GameEngineTools.Characters.Generation
             return hash;
         }
 
-        #endregion
+        #endregion Privátní pomocné metody
     }
 }

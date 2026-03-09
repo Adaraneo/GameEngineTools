@@ -7,7 +7,6 @@ namespace GameEngineTools.Characters.Engines.Memory
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;

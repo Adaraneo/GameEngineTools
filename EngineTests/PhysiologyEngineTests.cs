@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -16,9 +14,10 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using GameTester;
-    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Unit testy pro <see cref="DefaultPhysiologyEngine"/>.
@@ -34,19 +33,19 @@ namespace EngineTests
         private WDateTime _now;
         private IHumanContext _ctx = default!;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Setup
 
         [TestInitialize]
         public void Setup()
         {
-            _now    = new WDateTime(0);
+            _now = new WDateTime(0);
             _outbox = new EventCollector();
-            _ctx    = BuildContext();
+            _ctx = BuildContext();
         }
 
-        #endregion
+        #endregion Setup
 
         #region SleepEnded — spánkový dluh
 
@@ -58,7 +57,7 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine(sleepDebtHours: 8);
-            var ended  = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
+            var ended = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
             var debtBefore = engine.State.SleepDebtHours;
 
             // Act
@@ -76,16 +75,16 @@ namespace EngineTests
         public void Handle_SleepEnded_ZeroQuality_ReducesDebtMinimally()
         {
             // Arrange
-            var engine     = BuildEngine(sleepDebtHours: 8);
-            var fullEnded  = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
-            var badEnded   = MakeSleepEnded(quality: 0,   hoursSlept: 8, wasInterrupted: true);
+            var engine = BuildEngine(sleepDebtHours: 8);
+            var fullEnded = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
+            var badEnded = MakeSleepEnded(quality: 0, hoursSlept: 8, wasInterrupted: true);
 
             var fullEngine = BuildEngine(sleepDebtHours: 8);
-            var badEngine  = BuildEngine(sleepDebtHours: 8);
+            var badEngine = BuildEngine(sleepDebtHours: 8);
 
             // Act
             fullEngine.Handle(fullEnded, _ctx, new EventCollector());
-            badEngine.Handle(badEnded,   _ctx, new EventCollector());
+            badEngine.Handle(badEnded, _ctx, new EventCollector());
 
             // Assert — plný spánek splatí více dluhu než nulová kvalita
             Assert.IsTrue(
@@ -102,7 +101,7 @@ namespace EngineTests
         {
             // Arrange — malý dluh, velký spánek
             var engine = BuildEngine(sleepDebtHours: 1);
-            var ended  = MakeSleepEnded(quality: 100, hoursSlept: 12, wasInterrupted: false);
+            var ended = MakeSleepEnded(quality: 100, hoursSlept: 12, wasInterrupted: false);
 
             // Act
             engine.Handle(ended, _ctx, _outbox);
@@ -120,14 +119,14 @@ namespace EngineTests
         {
             // Arrange — stejná kvalita, různá délka
             var shortEngine = BuildEngine(sleepDebtHours: 10);
-            var longEngine  = BuildEngine(sleepDebtHours: 10);
+            var longEngine = BuildEngine(sleepDebtHours: 10);
 
             var shortSleep = MakeSleepEnded(quality: 80, hoursSlept: 4, wasInterrupted: false);
-            var longSleep  = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
+            var longSleep = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
 
             // Act
             shortEngine.Handle(shortSleep, _ctx, new EventCollector());
-            longEngine.Handle(longSleep,   _ctx, new EventCollector());
+            longEngine.Handle(longSleep, _ctx, new EventCollector());
 
             // Assert
             Assert.IsTrue(
@@ -136,7 +135,7 @@ namespace EngineTests
                 $"Krátký={shortEngine.State.SleepDebtHours:F2}, Dlouhý={longEngine.State.SleepDebtHours:F2}");
         }
 
-        #endregion
+        #endregion SleepEnded — spánkový dluh
 
         #region SleepEnded — imunita a bolest
 
@@ -147,8 +146,8 @@ namespace EngineTests
         public void Handle_SleepEnded_GoodQuality_ReducesImmuneLoad()
         {
             // Arrange
-            var engine    = BuildEngine(immuneLoad: 50);
-            var ended     = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
+            var engine = BuildEngine(immuneLoad: 50);
+            var ended = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
             var loadBefore = engine.State.ImmuneLoad;
 
             // Act
@@ -166,8 +165,8 @@ namespace EngineTests
         public void Handle_SleepEnded_QualityAbove60_ReducesPain()
         {
             // Arrange
-            var engine    = BuildEngine(pain: 30);
-            var ended     = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
+            var engine = BuildEngine(pain: 30);
+            var ended = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
             var painBefore = engine.State.Pain;
 
             // Act
@@ -185,8 +184,8 @@ namespace EngineTests
         public void Handle_SleepEnded_QualityBelow60_DoesNotReducePain()
         {
             // Arrange
-            var engine    = BuildEngine(pain: 30);
-            var ended     = MakeSleepEnded(quality: 30, hoursSlept: 2, wasInterrupted: true);
+            var engine = BuildEngine(pain: 30);
+            var ended = MakeSleepEnded(quality: 30, hoursSlept: 2, wasInterrupted: true);
             var painBefore = engine.State.Pain;
 
             // Act
@@ -197,7 +196,7 @@ namespace EngineTests
                 "Spánek kvality < 60 nesmí snižovat bolest.");
         }
 
-        #endregion
+        #endregion SleepEnded — imunita a bolest
 
         #region ActionCommitted — Eat / Drink / SelfCare
 
@@ -208,8 +207,8 @@ namespace EngineTests
         public void Handle_ActionCommitted_Eat_ReducesHungerAndIncreasesEnergy()
         {
             // Arrange
-            var engine  = BuildEngine(hunger: 80, energy: 30);
-            var eat     = new ActionCommitted(_now, _ctx.Id, ActionNames.Eat, WTimeSpan.FromHours(1));
+            var engine = BuildEngine(hunger: 80, energy: 30);
+            var eat = new ActionCommitted(_now, _ctx.Id, ActionNames.Eat, WTimeSpan.FromHours(1));
             var hungerBefore = engine.State.Hunger;
             var energyBefore = engine.State.Energy;
 
@@ -230,8 +229,8 @@ namespace EngineTests
         public void Handle_ActionCommitted_Drink_ReducesThirst()
         {
             // Arrange
-            var engine       = BuildEngine(thirst: 80);
-            var drink        = new ActionCommitted(_now, _ctx.Id, ActionNames.Drink, WTimeSpan.FromHours(0.5));
+            var engine = BuildEngine(thirst: 80);
+            var drink = new ActionCommitted(_now, _ctx.Id, ActionNames.Drink, WTimeSpan.FromHours(0.5));
             var thirstBefore = engine.State.Thirst;
 
             // Act
@@ -250,56 +249,56 @@ namespace EngineTests
         public void Handle_ActionCommitted_Sleep_HasNoEffect()
         {
             // Arrange — simulujeme případ, kdy by starý kód byl stále přítomen
-            var engine        = BuildEngine(sleepDebtHours: 8, energy: 40);
-            var sleepAction   = new ActionCommitted(_now, _ctx.Id, ActionNames.Sleep, WTimeSpan.FromHours(8));
-            var debtBefore    = engine.State.SleepDebtHours;
-            var energyBefore  = engine.State.Energy;
+            var engine = BuildEngine(sleepDebtHours: 8, energy: 40);
+            var sleepAction = new ActionCommitted(_now, _ctx.Id, ActionNames.Sleep, WTimeSpan.FromHours(8));
+            var debtBefore = engine.State.SleepDebtHours;
+            var energyBefore = engine.State.Energy;
 
             // Act
             engine.Handle(sleepAction, _ctx, _outbox);
 
             // Assert — state se nesmí změnit (ActionCommitted Sleep je ignorován)
-            Assert.AreEqual(debtBefore,   engine.State.SleepDebtHours, delta: 0.001,
+            Assert.AreEqual(debtBefore, engine.State.SleepDebtHours, delta: 0.001,
                 "ActionCommitted(Sleep) nesmí měnit SleepDebtHours — to řeší SleepEnded.");
             Assert.AreEqual(energyBefore, engine.State.Energy, delta: 0.001,
                 "ActionCommitted(Sleep) nesmí měnit Energy.");
         }
 
-        #endregion
+        #endregion ActionCommitted — Eat / Drink / SelfCare
 
         #region Pomocné metody
 
         /// <summary>Sestaví engine s nastavenými počátečními hodnotami.</summary>
         private static DefaultPhysiologyEngine BuildEngine(
             double sleepDebtHours = 2,
-            double energy         = 70,
-            double hunger         = 25,
-            double thirst         = 20,
-            double pain           = 5,
-            double immuneLoad     = 10)
+            double energy = 70,
+            double hunger = 25,
+            double thirst = 20,
+            double pain = 5,
+            double immuneLoad = 10)
         {
-            var cfg      = Options.Create(new PhysiologyConfig(
+            var cfg = Options.Create(new PhysiologyConfig(
                 RestingMetabolicRate: 1600,
-                MaxSleepDebtHours:  12,
+                MaxSleepDebtHours: 12,
                 EnableMenstrualCycle: false));
             var cycleCfg = Options.Create(new MenstrualCycleConfig());
-            var factory  = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
-            var rng      = new ZeroRandom();
+            var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
 
             var engine = new DefaultPhysiologyEngine(
                 cfg, cycleCfg, factory, rng,
                 biology: SexBiology.Female,
-                now:     WDateOnly.New(132, 1, 1));
+                now: WDateOnly.New(132, 1, 1));
 
             engine.RestoreState(new PhysiologyState(
-                Energy:         energy,
+                Energy: energy,
                 SleepDebtHours: sleepDebtHours,
-                Hunger:         hunger,
-                Thirst:         thirst,
-                Pain:           pain,
-                ImmuneLoad:     immuneLoad,
-                BodyTempDelta:  0,
-                Cycle:          null));
+                Hunger: hunger,
+                Thirst: thirst,
+                Pain: pain,
+                ImmuneLoad: immuneLoad,
+                BodyTempDelta: 0,
+                Cycle: null));
 
             return engine;
         }
@@ -308,7 +307,7 @@ namespace EngineTests
         private static IHumanContext BuildContext()
         {
             var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
-            var psych  = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
+            var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
 
             var snapshot = new EnginesSnapshot(
                 physio, psych,
@@ -321,8 +320,8 @@ namespace EngineTests
 
             return new HumanContext
             {
-                Id          = new HumanId(Guid.NewGuid()),
-                Biology     = SexBiology.Female,
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = new Personality(
                     new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
                     AttachmentStyle.Secure,
@@ -330,40 +329,45 @@ namespace EngineTests
                     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate,
                     Chronotype.Neutral),
-                Snapshot    = snapshot,
-                Random      = new ZeroRandom(),
-                Logger      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
                                            .CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
         /// <summary>Vytvoří <see cref="SleepEnded"/> s danými parametry.</summary>
         private SleepEnded MakeSleepEnded(double quality, double hoursSlept, bool wasInterrupted)
             => new SleepEnded(
-                OccurredAt:      _now,
-                Human:           new HumanId(Guid.NewGuid()),
+                OccurredAt: _now,
+                Human: new HumanId(Guid.NewGuid()),
                 TotalHoursSlept: hoursSlept,
-                Quality:         quality,
-                WasInterrupted:  wasInterrupted);
+                Quality: quality,
+                WasInterrupted: wasInterrupted);
 
-        #endregion
+        #endregion Pomocné metody
 
         #region Fake / Stub implementace
 
         private sealed class ZeroRandom : IRandomSource
         {
-            public int    Next(int min, int max) => min;
-            public double NextUnit()             => 0.0;
-            public bool   Chance(double p)       => false;
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => false;
         }
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
+
             public IDisposable SubscribeAll(Action<IDomainEvent> handler)
                 => new NullDisposable();
         }
@@ -372,15 +376,23 @@ namespace EngineTests
         {
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => true;
+
             public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime now)
                 => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
-        private sealed class NullDisposable : IDisposable { public void Dispose() { } }
+        private sealed class NullDisposable : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
 
-        #endregion
+        #endregion Fake / Stub implementace
     }
 }

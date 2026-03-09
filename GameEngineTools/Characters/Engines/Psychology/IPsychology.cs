@@ -3,7 +3,6 @@
 
 namespace GameEngineTools.Characters.Engines.Psychology
 {
-
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
@@ -23,9 +22,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double CognitiveLoad, // 0..100
         DiscreteEmotion DominantEmotion);
 
-    public enum DiscreteEmotion { Neutral, Joy, Sadness, Anger, Fear, Disgust, Surprise, Tenderness, Pride, Shame }
+    public enum DiscreteEmotion
+    { Neutral, Joy, Sadness, Anger, Fear, Disgust, Surprise, Tenderness, Pride, Shame }
 
-    public interface IPsychologyEngine : IEngine<PsychologyState, PsychologyConfig> { }
+    public interface IPsychologyEngine : IEngine<PsychologyState, PsychologyConfig>
+    { }
 
     // Události
     public sealed record EmotionShifted(WDateTime OccurredAt, HumanId Human, DiscreteEmotion To, double Valence, double Arousal, double Dominance) : IDomainEvent;

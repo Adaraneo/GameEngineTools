@@ -1,9 +1,9 @@
 // TestClock.cs
 // Copyright (c) 50PSoftware
 
-using System.Timers;
 using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
+using System.Timers;
 using Timer = System.Timers.Timer;
 
 namespace EngineTests.Utils
@@ -29,7 +29,7 @@ namespace EngineTests.Utils
     {
         #region Soukromá pole
 
-        private readonly Timer  _timer;
+        private readonly Timer _timer;
         private readonly double _timeScale;
 
         // Předpočítaný posun za jednu reálnou sekundu (= TimeScale × TicksPerSecond).
@@ -42,7 +42,7 @@ namespace EngineTests.Utils
 
         private bool _disposed;
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Konstrukce
 
@@ -58,18 +58,18 @@ namespace EngineTests.Utils
         /// </param>
         public TestClock(IWorldClock worldClock, WorldTimeSpec spec)
         {
-            _timeScale          = worldClock.TimeScale;
+            _timeScale = worldClock.TimeScale;
             _ticksPerRealSecond = spec.TicksPerSecond;
 
             // Počáteční čas bereme přímo z worldClock
             _nowTicks = worldClock.NowWorldTicks();
 
             // Interval 1000 ms — v testech timer nespouštíme, používáme Advance().
-            _timer          = new Timer { Interval = 1000 };
+            _timer = new Timer { Interval = 1000 };
             _timer.Elapsed += Timer_Elapsed;
         }
 
-        #endregion
+        #endregion Konstrukce
 
         #region IClock
 
@@ -90,7 +90,7 @@ namespace EngineTests.Utils
         /// <inheritdoc/>
         public void Stop() => _timer.Stop();
 
-        #endregion
+        #endregion IClock
 
         #region Testovací utility
 
@@ -116,7 +116,7 @@ namespace EngineTests.Utils
         public void SetNow(WDateTime now)
             => Interlocked.Exchange(ref _nowTicks, now.WorldTicks);
 
-        #endregion
+        #endregion Testovací utility
 
         #region IDisposable
 
@@ -129,13 +129,13 @@ namespace EngineTests.Utils
             _timer.Dispose();
         }
 
-        #endregion
+        #endregion IDisposable
 
         #region Privátní
 
         private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
             => Interlocked.Add(ref _nowTicks, (long)(_timeScale * _ticksPerRealSecond));
 
-        #endregion
+        #endregion Privátní
     }
 }

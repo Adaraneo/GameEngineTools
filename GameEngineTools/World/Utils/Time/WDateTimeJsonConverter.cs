@@ -33,9 +33,10 @@ namespace GameEngineTools.World.Utils.Time
         /// Inicializuje konverter — vyžaduje nakonfigurovaný <see cref="WWorld"/>.
         /// Použij jako atribut: <c>[JsonConverter(typeof(WDateTimeJsonConverter))]</c>.
         /// </summary>
-        public WDateTimeJsonConverter() { }
+        public WDateTimeJsonConverter()
+        { }
 
-        #endregion
+        #endregion Konstrukce
 
         #region JsonConverter<WDateTime>
 
@@ -57,6 +58,6 @@ namespace GameEngineTools.World.Utils.Time
         public override void Write(Utf8JsonWriter writer, WDateTime value, JsonSerializerOptions options)
             => writer.WriteStringValue(value.ToString());
 
-        #endregion
+        #endregion JsonConverter<WDateTime>
     }
 }

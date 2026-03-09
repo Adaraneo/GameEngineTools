@@ -21,16 +21,26 @@ namespace GameEngineTools.Characters.Traits
         double LipFullness,      // 0..1
         IReadOnlyList<string>? DistinctiveMarks = null);
 
-    public enum BodyFrame { Petite, Medium, Large, Strong }
+    public enum BodyFrame
+    { Petite, Medium, Large, Strong }
+
     public enum SkinTone
     {
         VeryFair, Fair, Light, LightMedium, Medium, Tan, Dark, VeryDark,
         Olive
     }
-    public enum EyeColor { Brown, Hazel, Green, Blue, Gray, Amber }
-    public enum HairColorNatural { Black, DarkBrown, Brown, Auburn, Red, Blond, DarkBlond }
-    public enum HairType { Straight, Wavy, Curly, Coily }
-    public enum FaceShape { Oval, Round, Square, Heart, Diamond, Oblong }
+
+    public enum EyeColor
+    { Brown, Hazel, Green, Blue, Gray, Amber }
+
+    public enum HairColorNatural
+    { Black, DarkBrown, Brown, Auburn, Red, Blond, DarkBlond }
+
+    public enum HairType
+    { Straight, Wavy, Curly, Coily }
+
+    public enum FaceShape
+    { Oval, Round, Square, Heart, Diamond, Oblong }
 
     // --- Projekce: stavový „aktuální vzhled“ (odvozený) ---
     public sealed record AppearanceView(
@@ -45,7 +55,8 @@ namespace GameEngineTools.Characters.Traits
         string? ClothingStyle = null,
         string? MakeupStyle = null);
 
-    public enum BloatingLevel { None, Light, Medium, High }
+    public enum BloatingLevel
+    { None, Light, Medium, High }
 
     // --- Projekce: čistá funkce z trait + fyzia ---
     public static class AppearanceProjector

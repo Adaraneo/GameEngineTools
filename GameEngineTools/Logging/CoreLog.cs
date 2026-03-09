@@ -9,13 +9,15 @@ namespace GameEngineTools.Logging
     public static partial class CoreLog
     {
         #region Physiology
+
         [LoggerMessage(EventId = 5000, Level = LogLevel.Information, Message = "[PHYSIO] {HumanId} Energy: {Energy:F1} Hunger: {Hunger:F2} Thirst: {Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1}")]
         public static partial void PhysiologySnapshot(this ILogger logger, string HumanId, double Energy, double Hunger, double Thirst, double Pain, double SleepDebt, double TempDelta, double Immune);
 
         [LoggerMessage(EventId = 5001, Level = LogLevel.Debug,
     Message = "[PHYSIO/CYCLE] {HumanId} Phase:{Phase} Day:{DayInCycle}")]
         public static partial void PhysiologyCycle(this ILogger logger, string HumanId, string Phase, int DayInCycle);
-        #endregion
+
+        #endregion Physiology
 
         #region Psychology
 
@@ -25,7 +27,7 @@ namespace GameEngineTools.Logging
             string HumanId, string Emotion, double Valence, double Arousal,
             double Dominance, double Stress, double CogLoad);
 
-        #endregion
+        #endregion Psychology
 
         #region Behavior
 
@@ -40,7 +42,7 @@ namespace GameEngineTools.Logging
         public static partial void BehaviorPlan(this ILogger logger,
             string HumanId, string Action, string Start, string Duration, double Utility);
 
-        #endregion
+        #endregion Behavior
 
         #region Relationships
 
@@ -66,7 +68,7 @@ namespace GameEngineTools.Logging
             string when, string from, string to, double DtSec,
             float L0, float L1, float T0, float T1, float A0, float A1, float C0, float C1, string S0, string S1);
 
-        #endregion
+        #endregion Relationships
 
         [LoggerMessage(EventId = 4100, Level = LogLevel.Information, Message = "Scheduler: started")]
         public static partial void SchedulerStarted(this ILogger logger);

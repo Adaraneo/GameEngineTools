@@ -1,20 +1,12 @@
-using GameEngineTools.Characters.GameObjects;
-
 namespace GameTester
 {
-    using System.Runtime.CompilerServices;
-    using GameTester.Extensions;
-    using Microsoft.Extensions.DependencyInjection;
-    using GameEngineTools;
+    using EngineTests.Utils;
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.GameObjects;
-    using GameEngineTools.Extensions;
-    using GameEngineTools.World.Utils.Time;
-    using EngineTests.Utils;
     using GameEngineTools.World.Core.Time;
-    using GameEngineTools.Characters.Hosting;
-    using GameEngineTools.Characters.Generation;
-    using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Utils.Time;
+    using GameTester.Extensions;
+    using Microsoft.Extensions.DependencyInjection;
 
     [TestClass]
     public class ExportsImports : TestBase
@@ -170,7 +162,6 @@ namespace GameTester
             GeneratedFile.Export(significantOther);
 
             clock.Advance(WTimeSpan.FromDays(235));
-
 
             GeneratedFile.Export(player);
             GeneratedFile.Export(significantOther);

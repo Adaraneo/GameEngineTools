@@ -36,7 +36,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </summary>
         private ISleepSession? _activeSession;
 
-        #endregion
+        #endregion Privátní pole
 
         #region Veřejné vlastnosti
 
@@ -46,7 +46,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// <inheritdoc/>
         public BehaviorConfig Config { get; }
 
-        #endregion
+        #endregion Veřejné vlastnosti
 
         #region Konstruktor
 
@@ -58,10 +58,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
             IOptions<SleepConfig> sleepCfg,
             ILoggerFactory loggerFactory)
         {
-            Config         = cfg.Value;
-            _sleepCfg      = sleepCfg.Value;
+            Config = cfg.Value;
+            _sleepCfg = sleepCfg.Value;
             _loggerFactory = loggerFactory;
-            _log           = loggerFactory.CreateLogger("Characters.Behavior");
+            _log = loggerFactory.CreateLogger("Characters.Behavior");
 
             State = new BehaviorState(
                 NeedRest: 40, NeedFood: 30, NeedWater: 25,
@@ -70,7 +70,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 Cooldowns: new Dictionary<string, double>());
         }
 
-        #endregion
+        #endregion Konstruktor
 
         #region IEngine — Tick
 
@@ -96,17 +96,17 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 .ToDictionary(kv => kv.Key, kv => Math.Max(0, kv.Value - h));
 
             // --- Snapshoty ---
-            var ph  = ctx.Snapshot.Physiology;
-            var ps  = ctx.Snapshot.Psychology;
+            var ph = ctx.Snapshot.Physiology;
+            var ps = ctx.Snapshot.Psychology;
             var rel = ctx.Snapshot.Relationships;
 
             // --- Potřeby ---
-            var needRest     = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2);
-            var needFood     = Clamp01p(ph.Hunger);
-            var needWater    = Clamp01p(ph.Thirst);
-            var needBel      = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15) - CooldownFor(updatedCooldowns, ReachOut) * 5);
-            var needComp     = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2);
-            var needInti     = ComputeIntimacyNeed(ctx, ph, rel, ps) - CooldownFor(updatedCooldowns, InviteIntimacy) * 8;
+            var needRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2);
+            var needFood = Clamp01p(ph.Hunger);
+            var needWater = Clamp01p(ph.Thirst);
+            var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15) - CooldownFor(updatedCooldowns, ReachOut) * 5);
+            var needComp = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2);
+            var needInti = ComputeIntimacyNeed(ctx, ph, rel, ps) - CooldownFor(updatedCooldowns, InviteIntimacy) * 8;
             var needSelfCare = Clamp01p(ph.Pain * 0.7 + ph.ImmuneLoad * 0.3);
 
             // --- Sleep prompt logika (mimo candidates) ---
@@ -115,8 +115,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 // Engine čeká na odpověď — žádný jiný výběr
                 State = State with
                 {
-                    NeedRest = needRest, NeedFood = needFood, NeedWater = needWater,
-                    NeedBelonging = needBel, NeedCompetence = needComp, NeedIntimacy = needInti,
+                    NeedRest = needRest,
+                    NeedFood = needFood,
+                    NeedWater = needWater,
+                    NeedBelonging = needBel,
+                    NeedCompetence = needComp,
+                    NeedIntimacy = needInti,
                     Cooldowns = updatedCooldowns
                 };
                 return;
@@ -128,7 +132,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 updatedCooldowns);
         }
 
-        #endregion
+        #endregion IEngine — Tick
 
         #region IEngine — Handle
 
@@ -163,7 +167,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             }
         }
 
-        #endregion
+        #endregion IEngine — Handle
 
         #region Sleep prompt — interní logika
 
@@ -249,14 +253,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private void OnSleepDeclined(SleepDeclined sd, IHumanContext ctx)
         {
             var newDeclineCount = State.SleepDeclineCount + 1;
-            var graceHours      = Math.Max(1.0, _sleepCfg.SleepGraceHours / newDeclineCount);
-            var graceExpiry     = sd.OccurredAt + WTimeSpan.FromHours(graceHours);
+            var graceHours = Math.Max(1.0, _sleepCfg.SleepGraceHours / newDeclineCount);
+            var graceExpiry = sd.OccurredAt + WTimeSpan.FromHours(graceHours);
 
             State = State with
             {
                 WaitingForSleepConfirmation = false,
-                SleepDeclineCount           = newDeclineCount,
-                SleepGraceExpiresAt         = graceExpiry
+                SleepDeclineCount = newDeclineCount,
+                SleepGraceExpiresAt = graceExpiry
             };
 
             _log.LogWarning("[Behavior] {Id} — spánek odmítnut (#{Count}), grace: {Grace:F1}h.",
@@ -270,14 +274,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private void OnSleepSessionEnded(WDateTime now, IHumanContext ctx)
         {
             SetCooldown(Sleep, Config.SleepCooldownHours);
-            State          = State with { CurrentPlan = null };
+            State = State with { CurrentPlan = null };
             _activeSession = null;
 
             _log.LogInformation("[Behavior] {Id} — sleep session ukončena, cooldown {Cooldown}h.",
                 ctx.Id, Config.SleepCooldownHours);
         }
 
-        #endregion
+        #endregion Sleep prompt — interní logika
 
         #region Výběr akce (utility)
 
@@ -333,7 +337,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
             candidates.Sort((a, b) => b.Utility.CompareTo(a.Utility));
             var chosen = candidates[0];
-            var plan   = new PlannedAction(chosen.Name, now, chosen.Dur, chosen.Utility);
+            var plan = new PlannedAction(chosen.Name, now, chosen.Dur, chosen.Utility);
 
             outbox.Add(new ActionProposed(now, ctx.Id, chosen.Name, chosen.Utility));
             outbox.Add(new ActionCommitted(now, ctx.Id, chosen.Name, chosen.Dur));
@@ -343,7 +347,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 chosen.Name, chosen.Utility, chosen.Dur);
         }
 
-        #endregion
+        #endregion Výběr akce (utility)
 
         #region Pomocné metody
 
@@ -388,10 +392,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
             Relationships.RelationshipState rel,
             Psychology.PsychologyState ps)
         {
-            var baseNeed      = 35.0;
-            var libido        = ph.Cycle?.LibidoMod ?? 1.0;
+            var baseNeed = 35.0;
+            var libido = ph.Cycle?.LibidoMod ?? 1.0;
             var topAttraction = TopAttraction(rel);
-            var trait         = 0.5 + ctx.Personality.Motivation.Sexuality;
+            var trait = 0.5 + ctx.Personality.Motivation.Sexuality;
             var stressPenalty = Math.Max(0, ps.Stress - 50) * 0.3;
 
             return Math.Clamp(
@@ -407,7 +411,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             }
         }
 
-        #endregion
+        #endregion Pomocné metody
 
         #region RestoreState
 
@@ -419,10 +423,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </remarks>
         public void RestoreState(BehaviorState state)
         {
-            State          = state;
+            State = state;
             _activeSession = null;
         }
 
-        #endregion
+        #endregion RestoreState
     }
 }

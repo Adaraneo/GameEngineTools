@@ -51,7 +51,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </param>
         public WTimeSpan(long ticks) => Ticks = ticks;
 
-        #endregion
+        #endregion Konstrukce
 
         #region Vlastnosti — raw data
 
@@ -62,16 +62,17 @@ namespace GameEngineTools.World.Utils.Time
         /// </summary>
         public long Ticks { get; }
 
-        #endregion
+        #endregion Vlastnosti — raw data
 
         #region Konstanty
 
         /// <summary>Interval nulové délky.</summary>
         public static WTimeSpan Zero => new(0);
 
-        #endregion
+        #endregion Konstanty
 
         #region Ambient vlastnosti — konverze na lidské jednotky
+
         // Tyto vlastnosti vyžadují WWorld.Configure. Výsledek může být desetinný i záporný.
 
         /// <summary>
@@ -102,7 +103,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
         public double TotalDays => (double)Ticks / GameEngineTools.World.Core.Time.WWorld.Spec.TicksPerDay;
 
-        #endregion
+        #endregion Ambient vlastnosti — konverze na lidské jednotky
 
         #region Static factory — z tiků
 
@@ -113,7 +114,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <param name="ticks">Počet worldTicks.</param>
         public static WTimeSpan FromTicks(long ticks) => new(ticks);
 
-        #endregion
+        #endregion Static factory — z tiků
 
         #region Static factory — z lidských jednotek (vyžadují WWorld.Configure)
 
@@ -149,7 +150,7 @@ namespace GameEngineTools.World.Utils.Time
         public static WTimeSpan FromDays(double days)
             => new((long)(days * GameEngineTools.World.Core.Time.WWorld.Spec.TicksPerDay));
 
-        #endregion
+        #endregion Static factory — z lidských jednotek (vyžadují WWorld.Configure)
 
         #region Utility (čistá matematika)
 
@@ -185,7 +186,7 @@ namespace GameEngineTools.World.Utils.Time
             return this;
         }
 
-        #endregion
+        #endregion Utility (čistá matematika)
 
         #region Aritmetické operátory
 
@@ -220,7 +221,7 @@ namespace GameEngineTools.World.Utils.Time
             return (double)a.Ticks / b.Ticks;
         }
 
-        #endregion
+        #endregion Aritmetické operátory
 
         #region Porovnávací operátory
 
@@ -242,7 +243,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> delší nebo stejně dlouhý jako <paramref name="b"/>.</summary>
         public static bool operator >=(WTimeSpan a, WTimeSpan b) => a.Ticks >= b.Ticks;
 
-        #endregion
+        #endregion Porovnávací operátory
 
         #region Rovnost a hashování
 
@@ -258,7 +259,7 @@ namespace GameEngineTools.World.Utils.Time
         /// <inheritdoc/>
         public override int GetHashCode() => Ticks.GetHashCode();
 
-        #endregion
+        #endregion Rovnost a hashování
 
         #region Formátování
 
@@ -275,16 +276,16 @@ namespace GameEngineTools.World.Utils.Time
             var spec = GameEngineTools.World.Core.Time.WWorld.Spec;
             var sign = Ticks < 0 ? "-" : "";
             long at = Math.Abs(Ticks);
-            long d  = at / spec.TicksPerDay;  at %= spec.TicksPerDay;
-            int  hh = (int)(at / spec.TicksPerHour);   at %= spec.TicksPerHour;
-            int  mm = (int)(at / spec.TicksPerMinute);  at %= spec.TicksPerMinute;
-            int  ss = (int)(at / spec.TicksPerSecond);  at %= spec.TicksPerSecond;
+            long d = at / spec.TicksPerDay; at %= spec.TicksPerDay;
+            int hh = (int)(at / spec.TicksPerHour); at %= spec.TicksPerHour;
+            int mm = (int)(at / spec.TicksPerMinute); at %= spec.TicksPerMinute;
+            int ss = (int)(at / spec.TicksPerSecond); at %= spec.TicksPerSecond;
 
             return d != 0
                 ? $"{sign}{d}.{hh:00}:{mm:00}:{ss:00}"
                 : $"{sign}{hh:00}:{mm:00}:{ss:00}";
         }
 
-        #endregion
+        #endregion Formátování
     }
 }

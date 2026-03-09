@@ -28,6 +28,7 @@ namespace GameEngineTools.Armory
 
         [JsonInclude]
         public string Name { get; internal set; }
+
         public WeaponType Type { get; set; }
 
         public void NameWeapon(string name)

@@ -13,7 +13,8 @@ namespace GameEngineTools.Characters.Engines.Sleep
     /// Základní délka spánku (<see cref="BaseSleepHours"/>) odpovídá cca 30 % herního dne.
     /// </remarks>
     public sealed record SleepConfig(
-        #region Prompt a odmítnutí
+
+    #region Prompt a odmítnutí
 
         /// <summary>
         /// Minimální hodnota <c>NeedRest</c> (0–100), při které BehaviorEngine
@@ -39,9 +40,9 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// </summary>
         double DeclinePenaltyStressPerHour,
 
-        #endregion
+    #endregion Prompt a odmítnutí
 
-        #region Délky fází (v herních hodinách)
+    #region Délky fází (v herních hodinách)
 
         /// <summary>
         /// Délka fáze <see cref="SleepPhase.Falling"/> v hodinách.
@@ -64,9 +65,9 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// </summary>
         double RemDurationHours,
 
-        #endregion
+    #endregion Délky fází (v herních hodinách)
 
-        #region Rizika
+    #region Rizika
 
         /// <summary>
         /// Základní pravděpodobnost přepadení za každou hodinu spánku (0–1).
@@ -90,25 +91,26 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// </summary>
         double NightmareChanceNormal
 
-        #endregion
+    #endregion Rizika
+
     )
     {
         /// <summary>
         /// Výchozí konfigurace kalibrovaná pro 26hodinový herní den.
         /// </summary>
         public SleepConfig() : this(
-            SleepPromptThreshold:         70.0,
-            SleepGraceHours:              4.0,
-            MaxDeclineCount:              3,
-            DeclinePenaltyStressPerHour:  2.0,
-            FallingDurationHours:         0.25,   // 15 min
-            LightDurationHours:           0.75,   // 45 min
-            DeepDurationHours:            2.5,    // 2.5 hod
-            RemDurationHours:             1.5,    // 1.5 hod
-            AmbushBaseChancePerHour:      0.03,
-            CompanionGuardModifier:       0.4,
-            NightmareChanceHighStress:    0.25,
-            NightmareChanceNormal:        0.05
+            SleepPromptThreshold: 70.0,
+            SleepGraceHours: 4.0,
+            MaxDeclineCount: 3,
+            DeclinePenaltyStressPerHour: 2.0,
+            FallingDurationHours: 0.25,   // 15 min
+            LightDurationHours: 0.75,   // 45 min
+            DeepDurationHours: 2.5,    // 2.5 hod
+            RemDurationHours: 1.5,    // 1.5 hod
+            AmbushBaseChancePerHour: 0.03,
+            CompanionGuardModifier: 0.4,
+            NightmareChanceHighStress: 0.25,
+            NightmareChanceNormal: 0.05
         )
         { }
     }

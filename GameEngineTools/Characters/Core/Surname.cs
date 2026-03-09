@@ -5,7 +5,7 @@ namespace GameEngineTools.Characters.Core
 {
     public class Surname
     {
-        public required string Male { get; set; }
-        public required string Female { get; set; }
+        public string Male { get; set; }
+        public string Female { get; set; }
     }
 }

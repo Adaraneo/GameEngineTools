@@ -15,7 +15,6 @@ using Microsoft.Extensions.Logging;
 
 namespace GameEngineTools.Characters.Core
 {
-
     /// <summary>
     /// Orchestrátor jedné postavy. Dodržuje pevné pořadí enginů:
     /// Physiology → Psychology → Behavior → Interactions → Relationships → Memory.
@@ -37,12 +36,14 @@ namespace GameEngineTools.Characters.Core
 
         // Služby
         private readonly IEventBus _bus;
+
         private readonly IScheduler _scheduler;
         private readonly IRandomSource _random;
         private readonly ILogger _log;
 
         // Enginy
         private readonly IPhysiologyEngine _physio;
+
         private readonly IPsychologyEngine _psych;
         private readonly IBehaviorEngine _behavior;
         private readonly IInteractionEngine _interact;
