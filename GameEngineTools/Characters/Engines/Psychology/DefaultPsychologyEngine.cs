@@ -159,6 +159,63 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         s = s with { Valence = Math.Clamp(s.Valence + (ep.Emotion == Characters.Engines.Memory.EmotionalTag.Positive ? +0.05 : -0.04), -1, 1) };
                     }
                     break;
+
+                // --- Konec spánkové session ---
+                // Kvalita spánku ovlivňuje valenci a stres — závisí na Config.SleepQualityAffectWeight
+                // a na osobnostním rysu Neuroticism (citlivější osobnosti reagují silněji).
+                case Sleep.SleepEnded se:
+                {
+                    var weight      = Config.SleepQualityAffectWeight;          // 0–1, z appsettings
+                    var neuroticism = ctx.Personality.BigFive.Neuroticism;       // 0–1
+                    var sensitivityMod = 1.0 + neuroticism * 0.5;                // neurotici reagují až 1.5×
+
+                    // Kvalita 0–100 → normalizujeme na -1..+1 (50 = neutrální bod)
+                    var qualityNorm = (se.Quality - 50.0) / 50.0;               // -1 = hrozný, +1 = perfektní
+
+                    // Valence: dobrý spánek zlepší náladu, špatný zhorší
+                    var valenceDelta = qualityNorm * weight * 0.15 * sensitivityMod;
+                    s = s with { Valence = Math.Clamp(s.Valence + valenceDelta, -1, 1) };
+
+                    // Stres: přerušený nebo nekvalitní spánek přidá stres
+                    if (se.WasInterrupted || se.Quality < 40)
+                    {
+                        var stressDelta = (1.0 - se.Quality / 100.0) * 10.0 * sensitivityMod;
+                        s = s with { Stress = Math.Clamp(s.Stress + stressDelta, 0, 100) };
+                        _log.LogDebug("[Psychology] Nekvalitní spánek (kvalita={Q:F0}) → stres +{D:F1}.", se.Quality, stressDelta);
+                    }
+                    else
+                    {
+                        // Dobrý spánek snižuje stres navíc k průběžnému driftu v Tick()
+                        var stressRelief = (se.Quality / 100.0) * 5.0;
+                        s = s with { Stress = Math.Clamp(s.Stress - stressRelief, 0, 100) };
+                    }
+
+                    // Publikuj StressSpiked pokud stres přesáhl threshold (ostatní enginy mohou reagovat)
+                    if (s.Stress > 70 && State.Stress <= 70)
+                        outbox.Add(new StressSpiked(se.OccurredAt, ctx.Id, s.Stress));
+
+                    break;
+                }
+
+                // --- Noční můra ---
+                // Přímý stresový spike + negativní valence; intenzita závisí na Neuroticism.
+                case Sleep.NightmareTriggered nm:
+                {
+                    var neuroticism   = ctx.Personality.BigFive.Neuroticism;
+                    var stressSpike   = 8.0 + neuroticism * 12.0;               // 8–20 bodů stresu
+                    var valencePenalty = 0.08 + neuroticism * 0.10;             // 0.08–0.18
+
+                    s = s with
+                    {
+                        Stress  = Math.Clamp(s.Stress + stressSpike, 0, 100),
+                        Valence = Math.Clamp(s.Valence - valencePenalty, -1, 1),
+                        Arousal = Math.Clamp(s.Arousal + 0.2, 0, 1)             // probuzení = vysoký arousal
+                    };
+
+                    outbox.Add(new StressSpiked(nm.OccurredAt, ctx.Id, s.Stress));
+                    _log.LogDebug("[Psychology] Noční můra → stres +{Spike:F1}, valence -{Penalty:F2}.", stressSpike, valencePenalty);
+                    break;
+                }
             }
 
             State = s;

@@ -137,7 +137,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 // --- Konec spánkové session ---
                 // Průběžný drift (energie, hlad, žízeň) probíhá v Tick() přes CurrentPlan.Name == "Sleep".
                 // Zde aplikujeme jednorázový souhrnný efekt na základě kvality a délky spánku.
-                case Sleep.SleepEvents.SleepEnded se:
+                case Sleep.SleepEnded se:
                 {
                     var h = Math.Max(0, se.TotalHoursSlept);
 
