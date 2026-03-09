@@ -43,8 +43,9 @@ namespace GameTester
     /// InitWorldClockConfig (appsettings)
     ///   → WorldTimeSpec      (singleton)
     ///   → IWorldClock        (singleton)
-    ///   → WorldTimeContext   (singleton)
-    ///   → IClock / TestClock (singleton)
+    ///   → IClock / TestClock (singleton — bere WorldTimeSpec přímo)
+    ///   → WorldTimeContext   (singleton — legacy wrapper)
+    ///   → WWorld.Configure   (ambient konfigurace pro W-typy)
     ///   → HumanBlueprintSpec (lazy factory)
     /// </code>
     /// </para>
@@ -71,21 +72,6 @@ namespace GameTester
         /// <summary>Export/import postav do/ze souborů.</summary>
         protected GeneratedFile GeneratedFile { get; set; }
 
-        /// <summary>Kontext světového času pro výpočty přímo v testech.</summary>
-        protected WorldTimeContext WorldTimeContext { get; set; }
-
-        /// <summary>
-        /// Herní hodiny — zachováno pro zpětnou kompatibilitu s existujícími testy.
-        /// Stejná instance jako <c>ServiceProvider.GetRequiredService&lt;IWorldClock&gt;()</c>.
-        /// </summary>
-        protected IWorldClock worldClock;
-
-        /// <summary>
-        /// Specifikace světového času — zachováno pro zpětnou kompatibilitu.
-        /// Preferuj přístup přes <see cref="WorldTimeContext"/><c>.Spec</c>.
-        /// </summary>
-        protected WorldTimeSpec spec;
-
         /// <summary>Zdroj náhodných čísel pro pomocné výpočty v testech.</summary>
         protected Random Random { get; private set; }
 
@@ -110,18 +96,19 @@ namespace GameTester
         /// Spouštěno po každém testu — uklízí sdílený stav pro izolaci testů.
         /// </summary>
         /// <remarks>
-        /// Záměrně neobsahuje <c>WDateTime.UseClock(null)</c> ani <c>WDateTime.Use(null)</c>
-        /// — globální stav byl odstraněn. Všechny závislosti na Spec jdou přes DI.
+        /// <see cref="WWorld.Reset"/> zajistí, že ambient konfigurace nepřeteče
+        /// mezi testy — každý test musí začínat čistým slate.
         /// </remarks>
         [TestCleanup]
         public void Cleanup()
         {
+            // Resetujeme WWorld aby ambient konfigurace nepřetékala mezi testy
+            WWorld.Reset();
+
             CharacterManager?.NPPCs.Clear();
             CharacterManager?.Items.Clear();
             Filenames.Clear();
             Random     = null;
-            worldClock = null;
-            spec       = null;
         }
 
         /// <summary>
@@ -180,7 +167,6 @@ namespace GameTester
         /// <summary>
         /// Importuje všechny postavy a vrátí je jako seznam.
         /// </summary>
-        /// <param name="nppcs">Výstupní seznam importovaných postav.</param>
         public virtual void Import(out List<CharacterBase> nppcs)
         {
             CharacterManager.Initialize();
@@ -202,18 +188,15 @@ namespace GameTester
         #region DI inicializace
 
         /// <summary>
-        /// Sestaví DI kontejner pro testy a naplní chráněné vlastnosti.
+        /// Sestaví DI kontejner pro testy, nakonfiguruje <see cref="WWorld"/>
+        /// a naplní chráněné vlastnosti.
         /// </summary>
         /// <remarks>
-        /// <para>
         /// <b>Proč jen jedno <c>BuildServiceProvider()</c>?</b><br/>
-        /// Původní kód volal <c>BuildServiceProvider()</c> dvakrát — jednou pro
-        /// získání <c>IClock.Now</c> (kvůli <c>HumanBlueprintSpec.Default</c>)
-        /// a podruhé pro finální provider. Každé volání vytvořilo <i>nový kontejner</i>
-        /// s vlastními singletony — výsledkem byly dvě různé instance <c>IWorldClock</c>.<br/>
-        /// Nyní je <c>HumanBlueprintSpec</c> lazy factory: vyhodnotí se až při prvním
-        /// resolve, kdy DI kontejner existuje a <c>WorldTimeContext</c> je k dispozici.
-        /// </para>
+        /// Původní kód volal <c>BuildServiceProvider()</c> dvakrát —
+        /// každé volání vytvořilo nový kontejner s vlastními singletony.
+        /// Nyní je <c>HumanBlueprintSpec</c> lazy factory — vyhodnotí se až
+        /// při prvním resolve, kdy DI kontejner existuje a <c>IClock</c> je k dispozici.
         /// </remarks>
         protected virtual void InitializeServicesAndGetProvider()
         {
@@ -244,10 +227,7 @@ namespace GameTester
                         cfg.GetSection($"InitWorldClock:{useWorldType}").Bind(opt);
                     });
 
-            // ── WorldTimeSpec — singleton, sdílený WorldClock i WorldTimeContext ──
-            //    Dřív: spec se vytvořil v InitializeTestWorldClock() a uložil
-            //          do WDateTime.Use(spec) — globální mutovatelný stav
-            //    Teď:  spec žije v DI, izolovaný per-test-provider
+            // ── WorldTimeSpec — singleton ──────────────────────────────────────
             services.AddSingleton<WorldTimeSpec>(sp =>
             {
                 var opts     = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
@@ -263,9 +243,6 @@ namespace GameTester
             });
 
             // ── IWorldClock — kotva na rok 132, 1. den 1. měsíce ─────────────
-            //    WDateTime.FromParts(132, 1, 1) bylo odstraněno (statická API pryč)
-            //    Tiky počítáme přímo ze spec.Calendar — žádná cirkulární závislost
-            //    (WorldTimeContext závisí na IWorldClock, nemůžeme ho zde použít)
             services.AddSingleton<IWorldClock>(sp =>
             {
                 var wSpec          = sp.GetRequiredService<WorldTimeSpec>();
@@ -273,10 +250,8 @@ namespace GameTester
                 return WorldClock.AlignNow(wSpec, beginningTicks);
             });
 
-            // ── WorldTimeContext — dostane WorldTimeSpec + IWorldClock ze DI ──
-            services.AddSingleton<WorldTimeContext>();
-
-            // ── TestClock — dostane IWorldClock + WorldTimeContext ze DI ──────
+            // ── IClock / TestClock — bere WorldTimeSpec přímo (ne WorldTimeContext)
+            //    Důvod: TestClock → WorldTimeContext → IClock by byl kruh.
             services.AddSingleton<IClock, TestClock>();
 
             // ── Soubory ───────────────────────────────────────────────────────
@@ -299,15 +274,12 @@ namespace GameTester
             services.AddOptions<MenstrualCycleConfig>()
                     .BindConfiguration("Characters:MenstrualCycle");
 
-            // ── HumanBlueprintSpec — lazy factory ─────────────────────────────
-            //    Dřív: HumanBlueprintSpec.Default(now) volal WDateTime.Spec (global)
-            //          + dvojité BuildServiceProvider() pro IClock.Now
-            //    Teď:  factory čeká na první resolve, kdy má ctx i clock k dispozici
+            // ── HumanBlueprintSpec — lazy factory ──────────────────────────────
+            //    WWorld musí být nakonfigurován před prvním resolve (níže).
             services.AddCharacterGeneration(sp =>
             {
-                var ctx   = sp.GetRequiredService<WorldTimeContext>();
                 var clock = sp.GetRequiredService<IClock>();
-                return HumanBlueprintSpec.Default(ctx.GetDate(clock.Now), ctx);
+                return HumanBlueprintSpec.Default(clock.Now.Date);
             });
 
             // ── Manager ───────────────────────────────────────────────────────
@@ -321,10 +293,12 @@ namespace GameTester
             var provider = services.BuildServiceProvider(
                 new ServiceProviderOptions { ValidateOnBuild = true });
 
-            // Naplnění chráněných polí pro zpětnou kompatibilitu testů
-            WorldTimeContext = provider.GetRequiredService<WorldTimeContext>();
-            worldClock       = provider.GetRequiredService<IWorldClock>();
-            spec             = provider.GetRequiredService<WorldTimeSpec>();
+            // ── WWorld.Configure — ambient konfigurace pro W-typy ──────────────
+            // Musí proběhnout před jakýmkoli voláním WDateTime.Now, dt.Year atd.
+            var resolvedSpec  = provider.GetRequiredService<WorldTimeSpec>();
+            var resolvedClock = provider.GetRequiredService<IClock>();
+            WWorld.Configure(resolvedSpec, resolvedClock);
+
             CharacterManager = (GameEngineToolsManager)provider.GetRequiredService<IGameEngineToolsManager>();
             GeneratedFile    = (GeneratedFile)provider.GetRequiredService<IGeneratedFile>();
             ServiceProvider  = provider;

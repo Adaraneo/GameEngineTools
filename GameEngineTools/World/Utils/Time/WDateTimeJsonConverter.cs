@@ -11,53 +11,43 @@ namespace GameEngineTools.World.Utils.Time
     /// <summary>
     /// JSON konverter pro <see cref="WDateTime"/>.
     /// Serializuje jako string ve formátu <c>YYYY-MM-DDTHH:MM:SS[.subW]</c>,
-    /// deserializuje zpět přes <see cref="WorldTimeContext.TryParse(string?, out WDateTime)"/>.
+    /// deserializuje zpět přes <see cref="WDateTime.TryParse(string?, out WDateTime)"/>.
     /// </summary>
     /// <remarks>
-    /// Vyžaduje <see cref="WorldTimeContext"/> — nelze použít jako atribut na <c>WDateTime</c>.
-    /// Zaregistruj přes <see cref="JsonSerializerOptions.Converters"/> v DI:
-    /// <code>
-    /// services.AddSingleton&lt;JsonSerializerOptions&gt;(sp =>
-    /// {
-    ///     var ctx = sp.GetRequiredService&lt;WorldTimeContext&gt;();
-    ///     return new JsonSerializerOptions
-    ///     {
-    ///         Converters = { new WDateTimeJsonConverter(ctx) }
-    ///     };
-    /// });
-    /// </code>
+    /// <para>
+    /// <b>Ambient design.</b> Konverter nyní vyžaduje nakonfigurovaný <see cref="WWorld"/>
+    /// místo explicitně předaného <see cref="WorldTimeContext"/>. Díky tomu ho lze
+    /// použít přímo jako atribut <c>[JsonConverter(typeof(WDateTimeJsonConverter))]</c>
+    /// na <see cref="WDateTime"/> bez DI.
+    /// </para>
+    /// <para>
+    /// Zpětná kompatibilita: konstruktor přijímající <see cref="WorldTimeContext"/>
+    /// je zachován, ale ignoruje se — interně se vždy použije <see cref="WWorld.Spec"/>.
+    /// </para>
     /// </remarks>
     public sealed class WDateTimeJsonConverter : JsonConverter<WDateTime>
     {
-        #region Soukromá pole
-
-        private readonly WorldTimeContext _ctx;
-
-        #endregion
-
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje konverter s kontextem světového času.
+        /// Inicializuje konverter — vyžaduje nakonfigurovaný <see cref="WWorld"/>.
+        /// Použij jako atribut: <c>[JsonConverter(typeof(WDateTimeJsonConverter))]</c>.
         /// </summary>
-        /// <param name="ctx">Kontext potřebný pro parsování a formátování.</param>
-        public WDateTimeJsonConverter(WorldTimeContext ctx) => _ctx = ctx;
+        public WDateTimeJsonConverter() { }
 
         #endregion
 
         #region JsonConverter<WDateTime>
 
         /// <inheritdoc/>
-        /// <exception cref="JsonException">
-        /// Pokud token není string nebo hodnota nelze naparsovat jako <see cref="WDateTime"/>.
-        /// </exception>
+        /// <exception cref="JsonException">Pokud token není string nebo hodnota nelze naparsovat.</exception>
         public override WDateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.String)
                 throw new JsonException("WDateTime očekává JSON string.");
 
             var s = reader.GetString();
-            if (s is null || !_ctx.TryParse(s, out var v))
+            if (s is null || !WDateTime.TryParse(s, out var v))
                 throw new JsonException($"Neplatný WDateTime: '{s}'.");
 
             return v;
@@ -65,7 +55,7 @@ namespace GameEngineTools.World.Utils.Time
 
         /// <inheritdoc/>
         public override void Write(Utf8JsonWriter writer, WDateTime value, JsonSerializerOptions options)
-            => writer.WriteStringValue(_ctx.Format(value));
+            => writer.WriteStringValue(value.ToString());
 
         #endregion
     }

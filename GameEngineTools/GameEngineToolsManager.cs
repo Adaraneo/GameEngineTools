@@ -29,7 +29,6 @@ namespace GameEngineTools
         private readonly ILogger<GameEngineToolsManager> _log;
         private readonly GameEngineToolsManagerOptions _opt;
         private readonly IClock _clock;
-        private readonly WorldTimeContext _wtctx;
         private readonly IRandomSourceFactory _rngFactory;
         private readonly IServiceProvider _serviceProvider;
 
@@ -55,14 +54,12 @@ namespace GameEngineTools
         /// <param name="serviceProvider">DI provider pro lazy-resolve factories.</param>
         public GameEngineToolsManager(
             IClock clock,
-            WorldTimeContext wtctx,
             IRandomSourceFactory rngFactory,
             IOptions<GameEngineToolsManagerOptions> opt,
             ILogger<GameEngineToolsManager> log,
             IServiceProvider serviceProvider)
         {
             _clock = clock;
-            _wtctx = wtctx;
             _rngFactory = rngFactory;
             _opt = opt.Value;
             _log = log;
@@ -136,25 +133,23 @@ namespace GameEngineTools
         /// </remarks>
         public IHuman RandomizePerson(int minAge = 0, int maxAge = 100)
         {
-            // Rozkládáme "teď" jednou — GetParts volá kalendář, nechceme to opakovat
-            var now = _clock.Now.Bind(_wtctx);
-            var (year, _, day, hour, minute, second, _) = _wtctx.GetParts(now);
-            var monthsInYear = _wtctx.Spec.Calendar.MonthsInYear(year);
+            var now = _clock.Now;
+            var year = now.Year;
+            var day = now.Day;
+            var monthsInYear = WWorld.Spec.Calendar.MonthsInYear(year);
 
             var rng = _rngFactory.Create(Environment.TickCount);
 
             // Datum = rok ± věk, náhodný měsíc a den v rozsahu aktuálního dne
-            var minBirth = _wtctx.GetDate(_wtctx.Create(
+            var minBirth = WDateOnly.New(
                 year - maxAge,
                 rng.Next(1, monthsInYear),
-                rng.Next(1, day),
-                hour, minute, second));
+                rng.Next(1, day));
 
-            var maxBirth = _wtctx.GetDate(_wtctx.Create(
+            var maxBirth = WDateOnly.New(
                 year - minAge,
                 rng.Next(1, monthsInYear),
-                rng.Next(1, day),
-                hour, minute, second));
+                rng.Next(1, day));
 
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
@@ -173,14 +168,11 @@ namespace GameEngineTools
         /// <returns>Nová náhodně vygenerovaná postava.</returns>
         public IHuman RandomizePerson(PC player)
         {
-            // BirthDate je WDateOnly → přivážeme na wtctx a voláme AddYears přímo
-            var birth = player.Person.Identity.BirthDate.Bind(_wtctx);
-
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
                 new HumanBlueprintRequest(
-                    MinBirthDate: birth.AddYears(-5),
-                    MaxBirthDate: birth.AddYears(5),
+                    MinBirthDate: player.Person.Identity.BirthDate.AddYears(-5),
+                    MaxBirthDate: player.Person.Identity.BirthDate.AddYears(5),
                     Sex: player.Person.Biology == SexBiology.Male
                         ? SexBiology.Female
                         : SexBiology.Male));

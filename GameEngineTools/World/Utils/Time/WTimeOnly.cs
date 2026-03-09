@@ -1,36 +1,36 @@
 // WTimeOnly.cs
 // Copyright (c) 50PSoftware
 
+using GameEngineTools.World.Core.Time;
+
 namespace GameEngineTools.World.Utils.Time
 {
     /// <summary>
-    /// Reprezentuje čas dne bez datové složky, uložený jako počet worldTicks
-    /// od začátku dne (půlnoci).
+    /// Reprezentuje čas dne bez datové složky, uložený jako počet worldTicks od půlnoci.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Čistý datový typ.</b> Struct neobsahuje žádnou závislost na <c>WorldTimeSpec</c>
-    /// ani jiném externím stavu. Jediným zdrojem pravdy je <see cref="TicksOfDay"/>.
-    /// </para>
-    /// <para>
-    /// Operace vyžadující znalost časové soustavy (rozklad na hodiny/minuty/sekundy,
-    /// přičítání hodin, parsování, formátování, wrap přes půlnoc) patří do
-    /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext"/>.
+    /// <b>Čistý datový typ + ambient properties.</b>
+    /// Jediným zdrojem pravdy je <see cref="TicksOfDay"/>.
+    /// Properties jako <see cref="Hour"/>, <see cref="Minute"/>, <see cref="Second"/>
+    /// a metody jako <see cref="AddHours"/> vyžadují nakonfigurovaný <see cref="WWorld"/>.
     /// </para>
     /// <para>
     /// Příklady:
     /// <code>
-    /// // Vytvoření
-    /// var time = _wtctx.CreateTime(hour: 6, minute: 30, second: 0);
+    /// // Factory (vyžaduje WWorld.Configure)
+    /// var time = WTimeOnly.New(6, 30, 0);
     ///
-    /// // Čistá matematika přímo na strukturách
-    /// var diff     = timeA.Diff(timeB);   // WTimeSpan (bez wrapu)
-    /// bool isEarly = time &lt; _wtctx.CreateTime(8, 0, 0);
+    /// // Ambient properties (vyžadují WWorld.Configure)
+    /// int hour = time.Hour;     // 6
+    /// int min  = time.Minute;   // 30
     ///
-    /// // Operace závislé na spec přes context
-    /// var later        = _wtctx.AddTime(time, _wtctx.Hours(2));
-    /// var (h, m, s, _) = _wtctx.GetTimeParts(time);
-    /// string label     = _wtctx.Format(time);
+    /// // Čistá matematika — nevyžaduje WWorld
+    /// var diff  = timeA.Diff(timeB);   // WTimeSpan (bez wrapu)
+    /// bool late = time > WTimeOnly.New(22, 0, 0);
+    ///
+    /// // Aritmetika s wraparoundem (vyžaduje WWorld.Configure)
+    /// var later = time.AddHours(3);    // wrap přes půlnoc automaticky
     /// </code>
     /// </para>
     /// </remarks>
@@ -43,48 +43,132 @@ namespace GameEngineTools.World.Utils.Time
         /// Inicializuje nový čas dne z počtu worldTicks od půlnoci.
         /// </summary>
         /// <param name="ticksOfDay">
-        /// Počet worldTicks od začátku dne (0 = půlnoc).
-        /// Musí být v rozsahu [0, TicksPerDay).
-        /// Rozsah je validován v <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.CreateTime"/>.
+        /// Počet worldTicks od začátku dne (0 = půlnoc). Musí být v rozsahu [0, TicksPerDay).
+        /// Rozsah je validován v <see cref="New"/> a <see cref="WWorld"/>-závislých metodách.
         /// </param>
-        /// <remarks>
-        /// Konstruktor sám o sobě nevaliduje rozsah vůči <c>TicksPerDay</c>,
-        /// protože by potřeboval <c>WorldTimeSpec</c>. Validaci zajišťuje
-        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.CreateTime"/>.
-        /// </remarks>
         public WTimeOnly(long ticksOfDay) => TicksOfDay = ticksOfDay;
 
         #endregion
 
-        #region Vlastnosti
+        #region Vlastnosti — raw data
 
         /// <summary>
-        /// Počet worldTicks od začátku dne (půlnoci).
-        /// Platný rozsah je [0, TicksPerDay) kde TicksPerDay závisí na <c>WorldTimeSpec</c>.
-        /// Jediný zdroj pravdy — veškeré ostatní hodnoty se dopočítávají přes
-        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext"/>.
+        /// Počet worldTicks od začátku dne (půlnoci). Jediný zdroj pravdy.
+        /// Platný rozsah je [0, TicksPerDay) kde TicksPerDay závisí na <see cref="WWorld.Spec"/>.
         /// </summary>
         public long TicksOfDay { get; }
 
         #endregion
 
-        #region Aritmetika (čistá matematika)
+        #region Ambient vlastnosti — složky času (vyžadují WWorld.Configure)
+
+        /// <summary>Hodina tohoto času dne (0-based).</summary>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        public int Hour
+        {
+            get
+            {
+                var spec = WWorld.Spec;
+                return (int)(TicksOfDay / spec.TicksPerHour);
+            }
+        }
+
+        /// <summary>Minuta tohoto času dne (0-based).</summary>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        public int Minute
+        {
+            get
+            {
+                var spec = WWorld.Spec;
+                long rem = TicksOfDay % spec.TicksPerHour;
+                return (int)(rem / spec.TicksPerMinute);
+            }
+        }
+
+        /// <summary>Sekunda tohoto času dne (0-based).</summary>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        public int Second
+        {
+            get
+            {
+                var spec = WWorld.Spec;
+                long rem = TicksOfDay % spec.TicksPerMinute;
+                return (int)(rem / spec.TicksPerSecond);
+            }
+        }
+
+        #endregion
+
+        #region Static factory
 
         /// <summary>
-        /// Vrátí hrubý rozdíl dvou časů dne jako <see cref="WTimeSpan"/>.
+        /// Vytvoří čas dne ze složek (hodina, minuta, sekunda).
+        /// Validuje rozsah vůči <see cref="WWorld.Spec"/>.
         /// </summary>
-        /// <param name="other">Čas dne, od kterého se odečítá.</param>
-        /// <returns>
-        /// <c>this.TicksOfDay - other.TicksOfDay</c> jako interval.
-        /// Výsledek může být záporný pokud je <paramref name="other"/> později.
-        /// </returns>
+        /// <param name="hour">Hodina (0..HoursPerDay-1).</param>
+        /// <param name="minute">Minuta (0..MinutesPerHour-1).</param>
+        /// <param name="second">Sekunda (0..SecondsPerMinute-1).</param>
+        /// <param name="subTick">Subtiky pod sekundou (0..TicksPerSecond-1). Výchozí 0.</param>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Pokud je složka mimo platný rozsah.</exception>
+        public static WTimeOnly New(int hour, int minute, int second, long subTick = 0)
+        {
+            var spec = WWorld.Spec;
+
+            if (hour    < 0 || hour    >= spec.HoursPerDay)     throw new ArgumentOutOfRangeException(nameof(hour));
+            if (minute  < 0 || minute  >= spec.MinutesPerHour)  throw new ArgumentOutOfRangeException(nameof(minute));
+            if (second  < 0 || second  >= spec.SecondsPerMinute) throw new ArgumentOutOfRangeException(nameof(second));
+            if (subTick < 0 || subTick >= spec.TicksPerSecond)  throw new ArgumentOutOfRangeException(nameof(subTick));
+
+            return new WTimeOnly(
+                hour   * spec.TicksPerHour
+              + minute * spec.TicksPerMinute
+              + second * spec.TicksPerSecond
+              + subTick);
+        }
+
+        #endregion
+
+        #region Aritmetika — čistá matematika (nevyžaduje WWorld)
+
+        /// <summary>
+        /// Vrátí hrubý rozdíl dvou časů dne jako <see cref="WTimeSpan"/> (bez wrapu přes půlnoc).
+        /// </summary>
         /// <remarks>
-        /// <b>Pozor:</b> tato metoda neprovádí wrap přes půlnoc.
-        /// Pokud potřebuješ nejkratší vzdálenost mezi dvěma časy v rámci dne
-        /// (s wraparoundem), použij
+        /// Pro nejkratší vzdálenost s wraparoundem přes půlnoc použij
         /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.TimeDiff"/>.
         /// </remarks>
         public WTimeSpan Diff(WTimeOnly other) => new(TicksOfDay - other.TicksOfDay);
+
+        #endregion
+
+        #region Aritmetika s wraparoundem (vyžadují WWorld.Configure)
+
+        /// <summary>
+        /// Přičte interval k času dne s automatickým wraparoundem přes půlnoc.
+        /// </summary>
+        /// <param name="span">Interval (může být záporný).</param>
+        /// <returns>Nový čas dne v rozsahu [0, TicksPerDay).</returns>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        public WTimeOnly Add(WTimeSpan span)
+        {
+            long tpd = WWorld.Spec.TicksPerDay;
+            long t = (TicksOfDay + span.Ticks) % tpd;
+            if (t < 0) t += tpd;
+            return new WTimeOnly(t);
+        }
+
+        /// <summary>Přičte hodiny k času dne s wraparoundem přes půlnoc.</summary>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        public WTimeOnly AddHours(double hours) => Add(WTimeSpan.FromHours(hours));
+
+        /// <summary>Přičte minuty k času dne s wraparoundem přes půlnoc.</summary>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        public WTimeOnly AddMinutes(double minutes) => Add(WTimeSpan.FromMinutes(minutes));
+
+        /// <summary>Přičte sekundy k času dne s wraparoundem přes půlnoc.</summary>
+        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        public WTimeOnly AddSeconds(double seconds) => Add(WTimeSpan.FromSeconds(seconds));
 
         #endregion
 
@@ -102,10 +186,10 @@ namespace GameEngineTools.World.Utils.Time
         /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
         public static bool operator <=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay <= b.TicksOfDay;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později než <paramref name="b"/>.</summary>
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po <paramref name="b"/>.</summary>
         public static bool operator >(WTimeOnly a, WTimeOnly b) => a.TicksOfDay > b.TicksOfDay;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> později nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
+        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po nebo ve stejnou chvíli jako <paramref name="b"/>.</summary>
         public static bool operator >=(WTimeOnly a, WTimeOnly b) => a.TicksOfDay >= b.TicksOfDay;
 
         #endregion
@@ -129,13 +213,21 @@ namespace GameEngineTools.World.Utils.Time
         #region Formátování
 
         /// <summary>
-        /// Vrátí raw <see cref="TicksOfDay"/> jako řetězec.
-        /// <para>
-        /// Pro čitelný formát (např. <c>06:30:00</c>) použij
-        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.Format(WTimeOnly)"/>.
-        /// </para>
+        /// Vrátí čas dne jako čitelný řetězec ve formátu <c>HH:MM:SS</c>.
+        /// Vyžaduje nakonfigurovaný <see cref="WWorld"/>. Fallback na TicksOfDay pokud není.
         /// </summary>
-        public override string ToString() => TicksOfDay.ToString();
+        public override string ToString()
+        {
+            if (!WWorld.IsConfigured) return TicksOfDay.ToString();
+
+            var spec = WWorld.Spec;
+            long rem = TicksOfDay;
+            int  hh  = (int)(rem / spec.TicksPerHour);  rem %= spec.TicksPerHour;
+            int  mm  = (int)(rem / spec.TicksPerMinute); rem %= spec.TicksPerMinute;
+            int  ss  = (int)(rem / spec.TicksPerSecond);
+
+            return $"{hh:00}:{mm:00}:{ss:00}";
+        }
 
         #endregion
     }

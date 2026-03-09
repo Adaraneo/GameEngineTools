@@ -17,13 +17,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
         public BehaviorConfig Config { get; }
 
         private readonly ILogger _log;
-        private readonly WorldTimeContext _wtctx;
 
-        public DefaultBehaviorEngine(IOptions<BehaviorConfig> cfg, ILoggerFactory loggerFactory, WorldTimeContext wtctx)
+        public DefaultBehaviorEngine(IOptions<BehaviorConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger("Characters.Behavior");
-            _wtctx = wtctx;
             State = new BehaviorState(
                 NeedRest: 40, NeedFood: 30, NeedWater: 25, NeedBelonging: 50, NeedCompetence: 50, NeedIntimacy: 35,
                 CurrentPlan: null,
@@ -43,7 +41,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
-            var h = Math.Max(0, _wtctx.TotalHours(dt));
+            var h = Math.Max(0, dt.TotalHours);
 
             var updatedCooldowns = (State.Cooldowns ?? new Dictionary<string, double>()).ToDictionary(kv => kv.Key, kv => Math.Max(0, kv.Value - h));
 
@@ -65,14 +63,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
             // Volba akce (utility = potřeba * váha motivace; setrvačnost + penalizace monotónnosti)
             var candidates = new List<(string Name, double Utility, WTimeSpan Dur)>
             {
-                ("Sleep",     Util(needRest,     ctx.Personality.Motivation.Rest * 1.3),        _wtctx.Hours(Math.Max(1.0, ph.SleepDebtHours * 0.6))),
-                ("Eat",       Util(needFood,     1.2),                                   _wtctx.Minutes(30)),
-                ("Drink",     Util(needWater,    1.1),                                   _wtctx.Minutes(10)),
-                ("ReachOut",  Util(needBel,      ctx.Personality.Motivation.Affiliation),_wtctx.Hours(1.0)),
-                ("Work",      Util(needComp,     ctx.Personality.Motivation.Competence), _wtctx.Hours(2.0)),
-                ("Create",    Util(needComp,     ctx.Personality.Motivation.Curiosity),  _wtctx.Hours(1.5)),
-                ("SelfCare",  Util(50,           0.5),                                   _wtctx.Hours(0.5)),
-                ("InviteIntimacy", Util(needInti, ctx.Personality.Motivation.Sexuality), _wtctx.Hours(1.0))
+                ("Sleep",     Util(needRest,     ctx.Personality.Motivation.Rest * 1.3), Hours(Math.Max(1.0, ph.SleepDebtHours * 0.6))),
+                ("Eat",       Util(needFood,     1.2),                                   Minutes(30)),
+                ("Drink",     Util(needWater,    1.1),                                   Minutes(10)),
+                ("ReachOut",  Util(needBel,      ctx.Personality.Motivation.Affiliation),Hours(1.0)),
+                ("Work",      Util(needComp,     ctx.Personality.Motivation.Competence), Hours(2.0)),
+                ("Create",    Util(needComp,     ctx.Personality.Motivation.Curiosity),  Hours(1.5)),
+                ("SelfCare",  Util(50,           0.5),                                   Hours(0.5)),
+                ("InviteIntimacy", Util(needInti, ctx.Personality.Motivation.Sexuality), Hours(1.0))
             };
 
             // Je aktuální akce stále rozdělaná? Pokud ano, nerozhodujeme se.
@@ -111,6 +109,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _log.LogInformation("[Behavior] Nová akce: '{Action}' (utility={Utility:F2}, trvání={Duration}).", chosen.Name, chosen.Utility, chosen.Dur);
 
             // ---- locals ----
+            static WTimeSpan Hours(double h) => WTimeSpan.FromHours(h);
+            static WTimeSpan Minutes(int m) => WTimeSpan.FromMinutes(m);
             static double Util(double need, double weight) => (need * (0.5 + weight));
             static double MeanCloseness(Relationships.RelationshipState rs)
             {

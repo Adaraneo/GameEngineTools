@@ -18,12 +18,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
         public RelationshipsConfig Config { get; }
 
         private readonly ILogger _log;
-        private readonly WorldTimeContext _wtctx;
-        public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory, WorldTimeContext wtctx)
+        public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger("Characters.Relationships");
-            _wtctx = wtctx;
             State = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>());
         }
 
@@ -97,7 +95,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
-            var days = Math.Max(0, _wtctx.TotalDays(dt));
+            var days = Math.Max(0, dt.TotalDays);
             if (days == 0)
             {
                 return;

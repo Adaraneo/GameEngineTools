@@ -21,7 +21,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
         private readonly MenstrualCycleConfig _cycleCfg;
-        private readonly WorldTimeContext _wtctx;
 
         private double _accHours;
         private bool _mensesOn;
@@ -32,15 +31,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
             ILoggerFactory loggerFactory,
             IRandomSource rng,
             SexBiology biology,
-            WDateOnly now,
-            WorldTimeContext wtctx)
+            WDateOnly now)
         {
             Config = cfg.Value;
             _cycleCfg = cycleCfg.Value;
 
             _log = loggerFactory.CreateLogger("Characters.Physiology");
             _rng = rng;
-            _wtctx = wtctx;
 
             var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female)
                 ? SeedCycle(_cycleCfg, rng, now)
@@ -138,7 +135,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 return;
             }
 
-            var h = Math.Max(0, _wtctx.TotalHours(ac.Duration));
+            var h = Math.Max(0, ac.Duration.TotalHours);
             var s = State;
 
             s = ac.ActionName switch
@@ -268,7 +265,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 LastMensesStart: lastMensesStart);
         }
 
-        private double SafeHours(WTimeSpan dt) => Math.Max(0, _wtctx.TotalHours(dt));
+        private double SafeHours(WTimeSpan dt) => Math.Max(0, dt.TotalHours);
         private static double Normal(IRandomSource r, double mean, double std)
         {
             // Box-Muller

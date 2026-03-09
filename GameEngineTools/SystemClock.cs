@@ -10,20 +10,31 @@ namespace GameEngineTools
 
     /// <summary>
     /// Produkční implementace <see cref="IClock"/> — automaticky postupuje v čase
-    /// na základě <see cref="IWorldClock.TimeScale"/> a <see cref="WorldTimeContext.Spec"/>.
+    /// na základě <see cref="IWorldClock.TimeScale"/> a <see cref="WorldTimeSpec.TicksPerSecond"/>.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Timer tiká každou reálnou sekundu a posune <see cref="Now"/> o
     /// <c>TimeScale × TicksPerSecond</c> worldTicků. Při <c>TimeScale = 1.0</c>
     /// tedy 1 reálná sekunda = 1 světová sekunda.
+    /// </para>
+    /// <para>
+    /// <b>Proč <see cref="WorldTimeSpec"/> místo <see cref="WorldTimeContext"/>?</b><br/>
+    /// <c>WorldTimeContext</c> závisí na <c>IClock</c>, <c>IClock</c> by zpětně závisel
+    /// na <c>WorldTimeContext</c> — kruhová závislost. <c>WorldTimeSpec</c> je čistý
+    /// datový objekt bez závislostí, takže kruh nevzniká.
+    /// </para>
     /// </remarks>
     public sealed class SystemClock : IClock, IDisposable
     {
         #region Soukromá pole
 
-        private readonly Timer _timer;
+        private readonly Timer  _timer;
         private readonly double _timeScale;
-        private readonly WorldTimeContext _ctx;
+
+        // Počet ticků za reálnou sekundu přepočítaný na rychlost světa.
+        // Předpočítáme jednou v konstruktoru — nemusíme sahat na spec v každém tiknutí.
+        private readonly long _ticksPerRealSecond;
 
         #endregion
 
@@ -34,21 +45,20 @@ namespace GameEngineTools
         /// světový čas z <paramref name="worldClock"/>.
         /// </summary>
         /// <param name="worldClock">
-        /// Zdroj aktuálního worldTick času a TimeScale.
-        /// Používá se pro počáteční hodnotu <see cref="Now"/> a rychlost posunu.
+        /// Zdroj počátečního worldTick času a <see cref="IWorldClock.TimeScale"/>.
         /// </param>
-        /// <param name="ctx">
-        /// Kontext světového času — potřebný pro výpočet posunu v Timer_Elapsed.
-        /// Nahrazuje odstraněný přístup přes <c>WDateTime.AddSeconds</c>.
+        /// <param name="spec">
+        /// Specifikace světového času — potřebná pro výpočet posunu v <c>Timer_Elapsed</c>.
+        /// Nepoužíváme <see cref="WorldTimeContext"/> kvůli předejití kruhové závislosti.
         /// </param>
-        public SystemClock(IWorldClock worldClock, WorldTimeContext ctx)
+        public SystemClock(IWorldClock worldClock, WorldTimeSpec spec)
         {
-            _timeScale = worldClock.TimeScale;
-            _ctx = ctx;
+            _timeScale          = worldClock.TimeScale;
+            _ticksPerRealSecond = spec.TicksPerSecond;
 
             Now = new WDateTime(worldClock.NowWorldTicks());
 
-            _timer = new Timer { Interval = 1000 };
+            _timer          = new Timer { Interval = 1000 };
             _timer.Elapsed += Timer_Elapsed;
         }
 
@@ -98,10 +108,9 @@ namespace GameEngineTools
 
         private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
         {
-            // Výpočet přes ticky přímo — WTimeSpan.FromSeconds (statika) bylo odstraněno.
-            // TimeScale je double, takže násobení je přesné i pro zlomkové rychlosti.
-            var ticksPerSecond = _ctx.Spec.TicksPerSecond;
-            Now = new WDateTime(Now.WorldTicks + (long)(_timeScale * ticksPerSecond));
+            // Posun o TimeScale světových sekund za každou reálnou sekundu.
+            // Předpočítané _ticksPerRealSecond zabraňuje přístupu na spec v hot-path.
+            Now = new WDateTime(Now.WorldTicks + (long)(_timeScale * _ticksPerRealSecond));
         }
 
         #endregion

@@ -169,7 +169,7 @@ namespace GameTester
             GeneratedFile.Export(player);
             GeneratedFile.Export(significantOther);
 
-            clock.Advance(WorldTimeContext.Days(352));
+            clock.Advance(WTimeSpan.FromDays(235));
 
 
             GeneratedFile.Export(player);

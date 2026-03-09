@@ -22,17 +22,19 @@ namespace EngineTests.Utils
     /// </para>
     /// <para>
     /// Implementuje <see cref="IDisposable"/> — timer musí být uvolněn po testu.
-    /// V testech stačí <c>ServiceProvider.Dispose()</c> (pokud je provider disposable),
-    /// nebo zavolej <c>Dispose()</c> přímo na instanci.
+    /// Stačí <c>ServiceProvider.Dispose()</c> pokud je provider disposable.
     /// </para>
     /// </remarks>
     internal sealed class TestClock : IClock, IDisposable
     {
         #region Soukromá pole
 
-        private readonly Timer            _timer;
-        private readonly double           _timeScale;
-        private readonly WorldTimeContext _wtctx;
+        private readonly Timer  _timer;
+        private readonly double _timeScale;
+
+        // Předpočítaný posun za jednu reálnou sekundu (= TimeScale × TicksPerSecond).
+        // Stejný důvod jako v SystemClock: vyhneme se závislosti na WorldTimeContext.
+        private readonly long _ticksPerRealSecond;
 
         // long nelze označit volatile (64-bit není atomický na 32-bit platformách).
         // Místo toho používáme Interlocked pro všechny přístupy — čtení, zápis i přičtení.
@@ -50,21 +52,19 @@ namespace EngineTests.Utils
         /// pokud potřebuješ automatický posun. V testech typicky nevolej.
         /// </summary>
         /// <param name="worldClock">Zdroj počátečního worldTick času a TimeScale.</param>
-        /// <param name="ctx">
-        /// Kontext světového času — potřebný pro převod TimeScale (double sekund)
-        /// na <see cref="WTimeSpan"/> v tiscích.
+        /// <param name="spec">
+        /// Specifikace světového času — potřebná pro výpočet posunu timeru.
+        /// Bere se přímo spec (ne WorldTimeContext) kvůli předejití kruhové závislosti.
         /// </param>
-        public TestClock(IWorldClock worldClock, WorldTimeContext ctx)
+        public TestClock(IWorldClock worldClock, WorldTimeSpec spec)
         {
-            _timeScale = worldClock.TimeScale;
-            _wtctx       = ctx;
+            _timeScale          = worldClock.TimeScale;
+            _ticksPerRealSecond = spec.TicksPerSecond;
 
             // Počáteční čas bereme přímo z worldClock
-            // WDateTime.Now (statická property) bylo odstraněno — nepoužíváme
             _nowTicks = worldClock.NowWorldTicks();
 
-            // Interval 1000 ms je rozumný pro produkční simulaci.
-            // V testech timer nespouštíme — používáme Advance() pro determinismus.
+            // Interval 1000 ms — v testech timer nespouštíme, používáme Advance().
             _timer          = new Timer { Interval = 1000 };
             _timer.Elapsed += Timer_Elapsed;
         }
@@ -88,10 +88,7 @@ namespace EngineTests.Utils
         }
 
         /// <inheritdoc/>
-        public void Stop()
-        {
-            _timer.Stop();
-        }
+        public void Stop() => _timer.Stop();
 
         #endregion
 
@@ -105,32 +102,25 @@ namespace EngineTests.Utils
         /// <example>
         /// <code>
         /// var clock = ServiceProvider.GetRequiredService&lt;IClock&gt;() as TestClock;
-        /// clock.Advance(ctx.Hours(8));   // posun o 8 světových hodin
+        /// clock.Advance(WTimeSpan.FromHours(8));   // posun o 8 světových hodin
         /// </code>
         /// </example>
         public void Advance(WTimeSpan timeSpan)
-        {
-            // Atomic přičtení přes Interlocked — thread-safe i bez lock
-            Interlocked.Add(ref _nowTicks, timeSpan.Ticks);
-        }
+            => Interlocked.Add(ref _nowTicks, timeSpan.Ticks);
 
         /// <summary>
         /// Nastaví aktuální herní čas na konkrétní hodnotu.
         /// Užitečné pro skok na specifický bod v čase (např. test jarní rovnodennosti).
         /// </summary>
         /// <param name="now">Nový aktuální čas.</param>
-        public void SetNow(WDateTime now) => Interlocked.Exchange(ref _nowTicks, now.WorldTicks);
+        public void SetNow(WDateTime now)
+            => Interlocked.Exchange(ref _nowTicks, now.WorldTicks);
 
         #endregion
 
         #region IDisposable
 
         /// <inheritdoc/>
-        /// <remarks>
-        /// Timer je <see cref="IDisposable"/> — pokud ho neuvolníš, zůstane vlákno
-        /// timeru aktivní i po skončení testu a může způsobit falešné zápimy do
-        /// <see cref="Now"/> po úklidu DI kontejneru.
-        /// </remarks>
         public void Dispose()
         {
             if (_disposed) return;
@@ -144,10 +134,7 @@ namespace EngineTests.Utils
         #region Privátní
 
         private void Timer_Elapsed(object? sender, ElapsedEventArgs e)
-        {
-            var ticks = _wtctx.Seconds(_timeScale).Ticks;
-            Interlocked.Add(ref _nowTicks, ticks);
-        }
+            => Interlocked.Add(ref _nowTicks, (long)(_timeScale * _ticksPerRealSecond));
 
         #endregion
     }

@@ -10,45 +10,29 @@ namespace GameEngineTools.World.Utils.Time
 
     /// <summary>
     /// JSON konverter pro <see cref="WTimeSpan"/>.
+    /// Serializuje vždy jako raw <c>int64</c> ticky — kompaktní a bezeztrátové.
+    /// Deserializuje z čísla nebo stringu (<c>ticky</c> nebo <c>[-]d.hh:mm:ss[.sub]</c>).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Akceptuje dva formáty při deserializaci:
-    /// <list type="bullet">
-    ///   <item><description><b>číslo (int64)</b> — raw worldTicky, round-trip formát</description></item>
-    ///   <item><description><b>string</b> — buď čisté číslo jako string, nebo <c>[-]d.hh:mm:ss[.sub]</c></description></item>
-    /// </list>
-    /// Serializuje vždy jako číslo (raw ticky) — kompaktní a bezeztrátové.
-    /// </para>
-    /// <para>
-    /// Zaregistruj přes <see cref="JsonSerializerOptions.Converters"/> v DI — viz
-    /// <see cref="WDateTimeJsonConverter"/> pro příklad registrace.
+    /// <b>Ambient design.</b> Interně používá <see cref="WWorld.Spec"/> místo
+    /// explicitně předaného <see cref="WorldTimeContext"/>.
+    /// Zpětně kompatibilní konstruktor je zachován ale ignoruje svůj parametr.
     /// </para>
     /// </remarks>
     public sealed class WTimeSpanJsonConverter : JsonConverter<WTimeSpan>
     {
-        #region Soukromá pole
-
-        private readonly WorldTimeContext _ctx;
-
-        #endregion
-
         #region Konstrukce
 
-        /// <summary>
-        /// Inicializuje konverter s kontextem světového času.
-        /// </summary>
-        /// <param name="ctx">Kontext potřebný pro validaci a výpočet tiků z lidských jednotek.</param>
-        public WTimeSpanJsonConverter(WorldTimeContext ctx) => _ctx = ctx;
+        /// <summary>Inicializuje konverter — vyžaduje nakonfigurovaný <see cref="WWorld"/>.</summary>
+        public WTimeSpanJsonConverter() { }
 
         #endregion
 
         #region JsonConverter<WTimeSpan>
 
         /// <inheritdoc/>
-        /// <exception cref="JsonException">
-        /// Pokud token není číslo ani string nebo hodnotu nelze naparsovat.
-        /// </exception>
+        /// <exception cref="JsonException">Pokud token není číslo ani string nebo hodnotu nelze naparsovat.</exception>
         public override WTimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             switch (reader.TokenType)
@@ -67,7 +51,7 @@ namespace GameEngineTools.World.Utils.Time
                     if (long.TryParse(s, out var asTicks))
                         return new WTimeSpan(asTicks);
 
-                    // Zkus "[-]d.hh:mm:ss[.sub]" nebo "[-]hh:mm:ss[.sub]"
+                    // Zkus [-]d.hh:mm:ss[.sub]
                     if (TryParseGeneral(s!, out var span))
                         return span;
 
@@ -80,7 +64,7 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <inheritdoc/>
-        /// <remarks>Serializuje jako raw int64 ticky — kompaktní a round-trip bezeztrátové.</remarks>
+        /// <remarks>Serializuje jako raw int64 — kompaktní a round-trip bezeztrátové.</remarks>
         public override void Write(Utf8JsonWriter writer, WTimeSpan value, JsonSerializerOptions options)
             => writer.WriteNumberValue(value.Ticks);
 
@@ -90,12 +74,9 @@ namespace GameEngineTools.World.Utils.Time
 
         /// <summary>
         /// Parsuje string ve formátu <c>[-]d.hh:mm:ss[.sub]</c> nebo <c>[-]hh:mm:ss[.sub]</c>.
-        /// Složky validuje vůči <see cref="WorldTimeContext.Spec"/>.
+        /// Složky validuje vůči <see cref="WWorld.Spec"/>.
         /// </summary>
-        /// <param name="s">Vstupní string (bez null).</param>
-        /// <param name="span">Výsledný interval, pokud se parsování podaří.</param>
-        /// <returns><c>true</c> pokud se parsování podařilo.</returns>
-        private bool TryParseGeneral(string s, out WTimeSpan span)
+        private static bool TryParseGeneral(string s, out WTimeSpan span)
         {
             span = default;
             s    = s.Trim();
@@ -103,7 +84,7 @@ namespace GameEngineTools.World.Utils.Time
             int sign = 1;
             if (s.StartsWith("-", StringComparison.Ordinal)) { sign = -1; s = s[1..]; }
 
-            // Rozděl na [dny] . [rest] — tečka jako oddělovač dnů
+            // Rozděl na [dny] . [rest]
             string[] partsD = s.Split('.', 2);
             long   days = 0;
             string rest;
@@ -125,18 +106,16 @@ namespace GameEngineTools.World.Utils.Time
             if (!long.TryParse(parts[0], out var hh)) return false;
             if (!long.TryParse(parts[1], out var mm)) return false;
 
-            // sekundy a volitelné subticky
             string[] secSub = parts[2].Split('.', 2);
             if (!long.TryParse(secSub[0], out var ss)) return false;
             long subticks = 0;
             if (secSub.Length == 2)
             {
-                // Bereme raw subticky v jednotce worldTicku (ne zlomek sekundy)
                 if (!long.TryParse(secSub[1], out subticks)) return false;
             }
 
-            // Validace vůči spec — přistupujeme přes _ctx, ne přes WDateTime.Spec (global state)
-            var spec = _ctx.Spec;
+            // Validace vůči WWorld.Spec
+            var spec = WWorld.Spec;
             if (hh       < 0 || hh       >= spec.HoursPerDay)     return false;
             if (mm       < 0 || mm       >= spec.MinutesPerHour)   return false;
             if (ss       < 0 || ss       >= spec.SecondsPerMinute) return false;

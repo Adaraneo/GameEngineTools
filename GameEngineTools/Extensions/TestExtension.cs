@@ -30,7 +30,7 @@ namespace GameEngineTools.Extensions
 
         #region ByClaude
 
-        public static string PrintInfo(this CharacterBase nppc, WorldTimeContext wtctx, bool basicInfo = true, bool withDNA = false)
+        public static string PrintInfo(this CharacterBase nppc, bool basicInfo = true, bool withDNA = false)
         {
             var person = nppc.Person;
             var identity = person.Identity;
@@ -46,8 +46,7 @@ namespace GameEngineTools.Extensions
                 ?? firstName.Original;
 
             sb.AppendLine($"Name: {displayName} {surname}");
-            var (year, _, _) = wtctx.GetDateParts(identity.BirthDate);
-            sb.AppendLine($"Born in year: {year}");
+            sb.AppendLine($"Born in year: {identity.BirthDate.Year}");
 
             if (basicInfo)
             {

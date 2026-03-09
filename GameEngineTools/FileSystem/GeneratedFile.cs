@@ -45,7 +45,6 @@ namespace GameEngineTools.FileSystem
         /// <param name="options">Volitelná konfigurace adresářů pro export souborů.</param>
         public GeneratedFile(
             IClock                              clock,
-            WorldTimeContext                    ctx,
             IGameEngineToolsManager             characterManager,
             IHumanFactory                       humanFactory,
             IOptions<GeneratedFileOptions>?     options = null)
@@ -69,8 +68,8 @@ namespace GameEngineTools.FileSystem
                 Converters =
                 {
                     new HumanIdJsonConverter(),
-                    new WDateTimeJsonConverter(ctx),
-                    new WTimeSpanJsonConverter(ctx),
+                    new WDateTimeJsonConverter(),
+                    new WTimeSpanJsonConverter(),
                 }
             };
         }

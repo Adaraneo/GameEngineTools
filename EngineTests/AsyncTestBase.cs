@@ -123,9 +123,6 @@ namespace GameTester
                 return WorldClock.AlignNow(wSpec, beginningTicks);
             });
 
-            // ── WorldTimeContext ───────────────────────────────────────────────
-            s.AddSingleton<WorldTimeContext>();
-
             // ── TestClock ─────────────────────────────────────────────────────
             s.AddSingleton<IClock, TestClock>();
 
@@ -152,9 +149,8 @@ namespace GameTester
             // ── HumanBlueprintSpec — lazy factory ─────────────────────────────
             s.AddCharacterGeneration(sp =>
             {
-                var ctx   = sp.GetRequiredService<WorldTimeContext>();
                 var clock = sp.GetRequiredService<IClock>();
-                return HumanBlueprintSpec.Default(ctx.GetDate(clock.Now), ctx);
+                return HumanBlueprintSpec.Default(clock.Now.Date);
             });
 
             // ── Manager + hosted services ─────────────────────────────────────
@@ -171,9 +167,10 @@ namespace GameTester
             // ── Sestavení ─────────────────────────────────────────────────────
             var provider = s.BuildServiceProvider();
 
-            WorldTimeContext = provider.GetRequiredService<WorldTimeContext>();
-            worldClock       = provider.GetRequiredService<IWorldClock>();
-            spec             = provider.GetRequiredService<WorldTimeSpec>();
+            var resolvedSpec = provider.GetRequiredService<WorldTimeSpec>();
+            var resolvedClock = provider.GetRequiredService<IClock>();
+            WWorld.Configure(resolvedSpec, resolvedClock);
+
             CharacterManager = (GameEngineToolsManager)provider.GetRequiredService<IGameEngineToolsManager>();
             GeneratedFile    = (GeneratedFile)provider.GetRequiredService<IGeneratedFile>();
             ServiceProvider  = provider;

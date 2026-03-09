@@ -61,13 +61,10 @@ namespace GameEngineTools.Characters.Generation
         /// </remarks>
         public static HumanBlueprintSpec Default(
             WDateOnly now,
-            WorldTimeContext ctx,
             int minAgeYears = 0,
             int maxAgeYears = 100)
         {
-            // Délka roku závisí na kalendáři — přistupujeme přes ctx, ne přes WDateTime.Spec
-            var (year, _, _) = ctx.GetDateParts(now);
-            var daysInYear = ctx.Spec.Calendar.DaysInYear(year);
+            var daysInYear = WWorld.Spec.Calendar.DaysInYear(now.Year);
             var minAgeDays = minAgeYears * daysInYear;
             var maxAgeDays = maxAgeYears * daysInYear;
 

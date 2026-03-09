@@ -38,44 +38,38 @@ namespace GameEngineTools
     ///       ↓
     /// IWorldClock     (singleton — mapování Earth ↔ World)
     ///       ↓
-    /// WorldTimeContext (singleton — factory, aritmetika, formátování)
+    /// IClock / SystemClock (singleton — herní smyčka, bere WorldTimeSpec přímo)
     ///       ↓
-    /// IClock / SystemClock (singleton — herní smyčka)
+    /// WorldTimeContext (singleton — legacy wrapper, bere IClock.Now přes WWorld)
+    ///       ↓
+    /// WWorld.Configure(spec, clock)  ← ambient konfigurace pro W-typy
     /// </code>
     /// <para>
-    /// <c>WDateTime.Use()</c> a <c>WDateTime.UseClock()</c> (globální statika)
-    /// jsou záměrně odstraněny — veškerá závislost na spec jde přes DI.
+    /// Od redesignu (Varianta A — Ambient Spec) jsou W-typy (<see cref="WDateTime"/> atd.)
+    /// konfigurovány přes <see cref="WWorld"/>. Volání <c>dt.Year</c>, <c>dt.AddMonths(3)</c>
+    /// atd. fungují bez předávání kontextu — stejně jako <see cref="DateTime"/>.
     /// </para>
     /// </remarks>
     public static class GameEngineToolsRuntime
     {
+        #region LoadSpec
+
         /// <summary>
         /// Načte <see cref="WorldTimeSpec"/> z konfigurace — bez spouštění DI kontejneru.
         /// </summary>
         /// <remarks>
-        /// <para>
         /// Použij tehdy, když potřebuješ sestavit <see cref="WDateTime"/> (nebo vypočítat tiky)
         /// <b>před</b> voláním <see cref="StartAsync"/> — typicky při načítání uloženého stavu hry.
-        /// </para>
-        /// <para>
-        /// Příklad — načtení uloženého herního času ze souboru:
         /// <code>
-        /// var spec    = GameEngineToolsRuntime.LoadSpec();
-        /// long ticks  = long.TryParse(saved, out var t) ? t
-        ///             : spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
-        /// var initNow = new WDateTime(ticks);
+        /// var spec   = GameEngineToolsRuntime.LoadSpec();
+        /// long ticks = long.TryParse(saved, out var t) ? t
+        ///            : spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
         ///
-        /// await using var runtime = await GameEngineToolsRuntime.StartAsync(initNow);
+        /// await using var runtime = await GameEngineToolsRuntime.StartAsync(new WDateTime(ticks));
         /// </code>
-        /// </para>
-        /// <para>
         /// Runtime interně volá stejný kód — spec je zaručeně identický s tím v DI.
-        /// </para>
         /// </remarks>
-        /// <returns>
-        /// <see cref="WorldTimeSpec"/> sestavený z <c>appsettings.json</c>
-        /// (sekce <c>InitWorldClock:{UseWorldType}</c>).
-        /// </returns>
+        /// <returns><see cref="WorldTimeSpec"/> sestavený z <c>appsettings.json</c>.</returns>
         public static WorldTimeSpec LoadSpec()
         {
             var config          = ConfigProvider.Configuration;
@@ -96,27 +90,29 @@ namespace GameEngineTools
                 calendar);
         }
 
+        #endregion
+
+        #region StartAsync
+
         /// <summary>
-        /// Sestaví DI kontejner, zaregistruje všechny služby a nastartuje hosted services.
+        /// Sestaví DI kontejner, zaregistruje všechny služby, nakonfiguruje
+        /// <see cref="WWorld"/> a nastartuje hosted services.
         /// </summary>
         /// <param name="beginning">
         /// Počáteční herní čas. Pouze <see cref="WDateTime.WorldTicks"/> se předá
-        /// <see cref="WorldClock.AlignNow"/> jako kotva — nepoužívají se žádné properties
-        /// závislé na spec.
+        /// <see cref="WorldClock.AlignNow"/> jako kotva.
         /// </param>
         /// <param name="consoleLogs">Zapne výstup logů do konzole (výchozí true).</param>
         /// <param name="logsRoot">Kořenový adresář pro file logy (výchozí "logs").</param>
         /// <param name="generatedFileOptions">Volitelná konfigurace adresářů pro exportované postavy.</param>
-        /// <param name="timescale">
-        /// Rychlost světového času vůči reálnému (1.0 = real-time).
-        /// </param>
+        /// <param name="timescale">Rychlost světového času vůči reálnému (1.0 = real-time).</param>
         /// <returns>Handle na běžící runtime — disposable, při dispose zastaví host.</returns>
         public static async Task<GameEngineToolsRuntimeHandle> StartAsync(
-            WDateTime              beginning,
-            bool                   consoleLogs           = true,
-            string                 logsRoot              = "logs",
-            GeneratedFileOptions?  generatedFileOptions  = null,
-            double                 timescale             = 1)
+            WDateTime             beginning,
+            bool                  consoleLogs          = true,
+            string                logsRoot             = "logs",
+            GeneratedFileOptions? generatedFileOptions = null,
+            double                timescale            = 1)
         {
             // Uložíme tiky před vstupem do DI lambdy — closure capture hodnoty, ne referenci
             var beginningTicks = beginning.WorldTicks;
@@ -144,17 +140,7 @@ namespace GameEngineTools
 
                     s.AddSingleton<IConfiguration>(configProvider);
 
-                    // ── Konfigurace světového času z appsettings.json ──────────────────
-                    s.AddOptionsWithValidateOnStart<InitWorldClockConfig>()
-                     .Configure<IConfiguration>((opt, cfg) =>
-                     {
-                         opt.DaysInMonths = Array.Empty<int>();
-                         cfg.GetSection($"InitWorldClock:{worldTypeConfig}").Bind(opt);
-                     });
-
                     // ── WorldTimeSpec — jeden singleton, sdílený WorldClock i WorldTimeContext ──
-                    //    Dřív: spec se vytvářel uvnitř InitWorldClock() a uložil do WDateTime.Spec (global state)
-                    //    Teď:  spec žije v DI, obě třídy ho dostanou ze stejného místa
                     s.AddSingleton<WorldTimeSpec>(sp =>
                     {
                         var opts = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
@@ -170,19 +156,23 @@ namespace GameEngineTools
                             calendar);
                     });
 
-                    // ── IWorldClock — přijme WorldTimeSpec ze stejného DI kontejneru ──
-                    //    beginningTicks = kotva "teď ve světě" při startu
-                    //    Dřív: WDateTime.UseClock(worldClock) ukládal do static pole
+                    s.AddOptionsWithValidateOnStart<InitWorldClockConfig>()
+                     .Configure<IConfiguration>((opt, cfg) =>
+                     {
+                         opt.DaysInMonths = Array.Empty<int>();
+                         cfg.GetSection($"InitWorldClock:{worldTypeConfig}").Bind(opt);
+                     });
+
+                    // ── IWorldClock — kotva na beginningTicks, mapování real-time → world-time ──
                     s.AddSingleton<IWorldClock>(sp =>
                     {
                         var spec = sp.GetRequiredService<WorldTimeSpec>();
                         return WorldClock.AlignNow(spec, beginningTicks, timescale);
                     });
 
-                    // ── WorldTimeContext — dostane WorldTimeSpec + IWorldClock automaticky ──
-                    s.AddSingleton<WorldTimeContext>();
-
-                    // ── IClock / SystemClock — dostane IWorldClock + WorldTimeContext ──
+                    // ── IClock / SystemClock — bere WorldTimeSpec (ne WorldTimeContext!)
+                    //    Důvod: SystemClock → WorldTimeContext → IClock by byl kruh.
+                    //    WorldTimeSpec je čistý datový objekt — žádná závislost.
                     s.AddSingleton<IClock, SystemClock>();
 
                     // ── Soubory a volby ───────────────────────────────────────────────
@@ -191,7 +181,7 @@ namespace GameEngineTools
                     {
                         if (generatedFileOptions is not null)
                         {
-                            opt.NPCDirectory   = generatedFileOptions.NPCDirectory;
+                            opt.NPCDirectory    = generatedFileOptions.NPCDirectory;
                             opt.PlayerDirectory = generatedFileOptions.PlayerDirectory;
                         }
                     });
@@ -208,14 +198,13 @@ namespace GameEngineTools
                     s.AddOptions<MenstrualCycleConfig>()
                      .BindConfiguration("Characters:MenstrualCycle");
 
-                    // ── HumanBlueprintSpec — lazy factory, WorldTimeContext je k dispozici ──
-                    //    Dřív: HumanBlueprintSpec.Default(initNow.DateOnly) volal WDateTime.Spec
-                    //    Teď:  spec se sestaví až při prvním resolve, kdy DI má vše k dispozici
+                    // ── HumanBlueprintSpec — lazy factory ─────────────────────────────
+                    //    WDateTime.New() funguje jakmile WWorld je nakonfigurován
+                    //    (volá se níže ihned po sestavení hostu).
                     s.AddCharacterGeneration(sp =>
                     {
-                        var ctx         = sp.GetRequiredService<WorldTimeContext>();
-                        var beginningDt = new WDateTime(beginningTicks);
-                        return HumanBlueprintSpec.Default(ctx.GetDate(beginningDt), ctx);
+                        var clock = sp.GetRequiredService<IClock>();
+                        return HumanBlueprintSpec.Default(clock.Now.Date);
                     });
 
                     // ── Manager a inicializace ─────────────────────────────────────────
@@ -230,9 +219,17 @@ namespace GameEngineTools
                 })
                 .Build();
 
+            // ── WWorld.Configure — ambient konfigurace pro W-typy ──────────────
+            // Musí proběhnout PŘED StartAsync — hosted services mohou volat W-typy.
+            var spec  = host.Services.GetRequiredService<WorldTimeSpec>();
+            var clock = host.Services.GetRequiredService<IClock>();
+            WWorld.Configure(spec, clock);
+
             await host.StartAsync();
             return new GameEngineToolsRuntimeHandle(host);
         }
+
+        #endregion
     }
 
     /// <summary>
@@ -241,11 +238,21 @@ namespace GameEngineTools
     /// </summary>
     public sealed class GameEngineToolsRuntimeHandle : IAsyncDisposable
     {
+        #region Soukromá pole
+
         private readonly IHost _host;
+
+        #endregion
+
+        #region Konstrukce
 
         internal GameEngineToolsRuntimeHandle(IHost host) => _host = host;
 
-        /// <summary>Herní hodiny (aktuální čas, Start/Stop).</summary>
+        #endregion
+
+        #region Veřejné vlastnosti
+
+        /// <summary>Herní hodiny — aktuální čas, Start/Stop pro game loop.</summary>
         public IClock Clock => Services.GetRequiredService<IClock>();
 
         /// <summary>Hlavní správce postav a herního světa.</summary>
@@ -255,10 +262,9 @@ namespace GameEngineTools
         /// <summary>DI provider pro přímý resolve libovolné služby.</summary>
         public IServiceProvider Services => _host.Services;
 
-        /// <summary>
-        /// WordTimeContext pro utils pro práci s časem.
-        /// </summary>
-        public WorldTimeContext WorldTimeContext => _host.Services.GetRequiredService<WorldTimeContext>();
+        #endregion
+
+        #region IAsyncDisposable
 
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
@@ -266,5 +272,7 @@ namespace GameEngineTools
             await _host.StopAsync();
             _host.Dispose();
         }
+
+        #endregion
     }
 }

@@ -33,7 +33,6 @@ await using var runtime = await GameEngineToolsRuntime.StartAsync(initNow, conso
     NPCDirectory = TFSC.NPCs
 }, timescale: 1);
 
-var wtctx = runtime.WorldTimeContext;
 var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
@@ -68,12 +67,12 @@ var significantOtherPerson = significantOther.Person;
 //PrintSymbolicRelationsInfoAccordingToPlayer(manager.NPPCs.ToArray());
 //PrintSymbolicRelationsInfo(families.ToArray());
 
-File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(wtctx, false));
+File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(false));
 
-//var bound = clock.Now.Bind(wtctx);
-Console.WriteLine("Now: {0}, now: {1}", wtctx.Format(clock.Now), wtctx.Format(initNow));
-Console.WriteLine("Player: {0}", player.PrintInfo(wtctx, true));
-Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(wtctx, true));
+
+Console.WriteLine("Now: {0}, now: {1}", clock.Now);
+Console.WriteLine("Player: {0}", player.PrintInfo(true));
+Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(true));
 
 Console.WriteLine("==========================================================");
 
@@ -81,21 +80,17 @@ PressAnyKeyToContinueM();
 //clock.Start();
 
 var now = clock.Now;
-var dt = wtctx.Hours(0.5);
+var dt = WTimeSpan.FromHours(0.5);
 
-var bound = clock.Now.Bind(wtctx);
-
-var (year, month, _, _, _, _, _) = wtctx.GetParts(now);
-
-for (int m = 0; m < wtctx.Spec.Calendar.MonthsInYear(year); m++)
+for (int m = 0; m < 2; m++)
 {
-    for (int d = 0; d < wtctx.Spec.Calendar.DaysInMonth(year, month); d++)
+    for (int d = 0; d < 36; d++)
     {
-        for (int h = 0; h < wtctx.Spec.HoursPerDay; h++)
+        for (int h = 0; h < 26; h++)
         {
             if (d is 2 or 6 or 25 && h is 8 or 12)
             {
-                var smallTalk = new InteractionProposed(now + wtctx.Minutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
+                var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
                 significantOtherPerson.ReceiveEvent(smallTalk);
             }
 
@@ -152,9 +147,9 @@ gf.Export(player);
 gf.Export((NPC)significantOther);
 
 //clock.Stop();
-Console.WriteLine(player.PrintInfo(wtctx, false));
+Console.WriteLine(player.PrintInfo(false));
 
-Console.WriteLine(significantOther.PrintInfo(wtctx, false));
+Console.WriteLine(significantOther.PrintInfo(false));
 
 PressAnyKeyToContinueM();
 

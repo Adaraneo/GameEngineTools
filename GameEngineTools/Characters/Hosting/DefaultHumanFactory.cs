@@ -44,9 +44,8 @@ namespace GameEngineTools.Characters.Hosting
         private readonly IPhysiologyEngineFactory _physioFactory;
         private readonly IPsychologyEngineFactory _psychFactory;
         private readonly IClock _clock;
-        private readonly WorldTimeContext _wtctx;
 
-        public DefaultHumanFactory(IServiceProvider sp, IRandomSourceFactory rngFactory, ILoggerFactory loggerFactory, IPhysiologyEngineFactory physioFactory, IPsychologyEngineFactory psychFactory, IClock clock, WorldTimeContext wtctx)
+        public DefaultHumanFactory(IServiceProvider sp, IRandomSourceFactory rngFactory, ILoggerFactory loggerFactory, IPhysiologyEngineFactory physioFactory, IPsychologyEngineFactory psychFactory, IClock clock)
         {
             _sp = sp;
             _rngFactory = rngFactory;
@@ -54,7 +53,6 @@ namespace GameEngineTools.Characters.Hosting
             _physioFactory = physioFactory;
             _psychFactory = psychFactory;
             _clock = clock;
-            _wtctx = wtctx;
         }
 
         public IHuman Create(HumanBlueprint b)
@@ -66,7 +64,7 @@ namespace GameEngineTools.Characters.Hosting
             var logger = _loggerFactory.CreateLogger($"Characters.Human[{b.Id.Value}]");
 
             // Engines vytvořené přes factories
-            var physio = _physioFactory.Create(rng, b.Biology, _wtctx.GetDate(_clock.Now));
+            var physio = _physioFactory.Create(rng, b.Biology, _clock.Now.Date);
             var psych = _psychFactory.Create(rng);
 
             // Engines bez runtime parametrů - stačí DI
