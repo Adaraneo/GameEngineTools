@@ -44,6 +44,7 @@ namespace GameEngineTools.World.Core.Calendars
 
                 days -= dim; month++;
             }
+
             int day = (int)days + 1;
             return (year, month, day);
         }
@@ -83,7 +84,13 @@ namespace GameEngineTools.World.Core.Calendars
                 throw new ArgumentOutOfRangeException(nameof(month));
             }
 
-            return _months[month - 1];
+            var days = _months[month - 1];
+            if (month == _months.Length)
+            {
+                days += _leapExtraDays(year);
+            }
+
+            return days;
         }
 
         public long DaysInYear(int year)

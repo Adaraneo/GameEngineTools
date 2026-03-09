@@ -73,9 +73,6 @@ var significantOtherPerson = significantOther.Person;
 //PrintSymbolicRelationsInfoAccordingToPlayer(manager.NPPCs.ToArray());
 //PrintSymbolicRelationsInfo(families.ToArray());
 
-File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(false));
-
-
 Console.WriteLine("Now: {0}", clock.Now.ToString());
 Console.WriteLine("Player: {0}", player.PrintInfo(true));
 Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(true));
@@ -135,7 +132,8 @@ while(clock.Now < endTime)
 
     clock.Advance(WTimeSpan.FromHours(1));
 
-    //Console.WriteLine("now: {0}", clock.Now.ToString());
+    now = clock.Now;
+    Console.WriteLine("now: {0}", clock.Now.ToString());
 }
 
 PressAnyKeyToContinueM(true);
@@ -150,6 +148,8 @@ Console.WriteLine(significantOther.PrintInfo(false));
 
 PressAnyKeyToContinueM();
 
+File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{nameof(player)}.{player.Person.Id.ToString()}.log.txt"), player.PrintInfo(false));
+File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{nameof(significantOther)}.{significantOther.Person.Id.ToString()}.log.txt"), significantOther.PrintInfo(false));
 File.WriteAllText(gameTimePath, clock.Now.WorldTicks.ToString());
 
 void PressAnyKeyToContinueM(bool clear = false)

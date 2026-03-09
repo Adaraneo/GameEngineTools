@@ -53,6 +53,18 @@ namespace GameEngineTools.Extensions
                 return sb.ToString();
             }
 
+            // --- Physical Appearance ---
+            sb.AppendLine();
+            sb.AppendLine("[PHYSICAL APPEARANCE]");
+            foreach (var appearanceProp in person.PhysicalAppearance.GetType().GetProperties())
+            {
+                sb.Append($"{appearanceProp.Name}: ");
+                var stateObj = appearanceProp.GetValue(person.PhysicalAppearance);
+                AppendValue(sb, stateObj, indent: 1);
+            }
+
+            sb.AppendLine();
+
             // --- Snapshot ---
             sb.AppendLine();
             foreach (var snapshotProp in person.Snapshot.GetType().GetProperties())
@@ -62,6 +74,8 @@ namespace GameEngineTools.Extensions
                 AppendValue(sb, stateObj, indent: 1);
                 sb.AppendLine();
             }
+
+            
 
             return sb.ToString();
         }
