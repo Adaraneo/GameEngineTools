@@ -3,6 +3,7 @@
 
 using GameEngineTools;
 using GameEngineTools.Characters.Engines.Interactions;
+using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.FileSystem;
 using GameEngineTools.World.Core.Time;
@@ -68,6 +69,18 @@ var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOpti
         if (now.Day is 2 or 6 or 12)
             npc.ReceiveEvent(new InteractionProposed(
                 now + WTimeSpan.FromMinutes(30), p.Id, npc.Id, SpeechAct.SmallTalk, "Ahoooj"));
+
+        if (now.Day is 13)
+            npc.ReceiveEvent(new InteractionProposed(now + WTimeSpan.FromMinutes(12), p.Id, npc.Id, SpeechAct.Humor, "Vtip"));
+
+        if (now.Day is 16)
+            npc.ReceiveEvent(new MicroPositive(now + WTimeSpan.FromMinutes(20), npc.Id, p.Id, "Whatever..."));
+
+        if (now.Day is 16 && now.Hour is 20 && p.Snapshot.InteractionSurface.Location != "Castle" && npc.Snapshot.InteractionSurface.Location != "Castle")
+        {
+            p.ReceiveEvent(new ContextChanged(now + WTimeSpan.FromHours(1), p.Id, "Castle", true, 0.13, 0.2));
+            npc.ReceiveEvent(new ContextChanged(now + WTimeSpan.FromHours(1), npc.Id, "Castle", true, 0.13, 0.2));
+        }
 
         // Den 10 → NPC posílá hráči validaci
         if (now.Day is 10)
