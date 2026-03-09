@@ -192,8 +192,8 @@ Console.WriteLine(significantOther.PrintInfo(false));
 
 PressAnyKeyToContinueM();
 
-File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{nameof(player)}.{player.Person.Id.ToString()}.log.txt"), player.PrintInfo(false));
-File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{nameof(significantOther)}.{significantOther.Person.Id.ToString()}.log.txt"), significantOther.PrintInfo(false));
+File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{nameof(player)}.{player.Person.Id.Value.ToString()}.log.txt"), player.PrintInfo(false));
+File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{nameof(significantOther)}.{significantOther.Person.Id.Value.ToString()}.log.txt"), significantOther.PrintInfo(false));
 File.WriteAllText(gameTimePath, clock.Now.WorldTicks.ToString());
 
 void PressAnyKeyToContinueM(bool clear = false)
