@@ -21,9 +21,11 @@ var gameTimePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFol
 
 var spec = GameEngineToolsRuntime.LoadSpec();
 
+var defaultTicks = spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
+
 var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(gameTimePath), out var saved)
     ? saved
-    : spec.Calendar.DaysFromDate(50, 1, 1) * spec.TicksPerDay;
+    : defaultTicks;
 
 var initNow = new WDateTime(initTicks);
 
@@ -37,8 +39,12 @@ var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
 
+clock.SetNow(WDateTime.New(WDateOnly.New(50, 1, 1)));
+
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
 manager.NPPCs.Add(player);
+
+clock.SetNow((initTicks == defaultTicks) ? WDateTime.New(player.Person.Identity.BirthDate.AddYears(16)) : new WDateTime(initTicks));
 
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
 {
@@ -70,7 +76,7 @@ var significantOtherPerson = significantOther.Person;
 File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"{player.Person.Identity.ToString()}.log.txt"), player.PrintInfo(false));
 
 
-Console.WriteLine("Now: {0}, now: {1}", clock.Now);
+Console.WriteLine("Now: {0}", clock.Now.ToString());
 Console.WriteLine("Player: {0}", player.PrintInfo(true));
 Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(true));
 
@@ -129,8 +135,7 @@ for (int m = 0; m < 2; m++)
                     playerPerson.ReceiveEvent(npcOutcome);
             }
 
-            now += dt;
-            clock.SetNow(now);
+            clock.Advance(dt);
 
             Console.WriteLine("H: {0}", h);
         }
@@ -153,7 +158,7 @@ Console.WriteLine(significantOther.PrintInfo(false));
 
 PressAnyKeyToContinueM();
 
-File.WriteAllText(gameTimePath, clock.Now.ToString());
+File.WriteAllText(gameTimePath, clock.Now.WorldTicks.ToString());
 
 void PressAnyKeyToContinueM(bool clear = false)
 {
