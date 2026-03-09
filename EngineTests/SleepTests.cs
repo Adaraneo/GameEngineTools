@@ -320,7 +320,6 @@ namespace EngineTests
             var session = BuildSession();
             var plannedWakeUp = _now + WTimeSpan.FromHours(10);
             session.Begin(_now, plannedWakeUp, _ctx, _outbox);
-            _outbox.Drain();
 
             var phases = new List<SleepPhase>();
 
