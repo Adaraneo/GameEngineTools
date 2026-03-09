@@ -11,6 +11,7 @@ using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.InteropServices.ComTypes;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
 
@@ -26,7 +27,7 @@ var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(game
 
 var initNow = new WDateTime(initTicks);
 
-await using var runtime = await GameEngineToolsRuntime.StartAsync(initNow, generatedFileOptions: new GeneratedFileOptions
+await using var runtime = await GameEngineToolsRuntime.StartAsync(initNow, consoleLogs: false, generatedFileOptions: new GeneratedFileOptions
 {
     PlayerDirectory = TFSC.player,
     NPCDirectory = TFSC.NPCs
@@ -82,54 +83,67 @@ PressAnyKeyToContinueM();
 var now = clock.Now;
 var dt = wtctx.Hours(0.5);
 
-for (int d = 0; d < 30; d++)
+var bound = clock.Now.Bind(wtctx);
+
+var (year, month, _, _, _, _, _) = wtctx.GetParts(now);
+
+for (int m = 0; m < wtctx.Spec.Calendar.MonthsInYear(year); m++)
 {
-    for (int i = 0; i < 24; i++)
+    for (int d = 0; d < wtctx.Spec.Calendar.DaysInMonth(year, month); d++)
     {
-        if (d == 2 && i == 8)
+        for (int h = 0; h < wtctx.Spec.HoursPerDay; h++)
         {
-            var smallTalk = new InteractionProposed(now + wtctx.Minutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
-            significantOtherPerson.ReceiveEvent(smallTalk);
-        }
+            if (d is 2 or 6 or 25 && h is 8 or 12)
+            {
+                var smallTalk = new InteractionProposed(now + wtctx.Minutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
+                significantOtherPerson.ReceiveEvent(smallTalk);
+            }
 
-        significantOtherPerson.Tick(now, dt);
-
-        var reachOut = significantOtherPerson.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == "ReachOut");
-        if (reachOut != null)
-        {
-            var initialized = new InteractionProposed(now, significantOtherPerson.Id, playerPerson.Id, SpeechAct.SmallTalk, "Ehm... Ahoj");
-            playerPerson.ReceiveEvent(initialized);
-        }
-
-        var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
-        if (outcome != null)
-            playerPerson.ReceiveEvent(outcome);
-
-        playerPerson.Tick(now, dt);
-
-        // ── Outcome z playera → significantOther ──
-        var playerOutcome = playerPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
-        if (playerOutcome != null)
-            significantOtherPerson.ReceiveEvent(playerOutcome);
-
-        // ── Player's ReachOut → NPC ──
-        var playerReachOut = playerPerson.LastOutbox
-            .OfType<ActionCommitted>()
-            .FirstOrDefault(a => a.ActionName == "ReachOut");
-
-        if (playerReachOut != null)
-        {
-            var initiated = new InteractionProposed(now, playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ehm... ahoj.");
-            significantOtherPerson.ReceiveEvent(initiated);
             significantOtherPerson.Tick(now, dt);
-            var npcOutcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
-            if (npcOutcome != null)
-                playerPerson.ReceiveEvent(npcOutcome);
+
+            var reachOut = significantOtherPerson.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == "ReachOut");
+            if (reachOut != null)
+            {
+                var initialized = new InteractionProposed(now, significantOtherPerson.Id, playerPerson.Id, SpeechAct.SmallTalk, "Ehm... Ahoj");
+                playerPerson.ReceiveEvent(initialized);
+            }
+
+            var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+            if (outcome != null)
+                playerPerson.ReceiveEvent(outcome);
+
+            playerPerson.Tick(now, dt);
+
+            // ── Outcome z playera → significantOther ──
+            var playerOutcome = playerPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+            if (playerOutcome != null)
+                significantOtherPerson.ReceiveEvent(playerOutcome);
+
+            // ── Player's ReachOut → NPC ──
+            var playerReachOut = playerPerson.LastOutbox
+                .OfType<ActionCommitted>()
+                .FirstOrDefault(a => a.ActionName == "ReachOut");
+
+            if (playerReachOut != null)
+            {
+                var initiated = new InteractionProposed(now, playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ehm... ahoj.");
+                significantOtherPerson.ReceiveEvent(initiated);
+                significantOtherPerson.Tick(now, dt);
+                var npcOutcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+                if (npcOutcome != null)
+                    playerPerson.ReceiveEvent(npcOutcome);
+            }
+
+            now += dt;
+            clock.SetNow(now);
+
+            Console.WriteLine("H: {0}", h);
         }
 
-        now += dt;
-        clock.SetNow(now);
+        Console.WriteLine("D: {0}", (d + 1).ToString());
     }
+
+    Console.WriteLine("M: {0}", (m + 1).ToString());
 }
 
 PressAnyKeyToContinueM(true);
@@ -144,7 +158,7 @@ Console.WriteLine(significantOther.PrintInfo(wtctx, false));
 
 PressAnyKeyToContinueM();
 
-File.WriteAllText(gameTimePath, clock.Now.WorldTicks.ToString());
+File.WriteAllText(gameTimePath, clock.Now.ToString());
 
 void PressAnyKeyToContinueM(bool clear = false)
 {
