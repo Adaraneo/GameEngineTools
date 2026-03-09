@@ -148,10 +148,11 @@ namespace GameEngineTools.Characters.Core
 
             // *** FÁZE C: vlastní eventy doručíme sami sobě ***
             // Postava reaguje na to, co sama udělala (paměť, vztahy, atd.)
-            SelfDeliver(outbox);
+            var toPublish = new EventCollector();
+            SelfDeliver(outbox, toPublish);
 
             // Publikace událostí vzniklých během fáze B (dorazí ostatním až v dalším ticku)
-            PublishOutbox(outbox);
+            PublishOutbox(toPublish);
 
             LogState();
         }
@@ -263,7 +264,7 @@ namespace GameEngineTools.Characters.Core
             _memory.RestoreState(snapshot.Memory);
         }
 
-        private void SelfDeliver(IEventCollector collector)
+        private void SelfDeliver(IEventCollector collector, IEventCollector toPublish)
         {
             const int maxPasses = 8;
             int pass = 0;
@@ -280,6 +281,7 @@ namespace GameEngineTools.Characters.Core
 
                 foreach (var ev in events)
                 {
+                    toPublish.Add(ev);
                     SafeHandle(ev, localOutbox);
                 }
 

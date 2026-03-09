@@ -85,65 +85,57 @@ Console.WriteLine("==========================================================");
 PressAnyKeyToContinueM();
 //clock.Start();
 
-var now = clock.Now;
 var dt = WTimeSpan.FromHours(0.5);
+var endTime = clock.Now.AddYears(2);
 
-for (int m = 0; m < 2; m++)
+while(clock.Now < endTime)
 {
-    for (int d = 0; d < 36; d++)
+    var now = clock.Now;
+
+    if (now.Day is 2 or 6 or 12)
     {
-        for (int h = 0; h < 26; h++)
-        {
-            if (d is 2 or 6 or 25 && h is 8 or 12)
-            {
-                var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
-                significantOtherPerson.ReceiveEvent(smallTalk);
-            }
-
-            significantOtherPerson.Tick(now, dt);
-
-            var reachOut = significantOtherPerson.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == "ReachOut");
-            if (reachOut != null)
-            {
-                var initialized = new InteractionProposed(now, significantOtherPerson.Id, playerPerson.Id, SpeechAct.SmallTalk, "Ehm... Ahoj");
-                playerPerson.ReceiveEvent(initialized);
-            }
-
-            var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
-            if (outcome != null)
-                playerPerson.ReceiveEvent(outcome);
-
-            playerPerson.Tick(now, dt);
-
-            // ── Outcome z playera → significantOther ──
-            var playerOutcome = playerPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
-            if (playerOutcome != null)
-                significantOtherPerson.ReceiveEvent(playerOutcome);
-
-            // ── Player's ReachOut → NPC ──
-            var playerReachOut = playerPerson.LastOutbox
-                .OfType<ActionCommitted>()
-                .FirstOrDefault(a => a.ActionName == "ReachOut");
-
-            if (playerReachOut != null)
-            {
-                var initiated = new InteractionProposed(now, playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ehm... ahoj.");
-                significantOtherPerson.ReceiveEvent(initiated);
-                significantOtherPerson.Tick(now, dt);
-                var npcOutcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
-                if (npcOutcome != null)
-                    playerPerson.ReceiveEvent(npcOutcome);
-            }
-
-            clock.Advance(dt);
-
-            Console.WriteLine("H: {0}", h);
-        }
-
-        Console.WriteLine("D: {0}", (d + 1).ToString());
+        var smallTalk = new InteractionProposed(now + WTimeSpan.FromMinutes(30), playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ahoooj");
+        significantOtherPerson.ReceiveEvent(smallTalk);
     }
 
-    Console.WriteLine("M: {0}", (m + 1).ToString());
+    significantOtherPerson.Tick(now, dt);
+
+    var reachOut = significantOtherPerson.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == "ReachOut");
+    if (reachOut != null)
+    {
+        var initialized = new InteractionProposed(now, significantOtherPerson.Id, playerPerson.Id, SpeechAct.SmallTalk, "Ehm... Ahoj");
+        playerPerson.ReceiveEvent(initialized);
+    }
+
+    var outcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+    if (outcome != null)
+        playerPerson.ReceiveEvent(outcome);
+
+    playerPerson.Tick(now, dt);
+
+    // ── Outcome z playera → significantOther ──
+    var playerOutcome = playerPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+    if (playerOutcome != null)
+        significantOtherPerson.ReceiveEvent(playerOutcome);
+
+    // ── Player's ReachOut → NPC ──
+    var playerReachOut = playerPerson.LastOutbox
+        .OfType<ActionCommitted>()
+        .FirstOrDefault(a => a.ActionName == "ReachOut");
+
+    if (playerReachOut != null)
+    {
+        var initiated = new InteractionProposed(now, playerPerson.Id, significantOtherPerson.Id, SpeechAct.SmallTalk, "Ehm... ahoj.");
+        significantOtherPerson.ReceiveEvent(initiated);
+        significantOtherPerson.Tick(now, dt);
+        var npcOutcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
+        if (npcOutcome != null)
+            playerPerson.ReceiveEvent(npcOutcome);
+    }
+
+    clock.Advance(WTimeSpan.FromHours(1));
+
+    //Console.WriteLine("now: {0}", clock.Now.ToString());
 }
 
 PressAnyKeyToContinueM(true);
