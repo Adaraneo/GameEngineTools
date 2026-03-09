@@ -767,7 +767,7 @@ foreach (var ev in npc.LastOutbox)
 
 ## Konfigurace
 
-Soubory `appsettings.json` (nebo `appsettings.Characters.json`) konfigurují všechny enginy.
+Soubory `appsettings.Characters.json` (nebo `appsettings.Characters.json`) konfigurují všechny enginy.
 
 ```json
 {
