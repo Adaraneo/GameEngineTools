@@ -57,24 +57,6 @@ var playerPerson = player.Person;
 var significantOther = manager.NPPCs.First(x => x is NPC);
 var significantOtherPerson = significantOther.Person;
 
-#region Families
-
-//var families = manager.NPPCs.Where(x => x is NPC && x.Person != significantOtherPerson);
-
-//foreach (var familyMember in families)
-//{
-//    Console.WriteLine(familyMember.PrintInfo(false) + "\n");
-//}
-
-//PrintRelationshipInfo(families.ToArray());
-
-#endregion
-
-//FireScene();
-
-//PrintSymbolicRelationsInfoAccordingToPlayer(manager.NPPCs.ToArray());
-//PrintSymbolicRelationsInfo(families.ToArray());
-
 Console.WriteLine("Now: {0}", clock.Now.ToString());
 Console.WriteLine("Player: {0}", player.PrintInfo(true));
 Console.WriteLine("SignificantOther: {0}", significantOther.PrintInfo(true));
