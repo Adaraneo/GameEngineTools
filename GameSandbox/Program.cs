@@ -22,7 +22,7 @@ var spec = GameEngineToolsRuntime.LoadSpec();
 
 var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(gameTimePath), out var saved)
     ? saved
-    : spec.Calendar.DaysFromDate(100, 1, 1) * spec.TicksPerDay;
+    : spec.Calendar.DaysFromDate(50, 1, 1) * spec.TicksPerDay;
 
 var initNow = new WDateTime(initTicks);
 
