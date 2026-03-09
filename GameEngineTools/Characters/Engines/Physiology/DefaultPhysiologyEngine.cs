@@ -130,39 +130,68 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
-            if (@event is not Behavior.ActionCommitted ac)
-            {
-                return;
-            }
-
-            var h = Math.Max(0, ac.Duration.TotalHours);
             var s = State;
 
-            s = ac.ActionName switch
+            switch (@event)
             {
-                "Sleep" => s with
+                // --- Konec spánkové session ---
+                // Průběžný drift (energie, hlad, žízeň) probíhá v Tick() přes CurrentPlan.Name == "Sleep".
+                // Zde aplikujeme jednorázový souhrnný efekt na základě kvality a délky spánku.
+                case Sleep.SleepEvents.SleepEnded se:
                 {
-                    SleepDebtHours = Math.Max(0, s.SleepDebtHours - h * 0.9),
-                    Energy = Clamp01p(s.Energy + 15 * h),
-                    Hunger = Clamp01p(s.Hunger + 2 * h),
-                    Thirst = Clamp01p(s.Thirst + 1 * h)
-                },
-                "Eat" => s with
+                    var h = Math.Max(0, se.TotalHoursSlept);
+
+                    // Kvalita (0–100) moduluje efektivitu obnovy.
+                    // Při kvalitě 100 = plná obnova, při 0 = žádná.
+                    var qualityFactor = se.Quality / 100.0;
+
+                    s = s with
+                    {
+                        // Spánkový dluh: maximální splacení závisí na kvalitě
+                        SleepDebtHours = Math.Max(0, s.SleepDebtHours - h * 0.9 * qualityFactor),
+
+                        // Imunitní systém: regenerace hlubokého spánku
+                        ImmuneLoad = Clamp01p(s.ImmuneLoad - 3.0 * qualityFactor),
+
+                        // Bolest: lehká úleva pokud byl spánek kvalitní (>= 60)
+                        Pain = se.Quality >= 60
+                            ? Clamp01p(s.Pain - 2.0 * qualityFactor)
+                            : s.Pain
+                    };
+
+                    _log.LogDebug(
+                        "[Physiology] SleepEnded — délka: {Hours:F1}h, kvalita: {Quality:F0}, dluh po obnově: {Debt:F2}h.",
+                        h, se.Quality, s.SleepDebtHours);
+                    break;
+                }
+
+                // --- Ostatní akce přes ActionCommitted ---
+                case Behavior.ActionCommitted ac:
                 {
-                    Hunger = Clamp01p(s.Hunger - 40 * h),
-                    Energy = Clamp01p(s.Energy + 5 * h),
-                },
-                "Drink" => s with
-                {
-                    Thirst = Clamp01p(s.Thirst - 50 * h)
-                },
-                "SelfCare" => s with
-                {
-                    Pain = Clamp01p(s.Pain - 10 * h),
-                    ImmuneLoad = Clamp01p(s.ImmuneLoad - 5 * h)
-                },
-                _ => s
-            };
+                    var h = Math.Max(0, ac.Duration.TotalHours);
+
+                    s = ac.ActionName switch
+                    {
+                        // Poznámka: "Sleep" zde záměrně chybí — spánek řeší SleepEnded výše
+                        "Eat" => s with
+                        {
+                            Hunger = Clamp01p(s.Hunger - 40 * h),
+                            Energy = Clamp01p(s.Energy + 5 * h)
+                        },
+                        "Drink" => s with
+                        {
+                            Thirst = Clamp01p(s.Thirst - 50 * h)
+                        },
+                        "SelfCare" => s with
+                        {
+                            Pain = Clamp01p(s.Pain - 10 * h),
+                            ImmuneLoad = Clamp01p(s.ImmuneLoad - 5 * h)
+                        },
+                        _ => s
+                    };
+                    break;
+                }
+            }
 
             State = s;
         }
