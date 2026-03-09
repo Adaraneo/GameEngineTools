@@ -1,7 +1,9 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using GameEngineTools;
+using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
+using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Config;
 using GameEngineTools.Extensions;
@@ -134,6 +136,42 @@ while(clock.Now < endTime)
         var npcOutcome = significantOtherPerson.LastOutbox.OfType<InteractionOutcome>().FirstOrDefault();
         if (npcOutcome != null)
             playerPerson.ReceiveEvent(npcOutcome);
+    }
+
+    // ── Sleep prompt handling ──────────────────────────────────────────────────
+    // PC: hráč musí odpovědět, NPC: systém odpoví automaticky
+    var sleepPrompt = significantOtherPerson.LastOutbox
+        .OfType<SleepPromptRequested>()
+        .FirstOrDefault();
+
+    if (sleepPrompt != null)
+    {
+        // NPC → automaticky potvrdí (žádný UI prompt)
+        var confirmed = new SleepConfirmed(
+            OccurredAt: now,
+            Human: sleepPrompt.Human,
+            PlannedWakeUp: default);   // default = engine vypočítá délku sám
+
+        significantOtherPerson.ReceiveEvent(confirmed);
+    }
+
+    // PC: hráč dostane konzolový prompt
+    var playerSleepPrompt = playerPerson.LastOutbox
+        .OfType<SleepPromptRequested>()
+        .FirstOrDefault();
+
+    if (playerSleepPrompt != null)
+    {
+        //Console.WriteLine($"\n[SPÁNEK] Postava je unavená (potřeba: {playerSleepPrompt.SleepNeed:F0}). Jít spát? (A/N)");
+        //var key = Console.ReadKey(intercept: true).Key;
+
+        //IDomainEvent response = key == ConsoleKey.A
+        //    ? new SleepConfirmed(now, playerSleepPrompt.Human, default)
+        //    : new SleepDeclined(now, playerSleepPrompt.Human, DeclineCount: playerPerson.Snapshot.Behavior.SleepDeclineCount);
+
+        var response = new SleepConfirmed(now, playerSleepPrompt.Human, default);
+
+        playerPerson.ReceiveEvent(response);
     }
 
     clock.Advance(WTimeSpan.FromHours(1));
