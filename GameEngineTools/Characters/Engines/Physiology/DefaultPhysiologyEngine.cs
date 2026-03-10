@@ -70,12 +70,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 _ => -2 * h
             };
 
-            var sleepDeptDelta = action switch
-            {
-                "Sleep" => -0.9 * h,
-                _ => 0.6 * h
-            };
-
             var hungerDelta = action switch
             {
                 "Eat" => -40 * h,
@@ -109,7 +103,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Hunger = Clamp01p(s.Hunger + hungerDelta),
                 Thirst = Clamp01p(s.Thirst + thirstDelta),
                 Pain = Clamp01p(s.Pain + painDelta),
-                SleepDebtHours = Math.Max(0, s.SleepDebtHours + sleepDeptDelta),
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + immuneDelta),
                 BodyTempDelta = Approach(s.BodyTempDelta, 0, 0.1 * h)
             };
