@@ -4,9 +4,7 @@
 using GameEngineTools;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Relationships;
-using GameEngineTools.Characters.Generation;
 using GameEngineTools.FileSystem;
-using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
 using GameSandbox.Scenes;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +16,7 @@ var gameTimePath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
     "GameTime.txt");
 
-var spec         = GameEngineToolsRuntime.LoadSpec();
+var spec = GameEngineToolsRuntime.LoadSpec();
 var defaultTicks = spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
 
 var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(gameTimePath), out var saved)
@@ -32,12 +30,12 @@ await using var runtime = await GameEngineToolsRuntime.StartAsync(
     generatedFileOptions: new GeneratedFileOptions
     {
         PlayerDirectory = TFSC.player,
-        NPCDirectory    = TFSC.NPCs
+        NPCDirectory = TFSC.NPCs
     });
 
-var gf      = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
+var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
-var clock   = (SystemClock)runtime.Clock;
+var clock = (SystemClock)runtime.Clock;
 
 // ── Postavy ───────────────────────────────────────────────────────────────────
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
@@ -56,11 +54,11 @@ var significantOther = manager.NPPCs.First(x => x is NPC);
 // Jediné místo kde definuješ CO se simuluje — scéna se stará o HOW.
 var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOptions
 {
-    Player          = player,
-    Npc             = significantOther,
+    Player = player,
+    Npc = significantOther,
     SimulationYears = 2,
-    TickStep        = WTimeSpan.FromHours(0.5),
-    ClockAdvance    = WTimeSpan.FromHours(1),
+    TickStep = WTimeSpan.FromHours(0.5),
+    ClockAdvance = WTimeSpan.FromHours(1),
 
     // Scénář: sem napíšeš jen co chceš testovat — zbytek řeší scéna
     OnTick = (now, p, npc) =>

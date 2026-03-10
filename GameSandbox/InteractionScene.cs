@@ -9,7 +9,6 @@ using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
-using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
@@ -76,7 +75,7 @@ namespace GameSandbox.Scenes
         /// <summary>Konfigurace scény předaná zvenku.</summary>
         private readonly InteractionSceneOptions _options;
 
-        #endregion
+        #endregion Privátní pole
 
         #region Konstruktor
 
@@ -98,14 +97,14 @@ namespace GameSandbox.Scenes
         {
             ArgumentNullException.ThrowIfNull(options);
 
-            _runtime      = runtime;
-            _clock        = (SystemClock)runtime.Clock;
-            _gf           = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
+            _runtime = runtime;
+            _clock = (SystemClock)runtime.Clock;
+            _gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
             _gameTimePath = gameTimePath;
-            _options      = options;
+            _options = options;
         }
 
-        #endregion
+        #endregion Konstruktor
 
         #region Veřejné metody
 
@@ -125,7 +124,7 @@ namespace GameSandbox.Scenes
             Export();
         }
 
-        #endregion
+        #endregion Veřejné metody
 
         #region Simulační smyčka
 
@@ -183,10 +182,10 @@ namespace GameSandbox.Scenes
             {
                 playerPerson.ReceiveEvent(new InteractionProposed(
                     OccurredAt: now,
-                    From:       npcPerson.Id,
-                    To:         playerPerson.Id,
-                    Act:        SpeechAct.SmallTalk,
-                    Content:    "Ehm... Ahoj"));
+                    From: npcPerson.Id,
+                    To: playerPerson.Id,
+                    Act: SpeechAct.SmallTalk,
+                    Content: "Ehm... Ahoj"));
             }
 
             // Výsledek interakce NPC → hráč
@@ -220,10 +219,10 @@ namespace GameSandbox.Scenes
             {
                 npcPerson.ReceiveEvent(new InteractionProposed(
                     OccurredAt: now,
-                    From:       playerPerson.Id,
-                    To:         npcPerson.Id,
-                    Act:        SpeechAct.SmallTalk,
-                    Content:    "Ehm... ahoj."));
+                    From: playerPerson.Id,
+                    To: npcPerson.Id,
+                    Act: SpeechAct.SmallTalk,
+                    Content: "Ehm... ahoj."));
 
                 npcPerson.Tick(now, dt);
 
@@ -245,8 +244,8 @@ namespace GameSandbox.Scenes
 
             // NPC nemá UI — spánek vždy potvrdíme, engine vypočítá délku sám (default)
             npcPerson.ReceiveEvent(new SleepConfirmed(
-                OccurredAt:    now,
-                Human:         prompt.Human,
+                OccurredAt: now,
+                Human: prompt.Human,
                 PlannedWakeUp: default));
         }
 
@@ -280,7 +279,7 @@ namespace GameSandbox.Scenes
             playerPerson.ReceiveEvent(response);
         }
 
-        #endregion
+        #endregion Simulační smyčka
 
         #region Export a výstup
 
@@ -312,7 +311,7 @@ namespace GameSandbox.Scenes
             File.WriteAllText(_gameTimePath, _clock.Now.WorldTicks.ToString());
         }
 
-        #endregion
+        #endregion Export a výstup
 
         #region Konzolové utility
 
@@ -334,6 +333,6 @@ namespace GameSandbox.Scenes
             if (clear) Console.Clear();
         }
 
-        #endregion
+        #endregion Konzolové utility
     }
 }

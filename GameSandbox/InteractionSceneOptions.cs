@@ -42,14 +42,14 @@ namespace GameSandbox.Scenes
         /// <remarks>
         /// Musí být již importována a přidána do manageru před spuštěním scény.
         /// </remarks>
-        public required CharacterBase Player { get; init; }
+        public CharacterBase Player { get; init; }
 
         /// <summary>
         /// NPC s nímž probíhají interakce.
         /// </summary>
-        public required CharacterBase Npc { get; init; }
+        public CharacterBase Npc { get; init; }
 
-        #endregion
+        #endregion Účastníci
 
         #region Časování simulace
 
@@ -79,7 +79,7 @@ namespace GameSandbox.Scenes
         /// </remarks>
         public WTimeSpan ClockAdvance { get; init; } = WTimeSpan.FromHours(1);
 
-        #endregion
+        #endregion Časování simulace
 
         #region Scénář (callback)
 
@@ -117,7 +117,7 @@ namespace GameSandbox.Scenes
         /// </remarks>
         public Action<WDateTime, IHuman, IHuman>? OnTick { get; init; }
 
-        #endregion
+        #endregion Scénář (callback)
 
         #region Sleep handling
 
@@ -146,7 +146,7 @@ namespace GameSandbox.Scenes
         /// </remarks>
         public Func<SleepPromptRequested, bool>? OnSleepPrompt { get; init; }
 
-        #endregion
+        #endregion Sleep handling
     }
 
     /// <summary>
