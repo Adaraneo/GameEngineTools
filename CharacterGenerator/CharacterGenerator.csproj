@@ -5,6 +5,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NoWin32Manifest>true</NoWin32Manifest>
+    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
   </PropertyGroup>
 
 <Target Name="PreBuild" BeforeTargets="PreBuildEvent">

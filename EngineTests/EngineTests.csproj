@@ -9,6 +9,8 @@
     <IsTestProject>true</IsTestProject>
     <IsPublishable>False</IsPublishable>
     <OutputType>Library</OutputType>
+    <NoWin32Manifest>true</NoWin32Manifest>
+    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
   </PropertyGroup>
 
   <ItemGroup>
