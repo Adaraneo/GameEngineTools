@@ -8,7 +8,7 @@
     <NoWin32Manifest>true</NoWin32Manifest>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Version>$(VersionPrefix)</Version>
-    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+    <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
