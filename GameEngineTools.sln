@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.3.11520.95 d18.3
+VisualStudioVersion = 18.3.11520.95
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Games", "Games", "{427FFDCB-7D57-476F-842C-38BD7BF9E468}"
 EndProject
@@ -35,7 +35,6 @@ Global
 		{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8AADC6EF-AF2F-449F-9142-E9F9F5AAA54D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{333E59D0-D969-4B56-80E7-7B5CED47512A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BA435300-7123-BAE1-AFFC-BC54B062B3A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
