@@ -109,7 +109,7 @@ namespace GameEngineTools
         /// </summary>
         /// <param name="startTime">
         /// Volitelný počáteční čas světa. Pokud <c>null</c>, použije se
-        /// výchozí začátek roku 1322 definovaný v konfiguraci.
+        /// výchozí začátek roku 1.
         /// </param>
         /// <param name="consoleLogs">Zapne konzolové logování v manageru.</param>
         /// <param name="logsRoot">Kořenový adresář pro logové soubory.</param>
@@ -119,7 +119,6 @@ namespace GameEngineTools
         /// Dispose zastaví všechny služby a uvolní DI kontejner.
         /// </returns>
         public static async Task<GameEngineToolsRuntimeHandle> StartAsync(
-            WDateTime? startTime = null,
             bool consoleLogs = false,
             string? logsRoot = null,
             GeneratedFileOptions? generatedFileOptions = null)
@@ -173,12 +172,7 @@ namespace GameEngineTools
             services.AddSingleton<IWorldClock>(sp =>
             {
                 var wSpec = sp.GetRequiredService<WorldTimeSpec>();
-
-                // Pokud caller předal startTime, použijeme jeho tiky.
-                // Jinak začínáme na rok 1322, 1. den, 1. měsíc — definovaný začátek světa.
-                long beginningTicks = startTime.HasValue
-                    ? startTime.Value.WorldTicks
-                    : wSpec.Calendar.DaysFromDate(1, 1, 1) * wSpec.TicksPerDay;
+                long beginningTicks = wSpec.Calendar.DaysFromDate(1, 1, 1) * wSpec.TicksPerDay;
 
                 return WorldClock.AlignNow(wSpec, beginningTicks);
             });

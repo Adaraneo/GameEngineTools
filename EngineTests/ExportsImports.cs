@@ -103,23 +103,6 @@ namespace GameTester
             this.AssertImports(this.DoImport(false), nppcs);
             this.AssertImports(this.DoImport(), nppcs);
         }
-    }
-
-    [TestClass]
-    public class ExportsImportsWithServices : AsyncTestBase
-    {
-        protected override void TestInit()
-        {
-            base.TestInit();
-            var root = GameEngineTools.Constants.TestFSConstatns.gfiles;
-            if (!Directory.Exists(root))
-            {
-                Directory.CreateDirectory(GameEngineTools.Constants.TestFSConstatns.player);
-                Directory.CreateDirectory(GameEngineTools.Constants.TestFSConstatns.NPCs);
-            }
-            CharacterManager.Initialize();
-            this.CleanFiles(root);
-        }
 
         [TestMethod]
         public void DoBasicRelationshipExport()

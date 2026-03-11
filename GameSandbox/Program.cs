@@ -26,7 +26,6 @@ var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(game
 
 // ── Runtime ───────────────────────────────────────────────────────────────────
 await using var runtime = await GameEngineToolsRuntime.StartAsync(
-    new WDateTime(initTicks),
     consoleLogs: false,
     generatedFileOptions: new GeneratedFileOptions
     {
@@ -51,8 +50,6 @@ foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
 
 var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16).FirstOrDefault()!;
 
-// ── Scéna ─────────────────────────────────────────────────────────────────────
-// Jediné místo kde definuješ CO se simuluje — scéna se stará o HOW.
 var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOptions
 {
     Player = player,
@@ -61,10 +58,8 @@ var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOpti
     TickStep = WTimeSpan.FromHours(0.5),
     ClockAdvance = WTimeSpan.FromHours(1),
 
-    // Scénář: sem napíšeš jen co chceš testovat — zbytek řeší scéna
     OnTick = (now, p, npc) =>
     {
-        // Dny 2, 6, 12 → hráč zahajuje small talk s NPC
         if (now.Day is 2 or 6 or 12)
             npc.ReceiveEvent(new InteractionProposed(
                 now + WTimeSpan.FromMinutes(30), p.Id, npc.Id, SpeechAct.SmallTalk, "Ahoooj"));
@@ -81,7 +76,6 @@ var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOpti
             npc.ReceiveEvent(new ContextChanged(now + WTimeSpan.FromHours(1), npc.Id, "Castle", true, 0.13, 0.2));
         }
 
-        // Den 10 → NPC posílá hráči validaci
         if (now.Day is 10)
             p.ReceiveEvent(new InteractionProposed(
                 now + WTimeSpan.FromMinutes(12), npc.Id, p.Id, SpeechAct.Validation, "Sluší ti to."));

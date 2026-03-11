@@ -43,11 +43,7 @@
             var pcFolderPath = GFC.pc;
             var npcFolderPath = GFC.npc;
 
-            var spec = GameEngineToolsRuntime.LoadSpec();
-            var beginSpec = spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
-            var beginning = new WDateTime(beginSpec);
-
-            await using var runtime = await GameEngineToolsRuntime.StartAsync(beginning, consoleLogs: false, generatedFileOptions: new GeneratedFileOptions
+            await using var runtime = await GameEngineToolsRuntime.StartAsync(consoleLogs: false, generatedFileOptions: new GeneratedFileOptions
             {
                 NPCDirectory = GFC.npc,
                 PlayerDirectory = GFC.pc
