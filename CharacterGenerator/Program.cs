@@ -88,6 +88,7 @@
             nppcs.Add(significantOther);
             nppcs.Add(friend);
 
+            Console.WriteLine("Done");
             Console.WriteLine("Would you like to generate other NPCs? [Y\\N]");
             var key = Console.ReadKey().Key;
             if (key != ConsoleKey.N)
@@ -122,7 +123,7 @@
 
             ExportInfo(currentDirectory, player, significantOther, friend);
 
-            Console.WriteLine("Done");
+            Console.WriteLine("Done. You may close the window right now.");
             Console.ReadKey();
         }
     }
