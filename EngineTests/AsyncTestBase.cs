@@ -18,6 +18,7 @@ namespace GameTester
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Calendars;
     using GameEngineTools.World.Core.Time;
+    using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
@@ -117,7 +118,7 @@ namespace GameTester
             s.AddSingleton<IWorldClock>(sp =>
             {
                 var wSpec = sp.GetRequiredService<WorldTimeSpec>();
-                long beginningTicks = wSpec.Calendar.DaysFromDate(132, 1, 1) * wSpec.TicksPerDay;
+                long beginningTicks = wSpec.Calendar.DaysFromDate(1, 1, 1) * wSpec.TicksPerDay;
                 return WorldClock.AlignNow(wSpec, beginningTicks);
             });
 
@@ -210,6 +211,9 @@ namespace GameTester
             }
 
             await OnInitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            var testClock = (TestClock)ServiceProvider.GetRequiredService<IClock>();
+            testClock.SetNow(WDateTime.New(WDateOnly.New(100, 1, 1)));
         }
 
         /// <summary>

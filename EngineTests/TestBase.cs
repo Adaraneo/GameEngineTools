@@ -19,6 +19,7 @@ namespace GameTester
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Calendars;
     using GameEngineTools.World.Core.Time;
+    using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
@@ -116,6 +117,8 @@ namespace GameTester
         protected virtual void TestInit()
         {
             InitializeServicesAndGetProvider();
+            var testClock = (TestClock)ServiceProvider.GetRequiredService<IClock>();
+            testClock.SetNow(WDateTime.New(WDateOnly.New(100, 1, 1)));
             Filenames.Clear();
         }
 
@@ -240,16 +243,13 @@ namespace GameTester
                     calendar);
             });
 
-            // ── IWorldClock — kotva na rok 132, 1. den 1. měsíce ─────────────
             services.AddSingleton<IWorldClock>(sp =>
             {
                 var wSpec = sp.GetRequiredService<WorldTimeSpec>();
-                long beginningTicks = wSpec.Calendar.DaysFromDate(132, 1, 1) * wSpec.TicksPerDay;
+                long beginningTicks = wSpec.Calendar.DaysFromDate(1, 1, 1) * wSpec.TicksPerDay;
                 return WorldClock.AlignNow(wSpec, beginningTicks);
             });
 
-            // ── IClock / TestClock — bere WorldTimeSpec přímo (ne WorldTimeContext)
-            //    Důvod: TestClock → WorldTimeContext → IClock by byl kruh.
             services.AddSingleton<IClock, TestClock>();
 
             // ── Soubory ───────────────────────────────────────────────────────

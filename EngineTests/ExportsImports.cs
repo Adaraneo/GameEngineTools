@@ -125,7 +125,7 @@ namespace GameTester
         public void DoBasicRelationshipExport()
         {
             var nppcs = new List<CharacterBase>();
-            var player = new PC(MaxHealth, CharacterManager.RandomizePerson(PlayersMinAge, PlayersMaxAge));
+            var player = new PC(MaxHealth, CharacterManager.RandomizePerson(PlayersMaxAge, PlayersMinAge));
             var npc = new NPC(MaxHealth, CharacterManager.RandomizePerson(player));
             var npc2 = new NPC(MaxHealth, CharacterManager.RandomizePerson());
             nppcs.Add(player);

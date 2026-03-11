@@ -65,7 +65,7 @@ namespace GameEngineTools.Characters.Generation
             int maxAgeYears = 100)
         {
             var daysInYear = WWorld.Spec.Calendar.DaysInYear(now.Year);
-            var minAgeDays = minAgeYears * daysInYear;
+            var minAgeDays = (minAgeYears == 0 ) ? 1 : minAgeYears * daysInYear;
             var maxAgeDays = maxAgeYears * daysInYear;
 
             WDateOnly minBirth;
@@ -75,9 +75,9 @@ namespace GameEngineTools.Characters.Generation
             }
             catch (ArgumentOutOfRangeException)
             {
-                // Datum by šlo před epochu — zarovnáme na 30 dní dopředu od "teď"
+                // Datum by šlo před epochu — zarovnáme na 30 dní dozadu od "teď"
                 // TODO: nahradit lunárním výpočtem
-                minBirth = new WDateOnly(now.DayIndex + 30);
+                minBirth = new WDateOnly(now.DayIndex - 30);
             }
 
             var maxBirth = new WDateOnly(now.DayIndex - minAgeDays);

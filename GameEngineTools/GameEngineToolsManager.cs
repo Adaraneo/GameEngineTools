@@ -124,14 +124,14 @@ namespace GameEngineTools
         /// <summary>
         /// Vygeneruje náhodnou postavu s věkem v zadaném rozsahu.
         /// </summary>
+        /// <param name="maxAge">Maximální věk v letech.</param>
         /// <param name="minAge">Minimální věk v letech (výchozí 0).</param>
-        /// <param name="maxAge">Maximální věk v letech (výchozí 100).</param>
         /// <returns>Nová náhodně vygenerovaná postava.</returns>
         /// <remarks>
         /// Datum narození se náhodně volí uvnitř okna odvozeného od aktuálního
         /// herního času a zadaného věkového rozsahu.
         /// </remarks>
-        public IHuman RandomizePerson(int minAge = 0, int maxAge = 100)
+        public IHuman RandomizePerson(int maxAge, int minAge = 0)
         {
             var now = _clock.Now;
             var year = now.Year;
