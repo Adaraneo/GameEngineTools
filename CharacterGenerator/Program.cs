@@ -89,7 +89,7 @@
             nppcs.Add(friend);
 
             Console.WriteLine("Done");
-            Console.WriteLine("Would you like to generate other NPCs? [Y\\N]");
+            Console.WriteLine("Would you like to generate other NPCs? [Y\\n]");
             var key = Console.ReadKey().Key;
             if (key != ConsoleKey.N)
             {
