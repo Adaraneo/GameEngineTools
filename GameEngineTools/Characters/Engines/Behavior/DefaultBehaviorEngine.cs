@@ -32,7 +32,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// <summary>
         /// Aktivní spánková session. <c>null</c> pokud postava nespí.
         /// Session je runtime objekt — není součástí <see cref="BehaviorState"/>
-        /// (záměrně, viz poznámku u <see cref="RestoreState"/>).
+        /// (záměrně, viz poznámka u <see cref="RestoreState"/>).
         /// </summary>
         private ISleepSession? _activeSession;
 
