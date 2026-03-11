@@ -8,6 +8,7 @@ using GameEngineTools.FileSystem;
 using GameEngineTools.World.Utils.Time;
 using GameSandbox.Scenes;
 using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics.CodeAnalysis;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
 
@@ -48,7 +49,7 @@ clock.SetNow(initTicks == defaultTicks
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.NPPCs.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
-var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology).FirstOrDefault()!;
+var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16).FirstOrDefault()!;
 
 // ── Scéna ─────────────────────────────────────────────────────────────────────
 // Jediné místo kde definuješ CO se simuluje — scéna se stará o HOW.
