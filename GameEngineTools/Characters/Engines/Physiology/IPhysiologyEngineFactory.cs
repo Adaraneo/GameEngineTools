@@ -8,6 +8,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
     public interface IPhysiologyEngineFactory
     {
-        IPhysiologyEngine Create(IRandomSource rng, SexBiology biology, WDateOnly now);
+        IPhysiologyEngine Create(IRandomSource rng, SexBiology biology, WDateOnly birthDate ,WDateOnly now);
     }
 }

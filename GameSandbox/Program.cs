@@ -48,7 +48,10 @@ clock.SetNow(initTicks == defaultTicks
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.NPPCs.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
-var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16).FirstOrDefault()!;
+var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && (Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16 || Math.Abs(npc.Person.Identity.BirthDate.Year - player.Person.Identity.BirthDate.Year) == 5)).FirstOrDefault();
+
+if (significantOther is null)
+    throw new NullReferenceException(nameof(significantOther));
 
 var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOptions
 {
@@ -68,7 +71,7 @@ var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOpti
             npc.ReceiveEvent(new InteractionProposed(now + WTimeSpan.FromMinutes(12), p.Id, npc.Id, SpeechAct.Humor, "Vtip"));
 
         if (now.Day is 16)
-            npc.ReceiveEvent(new MicroPositive(now + WTimeSpan.FromMinutes(20), npc.Id, p.Id, "Whatever..."));
+            npc.ReceiveEvent(new MicroPositive(now + WTimeSpan.FromMinutes(20), npc.Id, p.Id, "Smile"));
 
         if (now.Day is 16 && now.Hour is 20 && p.Snapshot.InteractionSurface.Location != "Castle" && npc.Snapshot.InteractionSurface.Location != "Castle")
         {

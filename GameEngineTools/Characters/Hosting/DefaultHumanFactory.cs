@@ -63,7 +63,7 @@ namespace GameEngineTools.Characters.Hosting
             var logger = _loggerFactory.CreateLogger($"Characters.Human[{b.Id.Value}]");
 
             // Engines vytvořené přes factories
-            var physio = _physioFactory.Create(rng, b.Biology, _clock.Now.Date);
+            var physio = _physioFactory.Create(rng, b.Biology, b.Identity.BirthDate, _clock.Now.Date);
             var psych = _psychFactory.Create(rng);
 
             // Engines bez runtime parametrů - stačí DI

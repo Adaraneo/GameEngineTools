@@ -14,6 +14,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         public PhysiologyEngineFactory(IServiceProvider sp) => _sp = sp;
 
-        public IPhysiologyEngine Create(IRandomSource rng, SexBiology biology, WDateOnly now) => ActivatorUtilities.CreateInstance<TImpl>(_sp, rng, biology, now);
+        public IPhysiologyEngine Create(IRandomSource rng, SexBiology biology, WDateOnly birthDate, WDateOnly now) => ActivatorUtilities.CreateInstance<TImpl>(_sp, rng, biology, birthDate, now);
     }
 }

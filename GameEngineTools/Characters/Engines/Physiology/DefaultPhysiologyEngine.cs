@@ -30,6 +30,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             ILoggerFactory loggerFactory,
             IRandomSource rng,
             SexBiology biology,
+            WDateOnly birthDate,
             WDateOnly now)
         {
             Config = cfg.Value;
@@ -38,7 +39,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             _log = loggerFactory.CreateLogger("Characters.Physiology");
             _rng = rng;
 
-            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female)
+            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && birthDate.Year >= Config.MenstrualCycleBeginsInAge)
                 ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 

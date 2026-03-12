@@ -26,9 +26,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="appsettings.Characters.Default.json">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
     <None Update="appsettings.Characters.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
