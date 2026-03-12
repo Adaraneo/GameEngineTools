@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using System.Collections.Generic;
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -61,7 +62,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             Config = cfg.Value;
             _sleepCfg = sleepCfg.Value;
             _loggerFactory = loggerFactory;
-            _log = loggerFactory.CreateLogger("Characters.Behavior");
+            _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
 
             State = new BehaviorState(
                 NeedRest: 40, NeedFood: 30, NeedWater: 25,
@@ -195,8 +196,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
             if (State.SleepGraceExpiresAt.HasValue && now < State.SleepGraceExpiresAt.Value)
             {
                 var penaltyMultiplier = 1.0 + State.SleepDeclineCount * 0.5; // roste s odmítnutími
-                _log.LogDebug("[Behavior] {Id} odmítá spánek — penalizace ×{Mult:F1} (odmítnutí #{Count}).",
-                    ctx.Id, penaltyMultiplier, State.SleepDeclineCount);
+                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
+                {
+                    _log.LogDebug("Pdmítá spánek — penalizace ×{Mult:F1} (odmítnutí #{Count}).", penaltyMultiplier, State.SleepDeclineCount);
+                }
+
                 return false; // candidates mohou fungovat, jen s rostoucím stresem
             }
 
@@ -206,8 +210,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
             {
                 outbox.Add(new SleepPromptRequested(now, ctx.Id, needRest));
                 State = State with { WaitingForSleepConfirmation = true, SleepGraceExpiresAt = null };
+                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
+                {
+                    _log.LogInformation("Sleep prompt vyslán (NeedRest={Need:F1}).", needRest);
+                }
 
-                _log.LogInformation("[Behavior] {Id} — sleep prompt vyslán (NeedRest={Need:F1}).", ctx.Id, needRest);
                 return true;
             }
 
@@ -243,7 +250,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 CurrentPlan = new PlannedAction(Sleep, sc.OccurredAt, WTimeSpan.FromHours(sleepHours), 100)
             };
 
-            _log.LogInformation("[Behavior] {Id} — spánek zahájen. Délka: {Hours:F1}h.", ctx.Id, sleepHours);
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
+            {
+                _log.LogInformation("Spánek zahájen. Délka: {Hours:F1}h.", sleepHours);
+            }
         }
 
         /// <summary>
@@ -263,8 +273,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 SleepGraceExpiresAt = graceExpiry
             };
 
-            _log.LogWarning("[Behavior] {Id} — spánek odmítnut (#{Count}), grace: {Grace:F1}h.",
-                ctx.Id, newDeclineCount, graceHours);
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
+            {
+                _log.LogWarning("Spánek odmítnut (#{Count}), grace: {Grace:F1}h.", newDeclineCount, graceHours);
+            }
         }
 
         /// <summary>
@@ -277,8 +289,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
             State = State with { CurrentPlan = null };
             _activeSession = null;
 
-            _log.LogInformation("[Behavior] {Id} — sleep session ukončena, cooldown {Cooldown}h.",
-                ctx.Id, Config.SleepCooldownHours);
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
+            {
+                _log.LogInformation("Sleep session ukončena, cooldown {Cooldown}h.", Config.SleepCooldownHours);
+            }
         }
 
         #endregion Sleep prompt — interní logika
@@ -318,8 +332,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 if (elapsed < running.ExpectedDuration)
                 {
                     State = State with { CurrentPlan = running };
-                    _log.LogDebug("[Behavior] Akce '{Action}' stále běží, zbývá {Remaining}.",
-                        running.Name, running.ExpectedDuration - elapsed);
+                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
+                    {
+                        _log.LogDebug("Akce '{Action}' stále běží, zbývá {Remaining}.", running.Name, running.ExpectedDuration - elapsed);
+                    }
+
                     return;
                 }
             }
@@ -343,8 +360,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
             outbox.Add(new ActionCommitted(now, ctx.Id, chosen.Name, chosen.Dur));
 
             State = State with { CurrentPlan = plan, Cooldowns = updatedCooldowns };
-            _log.LogInformation("[Behavior] Nová akce: '{Action}' (utility={Utility:F2}, trvání={Duration}).",
-                chosen.Name, chosen.Utility, chosen.Dur);
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
+            {
+                _log.LogInformation("Nová akce: '{Action}' (utility={Utility:F2}, trvání={Duration}).", chosen.Name, chosen.Utility, chosen.Dur);
+            }
         }
 
         #endregion Výběr akce (utility)

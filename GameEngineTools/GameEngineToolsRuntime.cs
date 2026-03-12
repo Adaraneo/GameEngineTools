@@ -132,9 +132,9 @@ namespace GameEngineTools
                 lb.AddConsole();
                 lb.AddCharactersFile(opt =>
                 {
-                    opt.FilePath = logsRoot != null
-                        ? Path.Combine(logsRoot, "Characters", "characters.log")
-                        : "logs/Characters/characters.log";
+                    opt.LogsDirectoryPath = logsRoot != null
+                        ? Path.Combine(logsRoot, "Characters")
+                        : Path.Combine("logs","Characters");
                     opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                 });

@@ -13,8 +13,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(EventId = 5000, Level = LogLevel.Information, Message = "[PHYSIO] {HumanId} Energy: {Energy:F1} Hunger: {Hunger:F2} Thirst: {Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1}")]
         public static partial void PhysiologySnapshot(this ILogger logger, string HumanId, double Energy, double Hunger, double Thirst, double Pain, double SleepDebt, double TempDelta, double Immune);
 
-        [LoggerMessage(EventId = 5001, Level = LogLevel.Debug,
-    Message = "[PHYSIO/CYCLE] {HumanId} Phase:{Phase} Day:{DayInCycle}")]
+        [LoggerMessage(EventId = 5001, Level = LogLevel.Debug, Message = "[PHYSIO/CYCLE] {HumanId} Phase:{Phase} Day:{DayInCycle}")]
         public static partial void PhysiologyCycle(this ILogger logger, string HumanId, string Phase, int DayInCycle);
 
         #endregion Physiology

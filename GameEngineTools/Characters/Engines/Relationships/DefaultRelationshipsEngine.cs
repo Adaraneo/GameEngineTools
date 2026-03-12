@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System;
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -21,7 +22,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
-            _log = loggerFactory.CreateLogger("Characters.Relationships");
+            _log = loggerFactory.CreateLogger<DefaultRelationshipsEngine>();
             State = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>());
         }
 
@@ -149,10 +150,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     A: self, B: other,
                     Like: 45, Trust: 45, Attraction: 35, Closeness: 10, Respect: 55, Comfort: 40,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
-                _log.LogInformation("[Relationships] Nová hrana: {A} → {B}.", self.Value, other.Value);
+                using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
+                {
+                    _log.LogInformation("Nová hrana: {A} → {B}.", self.Value, other.Value);
+                }
             }
             var updated = mut(e);
-            _log.LogDebug("[Relationships] Hrana {A}→{B}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}.", self.Value, other.Value, updated.Like, updated.Trust, updated.Closeness);
+            using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
+            {
+                _log.LogDebug("Hrana {A}→{B}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}.", self.Value, other.Value, updated.Like, updated.Trust, updated.Closeness);
+            }
             dict[other] = updated;
             State = new RelationshipState(dict);
         }

@@ -7,6 +7,8 @@ namespace GameEngineTools.Characters.Engines.Memory
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -23,13 +25,17 @@ namespace GameEngineTools.Characters.Engines.Memory
         public DefaultMemoryEngine(IOptions<MemoryConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
-            _log = loggerFactory.CreateLogger("Characters.Memory");
+            _log = loggerFactory.CreateLogger<DefaultMemoryEngine>();
             State = new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>());
         }
 
         public void Encode(EpisodicMemory episode, IHumanContext ctx, IEventCollector outbox)
         {
-            _log.LogDebug("[Memory] Zakódována epizoda: '{Tag}' (salience={Salience:F2}, emotion={Emotion}).", episode.What, episode.Salience, episode.Emotion);
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
+            {
+                _log.LogDebug("Zakódována epizoda: '{Tag}' (salience={Salience:F2}, emotion={Emotion}).", episode.What, episode.Salience, episode.Emotion);
+            }
+
             var list = State.Episodes.ToList();
             list.Add(episode);
             State = new MemoryIndex(list, State.Semantics);
@@ -105,7 +111,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                 episodes = set.Values.ToList();
 
                 outbox.Add(new MemoryConsolidated(now, ctx.Id, boosted.Count));
-                _log.LogInformation("[Memory] Konsolidace: posíleno {Count} epizod.", boosted.Count);
+                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
+                {
+                    _log.LogInformation("Konsolidace: posíleno {Count} epizod.", boosted.Count);
+                }
             }
 
             episodes = episodes

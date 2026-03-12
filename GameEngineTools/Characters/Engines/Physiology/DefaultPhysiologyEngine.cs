@@ -5,6 +5,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -36,10 +38,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
             Config = cfg.Value;
             _cycleCfg = cycleCfg.Value;
 
-            _log = loggerFactory.CreateLogger("Characters.Physiology");
+            _log = loggerFactory.CreateLogger<DefaultPhysiologyEngine>();
             _rng = rng;
 
-            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && birthDate.Year >= Config.MenstrualCycleBeginsInAge)
+            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && birthDate.Year >= Config.MenstrualCycleBeginsInAge && now != default)
                 ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 
@@ -152,9 +154,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                                 : s.Pain
                         };
 
-                        _log.LogDebug(
-                            "[Physiology] SleepEnded — délka: {Hours:F1}h, kvalita: {Quality:F0}, dluh po obnově: {Debt:F2}h.",
-                            h, se.Quality, s.SleepDebtHours);
+                        using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                        {
+                            _log.LogDebug("SleepEnded — délka: {Hours:F1}h, kvalita: {Quality:F0}, dluh po obnově: {Debt:F2}h.", h, se.Quality, s.SleepDebtHours);
+                        }
+
                         break;
                     }
 

@@ -5,6 +5,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -18,7 +20,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         public DefaultInteractionEngine(IOptions<InteractionConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
-            _log = loggerFactory.CreateLogger("Characters.Interactions");
+            _log = loggerFactory.CreateLogger<DefaultInteractionEngine>();
             State = new InteractionSurface(Location: "Unknown", HasPrivacy: false, Noise: 0.5, Crowding: 0.5);
         }
 
@@ -32,7 +34,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
             switch (@event)
             {
                 case ContextChanged cc:
-                    _log.LogInformation("[Interactions] Kontext změněn: lokace='{Location}', hluk={Noise:F2}, přeplněnost={Crowding:F2}.", cc.Location, cc.Noise, cc.Crowding);
+                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
+                    {
+                        _log.LogInformation("Kontext změněn: lokace='{Location}', hluk={Noise:F2}, přeplněnost={Crowding:F2}.", cc.Location, cc.Noise, cc.Crowding);
+                    }
                     State = new InteractionSurface(
                         Location: cc.Location,
                         HasPrivacy: cc.HasPrivacy,
@@ -69,7 +74,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     var pAcc = Math.Clamp(baseP, 0.05, 0.95);
                     var accepted = ctx.Random.Chance(pAcc);
 
-                    _log.LogInformation("[Interactions] {From} → {To}: p(přijetí)={P:F2}, výsledek={Result}.", p.From.Value, p.To.Value, pAcc, accepted ? "PŘIJATO" : "ODMÍTNUTO");
+                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
+                    {
+                        _log.LogInformation("{From} → {To}: p(přijetí)={P:F2}, výsledek={Result}.", p.From.Value, p.To.Value, pAcc, accepted ? "PŘIJATO" : "ODMÍTNUTO");
+                    }
 
                     outbox.Add(new InteractionOutcome((p.OccurredAt), p.From, p.To, accepted, accepted ? "accepted" : "declined"));
                     break;

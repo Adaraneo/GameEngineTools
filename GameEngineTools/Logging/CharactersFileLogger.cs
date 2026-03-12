@@ -3,6 +3,7 @@
 
 namespace GameEngineTools.Logging
 {
+    using System.Collections.Concurrent;
     using System.Text;
     using Microsoft.Extensions.Logging;
 
@@ -11,6 +12,7 @@ namespace GameEngineTools.Logging
         private readonly CharactersFileLoggerOptions _opt;
         private readonly object _sync = new();
         private readonly StreamWriter _writer;
+        private readonly ConcurrentDictionary<string, StreamWriter> _writers = new();
         private bool _disposed;
         private IExternalScopeProvider? _scopes;
 
@@ -45,13 +47,30 @@ namespace GameEngineTools.Logging
                 }
 
                 var msg = formatter(state, exception);
-                List<string>? scopes = null;
-                _provider._scopes?.ForEachScope((s, list) =>
+                var scopes = new List<string>();
+
+                _provider._scopes?.ForEachScope((s, state) =>
                 {
-                    (list ??= new()).Add(s?.ToString() ?? string.Empty);
+                    state.Add(s?.ToString() ?? string.Empty);
                 }, scopes);
+
                 _provider.Write(logLevel, _category, eventId, msg, exception, scopes);
             }
+        }
+
+        private StreamWriter GetWriter(string path)
+        {
+            return _writers.GetOrAdd(path, p =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(p)!);
+
+                return new StreamWriter(
+                    new FileStream(p, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                {
+                    AutoFlush = false,
+                    NewLine = "\n"
+                };
+            });
         }
 
         internal bool IsEnabled(LogLevel level) => level >= _opt.MinLevel;
@@ -76,30 +95,57 @@ namespace GameEngineTools.Logging
 
             sb.Append(" :: ").Append(message);
 
-            if (scopes is { Count: > 0 })
-            {
-                sb.Append(" | scopes: ").Append(string.Join(" > ", scopes));
-            }
-
             if (ex is not null)
             {
                 sb.Append(" | ex: ").Append(ex.GetType().Name).Append(": ").Append(ex.Message)
                   .AppendLine().Append(ex.StackTrace);
             }
 
+            var line = sb.ToString();
+
+            var (personId, engine) = ExtractScope(scopes);
+
             lock (_sync)
             {
-                _writer.WriteLine(sb.ToString());
+                _writer.WriteLine(line);
+
+                if (personId != null)
+                {
+                    var file = engine == null
+                        ? Path.Combine(_opt.LogsDirectoryPath, "Person", personId.Value.ToString(), "person.log")
+                        : Path.Combine(_opt.LogsDirectoryPath, "Person", personId.Value.ToString(), $"{engine}.log");
+
+                    var w = GetWriter(file);
+                    w.WriteLine(line);
+
+                    w.Flush();
+                }
+
                 _writer.Flush();
             }
+        }
+
+        private static (Guid? personId, string? subsystem) ExtractScope(List<string>? scopes)
+        {
+            if (scopes == null) return (null, null);
+
+            foreach (var s in scopes)
+            {
+                var parts = s.Split(':');
+
+                if (parts.Length == 2 && Guid.TryParse(parts[0], out var id))
+                    return (id, parts[1]);
+            }
+
+            return (null, null);
         }
 
         public CharactersFileLoggerProvider(CharactersFileLoggerOptions opt)
         {
             _opt = opt;
-            Directory.CreateDirectory(Path.GetDirectoryName(_opt.FilePath)!);
+            Directory.CreateDirectory(_opt.LogsDirectoryPath);
             // Append, AutoFlush off (lepší výkon), UTF8 bez BOM
-            _writer = new StreamWriter(new FileStream(_opt.FilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            _writer = new StreamWriter(new FileStream(Path.Combine(_opt.LogsDirectoryPath, "Characters.log"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
             {
                 AutoFlush = false,
                 NewLine = "\n"
@@ -118,6 +164,12 @@ namespace GameEngineTools.Logging
             _disposed = true;
             lock (_sync)
             {
+                foreach (var pw in _writers.Values)
+                {
+                    pw.Flush();
+                    pw.Dispose();
+                }
+
                 _writer.Flush();
                 _writer.Dispose();
             }
@@ -146,8 +198,23 @@ namespace GameEngineTools.Logging
 
     public sealed class CharactersFileLoggerOptions
     {
-        public string FilePath { get; set; } = Path.Combine("logs", "Characters", "characters.log");
+        public string LogsDirectoryPath { get; set; } = Path.Combine("logs", "Characters");
         public LogLevel MinLevel { get; set; } = LogLevel.Information;
         public bool UseUtcTimestamps { get; set; } = true;
+    }
+
+    public readonly struct CharacterLogScope
+    {
+        public Guid PersonId { get; }
+        public string Subsystem { get; }
+
+        public CharacterLogScope(Guid personId, string subsystem)
+        {
+            PersonId = personId;
+            Subsystem = subsystem;
+        }
+
+        public override string ToString()
+            => $"{PersonId}:{Subsystem}";
     }
 }

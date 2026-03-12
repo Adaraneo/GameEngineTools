@@ -5,6 +5,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Physiology;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -20,7 +22,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
         public DefaultPsychologyEngine(IOptions<PsychologyConfig> cfg, ILoggerFactory loggerFactory, IRandomSource rng)
         {
             Config = cfg.Value;
-            _log = loggerFactory.CreateLogger("Characters.Psychology");
+            _log = loggerFactory.CreateLogger<DefaultPsychologyEngine>();
             _rng = rng;
 
             State = new PsychologyState(
@@ -180,7 +182,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         {
                             var stressDelta = (1.0 - se.Quality / 100.0) * 10.0 * sensitivityMod;
                             s = s with { Stress = Math.Clamp(s.Stress + stressDelta, 0, 100) };
-                            _log.LogDebug("[Psychology] Nekvalitní spánek (kvalita={Q:F0}) → stres +{D:F1}.", se.Quality, stressDelta);
+                            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPsychologyEngine))))
+                            {
+                                _log.LogDebug("Nekvalitní spánek (kvalita={Q:F0}) → stres +{D:F1}.", se.Quality, stressDelta);
+                            }
                         }
                         else
                         {
@@ -212,7 +217,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         };
 
                         outbox.Add(new StressSpiked(nm.OccurredAt, ctx.Id, s.Stress));
-                        _log.LogDebug("[Psychology] Noční můra → stres +{Spike:F1}, valence -{Penalty:F2}.", stressSpike, valencePenalty);
+                        using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPsychologyEngine))))
+                        {
+                            _log.LogDebug("Noční můra → stres +{Spike:F1}, valence -{Penalty:F2}.", stressSpike, valencePenalty);
+                        }
+
                         break;
                     }
             }

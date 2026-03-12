@@ -48,10 +48,13 @@ clock.SetNow(initTicks == defaultTicks
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.NPPCs.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
-var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && (Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16 || Math.Abs(npc.Person.Identity.BirthDate.Year - player.Person.Identity.BirthDate.Year) == 5)).FirstOrDefault();
+var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && (Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16 || Math.Abs(npc.Person.Identity.BirthDate.Year - player.Person.Identity.BirthDate.Year) <= 5)).FirstOrDefault();
 
 if (significantOther is null)
+{
+    Console.ForegroundColor = ConsoleColor.Red;
     throw new NullReferenceException(nameof(significantOther));
+}
 
 var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOptions
 {

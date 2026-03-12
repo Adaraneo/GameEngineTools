@@ -210,7 +210,7 @@ namespace EngineTests
                 lb.AddConsole();
                 lb.AddCharactersFile(opt =>
                 {
-                    opt.FilePath = "logs/Characters/characters.log";
+                    opt.LogsDirectoryPath = Path.Combine("logs", "Characters");
                     opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                 });
