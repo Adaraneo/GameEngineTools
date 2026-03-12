@@ -1,7 +1,7 @@
 // TestBase.cs
 // Copyright (c) 50PSoftware
 
-namespace GameTester
+namespace EngineTests
 {
     using EngineTests.Utils;
     using GameEngineTools;

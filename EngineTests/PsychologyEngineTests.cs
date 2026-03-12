@@ -13,7 +13,6 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
-    using GameTester;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using System.Collections.Generic;

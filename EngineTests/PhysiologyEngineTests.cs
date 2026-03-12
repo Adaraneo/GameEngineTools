@@ -13,11 +13,11 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
-    using GameTester;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Reflection;
 
     /// <summary>
     /// Unit testy pro <see cref="DefaultPhysiologyEngine"/>.
@@ -266,6 +266,32 @@ namespace EngineTests
 
         #endregion ActionCommitted — Eat / Drink / SelfCare
 
+        #region Menstrual Cycle
+        [TestMethod]
+        public void Ctor_MenstrualCycleEnabledForAgeLessThanInConfiguration_ReturnsNullCycle()
+        {
+            var engine = BuildEngine(birthYear: 11, cycleEnabled: true);
+
+            Assert.IsNull(engine.State.Cycle);
+        }
+
+        [TestMethod]
+        public void Ctor_MenstrualCycleEnabledForAgeGreaterThanInConfiguration_ReturnsNotNullCycle()
+        {
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+
+            Assert.IsNotNull(engine.State.Cycle);
+        }
+
+        [TestMethod]
+        public void Ctor_MenstrualCycleDiabled_ReturnsNullCycle()
+        {
+            var engine = BuildEngine();
+
+            Assert.IsNull(engine.State.Cycle);
+        }
+        #endregion
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine s nastavenými počátečními hodnotami.</summary>
@@ -275,12 +301,16 @@ namespace EngineTests
             double hunger = 25,
             double thirst = 20,
             double pain = 5,
-            double immuneLoad = 10)
+            double immuneLoad = 10,
+            int birthYear = 100,
+            int todayYear = 116,
+            bool cycleEnabled = false)
         {
             var cfg = Options.Create(new PhysiologyConfig(
                 RestingMetabolicRate: 1600,
                 MaxSleepDebtHours: 12,
-                EnableMenstrualCycle: false));
+                EnableMenstrualCycle: cycleEnabled,
+                MenstrualCycleBeginsInAge: 12));
             var cycleCfg = Options.Create(new MenstrualCycleConfig());
             var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
@@ -288,7 +318,8 @@ namespace EngineTests
             var engine = new DefaultPhysiologyEngine(
                 cfg, cycleCfg, factory, rng,
                 biology: SexBiology.Female,
-                now: WDateOnly.New(132, 1, 1));
+                birthDate: WDateOnly.New(birthYear, 1, 1),
+                now: WDateOnly.New(todayYear, 1, 1));
 
             engine.RestoreState(new PhysiologyState(
                 Energy: energy,
@@ -298,7 +329,7 @@ namespace EngineTests
                 Pain: pain,
                 ImmuneLoad: immuneLoad,
                 BodyTempDelta: 0,
-                Cycle: null));
+                Cycle: engine.State.Cycle));
 
             return engine;
         }

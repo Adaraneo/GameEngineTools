@@ -1,6 +1,6 @@
 ﻿using GameEngineTools.Characters.GameObjects;
 
-namespace GameTester.Extensions
+namespace EngineTests.Extensions
 {
     public static class ImportExportExtensions
     {

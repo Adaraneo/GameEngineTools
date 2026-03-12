@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 
-namespace GameTester.Config
+namespace EngineTests.Config
 {
     public static class ConfigProvider
     {

@@ -1,11 +1,11 @@
-namespace GameTester
+namespace EngineTests
 {
     using EngineTests.Utils;
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
-    using GameTester.Extensions;
+    using EngineTests.Extensions;
     using Microsoft.Extensions.DependencyInjection;
 
     [TestClass]
