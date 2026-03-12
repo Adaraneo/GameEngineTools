@@ -144,7 +144,6 @@ namespace GameEngineTools.Logging
         {
             _opt = opt;
             Directory.CreateDirectory(_opt.LogsDirectoryPath);
-            // Append, AutoFlush off (lepší výkon), UTF8 bez BOM
             _writer = new StreamWriter(new FileStream(Path.Combine(_opt.LogsDirectoryPath, "Characters.log"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
             {
                 AutoFlush = false,

@@ -12,6 +12,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using static ActionNames;
 
     internal sealed class DefaultMemoryEngine : IMemoryEngine
     {
@@ -128,11 +129,11 @@ namespace GameEngineTools.Characters.Engines.Memory
         {
             return actionName switch
             {
-                "Sleep" => 0.4,
-                "Eat" => 0.5,
-                "Drink" => 0.3,
-                "ReachOut" => 0.6,
-                "InviteIntimacy" => 0.8,
+                Sleep => 0.4,
+                Eat => 0.5,
+                Drink => 0.3,
+                ReachOut => 0.6,
+                InviteIntimacy => 0.8,
                 _ => 0.5
             };
         }
@@ -141,8 +142,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         {
             return actionName switch
             {
-                "InviteIntimacy" or "ReachOut" or "SelfCare" => EmotionalTag.Positive,
-                "Flee" or "Fight" => EmotionalTag.Negative,
+                InviteIntimacy or ReachOut or SelfCare => EmotionalTag.Positive,
+                Flee or Fight => EmotionalTag.Negative,
                 _ => valence switch
                 {
                     > 0.05 => EmotionalTag.Positive,

@@ -91,7 +91,7 @@ var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOpti
     PlayerSleepHandling = SleepHandling.Auto,
     // OnSleepPrompt = _ =>
     // {
-    //     Console.WriteLine("[SPÁNEK] Jít spát? (A/N)");
+    //     Console.WriteLine("[SPÁNEK] Jít spát? (A/n)");
     //     return Console.ReadKey(true).Key == ConsoleKey.A;
     // }
 });

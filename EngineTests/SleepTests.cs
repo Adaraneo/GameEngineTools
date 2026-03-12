@@ -4,6 +4,7 @@
 namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;

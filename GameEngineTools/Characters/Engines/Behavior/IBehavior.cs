@@ -6,19 +6,6 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
-    internal static class ActionNames
-    {
-        public const string Sleep = "Sleep";
-        public const string Eat = "Eat";
-        public const string Drink = "Drink";
-        public const string ReachOut = "ReachOut";
-        public const string Work = "Work";
-        public const string Create = "Create";
-        public const string SelfCare = "SelfCare";
-        public const string InviteIntimacy = "InviteIntimacy";
-        public const string Idle = "Idle";
-    }
-
     public sealed record BehaviorConfig(
         double InertiaWeight = 0.25,
         double NoveltyPenalty = 0.1,

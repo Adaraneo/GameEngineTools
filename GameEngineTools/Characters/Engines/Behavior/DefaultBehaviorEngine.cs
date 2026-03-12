@@ -11,7 +11,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
-    using static Behavior.ActionNames;
+    using static ActionNames;
 
     /// <summary>
     /// Výchozí implementace behaviorálního enginu.

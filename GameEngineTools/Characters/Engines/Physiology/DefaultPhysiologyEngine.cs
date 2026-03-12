@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using static ActionNames;
 
     /// <summary>
     /// Homeostázy + základní menstruační cyklus. Bez „spánku“ či jídla z eventů – jen drift a symptomy.
@@ -68,35 +69,31 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Modifikátory driftu podle akce
             var energyDelta = action switch
             {
-                "Sleep" => 15 * h,
-                "SelfCare" => -0.5 * h,
+                SelfCare => -0.5 * h,
                 _ => -2 * h
             };
 
             var hungerDelta = action switch
             {
-                "Eat" => -40 * h,
-                "Sleep" => 2 * h,
+                Eat => -40 * h,
                 _ => 6 * h
             };
 
             var thirstDelta = action switch
             {
-                "Drink" => -50 * h,
-                "Sleep" => 1 * h,
+                Drink => -50 * h,
                 _ => 8 * h
             };
 
             var painDelta = action switch
             {
-                "SelfCare" => -10 * h,
+                SelfCare => -10 * h,
                 _ => 0
             };
 
             var immuneDelta = action switch
             {
-                "Sleep" => -0.5 * h,
-                "SelfCare" => -0.5 * h,
+                SelfCare => -0.5 * h,
                 _ => -0.3
             };
 
@@ -169,17 +166,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                         s = ac.ActionName switch
                         {
-                            // Poznámka: "Sleep" zde záměrně chybí — spánek řeší SleepEnded výše
-                            "Eat" => s with
+                            Eat => s with
                             {
                                 Hunger = Clamp01p(s.Hunger - 40 * h),
                                 Energy = Clamp01p(s.Energy + 5 * h)
                             },
-                            "Drink" => s with
+                            Drink => s with
                             {
                                 Thirst = Clamp01p(s.Thirst - 50 * h)
                             },
-                            "SelfCare" => s with
+                            SelfCare => s with
                             {
                                 Pain = Clamp01p(s.Pain - 10 * h),
                                 ImmuneLoad = Clamp01p(s.ImmuneLoad - 5 * h)

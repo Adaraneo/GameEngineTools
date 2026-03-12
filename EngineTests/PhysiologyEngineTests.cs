@@ -4,6 +4,7 @@
 namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
@@ -17,7 +18,7 @@ namespace EngineTests
     using Microsoft.Extensions.Options;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Reflection;
+    using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
     /// Unit testy pro <see cref="DefaultPhysiologyEngine"/>.
@@ -208,7 +209,7 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine(hunger: 80, energy: 30);
-            var eat = new ActionCommitted(_now, _ctx.Id, ActionNames.Eat, WTimeSpan.FromHours(1));
+            var eat = new ActionCommitted(_now, _ctx.Id, Eat, WTimeSpan.FromHours(1));
             var hungerBefore = engine.State.Hunger;
             var energyBefore = engine.State.Energy;
 
@@ -230,7 +231,7 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine(thirst: 80);
-            var drink = new ActionCommitted(_now, _ctx.Id, ActionNames.Drink, WTimeSpan.FromHours(0.5));
+            var drink = new ActionCommitted(_now, _ctx.Id, Drink, WTimeSpan.FromHours(0.5));
             var thirstBefore = engine.State.Thirst;
 
             // Act
@@ -239,29 +240,6 @@ namespace EngineTests
             // Assert
             Assert.IsTrue(engine.State.Thirst < thirstBefore,
                 "Drink musí snížit žízeň.");
-        }
-
-        /// <summary>
-        /// <c>ActionCommitted("Sleep")</c> (starý mrtvý kód) nesmí nijak změnit stav.
-        /// Spánek se nyní řeší výhradně přes <see cref="SleepEnded"/>.
-        /// </summary>
-        [TestMethod]
-        public void Handle_ActionCommitted_Sleep_HasNoEffect()
-        {
-            // Arrange — simulujeme případ, kdy by starý kód byl stále přítomen
-            var engine = BuildEngine(sleepDebtHours: 8, energy: 40);
-            var sleepAction = new ActionCommitted(_now, _ctx.Id, ActionNames.Sleep, WTimeSpan.FromHours(8));
-            var debtBefore = engine.State.SleepDebtHours;
-            var energyBefore = engine.State.Energy;
-
-            // Act
-            engine.Handle(sleepAction, _ctx, _outbox);
-
-            // Assert — state se nesmí změnit (ActionCommitted Sleep je ignorován)
-            Assert.AreEqual(debtBefore, engine.State.SleepDebtHours, delta: 0.001,
-                "ActionCommitted(Sleep) nesmí měnit SleepDebtHours — to řeší SleepEnded.");
-            Assert.AreEqual(energyBefore, engine.State.Energy, delta: 0.001,
-                "ActionCommitted(Sleep) nesmí měnit Energy.");
         }
 
         #endregion ActionCommitted — Eat / Drink / SelfCare
