@@ -15,7 +15,7 @@ namespace GameEngineTools.Characters.Generation;
 /// </summary>
 public interface IAppearanceGenerator
 {
-    PhysicalAppearance Generate(SexBiology sex, int? seed = null, AppearanceGenSpec? spec = null);
+    PhysicalAppearance Generate(SexBiology sex, int seed, AppearanceGenSpec? spec = null);
 }
 
 /// <summary>
@@ -87,22 +87,22 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
     public AppearanceGenerator(IRandomSourceFactory rngFactory)
         => _rngFactory = rngFactory;
 
-    public PhysicalAppearance Generate(SexBiology sex, int? seed = null, AppearanceGenSpec? spec = null)
+    public PhysicalAppearance Generate(SexBiology sex, int seed, AppearanceGenSpec? spec = null)
     {
         spec ??= AppearanceGenSpec.Default;
-        var rng = _rngFactory.Create(seed ?? Environment.TickCount);
+        var rng = _rngFactory.Create(seed);
 
         // 1) Výška (hlavní latentní proměnná)
         var (hMin, hMax) = sex == SexBiology.Female ? spec.HeightFemale : spec.HeightMale;
-        var height = Lerp(rng.Unit(), hMin, hMax);
+        var height = Lerp(rng.NextUnit(), hMin, hMax);
 
         // 2) Rám těla (diskrétní kategorie)
         var frame = Pick(new[] { BodyFrame.Petite, BodyFrame.Medium, BodyFrame.Large, BodyFrame.Strong }, spec.BodyFrameWeights, rng);
 
         // 3) Bazální šířky + korelace
-        var shoulderBase = Lerp(rng.Unit(), spec.ShoulderBreadthBase.Min, spec.ShoulderBreadthBase.Max);
+        var shoulderBase = Lerp(rng.NextUnit(), spec.ShoulderBreadthBase.Min, spec.ShoulderBreadthBase.Max);
         var (hipMin, hipMax) = sex == SexBiology.Female ? spec.HipBreadthBaseFemale : spec.HipBreadthBaseMale;
-        var hipBase = Lerp(rng.Unit(), hipMin, hipMax);
+        var hipBase = Lerp(rng.NextUnit(), hipMin, hipMax);
 
         // Korelační korekce (lineární):
         var heightNorm = (height - ((hMin + hMax) * 0.5)) / ((hMax - hMin) * 0.5); // -1..1
@@ -180,7 +180,7 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
         var face = Pick(new[] { FaceShape.Oval, FaceShape.Round, FaceShape.Heart, FaceShape.Square, FaceShape.Oblong }, faceWeights, rng);
 
         // 5) Jemné rysy
-        double N(double mean, double dev) => Clamp(mean + dev * (rng.Unit() + rng.Unit() + rng.Unit() - 1.5), 0.0, 1.0);
+        double N(double mean, double dev) => Clamp(mean + dev * (rng.NextUnit() + rng.NextUnit() + rng.NextUnit() - 1.5), 0.0, 1.0);
         var nose = Math.Round(N(spec.NoseProminence.Mean, spec.NoseProminence.Dev), 2);
         var lips = Math.Round(N(spec.LipFullness.Mean + (sex == SexBiology.Female ? +0.03 : -0.02), spec.LipFullness.Dev), 2);
 
@@ -206,11 +206,11 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
 
     private static double Clamp(double x, double a, double b) => x < a ? a : (x > b ? b : x);
 
-    private static double Jitter(IRandomSource rng, double amplitude) => (rng.Unit() - 0.5) * amplitude;
+    private static double Jitter(IRandomSource rng, double amplitude) => (rng.NextUnit() - 0.5) * amplitude;
 
     private static T Pick<T>(IReadOnlyList<T> values, IReadOnlyList<double> weights, IRandomSource rng)
     {
-        double s = 0, r = rng.Unit();
+        double s = 0, r = rng.NextUnit();
         for (int i = 0; i < values.Count; i++)
         {
             s += weights[i]; if (r <= s)
@@ -248,10 +248,4 @@ public sealed class AppearanceGenerator : IAppearanceGenerator
             w[i] /= sum;
         }
     }
-}
-
-internal static class RandomSourceExtensions
-{
-    /// <summary>0..1 rovnoměrně</summary>
-    public static double Unit(this IRandomSource rng) => rng.NextUnit();
 }
