@@ -184,7 +184,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             s = s with { Stress = Math.Clamp(s.Stress + stressDelta, 0, 100) };
                             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPsychologyEngine))))
                             {
-                                _log.LogDebug("Nekvalitní spánek (kvalita={Q:F0}) → stres +{D:F1}.", se.Quality, stressDelta);
+                                _log.PsychSleepInterrupted(ctx.Id.Value.ToString(), se.Quality, stressDelta);
                             }
                         }
                         else
@@ -219,7 +219,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         outbox.Add(new StressSpiked(nm.OccurredAt, ctx.Id, s.Stress));
                         using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPsychologyEngine))))
                         {
-                            _log.LogDebug("Noční můra → stres +{Spike:F1}, valence -{Penalty:F2}.", stressSpike, valencePenalty);
+                            _log.PsychNightmareEffect(ctx.Id.Value.ToString(), stressSpike, valencePenalty);
                         }
 
                         break;

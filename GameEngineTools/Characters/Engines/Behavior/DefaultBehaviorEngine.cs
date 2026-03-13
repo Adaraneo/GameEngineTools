@@ -159,11 +159,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
                 // --- Ostatní cooldowny ---
                 case ActionCommitted ac when ac.ActionName == ReachOut:
-                    SetCooldown(ReachOut, 4);
+                    SetCooldown(ctx.Id, ReachOut, 4);
                     break;
 
                 case ActionCommitted ac when ac.ActionName == InviteIntimacy:
-                    SetCooldown(InviteIntimacy, 6);
+                    SetCooldown(ctx.Id, InviteIntimacy, 6);
                     break;
             }
         }
@@ -196,10 +196,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             if (State.SleepGraceExpiresAt.HasValue && now < State.SleepGraceExpiresAt.Value)
             {
                 var penaltyMultiplier = 1.0 + State.SleepDeclineCount * 0.5; // roste s odmítnutími
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
-                {
-                    _log.LogDebug("Pdmítá spánek — penalizace ×{Mult:F1} (odmítnutí #{Count}).", penaltyMultiplier, State.SleepDeclineCount);
-                }
+                _log.SleepGracePenalty(ctx.Id.Value.ToString(), penaltyMultiplier, State.SleepDeclineCount);
 
                 return false; // candidates mohou fungovat, jen s rostoucím stresem
             }
@@ -212,7 +209,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 State = State with { WaitingForSleepConfirmation = true, SleepGraceExpiresAt = null };
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
                 {
-                    _log.LogInformation("Sleep prompt vyslán (NeedRest={Need:F1}).", needRest);
+                    _log.SleepPromptSent(ctx.Id.Value.ToString(), needRest);
                 }
 
                 return true;
@@ -252,7 +249,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
             {
-                _log.LogInformation("Spánek zahájen. Délka: {Hours:F1}h.", sleepHours);
+                _log.SleepStarted(ctx.Id.Value.ToString(), sleepHours);
             }
         }
 
@@ -275,7 +272,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
             {
-                _log.LogWarning("Spánek odmítnut (#{Count}), grace: {Grace:F1}h.", newDeclineCount, graceHours);
+                _log.SleepDeclinedByPlayer(ctx.Id.Value.ToString(), newDeclineCount, graceHours);
             }
         }
 
@@ -285,13 +282,13 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </summary>
         private void OnSleepSessionEnded(WDateTime now, IHumanContext ctx)
         {
-            SetCooldown(Sleep, Config.SleepCooldownHours);
+            SetCooldown(ctx.Id, Sleep, Config.SleepCooldownHours);
             State = State with { CurrentPlan = null };
             _activeSession = null;
 
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
             {
-                _log.LogInformation("Sleep session ukončena, cooldown {Cooldown}h.", Config.SleepCooldownHours);
+                _log.SleepSessionEnded(ctx.Id.Value.ToString(), Config.SleepCooldownHours);
             }
         }
 
@@ -334,7 +331,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     State = State with { CurrentPlan = running };
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
                     {
-                        _log.LogDebug("Akce '{Action}' stále běží, zbývá {Remaining}.", running.Name, running.ExpectedDuration - elapsed);
+                        _log.BehaviorActionRunning(ctx.Id.Value.ToString(), running.Name, (running.ExpectedDuration - elapsed).ToString());
                     }
 
                     return;
@@ -362,7 +359,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             State = State with { CurrentPlan = plan, Cooldowns = updatedCooldowns };
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
             {
-                _log.LogInformation("Nová akce: '{Action}' (utility={Utility:F2}, trvání={Duration}).", chosen.Name, chosen.Utility, chosen.Dur);
+                _log.BehaviorActionChosen(ctx.Id.Value.ToString(), chosen.Name, chosen.Utility, chosen.Dur.ToString());
             }
         }
 
@@ -371,12 +368,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         #region Pomocné metody
 
         /// <summary>Nastaví nebo přepíše cooldown pro danou akci.</summary>
-        private void SetCooldown(string action, double hours)
+        private void SetCooldown(HumanId owner, string action, double hours)
         {
             var dict = new Dictionary<string, double>(State.Cooldowns ?? new Dictionary<string, double>());
             dict[action] = hours;
             State = State with { Cooldowns = dict };
-            _log.LogDebug("[COOLDOWN] {Action}: {Hours}h.", action, hours);
+            _log.BehaviorCooldownSet(owner.Value.ToString(), action, hours);
         }
 
         /// <summary>Vrátí zbývající cooldown pro akci, nebo 0 pokud cooldown neexistuje.</summary>

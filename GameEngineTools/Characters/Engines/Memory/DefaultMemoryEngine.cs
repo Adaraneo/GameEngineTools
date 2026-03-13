@@ -34,7 +34,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         {
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
             {
-                _log.LogDebug("Zakódována epizoda: '{Tag}' (salience={Salience:F2}, emotion={Emotion}).", episode.What, episode.Salience, episode.Emotion);
+                _log.MemoryEncoded(ctx.Id.Value.ToString(), episode.What, episode.Salience, episode.Emotion.ToString());
             }
 
             var list = State.Episodes.ToList();
@@ -114,7 +114,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 outbox.Add(new MemoryConsolidated(now, ctx.Id, boosted.Count));
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
                 {
-                    _log.LogInformation("Konsolidace: posíleno {Count} epizod.", boosted.Count);
+                    _log.MemoryConsolidated(ctx.Id.Value.ToString(), boosted.Count);
                 }
             }
 

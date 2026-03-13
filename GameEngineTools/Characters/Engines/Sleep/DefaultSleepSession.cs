@@ -105,14 +105,14 @@ namespace GameEngineTools.Characters.Engines.Sleep
                 outbox.Add(new SharedSleepBegan(now, ctx.Id, companion.Value, sharedType.Value));
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
                 {
-                    _log.LogInformation("Zahájil sdílený spánek ({Type}) se {Companion}.", sharedType.Value, companion.Value);
+                    _log.SharedSleepStarted(ctx.Id.Value.ToString(), sharedType.Value.ToString(), companion.Value.ToString());
                 }
             }
             else
             {
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
                 {
-                    _log.LogInformation("Usíná. Plánované probuzení: {WakeUp}.", plannedWakeUp);
+                    _log.SleepStarted(ctx.Id.Value.ToString(), (plannedWakeUp - now).TotalHours);
                 }
             }
         }
@@ -180,7 +180,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             outbox.Add(new SleepInterrupted(now, ctx.Id, cause, CurrentPhase));
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
             {
-                _log.LogWarning("Byl přerušen ({Cause}) ve fázi {Phase}.", cause, CurrentPhase);
+                _log.SleepInterrupted(ctx.Id.Value.ToString(), cause.ToString(), CurrentPhase.ToString());
             }
 
             EndSession(now, wasInterrupted: true, ctx, outbox);
@@ -200,7 +200,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             outbox.Add(new SleepPhaseChanged(now, ctx.Id, phase));
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
             {
-                _log.LogDebug("Vstoupil do fáze {Phase}.", phase);
+                _log.SleepPhaseEntered(ctx.Id.Value.ToString(), phase.ToString());
             }
         }
 
@@ -229,7 +229,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             {
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
                 {
-                    _log.LogWarning("Přepadení během spánku (fáze: {Phase})!", CurrentPhase);
+                    _log.SleepAmbush(ctx.Id.Value.ToString(), CurrentPhase.ToString());
                 }
 
                 Interrupt(now, InterruptCause.Ambush, ctx, outbox);
@@ -254,7 +254,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
                 outbox.Add(new NightmareTriggered(now, ctx.Id, _stressAtSleepStart));
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
                 {
-                    _log.LogDebug("Noční můra (stres při usnutí: {Stress:F1}).", _stressAtSleepStart);
+                    _log.SleepNightmare(ctx.Id.Value.ToString(), _stressAtSleepStart);
                 }
 
                 Interrupt(now, InterruptCause.Nightmare, ctx, outbox);
@@ -266,7 +266,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
                 outbox.Add(new DreamOccurred(now, ctx.Id, dreamSeed));
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
                 {
-                    _log.LogDebug("Sen (seed: {Seed}).", dreamSeed);
+                    _log.SleepDream(ctx.Id.Value.ToString(), dreamSeed);
                 }
             }
 
@@ -287,7 +287,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             outbox.Add(new SleepEnded(now, ctx.Id, HoursSlept, quality, wasInterrupted));
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
             {
-                _log.LogInformation("Probudil se. Délka: {Hours:F2}h, Kvalita: {Quality:F1}, Přerušen: {Interrupted}.", HoursSlept, quality, wasInterrupted);
+                _log.SleepWokeUp(ctx.Id.Value.ToString(), HoursSlept, quality, wasInterrupted);
             }
         }
 

@@ -153,7 +153,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                         using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
                         {
-                            _log.LogDebug("SleepEnded — délka: {Hours:F1}h, kvalita: {Quality:F0}, dluh po obnově: {Debt:F2}h.", h, se.Quality, s.SleepDebtHours);
+                            _log.PhysiologySleepEnded(ctx.Id.Value.ToString(), h, se.Quality, s.SleepDebtHours);
                         }
 
                         break;

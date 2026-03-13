@@ -152,13 +152,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
                 using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
                 {
-                    _log.LogInformation("Nová hrana: {A} → {B}.", self.Value, other.Value);
+                    _log.RelEdgeCreated(self.Value.ToString(), self.Value.ToString(), other.Value.ToString());
                 }
             }
             var updated = mut(e);
             using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
             {
-                _log.LogDebug("Hrana {A}→{B}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}.", self.Value, other.Value, updated.Like, updated.Trust, updated.Closeness);
+                _log.RelEdgeUpdated(self.Value.ToString(), self.Value.ToString(), other.Value.ToString(), updated.Like, updated.Trust, updated.Closeness, updated.Attraction, updated.Comfort, updated.Respect);
             }
             dict[other] = updated;
             State = new RelationshipState(dict);

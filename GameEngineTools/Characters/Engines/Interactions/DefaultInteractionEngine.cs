@@ -36,8 +36,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 case ContextChanged cc:
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
                     {
-                        _log.LogInformation("Kontext změněn: lokace='{Location}', hluk={Noise:F2}, přeplněnost={Crowding:F2}.", cc.Location, cc.Noise, cc.Crowding);
+                        _log.InteractionContextChanged(ctx.Id.Value.ToString(), cc.Location, cc.Noise, cc.Crowding);
                     }
+
                     State = new InteractionSurface(
                         Location: cc.Location,
                         HasPrivacy: cc.HasPrivacy,
@@ -76,7 +77,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
                     {
-                        _log.LogInformation("{From} → {To}: p(přijetí)={P:F2}, výsledek={Result}.", p.From.Value, p.To.Value, pAcc, accepted ? "PŘIJATO" : "ODMÍTNUTO");
+                        _log.InteractionOutcomeDecided(ctx.Id.Value.ToString(), p.From.Value.ToString(), p.To.Value.ToString(), pAcc, accepted ? "PŘIJATO" : "ODMÍTNUTO");
                     }
 
                     outbox.Add(new InteractionOutcome((p.OccurredAt), p.From, p.To, accepted, accepted ? "accepted" : "declined"));
