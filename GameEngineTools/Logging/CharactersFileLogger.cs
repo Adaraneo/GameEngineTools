@@ -47,14 +47,17 @@ namespace GameEngineTools.Logging
                 }
 
                 var msg = formatter(state, exception);
-                var scopes = new List<string>();
+                CharacterLogScope? characterScope = null;
 
                 _provider._scopes?.ForEachScope((s, state) =>
                 {
-                    state.Add(s?.ToString() ?? string.Empty);
-                }, scopes);
+                    if (s is CharacterLogScope cls)
+                    {
+                        characterScope = cls;
+                    }
+                }, (object?)null);
 
-                _provider.Write(logLevel, _category, eventId, msg, exception, scopes);
+                _provider.Write(logLevel, _category, eventId, msg, exception, characterScope);
             }
         }
 
@@ -75,7 +78,7 @@ namespace GameEngineTools.Logging
 
         internal bool IsEnabled(LogLevel level) => level >= _opt.MinLevel;
 
-        internal void Write(LogLevel level, string category, EventId eventId, string message, Exception? ex, List<string>? scopes)
+        internal void Write(LogLevel level, string category, EventId eventId, string message, Exception? ex, CharacterLogScope? characterScope)
         {
             if (_disposed)
             {
@@ -103,41 +106,22 @@ namespace GameEngineTools.Logging
 
             var line = sb.ToString();
 
-            var (personId, engine) = ExtractScope(scopes);
-
             lock (_sync)
             {
                 _writer.WriteLine(line);
 
-                if (personId != null)
+                if (characterScope.HasValue)
                 {
-                    var file = engine == null
-                        ? Path.Combine(_opt.LogsDirectoryPath, "Person", personId.Value.ToString(), "person.log")
-                        : Path.Combine(_opt.LogsDirectoryPath, "Person", personId.Value.ToString(), $"{engine}.log");
+                    var personId = characterScope.Value.PersonId;
+                    var subsystem = characterScope.Value.Subsystem;
+                    var file = string.IsNullOrEmpty(subsystem)
+                        ? Path.Combine(_opt.LogsDirectoryPath, "Person", personId.ToString(), "person.log")
+                        : Path.Combine(_opt.LogsDirectoryPath, "Person", personId.ToString(), $"{subsystem}.log");
 
                     var w = GetWriter(file);
                     w.WriteLine(line);
-
-                    w.Flush();
                 }
-
-                _writer.Flush();
             }
-        }
-
-        private static (Guid? personId, string? subsystem) ExtractScope(List<string>? scopes)
-        {
-            if (scopes == null) return (null, null);
-
-            foreach (var s in scopes)
-            {
-                var parts = s.Split(':');
-
-                if (parts.Length == 2 && Guid.TryParse(parts[0], out var id))
-                    return (id, parts[1]);
-            }
-
-            return (null, null);
         }
 
         public CharactersFileLoggerProvider(CharactersFileLoggerOptions opt)

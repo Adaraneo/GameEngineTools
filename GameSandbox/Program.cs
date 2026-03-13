@@ -53,7 +53,7 @@ var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biolo
 if (significantOther is null)
 {
     Console.ForegroundColor = ConsoleColor.Red;
-    throw new NullReferenceException(nameof(significantOther));
+    throw new InvalidOperationException(nameof(significantOther));
 }
 
 var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOptions
