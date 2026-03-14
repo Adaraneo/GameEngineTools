@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using System;
     using System.Collections.Generic;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -38,6 +39,48 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private ISleepSession? _activeSession;
 
         #endregion Privátní pole
+
+        #region Statické konstanty — kategorie akcí
+
+        /// <summary>
+        /// Akce způsobilé pro setrvačnostní boost.
+        /// Pouze "dobrovolné" akce kde setrvačnost dává smysl — rutinní biologické
+        /// potřeby (Eat, Drink, SelfCare) se záměrně vynechávají.
+        ///
+        /// <c>static readonly</c> místo <c>new HashSet</c> uvnitř Tick() —
+        /// eliminuje zbytečnou alokaci na heapu při každém volání SelectAction().
+        /// </summary>
+        private static readonly HashSet<string> InertiaEligible = new HashSet<string> { Work, Create, ReachOut };
+
+        /// <summary>
+        /// Kategorie akcí pro výpočet NoveltyPenalty (cognitive switching cost).
+        ///
+        /// Přepnutí na akci ve STEJNÉ kategorii nemá switching cost — mozek zůstává
+        /// ve stejném "módu". Přepnutí do jiné kategorie je kognitivně náročnější.
+        ///
+        /// Kategorie:
+        /// <list type="bullet">
+        ///   <item><b>Productive</b> — Work, Create (soustředěná tvorba/práce)</item>
+        ///   <item><b>Social</b>     — ReachOut, InviteIntimacy (sociální interakce)</item>
+        ///   <item><b>Biological</b> — Eat, Drink, SelfCare (tělesné potřeby)</item>
+        ///   <item><b>Rest</b>       — Idle (pasivní odpočinek)</item>
+        /// </list>
+        /// </summary>
+        private static readonly Dictionary<string, ActionCategory> ActionCategories =
+            new Dictionary<string, ActionCategory>
+            {
+                { Work,           ActionCategory.Productive },
+                { Create,         ActionCategory.Productive },
+                { ReachOut,       ActionCategory.Social      },
+                { InviteIntimacy, ActionCategory.Social      },
+                { Eat,            ActionCategory.Biological  },
+                { Drink,          ActionCategory.Biological  },
+                { SelfCare,       ActionCategory.Biological  },
+                { Idle,           ActionCategory.Rest        },
+            };
+
+        #endregion
+
 
         #region Veřejné vlastnosti
 
@@ -338,16 +381,42 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 }
             }
 
-            // Setrvačnost: zvýhodní dokončenou produktivní akci pro opakování
             if (State.CurrentPlan is { } cp)
             {
-                var inertiaEligible = new HashSet<string> { Work, Create, ReachOut };
+                var currentCategory = GetCategory(cp.Name);
+
                 for (int i = 0; i < candidates.Count; i++)
                 {
-                    if (inertiaEligible.Contains(candidates[i].Name) && candidates[i].Name == cp.Name)
-                        candidates[i] = (cp.Name, candidates[i].Utility * (1.0 + Config.InertiaWeight), candidates[i].Dur);
+                    var candidate = candidates[i];
+
+                    // --- SETRVAČNOST ---
+                    // Boost pro opakování stejné produktivní akce.
+                    // Modeluje "flow state" — postava která pracuje chce pokračovat v práci.
+                    if (candidates[i].Name == cp.Name && InertiaEligible.Contains(cp.Name))
+                    {
+                        candidates[i] = candidate with
+                        {
+                            Utility = candidate.Utility * (1.0 + Config.InertiaWeight)
+                        };
+                        continue;
+                    }
+
+                    // --- NOVELTY PENALTY (cognitive switching cost) ---
+                    // Penalizuj přepnutí do jiné kognitivní kategorie.
+                    // Biologické potřeby (Eat, Drink) jsou z penalizace vyjmuty —
+                    // hlad a žízeň jsou urgentní a nesmí být uměle potlačeny.
+                    var candidateCategory = GetCategory(candidate.Name);
+                    if (candidateCategory != currentCategory && candidateCategory != ActionCategory.Biological)
+                    {
+                        candidates[i] = candidate with
+                        {
+                            Utility = candidate.Utility * (1.0 - Config.NoveltyPenalty)
+                        };
+                    }
                 }
             }
+
+            ApplyMemoryModifiers(candidates, ctx.Snapshot.Memory, now);
 
             candidates.Sort((a, b) => b.Utility.CompareTo(a.Utility));
             var chosen = candidates[0];
@@ -365,7 +434,178 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         #endregion Výběr akce (utility)
 
+        #region Memory → Behavior modifikátory
+
+        /// <summary>
+        /// Upraví utility kandidátů na základě epizodické paměti postavy.
+        ///
+        /// Toto je hlavní propojení Memory → Behavior. Postava "si pamatuje"
+        /// co se stalo a podle toho upraví sklon k určitým akcím.
+        ///
+        /// Implementované modifikátory:
+        /// <list type="bullet">
+        ///   <item>
+        ///     <b>Sociální trauma</b> — čerstvé silné negativní vzpomínky na interakce
+        ///     snižují chuť vyhledávat kontakt (<see cref="ActionNames.ReachOut"/>).
+        ///   </item>
+        ///   <item>
+        ///     <b>Pozitivní sociální vzpomínky</b> — dobré interakce zvyšují sociální chuť.
+        ///   </item>
+        ///   <item>
+        ///     <b>Intimní odmítnutí</b> — čerstvé odmítnutí intimního kontaktu penalizuje
+        ///     <see cref="ActionNames.InviteIntimacy"/> — postava se "stydí" zkoušet znovu.
+        ///   </item>
+        ///   <item>
+        ///     <b>Emocionální zátěž</b> — akumulace negativních vzpomínek (bez ohledu na typ)
+        ///     zvyšuje potřebu péče o sebe (<see cref="ActionNames.SelfCare"/>).
+        ///   </item>
+        /// </list>
+        /// </summary>
+        /// <param name="candidates">
+        ///   Seznam kandidátů (Name, Utility, Dur) — modifikujeme Utility in-place.
+        /// </param>
+        /// <param name="memory">
+        ///   Aktuální snapshot paměti z <see cref="IHumanContext.Snapshot"/>.
+        ///   Read-only — double-buffer zaručuje, že čteme stav z předchozího ticku.
+        /// </param>
+        /// <param name="now">Aktuální herní čas — pro výpočet čerstvosti vzpomínek.</param>
+        private static void ApplyMemoryModifiers(
+            List<(string Name, double Utility, WTimeSpan Dur)> candidates,
+            MemoryIndex memory,
+            WDateTime now)
+        {
+            // Pracujeme s epizodami, které jsou stále "živé" (Strength > 0)
+            var episodes = memory.Episodes;
+
+            if (episodes.Count == 0)
+                return; // Postava nemá žádné vzpomínky — nic neupravujeme
+
+            // ----------------------------------------------------------
+            // MODIFIKÁTOR 1: Sociální trauma → penalizuj ReachOut
+            //
+            // Proč: Pokud má postava čerstvé silné negativní vzpomínky
+            // na interakce (odmítnutí, konflikty), bude se vyhýbat kontaktu.
+            // "Čerstvost" modelujeme přes Strength — silná = nedávná nebo opakovaná.
+            // ----------------------------------------------------------
+            var negativeInteractions = episodes
+                .Where(e =>
+                    e.What.StartsWith("Interaction:") &&
+                    e.Emotion == EmotionalTag.Negative &&
+                    e.Strength > 0.4) // Prahová hodnota — jen opravdu silné vzpomínky
+                .ToList();
+
+            if (negativeInteractions.Count > 0)
+            {
+                // Penalizace roste s počtem negativních vzpomínek, ale je omezená
+                // Max penalizace = -40 % utility (aby postava nikdy úplně nesociálně nezamrzla)
+                var penalty = Math.Min(0.40, negativeInteractions.Count * 0.10);
+                ModifyUtility(candidates, ReachOut, multiplier: 1.0 - penalty);
+            }
+
+            // ----------------------------------------------------------
+            // MODIFIKÁTOR 2: Pozitivní sociální vzpomínky → boost ReachOut
+            //
+            // Proč: Dobré vzpomínky na interakce motivují k dalšímu kontaktu.
+            // Toto je opačný efekt než modifikátor 1 — postava si "pamatuje",
+            // že sociální kontakt byl příjemný a chce to zopakovat.
+            // ----------------------------------------------------------
+            var positiveInteractions = episodes
+                .Where(e =>
+                    e.What.StartsWith("Interaction:") &&
+                    e.Emotion == EmotionalTag.Positive &&
+                    e.Strength > 0.4)
+                .ToList();
+
+            if (positiveInteractions.Count > 0)
+            {
+                // Max boost = +25 % — pozitivní vzpomínky povzbuzují, ale méně dramaticky
+                var boost = Math.Min(0.25, positiveInteractions.Count * 0.08);
+                ModifyUtility(candidates, ReachOut, multiplier: 1.0 + boost);
+            }
+
+            // ----------------------------------------------------------
+            // MODIFIKÁTOR 3: Intimní odmítnutí → penalizuj InviteIntimacy
+            //
+            // Proč: Odmítnutí intimního kontaktu je emocionálně silný zážitek.
+            // Postava se bude bránit opakování — "burnt once, shy twice."
+            // Tento efekt modeluje sociální stud a strach z odmítnutí.
+            // ----------------------------------------------------------
+            var rejectedIntimacy = episodes
+                .Where(e =>
+                    e.What.Contains("InviteIntimacy") &&
+                    e.Emotion == EmotionalTag.Negative &&
+                    e.Strength > 0.35)
+                .ToList();
+
+            if (rejectedIntimacy.Count > 0)
+            {
+                // Silnější penalizace než u běžných interakcí — intimní odmítnutí více bolí
+                var penalty = Math.Min(0.55, rejectedIntimacy.Count * 0.20);
+                ModifyUtility(candidates, InviteIntimacy, multiplier: 1.0 - penalty);
+            }
+
+            // ----------------------------------------------------------
+            // MODIFIKÁTOR 4: Emocionální zátěž → boost SelfCare
+            //
+            // Proč: Akumulace negativních vzpomínek (bez ohledu na typ) signalizuje,
+            // že postava prochází těžkým obdobím. Přirozenou reakcí je péče o sebe.
+            // Toto modeluje psychologický self-regulation mechanismus.
+            // ----------------------------------------------------------
+            var negativeLoad = episodes
+                .Where(e =>
+                    e.Emotion == EmotionalTag.Negative &&
+                    e.Strength > 0.3)
+                .Sum(e => e.Strength); // Součet sil = "váha" negativní zátěže
+
+            if (negativeLoad > 0.5) // Threshold — až při výraznější zátěži
+            {
+                // Normalizuj na rozumný rozsah (negativeLoad může být třeba 3.5)
+                var boost = Math.Min(0.35, negativeLoad * 0.08);
+                ModifyUtility(candidates, SelfCare, multiplier: 1.0 + boost);
+            }
+        }
+
+        /// <summary>
+        /// Pomocná metoda — najde kandidáta podle jména a vynásobí jeho Utility daným koeficientem.
+        ///
+        /// Používá index místo LINQ, protože měníme strukturu v listu (value type tuple).
+        /// <c>candidates[i] = candidates[i] with { ... }</c> na tuple nefunguje —
+        /// musíme vytvořit novou tuple a přiřadit na index.
+        /// </summary>
+        /// <param name="candidates">Seznam kandidátů k modifikaci.</param>
+        /// <param name="actionName">Název akce, jejíž utility měníme.</param>
+        /// <param name="multiplier">Koeficient (např. 0.7 = -30 %, 1.25 = +25 %).</param>
+        private static void ModifyUtility(
+            List<(string Name, double Utility, WTimeSpan Dur)> candidates,
+            string actionName,
+            double multiplier)
+        {
+            // Tuple je value type — musíme pracovat přes index, ne foreach
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (candidates[i].Name == actionName)
+                {
+                    // Clamp na 0 — utility nemůže být záporná
+                    var newUtility = Math.Max(0.0, candidates[i].Utility * multiplier);
+                    candidates[i] = (candidates[i].Name, newUtility, candidates[i].Dur);
+                    return; // Každé jméno je v listu max jednou
+                }
+            }
+        }
+
+        #endregion Memory → Behavior modifikátory
+
+
         #region Pomocné metody
+
+        /// <summary>
+        /// Vrátí kognitivní kategorii akce pro výpočet NoveltyPenalty.
+        /// Neznámé akce (např. budoucí rozšíření) dostávají <see cref="ActionCategory.Rest"/>
+        /// jako bezpečný fallback, nebudou penalizovány ani boostovány.
+        /// </summary>
+        /// <param name="actionName">Název akce z <see cref="ActionNames"/>.</param>
+        private static ActionCategory GetCategory(string actionName)
+            => ActionCategories.TryGetValue(actionName, out var cat) ? cat : ActionCategory.Rest;
 
         /// <summary>Nastaví nebo přepíše cooldown pro danou akci.</summary>
         private void SetCooldown(HumanId owner, string action, double hours)
