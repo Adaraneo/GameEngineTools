@@ -89,9 +89,13 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <summary>
         /// Pravděpodobnost noční můry v průběhu REM fáze při normálním stresu.
         /// </summary>
-        double NightmareChanceNormal
+        double NightmareChanceNormal,
 
     #endregion Rizika
+        double EmergencyNeedRestThreshold,
+        double EmergencyEnergyThreshold,
+        double ThirstSleepBlockThreshold,
+        double HungerSleepBlockThreshold
 
     )
     {
@@ -110,7 +114,11 @@ namespace GameEngineTools.Characters.Engines.Sleep
             AmbushBaseChancePerHour: 0.03,
             CompanionGuardModifier: 0.4,
             NightmareChanceHighStress: 0.25,
-            NightmareChanceNormal: 0.05
+            NightmareChanceNormal: 0.05,
+            EmergencyNeedRestThreshold: 90.0,
+            EmergencyEnergyThreshold: 5.0,
+            ThirstSleepBlockThreshold: 80.0,
+            HungerSleepBlockThreshold: 80.0
         )
         { }
     }

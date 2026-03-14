@@ -339,6 +339,30 @@ namespace GameEngineTools.Logging
             double Penalty,
             int DeclineCount);
 
+        [LoggerMessage(
+            EventId = 1112,
+            Level = LogLevel.Warning,
+            Message = "[SLEEP/EMERGENCY] {HumanId} NeedRest:{NeedRest:F1} Energy:{Energy:F1} — cooldown bypassed")]
+        public static partial void SleepEmergencyBypass(
+            this ILogger logger,
+            string HumanId,
+            double NeedRest,
+            double Energy);
+
+        /// <summary>
+        /// Spánek byl zablokován biologickými potřebami (hlad nebo žízeň).
+        /// Postava půjde nejdřív jíst nebo pít.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1113,
+            Level = LogLevel.Debug,
+            Message = "[SLEEP/BLOCKED] {HumanId} Hunger:{Hunger:F1} Thirst:{Thirst:F1} — sleep blocked by biology")]
+        public static partial void SleepBlockedByBiology(
+            this ILogger logger,
+            string HumanId,
+            double Hunger,
+            double Thirst);
+
         #endregion Behavior/Sleep — spánkový subsystém
 
         #region Behavior/Interaction — kontext

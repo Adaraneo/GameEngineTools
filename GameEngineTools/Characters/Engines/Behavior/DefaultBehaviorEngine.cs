@@ -154,7 +154,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var needSelfCare = Clamp01p(ph.Pain * 0.7 + ph.ImmuneLoad * 0.3);
 
             // --- Sleep prompt logika (mimo candidates) ---
-            if (CheckSleepPrompt(now, h, needRest, ps.Stress, ctx, outbox, updatedCooldowns))
+            if (CheckSleepPrompt(now, h, needRest, ph.Energy, ps.Stress, ctx, outbox, updatedCooldowns))
             {
                 // Engine čeká na odpověď — žádný jiný výběr
                 State = State with
@@ -226,6 +226,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             WDateTime now,
             double h,
             double needRest,
+            double energy,
             double stress,
             IHumanContext ctx,
             IEventCollector outbox,
@@ -244,15 +245,37 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return false; // candidates mohou fungovat, jen s rostoucím stresem
             }
 
-            // --- Grace vypršela nebo neexistuje: zkontroluj threshold ---
+            // --- Emergency: extrémní únava přebije vše včetně hladu a žízně ---
+            var isEmergency = needRest >= _sleepCfg.EmergencyNeedRestThreshold
+                           || energy <= _sleepCfg.EmergencyEnergyThreshold;
+
+            // --- Biologický blok: střední únava + kritický hlad/žízeň → nejdřív jíst/pít ---
+            // Pouze pokud to není emergency — hladový člověk při kolapsu stejně usne.
+            if (!isEmergency)
+            {
+                var ph = ctx.Snapshot.Physiology;
+                var blocked = ph.Thirst >= _sleepCfg.ThirstSleepBlockThreshold
+                           || ph.Hunger >= _sleepCfg.HungerSleepBlockThreshold;
+
+                if (blocked)
+                {
+                    _log.SleepBlockedByBiology(ctx.Id.Value.ToString(), ph.Hunger, ph.Thirst);
+                    return false; // SelectAction převezme řízení → Eat/Drink vyhraje utility race
+                }
+            }
+
+            // --- Standardní threshold + emergency bypass cooldownu ---
             var sleepCooldown = CooldownFor(cooldowns, Sleep);
-            if (needRest >= _sleepCfg.SleepPromptThreshold && sleepCooldown <= 0)
+            if (needRest >= _sleepCfg.SleepPromptThreshold && (sleepCooldown <= 0 || isEmergency))
             {
                 outbox.Add(new SleepPromptRequested(now, ctx.Id, needRest));
                 State = State with { WaitingForSleepConfirmation = true, SleepGraceExpiresAt = null };
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
                 {
-                    _log.SleepPromptSent(ctx.Id.Value.ToString(), needRest);
+                    if (isEmergency && sleepCooldown > 0)
+                    {
+                        _log.SleepPromptSent(ctx.Id.Value.ToString(), needRest);
+                    }
                 }
 
                 return true;

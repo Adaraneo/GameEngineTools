@@ -98,6 +98,75 @@ namespace EngineTests
         }
 
         /// <summary>
+        /// Ověřuje, že BehaviorEngine vyšle SleepPromptRequested i přes aktivní cooldown,
+        /// pokud je postava v nouzovém stavu (Energy <= 5).
+        /// </summary>
+        [TestMethod]
+        public void Tick_WhenEnergyEmergency_BypassesSleepCooldown()
+        {
+            // Arrange — energie na dně, cooldown aktivní
+            _ctx = BuildFakeContext(sleepDebtHours: 5, stress: 0, energy: 3);
+            var engine = BuildBehaviorEngine();
+
+            // Simuluj aktivní sleep cooldown
+            engine.RestoreState(engine.State with
+            {
+                Cooldowns = new Dictionary<string, double> { [GameEngineTools.Characters.Engines.ActionNames.Sleep] = 10.0 }
+            });
+
+            // Act
+            engine.Tick(_now, WTimeSpan.FromHours(1), _ctx, _outbox);
+
+            // Assert
+            var events = _outbox.Drain();
+            Assert.IsTrue(
+                events.OfType<SleepPromptRequested>().Any(),
+                "Emergency stav musí obejít sleep cooldown.");
+        }
+
+        /// <summary>
+        /// Ověřuje, že spánek je zablokován pokud je žízeň kritická
+        /// a únava není v emergency zóně.
+        /// </summary>
+        [TestMethod]
+        public void Tick_WhenThirstCriticalAndNotEmergency_BlocksSleepPrompt()
+        {
+            // Arrange — únava nad prahem, ale ne emergency; žízeň kritická
+            _ctx = BuildFakeContext(sleepDebtHours: 5, stress: 0, energy: 30, thirst: 85);
+            var engine = BuildBehaviorEngine();
+
+            // Act
+            engine.Tick(_now, WTimeSpan.FromHours(1), _ctx, _outbox);
+
+            // Assert — žádný sleep prompt, SelectAction pustí Drink
+            var events = _outbox.Drain();
+            Assert.IsFalse(
+                events.OfType<SleepPromptRequested>().Any(),
+                "Spánek musí být zablokován kritickou žízní.");
+        }
+
+        /// <summary>
+        /// Ověřuje, že emergency stav přebije biologický blok —
+        /// postava usne i když je hladová a žíznivá.
+        /// </summary>
+        [TestMethod]
+        public void Tick_WhenEmergencyAndHungry_SleepOverridesBiology()
+        {
+            // Arrange — emergency energie + kritický hlad i žízeň
+            _ctx = BuildFakeContext(sleepDebtHours: 5, stress: 0, energy: 3, thirst: 100, hunger: 100);
+            var engine = BuildBehaviorEngine();
+
+            // Act
+            engine.Tick(_now, WTimeSpan.FromHours(1), _ctx, _outbox);
+
+            // Assert — emergency bypass funguje i přes biologický blok
+            var events = _outbox.Drain();
+            Assert.IsTrue(
+                events.OfType<SleepPromptRequested>().Any(),
+                "Emergency musí přebít biologický blok.");
+        }
+
+        /// <summary>
         /// Ověřuje, že BehaviorEngine NEVYŠLE sleep prompt když NeedRest je pod threshold.
         /// </summary>
         [TestMethod]
@@ -523,13 +592,13 @@ namespace EngineTests
         /// <param name="sleepDebtHours">Spánkový dluh — ovlivňuje NeedRest výpočet.</param>
         /// <param name="stress">Aktuální stres postavy.</param>
         /// <param name="energy">Aktuální energie postavy.</param>
-        private static IHumanContext BuildFakeContext(double sleepDebtHours, double stress, double energy)
+        private static IHumanContext BuildFakeContext(double sleepDebtHours, double stress, double energy, double thirst = 15, double hunger = 20)
         {
             var physio = new PhysiologyState(
                 Energy: energy,
                 SleepDebtHours: sleepDebtHours,
-                Hunger: 20,
-                Thirst: 15,
+                Hunger: hunger,
+                Thirst: thirst,
                 Pain: 0,
                 ImmuneLoad: 5,
                 BodyTempDelta: 0,
