@@ -245,7 +245,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             if (_dreamFiredThisRem) return;
 
             // Pravděpodobnost noční můry závisí na stresu v okamžiku usnutí
-            var nightmareChance = _stressAtSleepStart > 50
+            var nightmareChance = _stressAtSleepStart > _cfg.NightmareStressThreshold
                 ? _cfg.NightmareChanceHighStress
                 : _cfg.NightmareChanceNormal;
 

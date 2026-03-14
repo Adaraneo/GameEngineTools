@@ -36,24 +36,6 @@ namespace GameEngineTools.Characters.Hosting.Defaults
         private readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
         private readonly ILogger _log;
 
-        private readonly List<Action<IDomainEvent>> _wildcardHandlers = new();
-
-        public IDisposable SubscribeAll(Action<IDomainEvent> handler)
-        {
-            lock (_wildcardHandlers)
-            {
-                _wildcardHandlers.Add(handler);
-            }
-
-            return new ActionDisposable(() =>
-            {
-                lock (_wildcardHandlers)
-                {
-                    _wildcardHandlers.Remove(handler);
-                }
-            });
-        }
-
         private sealed class ActionDisposable : IDisposable
         {
             private readonly Action _action;
@@ -88,15 +70,6 @@ namespace GameEngineTools.Characters.Hosting.Defaults
                         _log.LogError(ex, "EventBus handler failed for event {0}", t.Name);
                     }
                 }
-            }
-
-            // Wildcard handlers — každá postava dostane každý event
-            Action<IDomainEvent>[] wildcards;
-            lock (_wildcardHandlers) { wildcards = _wildcardHandlers.ToArray(); }
-            foreach (var h in wildcards)
-            {
-                try { h(@event); }
-                catch (Exception ex) { _log.LogError(ex, "EventBus wildcard handler failed for event {0}", t.Name); }
             }
         }
 

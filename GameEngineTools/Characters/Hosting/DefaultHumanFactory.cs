@@ -83,8 +83,6 @@ namespace GameEngineTools.Characters.Hosting
                 physio, psych, behav, inter, rel, mem,
                 snapshot);
 
-            bus.SubscribeAll(human.ReceiveEvent);
-
             return human;
         }
 

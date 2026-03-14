@@ -325,9 +325,6 @@ namespace EngineTests
 
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
-
-            public IDisposable SubscribeAll(Action<IDomainEvent> handler)
-                => new NullDisposable();
         }
 
         protected sealed class NullDisposable : IDisposable

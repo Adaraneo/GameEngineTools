@@ -372,7 +372,6 @@ namespace EngineTests
         {
             public void Publish(IDomainEvent @event) { }
             public IDisposable Subscribe<TEvent>(Action<TEvent> h) where TEvent : class, IDomainEvent => new D();
-            public IDisposable SubscribeAll(Action<IDomainEvent> h) => new D();
         }
 
         private sealed class NullScheduler : IScheduler

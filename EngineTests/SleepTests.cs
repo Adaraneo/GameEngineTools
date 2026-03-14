@@ -682,9 +682,6 @@ namespace EngineTests
 
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
-
-            public IDisposable SubscribeAll(Action<IDomainEvent> handler)
-                => new NullDisposable();
         }
 
         /// <summary>IScheduler který nic neplánuje.</summary>
