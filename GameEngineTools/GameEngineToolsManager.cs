@@ -135,21 +135,22 @@ namespace GameEngineTools
         {
             var now = _clock.Now;
             var year = now.Year;
-            var day = now.Day;
             var monthsInYear = WWorld.Spec.Calendar.MonthsInYear(year);
 
             var rng = _rngFactory.Create(Environment.TickCount);
+
+            var daysInMonth = WWorld.Spec.Calendar.DaysInMonth(year, rng.Next(1, monthsInYear));
 
             // Datum = rok ± věk, náhodný měsíc a den v rozsahu aktuálního dne
             var minBirth = WDateOnly.New(
                 year - maxAge,
                 rng.Next(1, monthsInYear),
-                rng.Next(1, day));
+                rng.Next(1, daysInMonth + 1));
 
             var maxBirth = WDateOnly.New(
                 year - minAge,
                 rng.Next(1, monthsInYear),
-                rng.Next(1, day));
+                rng.Next(1, daysInMonth + 1));
 
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
