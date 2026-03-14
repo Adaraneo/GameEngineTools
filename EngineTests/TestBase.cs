@@ -5,6 +5,7 @@ namespace EngineTests
 {
     using EngineTests.Utils;
     using GameEngineTools;
+    using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
@@ -305,5 +306,17 @@ namespace EngineTests
         }
 
         #endregion DI inicializace
+
+        #region Pomocné metody
+        /// <summary>RNG vracející vždy 0 — eliminuje náhodný šum z Tick().</summary>
+        protected sealed class ZeroRandom : IRandomSource
+        {
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => false;
+        }
+        #endregion
     }
 }

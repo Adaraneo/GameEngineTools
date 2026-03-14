@@ -199,51 +199,6 @@ namespace EngineTests
 
         #endregion SleepEnded — imunita a bolest
 
-        #region ActionCommitted — Eat / Drink / SelfCare
-
-        /// <summary>
-        /// <c>ActionCommitted("Eat")</c> musí snížit hlad a mírně zvýšit energii.
-        /// </summary>
-        [TestMethod]
-        public void Handle_ActionCommitted_Eat_ReducesHungerAndIncreasesEnergy()
-        {
-            // Arrange
-            var engine = BuildEngine(hunger: 80, energy: 30);
-            var eat = new ActionCommitted(_now, _ctx.Id, Eat, WTimeSpan.FromHours(1));
-            var hungerBefore = engine.State.Hunger;
-            var energyBefore = engine.State.Energy;
-
-            // Act
-            engine.Handle(eat, _ctx, _outbox);
-
-            // Assert
-            Assert.IsTrue(engine.State.Hunger < hungerBefore,
-                "Eat musí snížit hlad.");
-            Assert.IsTrue(engine.State.Energy > energyBefore,
-                "Eat musí mírně zvýšit energii.");
-        }
-
-        /// <summary>
-        /// <c>ActionCommitted("Drink")</c> musí snížit žízeň.
-        /// </summary>
-        [TestMethod]
-        public void Handle_ActionCommitted_Drink_ReducesThirst()
-        {
-            // Arrange
-            var engine = BuildEngine(thirst: 80);
-            var drink = new ActionCommitted(_now, _ctx.Id, Drink, WTimeSpan.FromHours(0.5));
-            var thirstBefore = engine.State.Thirst;
-
-            // Act
-            engine.Handle(drink, _ctx, _outbox);
-
-            // Assert
-            Assert.IsTrue(engine.State.Thirst < thirstBefore,
-                "Drink musí snížit žízeň.");
-        }
-
-        #endregion ActionCommitted — Eat / Drink / SelfCare
-
         #region Menstrual Cycle
         [TestMethod]
         public void Ctor_MenstrualCycleEnabledForAgeLessThanInConfiguration_ReturnsNullCycle()
@@ -359,16 +314,6 @@ namespace EngineTests
         #endregion Pomocné metody
 
         #region Fake / Stub implementace
-
-        private sealed class ZeroRandom : IRandomSource
-        {
-            public int Next(int min, int max) => min;
-
-            public double NextUnit() => 0.0;
-
-            public bool Chance(double p) => false;
-        }
-
         private sealed class NullEventBus : IEventBus
         {
             public void Publish(IDomainEvent @event)

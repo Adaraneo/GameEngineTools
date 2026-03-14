@@ -440,19 +440,6 @@ namespace EngineTests
 
         #region Fake / Stub implementace
 
-        /// <summary>
-        /// IRandomSource vracející vždy 0 — eliminuje náhodný šum v Tick().
-        /// Bez toho by <c>BaselineAffectVariance</c> způsobovala nedeterministické výsledky.
-        /// </summary>
-        private sealed class ZeroRandom : IRandomSource
-        {
-            public int Next(int min, int max) => min;
-
-            public double NextUnit() => 0.0;
-
-            public bool Chance(double p) => false;
-        }
-
         private sealed class NullEventBus : IEventBus
         {
             public void Publish(IDomainEvent @event)

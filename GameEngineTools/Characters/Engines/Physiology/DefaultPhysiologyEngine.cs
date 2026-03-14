@@ -70,18 +70,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var energyDelta = action switch
             {
                 SelfCare => -0.5 * h,
+                Sleep => 0,
                 _ => -2 * h
             };
 
             var hungerDelta = action switch
             {
                 Eat => -40 * h,
+                Sleep => 2.0 * h,
                 _ => 6 * h
             };
 
             var thirstDelta = action switch
             {
                 Drink => -50 * h,
+                Sleep => 2.0 * h,
                 _ => 8 * h
             };
 
@@ -161,32 +164,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
                             _log.PhysiologySleepEnded(ctx.Id.Value.ToString(), h, se.Quality, s.SleepDebtHours);
                         }
 
-                        break;
-                    }
-
-                // --- Ostatní akce přes ActionCommitted ---
-                case Behavior.ActionCommitted ac:
-                    {
-                        var h = Math.Max(0, ac.Duration.TotalHours);
-
-                        s = ac.ActionName switch
-                        {
-                            Eat => s with
-                            {
-                                Hunger = Clamp01p(s.Hunger - 40 * h),
-                                Energy = Clamp01p(s.Energy + 5 * h)
-                            },
-                            Drink => s with
-                            {
-                                Thirst = Clamp01p(s.Thirst - 50 * h)
-                            },
-                            SelfCare => s with
-                            {
-                                Pain = Clamp01p(s.Pain - 10 * h),
-                                ImmuneLoad = Clamp01p(s.ImmuneLoad - 5 * h)
-                            },
-                            _ => s
-                        };
                         break;
                     }
             }
