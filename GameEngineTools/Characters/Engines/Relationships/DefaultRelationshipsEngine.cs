@@ -81,10 +81,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     {
                         // Lerp 70% směrem k prvnímu dojmu — ale nenahradí zcela,
                         // pokud postava druhého již trochu zná.
-                        Like       = Lerp(e.Like, fi.Like, 0.7),
+                        Like = Lerp(e.Like, fi.Like, 0.7),
                         Attraction = Lerp(e.Attraction, fi.Attraction, 0.7),
-                        Trust      = e.Trust <= 0 ? 45 : e.Trust,
-                        Closeness  = Math.Max(e.Closeness, 10)
+                        Trust = e.Trust <= 0 ? 45 : e.Trust,
+                        Closeness = Math.Max(e.Closeness, 10)
                     });
 
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
@@ -98,10 +98,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case MicroPositive mp:
                     Upsert(self, mp.B, e => e with
                     {
-                        Like      = Bump(e.Like,      +2.0),
-                        Trust     = Bump(e.Trust,     +1.0),
+                        Like = Bump(e.Like, +2.0),
+                        Trust = Bump(e.Trust, +1.0),
                         Closeness = Bump(e.Closeness, +1.5),
-                        Comfort   = Bump(e.Comfort,   +2.0)
+                        Comfort = Bump(e.Comfort, +2.0)
                     });
                     break;
 
@@ -109,8 +109,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case MicroNegative mn:
                     Upsert(self, mn.B, e => e with
                     {
-                        Like    = Bump(e.Like,    -2.5),
-                        Trust   = Bump(e.Trust,   -2.0),
+                        Like = Bump(e.Like, -2.5),
+                        Trust = Bump(e.Trust, -2.0),
                         Comfort = Bump(e.Comfort, -2.0)
                     });
                     break;
@@ -119,47 +119,62 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case RepairAttempt ra:
                     Upsert(self, ra.B, e => e with
                     {
-                        Trust     = Bump(e.Trust,     ra.Accepted ? +Config.RepairGain      : -Config.RupturePenalty),
+                        Trust = Bump(e.Trust, ra.Accepted ? +Config.RepairGain : -Config.RupturePenalty),
                         Closeness = Bump(e.Closeness, ra.Accepted ? +Config.RepairGain * 0.5 : -Config.RupturePenalty * 0.4)
                     });
                     break;
 
                 // ── Výsledek interakce — PŘIJATO ──────────────────────────────────────────
                 case InteractionOutcome io when io.Accepted:
-                {
-                    var otherId = io.From == self ? io.To : io.From;
-                    EnsureEdge(self, otherId);
-
-                    Upsert(self, otherId, e => e with
                     {
-                        Closeness = Bump(e.Closeness, +1.5),
-                        Like      = Bump(e.Like,      +0.5),
-                        Comfort   = Bump(e.Comfort,   +0.8),
+                        var otherId = io.From == self ? io.To : io.From;
+                        EnsureEdge(self, otherId);
 
-                        Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
-                    });
-                    break;
-                }
+                        Upsert(self, otherId, e => e with
+                        {
+                            Closeness = Bump(e.Closeness, +1.5),
+                            Like = Bump(e.Like, +0.5),
+                            Comfort = Bump(e.Comfort, +0.8),
+
+                            Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
+                        });
+                        break;
+                    }
 
                 // ── Výsledek interakce — ODMÍTNUTO ───────────────────────────────────────
                 case InteractionOutcome io when !io.Accepted:
-                {
-                    var otherId2 = io.From == self ? io.To : io.From;
-                    EnsureEdge(self, otherId2);
-
-                    Upsert(self, otherId2, e => e with
                     {
-                        // Mírný pokles Like a Comfort — sociální nepohodlí z odmítnutí
-                        Like    = Bump(e.Like,    -1.5),
-                        Comfort = Bump(e.Comfort, -2.0),
+                        var otherId2 = io.From == self ? io.To : io.From;
+                        EnsureEdge(self, otherId2);
 
-                        // Odmítnutí také zanechá stopu v doméně — ale menší než přijetí
-                        Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
-                    });
-                    break;
-                }
+                        // Já jsem odmítl
+                        if (io.To == self)
+                        {
+                            Upsert(self, otherId2, e => e with
+                            {
+                                Comfort = Bump(e.Comfort, -0.5),
+                                Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
+                            });
+                        }
+                        else
+                        {
+                            // Já jsem byl odmítnut
+                            Upsert(self, otherId2, e => e with
+                            {
+                                // Mírný pokles Like a Comfort — sociální nepohodlí z odmítnutí
+                                Like = Bump(e.Like, -1.5),
+                                Comfort = Bump(e.Comfort, -2.0),
+
+                                // Odmítnutí také zanechá stopu v doméně — ale menší než přijetí
+                                Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
+                            });
+                        }
+
+                        break;
+                    }
             }
         }
+        
 
         #endregion Handle — zpracování doménových událostí
 

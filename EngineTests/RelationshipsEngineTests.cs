@@ -248,7 +248,7 @@ namespace EngineTests
             var comfortBefore = engine.State.Edges[other].Comfort;
 
             // Act — odmítnutá interakce
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: false, Reason: "declined", Act: SpeechAct.SmallTalk), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "declined", Act: SpeechAct.SmallTalk), ctx, _outbox);
 
             // Assert
             Assert.IsTrue(
