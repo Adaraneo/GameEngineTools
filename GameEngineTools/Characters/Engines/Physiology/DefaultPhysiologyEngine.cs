@@ -91,7 +91,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var painDelta = action switch
             {
                 SelfCare => -10 * h,
-                _ => 0
+                Sleep => -(Config.PainPassiveRecoveryPerHour + Config.PainSleepRecoveryPerHour) * h,
+                _ => -Config.PainPassiveRecoveryPerHour * h
             };
 
             var immuneDelta = action switch
@@ -148,9 +149,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                             // Imunitní systém: regenerace hlubokého spánku
                             ImmuneLoad = Clamp01p(s.ImmuneLoad - 3.0 * qualityFactor),
 
-                            // Bolest: lehká úleva pokud byl spánek kvalitní (>= 60)
-                            Pain = se.Quality >= 60
-                                ? Clamp01p(s.Pain - 2.0 * qualityFactor)
+                            Pain = se.Quality >= 40
+                                ? Clamp01p(s.Pain - 5.0 * qualityFactor)
                                 : s.Pain,
 
                             // Energie se obnoví spánkem

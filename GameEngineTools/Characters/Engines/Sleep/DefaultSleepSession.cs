@@ -282,6 +282,8 @@ namespace GameEngineTools.Characters.Engines.Sleep
         {
             IsActive = false;
 
+            HoursSlept = (now - _sleepStart).TotalHours;
+
             var quality = ComputeSleepQuality(wasInterrupted);
 
             outbox.Add(new SleepEnded(now, ctx.Id, HoursSlept, quality, wasInterrupted));
