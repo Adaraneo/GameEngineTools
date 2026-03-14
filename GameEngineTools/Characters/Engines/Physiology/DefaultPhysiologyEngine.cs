@@ -148,7 +148,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                             // Bolest: lehká úleva pokud byl spánek kvalitní (>= 60)
                             Pain = se.Quality >= 60
                                 ? Clamp01p(s.Pain - 2.0 * qualityFactor)
-                                : s.Pain
+                                : s.Pain,
+
+                            // Energie se obnoví spánkem
+                            // 8h kvalitního spánku (quality=100) → +80 energie
+                            // Špatný spánek (quality=40) → +32 energie
+                            Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor)
                         };
 
                         using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))

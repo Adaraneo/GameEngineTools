@@ -10,9 +10,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double RestingMetabolicRate = 1600,
         double MaxSleepDebtHours = 12,
         bool EnableMenstrualCycle = true,
-        int MenstrualCycleBeginsInAge = 12)
+        int MenstrualCycleBeginsInAge = 12,
+        double EnergyRecoveryPerSleepHour = 10.0)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10) { }
     }
 
     public sealed record PhysiologyState(
