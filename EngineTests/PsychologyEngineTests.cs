@@ -437,42 +437,5 @@ namespace EngineTests
                 WasInterrupted: wasInterrupted);
 
         #endregion Pomocné metody
-
-        #region Fake / Stub implementace
-
-        private sealed class NullEventBus : IEventBus
-        {
-            public void Publish(IDomainEvent @event)
-            { }
-
-            public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
-                => new NullDisposable();
-
-            public IDisposable SubscribeAll(Action<IDomainEvent> handler)
-                => new NullDisposable();
-        }
-
-        private sealed class NullScheduler : IScheduler
-        {
-            public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
-                => new ScheduledId(Guid.NewGuid());
-
-            public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
-                => new ScheduledId(Guid.NewGuid());
-
-            public bool Cancel(ScheduledId id) => true;
-
-            public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime now)
-                => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
-        }
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
-
-        #endregion Fake / Stub implementace
     }
 }

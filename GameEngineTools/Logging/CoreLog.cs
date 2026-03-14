@@ -458,6 +458,16 @@ namespace GameEngineTools.Logging
             double Comfort,
             double Respect);
 
+        [LoggerMessage(
+            EventId = 2006,
+            Level = LogLevel.Debug,
+            Message = "[REL/DECAY] {HumanId} Počet hran {EdgesCount} (dny: {Days:F1}).")]
+        public static partial void RelDecayApplied(
+            this ILogger logger,
+            string HumanId,
+            int EdgesCount,
+            double Days);
+
         #endregion Relationships — vztahy
 
         #region Scheduler a infrastruktura

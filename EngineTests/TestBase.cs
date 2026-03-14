@@ -317,6 +317,39 @@ namespace EngineTests
 
             public bool Chance(double p) => false;
         }
+
+        protected sealed class NullEventBus : IEventBus
+        {
+            public void Publish(IDomainEvent @event)
+            { }
+
+            public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
+                => new NullDisposable();
+
+            public IDisposable SubscribeAll(Action<IDomainEvent> handler)
+                => new NullDisposable();
+        }
+
+        protected sealed class NullDisposable : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
+
+        protected sealed class NullScheduler : IScheduler
+        {
+            public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
+                => new ScheduledId(Guid.NewGuid());
+
+            public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
+                => new ScheduledId(Guid.NewGuid());
+
+            public bool Cancel(ScheduledId id) => true;
+
+            public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime now)
+                => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
+        }
         #endregion
     }
 }
