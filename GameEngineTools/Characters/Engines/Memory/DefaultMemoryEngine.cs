@@ -166,7 +166,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             $"Action:{ac.ActionName}",
                             SalienceForAction(ac.ActionName, ctx),
                             EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence),
-                            Strength: 0.6),
+                            Strength: Config.BaseEncoding),
                         ctx,
                         outbox);
                     break;
@@ -181,7 +181,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             tag,
                             salience,
                             io.Accepted ? EmotionalTag.Positive : EmotionalTag.Negative,
-                            Strength: 0.7),
+                            Strength: Config.BaseEncoding + 0.2),
                         ctx,
                         outbox);
                     break;
@@ -195,7 +195,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             $"Micro+:{mp.A}->{mp.B}:{mp.What}",
                             0.6,
                             EmotionalTag.Positive,
-                            Strength: 0.6),
+                            Strength: Config.BaseEncoding),
                         ctx,
                         outbox);
                     break;
@@ -209,10 +209,11 @@ namespace GameEngineTools.Characters.Engines.Memory
                             $"Micro-:{mn.A}->{mn.B}:{mn.What}",
                             0.6,
                             EmotionalTag.Negative,
-                            Strength: 0.6),
+                            Strength: Config.BaseEncoding),
                         ctx,
                         outbox);
                     break;
+
                 case SleepEnded se:
                     ConsolidateMemories(se.OccurredAt, ctx, outbox);
                     break;
@@ -248,11 +249,19 @@ namespace GameEngineTools.Characters.Engines.Memory
             {
                 var e = episodes[i];
 
+                var emotionMod = e.Emotion switch
+                {
+                    EmotionalTag.Negative => Config.EmotionDecayMod,
+                    EmotionalTag.Mixed => Config.EmotionDecayMod + 0.2,
+                    EmotionalTag.Positive => Config.EmotionDecayMod + 0.3,
+                    _ => 1.0
+                };
+
                 // Exponenciální decay: strength * e^(-k * Δt_ve_dnech)
                 // Čím menší je ForgettingRate (k), tím pomalejší je zapomínání.
                 // Příklad: k=0.06, Δt=1 den → zachová ~94.2 % síly.
                 //          k=0.06, Δt=7 dní → zachová ~65.7 % síly.
-                var decayFactor = Math.Exp(-Config.ForgettingRate * (hours / 24.0));
+                var decayFactor = Math.Exp(-Config.ForgettingRate * emotionMod * (hours / 24.0));
                 var newStrength = Math.Max(0.0, e.Strength * decayFactor);
 
                 episodes[i] = e with { Strength = newStrength };

@@ -11,9 +11,10 @@ namespace GameEngineTools.Characters.Engines.Memory
         double SleepConsolidationBoost = 0.12,
         double ForgettingRate = 0.06,
         double PruneThreshold = 0.01,
-        double ReinforcementBoost = 0.15)
+        double ReinforcementBoost = 0.15,
+        double EmotionDecayMod = 0.5)
     {
-        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15) { }
+        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5) { }
     }
 
     public sealed record MemoryIndex(
