@@ -97,8 +97,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     var existing = episodes[existingIndex];
                     var reinforced = existing with
                     {
-                        // +0.15 je empirická hodnota; dá se přesunout do MemoryConfig
-                        Strength = Math.Min(1.0, existing.Strength + 0.15),
+                        Strength = Math.Min(1.0, existing.Strength + Config.ReinforcementBoost),
                         // Aktualizuj timestamp — "naposledy se to stalo teď"
                         When = episode.When
                     };
