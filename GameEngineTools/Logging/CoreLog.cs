@@ -468,6 +468,19 @@ namespace GameEngineTools.Logging
             int EdgesCount,
             double Days);
 
+        /// <summary>První dojem vytvořen — inicializace relationship hrany z dojmu.</summary>
+        [LoggerMessage(
+            EventId = 2007,
+            Level = LogLevel.Information,
+            Message = "[REL/IMPRESSION] {HumanId} První dojem: {A} → {B} Like={Like:F1} Attraction={Attraction:F1}.")]
+        public static partial void RelFirstImpression(
+            this ILogger logger,
+            string HumanId,
+            string A,
+            string B,
+            double Like,
+            double Attraction);
+
         #endregion Relationships — vztahy
 
         #region Scheduler a infrastruktura

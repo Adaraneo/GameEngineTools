@@ -86,6 +86,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         Trust      = e.Trust <= 0 ? 45 : e.Trust,
                         Closeness  = Math.Max(e.Closeness, 10)
                     });
+
+                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
+                    {
+                        _log.RelFirstImpression(ctx.Id.Value.ToString(), fi.A.Value.ToString(), fi.B.Value.ToString(), fi.Like, fi.Attraction);
+                    }
+
                     break;
 
                 // ── Mikrokladná interakce (úsměv, kompliment, pomoc…) ──────────────────────

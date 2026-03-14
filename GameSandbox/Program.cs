@@ -6,20 +6,21 @@ using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.GameObjects;
+using GameEngineTools.Characters.Traits;
+using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
+using static GameEngineTools.Characters.Engines.ActionNames;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
-using static GameEngineTools.Characters.Engines.ActionNames;
-using GameEngineTools.Extensions;
 
 // ── Herní čas ─────────────────────────────────────────────────────────────────
 var gameTimePath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-    "GameTime.txt");
+    "gametime.bin");
 
 var spec = GameEngineToolsRuntime.LoadSpec();
 var defaultTicks = spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
@@ -63,6 +64,19 @@ if (significantOther is null)
 var playerPerson = player.Person;
 var significantOtherPerson = significantOther.Person;
 
+static double ComputeAttraction(AppearanceView view)
+{
+    // PostureScore = jak se postava drží (únava, bolest)
+    // AcneLevel    = stav pleti (imunitní zátěž)
+    // Bloating     = napnutí (cyklus)
+    var attraction = 50.0;
+    attraction += (view.PostureScore - 50) * 0.3;   // dobrá postava → +, shrbená → -
+    attraction -= view.AcneLevel * 0.15;             // špatná pleť → mírně dolů
+    attraction -= (int)view.Bloating * 3.0;          // None=0, Light=-3, Medium=-6, High=-9
+
+    return Math.Clamp(attraction, 0, 100);
+}
+
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson],
@@ -74,6 +88,15 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
     {
         var p = chars[0];
         var so = chars[1];
+
+        if (!p.Snapshot.Relationships.Edges.ContainsKey(so.Id))
+        {
+            var soView = AppearanceProjector.Compute(so.PhysicalAppearance, so.Snapshot.Physiology, so.Biology);
+            var pView = AppearanceProjector.Compute(p.PhysicalAppearance, p.Snapshot.Physiology, p.Biology);
+
+            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, 50, ComputeAttraction(soView)));
+            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, 50, ComputeAttraction(pView)));
+        }
 
         // Naplánované akce
         if (now.Day is 2 or 6 or 12)
