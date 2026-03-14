@@ -121,6 +121,15 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
                 now + WTimeSpan.FromHours(1), so.Id, "Castle", true, 0.13, 0.2));
         }
 
+        // Light touch — až když jsou dostatečně blízko
+        if (now.Day is 20)
+        {
+            var edge = p.Snapshot.Relationships.Edges.GetValueOrDefault(so.Id);
+            if (edge?.Closeness > 30)
+                so.ReceiveEvent(new TouchAttempted(
+                    now + WTimeSpan.FromMinutes(15), p.Id, so.Id, TouchLevel.Light));
+        }
+
         if (now.Day is 10)
             p.ReceiveEvent(new InteractionProposed(
                 now + WTimeSpan.FromMinutes(12), so.Id, p.Id, SpeechAct.Validation, "Sluší ti to."));

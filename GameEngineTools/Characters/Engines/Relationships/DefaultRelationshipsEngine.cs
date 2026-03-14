@@ -178,7 +178,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         var otherId = to.From == self ? to.To : to.From;
                         EnsureEdge(self, otherId);
 
-                        if (to.To == self) // já jsem byl dotknút — rozhodoval jsem
+                        if (to.To == self) // já jsem byl dotknut — rozhodoval jsem
                         {
                             if (to.Accepted)
                             {

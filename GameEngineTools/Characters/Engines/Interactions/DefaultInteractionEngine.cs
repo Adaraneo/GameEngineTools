@@ -132,6 +132,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 accepted = false;
             }
 
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
+            {
+                _log.TouchOutcomeDecided(ctx.Id.Value.ToString(), attempted.From.Value.ToString(), attempted.To.Value.ToString(), attempted.Level.ToString(), pAcc, accepted ? "PŘIJATO" : "ODMÍTNUTO");
+            }
+
             outbox.Add(new TouchOutcome(attempted.OccurredAt, attempted.From, attempted.To, attempted.Level, accepted, accepted ? "accepted" : "declined"));
         }
 
