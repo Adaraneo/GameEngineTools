@@ -9,7 +9,7 @@ namespace GameEngineTools.Characters.Engines
     using System.Text;
     using System.Threading.Tasks;
 
-    internal static class ActionNames
+    public static class ActionNames
     {
         public const string Sleep = "Sleep";
         public const string Eat = "Eat";

@@ -2,15 +2,19 @@
 // Copyright (c) 50PSoftware
 
 using GameEngineTools;
+using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.FileSystem;
+using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
-using GameSandbox.Scenes;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
+using static GameEngineTools.Characters.Engines.ActionNames;
+using GameEngineTools.Extensions;
 
 // ── Herní čas ─────────────────────────────────────────────────────────────────
 var gameTimePath = Path.Combine(
@@ -56,44 +60,84 @@ if (significantOther is null)
     throw new InvalidOperationException(nameof(significantOther));
 }
 
-var scene = new InteractionScene(runtime, gameTimePath, new InteractionSceneOptions
+var playerPerson = player.Person;
+var significantOtherPerson = significantOther.Person;
+
+var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
-    Player = player,
-    Npc = significantOther,
+    Characters = [playerPerson, significantOtherPerson],
     SimulationYears = 2,
     TickStep = WTimeSpan.FromHours(0.5),
     ClockAdvance = WTimeSpan.FromHours(1),
 
-    OnTick = (now, p, npc) =>
+    OnTick = (now, chars) =>
     {
+        var p = chars[0];
+        var so = chars[1];
+
+        // Naplánované akce
         if (now.Day is 2 or 6 or 12)
-            npc.ReceiveEvent(new InteractionProposed(
-                now + WTimeSpan.FromMinutes(30), p.Id, npc.Id, SpeechAct.SmallTalk, "Ahoooj"));
+            so.ReceiveEvent(new InteractionProposed(
+                now + WTimeSpan.FromMinutes(30), p.Id, so.Id, SpeechAct.SmallTalk, "Ahoooj"));
 
         if (now.Day is 13)
-            npc.ReceiveEvent(new InteractionProposed(now + WTimeSpan.FromMinutes(12), p.Id, npc.Id, SpeechAct.Humor, "Vtip"));
+            so.ReceiveEvent(new InteractionProposed(
+                now + WTimeSpan.FromMinutes(12), p.Id, so.Id, SpeechAct.Humor, "Vtip"));
 
         if (now.Day is 16)
-            npc.ReceiveEvent(new MicroPositive(now + WTimeSpan.FromMinutes(20), npc.Id, p.Id, "Smile"));
+            so.ReceiveEvent(new MicroPositive(
+                now + WTimeSpan.FromMinutes(20), so.Id, p.Id, "Smile"));
 
-        if (now.Day is 16 && now.Hour is 20 && p.Snapshot.InteractionSurface.Location != "Castle" && npc.Snapshot.InteractionSurface.Location != "Castle")
+        if (now.Day is 16 && now.Hour is 20
+            && p.Snapshot.InteractionSurface.Location != "Castle"
+            && so.Snapshot.InteractionSurface.Location != "Castle")
         {
-            p.ReceiveEvent(new ContextChanged(now + WTimeSpan.FromHours(1), p.Id, "Castle", true, 0.13, 0.2));
-            npc.ReceiveEvent(new ContextChanged(now + WTimeSpan.FromHours(1), npc.Id, "Castle", true, 0.13, 0.2));
+            p.ReceiveEvent(new ContextChanged(
+                now + WTimeSpan.FromHours(1), p.Id, "Castle", true, 0.13, 0.2));
+            so.ReceiveEvent(new ContextChanged(
+                now + WTimeSpan.FromHours(1), so.Id, "Castle", true, 0.13, 0.2));
         }
 
         if (now.Day is 10)
             p.ReceiveEvent(new InteractionProposed(
-                now + WTimeSpan.FromMinutes(12), npc.Id, p.Id, SpeechAct.Validation, "Sluší ti to."));
-    },
+                now + WTimeSpan.FromMinutes(12), so.Id, p.Id, SpeechAct.Validation, "Sluší ti to."));
 
-    // Sleep: Auto = potvrdí automaticky. Až budeš mít UI, přepni na Manual:
-    PlayerSleepHandling = SleepHandling.Auto,
-    // OnSleepPrompt = _ =>
-    // {
-    //     Console.WriteLine("[SPÁNEK] Jít spát? (A/n)");
-    //     return Console.ReadKey(true).Key == ConsoleKey.A;
-    // }
+        // Reach out routing
+        foreach (var character in chars)
+        {
+            var reachOut = character.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == ReachOut);
+
+            if (reachOut == null)
+                continue;
+
+            var target = chars.FirstOrDefault(c => c.Id != character.Id && c.Snapshot.InteractionSurface.Location == character.Snapshot.InteractionSurface.Location);
+
+            target?.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, SpeechAct.SmallTalk, null));
+        }
+
+        // ── Sleep handling ────────────────────────────────────────────────────────
+        // Žádný handler → auto pro všechny postavy (výchozí chování scény).
+        // Odkomentuj až budeš mít UI:
+        //
+        // SleepPromptHandlers = new Dictionary<HumanId, Func<SleepPromptRequested, bool>>
+        // {
+        //     [playerPerson.Id] = _ =>
+        //     {
+        //         Console.WriteLine("[SPÁNEK] Jít spát? (A/n)");
+        //         return Console.ReadKey(true).Key != ConsoleKey.N;
+        //     }
+        // }
+    }
 });
 
 await scene.RunAsync();
+
+await File.WriteAllTextAsync(gameTimePath, clock.Now.WorldTicks.ToString());
+gf.Export(player);
+gf.Export((NPC)significantOther);
+
+var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+await File.WriteAllTextAsync(Path.Combine(desktopPath, $"player.{playerPerson.Id.Value.ToString()}.txt"), player.PrintInfo(false));
+await File.WriteAllTextAsync(Path.Combine(desktopPath, $"significantOther.{significantOtherPerson.Id.Value.ToString()}.txt"), significantOther.PrintInfo(false));
+
+Console.WriteLine("Simulace dokončena. Herní čas: {0}", clock.Now);
