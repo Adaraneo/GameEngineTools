@@ -92,7 +92,47 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 case InteractionProposed p when p.To == ctx.Id:
                     HandleInteractionProposed(p, ctx, outbox);
                     break;
+
+                case TouchAttempted t when t.To == ctx.Id:
+                    HandleTouchAttempted(t, ctx, outbox);
+                    break;
             }
+        }
+
+        private void HandleTouchAttempted(TouchAttempted attempted, IHumanContext ctx, IEventCollector outbox)
+        {
+            var rels = ctx.Snapshot.Relationships.Edges;
+            rels.TryGetValue(attempted.From, out var edge);
+
+            var closeness = edge?.Closeness ?? 0;
+            var attraction = edge?.Attraction ?? 0;
+            var comfort = edge?.Comfort ?? 0;
+            var psych = ctx.Snapshot.Psychology;
+
+            // Pravděpodobnost přijení závisí silně na úrovni dotyku
+            var baseP = attempted.Level switch
+            {
+                TouchLevel.Light => 0.5 + closeness * 0.005,
+                TouchLevel.Friendly => 0.3 + closeness * 0.007 + comfort * 0.003,
+                TouchLevel.Intimate => 0.05 + closeness * 0.006 + attraction * 0.007,
+                _ => 0
+            };
+
+            // Soukromí a psychika modulují
+            baseP += State.HasPrivacy ? 0.05 : -0.05;
+            baseP -= psych.Stress * 0.002;
+            baseP += Math.Max(0, psych.Valence) * 0.05;
+
+            var pAcc = Math.Clamp(baseP, 0, 0.95);
+            var accepted = ctx.Random.Chance(pAcc);
+
+            // Intimate bez dostatečné Closeness/Attraction vždy odmítnuto
+            if (attempted.Level == TouchLevel.Intimate && (closeness < 60 || attraction < 55))
+            {
+                accepted = false;
+            }
+
+            outbox.Add(new TouchOutcome(attempted.OccurredAt, attempted.From, attempted.To, attempted.Level, accepted, accepted ? "accepted" : "declined"));
         }
 
         /// <summary>

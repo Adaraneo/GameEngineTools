@@ -172,6 +172,45 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                         break;
                     }
+
+                case TouchOutcome to:
+                    {
+                        var otherId = to.From == self ? to.To : to.From;
+                        EnsureEdge(self, otherId);
+
+                        if (to.To == self) // já jsem byl dotknút — rozhodoval jsem
+                        {
+                            if (to.Accepted)
+                            {
+                                Upsert(self, otherId, e => e with
+                                {
+                                    Comfort = Bump(e.Comfort, +1.5),
+                                    Closeness = Bump(e.Closeness, +1.0),
+                                    Breakdown = e.Breakdown with
+                                    {
+                                        Physical = BumpD(e.Breakdown.Physical, TouchBoost(to.Level))
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                // Odmítl jsem — mírný discomfort
+                                Upsert(self, otherId, e => e with
+                                {
+                                    Comfort = Bump(e.Comfort, -1.0)
+                                });
+                            }
+                        }
+                        else // já jsem byl odmítnut
+                        {
+                            Upsert(self, otherId, e => e with
+                            {
+                                Like = Bump(e.Like, to.Accepted ? +0.5 : -2.0),
+                                Comfort = Bump(e.Comfort, to.Accepted ? +1.0 : -3.0)
+                            });
+                        }
+                        break;
+                    }
             }
         }
         
@@ -296,6 +335,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
             if (!State.Edges.ContainsKey(other))
                 Upsert(self, other, e => e);
         }
+
+        private static double TouchBoost(TouchLevel level) => level switch
+        {
+            TouchLevel.Light => +1.5,
+            TouchLevel.Friendly => +3.0,
+            TouchLevel.Intimate => +5.0,
+            _ => 0.0
+        };
 
         /// <summary>
         /// Vloží nebo aktualizuje hranu v grafu vztahů.

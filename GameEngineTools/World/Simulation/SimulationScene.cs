@@ -171,6 +171,13 @@ namespace GameEngineTools.World.Simulation
                 var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
                 initiator?.ReceiveEvent(outcome);
             }
+
+            // Touch outcome
+            foreach (var outcome in sender.LastOutbox.OfType<TouchOutcome>())
+            {
+                var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
+                initiator?.ReceiveEvent(outcome);
+            }
         }
 
         #endregion Routování výstupů

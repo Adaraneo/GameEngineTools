@@ -481,6 +481,19 @@ namespace GameEngineTools.Logging
             double Like,
             double Attraction);
 
+        [LoggerMessage(
+            EventId = 1202,
+            Level = LogLevel.Information,
+            Message = "[BEHAV/TOUCH] {HumanId} {From} → {To}: level={Level}, p(přijetí)={P:F2}, výsledek={Result}.")]
+        public static partial void TouchOutcomeDecided(
+            this ILogger logger,
+            string HumanId,
+            string From,
+            string To,
+            string Level,
+            double P,
+            string Result);
+
         #endregion Relationships — vztahy
 
         #region Scheduler a infrastruktura
