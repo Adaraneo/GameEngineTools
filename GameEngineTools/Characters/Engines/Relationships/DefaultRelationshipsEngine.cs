@@ -130,12 +130,21 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         var otherId = io.From == self ? io.To : io.From;
                         EnsureEdge(self, otherId);
 
+                        // Trust delta dle SpeechAct — důvěra roste jen přes zranitelnost a potvrzení
+                        var trustDelta = io.Act switch
+                        {
+                            SpeechAct.SelfDisclosure => +2.5,   // sdílíš něco osobního → velký skok důvěry
+                            SpeechAct.Validation => +1.5,   // cítíš se pochopený → střední skok
+                            SpeechAct.Meta => +0.5,   // komentář o vztahu — trochu zranitelné
+                            _ => 0.0     // SmallTalk, Humor atd. Trust nebudují
+                        };
+
                         Upsert(self, otherId, e => e with
                         {
                             Closeness = Bump(e.Closeness, +1.5),
                             Like = Bump(e.Like, +0.5),
                             Comfort = Bump(e.Comfort, +0.8),
-
+                            Trust = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
                             Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                         });
                         break;
@@ -147,12 +156,21 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         var otherId2 = io.From == self ? io.To : io.From;
                         EnsureEdge(self, otherId2);
 
+                        // Odmítnuté SelfDisclosure bolí víc — zranitelnost byla sražena
+                        var trustPenalty = io.Act switch
+                        {
+                            SpeechAct.SelfDisclosure => -1.5,
+                            SpeechAct.Validation => -0.5,
+                            _ => 0.0
+                        };
+
                         // Já jsem odmítl
                         if (io.To == self)
                         {
                             Upsert(self, otherId2, e => e with
                             {
                                 Comfort = Bump(e.Comfort, -0.5),
+                                Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                             });
                         }
@@ -164,6 +182,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 // Mírný pokles Like a Comfort — sociální nepohodlí z odmítnutí
                                 Like = Bump(e.Like, -1.5),
                                 Comfort = Bump(e.Comfort, -2.0),
+                                Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
 
                                 // Odmítnutí také zanechá stopu v doméně — ale menší než přijetí
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
