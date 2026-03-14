@@ -73,7 +73,7 @@ namespace GameEngineTools
         /// <summary>
         /// Všechny aktivní postavy ve světě (NPC i hráčské).
         /// </summary>
-        public List<CharacterBase> NPPCs { get; } = new();
+        public List<CharacterBase> Characters { get; } = new();
 
         /// <summary>
         /// Obecné úložiště herních objektů indexované typem.
@@ -94,7 +94,7 @@ namespace GameEngineTools
             _log.LogInformation("Initializing CharacterManager...");
             _log.LogInformation("CharacterManager init (logs: {LogsRoot})", _opt.LogsRoot);
 
-            NPPCs.Clear();
+            Characters.Clear();
             Items.Clear();
 
             _log.LogInformation("Loading content...");

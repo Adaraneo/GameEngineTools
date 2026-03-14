@@ -8,7 +8,7 @@ namespace GameEngineTools
 
     public interface IGameEngineToolsManager
     {
-        List<CharacterBase> NPPCs { get; }
+        List<CharacterBase> Characters { get; }
 
         //IServiceProvider ServiceProvider { get; }
 

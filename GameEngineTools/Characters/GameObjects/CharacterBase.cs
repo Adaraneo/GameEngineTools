@@ -60,9 +60,9 @@ namespace GameEngineTools.Characters.GameObjects
             }
         }
 
-        public double MaxHealth { get; set; }
+        public double MaxHealth { get; init; }
 
-        public IHuman Person { get; set; }
+        public IHuman Person { get; init; }
 
         [JsonIgnore]
         public double Protection
@@ -94,17 +94,7 @@ namespace GameEngineTools.Characters.GameObjects
             return this.Person.Equals(other.Person);
         }
 
-        public override bool Equals(object? obj)
-        {
-            if (obj == null || (!(obj is CharacterBase)))
-            {
-                return false;
-            }
-            else
-            {
-                return Equals(obj as CharacterBase);
-            }
-        }
+        public override bool Equals(object? obj) => obj is CharacterBase other && Equals(other);
 
         public virtual void IncreaseHealth(double amount)
         {
@@ -115,9 +105,6 @@ namespace GameEngineTools.Characters.GameObjects
             }
         }
 
-        public override int GetHashCode()
-        {
-            throw new NotImplementedException();
-        }
+        public override int GetHashCode() => Person?.GetHashCode() ?? 0;
     }
 }

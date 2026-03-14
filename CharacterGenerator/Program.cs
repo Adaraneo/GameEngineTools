@@ -58,7 +58,7 @@
             {
                 Console.WriteLine("Trying to import characters...");
                 genFile.ImportNPPCs();
-                manager.NPPCs.Clear();
+                manager.Characters.Clear();
                 Console.WriteLine("Done");
                 Console.WriteLine("Originally generated files will be deleted");
                 ClearDirectoryForRegeneration(pcFolderPath, npcFolderPath);
@@ -79,7 +79,7 @@
             significantOther = new NPC(100, manager.RandomizePerson(player));
             friend = new NPC(100, manager.RandomizePerson(50, 18));
 
-            var nppcs = manager.NPPCs;
+            var nppcs = manager.Characters;
             nppcs.Add(player);
             nppcs.Add(significantOther);
             nppcs.Add(friend);

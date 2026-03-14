@@ -105,7 +105,7 @@ namespace EngineTests
             // Resetujeme WWorld aby ambient konfigurace nepřetékala mezi testy
             WWorld.Reset();
 
-            CharacterManager?.NPPCs.Clear();
+            CharacterManager?.Characters.Clear();
             CharacterManager?.Items.Clear();
             Filenames.Clear();
             Random = null;
@@ -153,7 +153,7 @@ namespace EngineTests
         public virtual void Import()
         {
             CharacterManager.Initialize();
-            var nppcs = CharacterManager.NPPCs;
+            var nppcs = CharacterManager.Characters;
             foreach (var filename in Filenames)
             {
                 if (filename.Equals(Filenames.First()))

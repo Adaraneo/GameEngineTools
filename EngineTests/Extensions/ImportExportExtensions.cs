@@ -30,7 +30,7 @@ namespace EngineTests.Extensions
             if (useGameManagerInstance)
             {
                 abstractTest.Import();
-                return abstractTest.CharacterManager.NPPCs;
+                return abstractTest.CharacterManager.Characters;
             }
             else
             {

@@ -119,7 +119,7 @@ namespace GameEngineTools.FileSystem
         public void ExportNPPCs(string? pathToRootDirectory = null)
         {
             _ = new GenerateFileSystem(pathToRootDirectory);
-            var nppcs = _characterManager.NPPCs.GetEnumerator();
+            var nppcs = _characterManager.Characters.GetEnumerator();
             nppcs.MoveNext();
             Export((PC)nppcs.Current);
             while (nppcs.MoveNext())
@@ -180,13 +180,13 @@ namespace GameEngineTools.FileSystem
         /// <param name="pathToRootDirectory">Volitelný kořenový adresář.</param>
         public void ImportNPPCs(string? pathToRootDirectory = null)
         {
-            _characterManager.NPPCs.Clear();
+            _characterManager.Characters.Clear();
             var generateFileSystem = new GenerateFileSystem(pathToRootDirectory);
             var fileName = generateFileSystem.Filenames.GetEnumerator();
             fileName.MoveNext();
-            _characterManager.NPPCs.Add(ImportPC(fileName.Current));
+            _characterManager.Characters.Add(ImportPC(fileName.Current));
             while (fileName.MoveNext())
-                _characterManager.NPPCs.Add(ImportNPC(fileName.Current));
+                _characterManager.Characters.Add(ImportNPC(fileName.Current));
         }
 
         #endregion Import

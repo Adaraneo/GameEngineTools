@@ -43,16 +43,16 @@ var clock = (SystemClock)runtime.Clock;
 
 // ── Postavy ───────────────────────────────────────────────────────────────────
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
-manager.NPPCs.Add(player);
+manager.Characters.Add(player);
 
 clock.SetNow(initTicks == defaultTicks
     ? WDateTime.New(player.Person.Identity.BirthDate.AddYears(16))
     : new WDateTime(initTicks));
 
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
-    manager.NPPCs.Add(gf.ImportNPC(new FileInfo(filename).Name));
+    manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
-var significantOther = manager.NPPCs.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && (Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16 || Math.Abs(npc.Person.Identity.BirthDate.Year - player.Person.Identity.BirthDate.Year) <= 5)).FirstOrDefault();
+var significantOther = manager.Characters.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && (Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16 || Math.Abs(npc.Person.Identity.BirthDate.Year - player.Person.Identity.BirthDate.Year) <= 5)).FirstOrDefault();
 
 if (significantOther is null)
 {
