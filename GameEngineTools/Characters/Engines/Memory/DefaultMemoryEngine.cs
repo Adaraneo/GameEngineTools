@@ -257,10 +257,6 @@ namespace GameEngineTools.Characters.Engines.Memory
                     _ => 1.0
                 };
 
-                // Exponenciální decay: strength * e^(-k * Δt_ve_dnech)
-                // Čím menší je ForgettingRate (k), tím pomalejší je zapomínání.
-                // Příklad: k=0.06, Δt=1 den → zachová ~94.2 % síly.
-                //          k=0.06, Δt=7 dní → zachová ~65.7 % síly.
                 var decayFactor = Math.Exp(-Config.ForgettingRate * emotionMod * (hours / 24.0));
                 var newStrength = Math.Max(0.0, e.Strength * decayFactor);
 

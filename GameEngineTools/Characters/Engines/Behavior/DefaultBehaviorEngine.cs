@@ -416,7 +416,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 }
             }
 
-            ApplyMemoryModifiers(candidates, ctx.Snapshot.Memory, now);
+            ApplyMemoryModifiers(candidates, ctx.Snapshot.Memory, now, ctx.Id, outbox);
 
             candidates.Sort((a, b) => b.Utility.CompareTo(a.Utility));
             var chosen = candidates[0];
@@ -462,17 +462,21 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </list>
         /// </summary>
         /// <param name="candidates">
-        ///   Seznam kandidátů (Name, Utility, Dur) — modifikujeme Utility in-place.
+        ///   Seznam kandidátů (Name, Utility, Dur) modifikujeme Utility in-place.
         /// </param>
         /// <param name="memory">
         ///   Aktuální snapshot paměti z <see cref="IHumanContext.Snapshot"/>.
-        ///   Read-only — double-buffer zaručuje, že čteme stav z předchozího ticku.
+        ///   Read-only double-buffer zaručuje, že čteme stav z předchozího ticku.
         /// </param>
-        /// <param name="now">Aktuální herní čas — pro výpočet čerstvosti vzpomínek.</param>
+        /// <param name="now">Aktuální herní čas pro výpočet čerstvosti vzpomínek.</param>
+        /// <param name="personId">DNA postavy.</param>
+        /// <param name="outbox">Event outbox</param>
         private static void ApplyMemoryModifiers(
             List<(string Name, double Utility, WTimeSpan Dur)> candidates,
             MemoryIndex memory,
-            WDateTime now)
+            WDateTime now,
+            HumanId personId,
+            IEventCollector outbox)
         {
             // Pracujeme s epizodami, které jsou stále "živé" (Strength > 0)
             var episodes = memory.Episodes;
@@ -480,35 +484,26 @@ namespace GameEngineTools.Characters.Engines.Behavior
             if (episodes.Count == 0)
                 return; // Postava nemá žádné vzpomínky — nic neupravujeme
 
-            // ----------------------------------------------------------
-            // MODIFIKÁTOR 1: Sociální trauma → penalizuj ReachOut
-            //
-            // Proč: Pokud má postava čerstvé silné negativní vzpomínky
-            // na interakce (odmítnutí, konflikty), bude se vyhýbat kontaktu.
-            // "Čerstvost" modelujeme přes Strength — silná = nedávná nebo opakovaná.
-            // ----------------------------------------------------------
+            // MODIFIKÁTOR 1: Sociální trauma
             var negativeInteractions = episodes
                 .Where(e =>
                     e.What.StartsWith("Interaction:") &&
                     e.Emotion == EmotionalTag.Negative &&
-                    e.Strength > 0.4) // Prahová hodnota — jen opravdu silné vzpomínky
+                    e.Strength > 0.4)
                 .ToList();
+
+            foreach (var e in negativeInteractions)
+            {
+                outbox.Add(new MemoryRecalled(now, personId, e.Id));
+            }
 
             if (negativeInteractions.Count > 0)
             {
-                // Penalizace roste s počtem negativních vzpomínek, ale je omezená
-                // Max penalizace = -40 % utility (aby postava nikdy úplně nesociálně nezamrzla)
                 var penalty = Math.Min(0.40, negativeInteractions.Count * 0.10);
                 ModifyUtility(candidates, ReachOut, multiplier: 1.0 - penalty);
             }
 
-            // ----------------------------------------------------------
-            // MODIFIKÁTOR 2: Pozitivní sociální vzpomínky → boost ReachOut
-            //
-            // Proč: Dobré vzpomínky na interakce motivují k dalšímu kontaktu.
-            // Toto je opačný efekt než modifikátor 1 — postava si "pamatuje",
-            // že sociální kontakt byl příjemný a chce to zopakovat.
-            // ----------------------------------------------------------
+            // MODIFIKÁTOR 2: Pozitivní sociální vzpomínky
             var positiveInteractions = episodes
                 .Where(e =>
                     e.What.StartsWith("Interaction:") &&
@@ -516,20 +511,18 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     e.Strength > 0.4)
                 .ToList();
 
+            foreach (var e in positiveInteractions)
+            {
+                outbox.Add(new MemoryRecalled(now, personId, e.Id));
+            }
+
             if (positiveInteractions.Count > 0)
             {
-                // Max boost = +25 % — pozitivní vzpomínky povzbuzují, ale méně dramaticky
                 var boost = Math.Min(0.25, positiveInteractions.Count * 0.08);
                 ModifyUtility(candidates, ReachOut, multiplier: 1.0 + boost);
             }
 
-            // ----------------------------------------------------------
-            // MODIFIKÁTOR 3: Intimní odmítnutí → penalizuj InviteIntimacy
-            //
-            // Proč: Odmítnutí intimního kontaktu je emocionálně silný zážitek.
-            // Postava se bude bránit opakování — "burnt once, shy twice."
-            // Tento efekt modeluje sociální stud a strach z odmítnutí.
-            // ----------------------------------------------------------
+            // MODIFIKÁTOR 3: Intimní odmítnutí
             var rejectedIntimacy = episodes
                 .Where(e =>
                     e.What.Contains("InviteIntimacy") &&
@@ -537,30 +530,33 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     e.Strength > 0.35)
                 .ToList();
 
+            foreach (var e in rejectedIntimacy)
+            {
+                outbox.Add(new MemoryRecalled(now, personId, e.Id));
+            }
+
             if (rejectedIntimacy.Count > 0)
             {
-                // Silnější penalizace než u běžných interakcí — intimní odmítnutí více bolí
                 var penalty = Math.Min(0.55, rejectedIntimacy.Count * 0.20);
                 ModifyUtility(candidates, InviteIntimacy, multiplier: 1.0 - penalty);
             }
 
-            // ----------------------------------------------------------
-            // MODIFIKÁTOR 4: Emocionální zátěž → boost SelfCare
-            //
-            // Proč: Akumulace negativních vzpomínek (bez ohledu na typ) signalizuje,
-            // že postava prochází těžkým obdobím. Přirozenou reakcí je péče o sebe.
-            // Toto modeluje psychologický self-regulation mechanismus.
-            // ----------------------------------------------------------
+            // MODIFIKÁTOR 4: Emocionální zátěž
             var negativeLoad = episodes
                 .Where(e =>
                     e.Emotion == EmotionalTag.Negative &&
                     e.Strength > 0.3)
-                .Sum(e => e.Strength); // Součet sil = "váha" negativní zátěže
+                .ToList();
 
-            if (negativeLoad > 0.5) // Threshold — až při výraznější zátěži
+            foreach (var e in negativeLoad)
             {
-                // Normalizuj na rozumný rozsah (negativeLoad může být třeba 3.5)
-                var boost = Math.Min(0.35, negativeLoad * 0.08);
+                outbox.Add(new MemoryRecalled(now, personId, e.Id));
+            }
+
+            var loadSum = negativeLoad.Sum(e => e.Strength);
+            if (loadSum > 0.5)
+            {
+                var boost = Math.Min(0.35, loadSum * 0.08);
                 ModifyUtility(candidates, SelfCare, multiplier: 1.0 + boost);
             }
         }
