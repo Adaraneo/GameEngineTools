@@ -52,6 +52,15 @@ namespace GameEngineTools.Narrative
     /// </remarks>
     public sealed class DefaultNarrativeFormatter : INarrativeFormatter
     {
+        private readonly MorphologyEngine _morphology;
+
+        public DefaultNarrativeFormatter()
+        {
+            _morphology = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
+                .BuildServiceProvider()
+                .GetRequiredService<MorphologyEngine>();
+        }
+
         #region Veřejné API — Format
 
         /// <inheritdoc/>
@@ -105,7 +114,7 @@ namespace GameEngineTools.Narrative
         /// <summary>
         /// První dojem — postava A potkala B a zformovala si o ní názor.
         /// </summary>
-        private static NarrativeEntry FormatFirstImpression(
+        private NarrativeEntry FormatFirstImpression(
             FirstImpressionFormed fi,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -150,7 +159,7 @@ namespace GameEngineTools.Narrative
         /// ale v narativu ho zachytíme z B's outboxu — proto výchozí zpracování je zde správné.
         /// </para>
         /// </remarks>
-        private static NarrativeEntry FormatInteractionOutcome(
+        private NarrativeEntry FormatInteractionOutcome(
             InteractionOutcome io,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -190,7 +199,7 @@ namespace GameEngineTools.Narrative
         /// <summary>
         /// Mikromoment — postava A udělala radost postavě B (pohlazení, kompliment…).
         /// </summary>
-        private static NarrativeEntry FormatMicroPositive(
+        private NarrativeEntry FormatMicroPositive(
             MicroPositive mp,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -204,7 +213,7 @@ namespace GameEngineTools.Narrative
         /// <summary>
         /// Mikromoment — postava A (neúmyslně) zranila city postavy B.
         /// </summary>
-        private static NarrativeEntry FormatMicroNegative(
+        private NarrativeEntry FormatMicroNegative(
             MicroNegative mn,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -222,7 +231,7 @@ namespace GameEngineTools.Narrative
         /// <summary>
         /// Pokus o smíření — A se pokusil/a o nápravu vztahu s B.
         /// </summary>
-        private static NarrativeEntry FormatRepairAttempt(
+        private NarrativeEntry FormatRepairAttempt(
             RepairAttempt ra,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -386,7 +395,7 @@ namespace GameEngineTools.Narrative
         /// <summary>
         /// Spánek byl přerušen — přepadení, bolest nebo vnější vyrušení.
         /// </summary>
-        private static NarrativeEntry FormatSleepInterrupted(
+        private NarrativeEntry FormatSleepInterrupted(
             SleepInterrupted si,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -424,7 +433,7 @@ namespace GameEngineTools.Narrative
         /// Volá se jen pokud <see cref="MemoryEncoded.What"/> není null —
         /// zajistí to pattern matching v <see cref="Format"/>.
         /// </remarks>
-        private static NarrativeEntry FormatMemoryEncoded(
+        private NarrativeEntry FormatMemoryEncoded(
             MemoryEncoded me,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -480,7 +489,7 @@ namespace GameEngineTools.Narrative
 
         private const string somebody = "někdo";
 
-        private static string? FormatInteractionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
+        private string? FormatInteractionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
         {
             // Interaction:Humor:Accepted|from=a3f2c1|to=b7e9a2
             var header = MemoryWhatParser.GetHeader(what);   // "Interaction:Humor:Accepted"
@@ -515,7 +524,7 @@ namespace GameEngineTools.Narrative
                 : $"{actText} odmítnut/a od {gen}";
         }
 
-        private static string? FormatFirstImpressionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
+        private string? FormatFirstImpressionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
         {
             // Relation:FirstImpression:Positive|of=b7e9a2
             var sentiment = MemoryWhatParser.GetHeader(what).Split(':')[2]; // "Positive"
@@ -578,7 +587,7 @@ namespace GameEngineTools.Narrative
             };
         }
 
-        private static string? FormatRepairMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
+        private string? FormatRepairMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
         {
             // Relation:Repair:Accepted|with=b7e9a2
             // Relation:Repair:Rejected|with=b7e9a2
@@ -595,7 +604,7 @@ namespace GameEngineTools.Narrative
                 : $"pokus o smír s {inst} byl odmítnut";
         }
 
-        private static string? FormatMicroMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve, bool positive)
+        private string? FormatMicroMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve, bool positive)
         {
             // Relation:MicroPositive|from=a3f2c1|what=compliment
             // Relation:MicroNegative|from=a3f2c1|what=interruption
@@ -625,7 +634,7 @@ namespace GameEngineTools.Narrative
         /// <summary>
         /// Konsolidace paměti po spánku — spánek posílil N vzpomínek.
         /// </summary>
-        private static NarrativeEntry FormatMemoryConsolidated(
+        private NarrativeEntry FormatMemoryConsolidated(
             MemoryConsolidated mc,
             Func<HumanId, NarrativeCharacterInfo> resolve)
         {
@@ -668,11 +677,8 @@ namespace GameEngineTools.Narrative
         private static string Conj(NarrativeCharacterInfo actor, string male, string female)
             => actor.IsFemale ? female : male;
 
-        private static string Decl(NarrativeCharacterInfo actor, Grammar.Core.Enums.Case @case)
+        private string Decl(NarrativeCharacterInfo actor, Grammar.Core.Enums.Case @case)
         {
-            var collection = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection());
-            var provider = collection.BuildServiceProvider();
-            var engine = provider.GetRequiredService<Grammar.Czech.Services.MorphologyEngine>();
             var request = new CzechWordRequest
             {
                 Lemma = actor.Name,
@@ -684,16 +690,11 @@ namespace GameEngineTools.Narrative
                 Pattern = actor.IsFemale ? "žena" : "pán"
             };
 
-            return engine.GetForm(request).Form;
+            return _morphology.GetForm(request).Form;
         }
 
-        private static string DeclString(string lemma, Grammar.Core.Enums.Case @case)
+        private string DeclString(string lemma, Grammar.Core.Enums.Case @case)
         {
-            var engine = CzechGrammarServiceFactory
-                .AddCzechGrammarServices(new ServiceCollection())
-                .BuildServiceProvider()
-                .GetRequiredService<MorphologyEngine>();
-
             var request = new CzechWordRequest
             {
                 Lemma = lemma,
@@ -701,7 +702,7 @@ namespace GameEngineTools.Narrative
                 Case = @case
             };
 
-            return engine.GetForm(request).Form;
+            return _morphology.GetForm(request).Form;
         }
 
         #endregion
