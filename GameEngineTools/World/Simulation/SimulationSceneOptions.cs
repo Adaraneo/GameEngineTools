@@ -5,6 +5,7 @@ namespace GameEngineTools.World.Simulation
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Narrative;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -132,6 +133,73 @@ namespace GameEngineTools.World.Simulation
         public Action<WDateTime, IReadOnlyList<IHuman>>? OnTick { get; init; }
 
         #endregion Scénář (callback)
+
+        #region Narativní výstup
+
+        /// <summary>
+        /// Volitelný formatter pro převod doménových událostí na čitelný text.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Pokud <c>null</c>, narrative výstup je deaktivován — scéna simuluje normálně.
+        /// </para>
+        /// <para>
+        /// <b>Typické použití v GameSandbox:</b>
+        /// <code>
+        /// NarrativeFormatter = new DefaultNarrativeFormatter(),
+        /// ResolveCharacter   = id => new NarrativeCharacterInfo(
+        ///     name:    chars.First(c => c.Id == id).Person.Identity.FirstName.Value,
+        ///     biology: chars.First(c => c.Id == id).Biology),
+        /// OnNarrative = entry =>
+        /// {
+        ///     if (entry.Priority >= NarrativePriority.Medium)
+        ///         Console.WriteLine($"[{entry.OccurredAt}] {entry.Text}");
+        /// }
+        /// </code>
+        /// </para>
+        /// </remarks>
+        public INarrativeFormatter? NarrativeFormatter { get; init; }
+
+        /// <summary>
+        /// Resolver informací o postavách pro narativní formátování.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Scéna ti předá <see cref="HumanId"/>, ty vrátíš jméno a pohlaví.
+        /// Resolver je lambdou — nemusíš předávat celý seznam postav do Narrative namespace.
+        /// </para>
+        /// <para>
+        /// Pokud <c>null</c> a <see cref="NarrativeFormatter"/> je nastaven,
+        /// scéna použije výchozí fallback resolver (<c>HumanId.Value.ToString()</c>,
+        /// <c>SexBiology.Unknown</c>).
+        /// </para>
+        /// </remarks>
+        public Func<HumanId, NarrativeCharacterInfo>? ResolveCharacter { get; init; }
+
+        /// <summary>
+        /// Callback volaný s každým vygenerovaným narativním záznamem.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Signatura: <c>void OnNarrative(NarrativeEntry entry)</c>
+        /// </para>
+        /// <para>
+        /// Filtruj priority dle potřeby:
+        /// <code>
+        /// OnNarrative = entry =>
+        /// {
+        ///     if (entry.Priority == NarrativePriority.High)
+        ///         ShowNotification(entry.Text);
+        ///
+        ///     _diary.Add(entry);
+        /// }
+        /// </code>
+        /// </para>
+        /// </remarks>
+        public Action<NarrativeEntry>? OnNarrative { get; init; }
+
+        #endregion
+
 
         #region Sleep handling
 

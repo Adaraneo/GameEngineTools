@@ -112,7 +112,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         reinforced.Emotion.ToString());
 
                     // Vyzvaň událost i pro reinforcement — Strength je aktualizovaná
-                    outbox.Add(new MemoryEncoded(episode.When, ctx.Id, existing.Id, reinforced.Strength));
+                    outbox.Add(new MemoryEncoded(episode.When, ctx.Id, existing.Id, reinforced.Strength, episode.What));
                     return;
                 }
 
@@ -126,7 +126,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     episode.Salience,
                     episode.Emotion.ToString());
 
-                outbox.Add(new MemoryEncoded(episode.When, ctx.Id, episode.Id, episode.Strength));
+                outbox.Add(new MemoryEncoded(episode.When, ctx.Id, episode.Id, episode.Strength, episode.What));
             }
         }
 

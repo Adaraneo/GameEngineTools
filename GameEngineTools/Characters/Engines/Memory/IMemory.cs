@@ -37,7 +37,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     }
 
     // Události
-    public sealed record MemoryEncoded(WDateTime OccurredAt, HumanId Human, Guid EpisodeId, double Strength) : IDomainEvent;
+    public sealed record MemoryEncoded(WDateTime OccurredAt, HumanId Human, Guid EpisodeId, double Strength, string? What = null) : IDomainEvent;
     public sealed record MemoryRecalled(WDateTime OccurredAt, HumanId Human, Guid EpisodeId) : IDomainEvent;
     public sealed record MemoryConsolidated(WDateTime OccurredAt, HumanId Human, int Count) : IDomainEvent;
 }

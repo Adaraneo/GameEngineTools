@@ -9,6 +9,7 @@ using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.Characters.Traits;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
+using GameEngineTools.Narrative;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
@@ -77,12 +78,41 @@ static double ComputeAttraction(AppearanceView view)
     return Math.Clamp(attraction, 0, 100);
 }
 
+var diary = new List<NarrativeEntry>();
+
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson],
     SimulationYears = 2,
     TickStep = WTimeSpan.FromHours(0.5),
     ClockAdvance = WTimeSpan.FromHours(1),
+    NarrativeFormatter = new DefaultNarrativeFormatter(),
+
+    ResolveCharacter = id =>
+    {
+        var chars = new[] { playerPerson, significantOtherPerson };
+        var found = chars.FirstOrDefault(c => c.Id == id);
+
+        return found is not null
+        ? new NarrativeCharacterInfo(found.Identity.FirstName.Original, found.Biology)
+        : new NarrativeCharacterInfo(id.Value.ToString()[..8], GameEngineTools.Characters.Core.SexBiology.Unknown);
+    },
+
+    OnNarrative = entry =>
+    {
+        diary.Add(entry);
+
+        if (entry.Priority == NarrativePriority.High)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"* [{entry.OccurredAt.ToString()}] {entry.Text}");
+            Console.ResetColor();
+        }
+        else if (entry.Priority == NarrativePriority.Medium)
+        {
+            Console.WriteLine($"  [{entry.OccurredAt.ToString()}] {entry.Text}");
+        }
+    },
 
     OnTick = (now, chars) =>
     {
@@ -164,6 +194,19 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
 
 await scene.RunAsync();
 
+// Zápis do deníku
+Console.WriteLine($"\n=== DENÍK ({diary.Count} záznamů) ===");
+foreach (var entry in diary.OrderBy(e => e.OccurredAt))
+{
+    var prefix = entry.Priority switch
+    {
+        NarrativePriority.High => "* ",
+        NarrativePriority.Medium => ". ",
+        _ => "  "
+    };
+    Console.WriteLine($"{prefix}[{entry.OccurredAt.ToString()}] {entry.Text}");
+}
+
 await File.WriteAllTextAsync(gameTimePath, clock.Now.WorldTicks.ToString());
 gf.Export(player);
 gf.Export((NPC)significantOther);
@@ -173,3 +216,5 @@ await File.WriteAllTextAsync(Path.Combine(desktopPath, $"player.{playerPerson.Id
 await File.WriteAllTextAsync(Path.Combine(desktopPath, $"significantOther.{significantOtherPerson.Id.Value.ToString()}.txt"), significantOther.PrintInfo(false));
 
 Console.WriteLine("Simulace dokončena. Herní čas: {0}", clock.Now);
+
+Console.ReadKey();

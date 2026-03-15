@@ -12,6 +12,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
+    using GameEngineTools.Narrative;
 
     /// <summary>
     /// Obecná simulační scéna pro libovolný počet postav.
@@ -126,6 +127,24 @@ namespace GameEngineTools.World.Simulation
                 {
                     character.Tick(now, dt);
                     RouteOutcomes(character, chars);
+                }
+
+                // --- Narrative scan ----
+                if (_options.NarrativeFormatter is { } formatter && _options.OnNarrative is { } onNarrative)
+                {
+                    var resolver = _options.ResolveCharacter ?? (id => new NarrativeCharacterInfo(id.Value.ToString(), SexBiology.Unknown));
+
+                    foreach (var character in chars)
+                    {
+                        foreach (var ev in character.LastOutbox)
+                        {
+                            var entry = formatter.Format(ev, resolver);
+                            if (entry is not null)
+                            {
+                                onNarrative(entry);
+                            }
+                        }
+                    }
                 }
 
                 // ── Krok 3: Sleep prompty ───────────────────────────────────────────────

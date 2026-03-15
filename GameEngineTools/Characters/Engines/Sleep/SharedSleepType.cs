@@ -26,6 +26,8 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// Nouzový úkryt — spánek ve stresu (skrývání, útěk, nebezpečí).
         /// Zvyšuje stres, zkracuje deep fázi, žádný hlídací bonus.
         /// </summary>
-        Emergency
+        Emergency,
+        Romantic,
+        Protective
     }
 }

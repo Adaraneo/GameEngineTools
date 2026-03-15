@@ -129,7 +129,7 @@ namespace GameEngineTools
             services.AddLogging(lb =>
             {
                 lb.ClearProviders();
-                lb.AddConsole();
+                if (consoleLogs) lb.AddConsole();
                 lb.AddCharactersFile(opt =>
                 {
                     opt.LogsDirectoryPath = logsRoot != null

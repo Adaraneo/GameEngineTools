@@ -35,6 +35,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <summary>
         /// Fyzická bolest nebo zdravotní stav.
         /// </summary>
-        Pain
+        Pain,
+        External
     }
 }
