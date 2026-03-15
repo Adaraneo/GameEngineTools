@@ -7,7 +7,9 @@ namespace GameEngineTools.Characters.Engines.Memory
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -144,76 +146,165 @@ namespace GameEngineTools.Characters.Engines.Memory
         #region Handle — zpracování doménových událostí
 
         /// <summary>
-        /// Reaguje na doménové události z ostatních enginů.
-        ///
-        /// Zakódované typy událostí:
-        /// <list type="bullet">
-        ///   <item><see cref="Behavior.ActionCommitted"/> — každá provedená akce se ukládá.</item>
-        ///   <item><see cref="InteractionOutcome"/> — výsledky interakcí (přijetí/odmítnutí).</item>
-        ///   <item><see cref="Relationships.MicroPositive"/> / <see cref="Relationships.MicroNegative"/> — mikrointerakce.</item>
-        ///   <item><see cref="SleepEvents.SleepEnded"/> — triggeruje konsolidaci paměti po spánku.</item>
-        /// </list>
+        /// Reaguje na doménové události z ostatních enginů a kóduje je jako epizodické vzpomínky.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Schema <c>What</c>:</b> každý event se překládá do deterministického sémantického klíče
+        /// přes <see cref="MemoryWhatParser"/>. Formát: <c>{Kategorie}:{Typ}:{Výsledek}|{klíč}={hodnota}</c>
+        /// </para>
+        /// <para>
+        /// <b>Proč deterministický klíč?</b>
+        /// <see cref="Encode"/> používá <c>What</c> jako klíč pro reinforcement (spacing effect) —
+        /// opakovaný zážitek stejného typu posílí existující vzpomínku místo vytvoření nové.
+        /// Kdyby byl klíč pokaždé jiný (např. obsahoval timestamp), reinforcement by nefungoval.
+        /// </para>
+        /// <para>
+        /// <b>Zakódované typy událostí:</b>
+        /// <list type="bullet">
+        ///   <item><see cref="ActionCommitted"/> — každá provedená akce, salience dle důležitosti.</item>
+        ///   <item><see cref="InteractionOutcome"/> — přijetí/odmítnutí interakce mezi postavami.</item>
+        ///   <item><see cref="FirstImpressionFormed"/> — první setkání s novou postavou.</item>
+        ///   <item><see cref="MicroPositive"/> / <see cref="MicroNegative"/> — mikrointerakce.</item>
+        ///   <item><see cref="RepairAttempt"/> — pokus o smíření.</item>
+        ///   <item><see cref="NightmareTriggered"/> — noční můra (vysoká salience, negativní emoce).</item>
+        ///   <item><see cref="SleepEnded"/> — triggeruje konsolidaci paměti.</item>
+        /// </list>
+        /// </para>
+        /// </remarks>
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
             switch (@event)
             {
-                case Behavior.ActionCommitted ac:
-                    Encode(
-                        new EpisodicMemory(
+                // ── Akce ─────────────────────────────────────────────────────────────────
+                case ActionCommitted ac:
+                    {
+                        // Vlastní akce — nejjednodušší schema, žádní aktéři
+                        var what = MemoryWhatParser.Action(ac.ActionName);
+
+                        Encode(new EpisodicMemory(
                             Guid.NewGuid(),
                             ac.OccurredAt,
-                            $"Action:{ac.ActionName}",
+                            what,
                             SalienceForAction(ac.ActionName, ctx),
                             EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence),
                             Strength: Config.BaseEncoding),
-                        ctx,
-                        outbox);
-                    break;
+                            ctx, outbox);
+                        break;
+                    }
 
+                // ── Interakce ─────────────────────────────────────────────────────────────
                 case InteractionOutcome io:
-                    var tag = $"Interaction:{io.From}->{io.To}:{io.Reason}";
-                    var salience = 0.7 + (io.Accepted ? 0.2 : 0.0);
-                    Encode(
-                        new EpisodicMemory(
+                    {
+                        // Schema zachytí: typ aktu, výsledek, oba aktéři (zkrácené ID)
+                        // Odmítnutí má vyšší salience — sociální bolest se pamatuje lépe
+                        var what = MemoryWhatParser.Interaction(io.Act.ToString(), io.Accepted, io.From.Value, io.To.Value);
+                        var salience = io.Accepted ? 0.7 : 0.9;
+                        var emotion = io.Accepted ? EmotionalTag.Positive : EmotionalTag.Negative;
+
+                        Encode(new EpisodicMemory(
                             Guid.NewGuid(),
                             io.OccurredAt,
-                            tag,
+                            what,
                             salience,
-                            io.Accepted ? EmotionalTag.Positive : EmotionalTag.Negative,
+                            emotion,
                             Strength: Config.BaseEncoding + 0.2),
-                        ctx,
-                        outbox);
-                    break;
+                            ctx, outbox);
+                        break;
+                    }
 
-                // Mikrokladná interakce (např. pozdrav, pomoc)
-                case Relationships.MicroPositive mp:
-                    Encode(
-                        new EpisodicMemory(
+                // ── První dojem ───────────────────────────────────────────────────────────
+                case FirstImpressionFormed fi:
+                    {
+                        // První setkání — vždy vysoká salience, emoce závisí na Like
+                        var what = MemoryWhatParser.FirstImpression(fi.Like, fi.B.Value);
+                        var emotion = fi.Like >= 70 ? EmotionalTag.Positive
+                                    : fi.Like >= 45 ? EmotionalTag.Neutral
+                                    : EmotionalTag.Negative;
+
+                        Encode(new EpisodicMemory(
+                            Guid.NewGuid(),
+                            fi.OccurredAt,
+                            what,
+                            Salience: 0.85,   // první dojem je velmi salinetní — evolučně důležitý
+                            emotion,
+                            Strength: Config.BaseEncoding + 0.3),
+                            ctx, outbox);
+                        break;
+                    }
+
+                // ── Mikrointerakce ────────────────────────────────────────────────────────
+                case MicroPositive mp:
+                    {
+                        var what = MemoryWhatParser.MicroPositive(mp.A.Value, mp.What);
+
+                        Encode(new EpisodicMemory(
                             Guid.NewGuid(),
                             mp.OccurredAt,
-                            $"Micro+:{mp.A}->{mp.B}:{mp.What}",
-                            0.6,
+                            what,
+                            Salience: 0.6,
                             EmotionalTag.Positive,
                             Strength: Config.BaseEncoding),
-                        ctx,
-                        outbox);
-                    break;
+                            ctx, outbox);
+                        break;
+                    }
 
-                // Mikrozáporná interakce (např. urážka, ignorování)
-                case Relationships.MicroNegative mn:
-                    Encode(
-                        new EpisodicMemory(
+                case MicroNegative mn:
+                    {
+                        // Negativní mikrointerakce — o něco vyšší salience než pozitivní
+                        // (negativní bias: nepříjemné věci si pamatujeme lépe)
+                        var what = MemoryWhatParser.MicroNegative(mn.A.Value, mn.What);
+
+                        Encode(new EpisodicMemory(
                             Guid.NewGuid(),
                             mn.OccurredAt,
-                            $"Micro-:{mn.A}->{mn.B}:{mn.What}",
-                            0.6,
+                            what,
+                            Salience: 0.65,
                             EmotionalTag.Negative,
-                            Strength: Config.BaseEncoding),
-                        ctx,
-                        outbox);
-                    break;
+                            Strength: Config.BaseEncoding + 0.1),
+                            ctx, outbox);
+                        break;
+                    }
 
+                // ── Smíření ───────────────────────────────────────────────────────────────
+                case RepairAttempt ra:
+                    {
+                        // Smíření nebo odmítnutí smíru — oba jsou vztahově zlomové momenty
+                        var what = MemoryWhatParser.RepairAttempt(ra.Accepted, ra.B.Value);
+                        var emotion = ra.Accepted ? EmotionalTag.Positive : EmotionalTag.Mixed;
+
+                        Encode(new EpisodicMemory(
+                            Guid.NewGuid(),
+                            ra.OccurredAt,
+                            what,
+                            Salience: 0.8,   // smíření/odmítnutí smíru je výrazná událost
+                            emotion,
+                            Strength: Config.BaseEncoding + 0.2),
+                            ctx, outbox);
+                        break;
+                    }
+
+                // ── Noční můra ────────────────────────────────────────────────────────────
+                case NightmareTriggered nt:
+                    {
+                        // Noční můra — nejvyšší salience ze spánkových událostí
+                        // Postava si ji jasně pamatuje, zvyšuje stres i příští den
+                        var what = MemoryWhatParser.Nightmare(nt.StressAtSleepStart);
+
+                        Encode(new EpisodicMemory(
+                            Guid.NewGuid(),
+                            nt.OccurredAt,
+                            what,
+                            Salience: 0.9,
+                            EmotionalTag.Negative,
+                            Strength: Config.BaseEncoding + 0.3),
+                            ctx, outbox);
+                        break;
+                    }
+
+                // ── Konsolidace po spánku ─────────────────────────────────────────────────
+                // SleepEnded netriggeruje kódování nové vzpomínky — konsoliduje existující.
+                // Viz ConsolidateMemories() — posílí top-N epizod dle salience.
                 case SleepEnded se:
                     ConsolidateMemories(se.OccurredAt, ctx, outbox);
                     break;

@@ -21,6 +21,10 @@ namespace GameEngineTools.Narrative
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Sleep;
+    using Grammar.Czech;
+    using Grammar.Czech.Models;
+    using Grammar.Czech.Services;
+    using Microsoft.Extensions.DependencyInjection;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -121,7 +125,7 @@ namespace GameEngineTools.Narrative
                 ? $" {Conj(a, "Cítil k ní přitažlivost.", "Cítila k němu přitažlivost.")}"
                 : string.Empty;
 
-            var text = $"{a.Name} {Conj(a, "poznal", "poznala")} {b.Name} " +
+            var text = $"{a.Name} {Conj(a, "poznal", "poznala")} {Decl(b, Grammar.Core.Enums.Case.Accusative)} " +
                        $"— {likeText}.{attractionText}";
 
             return new NarrativeEntry(fi.OccurredAt, fi.A, text, NarrativePriority.High);
@@ -173,7 +177,7 @@ namespace GameEngineTools.Narrative
                 : $"{recipient.Name} {Conj(recipient, "odmítl", "odmítla")} {actText}.";
 
             var text = $"{initiator.Name} {Conj(initiator, "nabídl", "nabídla")} " +
-                       $"{recipient.Name} {actText}. {reactionText}";
+                       $"{Decl(recipient, Grammar.Core.Enums.Case.Dative)} {actText}. {reactionText}";
 
             // Odmítnutí je narativně stejně zajímavé jako přijetí — oba jsou Medium
             return new NarrativeEntry(io.OccurredAt, io.From, text, NarrativePriority.Medium);
@@ -193,7 +197,7 @@ namespace GameEngineTools.Narrative
             var a = resolve(mp.A);
             var b = resolve(mp.B);
 
-            var text = $"{a.Name} {Conj(a, "udělal", "udělala")} {b.Name} radost: {mp.What}.";
+            var text = $"{a.Name} {Conj(a, "udělal", "udělala")} {Decl(b, Grammar.Core.Enums.Case.Dative)} radost: {mp.What}.";
             return new NarrativeEntry(mp.OccurredAt, mp.A, text, NarrativePriority.Medium);
         }
 
@@ -207,7 +211,7 @@ namespace GameEngineTools.Narrative
             var a = resolve(mn.A);
             var b = resolve(mn.B);
 
-            var text = $"{a.Name} {Conj(a, "zranil", "zranila")} city {b.Name}: {mn.What}.";
+            var text = $"{a.Name} {Conj(a, "zranil", "zranila")} {Decl(b, Grammar.Core.Enums.Case.Accusative)} city: {mn.What}.";
             return new NarrativeEntry(mn.OccurredAt, mn.A, text, NarrativePriority.Medium);
         }
 
@@ -226,8 +230,8 @@ namespace GameEngineTools.Narrative
             var b = resolve(ra.B);
 
             var text = ra.Accepted
-                ? $"{a.Name} {Conj(a, "se smířil", "se smířila")} s {b.Name}. Vztah se hojí."
-                : $"{a.Name} {Conj(a, "se pokusil", "se pokusila")} o smír s {b.Name}, " +
+                ? $"{a.Name} {Conj(a, "se smířil", "se smířila")} s {Decl(b, Grammar.Core.Enums.Case.Instrumental)}. Vztah se hojí."
+                : $"{a.Name} {Conj(a, "se pokusil", "se pokusila")} o smír s {Decl(b, Grammar.Core.Enums.Case.Instrumental)}, " +
                   $"ale {b.Name} {Conj(b, "odmítl", "odmítla")}.";
 
             // Smíření nebo odmítnutí smíru — vždy High (vztahový zlom)
@@ -399,7 +403,8 @@ namespace GameEngineTools.Narrative
             };
 
             var phase = si.PhaseAtInterrupt.ToString();
-            var text = $"Spánek {actor.Name} {causeText} ve fázi {phase}.";
+            var gen = Decl(actor, Grammar.Core.Enums.Case.Genitive);
+            var text = $"Spánek {gen} {causeText} ve fázi {phase}.";
 
             return new NarrativeEntry(si.OccurredAt, si.Human, text, NarrativePriority.High);
         }
@@ -425,19 +430,193 @@ namespace GameEngineTools.Narrative
         {
             var actor = resolve(me.Human);
 
-            // Síla vzpomínky — kontextualizace pro hráče
+            // ── Parsuj hlavičku — zjisti co za událost to je ──────────────────────
+            var header = MemoryWhatParser.GetHeader(me.What);
+
+            // ── Přelož schema na větu ─────────────────────────────────────────────
+            var memoryText = header switch
+            {
+                // Interaction:SmallTalk:Accepted|from=a3f2c1|to=b7e9a2
+                var h when h.StartsWith("Interaction:") => FormatInteractionMemory(me.What, resolve),
+
+                // Relation:FirstImpression:Positive|of=b7e9a2
+                var h when h.StartsWith("Relation:FirstImpression") => FormatFirstImpressionMemory(me.What, resolve),
+
+                // Relation:MicroPositive|from=a3f2c1|what=compliment
+                var h when h.StartsWith("Relation:MicroPositive") => FormatMicroMemory(me.What, resolve, positive: true),
+                var h when h.StartsWith("Relation:MicroNegative") => FormatMicroMemory(me.What, resolve, positive: false),
+
+                // Relation:Repair:Accepted|with=b7e9a2
+                var h when h.StartsWith("Relation:Repair") => FormatRepairMemory(me.What, resolve),
+
+                // Sleep:Ended:High|hours=7.5
+                var h when h.StartsWith("Sleep:Ended") => FormatSleepEndedMemory(me.What),
+
+                // Sleep:Nightmare|stress=High
+                "Sleep:Nightmare" => FormatNightmareMemory(me.What),
+
+                // Action:Sleep, Action:Eat...
+                var h when h.StartsWith("Action:") => FormatActionMemory(me.What),
+
+                // Neznámý formát — fallback, ticho je lepší než nesmysl
+                _ => null
+            };
+
+            if (memoryText is null) return null!;
+
+            // Síla vzpomínky — kontextová informace pro hráče
             var strengthHint = me.Strength switch
             {
                 >= 0.8 => " (silná vzpomínka)",
                 >= 0.4 => string.Empty,
-                _      => " (slabá vzpomínka)"
+                _ => " (slabá vzpomínka)"
             };
 
-            var text = $"{actor.Name} {Conj(actor, "si zapamatoval", "si zapamatovala")}: " +
-                       $"\"{me.What}\"{strengthHint}.";
-
+            var text = $"{actor.Name} {Conj(actor, "si vzpomněl", "si vzpomněla")}: {memoryText}{strengthHint}.";
             return new NarrativeEntry(me.OccurredAt, me.Human, text, NarrativePriority.Low);
         }
+
+        #region HelperMethods
+
+        private const string somebody = "někdo";
+
+        private static string? FormatInteractionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            // Interaction:Humor:Accepted|from=a3f2c1|to=b7e9a2
+            var header = MemoryWhatParser.GetHeader(what);   // "Interaction:Humor:Accepted"
+            var parts = header.Split(':');                   // ["Interaction", "Humor", "Accepted"]
+
+            if (parts.Length < 3) return null;
+
+            var act = parts[1];                           // "Humor"
+            var outcome = parts[2];                           // "Accepted" / "Rejected"
+
+            // Přelož act na čitelný text
+            var actText = act switch
+            {
+                "SmallTalk" => "nezávazný hovor",
+                "Humor" => "vtip",
+                "Question" => "otázku",
+                "SelfDisclosure" => "osobní sdělení",
+                "Validation" => "podporu",
+                "Invite" => "pozvání",
+                "Boundary" => "nastavení hranic",
+                "Meta" => "komentář o vztahu",
+                _ => act
+            };
+
+            var fromParam = MemoryWhatParser.GetParam(what, "from");
+            var fromPerson = fromParam is not null && Guid.TryParse(fromParam, out var fromGuid) ? resolve(new HumanId(fromGuid)) : null;
+
+            var gen = fromPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Genitive) : Decl(fromPerson, Grammar.Core.Enums.Case.Genitive);
+
+            return outcome == "Accepted"
+                ? $"{actText} přijat/a od {gen}"
+                : $"{actText} odmítnut/a od {gen}";
+        }
+
+        private static string? FormatFirstImpressionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            // Relation:FirstImpression:Positive|of=b7e9a2
+            var sentiment = MemoryWhatParser.GetHeader(what).Split(':')[2]; // "Positive"
+            var ofParam = MemoryWhatParser.GetParam(what, "of");
+            var ofPerson = ofParam is not null && Guid.TryParse(ofParam, out var g)
+                ? resolve(new HumanId(g)) : null;
+
+            string gen = ofPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Genitive) : Decl(ofPerson, Grammar.Core.Enums.Case.Genitive);
+            string inst = ofPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Instrumental) : Decl(ofPerson, Grammar.Core.Enums.Case.Instrumental);
+
+            return sentiment switch
+            {
+                "Positive" => $"první dojem z {gen} byl dobrý",
+                "Neutral" => $"první setkání s {inst}",
+                "Negative" => $"první dojem z {gen} byl špatný",
+                _ => $"setkání s {inst}"
+            };
+        }
+
+        private static string? FormatSleepEndedMemory(string what)
+        {
+            // Sleep:Ended:High|hours=7.5
+            var quality = MemoryWhatParser.GetHeader(what).Split(':')[2]; // "High"
+            var hours = MemoryWhatParser.GetParam(what, "hours");
+
+            var qualityText = quality switch
+            {
+                "High" => "výborný",
+                "Medium" => "dobrý",
+                "Low" => "špatný",
+                "Poor" => "velmi špatný",
+                _ => "?"
+            };
+
+            return hours is not null
+                ? $"{qualityText} spánek ({hours} h)"
+                : $"{qualityText} spánek";
+        }
+
+        private static string? FormatNightmareMemory(string what)
+        {
+            // Sleep:Nightmare|stress=High
+            var stress = MemoryWhatParser.GetParam(what, "stress");
+            return stress == "High"
+                ? "noční můra — silný stres"
+                : "noční můra";
+        }
+
+        private static string? FormatActionMemory(string what)
+        {
+            // Action:ReachOut, Action:Sleep...
+            var action = MemoryWhatParser.GetHeader(what).Split(':')[1];
+            return action switch
+            {
+                "ReachOut" => "hledal/a společnost",
+                "InviteIntimacy" => "projevil/a zájem o intimitu",
+                // Rutinní akce (Eat, Drink, Sleep, SelfCare) — nízká narativní hodnota
+                // → null = ticho, do deníku vzpomínek je nevypíšeme
+                _ => null
+            };
+        }
+
+        private static string? FormatRepairMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            // Relation:Repair:Accepted|with=b7e9a2
+            // Relation:Repair:Rejected|with=b7e9a2
+            var outcome = MemoryWhatParser.GetHeader(what).Split(':')[2]; // "Accepted" / "Rejected"
+            var withParam = MemoryWhatParser.GetParam(what, "with");
+            var withPerson = withParam is not null && Guid.TryParse(withParam, out var g)
+                ? resolve(new HumanId(g))
+                : null;
+
+            var inst = withPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Instrumental) : Decl(withPerson, Grammar.Core.Enums.Case.Instrumental);
+
+            return outcome == "Accepted"
+                ? $"smíření s {inst} proběhlo"
+                : $"pokus o smír s {inst} byl odmítnut";
+        }
+
+        private static string? FormatMicroMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve, bool positive)
+        {
+            // Relation:MicroPositive|from=a3f2c1|what=compliment
+            // Relation:MicroNegative|from=a3f2c1|what=interruption
+            var fromParam = MemoryWhatParser.GetParam(what, "from");
+            var fromPerson = fromParam is not null && Guid.TryParse(fromParam, out var g) ? resolve(new HumanId(g)) : null;
+
+            var whatParam = MemoryWhatParser.GetParam(what, "what");
+
+            var inst = fromPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Instrumental) : Decl(fromPerson, Grammar.Core.Enums.Case.Instrumental);
+
+            // Pokud máme konkrétní popis události, použijeme ho — jinak generický fallback
+            return positive
+                ? whatParam is not null
+                    ? $"příjemný moment s {inst}: {whatParam}"
+                    : $"příjemný moment s {inst}"
+                : whatParam is not null
+                    ? $"nepříjemný moment s {inst}: {whatParam}"
+                    : $"nepříjemný moment s {inst}";
+        }
+
+        #endregion
 
         #endregion
 
@@ -459,8 +638,8 @@ namespace GameEngineTools.Narrative
                 _  => $"{mc.Count} vzpomínek"
             };
 
-            var text = $"Spánek {Conj(actor, "upevnil", "upevnila")} {actor.Name} {countText} " +
-                       $"v paměti.";
+            var dat = Decl(actor, Grammar.Core.Enums.Case.Dative);
+            var text = $"Spánek upevnil {dat} {countText} v paměti.";
 
             return new NarrativeEntry(mc.OccurredAt, mc.Human, text, NarrativePriority.Low);
         }
@@ -488,6 +667,42 @@ namespace GameEngineTools.Narrative
         /// </example>
         private static string Conj(NarrativeCharacterInfo actor, string male, string female)
             => actor.IsFemale ? female : male;
+
+        private static string Decl(NarrativeCharacterInfo actor, Grammar.Core.Enums.Case @case)
+        {
+            var collection = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection());
+            var provider = collection.BuildServiceProvider();
+            var engine = provider.GetRequiredService<Grammar.Czech.Services.MorphologyEngine>();
+            var request = new CzechWordRequest
+            {
+                Lemma = actor.Name,
+                WordCategory = Grammar.Core.Enums.WordCategory.Noun,
+                Case = @case,
+                Number = Grammar.Core.Enums.Number.Singular,
+                Gender = actor.IsFemale ? Grammar.Core.Enums.Gender.Feminine : Grammar.Core.Enums.Gender.Masculine,
+                IsAnimate = actor.IsFemale ? false : true,
+                Pattern = actor.IsFemale ? "žena" : "pán"
+            };
+
+            return engine.GetForm(request).Form;
+        }
+
+        private static string DeclString(string lemma, Grammar.Core.Enums.Case @case)
+        {
+            var engine = CzechGrammarServiceFactory
+                .AddCzechGrammarServices(new ServiceCollection())
+                .BuildServiceProvider()
+                .GetRequiredService<MorphologyEngine>();
+
+            var request = new CzechWordRequest
+            {
+                Lemma = lemma,
+                WordCategory = Grammar.Core.Enums.WordCategory.Pronoun,
+                Case = @case
+            };
+
+            return engine.GetForm(request).Form;
+        }
 
         #endregion
     }
