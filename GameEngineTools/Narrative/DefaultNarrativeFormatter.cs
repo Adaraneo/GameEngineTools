@@ -21,6 +21,7 @@ namespace GameEngineTools.Narrative
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Sleep;
+    using Grammar.Core.Enums;
     using Grammar.Czech;
     using Grammar.Czech.Models;
     using Grammar.Czech.Services;
@@ -52,13 +53,13 @@ namespace GameEngineTools.Narrative
     /// </remarks>
     public sealed class DefaultNarrativeFormatter : INarrativeFormatter
     {
-        private readonly MorphologyEngine _morphology;
+        private readonly CzechWordFormComposer _wordComposer;
 
         public DefaultNarrativeFormatter()
         {
-            _morphology = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
+            _wordComposer = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
                 .BuildServiceProvider()
-                .GetRequiredService<MorphologyEngine>();
+                .GetRequiredService<CzechWordFormComposer>();
         }
 
         #region Veřejné API — Format
@@ -677,32 +678,48 @@ namespace GameEngineTools.Narrative
         private static string Conj(NarrativeCharacterInfo actor, string male, string female)
             => actor.IsFemale ? female : male;
 
-        private string Decl(NarrativeCharacterInfo actor, Grammar.Core.Enums.Case @case)
+        private string Decl(NarrativeCharacterInfo actor, Case @case)
         {
             var request = new CzechWordRequest
             {
                 Lemma = actor.Name,
-                WordCategory = Grammar.Core.Enums.WordCategory.Noun,
+                WordCategory = WordCategory.Noun,
                 Case = @case,
-                Number = Grammar.Core.Enums.Number.Singular,
-                Gender = actor.IsFemale ? Grammar.Core.Enums.Gender.Feminine : Grammar.Core.Enums.Gender.Masculine,
+                Number = Number.Singular,
+                Gender = actor.IsFemale ? Gender.Feminine : Gender.Masculine,
                 IsAnimate = actor.IsFemale ? false : true,
                 Pattern = actor.IsFemale ? "žena" : "pán"
             };
 
-            return _morphology.GetForm(request).Form;
+            return _wordComposer.GetFullForm(request).Form;
         }
 
-        private string DeclString(string lemma, Grammar.Core.Enums.Case @case)
+        private string DeclString(string lemma, Case @case)
         {
             var request = new CzechWordRequest
             {
                 Lemma = lemma,
-                WordCategory = Grammar.Core.Enums.WordCategory.Pronoun,
+                WordCategory = WordCategory.Pronoun,
                 Case = @case
             };
 
-            return _morphology.GetForm(request).Form;
+            return _wordComposer.GetFullForm(request).Form;
+        }
+
+        private string Conj(string lemma, VerbAspect aspect, Tense tense, bool isFemale, Person person = Person.Third)
+        {
+            var request = new CzechWordRequest
+            {
+                Lemma = lemma,
+                WordCategory = WordCategory.Verb,
+                Person = person,
+                Aspect = aspect,
+                Modus = Modus.Conjunctive,
+                Tense = tense,
+                Gender = isFemale ? Gender.Feminine : Gender.Masculine
+            };
+
+            return _wordComposer.GetFullForm(request).Form;
         }
 
         #endregion
