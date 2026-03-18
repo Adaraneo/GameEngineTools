@@ -1,10 +1,10 @@
+![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
+![License](https://img.shields.io/badge/license-Proprietary-red)
+
 # GameEngineTools
 
 **A C# NPC simulation library for narrative-driven games.**  
-Built by [50PSoftware](https://github.com/50PSoftware) · Unity-ready
-
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
-![License](https://img.shields.io/badge/license-Proprietary-red)
+Built by [50PSoftware](https://github.com/50PSoftware) ·
 
 ---
 
