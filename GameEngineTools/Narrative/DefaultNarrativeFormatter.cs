@@ -306,10 +306,10 @@ namespace GameEngineTools.Narrative
                 Sleep          => ($"{actor.Name} {Conj(actor, "šel", "šla")} spát.",
                                    NarrativePriority.Low),
 
-                Eat            => ($"{actor.Name} {Conj(actor, "šel", "šla")} se najíst.",
+                Eat            => ($"{actor.Name} se {Conj(actor, "šel", "šla")} najíst.",
                                    NarrativePriority.Low),
 
-                Drink          => ($"{actor.Name} {Conj(actor, "šel", "šla")} se napít.",
+                Drink          => ($"{actor.Name} se {Conj(actor, "šel", "šla")} napít.",
                                    NarrativePriority.Low),
 
                 SelfCare       => ($"{actor.Name} {Conj(actor, "se věnoval", "se věnovala")} péči o sebe.",
@@ -447,7 +447,7 @@ namespace GameEngineTools.Narrative
             var memoryText = header switch
             {
                 // Interaction:SmallTalk:Accepted|from=a3f2c1|to=b7e9a2
-                var h when h.StartsWith("Interaction:") => FormatInteractionMemory(me.What, resolve),
+                var h when h.StartsWith("Interaction:") => FormatInteractionMemory(me.What, resolve, actor),
 
                 // Relation:FirstImpression:Positive|of=b7e9a2
                 var h when h.StartsWith("Relation:FirstImpression") => FormatFirstImpressionMemory(me.What, resolve),
@@ -490,7 +490,7 @@ namespace GameEngineTools.Narrative
 
         private const string somebody = "někdo";
 
-        private string? FormatInteractionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)
+        private string? FormatInteractionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve, NarrativeCharacterInfo actor)
         {
             // Interaction:Humor:Accepted|from=a3f2c1|to=b7e9a2
             var header = MemoryWhatParser.GetHeader(what);   // "Interaction:Humor:Accepted"
@@ -519,10 +519,13 @@ namespace GameEngineTools.Narrative
             var fromPerson = fromParam is not null && Guid.TryParse(fromParam, out var fromGuid) ? resolve(new HumanId(fromGuid)) : null;
 
             var gen = fromPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Genitive) : Decl(fromPerson, Grammar.Core.Enums.Case.Genitive);
+            var acceptVerb = Conj("přijmout", VerbAspect.Perfective, Tense.Past, actor.IsFemale);
+            var declineVerb = Conj("odmítnout", VerbAspect.Perfective, Tense.Past, actor.IsFemale);
 
-            return outcome == "Accepted"
-                ? $"{actText} přijat/a od {gen}"
-                : $"{actText} odmítnut/a od {gen}";
+            var acceptedText = actor.Name == fromPerson?.Name ? $"{acceptVerb} {actText}" : $"{acceptVerb} {actText} od {gen}";
+            var declinedText = actor.Name == fromPerson?.Name ? $"{declineVerb} {actText}" : $"{declineVerb} {actText} od {gen}";
+
+            return outcome == "Accepted" ? acceptedText : declinedText;
         }
 
         private string? FormatFirstImpressionMemory(string what, Func<HumanId, NarrativeCharacterInfo> resolve)

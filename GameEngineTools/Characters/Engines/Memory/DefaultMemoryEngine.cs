@@ -196,7 +196,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 // ── Interakce ─────────────────────────────────────────────────────────────
                 case InteractionOutcome io:
                     {
-                        // Schema zachytí: typ aktu, výsledek, oba aktéři (zkrácené ID)
+                        // Schema zachytí: typ aktu, výsledek, oba aktéři
                         // Odmítnutí má vyšší salience — sociální bolest se pamatuje lépe
                         var what = MemoryWhatParser.Interaction(io.Act.ToString(), io.Accepted, io.From.Value, io.To.Value);
                         var salience = io.Accepted ? 0.7 : 0.9;

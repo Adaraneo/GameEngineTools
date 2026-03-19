@@ -125,8 +125,8 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
             var soView = AppearanceProjector.Compute(so.PhysicalAppearance, so.Snapshot.Physiology, so.Biology);
             var pView = AppearanceProjector.Compute(p.PhysicalAppearance, p.Snapshot.Physiology, p.Biology);
 
-            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, 50, ComputeAttraction(soView)));
-            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, 50, ComputeAttraction(pView)));
+            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, 0, ComputeAttraction(soView)));
+            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, 0, ComputeAttraction(pView)));
         }
 
         // Naplánované akce
