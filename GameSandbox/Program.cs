@@ -14,6 +14,8 @@ using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using System.Text;
 using static GameEngineTools.Characters.Engines.ActionNames;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
@@ -85,7 +87,6 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
     Characters = [playerPerson, significantOtherPerson],
     SimulationYears = 2,
     TickStep = WTimeSpan.FromHours(0.5),
-    ClockAdvance = WTimeSpan.FromHours(1),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
 
     ResolveCharacter = id =>
@@ -129,15 +130,15 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
         }
 
         // Naplánované akce
-        if (now.Day is 2 or 6 or 12)
+        if (now.Day is 2 or 6 or 12 && now.Hour is 8)
             so.ReceiveEvent(new InteractionProposed(
                 now + WTimeSpan.FromMinutes(30), p.Id, so.Id, SpeechAct.SmallTalk, "Ahoooj"));
 
-        if (now.Day is 13)
+        if (now.Day is 13 && now.Hour is 13)
             so.ReceiveEvent(new InteractionProposed(
                 now + WTimeSpan.FromMinutes(12), p.Id, so.Id, SpeechAct.Humor, "Vtip"));
 
-        if (now.Day is 16)
+        if (now.Day is 16 && now.Hour is 12)
             so.ReceiveEvent(new MicroPositive(
                 now + WTimeSpan.FromMinutes(20), so.Id, p.Id, "Smile"));
 
@@ -152,7 +153,7 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
         }
 
         // Light touch — až když jsou dostatečně blízko
-        if (now.Day is 20)
+        if (now.Day is 20 && now.Hour == new Random().Next(8, 16))
         {
             var edge = p.Snapshot.Relationships.Edges.GetValueOrDefault(so.Id);
             if (edge?.Closeness > 30)
@@ -160,7 +161,7 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
                     now + WTimeSpan.FromMinutes(15), p.Id, so.Id, TouchLevel.Light));
         }
 
-        if (now.Day is 10)
+        if (now.Day is 10 && now.Hour == new Random().Next(8, 16))
             p.ReceiveEvent(new InteractionProposed(
                 now + WTimeSpan.FromMinutes(12), so.Id, p.Id, SpeechAct.Validation, "Sluší ti to."));
 
@@ -195,7 +196,8 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
 await scene.RunAsync();
 
 // Zápis do deníku
-Console.WriteLine($"\n=== DENÍK ({diary.Count} záznamů) ===");
+var sbDiary = new StringBuilder();
+AddDiaryEntry(sbDiary, $"\n=== DENÍK ({diary.Count} záznamů) ===");
 foreach (var entry in diary.OrderBy(e => e.OccurredAt))
 {
     var prefix = entry.Priority switch
@@ -204,7 +206,7 @@ foreach (var entry in diary.OrderBy(e => e.OccurredAt))
         NarrativePriority.Medium => ". ",
         _ => "  "
     };
-    Console.WriteLine($"{prefix}[{entry.OccurredAt.ToString()}] {entry.Text}");
+    AddDiaryEntry(sbDiary, $"{prefix}[{entry.OccurredAt.ToString()}] {entry.Text}");
 }
 
 await File.WriteAllTextAsync(gameTimePath, clock.Now.WorldTicks.ToString());
@@ -217,4 +219,12 @@ await File.WriteAllTextAsync(Path.Combine(desktopPath, $"significantOther.{signi
 
 Console.WriteLine("Simulace dokončena. Herní čas: {0}", clock.Now);
 
+File.WriteAllText(Path.Combine(desktopPath, $"diary.{clock.Now.Date.ToString()}.txt"), sbDiary.ToString());
+
 Console.ReadKey();
+
+static void AddDiaryEntry(StringBuilder stringBuilder, string entry)
+{
+    Console.WriteLine(entry);
+    stringBuilder.AppendLine(entry);
+}

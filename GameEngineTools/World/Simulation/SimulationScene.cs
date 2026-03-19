@@ -154,7 +154,7 @@ namespace GameEngineTools.World.Simulation
                 }
 
                 // ── Krok 4: Posun hodin ────────────────────────────────────────────────
-                _clock.Advance(_options.ClockAdvance);
+                _clock.Advance(_options.TickStep);
             }
 
             return Task.CompletedTask;

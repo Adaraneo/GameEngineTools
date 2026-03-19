@@ -148,9 +148,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var needRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2);
             var needFood = Clamp01p(ph.Hunger);
             var needWater = Clamp01p(ph.Thirst);
-            var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15) - CooldownFor(updatedCooldowns, ReachOut) * 5);
+            var needBel = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15) - CooldownFor(updatedCooldowns, ReachOut) * 15);
             var needComp = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2);
-            var needInti = ComputeIntimacyNeed(ctx, ph, rel, ps) - CooldownFor(updatedCooldowns, InviteIntimacy) * 8;
+            var needInti = ComputeIntimacyNeed(ctx, ph, rel, ps) - CooldownFor(updatedCooldowns, InviteIntimacy) * 20;
             var needSelfCare = Clamp01p(ph.Pain * 0.7 + ph.ImmuneLoad * 0.3);
 
             // --- Sleep prompt logika (mimo candidates) ---
@@ -198,15 +198,6 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 // --- Spánek: externí přerušení (přepad, bolest...) ---
                 case SleepInterrupted si when _activeSession is { IsActive: true }:
                     _activeSession.Interrupt(si.OccurredAt, si.Cause, ctx, outbox);
-                    break;
-
-                // --- Ostatní cooldowny ---
-                case ActionCommitted ac when ac.ActionName == ReachOut:
-                    SetCooldown(ctx.Id, ReachOut, 4);
-                    break;
-
-                case ActionCommitted ac when ac.ActionName == InviteIntimacy:
-                    SetCooldown(ctx.Id, InviteIntimacy, 6);
                     break;
             }
         }
@@ -394,7 +385,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 var elapsed = now - running.Start;
                 if (elapsed < running.ExpectedDuration)
                 {
-                    State = State with { CurrentPlan = running };
+                    State = State with { CurrentPlan = running, Cooldowns = updatedCooldowns };
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
                     {
                         _log.BehaviorActionRunning(ctx.Id.Value.ToString(), running.Name, (running.ExpectedDuration - elapsed).ToString());
@@ -449,6 +440,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
             outbox.Add(new ActionCommitted(now, ctx.Id, chosen.Name, chosen.Dur));
 
             State = State with { CurrentPlan = plan, Cooldowns = updatedCooldowns };
+            UpdateCooldownsForActions(ctx.Id, chosen.Name);
+
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
             {
                 _log.BehaviorActionChosen(ctx.Id.Value.ToString(), chosen.Name, chosen.Utility, chosen.Dur.ToString());
@@ -638,6 +631,21 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// <summary>Vrátí zbývající cooldown pro akci, nebo 0 pokud cooldown neexistuje.</summary>
         private static double CooldownFor(IReadOnlyDictionary<string, double> cd, string action)
             => cd.TryGetValue(action, out var v) ? v : 0;
+
+        private void UpdateCooldownsForActions(HumanId owner, string chosen)
+        {
+            double hours = chosen switch
+            {
+                InviteIntimacy => 6,
+                ReachOut => 4,
+                _ => double.NaN
+            };
+
+            if (!double.IsNaN(hours))
+            {
+                SetCooldown(owner, chosen, hours);
+            }
+        }
 
         /// <summary>Vypočítá utility akce: potřeba × (0.5 + váha motivace).</summary>
         private static double Util(double need, double weight) => need * (0.5 + weight);

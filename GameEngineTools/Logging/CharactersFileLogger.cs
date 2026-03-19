@@ -5,6 +5,7 @@ namespace GameEngineTools.Logging
 {
     using System.Collections.Concurrent;
     using System.Text;
+    using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
 
     /// <summary>
@@ -156,7 +157,6 @@ namespace GameEngineTools.Logging
                     w.WriteLine(line);
                 }
             }
-            // Flush NENÍ zde — provádí se přes FlushAll() nebo Dispose()
         }
 
         #endregion Interní zápis
@@ -178,6 +178,7 @@ namespace GameEngineTools.Logging
 
             var sb = new StringBuilder()
                 .Append(ts.ToString("yyyy-MM-ddTHH:mm:ss.fffK"))
+                .Append($" [{WDateTime.Now.ToString()}]")
                 .Append(" [").Append(level.ToString()[..3].ToUpperInvariant()).Append("] ")
                 .Append(category);
 

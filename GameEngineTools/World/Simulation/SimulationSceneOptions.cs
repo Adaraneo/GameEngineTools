@@ -64,16 +64,6 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         public WTimeSpan TickStep { get; init; } = WTimeSpan.FromHours(0.5);
 
-        /// <summary>
-        /// O kolik herního času se hodiny posunou na konci každé iterace smyčky.
-        /// Výchozí hodnota: <c>1 herní hodina</c>.
-        /// </summary>
-        /// <remarks>
-        /// <b>Invariant:</b> <c>ClockAdvance</c> musí být ≥ <c>TickStep</c>.
-        /// Pokud by byl menší, simuluješ stejný okamžik víckrát za sebou.
-        /// </remarks>
-        public WTimeSpan ClockAdvance { get; init; } = WTimeSpan.FromHours(1);
-
         #endregion Časování simulace
 
         #region Scénář (callback)
