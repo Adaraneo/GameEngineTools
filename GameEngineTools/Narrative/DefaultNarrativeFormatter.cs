@@ -1,15 +1,5 @@
 // DefaultNarrativeFormatter.cs
 // Copyright (c) 50PSoftware
-//
-// Český narativní formatter — překládá doménové eventy na čitelné věty.
-//
-// Architektonická lekce:
-//   Formatter je PURE FUNCTION — bere event, vrací větu. Žádný stav, žádné závislosti.
-//   Tím splňujeme SRP (single responsibility) i OCP (přidáš event → přidáš větev switch).
-//
-// Gramatika:
-//   Čeština vyžaduje gramatický rod. Pomocná metoda Conj() vybírá mužskou/ženskou formu
-//   na základě NarrativeCharacterInfo.IsFemale.
 
 namespace GameEngineTools.Narrative
 {
@@ -519,8 +509,8 @@ namespace GameEngineTools.Narrative
             var fromPerson = fromParam is not null && Guid.TryParse(fromParam, out var fromGuid) ? resolve(new HumanId(fromGuid)) : null;
 
             var gen = fromPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Genitive) : Decl(fromPerson, Grammar.Core.Enums.Case.Genitive);
-            var acceptVerb = Conj("přijmout", VerbAspect.Perfective, Tense.Past, actor.IsFemale);
-            var declineVerb = Conj("odmítnout", VerbAspect.Perfective, Tense.Past, actor.IsFemale);
+            var acceptVerb = Conj("přijmout", VerbAspect.Perfective, Tense.Past, VerbClass.Class2, actor.IsFemale);
+            var declineVerb = Conj("odmítnout", VerbAspect.Perfective, Tense.Past, VerbClass.Class2, actor.IsFemale);
 
             var acceptedText = actor.Name == fromPerson?.Name ? $"{acceptVerb} {actText}" : $"{acceptVerb} {actText} od {gen}";
             var declinedText = actor.Name == fromPerson?.Name ? $"{declineVerb} {actText}" : $"{declineVerb} {actText} od {gen}";
@@ -709,7 +699,7 @@ namespace GameEngineTools.Narrative
             return _wordComposer.GetFullForm(request).Form;
         }
 
-        private string Conj(string lemma, VerbAspect aspect, Tense tense, bool isFemale, Person person = Person.Third)
+        private string Conj(string lemma, VerbAspect aspect, Tense tense, VerbClass verbClass, bool isFemale, Person person = Person.Third, string? pattern = null)
         {
             var request = new CzechWordRequest
             {
@@ -719,6 +709,8 @@ namespace GameEngineTools.Narrative
                 Aspect = aspect,
                 Modus = Modus.Conjunctive,
                 Tense = tense,
+                VerbClass = verbClass,
+                Pattern = pattern,
                 Gender = isFemale ? Gender.Feminine : Gender.Masculine
             };
 
