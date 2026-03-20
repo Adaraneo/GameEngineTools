@@ -711,7 +711,8 @@ namespace GameEngineTools.Narrative
                 Tense = tense,
                 VerbClass = verbClass,
                 Pattern = pattern,
-                Gender = isFemale ? Gender.Feminine : Gender.Masculine
+                Gender = isFemale ? Gender.Feminine : Gender.Masculine,
+                Number = Number.Singular
             };
 
             return _wordComposer.GetFullForm(request).Form;
