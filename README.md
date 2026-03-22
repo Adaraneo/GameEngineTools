@@ -1,458 +1,230 @@
 # GameEngineTools
 
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
-![License](https://img.shields.io/badge/license-Proprietary-red)
-
-**A C# NPC simulation library for narrative-driven games.**  
-Built by [50PSoftware](https://github.com/50PSoftware) ·
+> **Copyright © 50PSoftware**  
+> C# knihovna pro simulaci vnitřního světa herních postav.
 
 ---
 
-## Table of Contents
+## Co to je a proč to vzniklo
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-  - [The Six-Engine Pipeline](#the-six-engine-pipeline)
-  - [Event-Driven Communication](#event-driven-communication)
-  - [Consumer Responsibility Pattern](#consumer-responsibility-pattern)
-- [Core Systems](#core-systems)
-  - [Physiology](#physiology)
-  - [Psychology](#psychology)
-  - [Behavior](#behavior)
-  - [Interactions](#interactions)
-  - [Relationships](#relationships)
-  - [Memory](#memory)
-- [World Time System](#world-time-system)
-- [Character Generation](#character-generation)
-- [Getting Started](#getting-started)
-- [Logging](#logging)
-- [Configuration Reference](#configuration-reference)
-- [Project Structure](#project-structure)
-- [Testing](#testing)
-- [Dependencies](#dependencies)
+Většina her simuluje postavy jako automaty: NPC stojí na místě, čeká na hráče a pak
+odehraje předepsanou animaci. Jakmile hráč odejde, NPC zmizí ze světa.
+
+**GameEngineTools** funguje jinak. Každá postava — hráč i NPC — žije vlastním životem
+i bez přítomnosti hráče. Má hlad, únavu a stres. Pamatuje si, co se jí stalo.
+Buduje nebo ničí vztahy. Rozhoduje se na základě svého vnitřního stavu, ne na základě
+skriptovaných triggerů.
+
+Cílem je, aby se postavy chovaly věrohodně — ne jako loutky, ale jako lidé s vnitřním světem.
 
 ---
 
-## Overview
+## Jak postava „funguje" uvnitř
 
-GameEngineTools is a character simulation library that models human behaviour through a pipeline of six independent but interconnected engines. Each character runs a deterministic simulation tick-by-tick, producing domain events consumed by the next engine in the chain. The result is emergent, psychologically grounded NPC behaviour — without scripted state machines.
-
-The library is engine-agnostic and integrates with **Unity** via a VContainer adapter, or runs standalone in any `.NET 8` host (console, server, test harness).
-
----
-
-## Architecture
-
-### The Six-Engine Pipeline
-
-Every character (`OrchestratedHuman`) runs engines in strict order each tick:
+Každá postava prochází při každém herním tiknutí pipeline šesti modulů, které se nazývají **enginy**.
+Každý engine má na starosti jeden aspekt existence postavy a předává výsledky dál:
 
 ```
 Physiology → Psychology → Behavior → Interactions → Relationships → Memory
 ```
 
-| # | Engine | Responsibility |
-|---|--------|----------------|
-| 1 | **PhysiologyEngine** | Energy, hunger, thirst, pain, immune load, menstrual cycle |
-| 2 | **PsychologyEngine** | Valence, arousal, dominance, stress, cognitive load, discrete emotion |
-| 3 | **BehaviorEngine** | Utility-based action selection (need-weighted candidates) |
-| 4 | **InteractionEngine** | Speech acts, touch attempts, misattribution, outcome resolution |
-| 5 | **RelationshipsEngine** | Multi-dimensional relationship graph with decay and domain breakdown |
-| 6 | **MemoryEngine** | Ebbinghaus forgetting curve, sleep consolidation, reinforcement (spacing effect) |
+### 1. Physiology — tělo
 
-Each engine implements `IEngine<TState, TConfig>` — state is immutable records; config is injected via `IOptions<T>`.
+Sleduje fyzický stav: energii, spánkový dluh, hlad, žízeň, bolest, teplotu, imunitní zátěž.
+U ženských postav simuluje i menstruační cyklus, který jemně ovlivňuje náladu a arousal.
 
-### Event-Driven Communication
+Fyzický stav přímo ovlivňuje psychiku — vyhládlá nebo unavená postava je podrážděnější,
+méně sociabilní, hůře se soustředí.
 
-Engines communicate exclusively through **domain events** (`IDomainEvent`). An engine emits events into a per-tick `IEventCollector` (outbox); the orchestrator publishes them after all engines have ticked. Events are never shared mid-tick — this prevents ordering bugs and makes the simulation deterministic.
+### 2. Psychology — mysl
 
-```csharp
-// Engine emits an event:
-outbox.Add(new InteractionOutcomeDecided(now, initiatorId, targetId, outcome));
+Používá [PAD model](https://en.wikipedia.org/wiki/PAD_emotional_state_model) —
+tři osy, které dohromady popisují emocionální stav:
+- **Valence** — jak příjemně se postava cítí (−1 = bídně, +1 = skvěle)
+- **Arousal** — jak je vzrušená nebo ospalá (0 = apatická, 1 = hyperaktivní)
+- **Dominance** — jak moc se cítí v kontrole situace
 
-// Another engine reacts to it in the next tick via Handle():
-public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
-{
-    if (@event is InteractionOutcomeDecided e) { /* ... */ }
-}
-```
+Na to se navrstvuje stres a kognitivní zátěž. Stres roste ze spánkového dluhu,
+bolesti a neúspěšných sociálních interakcí. Čas, jídlo a spánek ho postupně snižují.
 
-### Consumer Responsibility Pattern
+Neuroticism (součást osobnosti Big Five) určuje, jak rychle stres roste a jak pomalu opadá.
 
-The library exposes events; **wiring them into game logic is the consumer's responsibility**. This is a deliberate architectural boundary. For example, `BehaviorEngine` emits `InteractionProposed` — the game decides who the target is and routes the event to the appropriate character.
+### 3. Behavior — rozhodování
 
----
+Postava si nevybírá akci náhodně — vybírá ji přes **utility funkci**.
+Každá možná akce dostane skóre na základě aktuálních potřeb postavy:
 
-## Core Systems
+- Je unavená? → Spánek dostane vysoké skóre.
+- Má hlad a zároveň je osaměla? → Eat vs. ReachOut — záleží na tom, co víc tlačí.
+- Dělala tu samou věc už dlouho? → Setrvačnostní boost ji v ní podrží, ale kognitivní switching cost ji zpomalí při přepínání kategorií.
 
-### Physiology
+Postava může dělat: `Work`, `Create`, `Eat`, `Drink`, `SelfCare`, `ReachOut`, `InviteIntimacy`, `Idle` — nebo spát.
 
-Tracks six continuous physiological values on `[0, 100]` scales:
+#### Spánek
 
-- `Energy` — depleted by activity, restored by sleep
-- `Hunger` / `Thirst` — increase over time, trigger eating/drinking behaviour
-- `Pain` — passive recovery per hour; sleep accelerates recovery
-- `ImmuneLoad` — gradual accumulation, affects psychology
-- `BodyTempDelta` — deviation from baseline temperature
+Spánek je záměrně vyřazen z běžného výběru akcí a řeší se jako separátní session.
+Postava prochází fázemi: **Falling asleep → Light sleep → Deep sleep → REM**.
+V REM fázi může zažít sen nebo noční můru. Noční můra přeruší spánek a zvýší stres.
 
-Optional: **menstrual cycle simulation** (configurable age of onset, cycle length distribution, PMS probability, ovulation window events).
+Při opakovaném odmítání spánku (hráčem) se zapíná penalizace — stres roste rychleji.
+Po dostatečně vysokém spánkovém dluhu engine bypasse cooldown a postava prostě musí spát.
 
-### Psychology
+#### Vliv vzpomínek na rozhodování
 
-Models affect using a three-dimensional PAD (Pleasure-Arousal-Dominance) space:
+Toto je jeden z nejzajímavějších systémů. Behavior engine se při výběru akce ptá
+paměťového enginu: *"Pamatuješ si něco relevantního?"*
 
-- `Valence` — current hedonic state (−1..+1)
-- `Arousal` — activation level
-- `Dominance` — sense of control
-- `Stress` — cumulative, decays at a configurable rate per hour
-- `CognitiveLoad` — mental fatigue
-- `DominantEmotion` — discrete categorical label (`Neutral`, `Happy`, `Sad`, `Angry`, `Afraid`, `Disgusted`, `Surprised`)
+- Pokud postava zažila sociální trauma → utilita `ReachOut` klesne.
+- Pokud ji někdo odmítl při intimní iniciativě → `InviteIntimacy` dostane penaltu.
+- Pozitivní vzpomínky na společný čas → sociální aktivity dostávají bonus.
+- Vysoká emocionální zátěž (mnoho silných vzpomínek najednou) → postava více pečuje o sebe.
 
-Neuroticism (BigFive trait) modulates stress sensitivity.
+### 4. Interactions — sociální kontakt
 
-### Behavior
+Když se postava A pokusí o interakci s B, engine B vyhodnotí, jestli ji přijme nebo odmítne.
+Záleží na: jak blízký je jejich vztah, jaká je nálada B, jestli je přeplněno nebo hlučno,
+jestli mají soukromí, a na misattribution — stres způsobuje chybné čtení záměrů.
 
-Utility-based action selection. Candidate actions are scored by:
+Typy interakcí (`SpeechAct`): `SmallTalk`, `Question`, `SelfDisclosure`, `Validation`,
+`Humor`, `Meta`, `Invite`, `Boundary`.
 
-```
-Utility(need, weight) = need * (0.5 + personalityWeight)
-```
+Existuje i fyzický kontakt (`TouchAttempted`): Light, Friendly, Intimate — každá úroveň
+vyžaduje odpovídající hloubku vztahu.
 
-Needs are computed fresh from the current `EnginesSnapshot` every tick — `BehaviorState` is only for persistence, not for driving decisions.
+### 5. Relationships — vztahy
 
-**Inertia and novelty penalties** prevent constant action switching. **Sleep sub-system** runs as a state machine within the engine:
+Vztahy jsou **asymetrické** — A může mít B ráda víc, než B má ráda A.
+Každá postava vede orientovaný graf: pro každou osobu, se kterou se setkala, drží hranu
+se šesti dimenzemi:
 
-- Detects fatigue (`SleepDebt`, `Energy`) and emits `SleepPromptRequested` for player confirmation
-- Handles player `SleepConfirmed` / `SleepDeclined` 
-- Progresses through phases: Falling → Light → Deep → REM
-- Nightmares (stress-dependent), ambush events, and interrupted sleep are all modelled
+| Dimenze | Co měří |
+|---|---|
+| Like | Jak moc ji má ráda celkově |
+| Trust | Jak moc jí věří |
+| Attraction | Fyzická přitažlivost |
+| Closeness | Emocionální intimita |
+| Respect | Respekt k hodnotám a schopnostem |
+| Comfort | Jak příjemně se s ní cítí |
 
-### Interactions
+Kromě toho vede **DomainBreakdown** — granulární obraz ČEHO si na druhém váží:
+intelekt, humor, estetika, hodnoty, fyzičnost. Každá interakce posouvá konkrétní domény.
 
-Handles social actions between characters:
+Vztahy časem **decay** — bez kontaktu se pomalu blíží k neutrálním hodnotám.
 
-- **Speech acts**: `SmallTalk`, `Question`, `SelfDisclosure`, `Validation`, `Humor`, `Meta`, `Invite`, `Boundary`
-- **Physical touch**: graded intensity levels; acceptance probability based on relationship state
-- **Misattribution**: configurable base rate — a character may attribute an outcome to the wrong cause
+### 6. Memory — paměť
 
-Outcomes are resolved asymmetrically: rejection affects initiator and recipient differently.
+Paměťový engine modeluje tři kognitivní principy:
 
-### Relationships
+**Ebbinghausova křivka zapomínání** — vzpomínky se nerozpadají lineárně,
+ale exponenciálně. Čerstvá vzpomínka ztrácí sílu rychleji než ta dobře zakotvená.
+Negativní vzpomínky (stres, odmítnutí) se rozpadají *pomaleji* než pozitivní.
 
-A directed, weighted graph of `RelationshipEdge` records. Each edge carries six dimensions:
+**Spánková konsolidace** — po probuzení engine posílí nejsalientnější vzpomínky.
+Nedostatečný spánek tak přímo narušuje paměť — přesně jako v reálném životě.
 
-| Dimension | Neutral | Notes |
-|-----------|---------|-------|
-| `Like` | 50 | Affected by all positive/negative interactions |
-| `Trust` | 50 | Slow decay; hard to rebuild |
-| `Closeness` | 35 | Fastest decay; proximity-dependent |
-| `Attraction` | 35–45 | Anchors at different baselines based on initial value |
-| `Respect` | 55 | Very slow decay |
-| `Comfort` | 45 | Modulated by valence and stress |
-
-**Domain breakdown** (`DomainBreakdown`) tracks which facets of the relationship have developed (Humor, Intellect, Values, Physical). Each speech act type contributes to specific domains.
-
-Decay is modulated by the character's current psychology: positive valence slows decay; stress accelerates it.
-
-### Memory
-
-Implements three cognitively-grounded principles:
-
-1. **Ebbinghaus forgetting curve** — exponential decay: `strength *= exp(-k * emotionMod * Δt)`
-   - Negative memories decay *slower* (lower `emotionMod`) — trauma persists
-   - Positive memories fade faster than neutral ones
-
-2. **Sleep consolidation** — on `SleepEnded`, the top 10 episodes by salience are strengthened by `SleepConsolidationBoost`
-
-3. **Spacing effect** — a repeated experience of the same type reinforces the existing episode rather than creating a duplicate
-
-**Memory → Behavior integration**: `ApplyMemoryModifiers()` in `BehaviorEngine` reads the memory index and adjusts action utilities:
-- Social trauma reduces `ReachOut` utility
-- Positive social memories boost social inclination
-- Intimate rejection penalises `InviteIntimacy`
-- High emotional load increases `SelfCare`
+**Spacing effect** — opakovaný zážitek stejného druhu nevytváří duplicitní záznam,
+ale posiluje stávající vzpomínku. Postava, která se opakovaně setkává s příjemnou osobou,
+má tuto osobu čím dál hlouběji zakořeněnou v paměti.
 
 ---
 
-## World Time System
+## Herní čas
 
-GameEngineTools uses a fully configurable fictional calendar, decoupled from real-world time.
+Svět nepoužívá reálný `DateTime`. Místo toho běží vlastní herní čas definovaný přes
+`WorldTimeSpec` — kalendář s libovolným počtem měsíců, dní v měsíci a hodin v dni.
 
-### Key Types
+Aktuální konfigurace: **10 měsíců × 36 dní, 26 hodin denně** (svět Vigilia Insectianis).
 
-| Type | Purpose |
-|------|---------|
-| `WDateTime` | A point in world time (stored as `long worldTicks` from epoch) |
-| `WDateOnly` | Date without time |
-| `WTimeOnly` | Time of day |
-| `WTimeSpan` | Duration |
-| `WorldTimeSpec` | Calendar definition (hours/day, days/month, leap rules) |
-| `IWorldCalendar` | Calendar abstraction (`FixedMonthsCalendar` provided) |
-
-`WDateTime` properties (`Year`, `Month`, `Day`, `Hour`...) work as ambient accessors — no context passing required, analogous to `System.DateTime`. Pure arithmetic operations (operators, comparison) do **not** require `WWorld` to be configured.
-
-### Configuration (`appsettings.json`)
-
-```json
-"InitWorldClock": {
-  "UseWorldType": "MyWorld",
-  "MyWorld": {
-    "TicksPerSecond": 1,
-    "SecondsPerMinute": 60,
-    "MinutesPerHour": 60,
-    "HoursPerDay": 26,
-    "DaysInMonths": [36, 36, 36, 36, 36, 36, 36, 36, 36, 36],
-    "LeapYearInterval": 5,
-    "LeapExtraDays": 1
-  }
-}
-```
+Čas je plně konfigurovatelný a nezávislý na reálném čase — simulace může běžet
+stokrát rychleji než realita nebo v přesném lockstepu s ní.
 
 ---
 
-## Character Generation
+## Narativní výstup
 
-Characters are generated from a `HumanBlueprint` via `IHumanBlueprintGenerator`.
+Engine sám o sobě generuje jen doménové události (interakce proběhla, vzpomínka uložena,
+postava usnula…). K tomu existuje **Narrative vrstva**: formatter, který přeloží tyto
+technické události na čitelný text.
 
-### Personality Model
+Výchozí implementace `DefaultNarrativeFormatter` píše v češtině a využívá vlastní
+morfologickou knihovnu **Grammar Modular** pro správné skloňování jmen, sloves a rodů.
 
-```
-BigFive (O, C, E, A, N)
-  └─ correlated generation via Cholesky decomposition
-  └─ mapped to MotivationWeights (9 drives)
-       Affiliation · Achievement · Power · Altruism · Competence
-       Autonomy · Curiosity · Rest · Sexuality
-  └─ drives directly scale Behavior utility weights
+Každá narativní věta má prioritu — High, Medium nebo Low — takže si hráč může
+nastavit, co chce vidět: jen klíčové momenty, nebo celý proud vědomí postavy.
 
-AttachmentStyle   — Secure / Anxious / Avoidant / Disorganized
-CommunicationStyle — Direct / Indirect / HighContext / LowContext
-Sociosexuality    — Restricted / Intermediate / Unrestricted
-Chronotype        — Lark / Neutral / Owl
-```
+### Živá ukázka
 
-Generation is **deterministic with a seed** — the same seed always produces the same character.
-
-### Usage
-
-```csharp
-var blueprint = generator.Generate(new HumanBlueprintRequest
-{
-    Sex = SexBiology.Female,
-    PersonalityHints = new PersonalityHints(Extraversion: 0.8, Neuroticism: 0.3),
-    Seed = 42
-});
-
-var character = manager.AddCharacter(blueprint);
-```
+`GameSandbox` spouští dvouletou simulaci dvou postav a zapisuje celý jejich narativní
+deník do souboru `diary.txt`. Výstup (~9000 řádků) slouží jako živá produkční ukázka
+Grammar Modular v akci.
 
 ---
 
-## Getting Started
+## Jak to zapojit do hry
 
-### 1. Configure `appsettings.json`
+Knihovna je navržena tak, aby šla použít ve dvou scénářích:
 
-Add `InitWorldClock` and `Characters` sections (see `appsettings.Characters.json` for all defaults).
-
-### 2. Start the Runtime
+### Konzolová aplikace / standalone
 
 ```csharp
-await using var runtime = await GameEngineToolsRuntime.StartAsync(
-    consoleLogs: true,
-    logsRoot: "logs"
-);
+await using var runtime = await GameEngineToolsRuntime.StartAsync();
 
-var manager = runtime.Services.GetRequiredService<IGameEngineToolsManager>();
-await manager.InitializeAsync();
-```
-
-### 3. Run a Simulation
-
-```csharp
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
-    Characters = manager.Characters,
-    TickStep   = WTimeSpan.FromHours(1),
+    Characters      = [playerHuman, npcHuman],
     SimulationYears = 2,
+    TickStep        = WTimeSpan.FromHours(0.5),
 
-    OnTick = (now, characters) =>
+    OnNarrative = entry =>
     {
-        // ReachOut routing — consumer decides who interacts with whom
-        var actor  = characters[0];
-        var target = characters[1];
-
-        if (actor.LastOutbox.OfType<InteractionProposed>().Any())
-        {
-            target.ReceiveEvent(new InteractionProposed(now, actor.Id, target.Id, SpeechAct.SmallTalk));
-        }
-    },
-
-    SleepPromptHandlers = new Dictionary<HumanId, Func<SleepPromptRequested, bool>>
-    {
-        // Player character — ask the player
-        [playerId] = prompt => AskPlayer(prompt)
-        // NPCs — auto-confirm (missing handler = auto-confirm)
+        if (entry.Priority == NarrativePriority.High)
+            Console.WriteLine(entry.Text);
     }
 });
 
 await scene.RunAsync();
 ```
 
-### 4. Loading Saved State
+### Unity
 
-```csharp
-// Load WorldTimeSpec before starting the runtime (e.g. to parse saved ticks)
-var spec  = GameEngineToolsRuntime.LoadSpec();
-long ticks = savedTicksString != null ? long.Parse(savedTicksString)
-           : spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
-
-await using var runtime = await GameEngineToolsRuntime.StartAsync(new WDateTime(ticks));
-```
+Pro Unity existuje VContainer adaptér — díky Adapter patternu fungují všechny
+registrační metody beze změny. Místo `IHost` (který Unity nepotřebuje) se engine
+bootstrapuje přes `ServiceCollection` přímo.
 
 ---
 
-## Logging
+## Persistence — ukládání postav
 
-Logging uses `[LoggerMessage]` source generation — **zero allocations** at runtime, compile-time validation.
-
-All log methods live in `CoreLog` (the single source of truth for EventIds). Never call raw `_log.LogXxx()` inside engines — always use `CoreLog` extension methods.
-
-### EventId Ranges
-
-| Range | Domain |
-|-------|--------|
-| 1000–1099 | Behavior — decisions, actions, cooldowns |
-| 1100–1199 | Sleep — phases, prompts, nightmares, ambush |
-| 1200–1299 | Interactions — outcomes, touch |
-| 2000–2999 | Relationships — edges, decay, stages |
-| 3000–3999 | Memory — encoding, consolidation |
-| 4000–4999 | Infrastructure — Scheduler |
-| 5000–5999 | Snapshots — Physiology / Psychology / Behavior |
-
-### Per-Character Log Files
-
-Each character gets its own log file per engine under `logs/Characters/Person/{guid}/{Engine}.log`.  
-Routing is done via `CharacterLogScope` — no string parsing, direct type check only.
-
-```csharp
-using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
-{
-    _log.MemoryEncoded(ctx.Id.Value.ToString(), tag, salience, emotion.ToString());
-}
-```
+Postava se serializuje do JSON a načítá zpátky s plným zachováním stavu —
+vzpomínky, vztahy, fyzický stav, osobnost. Herní čas se ukládá zvlášť,
+takže simulace při příštím spuštění pokračuje přesně tam, kde skončila.
 
 ---
 
-## Configuration Reference
+## Kam projekt míří
 
-All values live under `Characters:` in `appsettings.json`.
+**GameEngineTools** je základ pro **Vigilia Insectianis** — RPG s přežitím a narativními prvky
+zasazené do světa se dvěma civilizacemi: feudální lidé a Insectiani — 3mm telepatické bytosti
+žijící v symbióze s mravenci.
 
-### Physiology
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `RestingMetabolicRate` | 1600 | Calories burned at rest (future use) |
-| `MaxSleepDebtHours` | 12 | Cap on accumulated sleep debt |
-| `EnableMenstrualCycle` | true | Enable hormonal cycle simulation |
-| `MenstrualCycleBeginsInAge` | 12 | Minimum age for cycle activation |
-| `EnergyRecoveryPerSleepHour` | 10 | Energy restored per hour of sleep |
-| `PainPassiveRecoveryPerHour` | 0.3 | Passive pain reduction per hour |
-| `PainSleepRecoveryPerHour` | 0.5 | Additional pain reduction during sleep |
-
-### Psychology
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `BaselineAffectVariance` | 0.02 | Random drift in valence/arousal each tick |
-| `StressRecoveryRatePerHour` | 1.5 | Stress reduction per hour |
-| `SleepQualityAffectWeight` | 0.5 | How much sleep quality shifts valence |
-
-### Behavior
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `InertiaWeight` | 0.25 | Bonus for continuing the current action |
-| `NoveltyPenalty` | 0.1 | Penalty for switching to a new action |
-| `PlanningHorizonHours` | 2.0 | Look-ahead for need projection |
-| `BaseSleepHours` | 8 | Target sleep duration |
-| `SleepCooldownHours` | 16 | Minimum time between sleep sessions |
-
-### Memory
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `BaseEncoding` | 0.5 | Initial strength of a new episodic memory |
-| `ForgettingRate` | 0.06 | Decay rate constant `k` in Ebbinghaus formula |
-| `EmotionDecayMod` | 0.5 | Multiplier for negative emotion decay (lower = slower) |
-| `SleepConsolidationBoost` | 0.12 | Strength added to top episodes after sleep |
-| `ReinforcementBoost` | 0.15 | Strength added when an existing episode is reinforced |
-| `PruneThreshold` | 0.01 | Episodes below this strength are removed |
-
-### Relationships
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `DecayPerDay` | 1.5 | Base decay applied to all dimensions per day |
-| `RepairGain` | 6.0 | `Like` gain from a repair interaction |
-| `RupturePenalty` | 8.0 | `Like` penalty from a rupture interaction |
+Zároveň je knihovna navržena jako kandidát pro samostatnou distribuci:
+vývojáři, kteří chtějí do své hry vnést věrohodné chování NPC, si ji mohou
+vzít jako hotový základ a zaměřit se na herní obsah místo simulační infrastruktury.
 
 ---
 
-## Project Structure
+## Technické informace
 
-```
-GameEngineTools/
-├── Characters/
-│   ├── Core/               # IHuman, IEngine, OrchestratedHuman, domain contracts
-│   ├── Engines/
-│   │   ├── Physiology/
-│   │   ├── Psychology/
-│   │   ├── Behavior/
-│   │   ├── Interactions/
-│   │   ├── Relationships/
-│   │   └── Memory/
-│   ├── Generation/         # HumanBlueprintGenerator, PersonalityGenerator
-│   ├── Hosting/            # DI registration (AddCharacters, AddCharacterGeneration)
-│   └── Traits/             # Personality, BigFive, MotivationWeights
-├── World/
-│   ├── Core/               # WorldTimeSpec, IWorldCalendar, FixedMonthsCalendar
-│   ├── Utils/Time/         # WDateTime, WDateOnly, WTimeOnly, WTimeSpan
-│   └── Simulation/         # SimulationScene
-├── Logging/                # CoreLog, CharactersFileLoggerProvider, CharacterLogScope
-├── Config/                 # All *Config records
-├── GameEngineToolsRuntime.cs   # DI entry point
-└── GameEngineToolsManager.cs   # Character management, factory methods
-
-EngineTests/                # MSTest integration tests
-GameSandbox/                # Console host for development & diary output
-```
+| | |
+|---|---|
+| Jazyk | C# |
+| Framework | .NET 8 |
+| DI | Microsoft.Extensions.DependencyInjection |
+| Unity DI | VContainer (adaptér) |
+| Logování | `[LoggerMessage]` source generator (nulové alokace) |
+| Testy | MSTest |
+| Jazyková vrstva | Grammar Modular (vlastní projekt) |
 
 ---
 
-## Testing
-
-Integration tests use `MSTest` and build a real DI container with in-memory overrides. The base class `TestBase` wires up all six engines with default configuration.
-
-All behavior utility tables are documented analytically in test comments — exact utility values per scenario are shown to make calibration decisions traceable.
-
-```
-dotnet test EngineTests/
-```
-
----
-
-## Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `Microsoft.Extensions.DependencyInjection` | DI container |
-| `Microsoft.Extensions.Logging` | Structured logging with source generation |
-| `Microsoft.Extensions.Options` | Typed configuration |
-| `Microsoft.Extensions.Configuration.Json` | `appsettings.json` loading |
-
-Unity integration uses VContainer with a custom `IServiceCollection` adapter — all `ServiceCollectionExtensions` registration methods work unchanged.
-
----
-
-## License
-
-Copyright © 50PSoftware. All rights reserved.
+*GameEngineTools — 50PSoftware*
