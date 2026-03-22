@@ -1,5 +1,8 @@
 # GameEngineTools
 
+![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
+![License](https://img.shields.io/badge/license-Proprietary-red)
+
 > **Copyright © 50PSoftware**  
 > C# knihovna pro simulaci vnitřního světa herních postav.
 
