@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Generation
 {
     using System;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Attraction;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.World.Core.Time;
@@ -193,6 +194,7 @@ namespace GameEngineTools.Characters.Generation
         private readonly IPersonalityGenerator _personalityGenerator;
         private readonly IIdentityGenerator _identityGenerator;
         private readonly IAppearanceGenerator _appearanceGenerator;
+        private readonly IAttractionProfileGenerator _attractionProfileGenerator;
         private readonly HumanBlueprintSpec _spec;
 
         #endregion Soukromá pole
@@ -207,12 +209,14 @@ namespace GameEngineTools.Characters.Generation
             IPersonalityGenerator personalityGenerator,
             IIdentityGenerator identityGenerator,
             IAppearanceGenerator appearanceGenerator,
+            IAttractionProfileGenerator attractionProfileGenerator,
             HumanBlueprintSpec spec)
         {
             _rngFactory = rngFactory;
             _personalityGenerator = personalityGenerator;
             _identityGenerator = identityGenerator;
             _appearanceGenerator = appearanceGenerator;
+            _attractionProfileGenerator = attractionProfileGenerator;
             _spec = spec;
         }
 
@@ -243,8 +247,9 @@ namespace GameEngineTools.Characters.Generation
             var id = new HumanId(Guid.NewGuid());
             var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
             var appearance = _appearanceGenerator.Generate(sex, seed);
+            var attractionProfile = _attractionProfileGenerator.Generate(sex, rng);
 
-            return new HumanBlueprint(id, identity, sex, personality, appearance, runtimeSeed);
+            return new HumanBlueprint(id, identity, sex, personality, appearance, attractionProfile, runtimeSeed);
         }
 
         #endregion IHumanBlueprintGenerator

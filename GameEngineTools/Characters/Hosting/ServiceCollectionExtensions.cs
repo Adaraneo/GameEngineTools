@@ -2,6 +2,7 @@
 // Copyright (c) 50PSoftware
 
 using GameEngineTools.Characters.Core;
+using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
@@ -107,6 +108,8 @@ namespace GameEngineTools.Characters.Hosting
                     surnames.ToArray());
             });
             services.AddAppearanceGenerator();
+            services.AddSingleton<IAttractionProfileGenerator, AttractionProfileGenerator>();
+            services.AddSingleton<IAttractionCalculator, DefaultAttractionCalculator>();
             services.AddPersonalityGenerator();
             return services;
         }

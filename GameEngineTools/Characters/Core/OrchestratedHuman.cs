@@ -1,47 +1,77 @@
-﻿// OrchestratedHuman.cs
+// OrchestratedHuman.cs
 // Copyright (c) 50PSoftware
-
-using System.Collections.Concurrent;
-using GameEngineTools.Characters.Engines.Behavior;
-using GameEngineTools.Characters.Engines.Interactions;
-using GameEngineTools.Characters.Engines.Memory;
-using GameEngineTools.Characters.Engines.Physiology;
-using GameEngineTools.Characters.Engines.Psychology;
-using GameEngineTools.Characters.Engines.Relationships;
-using GameEngineTools.Characters.Traits;
-using GameEngineTools.Logging;
-using GameEngineTools.World.Utils.Time;
-using Microsoft.Extensions.Logging;
 
 namespace GameEngineTools.Characters.Core
 {
+    using System.Collections.Concurrent;
+    using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Physiology;
+    using GameEngineTools.Characters.Engines.Psychology;
+    using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Traits;
+    using GameEngineTools.Logging;
+    using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
+
     /// <summary>
-    /// Orchestrátor jedné postavy. Dodržuje pevné pořadí enginů:
-    /// Physiology → Psychology → Behavior → Interactions → Relationships → Memory.
-    /// Události přijaté zvnějšku a splatné plánované akce se zpracovávají ve fázi A (Handle),
-    /// během fáze B (Tick) se události pouze hromadí a publikují se až po dokončení.
+    /// Orchestrates a single character through the simulation pipeline.
+    /// Enforces the fixed engine order: Physiology → Psychology → Behavior → Interactions → Relationships → Memory.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Two-phase tick model:</b>
+    /// <list type="bullet">
+    ///   <item><b>Phase A (Handle)</b> — scheduled actions and inbox events are delivered against the previous snapshot.</item>
+    ///   <item><b>Phase B (Tick)</b> — each engine advances its state; events accumulate and are published after all engines complete.</item>
+    ///   <item><b>Phase C (SelfDeliver)</b> — the character reacts to its own Phase B events (memory, relationships, …).</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
     public sealed class OrchestratedHuman : IHuman
     {
+        #region Public properties — identity
+
+        /// <inheritdoc/>
         public HumanId Id { get; }
+
+        /// <inheritdoc/>
         public Identity Identity { get; }
+
+        /// <inheritdoc/>
         public SexBiology Biology { get; }
+
+        /// <inheritdoc/>
         public Personality Personality { get; }
 
+        /// <inheritdoc/>
         public PhysicalAppearance PhysicalAppearance { get; }
 
+        /// <inheritdoc/>
+        public AttractionProfile? AttractionProfile { get; }
+
+        #endregion Public properties — identity
+
+        #region Public properties — runtime state
+
+        /// <inheritdoc/>
         public EnginesSnapshot Snapshot { get; private set; }
-        private readonly List<IDomainEvent> _lastOutboxAccumulator = new();
+
+        /// <inheritdoc/>
         public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutboxAccumulator;
 
+        /// <inheritdoc/>
         public int Age
         {
             get
             {
                 var today = WDateTime.Now.Date;
                 var birth = Identity.BirthDate;
-                var age = today.Year - birth.Year;
-                if (today.Month< birth.Month || (today.Month == birth.Month && today.Day < birth.Day))
+                var age   = today.Year - birth.Year;
+
+                if (today.Month < birth.Month ||
+                   (today.Month == birth.Month && today.Day < birth.Day))
                 {
                     age--;
                 }
@@ -50,98 +80,138 @@ namespace GameEngineTools.Characters.Core
             }
         }
 
-        // Služby
-        private readonly IEventBus _bus;
+        #endregion Public properties — runtime state
 
+        #region Private fields
+
+        private readonly List<IDomainEvent> _lastOutboxAccumulator = new();
+
+        // Services
+        private readonly IEventBus _bus;
         private readonly IScheduler _scheduler;
         private readonly IRandomSource _random;
         private readonly ILogger _log;
 
-        // Enginy
+        // Engines
         private readonly IPhysiologyEngine _physio;
-
         private readonly IPsychologyEngine _psych;
         private readonly IBehaviorEngine _behavior;
         private readonly IInteractionEngine _interact;
         private readonly IRelationshipsEngine _relations;
         private readonly IMemoryEngine _memory;
 
-        // Inbox událostí zvenku (doručí se až ve fázi A dalšího ticku)
+        // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
         private readonly ConcurrentQueue<IDomainEvent> _inbox = new();
 
-        // Kontext sdílený napříč tickem; Snapshot v něm je vždy „minulý“
+        // Context shared across a single tick; Snapshot inside is always the previous completed state
         private readonly HumanContext _ctx;
 
+        #endregion Private fields
+
+        #region Constructor
+
+        /// <summary>
+        /// Initialises the orchestrated character with all required services and engines.
+        /// </summary>
+        /// <param name="id">Unique character identifier.</param>
+        /// <param name="identity">Name and birth date.</param>
+        /// <param name="biology">Biological sex.</param>
+        /// <param name="personality">Personality traits.</param>
+        /// <param name="appearance">Stable physical appearance traits.</param>
+        /// <param name="attractionProfile">
+        /// Personal attraction preferences, or <c>null</c> for legacy characters loaded from
+        /// saves created before this field existed.
+        /// </param>
+        /// <param name="bus">Event bus for cross-character communication.</param>
+        /// <param name="scheduler">Scheduler for deferred actions.</param>
+        /// <param name="random">Per-character RNG source.</param>
+        /// <param name="logger">Per-character logger.</param>
+        /// <param name="physio">Physiology engine instance.</param>
+        /// <param name="psych">Psychology engine instance.</param>
+        /// <param name="behavior">Behavior engine instance.</param>
+        /// <param name="interact">Interaction engine instance.</param>
+        /// <param name="relations">Relationships engine instance.</param>
+        /// <param name="memory">Memory engine instance.</param>
+        /// <param name="initialSnapshot">Initial engine snapshot (provided by the factory).</param>
         public OrchestratedHuman(
             HumanId id,
             Identity identity,
             SexBiology biology,
-            Traits.Personality personality,
+            Personality personality,
             PhysicalAppearance appearance,
-            // služby
+            AttractionProfile? attractionProfile,
+            // services
             IEventBus bus,
             IScheduler scheduler,
             IRandomSource random,
             ILogger logger,
-            // enginy
+            // engines
             IPhysiologyEngine physio,
             IPsychologyEngine psych,
             IBehaviorEngine behavior,
             IInteractionEngine interact,
             IRelationshipsEngine relations,
             IMemoryEngine memory,
-            // počáteční snapshot (např. z factory)
+            // initial snapshot (from factory)
             EnginesSnapshot initialSnapshot)
         {
-            Id = id;
-            Identity = identity;
-            Biology = biology;
-            Personality = personality;
+            Id                = id;
+            Identity          = identity;
+            Biology           = biology;
+            Personality       = personality;
             PhysicalAppearance = appearance;
+            AttractionProfile  = attractionProfile;
 
-            _bus = bus;
+            _bus       = bus;
             _scheduler = scheduler;
-            _random = random;
-            _log = logger;
+            _random    = random;
+            _log       = logger;
 
-            _physio = physio;
-            _psych = psych;
-            _behavior = behavior;
-            _interact = interact;
+            _physio    = physio;
+            _psych     = psych;
+            _behavior  = behavior;
+            _interact  = interact;
             _relations = relations;
-            _memory = memory;
+            _memory    = memory;
 
             Snapshot = initialSnapshot;
 
             _ctx = new HumanContext
             {
-                Id = Id,
-                Identity = Identity,
-                Biology = Biology,
+                Id          = Id,
+                Identity    = Identity,
+                Biology     = Biology,
                 Personality = Personality,
-                EventBus = _bus,
-                Scheduler = _scheduler,
-                Random = _random,
-                Logger = _log,
-                Snapshot = Snapshot
+                EventBus    = _bus,
+                Scheduler   = _scheduler,
+                Random      = _random,
+                Logger      = _log,
+                Snapshot    = Snapshot
             };
         }
 
+        #endregion Constructor
+
+        #region IHuman — public API
+
+        /// <inheritdoc/>
         public void ReceiveEvent(IDomainEvent @event)
         {
             _inbox.Enqueue(@event);
         }
 
+        /// <inheritdoc/>
         public void Tick(WDateTime now, WTimeSpan dt)
         {
             _lastOutboxAccumulator.Clear();
-            // FÁZE A: nejdřív splatné plánované akce a všechny frontované události
-            // — doručíme je do Handle() enginů na základě „minulého“ snapshotu.
+
+            // Phase A: deliver scheduled actions and all queued inbox events
+            // against the previous (last completed) snapshot.
             PhaseA_HandleScheduled(now);
             PhaseA_HandleInbox();
 
-            // FÁZE B: výpočet nových stavů enginů v pevně daném pořadí.
-            // Události dočasně ukládáme do outboxu; publikujeme/předáme až po dokončení fáze.
+            // Phase B: advance each engine in the fixed order.
+            // Events accumulate in the outbox and are only published after all engines complete.
             var outbox = new EventCollector();
 
             _behavior.Tick(now, dt, _ctx, outbox);
@@ -151,7 +221,7 @@ namespace GameEngineTools.Characters.Core
             _relations.Tick(now, dt, _ctx, outbox);
             _memory.Tick(now, dt, _ctx, outbox);
 
-            // After-tick: sestav nový snapshot z aktuálních stavů enginů (double-buffering)
+            // After-tick: build new snapshot from the current engine states (double-buffering)
             var newSnapshot = new EnginesSnapshot(
                 _physio.State,
                 _psych.State,
@@ -160,19 +230,36 @@ namespace GameEngineTools.Characters.Core
                 _relations.State,
                 _memory.State);
 
-            Snapshot = newSnapshot;
-            _ctx.Snapshot = Snapshot; // kontext dál vždy nese poslední dokončený stav
+            Snapshot      = newSnapshot;
+            _ctx.Snapshot = Snapshot; // context always carries the last completed state
 
-            // *** FÁZE C: vlastní eventy doručíme sami sobě ***
-            // Postava reaguje na to, co sama udělala (paměť, vztahy, atd.)
+            // Phase C: self-deliver — character reacts to its own Phase B events
             var toPublish = new EventCollector();
             SelfDeliver(outbox, toPublish);
 
-            // Publikace událostí vzniklých během fáze B (dorazí ostatním až v dalším ticku)
+            // Publish events produced during Phase B (other characters receive them next tick)
             PublishOutbox(toPublish);
 
             LogState();
         }
+
+        /// <inheritdoc/>
+        public void RestoreSnapshot(EnginesSnapshot snapshot)
+        {
+            Snapshot      = snapshot;
+            _ctx.Snapshot = snapshot;
+
+            _physio.RestoreState(snapshot.Physiology);
+            _psych.RestoreState(snapshot.Psychology);
+            _behavior.RestoreState(snapshot.Behavior);
+            _interact.RestoreState(snapshot.InteractionSurface);
+            _relations.RestoreState(snapshot.Relationships);
+            _memory.RestoreState(snapshot.Memory);
+        }
+
+        #endregion IHuman — public API
+
+        #region Phase A — Handle
 
         private void PhaseA_HandleScheduled(WDateTime now)
         {
@@ -194,6 +281,7 @@ namespace GameEngineTools.Characters.Core
                     _log.LogError(ex, "[{Human}] ScheduledAction threw.", Id.Value);
                 }
             }
+
             Deliver(outbox);
         }
 
@@ -209,83 +297,18 @@ namespace GameEngineTools.Characters.Core
             {
                 SafeHandle(ev, outbox);
             }
+
             Deliver(outbox);
         }
 
-        private void SafeHandle(IDomainEvent ev, IEventCollector outbox)
-        {
-            // Handle() každého engine; výjimky nepropadnou ven (logujeme, pokračujeme)
-            try { _physio.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Physiology.Handle failed.", Id.Value); }
-            try { _psych.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Psychology.Handle failed.", Id.Value); }
-            try { _behavior.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Behavior.Handle failed.", Id.Value); }
-            try { _interact.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Interactions.Handle failed.", Id.Value); }
-            try { _relations.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Relationships.Handle failed.", Id.Value); }
-            try { _memory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
-        }
+        #endregion Phase A — Handle
 
-        private void Deliver(IEventCollector collector)
-        {
-            const int maxPasses = 8;
-            int pass = 0;
-            var toPublish = new EventCollector();
-
-            while (pass++ < maxPasses)
-            {
-                var events = collector.Drain();
-                if (events.Count == 0)
-                {
-                    break;
-                }
-
-                foreach (var ev in events)
-                {
-                    toPublish.Add(ev);
-                    SafeHandle(ev, collector);
-                }
-            }
-
-            if (pass > maxPasses && collector.Drain().Count > 0)
-            {
-                _log.LogWarning("[{Human}] Deliver: dosažen maxPasses={Max}, eventy zahozeny!", Id.Value, maxPasses);
-            }
-
-            PublishOutbox(toPublish);
-        }
-
-        private void PublishOutbox(IEventCollector collector)
-        {
-            var events = collector.Drain();
-            _lastOutboxAccumulator.AddRange(events);
-            foreach (var ev in events)
-            {
-                try
-                {
-                    _bus.Publish(ev);
-                }
-                catch (Exception ex)
-                {
-                    _log.LogError(ex, "[{Human}] EventBus.Publish failed for {EventType}.", Id.Value, ev.GetType().Name);
-                }
-            }
-        }
-
-        public void RestoreSnapshot(EnginesSnapshot snapshot)
-        {
-            Snapshot = snapshot;
-            _ctx.Snapshot = snapshot;
-            _physio.RestoreState(snapshot.Physiology);
-            _psych.RestoreState(snapshot.Psychology);
-            _behavior.RestoreState(snapshot.Behavior);
-            _interact.RestoreState(snapshot.InteractionSurface);
-            _relations.RestoreState(snapshot.Relationships);
-            _memory.RestoreState(snapshot.Memory);
-        }
+        #region Phase C — SelfDeliver
 
         private void SelfDeliver(IEventCollector collector, IEventCollector toPublish)
         {
             const int maxPasses = 8;
-            int pass = 0;
-
+            var pass       = 0;
             var localOutbox = new EventCollector();
 
             while (pass++ < maxPasses)
@@ -310,20 +333,73 @@ namespace GameEngineTools.Characters.Core
             }
         }
 
-        public override bool Equals(object? obj)
+        #endregion Phase C — SelfDeliver
+
+        #region Private helpers
+
+        private void SafeHandle(IDomainEvent ev, IEventCollector outbox)
         {
-            return obj is IHuman other && Id == other.Id;
+            try { _physio.Handle(ev, _ctx, outbox); }    catch (Exception ex) { _log.LogError(ex, "[{Human}] Physiology.Handle failed.", Id.Value); }
+            try { _psych.Handle(ev, _ctx, outbox); }     catch (Exception ex) { _log.LogError(ex, "[{Human}] Psychology.Handle failed.", Id.Value); }
+            try { _behavior.Handle(ev, _ctx, outbox); }  catch (Exception ex) { _log.LogError(ex, "[{Human}] Behavior.Handle failed.", Id.Value); }
+            try { _interact.Handle(ev, _ctx, outbox); }  catch (Exception ex) { _log.LogError(ex, "[{Human}] Interactions.Handle failed.", Id.Value); }
+            try { _relations.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Relationships.Handle failed.", Id.Value); }
+            try { _memory.Handle(ev, _ctx, outbox); }    catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
         }
 
-        public override int GetHashCode()
+        private void Deliver(IEventCollector collector)
         {
-            return Id.GetHashCode();
+            const int maxPasses = 8;
+            var pass      = 0;
+            var toPublish = new EventCollector();
+
+            while (pass++ < maxPasses)
+            {
+                var events = collector.Drain();
+                if (events.Count == 0)
+                {
+                    break;
+                }
+
+                foreach (var ev in events)
+                {
+                    toPublish.Add(ev);
+                    SafeHandle(ev, collector);
+                }
+            }
+
+            if (pass > maxPasses && collector.Drain().Count > 0)
+            {
+                _log.LogWarning("[{Human}] Deliver: maxPasses={Max} reached, events discarded!", Id.Value, maxPasses);
+            }
+
+            PublishOutbox(toPublish);
+        }
+
+        private void PublishOutbox(IEventCollector collector)
+        {
+            var events = collector.Drain();
+            _lastOutboxAccumulator.AddRange(events);
+
+            foreach (var ev in events)
+            {
+                try
+                {
+                    _bus.Publish(ev);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "[{Human}] EventBus.Publish failed for {EventType}.", Id.Value, ev.GetType().Name);
+                }
+            }
         }
 
         private void LogState()
         {
             var s = Snapshot;
-            _log.PhysiologySnapshot(Id.Value.ToString(),
+
+            _log.PhysiologySnapshot(
+                Id.Value.ToString(),
                 s.Physiology.Energy, s.Physiology.Hunger, s.Physiology.Thirst,
                 s.Physiology.Pain, s.Physiology.SleepDebtHours,
                 s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad);
@@ -333,22 +409,39 @@ namespace GameEngineTools.Characters.Core
                 _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle);
             }
 
-            _log.PsychologySnapshot(Id.Value.ToString(),
+            _log.PsychologySnapshot(
+                Id.Value.ToString(),
                 s.Psychology.DominantEmotion.ToString(),
                 s.Psychology.Valence, s.Psychology.Arousal, s.Psychology.Dominance,
                 s.Psychology.Stress, s.Psychology.CognitiveLoad);
 
             var plan = s.Behavior.CurrentPlan;
-            _log.BehaviorSnapshot(Id.Value.ToString(),
+            _log.BehaviorSnapshot(
+                Id.Value.ToString(),
                 plan?.Name ?? "—",
                 s.Behavior.NeedRest, s.Behavior.NeedFood, s.Behavior.NeedWater,
                 s.Behavior.NeedBelonging, s.Behavior.NeedCompetence, s.Behavior.NeedIntimacy);
 
             if (plan is not null)
             {
-                _log.BehaviorPlan(Id.Value.ToString(),
+                _log.BehaviorPlan(
+                    Id.Value.ToString(),
                     plan.Name, plan.Start.ToString(), plan.ExpectedDuration.ToString(), plan.Utility);
             }
         }
+
+        #endregion Private helpers
+
+        #region Object overrides
+
+        /// <inheritdoc/>
+        public override bool Equals(object? obj)
+            => obj is IHuman other && Id == other.Id;
+
+        /// <inheritdoc/>
+        public override int GetHashCode()
+            => Id.GetHashCode();
+
+        #endregion Object overrides
     }
 }

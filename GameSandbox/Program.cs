@@ -2,6 +2,7 @@
 // Copyright (c) 50PSoftware
 
 using GameEngineTools;
+using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Relationships;
@@ -41,6 +42,7 @@ await using var runtime = await GameEngineToolsRuntime.StartAsync(
 var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
+var attractionCalculator = (DefaultAttractionCalculator)runtime.Services.GetRequiredService<IAttractionCalculator>();
 
 // ── Postavy ───────────────────────────────────────────────────────────────────
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
@@ -64,19 +66,6 @@ if (significantOther is null)
 
 var playerPerson = player.Person;
 var significantOtherPerson = significantOther.Person;
-
-static double ComputeAttraction(AppearanceView view)
-{
-    // PostureScore = jak se postava drží (únava, bolest)
-    // AcneLevel    = stav pleti (imunitní zátěž)
-    // Bloating     = napnutí (cyklus)
-    var attraction = 50.0;
-    attraction += (view.PostureScore - 50) * 0.3;   // dobrá postava → +, shrbená → -
-    attraction -= view.AcneLevel * 0.15;             // špatná pleť → mírně dolů
-    attraction -= (int)view.Bloating * 3.0;          // None=0, Light=-3, Medium=-6, High=-9
-
-    return Math.Clamp(attraction, 0, 100);
-}
 
 var diary = new List<NarrativeEntry>();
 
@@ -123,8 +112,16 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
             var soView = AppearanceProjector.Compute(so.PhysicalAppearance, so.Snapshot.Physiology, so.Biology);
             var pView = AppearanceProjector.Compute(p.PhysicalAppearance, p.Snapshot.Physiology, p.Biology);
 
-            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, 0, ComputeAttraction(soView)));
-            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, 0, ComputeAttraction(pView)));
+            var pAttractionToSo = p.AttractionProfile is not null
+            ? attractionCalculator.Calculate(p.AttractionProfile, so.PhysicalAppearance, soView, so.Biology).Score
+            : AttractionResult.Neutral.Score;
+
+            var soAttractionToP = so.AttractionProfile is not null
+            ? attractionCalculator.Calculate(so.AttractionProfile, p.PhysicalAppearance, pView, p.Biology).Score
+            : AttractionResult.Neutral.Score;
+
+            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, 0, pAttractionToSo));
+            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, 0, soAttractionToP));
         }
 
         // Naplánované akce

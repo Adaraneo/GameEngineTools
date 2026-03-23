@@ -40,6 +40,8 @@ namespace GameEngineTools.Characters.Core
         Personality Personality { get; } // Trait modul (nemění se rychle)
         PhysicalAppearance PhysicalAppearance { get; }
 
+        AttractionProfile AttractionProfile { get; }
+
         // Přístup ke stavům (read-only snapshoty)
         EnginesSnapshot Snapshot { get; }
 

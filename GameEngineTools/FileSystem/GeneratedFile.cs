@@ -138,7 +138,7 @@ namespace GameEngineTools.FileSystem
         public NPC ImportNPC(string filename)
         {
             var data = ReadJson(Path.Combine(NPCDirectory, filename));
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance, data.AttractionProfile);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
@@ -160,7 +160,7 @@ namespace GameEngineTools.FileSystem
         public PC ImportPC(string filename)
         {
             var data = ReadJson(Path.Combine(PlayerDirectory, filename));
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance, data.AttractionProfile);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
@@ -201,6 +201,7 @@ namespace GameEngineTools.FileSystem
             Biology = character.Person.Biology,
             Personality = character.Person.Personality,
             PhysicalAppearance = character.Person.PhysicalAppearance,
+            AttractionProfile = character.Person.AttractionProfile,
             Snapshot = character.Person.Snapshot,
             MaxHealth = character.MaxHealth,
             Health = character.Health,
