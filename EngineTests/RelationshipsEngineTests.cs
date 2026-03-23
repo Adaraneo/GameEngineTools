@@ -10,7 +10,6 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
-    using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -45,8 +44,8 @@ namespace EngineTests
         private WDateTime _now;
 
         private static readonly RelationshipsConfig DefaultCfg = new RelationshipsConfig(
-            DecayPerDay:    1.5,
-            RepairGain:     6.0,
+            DecayPerDay: 1.5,
+            RepairGain: 6.0,
             RupturePenalty: 8.0);
 
         #endregion Soukromá pole
@@ -56,7 +55,7 @@ namespace EngineTests
         [TestInitialize]
         public void Setup()
         {
-            _now    = new WDateTime(0);
+            _now = new WDateTime(0);
             _outbox = new EventCollector();
         }
 
@@ -75,10 +74,10 @@ namespace EngineTests
         public void Handle_RepairAttempt_Accepted_IncreaseTrustByRepairGain()
         {
             // Arrange
-            var engine  = BuildEngine();
-            var self    = new HumanId(Guid.NewGuid());
-            var other   = new HumanId(Guid.NewGuid());
-            var ctx     = BuildContext(self);
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             // Nejdřív vytvoříme hranu se známou hodnotou Trust
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
@@ -91,9 +90,9 @@ namespace EngineTests
             var trustAfter = engine.State.Edges[other].Trust;
             Assert.AreEqual(
                 expected: Math.Min(100, trustBefore + DefaultCfg.RepairGain),
-                actual:   trustAfter,
-                delta:    0.001,
-                message:  $"Přijatá oprava musí přidat přesně RepairGain={DefaultCfg.RepairGain} k Trust. Bylo: {trustBefore:F2}, je: {trustAfter:F2}");
+                actual: trustAfter,
+                delta: 0.001,
+                message: $"Přijatá oprava musí přidat přesně RepairGain={DefaultCfg.RepairGain} k Trust. Bylo: {trustBefore:F2}, je: {trustAfter:F2}");
         }
 
         /// <summary>
@@ -104,9 +103,9 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
             var trustBefore = engine.State.Edges[other].Trust;
@@ -118,9 +117,9 @@ namespace EngineTests
             var trustAfter = engine.State.Edges[other].Trust;
             Assert.AreEqual(
                 expected: Math.Max(0, trustBefore - DefaultCfg.RupturePenalty),
-                actual:   trustAfter,
-                delta:    0.001,
-                message:  $"Odmítnutá oprava musí odečíst přesně RupturePenalty={DefaultCfg.RupturePenalty} z Trust.");
+                actual: trustAfter,
+                delta: 0.001,
+                message: $"Odmítnutá oprava musí odečíst přesně RupturePenalty={DefaultCfg.RupturePenalty} z Trust.");
         }
 
         #endregion RepairAttempt — Config hodnoty
@@ -139,9 +138,9 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
             var humorBefore = engine.State.Edges[other].Breakdown.Humor;
@@ -164,9 +163,9 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
             var intellectBefore = engine.State.Edges[other].Breakdown.Intellect;
@@ -188,9 +187,9 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             // Vytvoříme dvě čisté hrany se stejnou výchozí hodnotou Humor
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
@@ -198,7 +197,7 @@ namespace EngineTests
             var humorStart = engine.State.Edges[other].Breakdown.Humor;
 
             // Jedno přijetí — referenční boost
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true,  Reason: "ok",      Act: SpeechAct.Humor), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.Humor), ctx, _outbox);
             var humorAccepted = engine.State.Edges[other].Breakdown.Humor;
 
             // Resetujeme hranu na výchozí hodnotu
@@ -238,13 +237,13 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
 
-            var likeBefore    = engine.State.Edges[other].Like;
+            var likeBefore = engine.State.Edges[other].Like;
             var comfortBefore = engine.State.Edges[other].Comfort;
 
             // Act — odmítnutá interakce
@@ -269,13 +268,13 @@ namespace EngineTests
         {
             // Arrange
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
 
-            var likeBefore    = engine.State.Edges[other].Like;
+            var likeBefore = engine.State.Edges[other].Like;
             var comfortBefore = engine.State.Edges[other].Comfort;
 
             // Act
@@ -320,8 +319,8 @@ namespace EngineTests
 
             return new HumanContext
             {
-                Id          = id,
-                Biology     = SexBiology.Female,
+                Id = id,
+                Biology = SexBiology.Female,
                 Personality = new Personality(
                     new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
                     AttachmentStyle.Secure,
@@ -329,11 +328,11 @@ namespace EngineTests
                     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate,
                     Chronotype.Neutral),
-                Snapshot    = snapshot,
-                Random      = new AlwaysTrueRandom(),
-                Logger      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler()
+                Snapshot = snapshot,
+                Random = new AlwaysTrueRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
@@ -343,9 +342,11 @@ namespace EngineTests
         /// </summary>
         private sealed class AlwaysTrueRandom : IRandomSource
         {
-            public int    Next(int min, int max) => min;
-            public double NextUnit()             => 0.0;
-            public bool   Chance(double p)       => true;
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => true;
         }
 
         #endregion Factory metody

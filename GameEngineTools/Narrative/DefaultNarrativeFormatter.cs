@@ -5,7 +5,6 @@ namespace GameEngineTools.Narrative
 {
     using System;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
@@ -94,7 +93,7 @@ namespace GameEngineTools.Narrative
             };
         }
 
-        #endregion
+        #endregion Veřejné API — Format
 
         // ══════════════════════════════════════════════════════════════════════════
         // Sociální události
@@ -117,7 +116,7 @@ namespace GameEngineTools.Narrative
             {
                 >= 70 => "kladný dojem",
                 >= 45 => "neutrální dojem",
-                _     => "negativní dojem"
+                _ => "negativní dojem"
             };
 
             // Přitažlivost — jen pokud je výrazná
@@ -131,7 +130,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(fi.OccurredAt, fi.A, text, NarrativePriority.High);
         }
 
-        #endregion
+        #endregion Sociální — FormatFirstImpression
 
         #region Sociální — FormatInteractionOutcome
 
@@ -160,15 +159,15 @@ namespace GameEngineTools.Narrative
             // Překlad SpeechAct do přirozeného jazyka (objekt věty)
             var actText = io.Act switch
             {
-                SpeechAct.SmallTalk      => "nezávazný hovor",
-                SpeechAct.Question       => "zvídavou otázku",
+                SpeechAct.SmallTalk => "nezávazný hovor",
+                SpeechAct.Question => "zvídavou otázku",
                 SpeechAct.SelfDisclosure => "osobní sdělení",
-                SpeechAct.Validation     => "slova podpory",
-                SpeechAct.Boundary       => "nastavení hranic",
-                SpeechAct.Humor          => "vtip",
-                SpeechAct.Meta           => "komentář o vztahu",
-                SpeechAct.Invite         => "pozvání",
-                _                        => "interakci"
+                SpeechAct.Validation => "slova podpory",
+                SpeechAct.Boundary => "nastavení hranic",
+                SpeechAct.Humor => "vtip",
+                SpeechAct.Meta => "komentář o vztahu",
+                SpeechAct.Invite => "pozvání",
+                _ => "interakci"
             };
 
             // Reakce příjemce — přijal/odmítl s gramatickým rodem
@@ -183,7 +182,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(io.OccurredAt, io.From, text, NarrativePriority.Medium);
         }
 
-        #endregion
+        #endregion Sociální — FormatInteractionOutcome
 
         #region Sociální — FormatMicroPositive / FormatMicroNegative
 
@@ -215,7 +214,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(mn.OccurredAt, mn.A, text, NarrativePriority.Medium);
         }
 
-        #endregion
+        #endregion Sociální — FormatMicroPositive / FormatMicroNegative
 
         #region Sociální — FormatRepairAttempt
 
@@ -238,7 +237,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(ra.OccurredAt, ra.A, text, NarrativePriority.High);
         }
 
-        #endregion
+        #endregion Sociální — FormatRepairAttempt
 
         #region Sociální — FormatSharedSleepBegan
 
@@ -255,10 +254,10 @@ namespace GameEngineTools.Narrative
             // Kontext sdíleného spánku — převeď enum na přirozený jazyk
             var typeText = ssb.Type switch
             {
-                SharedSleepType.Romantic   => "romanticky",
+                SharedSleepType.Romantic => "romanticky",
                 SharedSleepType.Protective => "ochranitelsky",
-                SharedSleepType.Emergency  => "z nutnosti",
-                _                          => "spolu"
+                SharedSleepType.Emergency => "z nutnosti",
+                _ => "spolu"
             };
 
             // "usnuli" — mužský rod plurálu pro smíšenou dvojici (gramaticky korektní)
@@ -266,7 +265,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(ssb.OccurredAt, ssb.Who, text, NarrativePriority.High);
         }
 
-        #endregion
+        #endregion Sociální — FormatSharedSleepBegan
 
         // ══════════════════════════════════════════════════════════════════════════
         // Chování (Behavior)
@@ -293,32 +292,32 @@ namespace GameEngineTools.Narrative
             // Každá akce → (věta, priorita). Null text = ignorujeme.
             var (text, priority) = ac.ActionName switch
             {
-                Sleep          => ($"{actor.Name} {Conj(actor, "šel", "šla")} spát.",
+                Sleep => ($"{actor.Name} {Conj(actor, "šel", "šla")} spát.",
                                    NarrativePriority.Low),
 
-                Eat            => ($"{actor.Name} se {Conj(actor, "šel", "šla")} najíst.",
+                Eat => ($"{actor.Name} se {Conj(actor, "šel", "šla")} najíst.",
                                    NarrativePriority.Low),
 
-                Drink          => ($"{actor.Name} se {Conj(actor, "šel", "šla")} napít.",
+                Drink => ($"{actor.Name} se {Conj(actor, "šel", "šla")} napít.",
                                    NarrativePriority.Low),
 
-                SelfCare       => ($"{actor.Name} {Conj(actor, "se věnoval", "se věnovala")} péči o sebe.",
+                SelfCare => ($"{actor.Name} {Conj(actor, "se věnoval", "se věnovala")} péči o sebe.",
                                    NarrativePriority.Low),
 
-                ReachOut       => ($"{actor.Name} {Conj(actor, "se rozhlédl", "se rozhlédla")} po okolí — hledá společnost.",
+                ReachOut => ($"{actor.Name} {Conj(actor, "se rozhlédl", "se rozhlédla")} po okolí — hledá společnost.",
                                    NarrativePriority.Medium),
 
                 InviteIntimacy => ($"{actor.Name} {Conj(actor, "projevil", "projevila")} zájem o intimitu.",
                                    NarrativePriority.High),
 
                 // Neznámá akce — ticho je lepší než nesmyslný text
-                _              => (null!, NarrativePriority.Low)
+                _ => (null!, NarrativePriority.Low)
             };
 
             return text is null ? null : new NarrativeEntry(ac.OccurredAt, ac.Human, text, priority);
         }
 
-        #endregion
+        #endregion Chování — FormatActionCommitted
 
         // ══════════════════════════════════════════════════════════════════════════
         // Spánek
@@ -341,7 +340,7 @@ namespace GameEngineTools.Narrative
                 >= 80 => Conj(actor, "osvěžen", "osvěžena"),
                 >= 55 => Conj(actor, "odpočatý", "odpočatá"),
                 >= 30 => Conj(actor, "unavený", "unavená"),
-                _     => Conj(actor, "vyčerpaný", "vyčerpaná")
+                _ => Conj(actor, "vyčerpaný", "vyčerpaná")
             };
 
             var interruptedText = se.WasInterrupted
@@ -354,7 +353,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(se.OccurredAt, se.Human, text, NarrativePriority.Low);
         }
 
-        #endregion
+        #endregion Spánek — FormatSleepEnded
 
         #region Spánek — FormatNightmare
 
@@ -372,14 +371,14 @@ namespace GameEngineTools.Narrative
             {
                 >= 70 => "Vysoký stres před usnutím se projevil.",
                 >= 40 => "Napětí dne přišlo ve snech.",
-                _     => "Přesto ji postihla noční můra."
+                _ => "Přesto ji postihla noční můra."
             };
 
             var text = $"{actor.Name} {Conj(actor, "trpěl", "trpěla")} noční můrou. {stressContext}";
             return new NarrativeEntry(nt.OccurredAt, nt.Human, text, NarrativePriority.High);
         }
 
-        #endregion
+        #endregion Spánek — FormatNightmare
 
         #region Spánek — FormatSleepInterrupted
 
@@ -396,10 +395,10 @@ namespace GameEngineTools.Narrative
             // Poznámka: gramatický rod je v minulém pasivním tvaru ("byl přerušen" / "byla přerušena")
             var causeText = si.Cause switch
             {
-                InterruptCause.Ambush   => Conj(actor, "byl přepaden", "byla přepadena"),
-                InterruptCause.Pain     => Conj(actor, "byl probuzen bolestí", "byla probuzena bolestí"),
+                InterruptCause.Ambush => Conj(actor, "byl přepaden", "byla přepadena"),
+                InterruptCause.Pain => Conj(actor, "byl probuzen bolestí", "byla probuzena bolestí"),
                 InterruptCause.External => Conj(actor, "byl vyrušen zvenku", "byla vyrušena zvenku"),
-                _                       => Conj(actor, "byl přerušen", "byla přerušena")
+                _ => Conj(actor, "byl přerušen", "byla přerušena")
             };
 
             var phase = si.PhaseAtInterrupt.ToString();
@@ -409,7 +408,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(si.OccurredAt, si.Human, text, NarrativePriority.High);
         }
 
-        #endregion
+        #endregion Spánek — FormatSleepInterrupted
 
         // ══════════════════════════════════════════════════════════════════════════
         // Paměť
@@ -619,9 +618,9 @@ namespace GameEngineTools.Narrative
                     : $"nepříjemný moment s {inst}";
         }
 
-        #endregion
+        #endregion HelperMethods
 
-        #endregion
+        #endregion Paměť — FormatMemoryEncoded
 
         #region Paměť — FormatMemoryConsolidated
 
@@ -637,8 +636,8 @@ namespace GameEngineTools.Narrative
             // Plurál — "vzpomínku" vs. "vzpomínky" (gramatika číslovek v češtině)
             var countText = mc.Count switch
             {
-                1  => "1 vzpomínku",
-                _  => $"{mc.Count} vzpomínek"
+                1 => "1 vzpomínku",
+                _ => $"{mc.Count} vzpomínek"
             };
 
             var dat = Decl(actor, Grammar.Core.Enums.Case.Dative);
@@ -647,7 +646,7 @@ namespace GameEngineTools.Narrative
             return new NarrativeEntry(mc.OccurredAt, mc.Human, text, NarrativePriority.Low);
         }
 
-        #endregion
+        #endregion Paměť — FormatMemoryConsolidated
 
         // ══════════════════════════════════════════════════════════════════════════
         // Privátní pomocné metody — gramatika
@@ -718,6 +717,6 @@ namespace GameEngineTools.Narrative
             return _wordComposer.GetFullForm(request).Form;
         }
 
-        #endregion
+        #endregion Pomocné — gramatika
     }
 }

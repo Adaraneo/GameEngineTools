@@ -79,8 +79,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 { Idle,           ActionCategory.Rest        },
             };
 
-        #endregion
-
+        #endregion Statické konstanty — kategorie akcí
 
         #region Veřejné vlastnosti
 
@@ -606,7 +605,6 @@ namespace GameEngineTools.Characters.Engines.Behavior
         }
 
         #endregion Memory → Behavior modifikátory
-
 
         #region Pomocné metody
 

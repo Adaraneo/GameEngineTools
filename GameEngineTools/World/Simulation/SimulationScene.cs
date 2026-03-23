@@ -10,9 +10,8 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Sleep;
-    using GameEngineTools.World.Core.Time;
-    using GameEngineTools.World.Utils.Time;
     using GameEngineTools.Narrative;
+    using GameEngineTools.World.Utils.Time;
 
     /// <summary>
     /// Obecná simulační scéna pro libovolný počet postav.
@@ -83,7 +82,7 @@ namespace GameEngineTools.World.Simulation
                 throw new ArgumentException(
                     "SimulationScene vyžaduje alespoň jednu postavu v Characters.", nameof(options));
 
-            _clock   = clock;
+            _clock = clock;
             _options = options;
         }
 
@@ -108,9 +107,9 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private Task SimulateAsync()
         {
-            var endTime  = _clock.Now.AddYears(_options.SimulationYears);
-            var chars    = _options.Characters;
-            var dt       = _options.TickStep;
+            var endTime = _clock.Now.AddYears(_options.SimulationYears);
+            var chars = _options.Characters;
+            var dt = _options.TickStep;
 
             while (_clock.Now < endTime)
             {

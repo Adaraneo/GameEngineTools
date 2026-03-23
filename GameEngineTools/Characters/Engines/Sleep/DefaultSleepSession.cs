@@ -5,7 +5,6 @@ namespace GameEngineTools.Characters.Engines.Sleep
 {
     using System;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;

@@ -5,7 +5,6 @@ namespace GameEngineTools.Characters.Engines.Interactions
 {
     using System;
     using Characters.Core;
-    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -181,8 +180,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
             // Vztahové vstupy — neznámý člověk dostane neutrální výchozí hodnoty
             var closeness = edge?.Closeness ?? 30;
-            var comfort   = edge?.Comfort   ?? 30;
-            var trust     = edge?.Trust     ?? 30;
+            var comfort = edge?.Comfort ?? 30;
+            var trust = edge?.Trust ?? 30;
 
             var psych = ctx.Snapshot.Psychology;
 
@@ -191,16 +190,16 @@ namespace GameEngineTools.Characters.Engines.Interactions
                         + 0.0025 * closeness
                         + 0.0020 * comfort
                         + 0.0020 * trust
-                        + 0.10   * Math.Max(0, psych.Valence)
+                        + 0.10 * Math.Max(0, psych.Valence)
                         + (State.HasPrivacy ? 0.05 : 0)
-                        - 0.05   * State.Crowding
+                        - 0.05 * State.Crowding
                         - 0.0015 * psych.Stress;
 
             // Misattribution: vyšší stres → větší šance na špatné čtení záměru
             var misattrib = Config.MisattributionRateBase * (psych.Stress / 100.0);
             baseP -= misattrib;
 
-            var pAcc     = Math.Clamp(baseP, 0.05, 0.95);
+            var pAcc = Math.Clamp(baseP, 0.05, 0.95);
             var accepted = ctx.Random.Chance(pAcc);
 
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
@@ -216,11 +215,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
             // Přenášíme p.Act — RelationshipsEngine ho potřebuje pro DomainBreakdown
             outbox.Add(new InteractionOutcome(
                 OccurredAt: p.OccurredAt,
-                From:        p.From,
-                To:          p.To,
-                Accepted:    accepted,
-                Reason:      accepted ? "accepted" : "declined",
-                Act:         p.Act));
+                From: p.From,
+                To: p.To,
+                Accepted: accepted,
+                Reason: accepted ? "accepted" : "declined",
+                Act: p.Act));
         }
 
         #endregion Handle — zpracování doménových událostí

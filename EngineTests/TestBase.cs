@@ -308,6 +308,7 @@ namespace EngineTests
         #endregion DI inicializace
 
         #region Pomocné metody
+
         /// <summary>RNG vracející vždy 0 — eliminuje náhodný šum z Tick().</summary>
         protected sealed class ZeroRandom : IRandomSource
         {
@@ -347,6 +348,7 @@ namespace EngineTests
             public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime now)
                 => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
-        #endregion
+
+        #endregion Pomocné metody
     }
 }

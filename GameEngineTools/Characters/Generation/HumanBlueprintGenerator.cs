@@ -65,7 +65,7 @@ namespace GameEngineTools.Characters.Generation
             int maxAgeYears = 100)
         {
             var daysInYear = WWorld.Spec.Calendar.DaysInYear(now.Year);
-            var minAgeDays = (minAgeYears == 0 ) ? 1 : minAgeYears * daysInYear;
+            var minAgeDays = (minAgeYears == 0) ? 1 : minAgeYears * daysInYear;
             var maxAgeDays = maxAgeYears * daysInYear;
 
             WDateOnly minBirth;

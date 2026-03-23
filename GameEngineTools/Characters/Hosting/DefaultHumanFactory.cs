@@ -10,7 +10,6 @@ using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Characters.Traits;
-using GameEngineTools.Logging;
 using GameEngineTools.World.Core.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

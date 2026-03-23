@@ -337,7 +337,8 @@ namespace GameEngineTools.Logging
                 public static readonly NullScope Instance = new();
 
                 /// <inheritdoc/>
-                public void Dispose() { }
+                public void Dispose()
+                { }
             }
 
             #endregion Null scope

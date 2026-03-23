@@ -8,7 +8,6 @@
 
 namespace EngineTests
 {
-    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -41,8 +40,8 @@ namespace EngineTests
         [TestInitialize]
         public void Setup()
         {
-            _now    = new WDateTime(0);
-            _ctx    = BuildContext(currentAction: null);
+            _now = new WDateTime(0);
+            _ctx = BuildContext(currentAction: null);
             _outbox = new EventCollector();
         }
 
@@ -62,11 +61,11 @@ namespace EngineTests
         {
             // Arrange
             // Kontext říká enginu: "postava aktuálně jí" (CurrentPlan = Eat)
-            var ctx    = BuildContext(currentAction: Eat);
+            var ctx = BuildContext(currentAction: Eat);
             var engine = BuildEngine(hunger: 80, energy: 30);
 
             var hungerBefore = engine.State.Hunger;
-            var tickStep     = WTimeSpan.FromHours(1.0);
+            var tickStep = WTimeSpan.FromHours(1.0);
 
             // Act
             engine.Tick(_now, tickStep, ctx, _outbox);
@@ -85,7 +84,7 @@ namespace EngineTests
         public void Tick_WhenCurrentPlanIsDrink_ThirstDecreaseMatchesSingleApplication()
         {
             // Arrange
-            var ctx    = BuildContext(currentAction: Drink);
+            var ctx = BuildContext(currentAction: Drink);
             var engine = BuildEngine(thirst: 80);
 
             var tickStep = WTimeSpan.FromHours(1.0);
@@ -118,11 +117,11 @@ namespace EngineTests
         public void Tick_WhenCurrentPlanIsSleep_EnergyDoesNotDecrease()
         {
             // Arrange
-            var ctx    = BuildContext(currentAction: Sleep);
+            var ctx = BuildContext(currentAction: Sleep);
             var engine = BuildEngine(energy: 50);
 
             var energyBefore = engine.State.Energy;
-            var tickStep     = WTimeSpan.FromHours(1.0);
+            var tickStep = WTimeSpan.FromHours(1.0);
 
             // Act
             engine.Tick(_now, tickStep, ctx, _outbox);
@@ -139,16 +138,16 @@ namespace EngineTests
         {
             // Arrange — dva enginy ve stejném stavu, jeden spí, druhý je bdělý (Idle)
             var ctxSleep = BuildContext(currentAction: Sleep);
-            var ctxIdle  = BuildContext(currentAction: Idle);
+            var ctxIdle = BuildContext(currentAction: Idle);
 
             var sleepEngine = BuildEngine(energy: 70);
-            var idleEngine  = BuildEngine(energy: 70);
+            var idleEngine = BuildEngine(energy: 70);
 
             var tickStep = WTimeSpan.FromHours(1.0);
 
             // Act
             sleepEngine.Tick(_now, tickStep, ctxSleep, _outbox);
-            idleEngine.Tick(_now, tickStep, ctxIdle,  _outbox);
+            idleEngine.Tick(_now, tickStep, ctxIdle, _outbox);
 
             // Assert
             // Spící postava nesmí ztratit více energie než bdělá
@@ -176,16 +175,16 @@ namespace EngineTests
         {
             // Arrange
             var ctxSleep = BuildContext(currentAction: Sleep);
-            var ctxIdle  = BuildContext(currentAction: Idle);
+            var ctxIdle = BuildContext(currentAction: Idle);
 
             var sleepEngine = BuildEngine(hunger: 20);
-            var idleEngine  = BuildEngine(hunger: 20);
+            var idleEngine = BuildEngine(hunger: 20);
 
             var tickStep = WTimeSpan.FromHours(1.0);
 
             // Act
             sleepEngine.Tick(_now, tickStep, ctxSleep, _outbox);
-            idleEngine.Tick(_now, tickStep, ctxIdle,  _outbox);
+            idleEngine.Tick(_now, tickStep, ctxIdle, _outbox);
 
             // Assert
             // Hlad spící postavy musí růst pomaleji než bdělé
@@ -200,16 +199,16 @@ namespace EngineTests
         {
             // Arrange
             var ctxSleep = BuildContext(currentAction: Sleep);
-            var ctxIdle  = BuildContext(currentAction: Idle);
+            var ctxIdle = BuildContext(currentAction: Idle);
 
             var sleepEngine = BuildEngine(thirst: 20);
-            var idleEngine  = BuildEngine(thirst: 20);
+            var idleEngine = BuildEngine(thirst: 20);
 
             var tickStep = WTimeSpan.FromHours(1.0);
 
             // Act
             sleepEngine.Tick(_now, tickStep, ctxSleep, _outbox);
-            idleEngine.Tick(_now, tickStep, ctxIdle,  _outbox);
+            idleEngine.Tick(_now, tickStep, ctxIdle, _outbox);
 
             // Assert
             Assert.IsTrue(
@@ -222,7 +221,7 @@ namespace EngineTests
         public void Tick_WhenSleeping8Hours_HungerGrowsByExpectedAmount()
         {
             // Arrange — ověření konkrétní hodnoty po 8h spánku
-            var ctx    = BuildContext(currentAction: Sleep);
+            var ctx = BuildContext(currentAction: Sleep);
             var engine = BuildEngine(hunger: 10);
 
             // Act — simulujeme 8 ticků po 1 hodině
@@ -248,32 +247,32 @@ namespace EngineTests
         /// Menstruační cyklus je vždy vypnutý — testy ho nepotřebují.
         /// </summary>
         private static DefaultPhysiologyEngine BuildEngine(
-            double energy     = 70,
-            double hunger     = 25,
-            double thirst     = 20,
-            double pain       = 5,
+            double energy = 70,
+            double hunger = 25,
+            double thirst = 20,
+            double pain = 5,
             double immuneLoad = 10)
         {
-            var cfg      = Options.Create(DefaultCfg);
+            var cfg = Options.Create(DefaultCfg);
             var cycleCfg = Options.Create(new MenstrualCycleConfig());
-            var factory  = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
-            var rng      = new ZeroRandom();
+            var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
 
             var engine = new DefaultPhysiologyEngine(
                 cfg, cycleCfg, factory, rng,
-                biology:   SexBiology.Female,
+                biology: SexBiology.Female,
                 birthDate: WDateOnly.New(100, 1, 1),
-                now:       WDateOnly.New(116, 1, 1));
+                now: WDateOnly.New(116, 1, 1));
 
             engine.RestoreState(new PhysiologyState(
-                Energy:        energy,
+                Energy: energy,
                 SleepDebtHours: 2,
-                Hunger:        hunger,
-                Thirst:        thirst,
-                Pain:          pain,
-                ImmuneLoad:    immuneLoad,
+                Hunger: hunger,
+                Thirst: thirst,
+                Pain: pain,
+                ImmuneLoad: immuneLoad,
                 BodyTempDelta: 0,
-                Cycle:         null));
+                Cycle: null));
 
             return engine;
         }
@@ -289,7 +288,7 @@ namespace EngineTests
         private static IHumanContext BuildContext(string? currentAction)
         {
             var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
-            var psych  = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
+            var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
 
             // Aktuální plán je to jediné, na co se PhysiologyEngine v kontextu dívá
             var plan = currentAction is not null
@@ -307,8 +306,8 @@ namespace EngineTests
 
             return new HumanContext
             {
-                Id       = new HumanId(Guid.NewGuid()),
-                Biology  = SexBiology.Female,
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = new Personality(
                     new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
                     AttachmentStyle.Secure,

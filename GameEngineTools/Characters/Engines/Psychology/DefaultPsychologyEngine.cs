@@ -5,7 +5,6 @@ namespace GameEngineTools.Characters.Engines.Psychology
 {
     using System;
     using Characters.Core;
-    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;

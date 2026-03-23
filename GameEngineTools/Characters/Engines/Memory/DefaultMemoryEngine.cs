@@ -40,13 +40,13 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <summary>Konfigurace enginu (míra zapomínání, boost, práh prořezání).</summary>
         public MemoryConfig Config { get; }
 
-        #endregion
+        #endregion Stav a konfigurace
 
         #region Privátní pole
 
         private readonly ILogger _log;
 
-        #endregion
+        #endregion Privátní pole
 
         #region Konstruktor
 
@@ -66,7 +66,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 new Dictionary<string, SemanticFact>());
         }
 
-        #endregion
+        #endregion Konstruktor
 
         #region Veřejné API
 
@@ -141,7 +141,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         public IReadOnlyList<EpisodicMemory> Recall(Func<EpisodicMemory, bool> predicate)
             => State.Episodes.Where(predicate).ToList();
 
-        #endregion
+        #endregion Veřejné API
 
         #region Handle — zpracování doménových událostí
 
@@ -311,7 +311,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             }
         }
 
-        #endregion
+        #endregion Handle — zpracování doménových událostí
 
         #region Tick — zapomínání (Ebbinghausova křivka)
 
@@ -362,7 +362,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             State = new MemoryIndex(episodes, State.Semantics);
         }
 
-        #endregion
+        #endregion Tick — zapomínání (Ebbinghausova křivka)
 
         #region Obnovení stavu
 
@@ -372,7 +372,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <param name="state">Předchozí stav paměti.</param>
         public void RestoreState(MemoryIndex state) => State = state;
 
-        #endregion
+        #endregion Obnovení stavu
 
         #region Privátní metody
 
@@ -428,11 +428,11 @@ namespace GameEngineTools.Characters.Engines.Memory
             => actionName switch
             {
                 InviteIntimacy => 0.9,  // Nejvyšší — intimní interakce jsou výrazné
-                ReachOut       => 0.6,  // Sociální kontakt
-                Eat            => 0.5,  // Biologická potřeba
-                Sleep          => 0.4,  // Rutina — nízká salience
-                Drink          => 0.3,  // Rutina
-                _              => 0.5   // Výchozí pro neznámé akce
+                ReachOut => 0.6,  // Sociální kontakt
+                Eat => 0.5,  // Biologická potřeba
+                Sleep => 0.4,  // Rutina — nízká salience
+                Drink => 0.3,  // Rutina
+                _ => 0.5   // Výchozí pro neznámé akce
             };
 
         /// <summary>
@@ -446,15 +446,15 @@ namespace GameEngineTools.Characters.Engines.Memory
             => actionName switch
             {
                 InviteIntimacy or ReachOut or SelfCare => EmotionalTag.Positive,
-                Flee           or Fight                => EmotionalTag.Negative,
+                Flee or Fight => EmotionalTag.Negative,
                 _ => valence switch
                 {
-                    > 0.05  => EmotionalTag.Positive,
+                    > 0.05 => EmotionalTag.Positive,
                     < -0.05 => EmotionalTag.Negative,
-                    _       => EmotionalTag.Neutral
+                    _ => EmotionalTag.Neutral
                 }
             };
 
-        #endregion
+        #endregion Privátní metody
     }
 }

@@ -134,7 +134,7 @@ namespace GameEngineTools
                 {
                     opt.LogsDirectoryPath = logsRoot != null
                         ? Path.Combine(logsRoot, "Characters")
-                        : Path.Combine("logs","Characters");
+                        : Path.Combine("logs", "Characters");
                     opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                 });

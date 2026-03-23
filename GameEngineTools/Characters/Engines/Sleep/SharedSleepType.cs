@@ -27,6 +27,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// Zvyšuje stres, zkracuje deep fázi, žádný hlídací bonus.
         /// </summary>
         Emergency,
+
         Romantic,
         Protective
     }

@@ -232,7 +232,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     }
             }
         }
-        
 
         #endregion Handle — zpracování doménových událostí
 
@@ -254,12 +253,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
             if (days == 0 || State.Edges.Count == 0)
                 return;
 
-            var dict  = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
+            var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
             var psych = ctx.Snapshot.Psychology;
 
             // Psychika moduluje decay: dobrá nálada mírně zlepšuje, stres poškozuje
             var valenceEffect = psych.Valence * 0.3 * days;
-            var stressEffect  = psych.Stress  * 0.02 * days;
+            var stressEffect = psych.Stress * 0.02 * days;
 
             foreach (var kv in State.Edges)
             {
@@ -268,12 +267,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 dict[kv.Key] = e with
                 {
-                    Like       = Clamp(Approach(e.Like,       50,               d)       + valenceEffect - stressEffect),
-                    Trust      = Clamp(Approach(e.Trust,      50,               d * 0.5)),
+                    Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect),
+                    Trust = Clamp(Approach(e.Trust, 50, d * 0.5)),
                     Attraction = Clamp(Approach(e.Attraction, e.Attraction > 50 ? 45 : 35, d * 0.4)),
-                    Closeness  = Clamp(Approach(e.Closeness,  35,               d * 1.2)),
-                    Respect    = Clamp(Approach(e.Respect,    55,               d * 0.3)),
-                    Comfort    = Clamp(Approach(e.Comfort,    45,               d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5)
+                    Closeness = Clamp(Approach(e.Closeness, 35, d * 1.2)),
+                    Respect = Clamp(Approach(e.Respect, 55, d * 0.3)),
+                    Comfort = Clamp(Approach(e.Comfort, 45, d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5)
                     // Poznámka: Breakdown se v Tick() nemění — domény jsou fixovány zážitky,
                     // ne pouhým uplynutím času.
                 };
@@ -326,16 +325,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             return act switch
             {
-                SpeechAct.SmallTalk      => bd with { Humor     = BumpD(bd.Humor,     +1.5 * mul) },
-                SpeechAct.Question       => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
-                SpeechAct.SelfDisclosure => bd with { Values    = BumpD(bd.Values,    +2.0 * mul) },
-                SpeechAct.Validation     => bd with { Values    = BumpD(bd.Values,    +1.0 * mul) },
-                SpeechAct.Humor          => bd with { Humor     = BumpD(bd.Humor,     +2.5 * mul) },
-                SpeechAct.Meta           => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
-                SpeechAct.Invite         => bd with { Physical  = BumpD(bd.Physical,  +0.5 * mul) },
+                SpeechAct.SmallTalk => bd with { Humor = BumpD(bd.Humor, +1.5 * mul) },
+                SpeechAct.Question => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
+                SpeechAct.SelfDisclosure => bd with { Values = BumpD(bd.Values, +2.0 * mul) },
+                SpeechAct.Validation => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
+                SpeechAct.Humor => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
+                SpeechAct.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
+                SpeechAct.Invite => bd with { Physical = BumpD(bd.Physical, +0.5 * mul) },
 
                 // Boundary — vymezení hranic mírně snižuje Values vnímání
-                SpeechAct.Boundary       => bd with { Values    = BumpD(bd.Values,    -1.0 * mul) },
+                SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.0 * mul) },
 
                 _ => bd  // neznámý act → beze změny
             };
@@ -403,7 +402,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Posune hodnotu o <paramref name="by"/> a ořízne na [0, 100].
         /// Používá se pro hlavní dimenze vztahu (Like, Trust…).
         /// </summary>
-        private static double Bump(double v, double by)  => Math.Max(0, Math.Min(100, v + by));
+        private static double Bump(double v, double by) => Math.Max(0, Math.Min(100, v + by));
 
         /// <summary>
         /// Posune hodnotu DomainBreakdown o <paramref name="by"/> a ořízne na [0, 100].

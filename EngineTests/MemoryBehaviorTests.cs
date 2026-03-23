@@ -54,7 +54,7 @@ namespace EngineTests
             SleepPromptThreshold = 999.0
         };
 
-        #endregion
+        #endregion Soukromá pole
 
         #region Setup
 
@@ -64,7 +64,7 @@ namespace EngineTests
             _now = new WDateTime(0);
         }
 
-        #endregion
+        #endregion Setup
 
         // ====================================================================
         // TEST 1 — Negativní vzpomínky na interakce penalizují ReachOut
@@ -87,24 +87,24 @@ namespace EngineTests
         public void Tick_WithNegativeInteractionMemories_ReducesLikelihoodOfReachOut()
         {
             // Arrange
-            var cleanMemory  = EmptyMemory();
+            var cleanMemory = EmptyMemory();
             var traumaMemory = Memory(NegativeInteractions(count: 4, strength: 0.7));
 
-            var ctxClean  = BuildContext(cleanMemory,  affiliation: 0.9, competence: 0.25, curiosity: 0.25);
+            var ctxClean = BuildContext(cleanMemory, affiliation: 0.9, competence: 0.25, curiosity: 0.25);
             var ctxTrauma = BuildContext(traumaMemory, affiliation: 0.9, competence: 0.25, curiosity: 0.25);
 
-            var outboxClean  = new EventCollector();
+            var outboxClean = new EventCollector();
             var outboxTrauma = new EventCollector();
 
             // Act
-            BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxClean,  outboxClean);
+            BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxClean, outboxClean);
             BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxTrauma, outboxTrauma);
 
             // Assert
-            var chosenClean  = outboxClean.Drain().OfType<ActionCommitted>().FirstOrDefault();
+            var chosenClean = outboxClean.Drain().OfType<ActionCommitted>().FirstOrDefault();
             var chosenTrauma = outboxTrauma.Drain().OfType<ActionCommitted>().FirstOrDefault();
 
-            Assert.IsNotNull(chosenClean,  "Čistá postava musí vybrat akci.");
+            Assert.IsNotNull(chosenClean, "Čistá postava musí vybrat akci.");
             Assert.IsNotNull(chosenTrauma, "Traumatizovaná postava musí vybrat akci.");
 
             // ReachOut=28 > Work=22.5 → vítězí bez traumatu
@@ -133,25 +133,25 @@ namespace EngineTests
         public void Tick_WithPositiveInteractionMemories_PrefersReachOutOverOtherActions()
         {
             // Arrange
-            var noMemory       = EmptyMemory();
+            var noMemory = EmptyMemory();
             var positiveMemory = Memory(PositiveInteractions(count: 3, strength: 0.7));
 
             // Záměrně nižší Affiliation=0.5 → ReachOut=20 NEVYHRAJE bez paměti
-            var ctxNoMem  = BuildContext(noMemory,       affiliation: 0.5, competence: 0.25, curiosity: 0.25);
+            var ctxNoMem = BuildContext(noMemory, affiliation: 0.5, competence: 0.25, curiosity: 0.25);
             var ctxPosMem = BuildContext(positiveMemory, affiliation: 0.5, competence: 0.25, curiosity: 0.25);
 
-            var outboxNoMem  = new EventCollector();
+            var outboxNoMem = new EventCollector();
             var outboxPosMem = new EventCollector();
 
             // Act
-            BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxNoMem,  outboxNoMem);
+            BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxNoMem, outboxNoMem);
             BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxPosMem, outboxPosMem);
 
             // Assert
-            var chosenNoMem  = outboxNoMem.Drain().OfType<ActionCommitted>().FirstOrDefault();
+            var chosenNoMem = outboxNoMem.Drain().OfType<ActionCommitted>().FirstOrDefault();
             var chosenPosMem = outboxPosMem.Drain().OfType<ActionCommitted>().FirstOrDefault();
 
-            Assert.IsNotNull(chosenNoMem,  "Postava bez paměti musí vybrat akci.");
+            Assert.IsNotNull(chosenNoMem, "Postava bez paměti musí vybrat akci.");
             Assert.IsNotNull(chosenPosMem, "Postava s pozitivní pamětí musí vybrat akci.");
 
             // Work=22.5 > ReachOut=20 → ReachOut nevyhraje bez paměti
@@ -181,24 +181,24 @@ namespace EngineTests
         public void Tick_WithRejectedIntimacyMemories_AvoidInviteIntimacy()
         {
             // Arrange
-            var cleanMemory    = EmptyMemory();
+            var cleanMemory = EmptyMemory();
             var rejectedMemory = Memory(RejectedIntimacyEpisodes(count: 2, strength: 0.7));
 
-            var ctxClean    = BuildContext(cleanMemory,    sexuality: 0.8, competence: 0.5, curiosity: 0.4);
+            var ctxClean = BuildContext(cleanMemory, sexuality: 0.8, competence: 0.5, curiosity: 0.4);
             var ctxRejected = BuildContext(rejectedMemory, sexuality: 0.8, competence: 0.5, curiosity: 0.4);
 
-            var outboxClean    = new EventCollector();
+            var outboxClean = new EventCollector();
             var outboxRejected = new EventCollector();
 
             // Act
-            BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxClean,    outboxClean);
+            BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxClean, outboxClean);
             BuildEngine().Tick(_now, WTimeSpan.FromHours(1), ctxRejected, outboxRejected);
 
             // Assert
-            var chosenClean    = outboxClean.Drain().OfType<ActionCommitted>().FirstOrDefault();
+            var chosenClean = outboxClean.Drain().OfType<ActionCommitted>().FirstOrDefault();
             var chosenRejected = outboxRejected.Drain().OfType<ActionCommitted>().FirstOrDefault();
 
-            Assert.IsNotNull(chosenClean,    "Čistá postava musí vybrat akci.");
+            Assert.IsNotNull(chosenClean, "Čistá postava musí vybrat akci.");
             Assert.IsNotNull(chosenRejected, "Odmítnutá postava musí vybrat akci.");
 
             // InviteIntimacy=59.15 > Work=50 → vítězí bez paměti
@@ -228,11 +228,11 @@ namespace EngineTests
         public void Tick_WithHighNegativeEmotionalLoad_BoostsSelfCare()
         {
             // Arrange
-            var noMemory    = EmptyMemory();
+            var noMemory = EmptyMemory();
             var heavyMemory = Memory(MixedNegativeEpisodes(count: 5, strength: 0.7));
 
             // Pain=55 → needSelfCare=41.5 → SelfCare=41.5 (záměrně POD Work=50 bez paměti)
-            var ctxNoMem = BuildContext(noMemory,    competence: 0.5, curiosity: 0.4, pain: 55, immuneLoad: 10);
+            var ctxNoMem = BuildContext(noMemory, competence: 0.5, curiosity: 0.4, pain: 55, immuneLoad: 10);
             var ctxHeavy = BuildContext(heavyMemory, competence: 0.5, curiosity: 0.4, pain: 55, immuneLoad: 10);
 
             var outboxNoMem = new EventCollector();
@@ -304,12 +304,12 @@ namespace EngineTests
         /// </summary>
         private IHumanContext BuildContext(
             MemoryIndex memory,
-            double affiliation  = 0.5,
-            double competence   = 0.5,
-            double curiosity    = 0.5,
-            double sexuality    = 0.3,
-            double pain         = 0,
-            double immuneLoad   = 0)
+            double affiliation = 0.5,
+            double competence = 0.5,
+            double curiosity = 0.5,
+            double sexuality = 0.3,
+            double pain = 0,
+            double immuneLoad = 0)
         {
             var physio = new PhysiologyState(
                 Energy: 95,             // → needRest ≈ 22.5, daleko pod threshold 999
@@ -398,26 +398,36 @@ namespace EngineTests
                     $"Negative:MixedEvent_{i}", 0.6, EmotionalTag.Negative, strength))
                 .ToList();
 
-        #endregion
+        #endregion Factory metody
 
         #region Fake implementace
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> h) where TEvent : class, IDomainEvent => new D();
         }
 
         private sealed class NullScheduler : IScheduler
         {
             public ScheduledId ScheduleAt(WDateTime w, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime n, WTimeSpan d, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => true;
+
             public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime n) => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
-        private sealed class D : IDisposable { public void Dispose() { } }
+        private sealed class D : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
 
-        #endregion
+        #endregion Fake implementace
     }
 }

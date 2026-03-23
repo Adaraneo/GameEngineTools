@@ -64,7 +64,7 @@ namespace EngineTests
             SleepPromptThreshold = 999.0
         };
 
-        #endregion
+        #endregion Soukromá pole
 
         // ====================================================================
         // TEST 1 — Setrvačnost: opakování stejné produktivní akce dostane boost
@@ -84,7 +84,7 @@ namespace EngineTests
         public void SelectAction_WithExpiredWorkPlan_BoostsWorkUtilityAndWinsOverCreate()
         {
             // Arrange — dvě identické postavy, liší se jen přítomností prošlého plánu
-            var ctxNoPlan      = BuildContext(competence: 0.5, curiosity: 0.6);
+            var ctxNoPlan = BuildContext(competence: 0.5, curiosity: 0.6);
             var ctxWithWorkPlan = BuildContext(competence: 0.5, curiosity: 0.6);
 
             // Engine bez plánu — Create=55 vyhraje bez inertia
@@ -98,18 +98,18 @@ namespace EngineTests
                     CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0)
                 });
 
-            var outboxNoPlan   = new EventCollector();
+            var outboxNoPlan = new EventCollector();
             var outboxWithPlan = new EventCollector();
 
             // Act
-            engineNoPlan.Tick(FarFuture,   WTimeSpan.FromHours(1), ctxNoPlan,      outboxNoPlan);
+            engineNoPlan.Tick(FarFuture, WTimeSpan.FromHours(1), ctxNoPlan, outboxNoPlan);
             engineWithPlan.Tick(FarFuture, WTimeSpan.FromHours(1), ctxWithWorkPlan, outboxWithPlan);
 
             // Assert
-            var chosenNoPlan   = outboxNoPlan.Drain().OfType<ActionCommitted>().FirstOrDefault();
+            var chosenNoPlan = outboxNoPlan.Drain().OfType<ActionCommitted>().FirstOrDefault();
             var chosenWithPlan = outboxWithPlan.Drain().OfType<ActionCommitted>().FirstOrDefault();
 
-            Assert.IsNotNull(chosenNoPlan,   "Engine bez plánu musí vybrat akci.");
+            Assert.IsNotNull(chosenNoPlan, "Engine bez plánu musí vybrat akci.");
             Assert.IsNotNull(chosenWithPlan, "Engine s prošlým plánem musí vybrat akci.");
 
             // Bez inertia: Create=55 > Work=50 → Create vítězí
@@ -160,18 +160,18 @@ namespace EngineTests
                     CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0)
                 });
 
-            var outboxNoPenalty   = new EventCollector();
+            var outboxNoPenalty = new EventCollector();
             var outboxWithPenalty = new EventCollector();
 
             // Act
-            engineNoPenalty.Tick(FarFuture,   WTimeSpan.FromHours(1), ctx, outboxNoPenalty);
+            engineNoPenalty.Tick(FarFuture, WTimeSpan.FromHours(1), ctx, outboxNoPenalty);
             engineWithPenalty.Tick(FarFuture, WTimeSpan.FromHours(1), ctx, outboxWithPenalty);
 
             // Assert
-            var chosenNoPenalty   = outboxNoPenalty.Drain().OfType<ActionCommitted>().FirstOrDefault();
+            var chosenNoPenalty = outboxNoPenalty.Drain().OfType<ActionCommitted>().FirstOrDefault();
             var chosenWithPenalty = outboxWithPenalty.Drain().OfType<ActionCommitted>().FirstOrDefault();
 
-            Assert.IsNotNull(chosenNoPenalty,   "Engine bez penalty musí vybrat akci.");
+            Assert.IsNotNull(chosenNoPenalty, "Engine bez penalty musí vybrat akci.");
             Assert.IsNotNull(chosenWithPenalty, "Engine s penaltou musí vybrat akci.");
 
             // Bez penalty: ReachOut=52.5 > Work=50 → ReachOut vítězí
@@ -302,14 +302,14 @@ namespace EngineTests
         /// Prázdné vztahy → MeanCloseness=50, topAttraction=0.
         /// </summary>
         private static IHumanContext BuildContext(
-            double competence  = 0.5,
-            double curiosity   = 0.5,
+            double competence = 0.5,
+            double curiosity = 0.5,
             double affiliation = 0.5,
-            double sexuality   = 0.3,
-            double valence     = 0.0,
-            double hunger      = 5,
-            double pain        = 0,
-            double immuneLoad  = 0)
+            double sexuality = 0.3,
+            double valence = 0.0,
+            double hunger = 5,
+            double pain = 0,
+            double immuneLoad = 0)
         {
             var physio = new PhysiologyState(
                 Energy: 95,
@@ -364,27 +364,37 @@ namespace EngineTests
             };
         }
 
-        #endregion
+        #endregion Factory metody
 
         #region Fake implementace
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> h) where TEvent : class, IDomainEvent => new D();
         }
 
         private sealed class NullScheduler : IScheduler
         {
             public ScheduledId ScheduleAt(WDateTime w, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime n, WTimeSpan d, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => true;
+
             public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime n)
                 => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
-        private sealed class D : IDisposable { public void Dispose() { } }
+        private sealed class D : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
 
-        #endregion
+        #endregion Fake implementace
     }
 }

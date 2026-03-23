@@ -92,6 +92,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         double NightmareChanceNormal,
 
     #endregion Rizika
+
         double EmergencyNeedRestThreshold,
         double EmergencyEnergyThreshold,
         double ThirstSleepBlockThreshold,

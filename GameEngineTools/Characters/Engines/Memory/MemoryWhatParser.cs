@@ -92,7 +92,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 >= 80 => "High",
                 >= 55 => "Medium",
                 >= 30 => "Low",
-                _     => "Poor"
+                _ => "Poor"
             };
             return $"Sleep:Ended:{qualityBucket}|hours={totalHours:F1}";
         }
@@ -110,7 +110,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             {
                 >= 70 => "High",
                 >= 40 => "Medium",
-                _     => "Low"
+                _ => "Low"
             };
             return $"Sleep:Nightmare|stress={stressBucket}";
         }
@@ -129,7 +129,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             {
                 >= 70 => "Positive",
                 >= 45 => "Neutral",
-                _     => "Negative"
+                _ => "Negative"
             };
             return $"Relation:FirstImpression:{sentiment}|of={Full(of)}";
         }
@@ -161,7 +161,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         public static string RepairAttempt(bool accepted, Guid with)
             => $"Relation:Repair:{(accepted ? "Accepted" : "Rejected")}|with={Full(with)}";
 
-        #endregion
+        #endregion Build — sestavení What
 
         // ══════════════════════════════════════════════════════════════════════════
         // Parsování What řetězce
@@ -224,7 +224,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             return null;
         }
 
-        #endregion
+        #endregion Parse — čtení What
 
         // ══════════════════════════════════════════════════════════════════════════
         // Privátní pomocné metody
@@ -238,6 +238,6 @@ namespace GameEngineTools.Characters.Engines.Memory
         private static string Full(Guid id)
             => id.ToString("N");
 
-        #endregion
+        #endregion Privátní — Full ID
     }
 }

@@ -4,7 +4,6 @@
 namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
@@ -18,7 +17,6 @@ namespace EngineTests
     using Microsoft.Extensions.Options;
     using System.Collections.Generic;
     using System.Linq;
-    using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
     /// Unit testy pro <see cref="DefaultPhysiologyEngine"/>.
@@ -200,6 +198,7 @@ namespace EngineTests
         #endregion SleepEnded — imunita a bolest
 
         #region Menstrual Cycle
+
         [TestMethod]
         public void Ctor_MenstrualCycleEnabledForAgeLessThanInConfiguration_ReturnsNullCycle()
         {
@@ -223,7 +222,8 @@ namespace EngineTests
 
             Assert.IsNull(engine.State.Cycle);
         }
-        #endregion
+
+        #endregion Menstrual Cycle
 
         #region Pomocné metody
 
@@ -314,6 +314,7 @@ namespace EngineTests
         #endregion Pomocné metody
 
         #region Fake / Stub implementace
+
         private sealed class NullEventBus : IEventBus
         {
             public void Publish(IDomainEvent @event)

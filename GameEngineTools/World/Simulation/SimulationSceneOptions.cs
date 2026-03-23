@@ -188,8 +188,7 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         public Action<NarrativeEntry>? OnNarrative { get; init; }
 
-        #endregion
-
+        #endregion Narativní výstup
 
         #region Sleep handling
 
