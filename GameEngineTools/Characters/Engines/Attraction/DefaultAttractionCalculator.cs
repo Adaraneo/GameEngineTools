@@ -9,6 +9,7 @@ namespace GameEngineTools.Characters.Engines.Attraction
     /// <summary>
     /// Default implementation of <see cref="IAttractionCalculator"/>.
     /// Computes attraction as a sum of four independent components, each with a defined ceiling.
+    /// Also derives an initial like score from the halo effect for use in first impressions.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -19,6 +20,11 @@ namespace GameEngineTools.Characters.Engines.Attraction
     ///   <item><term>StateModifier</term><description>−15..+10 — posture, skin, bloating</description></item>
     ///   <item><term>MereExposure</term><description>max 15 — familiarity bonus</description></item>
     /// </list>
+    /// </para>
+    /// <para>
+    /// <b>FirstImpressionLike formula:</b>
+    /// <c>Like = 25 + Attraction × 0.40 + ObserverValence × 8</c> clamped to [0, 100].
+    /// Calibration: Attraction 50 → Like ~45; Attraction 80 → Like ~57; Attraction 20 → Like ~33.
     /// </para>
     /// <para>
     /// The calculator is a <b>pure function</b> — no state, no side-effects.
@@ -43,13 +49,23 @@ namespace GameEngineTools.Characters.Engines.Attraction
         // ── Mere-exposure cap and scale ──────────────────────────────────────────
         private const int    MereExposureSaturationCount = 20; // interactions to reach max bonus
 
+        // ── First impression like constants ─────────────────────────────────────
+        // Like = HaloBase + Attraction × HaloAttractionScale + Valence × ValenceLikeScale
+        // Attraction 50 → Like 45 (neutral stranger, not automatically liked)
+        // Attraction 80 → Like 57
+        // Attraction 20 → Like 33
+        private const double HaloBase            = 25.0;
+        private const double HaloAttractionScale = 0.40;
+        private const double ValenceLikeScale    = 8.0;  // valence ±1 → ±8 Like points
+
         /// <inheritdoc/>
         public AttractionResult Calculate(
             AttractionProfile observerProfile,
             PhysicalAppearance targetAppearance,
             AppearanceView targetView,
             SexBiology targetBiology,
-            int positiveInteractionCount = 0)
+            int positiveInteractionCount = 0,
+            double observerValence = 0.0)
         {
             var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology);
             var preferenceMatch = ComputePreferenceMatch(observerProfile, targetAppearance, targetBiology);
@@ -59,12 +75,15 @@ namespace GameEngineTools.Characters.Engines.Attraction
             var raw   = basePhysical + preferenceMatch + stateModifier + mereExposure;
             var score = Math.Clamp(raw, 0.0, 100.0);
 
+            var firstImpressionLike = ComputeFirstImpressionLike(score, observerValence);
+
             return new AttractionResult(
-                Score:           Math.Round(score, 2),
-                BasePhysical:    Math.Round(basePhysical, 2),
-                PreferenceMatch: Math.Round(preferenceMatch, 2),
-                StateModifier:   Math.Round(stateModifier, 2),
-                MereExposure:    Math.Round(mereExposure, 2));
+                Score:               Math.Round(score, 2),
+                BasePhysical:        Math.Round(basePhysical, 2),
+                PreferenceMatch:     Math.Round(preferenceMatch, 2),
+                StateModifier:       Math.Round(stateModifier, 2),
+                MereExposure:        Math.Round(mereExposure, 2),
+                FirstImpressionLike: Math.Round(firstImpressionLike, 2));
         }
 
         // ── Component calculations ───────────────────────────────────────────────
@@ -204,6 +223,25 @@ namespace GameEngineTools.Characters.Engines.Attraction
 
             var distance = Math.Abs(value - optimum);
             return Math.Max(0.0, 1.0 - distance / halfWindow);
+        }
+
+        /// <summary>
+        /// Derives an initial like score from the halo effect.
+        /// </summary>
+        /// <remarks>
+        /// Formula: <c>25 + attractionScore × 0.40 + observerValence × 8</c>
+        /// The halo effect means physically attractive targets are perceived as more likeable
+        /// on first contact, before any personality information is available.
+        /// Observer mood (valence) shifts the baseline up or down by up to 8 points.
+        /// </remarks>
+        /// <param name="attractionScore">Computed attraction score in [0, 100].</param>
+        /// <param name="observerValence">Observer's current emotional valence in [−1, +1].</param>
+        private static double ComputeFirstImpressionLike(double attractionScore, double observerValence)
+        {
+            var halo      = HaloBase + attractionScore * HaloAttractionScale;
+            var moodBoost = observerValence * ValenceLikeScale;
+
+            return Math.Clamp(halo + moodBoost, 0.0, 100.0);
         }
 
         /// <summary>Maps a <see cref="BodyFrame"/> to the equivalent <see cref="BodyFramePreference"/>.</summary>

@@ -112,16 +112,16 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
             var soView = AppearanceProjector.Compute(so.PhysicalAppearance, so.Snapshot.Physiology, so.Biology);
             var pView = AppearanceProjector.Compute(p.PhysicalAppearance, p.Snapshot.Physiology, p.Biology);
 
-            var pAttractionToSo = p.AttractionProfile is not null
-            ? attractionCalculator.Calculate(p.AttractionProfile, so.PhysicalAppearance, soView, so.Biology).Score
-            : AttractionResult.Neutral.Score;
+            var pResult = p.AttractionProfile is not null
+            ? attractionCalculator.Calculate(p.AttractionProfile, so.PhysicalAppearance, soView, so.Biology, observerValence: p.Snapshot.Psychology.Valence)
+            : AttractionResult.Neutral;
 
-            var soAttractionToP = so.AttractionProfile is not null
-            ? attractionCalculator.Calculate(so.AttractionProfile, p.PhysicalAppearance, pView, p.Biology).Score
-            : AttractionResult.Neutral.Score;
+            var soResult = so.AttractionProfile is not null
+            ? attractionCalculator.Calculate(so.AttractionProfile, p.PhysicalAppearance, pView, p.Biology, observerValence: so.Snapshot.Psychology.Valence)
+            : AttractionResult.Neutral;
 
-            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, 0, pAttractionToSo));
-            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, 0, soAttractionToP));
+            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, pResult.FirstImpressionLike, pResult.Score));
+            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, soResult.FirstImpressionLike, soResult.Score));
         }
 
         // Naplánované akce

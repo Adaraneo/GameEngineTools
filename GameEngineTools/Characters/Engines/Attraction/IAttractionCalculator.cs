@@ -7,7 +7,8 @@ namespace GameEngineTools.Characters.Engines.Attraction
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
-    /// Calculates how attractive character <c>A</c> finds character <c>B</c>.
+    /// Calculates how attractive character <c>A</c> finds character <c>B</c>,
+    /// and what initial like score would arise from a first impression.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -25,12 +26,19 @@ namespace GameEngineTools.Characters.Engines.Attraction
     /// </list>
     /// Final score is clamped to [0, 100].
     /// </para>
+    /// <para>
+    /// <b>First impression like:</b>
+    /// Derived from the halo effect — physical attraction biases initial liking.
+    /// The observer's current emotional valence modulates the baseline.
+    /// Only meaningful when <paramref name="positiveInteractionCount"/> is 0.
+    /// </para>
     /// </remarks>
     public interface IAttractionCalculator
     {
         /// <summary>
         /// Computes how attractive observer <paramref name="observerProfile"/> finds the target
-        /// described by <paramref name="targetAppearance"/> and <paramref name="targetView"/>.
+        /// described by <paramref name="targetAppearance"/> and <paramref name="targetView"/>,
+        /// and derives an initial like score based on the halo effect.
         /// </summary>
         /// <param name="observerProfile">
         /// The observer's personal attraction preferences.
@@ -48,6 +56,11 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// Number of accepted positive interactions the observer has had with the target so far.
         /// Used to compute the mere-exposure bonus. Pass <c>0</c> for a first impression.
         /// </param>
+        /// <param name="observerValence">
+        /// The observer's current emotional valence in [−1, +1].
+        /// Positive mood boosts <see cref="AttractionResult.FirstImpressionLike"/>;
+        /// negative mood reduces it. Defaults to <c>0.0</c> (neutral).
+        /// </param>
         /// <returns>
         /// An <see cref="AttractionResult"/> with the final score and a per-component breakdown.
         /// </returns>
@@ -56,7 +69,8 @@ namespace GameEngineTools.Characters.Engines.Attraction
             PhysicalAppearance targetAppearance,
             AppearanceView targetView,
             SexBiology targetBiology,
-            int positiveInteractionCount = 0);
+            int positiveInteractionCount = 0,
+            double observerValence = 0.0);
     }
 
     /// <summary>
@@ -81,17 +95,26 @@ namespace GameEngineTools.Characters.Engines.Attraction
     /// <param name="MereExposure">
     /// Bonus from repeated positive contact. Range: [0, 15].
     /// </param>
+    /// <param name="FirstImpressionLike">
+    /// Initial like score derived from the halo effect and the observer's emotional valence.
+    /// Use this as <c>FirstImpressionFormed.Like</c>.
+    /// Range: [0, 100].
+    /// </param>
     public sealed record AttractionResult(
         double Score,
         double BasePhysical,
         double PreferenceMatch,
         double StateModifier,
-        double MereExposure)
+        double MereExposure,
+        double FirstImpressionLike)
     {
         /// <summary>
-        /// Creates a neutral result with all components zeroed and score at 50.
+        /// Creates a neutral result with all components zeroed, score at 50 and like at 45.
         /// Useful as a fallback when no profile is available.
         /// </summary>
-        public static AttractionResult Neutral => new(50, 0, 0, 0, 0);
+        /// <remarks>
+        /// Like defaults to 45 rather than 50 — an unknown stranger is not automatically liked.
+        /// </remarks>
+        public static AttractionResult Neutral => new(50, 0, 0, 0, 0, 45);
     }
 }

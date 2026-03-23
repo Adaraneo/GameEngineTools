@@ -319,6 +319,118 @@ namespace EngineTests
 
         #endregion
 
+        // ── FirstImpressionLike ──────────────────────────────────────────────────
+
+        #region FirstImpressionLike
+
+        /// <summary>
+        /// Neutral valence + mid attraction (50) should yield Like close to 45.
+        /// Calibration: 25 + 50 × 0.40 + 0 × 8 = 45.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_NeutralValenceAndMidAttraction_FirstImpressionLikeIsBaseline()
+        {
+            // Arrange — profile tuned so attraction ≈ 50
+            var profile    = BuildNeutralProfile();
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view       = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+
+            // Act
+            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                                        positiveInteractionCount: 0, observerValence: 0.0);
+
+            // Assert — baseline is 25 + score×0.40; score will be somewhere in [30, 70] for neutral inputs
+            var expectedBaseline = 25.0 + result.Score * 0.40;
+            Assert.AreEqual(expectedBaseline, result.FirstImpressionLike, delta: 0.5,
+                $"FirstImpressionLike should equal halo baseline (25 + score×0.40). " +
+                $"Score={result.Score:F2}, expected Like≈{expectedBaseline:F2}, actual={result.FirstImpressionLike:F2}");
+        }
+
+        /// <summary>
+        /// Positive valence must yield a higher FirstImpressionLike than negative valence,
+        /// everything else being equal.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_PositiveValence_FirstImpressionLikeHigherThanNegativeValence()
+        {
+            // Arrange
+            var profile    = BuildNeutralProfile();
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view       = BuildView(postureScore: 60, acneLevel: 5, bloating: BloatingLevel.None);
+
+            // Act
+            var resultGoodMood = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                                                observerValence: +0.8);
+            var resultBadMood  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                                                observerValence: -0.8);
+
+            // Assert
+            Assert.IsTrue(
+                resultGoodMood.FirstImpressionLike > resultBadMood.FirstImpressionLike,
+                $"Good mood Like ({resultGoodMood.FirstImpressionLike:F2}) must exceed " +
+                $"bad mood Like ({resultBadMood.FirstImpressionLike:F2}).");
+        }
+
+        /// <summary>
+        /// High attraction must yield a higher FirstImpressionLike than low attraction
+        /// at the same valence — halo effect in action.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_HighAttractionVsLow_FirstImpressionLikeReflectsHaloEffect()
+        {
+            // Arrange — profile strongly preferring 170 cm female, Medium frame
+            var profile = new AttractionProfile(
+                PreferredHeightCm:  170.0,
+                HeightToleranceCm:  5.0,     // tight window → big preference bonus at 170
+                FramePreference:    BodyFramePreference.Medium,
+                PreferredWhr:       0.70,
+                SymmetryWeight:     0.5,
+                MereExposureWeight: 0.5);
+
+            var viewNeutral     = BuildView(50, 0, BloatingLevel.None);
+            var appearanceGood  = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium,
+                                                  noseProminence: 0.5, lipFullness: 0.5);
+            var appearancePoor  = BuildAppearance(heightCm: 200, frame: BodyFrame.Petite,
+                                                  noseProminence: 0.9, lipFullness: 0.9);
+
+            // Act
+            var resultHigh = _sut.Calculate(profile, appearanceGood, viewNeutral, SexBiology.Female,
+                                            observerValence: 0.0);
+            var resultLow  = _sut.Calculate(profile, appearancePoor, viewNeutral, SexBiology.Female,
+                                            observerValence: 0.0);
+
+            // Assert
+            Assert.IsTrue(
+                resultHigh.FirstImpressionLike > resultLow.FirstImpressionLike,
+                $"High attraction Like ({resultHigh.FirstImpressionLike:F2}) must exceed " +
+                $"low attraction Like ({resultLow.FirstImpressionLike:F2}).");
+        }
+
+        /// <summary>
+        /// FirstImpressionLike must always stay within [0, 100] regardless of extreme inputs.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(+1.0, 100.0, 0.0,  BloatingLevel.None)]  // best case
+        [DataRow(-1.0, 0.0,   100.0, BloatingLevel.High)]  // worst case
+        public void Calculate_ExtremeValenceAndState_FirstImpressionLikeStaysInBounds(
+            double valence, double postureScore, double acneLevel, BloatingLevel bloating)
+        {
+            // Arrange
+            var profile    = BuildNeutralProfile();
+            var appearance = BuildAppearance(170, BodyFrame.Medium);
+            var view       = BuildView(postureScore, acneLevel, bloating);
+
+            // Act
+            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                                        observerValence: valence);
+
+            // Assert
+            Assert.IsTrue(result.FirstImpressionLike is >= 0.0 and <= 100.0,
+                $"FirstImpressionLike={result.FirstImpressionLike:F2} is outside [0, 100].");
+        }
+
+        #endregion
+
         // ── Builders ─────────────────────────────────────────────────────────────
 
         #region Helpers
