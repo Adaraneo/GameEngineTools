@@ -45,6 +45,8 @@ namespace GameEngineTools.Characters.Core
 
         IReadOnlyList<IDomainEvent> LastOutbox { get; }
 
+        int Age { get; }
+
         // Orchestrace jednoho kroku simulace
         void Tick(WDateTime now, WTimeSpan dt);
 

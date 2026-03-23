@@ -34,6 +34,22 @@ namespace GameEngineTools.Characters.Core
         private readonly List<IDomainEvent> _lastOutboxAccumulator = new();
         public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutboxAccumulator;
 
+        public int Age
+        {
+            get
+            {
+                var today = WDateTime.Now.Date;
+                var birth = Identity.BirthDate;
+                var age = today.Year - birth.Year;
+                if (today.Month< birth.Month || (today.Month == birth.Month && today.Day < birth.Day))
+                {
+                    age--;
+                }
+
+                return age;
+            }
+        }
+
         // Služby
         private readonly IEventBus _bus;
 

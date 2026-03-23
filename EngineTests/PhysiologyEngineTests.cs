@@ -202,7 +202,7 @@ namespace EngineTests
         [TestMethod]
         public void Ctor_MenstrualCycleEnabledForAgeLessThanInConfiguration_ReturnsNullCycle()
         {
-            var engine = BuildEngine(birthYear: 11, cycleEnabled: true);
+            var engine = BuildEngine(birthYear: 111, cycleEnabled: true);
 
             Assert.IsNull(engine.State.Cycle);
         }

@@ -75,6 +75,9 @@ namespace GameEngineTools.Characters.GameObjects
 
         public Weapon? Weapon { get; set; }
 
+        [JsonIgnore]
+        public int Age => Person.Age;
+
         public virtual void DecreaseHealth(double amount)
         {
             this.health -= amount;

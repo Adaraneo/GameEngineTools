@@ -53,7 +53,8 @@ clock.SetNow(initTicks == defaultTicks
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
-var significantOther = manager.Characters.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology && (Math.Abs(npc.Person.Identity.BirthDate.Year - clock.Now.Year) >= 16 || Math.Abs(npc.Person.Identity.BirthDate.Year - player.Person.Identity.BirthDate.Year) <= 5)).FirstOrDefault();
+var significantOther = manager.Characters.Where(npc => npc is NPC && npc.Person.Biology != player.Person.Biology
+&& (npc.Age >= 16 && Math.Abs(npc.Age - player.Age) <= 5)).FirstOrDefault();
 
 if (significantOther is null)
 {

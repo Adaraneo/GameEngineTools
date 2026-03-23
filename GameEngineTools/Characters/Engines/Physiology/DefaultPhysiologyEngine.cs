@@ -41,7 +41,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             _log = loggerFactory.CreateLogger<DefaultPhysiologyEngine>();
             _rng = rng;
 
-            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && birthDate.Year >= Config.MenstrualCycleBeginsInAge && now != default)
+            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && (now.Year - birthDate.Year) >= Config.MenstrualCycleBeginsInAge && now != default)
                 ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 
@@ -198,7 +198,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
             }
 
-            var next = c with { DayInCycle = day, Phase = phase, OvulationWindow = ovulWindow };
+            var next = c with { DayInCycle = day, Phase = phase, OvulationWindow = ovulWindow, LastMensesStart = (day == 1) ? now.Date : c.LastMensesStart };
             s = s with { Cycle = next };
 
             // Symptomy jednou za den
