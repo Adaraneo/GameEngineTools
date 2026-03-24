@@ -11,6 +11,7 @@ using GameEngineTools.Characters.Traits;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
 using GameEngineTools.Narrative;
+using GameEngineTools.World.Location;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
@@ -80,9 +81,31 @@ var diary = new List<NarrativeEntry>();
 // System.Random is sufficient here: scene-level decisions are not deterministic anyway.
 var rng = new Random();
 
+var locationService = new DefaultLocationService();
+
+locationService.RegisterLocation(new LocationDescriptor(
+    Id: "village_square",
+    DisplayName: "Village Square",
+    BaseNoise: 0.3,
+    NoisePerPerson: 0.05,
+    Capacity: 20,
+    AllowsPrivacy: false));
+
+locationService.RegisterLocation(new LocationDescriptor(
+    Id: "castle",
+    DisplayName: "Castle Hall",
+    BaseNoise: 0.1,
+    NoisePerPerson: 0.02,
+    Capacity: 10,
+    AllowsPrivacy: true));
+
+locationService.MoveCharacter(playerPerson.Id, "village_square");
+locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
+
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson],
+    LocationService = locationService,
     SimulationYears = 2,
     TickStep = WTimeSpan.FromHours(0.5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
@@ -140,12 +163,10 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
         // ── Location context — move both to Castle on day 16, evening ─────────
         // This is a narrative beat: a shared environment that enables intimacy.
         // HasPrivacy=true, low noise, low crowding.
-        if (now.Day is 16 && now.Hour is 20
-            && p.Snapshot.InteractionSurface.Location != "Castle"
-            && so.Snapshot.InteractionSurface.Location != "Castle")
+        if (now.Day is 16 && now.Hour is 20)
         {
-            p.ReceiveEvent(new ContextChanged(now + WTimeSpan.FromHours(1), p.Id, "Castle", true, 0.13, 0.2));
-            so.ReceiveEvent(new ContextChanged(now + WTimeSpan.FromHours(1), so.Id, "Castle", true, 0.13, 0.2));
+            locationService.MoveCharacter(playerPerson.Id, "castle");
+            locationService.MoveCharacter(significantOtherPerson.Id, "castle");
         }
 
         // ── ReachOut routing — dynamic, relationship-aware ────────────────────

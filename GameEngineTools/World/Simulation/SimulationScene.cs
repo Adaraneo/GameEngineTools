@@ -107,6 +107,7 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private Task SimulateAsync()
         {
+            var startTime = _clock.Now;
             var endTime = _clock.Now.AddYears(_options.SimulationYears);
             var chars = _options.Characters;
             var dt = _options.TickStep;
@@ -114,6 +115,8 @@ namespace GameEngineTools.World.Simulation
             while (_clock.Now < endTime)
             {
                 var now = _clock.Now;
+
+                _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
 
                 // ── Krok 1: OnTick callback ─────────────────────────────────────────────
                 // Zavolej scénář / ReachOut routing.

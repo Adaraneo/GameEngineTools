@@ -6,6 +6,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Narrative;
+    using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -45,6 +46,13 @@ namespace GameEngineTools.World.Simulation
         public IReadOnlyList<IHuman> Characters { get; init; } = Array.Empty<IHuman>();
 
         #endregion Účastníci
+
+        /// <summary>
+        /// Optional location service. When provided, the scene calls
+        /// <see cref="ILocationService.DispatchContextEvents"/> at the start
+        /// of every tick — before the OnTick callback.
+        /// </summary>
+        public ILocationService? LocationService { get; init; }
 
         #region Časování simulace
 
