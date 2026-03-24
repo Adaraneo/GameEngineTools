@@ -236,7 +236,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                 // ── Mikrointerakce ────────────────────────────────────────────────────────
                 case MicroPositive mp:
                     {
-                        var what = MemoryWhatParser.MicroPositive(mp.A.Value, mp.What);
+                        var fromId = ctx.Id == mp.A ? mp.B.Value : mp.A.Value;
+                        var what = MemoryWhatParser.MicroPositive(fromId, mp.What);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -253,7 +254,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                     {
                         // Negativní mikrointerakce — o něco vyšší salience než pozitivní
                         // (negativní bias: nepříjemné věci si pamatujeme lépe)
-                        var what = MemoryWhatParser.MicroNegative(mn.A.Value, mn.What);
+                        var fromId = ctx.Id == mn.A ? mn.B.Value : mn.A.Value;
+                        var what = MemoryWhatParser.MicroNegative(fromId, mn.What);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
