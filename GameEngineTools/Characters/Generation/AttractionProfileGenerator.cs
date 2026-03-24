@@ -91,8 +91,7 @@ namespace GameEngineTools.Characters.Generation
                 HeightToleranceCm:   Math.Round(heightTolerance, 1),
                 FramePreference:     framePreference,
                 PreferredWhr:        Math.Round(preferredWhr, 3),
-                SymmetryWeight:      Math.Round(symmetryWeight, 3),
-                MereExposureWeight:  Math.Round(mereExposureWeight, 3));
+                SymmetryWeight:      Math.Round(symmetryWeight, 3));
         }
 
         // ── Private helpers ──────────────────────────────────────────────────────

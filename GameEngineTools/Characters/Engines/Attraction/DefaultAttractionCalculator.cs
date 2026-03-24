@@ -36,27 +36,19 @@ namespace GameEngineTools.Characters.Engines.Attraction
         // ── Component ceilings ───────────────────────────────────────────────────
         private const double MaxBasePhysical    = 40.0;
         private const double MaxPreferenceMatch = 35.0;
-        private const double MaxMereExposure    = 15.0;
 
         // ── WHR optimum windows (population-level baselines) ────────────────────
         private const double WhrOptimumFemale   = 0.70;
         private const double WhrOptimumMale     = 0.90;
-        private const double WhrToleranceHalf   = 0.12; // ±0.12 before score drops to 0
+        private const double WhrToleranceHalf   = 0.12;
 
         // ── Height window (population-level) ────────────────────────────────────
-        private const double HeightWindowHalf   = 25.0; // ±25 cm before base score drops to 0
-
-        // ── Mere-exposure cap and scale ──────────────────────────────────────────
-        private const int    MereExposureSaturationCount = 20; // interactions to reach max bonus
+        private const double HeightWindowHalf   = 25.0;
 
         // ── First impression like constants ─────────────────────────────────────
-        // Like = HaloBase + Attraction × HaloAttractionScale + Valence × ValenceLikeScale
-        // Attraction 50 → Like 45 (neutral stranger, not automatically liked)
-        // Attraction 80 → Like 57
-        // Attraction 20 → Like 33
         private const double HaloBase            = 25.0;
         private const double HaloAttractionScale = 0.40;
-        private const double ValenceLikeScale    = 8.0;  // valence ±1 → ±8 Like points
+        private const double ValenceLikeScale    = 8.0;
 
         /// <inheritdoc/>
         public AttractionResult Calculate(
@@ -64,15 +56,13 @@ namespace GameEngineTools.Characters.Engines.Attraction
             PhysicalAppearance targetAppearance,
             AppearanceView targetView,
             SexBiology targetBiology,
-            int positiveInteractionCount = 0,
             double observerValence = 0.0)
         {
             var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology);
             var preferenceMatch = ComputePreferenceMatch(observerProfile, targetAppearance, targetBiology);
             var stateModifier   = ComputeStateModifier(targetView);
-            var mereExposure    = ComputeMereExposure(observerProfile, positiveInteractionCount);
 
-            var raw   = basePhysical + preferenceMatch + stateModifier + mereExposure;
+            var raw   = basePhysical + preferenceMatch + stateModifier;
             var score = Math.Clamp(raw, 0.0, 100.0);
 
             var firstImpressionLike = ComputeFirstImpressionLike(score, observerValence);
@@ -82,7 +72,6 @@ namespace GameEngineTools.Characters.Engines.Attraction
                 BasePhysical:        Math.Round(basePhysical, 2),
                 PreferenceMatch:     Math.Round(preferenceMatch, 2),
                 StateModifier:       Math.Round(stateModifier, 2),
-                MereExposure:        Math.Round(mereExposure, 2),
                 FirstImpressionLike: Math.Round(firstImpressionLike, 2));
         }
 
@@ -164,31 +153,6 @@ namespace GameEngineTools.Characters.Engines.Attraction
         }
 
         #endregion StateModifier
-
-        #region MereExposure
-
-        /// <summary>
-        /// Familiarity bonus — the more positive interactions, the higher the bonus,
-        /// up to <see cref="MaxMereExposure"/> scaled by <see cref="AttractionProfile.MereExposureWeight"/>.
-        /// </summary>
-        private static double ComputeMereExposure(AttractionProfile profile, int positiveInteractionCount)
-        {
-            if (positiveInteractionCount <= 0)
-            {
-                return 0.0;
-            }
-
-            // Logarithmic growth: fast at first, then levels off
-            var saturation = Math.Log(1.0 + positiveInteractionCount)
-                           / Math.Log(1.0 + MereExposureSaturationCount);
-
-            return Math.Clamp(
-                saturation * MaxMereExposure * profile.MereExposureWeight,
-                0.0,
-                MaxMereExposure);
-        }
-
-        #endregion MereExposure
 
         // ── Private helpers ──────────────────────────────────────────────────────
 

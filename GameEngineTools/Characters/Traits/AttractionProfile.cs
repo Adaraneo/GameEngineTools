@@ -39,13 +39,7 @@ namespace GameEngineTools.Characters.Traits
         /// Weight of facial symmetry in the score (0..1).
         /// Higher value means the character is more sensitive to symmetry cues.
         /// </summary>
-        double SymmetryWeight,
-
-        /// <summary>
-        /// Weight of the mere-exposure bonus applied per positive interaction (0..1).
-        /// Higher value means familiarity has more impact than initial physical impression.
-        /// </summary>
-        double MereExposureWeight
+        double SymmetryWeight
     );
 
     /// <summary>

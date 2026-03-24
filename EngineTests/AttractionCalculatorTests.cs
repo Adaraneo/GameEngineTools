@@ -21,8 +21,11 @@ namespace EngineTests
     /// | BasePhysical    |  0   |  40  |
     /// | PreferenceMatch |  0   |  35  |
     /// | StateModifier   | -15  | +10  |
-    /// | MereExposure    |  0   |  15  |
     /// | Score (total)   |  0   | 100  |
+    ///
+    /// Note: MereExposure has been moved to DefaultRelationshipsEngine.
+    /// Test it via RelationshipsEngineTests — InteractionOutcome accepted
+    /// should increment PositiveInteractionCount and raise Attraction logarithmically.
     /// </remarks>
     [TestClass]
     public class AttractionCalculatorTests
@@ -54,7 +57,7 @@ namespace EngineTests
             var view       = BuildView(postureScore: 100, acneLevel: 0, bloating: BloatingLevel.None);
 
             // Act
-            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female, positiveInteractionCount: 100);
+            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female);
 
             // Assert
             Assert.IsTrue(result.Score <= 100.0, $"Score exceeded 100: {result.Score}");
@@ -72,7 +75,7 @@ namespace EngineTests
             var view       = BuildView(postureScore: 0, acneLevel: 100, bloating: BloatingLevel.High);
 
             // Act
-            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female, positiveInteractionCount: 0);
+            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female);
 
             // Assert
             Assert.IsTrue(result.Score >= 0.0, $"Score was negative: {result.Score}");
@@ -146,8 +149,7 @@ namespace EngineTests
                 HeightToleranceCm:  10.0,
                 FramePreference:    BodyFramePreference.None,
                 PreferredWhr:       0.70,
-                SymmetryWeight:     0.5,
-                MereExposureWeight: 0.5);
+                SymmetryWeight:     0.5);
 
             var viewNeutral    = BuildView(50, 10, BloatingLevel.None);
             var appearanceGood = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
@@ -177,8 +179,7 @@ namespace EngineTests
                 HeightToleranceCm:  15.0,
                 FramePreference:    BodyFramePreference.Petite,
                 PreferredWhr:       0.70,
-                SymmetryWeight:     0.5,
-                MereExposureWeight: 0.5);
+                SymmetryWeight:     0.5);
 
             var view            = BuildView(50, 10, BloatingLevel.None);
             var appearancePetite = BuildAppearance(heightCm: 165, frame: BodyFrame.Petite);
@@ -249,75 +250,10 @@ namespace EngineTests
 
         #endregion
 
-        // ── MereExposure ─────────────────────────────────────────────────────────
-
-        #region MereExposure
-
-        /// <summary>
-        /// Zero interactions must yield a MereExposure of exactly 0.
-        /// </summary>
-        [TestMethod]
-        public void Calculate_ZeroInteractions_MereExposureIsZero()
-        {
-            // Arrange
-            var profile    = BuildNeutralProfile();
-            var appearance = BuildAppearance(170, BodyFrame.Medium);
-            var view       = BuildView(50, 10, BloatingLevel.None);
-
-            // Act
-            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
-                                        positiveInteractionCount: 0);
-
-            // Assert
-            Assert.AreEqual(0.0, result.MereExposure, delta: 0.001,
-                "MereExposure must be zero when no positive interactions have occurred.");
-        }
-
-        /// <summary>
-        /// More interactions must yield a higher MereExposure than fewer interactions.
-        /// </summary>
-        [TestMethod]
-        public void Calculate_MoreInteractions_MereExposureIncreases()
-        {
-            // Arrange
-            var profile    = new AttractionProfile(170, 12, BodyFramePreference.None, 0.70, 0.5, 1.0);
-            var appearance = BuildAppearance(170, BodyFrame.Medium);
-            var view       = BuildView(50, 10, BloatingLevel.None);
-
-            // Act
-            var resultFew  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
-                                            positiveInteractionCount: 2);
-            var resultMany = _sut.Calculate(profile, appearance, view, SexBiology.Female,
-                                            positiveInteractionCount: 20);
-
-            // Assert
-            Assert.IsTrue(
-                resultMany.MereExposure > resultFew.MereExposure,
-                $"More interactions ({resultMany.MereExposure:F2}) must yield higher " +
-                $"mere-exposure than fewer ({resultFew.MereExposure:F2}).");
-        }
-
-        /// <summary>
-        /// MereExposure must never exceed its ceiling of 15.
-        /// </summary>
-        [TestMethod]
-        public void Calculate_ManyInteractions_MereExposureDoesNotExceedCeiling()
-        {
-            // Arrange — MereExposureWeight = 1.0 (max possible weight)
-            var profile    = new AttractionProfile(170, 12, BodyFramePreference.None, 0.70, 0.5, 1.0);
-            var appearance = BuildAppearance(170, BodyFrame.Medium);
-            var view       = BuildView(50, 10, BloatingLevel.None);
-
-            // Act
-            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
-                                        positiveInteractionCount: 9999);
-
-            // Assert
-            Assert.IsTrue(result.MereExposure <= 15.0,
-                $"MereExposure {result.MereExposure:F2} exceeded ceiling of 15.");
-        }
-
-        #endregion
+        // ── MereExposure — přesunuto do RelationshipsEngine ─────────────────────
+        // Mere-exposure effect je nyní zodpovědností DefaultRelationshipsEngine.
+        // Testuj ho v RelationshipsEngineTests přes InteractionOutcome accepted
+        // a ověř že RelationshipEdge.Attraction roste logaritmicky s PositiveInteractionCount.
 
         // ── FirstImpressionLike ──────────────────────────────────────────────────
 
@@ -337,7 +273,7 @@ namespace EngineTests
 
             // Act
             var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
-                                        positiveInteractionCount: 0, observerValence: 0.0);
+                                        observerValence: 0.0);
 
             // Assert — baseline is 25 + score×0.40; score will be somewhere in [30, 70] for neutral inputs
             var expectedBaseline = 25.0 + result.Score * 0.40;
@@ -384,8 +320,7 @@ namespace EngineTests
                 HeightToleranceCm:  5.0,     // tight window → big preference bonus at 170
                 FramePreference:    BodyFramePreference.Medium,
                 PreferredWhr:       0.70,
-                SymmetryWeight:     0.5,
-                MereExposureWeight: 0.5);
+                SymmetryWeight:     0.5);
 
             var viewNeutral     = BuildView(50, 0, BloatingLevel.None);
             var appearanceGood  = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium,
@@ -442,8 +377,7 @@ namespace EngineTests
                 HeightToleranceCm:  15.0,
                 FramePreference:    BodyFramePreference.None,
                 PreferredWhr:       0.70,
-                SymmetryWeight:     0.5,
-                MereExposureWeight: 0.5);
+                SymmetryWeight:     0.5);
 
         private static PhysicalAppearance BuildAppearance(
             double heightCm,

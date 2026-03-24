@@ -52,10 +52,6 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// <param name="targetBiology">
         /// Biological sex of the target — used for WHR baseline selection.
         /// </param>
-        /// <param name="positiveInteractionCount">
-        /// Number of accepted positive interactions the observer has had with the target so far.
-        /// Used to compute the mere-exposure bonus. Pass <c>0</c> for a first impression.
-        /// </param>
         /// <param name="observerValence">
         /// The observer's current emotional valence in [−1, +1].
         /// Positive mood boosts <see cref="AttractionResult.FirstImpressionLike"/>;
@@ -64,12 +60,16 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// <returns>
         /// An <see cref="AttractionResult"/> with the final score and a per-component breakdown.
         /// </returns>
+        /// <remarks>
+        /// The mere-exposure effect is <b>not</b> computed here — it lives in
+        /// <c>DefaultRelationshipsEngine</c>, which applies a logarithmic bonus to
+        /// <c>Attraction</c> on every accepted <c>InteractionOutcome</c>.
+        /// </remarks>
         AttractionResult Calculate(
             AttractionProfile observerProfile,
             PhysicalAppearance targetAppearance,
             AppearanceView targetView,
             SexBiology targetBiology,
-            int positiveInteractionCount = 0,
             double observerValence = 0.0);
     }
 
@@ -92,9 +92,6 @@ namespace GameEngineTools.Characters.Engines.Attraction
     /// Modifier from the target's current appearance state (posture, skin, cycle).
     /// Can be negative. Range: approximately [−15, +10].
     /// </param>
-    /// <param name="MereExposure">
-    /// Bonus from repeated positive contact. Range: [0, 15].
-    /// </param>
     /// <param name="FirstImpressionLike">
     /// Initial like score derived from the halo effect and the observer's emotional valence.
     /// Use this as <c>FirstImpressionFormed.Like</c>.
@@ -105,7 +102,6 @@ namespace GameEngineTools.Characters.Engines.Attraction
         double BasePhysical,
         double PreferenceMatch,
         double StateModifier,
-        double MereExposure,
         double FirstImpressionLike)
     {
         /// <summary>
@@ -115,6 +111,6 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// <remarks>
         /// Like defaults to 45 rather than 50 — an unknown stranger is not automatically liked.
         /// </remarks>
-        public static AttractionResult Neutral => new(50, 0, 0, 0, 0, 45);
+        public static AttractionResult Neutral => new(50, 0, 0, 0, 45);
     }
 }

@@ -13,32 +13,33 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using Microsoft.Extensions.Options;
 
     /// <summary>
-    /// Výchozí implementace <see cref="IRelationshipsEngine"/>.
+    /// Default implementation of <see cref="IRelationshipsEngine"/>.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Engine spravuje orientovaný graf vztahů postavy — každá hrana (<see cref="RelationshipEdge"/>)
-    /// reprezentuje, jak táto postava vnímá konkrétního druhého člověka.
-    /// Graf je tedy <b>asymetrický</b>: A může mít ráda B víc, než B má ráda A.
+    /// Manages a directed relationship graph for one character.
+    /// Each <see cref="RelationshipEdge"/> represents how this character perceives one other person.
+    /// The graph is <b>asymmetric</b>: A may like B more than B likes A.
     /// </para>
     /// <para>
-    /// <b>Tři vrstvy dynamiky:</b>
+    /// <b>Three dynamic layers:</b>
     /// <list type="number">
-    ///   <item>
-    ///     <b>Události</b> — okamžité skoky (MicroPositive, RepairAttempt, InteractionOutcome)
-    ///   </item>
-    ///   <item>
-    ///     <b>Decay</b> — pomalé tíhnutí k neutrálním hodnotám (čas bez kontaktu)
-    ///   </item>
-    ///   <item>
-    ///     <b>DomainBreakdown</b> — granulární obraz ČEHO si váží (humor, intelekt, hodnoty…)
-    ///   </item>
+    ///   <item><b>Events</b> — immediate jumps (MicroPositive, RepairAttempt, InteractionOutcome)</item>
+    ///   <item><b>Decay</b> — slow drift toward neutral values (time without contact)</item>
+    ///   <item><b>DomainBreakdown</b> — granular record of <em>what</em> the character values (humour, intellect…)</item>
     /// </list>
+    /// </para>
+    /// <para>
+    /// <b>Mere-exposure effect:</b>
+    /// Each accepted interaction increments <see cref="RelationshipEdge.PositiveInteractionCount"/>.
+    /// A logarithmic bonus is applied to <c>Attraction</c> on every increment,
+    /// saturating at <see cref="RelationshipsConfig.MereExposureSaturation"/> interactions.
+    /// This keeps the effect in the engine that owns Attraction — no external calculator needed.
     /// </para>
     /// </remarks>
     internal sealed class DefaultRelationshipsEngine : IRelationshipsEngine
     {
-        #region Stav a konfigurace
+        #region State and configuration
 
         /// <inheritdoc/>
         public RelationshipState State { get; private set; }
@@ -46,27 +47,27 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// <inheritdoc/>
         public RelationshipsConfig Config { get; }
 
-        #endregion Stav a konfigurace
+        #endregion State and configuration
 
-        #region Privátní pole
+        #region Private fields
 
         private readonly ILogger _log;
 
-        #endregion Privátní pole
+        #endregion Private fields
 
-        #region Konstruktor
+        #region Constructor
 
-        /// <summary>Vytvoří instanci enginu s prázdným grafem vztahů.</summary>
+        /// <summary>Creates an engine instance with an empty relationship graph.</summary>
         public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
-            _log = loggerFactory.CreateLogger<DefaultRelationshipsEngine>();
-            State = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>());
+            _log   = loggerFactory.CreateLogger<DefaultRelationshipsEngine>();
+            State  = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>());
         }
 
-        #endregion Konstruktor
+        #endregion Constructor
 
-        #region Handle — zpracování doménových událostí
+        #region Handle — domain event processing
 
         /// <inheritdoc/>
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
@@ -75,116 +76,126 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             switch (@event)
             {
-                // ── První dojem ────────────────────────────────────────────────────────────
+                // ── First impression ─────────────────────────────────────────────────────
                 case FirstImpressionFormed fi:
                     Upsert(self, fi.B, e => e with
                     {
-                        // Lerp 70% směrem k prvnímu dojmu — ale nenahradí zcela,
-                        // pokud postava druhého již trochu zná.
-                        Like = Lerp(e.Like, fi.Like, 0.7),
-                        Attraction = Lerp(e.Attraction, fi.Attraction, 0.7),
-                        Trust = e.Trust <= 0 ? 45 : e.Trust,
-                        Closeness = Math.Max(e.Closeness, 10)
+                        // Lerp 70% toward the first impression — does not fully override
+                        // if the character already knows the person slightly.
+                        Like       = Lerp(e.Like,       fi.Like,       0.7),
+                        Attraction = Lerp(e.Attraction,  fi.Attraction, 0.7),
+                        Trust      = e.Trust <= 0 ? 45 : e.Trust,
+                        Closeness  = Math.Max(e.Closeness, 10)
                     });
 
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
                     {
-                        _log.RelFirstImpression(ctx.Id.Value.ToString(), fi.A.Value.ToString(), fi.B.Value.ToString(), fi.Like, fi.Attraction);
+                        _log.RelFirstImpression(
+                            ctx.Id.Value.ToString(),
+                            fi.A.Value.ToString(), fi.B.Value.ToString(),
+                            fi.Like, fi.Attraction);
                     }
 
                     break;
 
-                // ── Mikrokladná interakce (úsměv, kompliment, pomoc…) ──────────────────────
+                // ── Micro-positive (smile, compliment, small help…) ──────────────────────
                 case MicroPositive mp:
                     Upsert(self, mp.B, e => e with
                     {
-                        Like = Bump(e.Like, +2.0),
-                        Trust = Bump(e.Trust, +1.0),
+                        Like      = Bump(e.Like,      +2.0),
+                        Trust     = Bump(e.Trust,     +1.0),
                         Closeness = Bump(e.Closeness, +1.5),
-                        Comfort = Bump(e.Comfort, +2.0)
+                        Comfort   = Bump(e.Comfort,   +2.0)
                     });
                     break;
 
-                // ── Mikronegativní interakce (kritika, ignorování, lhostejnost…) ───────────
+                // ── Micro-negative (criticism, ignoring, cold response…) ─────────────────
                 case MicroNegative mn:
                     Upsert(self, mn.B, e => e with
                     {
-                        Like = Bump(e.Like, -2.5),
-                        Trust = Bump(e.Trust, -2.0),
+                        Like    = Bump(e.Like,    -2.5),
+                        Trust   = Bump(e.Trust,   -2.0),
                         Comfort = Bump(e.Comfort, -2.0)
                     });
                     break;
 
-                // ── Pokus o opravu vztahu ─────────────────────────────────────────────────
+                // ── Repair attempt ───────────────────────────────────────────────────────
                 case RepairAttempt ra:
                     Upsert(self, ra.B, e => e with
                     {
-                        Trust = Bump(e.Trust, ra.Accepted ? +Config.RepairGain : -Config.RupturePenalty),
+                        Trust     = Bump(e.Trust,     ra.Accepted ? +Config.RepairGain            : -Config.RupturePenalty),
                         Closeness = Bump(e.Closeness, ra.Accepted ? +Config.RepairGain * 0.5 : -Config.RupturePenalty * 0.4)
                     });
                     break;
 
-                // ── Výsledek interakce — PŘIJATO ──────────────────────────────────────────
+                // ── Interaction outcome — ACCEPTED ───────────────────────────────────────
                 case InteractionOutcome io when io.Accepted:
                     {
                         var otherId = io.From == self ? io.To : io.From;
                         EnsureEdge(self, otherId);
 
-                        // Trust delta dle SpeechAct — důvěra roste jen přes zranitelnost a potvrzení
+                        // Trust grows only through vulnerability and acknowledgement
                         var trustDelta = io.Act switch
                         {
-                            SpeechAct.SelfDisclosure => +2.5,   // sdílíš něco osobního → velký skok důvěry
-                            SpeechAct.Validation => +1.5,   // cítíš se pochopený → střední skok
-                            SpeechAct.Meta => +0.5,   // komentář o vztahu — trochu zranitelné
-                            _ => 0.0     // SmallTalk, Humor atd. Trust nebudují
+                            SpeechAct.SelfDisclosure => +2.5,   // sharing something personal → large trust jump
+                            SpeechAct.Validation     => +1.5,   // feeling understood → medium jump
+                            SpeechAct.Meta           => +0.5,   // comment about the relationship — slightly vulnerable
+                            _                        =>  0.0    // SmallTalk, Humor etc. do not build trust
                         };
 
-                        Upsert(self, otherId, e => e with
+                        Upsert(self, otherId, e =>
                         {
-                            Closeness = Bump(e.Closeness, +1.5),
-                            Like = Bump(e.Like, +0.5),
-                            Comfort = Bump(e.Comfort, +0.8),
-                            Trust = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
-                            Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
+                            // Mere-exposure: incremental attraction boost from familiarity.
+                            // Delta = total boost at (N+1) minus total boost at N.
+                            // Logarithmic growth → fast early, levels off near saturation.
+                            var newCount      = e.PositiveInteractionCount + 1;
+                            var exposureDelta = MereExposureBoost(newCount, Config)
+                                              - MereExposureBoost(e.PositiveInteractionCount, Config);
+
+                            return e with
+                            {
+                                Closeness              = Bump(e.Closeness, +1.5),
+                                Like                   = Bump(e.Like,      +0.5),
+                                Comfort                = Bump(e.Comfort,   +0.8),
+                                Trust                  = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
+                                Attraction             = Bump(e.Attraction, exposureDelta),
+                                PositiveInteractionCount = newCount,
+                                Breakdown              = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
+                            };
                         });
                         break;
                     }
 
-                // ── Výsledek interakce — ODMÍTNUTO ───────────────────────────────────────
+                // ── Interaction outcome — REJECTED ───────────────────────────────────────
                 case InteractionOutcome io when !io.Accepted:
                     {
-                        var otherId2 = io.From == self ? io.To : io.From;
-                        EnsureEdge(self, otherId2);
+                        var otherId = io.From == self ? io.To : io.From;
+                        EnsureEdge(self, otherId);
 
-                        // Odmítnuté SelfDisclosure bolí víc — zranitelnost byla sražena
+                        // Rejected SelfDisclosure hurts more — vulnerability was turned away
                         var trustPenalty = io.Act switch
                         {
                             SpeechAct.SelfDisclosure => -1.5,
-                            SpeechAct.Validation => -0.5,
-                            _ => 0.0
+                            SpeechAct.Validation     => -0.5,
+                            _                        =>  0.0
                         };
 
-                        // Já jsem odmítl
-                        if (io.To == self)
+                        if (io.To == self) // I rejected
                         {
-                            Upsert(self, otherId2, e => e with
+                            Upsert(self, otherId, e => e with
                             {
-                                Comfort = Bump(e.Comfort, -0.5),
-                                Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
+                                Comfort  = Bump(e.Comfort, -0.5),
+                                Trust    = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                             });
                         }
-                        else
+                        else // I was rejected
                         {
-                            // Já jsem byl odmítnut
-                            Upsert(self, otherId2, e => e with
+                            Upsert(self, otherId, e => e with
                             {
-                                // Mírný pokles Like a Comfort — sociální nepohodlí z odmítnutí
-                                Like = Bump(e.Like, -1.5),
-                                Comfort = Bump(e.Comfort, -2.0),
-                                Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
-
-                                // Odmítnutí také zanechá stopu v doméně — ale menší než přijetí
+                                Like      = Bump(e.Like,    -1.5),
+                                Comfort   = Bump(e.Comfort, -2.0),
+                                Trust     = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                             });
                         }
@@ -192,18 +203,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         break;
                     }
 
+                // ── Touch outcome ────────────────────────────────────────────────────────
                 case TouchOutcome to:
                     {
                         var otherId = to.From == self ? to.To : to.From;
                         EnsureEdge(self, otherId);
 
-                        if (to.To == self) // já jsem byl dotknut — rozhodoval jsem
+                        if (to.To == self) // I was touched — I decided
                         {
                             if (to.Accepted)
                             {
                                 Upsert(self, otherId, e => e with
                                 {
-                                    Comfort = Bump(e.Comfort, +1.5),
+                                    Comfort   = Bump(e.Comfort,   +1.5),
                                     Closeness = Bump(e.Closeness, +1.0),
                                     Breakdown = e.Breakdown with
                                     {
@@ -213,52 +225,57 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             }
                             else
                             {
-                                // Odmítl jsem — mírný discomfort
+                                // I rejected — mild discomfort
                                 Upsert(self, otherId, e => e with
                                 {
                                     Comfort = Bump(e.Comfort, -1.0)
                                 });
                             }
                         }
-                        else // já jsem byl odmítnut
+                        else // I was rejected
                         {
                             Upsert(self, otherId, e => e with
                             {
-                                Like = Bump(e.Like, to.Accepted ? +0.5 : -2.0),
+                                Like    = Bump(e.Like,    to.Accepted ? +0.5 : -2.0),
                                 Comfort = Bump(e.Comfort, to.Accepted ? +1.0 : -3.0)
                             });
                         }
+
                         break;
                     }
             }
         }
 
-        #endregion Handle — zpracování doménových událostí
+        #endregion Handle — domain event processing
 
-        #region Tick — časový decay
+        #region Tick — time decay
 
         /// <inheritdoc/>
         /// <remarks>
-        /// Bez pravidelného kontaktu se vztahy tíhnou k neutrálním hodnotám (Ebbinghausův efekt).
-        /// Každá dimenze má jiné tempo:
+        /// Without regular contact, relationships drift toward neutral values.
+        /// Each dimension decays at a different rate:
         /// <list type="bullet">
-        ///   <item>Closeness — nejrychlejší decay (vzdálenost se rychle cítí)</item>
-        ///   <item>Trust — pomalý decay (jednou získaná důvěra dlouho vydrží)</item>
-        ///   <item>Attraction — pomalý, ale tíhne k 35 nebo 45 dle počáteční hodnoty</item>
+        ///   <item>Closeness — fastest decay (distance is felt quickly)</item>
+        ///   <item>Trust — slowest decay (trust earned persists)</item>
+        ///   <item>Attraction — slow, drifts toward 35 or 45 based on initial value</item>
         /// </list>
+        /// Note: <c>PositiveInteractionCount</c> does <b>not</b> decay — it is a cumulative
+        /// historical counter, not a relationship intensity measure.
         /// </remarks>
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
             var days = Math.Max(0, dt.TotalDays);
             if (days == 0 || State.Edges.Count == 0)
+            {
                 return;
+            }
 
-            var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
+            var dict  = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
             var psych = ctx.Snapshot.Psychology;
 
-            // Psychika moduluje decay: dobrá nálada mírně zlepšuje, stres poškozuje
+            // Psychology modulates decay: positive mood slightly improves, stress damages
             var valenceEffect = psych.Valence * 0.3 * days;
-            var stressEffect = psych.Stress * 0.02 * days;
+            var stressEffect  = psych.Stress  * 0.02 * days;
 
             foreach (var kv in State.Edges)
             {
@@ -267,14 +284,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 dict[kv.Key] = e with
                 {
-                    Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect),
-                    Trust = Clamp(Approach(e.Trust, 50, d * 0.5)),
-                    Attraction = Clamp(Approach(e.Attraction, e.Attraction > 50 ? 45 : 35, d * 0.4)),
-                    Closeness = Clamp(Approach(e.Closeness, 35, d * 1.2)),
-                    Respect = Clamp(Approach(e.Respect, 55, d * 0.3)),
-                    Comfort = Clamp(Approach(e.Comfort, 45, d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5)
-                    // Poznámka: Breakdown se v Tick() nemění — domény jsou fixovány zážitky,
-                    // ne pouhým uplynutím času.
+                    Like       = Clamp(Approach(e.Like,       50,                              d)       + valenceEffect - stressEffect),
+                    Trust      = Clamp(Approach(e.Trust,      50,                              d * 0.5)),
+                    Attraction = Clamp(Approach(e.Attraction, e.Attraction > 50 ? 45.0 : 35.0, d * 0.4)),
+                    Closeness  = Clamp(Approach(e.Closeness,  35,                              d * 1.2)),
+                    Respect    = Clamp(Approach(e.Respect,    55,                              d * 0.3)),
+                    Comfort    = Clamp(Approach(e.Comfort,    45,                              d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5)
+                    // DomainBreakdown does not decay — domains are fixed by experience, not by time.
+                    // PositiveInteractionCount does not decay — it is a cumulative historical counter.
                 };
             }
 
@@ -286,7 +303,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             }
         }
 
-        #endregion Tick — časový decay
+        #endregion Tick — time decay
 
         #region RestoreState
 
@@ -295,13 +312,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
         #endregion RestoreState
 
-        #region Privátní metody — DomainBreakdown
+        #region Private methods — DomainBreakdown
 
         /// <summary>
-        /// Aktualizuje <see cref="DomainBreakdown"/> na základě typu řečového aktu.
+        /// Updates <see cref="DomainBreakdown"/> based on the type of speech act.
         /// </summary>
         /// <remarks>
-        /// Každý <see cref="SpeechAct"/> ovlivňuje jiné domény:
+        /// Each <see cref="SpeechAct"/> affects different domains:
         /// <list type="table">
         ///   <item><term>SmallTalk</term><description>Humor +1.5</description></item>
         ///   <item><term>Question</term><description>Intellect +2.0</description></item>
@@ -310,61 +327,79 @@ namespace GameEngineTools.Characters.Engines.Relationships
         ///   <item><term>Humor</term><description>Humor +2.5</description></item>
         ///   <item><term>Meta</term><description>Intellect +1.0</description></item>
         ///   <item><term>Invite</term><description>Physical +0.5</description></item>
-        ///   <item><term>Boundary</term><description>Values –1.0 (vymezení)</description></item>
+        ///   <item><term>Boundary</term><description>Values −1.0</description></item>
         /// </list>
-        /// Odmítnuté interakce mají efekt poloviční — zážitek je zaznamenán,
-        /// ale slabší (postava se uzavřela).
+        /// Rejected interactions have half the effect — the event is registered but weaker.
         /// </remarks>
-        /// <param name="bd">Stávající breakdown.</param>
-        /// <param name="act">Typ aktu z <see cref="InteractionOutcome.Act"/>.</param>
-        /// <param name="accepted">Zda byla interakce přijata.</param>
         private static DomainBreakdown ApplyDomainBoost(DomainBreakdown bd, SpeechAct act, bool accepted)
         {
-            // Odmítnuté interakce mají poloviční efekt na domény
             var mul = accepted ? 1.0 : 0.5;
 
             return act switch
             {
-                SpeechAct.SmallTalk => bd with { Humor = BumpD(bd.Humor, +1.5 * mul) },
-                SpeechAct.Question => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
-                SpeechAct.SelfDisclosure => bd with { Values = BumpD(bd.Values, +2.0 * mul) },
-                SpeechAct.Validation => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
-                SpeechAct.Humor => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
-                SpeechAct.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
-                SpeechAct.Invite => bd with { Physical = BumpD(bd.Physical, +0.5 * mul) },
-
-                // Boundary — vymezení hranic mírně snižuje Values vnímání
-                SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.0 * mul) },
-
-                _ => bd  // neznámý act → beze změny
+                SpeechAct.SmallTalk      => bd with { Humor     = BumpD(bd.Humor,     +1.5 * mul) },
+                SpeechAct.Question       => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
+                SpeechAct.SelfDisclosure => bd with { Values    = BumpD(bd.Values,    +2.0 * mul) },
+                SpeechAct.Validation     => bd with { Values    = BumpD(bd.Values,    +1.0 * mul) },
+                SpeechAct.Humor          => bd with { Humor     = BumpD(bd.Humor,     +2.5 * mul) },
+                SpeechAct.Meta           => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
+                SpeechAct.Invite         => bd with { Physical  = BumpD(bd.Physical,  +0.5 * mul) },
+                SpeechAct.Boundary       => bd with { Values    = BumpD(bd.Values,    -1.0 * mul) },
+                _                        => bd
             };
         }
 
-        #endregion Privátní metody — DomainBreakdown
+        #endregion Private methods — DomainBreakdown
 
-        #region Privátní metody — pomocné
+        #region Private methods — mere-exposure
 
         /// <summary>
-        /// Vytvoří hranu pokud ještě neexistuje (bez jiné mutace).
-        /// Odděleno od <see cref="Upsert"/> pro čitelnost switch větví.
+        /// Computes the total mere-exposure attraction bonus for a given interaction count.
+        /// Logarithmic growth: fast early, levels off near <see cref="RelationshipsConfig.MereExposureSaturation"/>.
+        /// </summary>
+        /// <param name="count">Total positive interactions so far.</param>
+        /// <param name="config">Engine configuration.</param>
+        /// <returns>Total bonus in [0, <see cref="RelationshipsConfig.MereExposureMaxBoost"/>].</returns>
+        private static double MereExposureBoost(int count, RelationshipsConfig config)
+        {
+            if (count <= 0)
+            {
+                return 0.0;
+            }
+
+            var saturation = Math.Log(1.0 + count)
+                           / Math.Log(1.0 + config.MereExposureSaturation);
+
+            return Math.Clamp(saturation * config.MereExposureMaxBoost, 0.0, config.MereExposureMaxBoost);
+        }
+
+        #endregion Private methods — mere-exposure
+
+        #region Private methods — helpers
+
+        /// <summary>
+        /// Ensures an edge exists for <paramref name="other"/> without applying any mutation.
+        /// Separated from <see cref="Upsert"/> for clarity in switch branches.
         /// </summary>
         private void EnsureEdge(HumanId self, HumanId other)
         {
             if (!State.Edges.ContainsKey(other))
+            {
                 Upsert(self, other, e => e);
+            }
         }
 
         private static double TouchBoost(TouchLevel level) => level switch
         {
-            TouchLevel.Light => +1.5,
+            TouchLevel.Light    => +1.5,
             TouchLevel.Friendly => +3.0,
             TouchLevel.Intimate => +5.0,
-            _ => 0.0
+            _                   =>  0.0
         };
 
         /// <summary>
-        /// Vloží nebo aktualizuje hranu v grafu vztahů.
-        /// Pokud hrana neexistuje, inicializuje ji s neutrálními výchozími hodnotami.
+        /// Inserts or updates an edge in the relationship graph.
+        /// If the edge does not exist, initialises it with neutral default values.
         /// </summary>
         private void Upsert(HumanId self, HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
         {
@@ -372,11 +407,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             if (!dict.TryGetValue(other, out var e))
             {
-                // Neutrální výchozí hodnoty pro neznámého člověka
+                // Neutral defaults for an unknown person
                 e = new RelationshipEdge(
                     A: self, B: other,
-                    Like: 45, Trust: 45, Attraction: 35, Closeness: 10, Respect: 55, Comfort: 40,
-                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
+                    Like: 45, Trust: 45, Attraction: 35,
+                    Closeness: 10, Respect: 55, Comfort: 40,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 0);
 
                 using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
                 {
@@ -398,35 +435,31 @@ namespace GameEngineTools.Characters.Engines.Relationships
             State = new RelationshipState(dict);
         }
 
-        /// <summary>
-        /// Posune hodnotu o <paramref name="by"/> a ořízne na [0, 100].
-        /// Používá se pro hlavní dimenze vztahu (Like, Trust…).
-        /// </summary>
-        private static double Bump(double v, double by) => Math.Max(0, Math.Min(100, v + by));
+        /// <summary>Bumps a primary relationship dimension by <paramref name="by"/> and clamps to [0, 100].</summary>
+        private static double Bump(double v, double by)
+            => Math.Max(0, Math.Min(100, v + by));
+
+        /// <summary>Bumps a domain breakdown value by <paramref name="by"/> and clamps to [0, 100].</summary>
+        private static double BumpD(double v, double by)
+            => Math.Max(0, Math.Min(100, v + by));
+
+        /// <summary>Linear interpolation — used during first impression for smooth blending.</summary>
+        private static double Lerp(double a, double b, double t)
+            => a + (b - a) * Math.Clamp(t, 0, 1);
+
+        /// <summary>Clamps a value to [0, 100].</summary>
+        private static double Clamp(double v)
+            => Math.Max(0, Math.Min(100, v));
 
         /// <summary>
-        /// Posune hodnotu DomainBreakdown o <paramref name="by"/> a ořízne na [0, 100].
-        /// Odděleno od <see cref="Bump"/> pro explicitnost — domény mají stejný rozsah.
-        /// </summary>
-        private static double BumpD(double v, double by) => Math.Max(0, Math.Min(100, v + by));
-
-        /// <summary>
-        /// Lineární interpolace — používá se při prvním dojmu pro plynulý přechod.
-        /// </summary>
-        private static double Lerp(double a, double b, double t) => a + (b - a) * Math.Clamp(t, 0, 1);
-
-        /// <summary>Clamp na rozsah [0, 100].</summary>
-        private static double Clamp(double v) => Math.Max(0, Math.Min(100, v));
-
-        /// <summary>
-        /// Tíhnutí hodnoty ke středové hodnotě — simuluje zapomínání bez kontaktu.
-        /// Pokud je <paramref name="cur"/> pod targetem, hodnota roste, jinak klesá.
+        /// Drifts <paramref name="cur"/> toward <paramref name="target"/> by at most <paramref name="amount"/>.
+        /// Models forgetting without contact.
         /// </summary>
         private static double Approach(double cur, double target, double amount)
             => cur < target
                 ? Math.Min(target, cur + amount)
                 : Math.Max(target, cur - amount);
 
-        #endregion Privátní metody — pomocné
+        #endregion Private methods — helpers
     }
 }
