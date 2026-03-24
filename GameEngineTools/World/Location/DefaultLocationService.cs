@@ -18,6 +18,15 @@ namespace GameEngineTools.World.Location
     /// </summary>
     public sealed class DefaultLocationService : ILocationService
     {
+        #region Public Methods
+        /// <inheritdoc/>
+        public IReadOnlyList<HumanId> GetCharactersAt(string locationId)
+            => _characterLocation
+                .Where(kv => kv.Value == locationId)
+                .Select(kv => kv.Key)
+                .ToList();
+        #endregion
+
         #region Private state
 
         /// <summary>Registered location descriptors, keyed by location id.</summary>

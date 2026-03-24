@@ -101,6 +101,14 @@ namespace GameEngineTools.World.Location
         /// or null if the character has not been placed yet.
         /// </summary>
         string? GetLocation(HumanId characterId);
+
+        /// <summary>
+        /// Returns the ids of all characters currently assigned to the given location.
+        /// Returns an empty collection if the location is unknown or has no characters.
+        /// </summary>
+        /// <param name="locationId">The location to query.</param>
+        IReadOnlyList<HumanId> GetCharactersAt(string locationId);
+
     }
 
     #endregion

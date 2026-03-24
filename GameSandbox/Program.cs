@@ -92,7 +92,7 @@ locationService.RegisterLocation(new LocationDescriptor(
     AllowsPrivacy: false));
 
 locationService.RegisterLocation(new LocationDescriptor(
-    Id: "castle",
+    Id: "castle_hall",
     DisplayName: "Castle Hall",
     BaseNoise: 0.1,
     NoisePerPerson: 0.02,
@@ -101,6 +101,11 @@ locationService.RegisterLocation(new LocationDescriptor(
 
 locationService.MoveCharacter(playerPerson.Id, "village_square");
 locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
+
+foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != significantOtherPerson.Id))
+{
+    locationService.MoveCharacter(npc.Person.Id, "village_square");
+}
 
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
@@ -138,41 +143,18 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
 
     OnTick = (now, chars) =>
     {
-        var p = chars[0];
-        var so = chars[1];
-
-        // ── First impression — computed from attraction profile, fired once ────
-        // Only when the relationship edge does not yet exist.
-        if (!p.Snapshot.Relationships.Edges.ContainsKey(so.Id))
-        {
-            var soView = AppearanceProjector.Compute(so.PhysicalAppearance, so.Snapshot.Physiology, so.Biology);
-            var pView = AppearanceProjector.Compute(p.PhysicalAppearance, p.Snapshot.Physiology, p.Biology);
-
-            var pResult = p.AttractionProfile is not null
-                ? attractionCalculator.Calculate(p.AttractionProfile, so.PhysicalAppearance, soView, so.Biology, observerValence: p.Snapshot.Psychology.Valence)
-                : AttractionResult.Neutral;
-
-            var soResult = so.AttractionProfile is not null
-                ? attractionCalculator.Calculate(so.AttractionProfile, p.PhysicalAppearance, pView, p.Biology, observerValence: so.Snapshot.Psychology.Valence)
-                : AttractionResult.Neutral;
-
-            p.ReceiveEvent(new FirstImpressionFormed(now, p.Id, so.Id, pResult.FirstImpressionLike, pResult.Score));
-            so.ReceiveEvent(new FirstImpressionFormed(now, so.Id, p.Id, soResult.FirstImpressionLike, soResult.Score));
-        }
+        // ── First impressions — all unmet pairs sharing a location ────────────
+        // Replaces the old hardcoded p/so pair check.
+        FireFirstImpressions(now, chars, attractionCalculator, locationService);
 
         // ── Location context — move both to Castle on day 16, evening ─────────
-        // This is a narrative beat: a shared environment that enables intimacy.
-        // HasPrivacy=true, low noise, low crowding.
         if (now.Day is 16 && now.Hour is 20)
         {
-            locationService.MoveCharacter(playerPerson.Id, "castle");
-            locationService.MoveCharacter(significantOtherPerson.Id, "castle");
+            locationService.MoveCharacter(playerPerson.Id, "castle_hall");
+            locationService.MoveCharacter(significantOtherPerson.Id, "castle_hall");
         }
 
         // ── ReachOut routing — dynamic, relationship-aware ────────────────────
-        // When a character decides to ReachOut, we translate that into a concrete
-        // InteractionProposed. The SpeechAct is chosen based on how close the
-        // characters already are — shallow early on, deeper as trust grows.
         foreach (var character in chars)
         {
             var reachOut = character.LastOutbox
@@ -182,27 +164,38 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
             if (reachOut is null)
                 continue;
 
-            var target = chars.FirstOrDefault(c =>
-                c.Id != character.Id &&
-                c.Snapshot.InteractionSurface.Location == character.Snapshot.InteractionSurface.Location);
-
-            if (target is null)
+            // Ask the location service who is in the same location right now.
+            var locationId = locationService.GetLocation(character.Id);
+            if (locationId is null)
                 continue;
 
-            var edge = character.Snapshot.Relationships.Edges.GetValueOrDefault(target.Id);
-            var act = ChooseSpeechAct(edge, rng);
+            var candidates = locationService
+                .GetCharactersAt(locationId)
+                .Where(id => id != character.Id)
+                .Select(id => chars.FirstOrDefault(c => c.Id == id))
+                .OfType<IHuman>()
+                .ToList();
+
+            if (candidates.Count == 0)
+                continue;
+
+            // Weighted random — prefer characters the initiator likes,
+            // but keep a chance to approach a stranger.
+            // Unknown character gets neutral weight 45 — openness to strangers.
+            var target = PickWeightedRandom(candidates, c =>
+            {
+                var edge = character.Snapshot.Relationships.Edges.GetValueOrDefault(c.Id);
+                return edge?.Like ?? 45.0;
+            }, rng);
+
+            var targetEdge = character.Snapshot.Relationships.Edges.GetValueOrDefault(target.Id);
+            var act = ChooseSpeechAct(targetEdge, rng);
 
             target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null));
-
-            // Physical contact attempt — only when emotionally close enough.
-            // Probability is intentionally low to model the rarity of these moments.
             TryTouch(now, character, target, rng);
         }
 
         // ── Organic MicroPositive — witnessing effort ─────────────────────────
-        // When a character finishes a creative or productive action and the other
-        // is in the same location, there is a small chance of a spontaneous
-        // positive micro-interaction (noticing, encouraging).
         foreach (var character in chars)
         {
             var justCreated = character.LastOutbox
@@ -212,15 +205,25 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
             if (!justCreated)
                 continue;
 
-            var witness = chars.FirstOrDefault(c =>
-                c.Id != character.Id &&
-                c.Snapshot.InteractionSurface.Location == character.Snapshot.InteractionSurface.Location);
+            var locationId = locationService.GetLocation(character.Id);
+            if (locationId is null)
+                continue;
 
-            // 30% chance: witness notices and reacts positively
-            if (witness is not null && rng.NextDouble() < 0.30)
-            {
+            var witnesses = locationService
+                .GetCharactersAt(locationId)
+                .Where(id => id != character.Id)
+                .Select(id => chars.FirstOrDefault(c => c.Id == id))
+                .OfType<IHuman>()
+                .ToList();
+
+            if (witnesses.Count == 0)
+                continue;
+
+            // Pick one random witness — only one MicroPositive per creative action.
+            var witness = witnesses[rng.Next(witnesses.Count)];
+
+            if (rng.NextDouble() < 0.30)
                 character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, "noticed your work"));
-            }
         }
     }
 });
@@ -341,4 +344,97 @@ static void AddDiaryEntry(StringBuilder stringBuilder, string entry)
 {
     Console.WriteLine(entry);
     stringBuilder.AppendLine(entry);
+}
+
+/// <summary>
+/// Selects one element from <paramref name="candidates"/> using weighted random sampling.
+/// Higher weight means higher probability of being selected.
+/// Falls back to uniform random when all weights are zero.
+/// </summary>
+/// <typeparam name="T">Element type.</typeparam>
+/// <param name="candidates">Non-empty list of candidates.</param>
+/// <param name="weight">Weight function — must return a non-negative value.</param>
+/// <param name="rng">Random source.</param>
+static T PickWeightedRandom<T>(IReadOnlyList<T> candidates, Func<T, double> weight, Random rng)
+{
+    var totalWeight = candidates.Sum(weight);
+
+    // Uniform fallback when all weights are zero (e.g. all strangers with Like=0)
+    if (totalWeight <= 0)
+        return candidates[rng.Next(candidates.Count)];
+
+    var threshold = rng.NextDouble() * totalWeight;
+    var accumulated = 0.0;
+
+    foreach (var candidate in candidates)
+    {
+        accumulated += weight(candidate);
+        if (accumulated >= threshold)
+            return candidate;
+    }
+
+    // Floating-point safety net — return last element
+    return candidates[^1];
+}
+
+/// <summary>
+/// Fires <see cref="FirstImpressionFormed"/> for every pair of characters
+/// that share a location and have not yet met (no relationship edge exists).
+/// Each pair is processed exactly once — A→B and B→A in a single pass.
+/// </summary>
+/// <param name="now">Current simulation time.</param>
+/// <param name="chars">All characters in the scene.</param>
+/// <param name="calculator">Shared attraction calculator singleton.</param>
+/// <param name="locations">Location service — used to group characters by place.</param>
+static void FireFirstImpressions(
+    WDateTime now,
+    IReadOnlyList<IHuman> chars,
+    IAttractionCalculator calculator,
+    ILocationService locations)
+{
+    // Build a lookup: HumanId → IHuman for O(1) resolve inside the loop.
+    var byId = chars.ToDictionary(c => c.Id);
+
+    // Get all registered location ids that have at least one character.
+    var occupiedLocations = chars
+        .Select(c => locations.GetLocation(c.Id))
+        .Where(loc => loc is not null)
+        .Distinct()!;
+
+    foreach (var locationId in occupiedLocations)
+    {
+        var ids = locations.GetCharactersAt(locationId);
+
+        // Iterate every unique pair (i, j) — no duplicates, no self-pairs.
+        for (var i = 0; i < ids.Count; i++)
+            for (var j = i + 1; j < ids.Count; j++)
+            {
+                if (!byId.TryGetValue(ids[i], out var a)) continue;
+                if (!byId.TryGetValue(ids[j], out var b)) continue;
+
+                // Skip pairs that already have a relationship edge — they have already met.
+                if (a.Snapshot.Relationships.Edges.ContainsKey(b.Id))
+                    continue;
+
+                var viewA = AppearanceProjector.Compute(a.PhysicalAppearance, a.Snapshot.Physiology, a.Biology);
+                var viewB = AppearanceProjector.Compute(b.PhysicalAppearance, b.Snapshot.Physiology, b.Biology);
+
+                // A sees B
+                var aResult = a.AttractionProfile is not null
+                    ? calculator.Calculate(a.AttractionProfile, b.PhysicalAppearance, viewB, b.Biology,
+                                           observerValence: a.Snapshot.Psychology.Valence)
+                    : AttractionResult.Neutral;
+
+                // B sees A
+                var bResult = b.AttractionProfile is not null
+                    ? calculator.Calculate(b.AttractionProfile, a.PhysicalAppearance, viewA, a.Biology,
+                                           observerValence: b.Snapshot.Psychology.Valence)
+                    : AttractionResult.Neutral;
+
+                a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
+                    aResult.FirstImpressionLike, aResult.Score));
+                b.ReceiveEvent(new FirstImpressionFormed(now, b.Id, a.Id,
+                    bResult.FirstImpressionLike, bResult.Score));
+            }
+    }
 }
