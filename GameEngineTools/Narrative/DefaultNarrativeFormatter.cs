@@ -573,7 +573,7 @@ namespace GameEngineTools.Narrative
             return action switch
             {
                 "ReachOut" => $"{Conj("hledat", VerbAspect.Perfective, Tense.Past, VerbClass.Class5, actor.IsFemale)} společnost",
-                "InviteIntimacy" => $"{Conj("projevit", VerbAspect.Perfective, Tense.Past, VerbClass.Class3, actor.IsFemale)} zájem o intimitu",
+                "InviteIntimacy" => $"{Conj("projevit", VerbAspect.Perfective, Tense.Past, VerbClass.Class4, actor.IsFemale)} zájem o intimitu",
                 // Rutinní akce (Eat, Drink, Sleep, SelfCare) — nízká narativní hodnota
                 // → null = ticho, do deníku vzpomínek je nevypíšeme
                 _ => null
