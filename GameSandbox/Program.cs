@@ -44,7 +44,6 @@ var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
 var attractionCalculator = (DefaultAttractionCalculator)runtime.Services.GetRequiredService<IAttractionCalculator>();
-var random = runtime.Services.GetRequiredService<IRandomSource>();
 
 // ── Characters ────────────────────────────────────────────────────────────────
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
@@ -61,8 +60,8 @@ foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
 var significantOther = manager.Characters
     .Where(npc => npc is NPC
         && npc.Person.Biology != player.Person.Biology
-        && npc.Age >= 16
-        && Math.Abs(npc.Age - player.Age) <= 5)
+        && (npc.Age >= 16
+        || Math.Abs(npc.Age - player.Age) <= 5))
     .FirstOrDefault();
 
 if (significantOther is null)
@@ -75,6 +74,11 @@ var playerPerson = player.Person;
 var significantOtherPerson = significantOther.Person;
 
 var diary = new List<NarrativeEntry>();
+
+// Shared random source for OnTick scene logic.
+// IHuman does not expose IRandomSource — that lives on IHumanContext (engine-internal).
+// System.Random is sufficient here: scene-level decisions are not deterministic anyway.
+var rng = new Random();
 
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
@@ -165,13 +169,13 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
                 continue;
 
             var edge = character.Snapshot.Relationships.Edges.GetValueOrDefault(target.Id);
-            var act = ChooseSpeechAct(edge, random);
+            var act = ChooseSpeechAct(edge, rng);
 
             target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null));
 
             // Physical contact attempt — only when emotionally close enough.
             // Probability is intentionally low to model the rarity of these moments.
-            TryTouch(now, character, target, random);
+            TryTouch(now, character, target, rng);
         }
 
         // ── Organic MicroPositive — witnessing effort ─────────────────────────
@@ -192,7 +196,7 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
                 c.Snapshot.InteractionSurface.Location == character.Snapshot.InteractionSurface.Location);
 
             // 30% chance: witness notices and reacts positively
-            if (witness is not null && random.Chance(0.30))
+            if (witness is not null && rng.NextDouble() < 0.30)
             {
                 character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, "noticed your work"));
             }
@@ -252,7 +256,7 @@ Console.ReadKey();
 /// <param name="edge">Current relationship edge, or <c>null</c> if characters have not met.</param>
 /// <param name="rng">Random source from the initiating character's context.</param>
 /// <returns>The most contextually appropriate <see cref="SpeechAct"/>.</returns>
-static SpeechAct ChooseSpeechAct(RelationshipEdge? edge, IRandomSource rng)
+static SpeechAct ChooseSpeechAct(RelationshipEdge? edge, Random rng)
 {
     // Strangers or very early acquaintance — safe, low-risk opening
     if (edge is null || edge.Closeness < 20)
@@ -260,19 +264,19 @@ static SpeechAct ChooseSpeechAct(RelationshipEdge? edge, IRandomSource rng)
 
     // Getting to know each other — curiosity starts showing
     if (edge.Closeness < 40)
-        return rng.Chance(0.40) ? SpeechAct.Question : SpeechAct.SmallTalk;
+        return rng.NextDouble() < 0.40 ? SpeechAct.Question : SpeechAct.SmallTalk;
 
     // Established acquaintance — humor and deeper curiosity become natural
     if (edge.Closeness < 60)
     {
-        if (rng.Chance(0.30)) return SpeechAct.SelfDisclosure;
-        if (rng.Chance(0.40)) return SpeechAct.Humor;
+        if (rng.NextDouble() < 0.30) return SpeechAct.SelfDisclosure;
+        if (rng.NextDouble() < 0.40) return SpeechAct.Humor;
         return SpeechAct.Question;
     }
 
     // Close relationship — validation, meta-commentary, vulnerability
-    if (rng.Chance(0.25)) return SpeechAct.Validation;
-    if (rng.Chance(0.35)) return SpeechAct.SelfDisclosure;
+    if (rng.NextDouble() < 0.25) return SpeechAct.Validation;
+    if (rng.NextDouble() < 0.35) return SpeechAct.SelfDisclosure;
     return SpeechAct.Meta;
 }
 
@@ -288,7 +292,7 @@ static SpeechAct ChooseSpeechAct(RelationshipEdge? edge, IRandomSource rng)
 /// <param name="from">Initiating character.</param>
 /// <param name="to">Receiving character.</param>
 /// <param name="rng">Random source from the initiating character's context.</param>
-static void TryTouch(WDateTime now, IHuman from, IHuman to, IRandomSource rng)
+static void TryTouch(WDateTime now, IHuman from, IHuman to, Random rng)
 {
     var edge = from.Snapshot.Relationships.Edges.GetValueOrDefault(to.Id);
     if (edge is null)
@@ -298,7 +302,7 @@ static void TryTouch(WDateTime now, IHuman from, IHuman to, IRandomSource rng)
 
     // Light touch — shoulder, arm. Requires moderate closeness and comfort.
     // 12% base chance keeps it rare enough to feel meaningful.
-    if (edge.Closeness > 50 && edge.Comfort > 45 && rng.Chance(0.12))
+    if (edge.Closeness > 50 && edge.Comfort > 45 && rng.NextDouble() < 0.12)
     {
         to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, TouchLevel.Light));
         return; // One touch attempt per tick is enough
@@ -306,7 +310,7 @@ static void TryTouch(WDateTime now, IHuman from, IHuman to, IRandomSource rng)
 
     // Friendly touch — hug or equivalent. Requires deeper closeness, more attraction,
     // and privacy — open spaces make this socially awkward.
-    if (edge.Closeness > 70 && edge.Attraction > 55 && hasPrivacy && rng.Chance(0.07))
+    if (edge.Closeness > 70 && edge.Attraction > 55 && hasPrivacy && rng.NextDouble() < 0.07)
     {
         to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, TouchLevel.Friendly));
     }
