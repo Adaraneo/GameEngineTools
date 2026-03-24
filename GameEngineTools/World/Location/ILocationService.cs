@@ -10,6 +10,28 @@ namespace GameEngineTools.World.Location
     #region Location data types
 
     /// <summary>
+    /// Broad category of a location — used by <see cref="ILocationService.GetLocationsByType"/>
+    /// and by <see cref="DefaultBehaviorEngine"/> when emitting <c>MoveTo:*</c> actions.
+    /// </summary>
+    public enum LocationType
+    {
+        /// <summary>Open social spaces — tavern, square, market.</summary>
+        Social,
+
+        /// <summary>Quiet spaces for focus or intimacy — library, private room.</summary>
+        Private,
+
+        /// <summary>Spaces tied to productive activity — workshop, forge, study.</summary>
+        Work,
+
+        /// <summary>Spaces for recovery — inn, home.</summary>
+        Rest,
+
+        /// <summary>Large public spaces with no dominant character — roads, fields.</summary>
+        Public
+    }
+
+    /// <summary>
     /// Static descriptor of a named location in the world.
     /// Defines the baseline acoustic and social character of a place
     /// before any characters arrive.
@@ -38,7 +60,8 @@ namespace GameEngineTools.World.Location
         double BaseNoise,
         double NoisePerPerson,
         int Capacity,
-        bool AllowsPrivacy);
+        bool AllowsPrivacy,
+        LocationType Type);
 
     #endregion
 
@@ -109,6 +132,12 @@ namespace GameEngineTools.World.Location
         /// <param name="locationId">The location to query.</param>
         IReadOnlyList<HumanId> GetCharactersAt(string locationId);
 
+        /// <summary>
+        /// Returns the ids of all registered locations with the given type.
+        /// Returns an empty list if no locations of that type have been registered.
+        /// </summary>
+        /// <param name="type">The location type to query.</param>
+        IReadOnlyList<string> GetLocationsByType(LocationType type);
     }
 
     #endregion

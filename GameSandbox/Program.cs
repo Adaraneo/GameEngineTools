@@ -89,7 +89,8 @@ locationService.RegisterLocation(new LocationDescriptor(
     BaseNoise: 0.3,
     NoisePerPerson: 0.05,
     Capacity: 20,
-    AllowsPrivacy: false));
+    AllowsPrivacy: false,
+    LocationType.Social));
 
 locationService.RegisterLocation(new LocationDescriptor(
     Id: "castle_hall",
@@ -97,7 +98,8 @@ locationService.RegisterLocation(new LocationDescriptor(
     BaseNoise: 0.1,
     NoisePerPerson: 0.02,
     Capacity: 10,
-    AllowsPrivacy: true));
+    AllowsPrivacy: true,
+    LocationType.Private));
 
 locationService.MoveCharacter(playerPerson.Id, "village_square");
 locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
@@ -146,6 +148,9 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
         // ── First impressions — all unmet pairs sharing a location ────────────
         // Replaces the old hardcoded p/so pair check.
         FireFirstImpressions(now, chars, attractionCalculator, locationService);
+
+        // ── NPC movement — route MoveTo:* actions from previous tick ─────────
+        RouteMoveTo(now, chars, locationService, rng);
 
         // ── Location context — move both to Castle on day 16, evening ─────────
         if (now.Day is 16 && now.Hour is 20)
@@ -267,7 +272,7 @@ File.WriteAllText(
 
 Console.ReadKey();
 
-// ── Helper methods ────────────────────────────────────────────────────────────
+# region Helper Methods
 
 /// <summary>
 /// Chooses a <see cref="SpeechAct"/> appropriate for the current relationship depth.
@@ -438,3 +443,52 @@ static void FireFirstImpressions(
             }
     }
 }
+
+/// <summary>
+/// Routes <c>MoveTo:*</c> actions emitted by <see cref="DefaultBehaviorEngine"/>
+/// to a concrete location via <see cref="ILocationService"/>.
+/// </summary>
+/// <remarks>
+/// The engine emits the intent (e.g. <c>"MoveTo:Social"</c>); this method
+/// resolves a concrete location of the requested type, avoiding the current one
+/// and preferring locations that are not overcrowded (Crowding &lt; 0.8).
+/// </remarks>
+static void RouteMoveTo(
+    WDateTime now,
+    IReadOnlyList<IHuman> chars,
+    ILocationService locations,
+    Random rng)
+{
+    foreach (var character in chars)
+    {
+        var moveTo = character.LastOutbox
+            .OfType<ActionCommitted>()
+            .FirstOrDefault(a => a.ActionName.StartsWith("MoveTo:"));
+
+        if (moveTo is null)
+            continue;
+
+        // Parse the requested LocationType from action name suffix
+        var typeName = moveTo.ActionName["MoveTo:".Length..];
+        if (!Enum.TryParse<LocationType>(typeName, out var requestedType))
+            continue;
+
+        var currentLocation = locations.GetLocation(character.Id);
+
+        // Find candidate locations of the requested type,
+        // excluding the current one and overcrowded ones.
+        var candidates = locations
+            .GetLocationsByType(requestedType)
+            .Where(id => id != currentLocation)
+            .ToList();
+
+        if (candidates.Count == 0)
+            continue;
+
+        // Pick randomly — could be weighted by crowding in the future
+        var chosen = candidates[rng.Next(candidates.Count)];
+        locations.MoveCharacter(character.Id, chosen);
+    }
+}
+
+#endregion

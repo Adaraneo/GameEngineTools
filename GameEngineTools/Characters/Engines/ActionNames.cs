@@ -16,5 +16,11 @@ namespace GameEngineTools.Characters.Engines
         public const string Flee = "Flee";
         public const string Fight = "Fight";
         public const string Idle = "Idle";
+
+        public const string MoveToSocial = "MoveTo:Social";
+        public const string MoveToPrivate = "MoveTo:Private";
+        public const string MoveToWork = "MoveTo:Work";
+        public const string MoveToRest = "MoveTo:Rest";
+        public const string MoveToPublic = "MoveTo:Public";
     }
 }

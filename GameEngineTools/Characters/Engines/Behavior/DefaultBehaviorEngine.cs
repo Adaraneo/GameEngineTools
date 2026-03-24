@@ -8,7 +8,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -77,6 +79,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 { Drink,          ActionCategory.Biological  },
                 { SelfCare,       ActionCategory.Biological  },
                 { Idle,           ActionCategory.Rest        },
+                { MoveToSocial,  ActionCategory.Social },
+                { MoveToPrivate, ActionCategory.Rest   },
+                { MoveToWork,    ActionCategory.Productive },
+                { MoveToRest,    ActionCategory.Rest   },
+                { MoveToPublic,  ActionCategory.Social },
             };
 
         #endregion Statické konstanty — kategorie akcí
@@ -378,6 +385,44 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 (Idle,           Util(10,           0.3),                                    WTimeSpan.FromMinutes(30))
             };
 
+            // ── MoveTo candidates ──────────────────────────────────────────────────────
+            // Read current environment from snapshot — safe NaN guards for unplaced characters.
+            var surface = ctx.Snapshot.InteractionSurface;
+            var noise = double.IsNaN(surface.Noise) ? 0.5 : surface.Noise;
+            var crowding = double.IsNaN(surface.Crowding) ? 0.5 : surface.Crowding;
+
+            // Escape drive: high noise + high stress pushes the character toward quieter spaces.
+            // Max contribution: (1.0-0.5)*2 * (100/100) * 20 = 20.
+            var noiseStress = Math.Max(0, noise - 0.5) * 2.0
+                            * (ctx.Snapshot.Psychology.Stress / 100.0)
+                            * 20.0;
+
+            // Chronotype bonus: peaks near the character's natural active hour (0..15).
+            var chronoBonus = ComputeChronoBonus(now, ctx.Personality.Chronotype);
+
+            // Social pull: want company when lonely AND current location is not already crowded.
+            // Multiplying by (1 - crowding) prevents seeking a social space when already in one.
+            var socialPull = needBel * ctx.Personality.Motivation.Affiliation
+                           * Math.Max(0, 1.0 - crowding);
+
+            candidates.AddRange(new[]
+            {
+                // MoveTo:Social  — driven by loneliness + time-of-day peak
+                (MoveToSocial,  socialPull  + chronoBonus,        WTimeSpan.FromMinutes(20)),
+
+                // MoveTo:Private — driven by noise/stress escape + weak evening pull
+                (MoveToPrivate, noiseStress + chronoBonus * 0.5,  WTimeSpan.FromMinutes(20)),
+
+                // MoveTo:Work    — weak pull from competence need + chrono peak
+                (MoveToWork,    needComp    * 0.3 + chronoBonus,  WTimeSpan.FromMinutes(20)),
+
+                // MoveTo:Rest    — gentler version of escape, no chrono component
+                (MoveToRest,    noiseStress * 0.5,                WTimeSpan.FromMinutes(20)),
+
+                // MoveTo:Public  — low-intensity wandering during active chrono hours
+                (MoveToPublic,  chronoBonus * 0.4,                WTimeSpan.FromMinutes(20)),
+            });
+
             // Běžící akce ještě neskončila — ponech ji
             if (State.CurrentPlan is { } running)
             {
@@ -643,6 +688,33 @@ namespace GameEngineTools.Characters.Engines.Behavior
             {
                 SetCooldown(owner, chosen, hours);
             }
+        }
+
+        /// <summary>
+        /// Computes a time-of-day movement bonus based on the character's chronotype.
+        /// Morning types get a bonus toward social/work locations early in the day;
+        /// evening types peak later.
+        /// </summary>
+        /// <param name="now">Current simulation time.</param>
+        /// <param name="chronotype">The character's chronotype.</param>
+        /// <returns>A bonus in [0, 15] — higher means stronger urge to move right now.</returns>
+        private static double ComputeChronoBonus(WDateTime now, Chronotype chronotype)
+        {
+            // Peak hour: when this chronotype is most "active" and likely to seek a new space.
+            // Lark → peak at hour 8, Owl → peak at hour 20, Neutral → peak at hour 13.
+            var peakHour = chronotype switch
+            {
+                Chronotype.Lark => 8.0,
+                Chronotype.Owl => 20.0,
+                _ => 13.0
+            };
+
+            // Triangular proximity to peak — full bonus within ±2 hours of peak.
+            var distance = Math.Abs(now.Hour - peakHour);
+            if (distance > 6.0)
+                return 0.0;
+
+            return Math.Max(0.0, 15.0 * (1.0 - distance / 6.0));
         }
 
         /// <summary>Vypočítá utility akce: potřeba × (0.5 + váha motivace).</summary>

@@ -48,7 +48,8 @@ namespace EngineTests
             BaseNoise: 0.05,
             NoisePerPerson: 0.02,
             Capacity: 10,
-            AllowsPrivacy: true);
+            AllowsPrivacy: true,
+            LocationType.Work);
 
         private static readonly LocationDescriptor Tavern = new LocationDescriptor(
             Id: "tavern",
@@ -56,7 +57,8 @@ namespace EngineTests
             BaseNoise: 0.4,
             NoisePerPerson: 0.05,
             Capacity: 20,
-            AllowsPrivacy: false);
+            AllowsPrivacy: false,
+            LocationType.Social);
 
         private static readonly LocationDescriptor Square = new LocationDescriptor(
             Id: "square",
@@ -64,7 +66,8 @@ namespace EngineTests
             BaseNoise: 0.3,
             NoisePerPerson: 0.03,
             Capacity: 50,
-            AllowsPrivacy: false);
+            AllowsPrivacy: false,
+            LocationType.Social);
 
         /// <summary>Shared simulation time — the exact value is irrelevant, kept consistent across tests.</summary>
         private static readonly WDateTime Now = new WDateTime(0);

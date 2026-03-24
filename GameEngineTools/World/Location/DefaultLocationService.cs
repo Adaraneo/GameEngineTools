@@ -25,6 +25,13 @@ namespace GameEngineTools.World.Location
                 .Where(kv => kv.Value == locationId)
                 .Select(kv => kv.Key)
                 .ToList();
+
+        /// <inheritdoc/>
+        public IReadOnlyList<string> GetLocationsByType(LocationType type)
+            => _descriptors.Values
+                .Where(d => d.Type == type)
+                .Select(d => d.Id)
+                .ToList();
         #endregion
 
         #region Private state
