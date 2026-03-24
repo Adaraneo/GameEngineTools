@@ -455,7 +455,7 @@ namespace GameEngineTools.Narrative
                 "Sleep:Nightmare" => FormatNightmareMemory(me.What),
 
                 // Action:Sleep, Action:Eat...
-                var h when h.StartsWith("Action:") => FormatActionMemory(me.What),
+                var h when h.StartsWith("Action:") => FormatActionMemory(me.What, actor),
 
                 // Neznámý formát — fallback, ticho je lepší než nesmysl
                 _ => null
@@ -566,14 +566,14 @@ namespace GameEngineTools.Narrative
                 : "noční můra";
         }
 
-        private static string? FormatActionMemory(string what)
+        private string? FormatActionMemory(string what, NarrativeCharacterInfo actor)
         {
             // Action:ReachOut, Action:Sleep...
             var action = MemoryWhatParser.GetHeader(what).Split(':')[1];
             return action switch
             {
-                "ReachOut" => "hledal/a společnost",
-                "InviteIntimacy" => "projevil/a zájem o intimitu",
+                "ReachOut" => $"{Conj("hledat", VerbAspect.Perfective, Tense.Past, VerbClass.Class5, actor.IsFemale)} společnost",
+                "InviteIntimacy" => $"{Conj("projevit", VerbAspect.Perfective, Tense.Past, VerbClass.Class3, actor.IsFemale)} zájem o intimitu",
                 // Rutinní akce (Eat, Drink, Sleep, SelfCare) — nízká narativní hodnota
                 // → null = ticho, do deníku vzpomínek je nevypíšeme
                 _ => null
