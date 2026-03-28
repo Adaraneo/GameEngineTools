@@ -339,51 +339,30 @@ namespace EngineTests
         [TestMethod]
         public void Tick_MorningChronotype_PeakHourBoostsMoveToSocialOverOffPeak()
         {
-            // Arrange
-            //
-            // At peak (hour 8):   chronoBonus=15, MoveTo:Social = 20+15 = 35 > Work=10.8 → wins
-            // At off-peak (hour 20): chronoBonus=0, MoveTo:Social = 20+0  = 20 > Work=10.8 → still wins
-            //
-            // To make the difference visible we need Work to beat MoveTo:Social off-peak.
-            // Use Competence=0.5 so Work=50 at off-peak (no chrono), and confirm peak still wins.
-            //
-            // Actually simpler: just confirm peak chooses MoveTo:Social and off-peak does NOT.
-            // Use Competence=0.5 so off-peak Work=50 >> MoveTo:Social=20 → Work wins off-peak.
-            //
-            // Peak   (hour 8):  MoveTo:Social = 20 + 15 = 35, Work = 10.8 → MoveTo:Social wins ✓
-            // OffPeak (hour 20): MoveTo:Social = 20 + 0  = 20, Work = 50   → Work wins ✓
-            var ctxPeak    = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
+            // Peak   (hour 8):   chronoBonus=15, MoveTo:Social = 20+15 = 35, Work=10.8 → MoveTo wins
+            // OffPeak (hour 20): chronoBonus=0,  MoveTo:Social = 20+0  = 20, Work=50   → Work wins
+            var ctxPeak = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
                                          affiliation: 1.0, competence: 0.1, curiosity: 0.1,
                                          chronotype: Chronotype.Lark);
             var ctxOffPeak = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
                                          affiliation: 1.0, competence: 0.5, curiosity: 0.5,
                                          chronotype: Chronotype.Lark);
 
-            var enginePeak    = BuildEngine();
+            var enginePeak = BuildEngine();
             var engineOffPeak = BuildEngine();
-            var outboxPeak    = new EventCollector();
+            var outboxPeak = new EventCollector();
             var outboxOffPeak = new EventCollector();
 
-            // Act
-            enginePeak.Tick(Hour8,   WTimeSpan.FromHours(1), ctxPeak,    outboxPeak);
+            enginePeak.Tick(Hour8, WTimeSpan.FromHours(1), ctxPeak, outboxPeak);
             engineOffPeak.Tick(Hour20, WTimeSpan.FromHours(1), ctxOffPeak, outboxOffPeak);
 
-            // Assert — at peak the engine should be closer to MoveTo:Social than off-peak.
-            // We verify by checking ActionProposed utility values.
-            //var peakProposed    = outboxPeak.Drain().OfType<ActionProposed>()
-            //    .FirstOrDefault(a => a.ActionName == MoveToSocial);
-            //var offPeakProposed = outboxOffPeak.Drain().OfType<ActionProposed>()
-            //    .FirstOrDefault(a => a.ActionName == MoveToSocial);
-            var peakProposed = outboxPeak.Drain().OfType<ActionProposed>().Single();
-            var offPeakProposed = outboxOffPeak.Drain().OfType<ActionProposed>().Single();
+            var chosenPeak = outboxPeak.Drain().OfType<ActionCommitted>().Single();
+            var chosenOffPeak = outboxOffPeak.Drain().OfType<ActionCommitted>().Single();
 
-            Assert.IsNotNull(peakProposed,    "ActionProposed for MoveTo:Social must exist at peak.");
-            Assert.IsNotNull(offPeakProposed, "ActionProposed for MoveTo:Social must exist off-peak.");
-
-            Assert.IsTrue(
-                peakProposed.Utility > offPeakProposed.Utility,
-                $"Morning peak (hour 8) must yield higher MoveTo:Social utility than off-peak (hour 20). " +
-                $"Peak={peakProposed.Utility:F2}, OffPeak={offPeakProposed.Utility:F2}");
+            Assert.AreEqual(MoveToSocial, chosenPeak.ActionName,
+                $"Morning peak (hour 8) must choose MoveTo:Social. Chosen: {chosenPeak.ActionName}");
+            Assert.AreNotEqual(MoveToSocial, chosenOffPeak.ActionName,
+                $"Off-peak (hour 20, high competence) must NOT choose MoveTo:Social. Chosen: {chosenOffPeak.ActionName}");
         }
 
         /// <summary>
@@ -393,39 +372,30 @@ namespace EngineTests
         [TestMethod]
         public void Tick_EveningChronotype_PeakAt20HigherThanAt8()
         {
-            // Peak   (hour 20): chronoBonus=15, MoveTo:Social = 20+15 = 35 > Work=10.8 → wins
-            // OffPeak (hour 8):  chronoBonus=0,  MoveTo:Social = 20+0  = 20 < Work=50  → loses
+            // Peak   (hour 20): chronoBonus=15, MoveTo:Social = 20+15 = 35, Work=10.8 → MoveTo wins
+            // OffPeak (hour 8):  chronoBonus=0,  MoveTo:Social = 20+0  = 20, Work=50   → Work wins
             var ctxAt20 = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
                                        affiliation: 1.0, competence: 0.1, curiosity: 0.1,
                                        chronotype: Chronotype.Owl);
-            var ctxAt8  = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
+            var ctxAt8 = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
                                        affiliation: 1.0, competence: 0.5, curiosity: 0.5,
                                        chronotype: Chronotype.Owl);
 
             var engineAt20 = BuildEngine();
-            var engineAt8  = BuildEngine();
+            var engineAt8 = BuildEngine();
             var outboxAt20 = new EventCollector();
-            var outboxAt8  = new EventCollector();
+            var outboxAt8 = new EventCollector();
 
-            // Act
             engineAt20.Tick(Hour20, WTimeSpan.FromHours(1), ctxAt20, outboxAt20);
-            engineAt8.Tick(Hour8,   WTimeSpan.FromHours(1), ctxAt8,  outboxAt8);
+            engineAt8.Tick(Hour8, WTimeSpan.FromHours(1), ctxAt8, outboxAt8);
 
-            // Assert
-            //var proposedAt20 = outboxAt20.Drain().OfType<ActionProposed>()
-            //    .FirstOrDefault(a => a.ActionName == MoveToSocial);
-            //var proposedAt8  = outboxAt8.Drain().OfType<ActionProposed>()
-            //    .FirstOrDefault(a => a.ActionName == MoveToSocial);
-            var proposedAt20 = outboxAt20.Drain().OfType<ActionProposed>().Single();
-            var proposedAt8 = outboxAt8.Drain().OfType<ActionProposed>().Single();
+            var chosenAt20 = outboxAt20.Drain().OfType<ActionCommitted>().Single();
+            var chosenAt8 = outboxAt8.Drain().OfType<ActionCommitted>().Single();
 
-            Assert.IsNotNull(proposedAt20, "ActionProposed for MoveTo:Social must exist at hour 20.");
-            Assert.IsNotNull(proposedAt8,  "ActionProposed for MoveTo:Social must exist at hour 8.");
-
-            Assert.IsTrue(
-                proposedAt20.Utility > proposedAt8.Utility,
-                $"Evening chronotype must have higher MoveTo:Social at hour 20 than hour 8. " +
-                $"At20={proposedAt20.Utility:F2}, At8={proposedAt8.Utility:F2}");
+            Assert.AreEqual(MoveToSocial, chosenAt20.ActionName,
+                $"Evening peak (hour 20) must choose MoveTo:Social. Chosen: {chosenAt20.ActionName}");
+            Assert.AreNotEqual(MoveToSocial, chosenAt8.ActionName,
+                $"Off-peak (hour 8, high competence) must NOT choose MoveTo:Social. Chosen: {chosenAt8.ActionName}");
         }
 
         /// <summary>

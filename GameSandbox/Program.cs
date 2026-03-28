@@ -109,9 +109,12 @@ foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != significant
     locationService.MoveCharacter(npc.Person.Id, "village_square");
 }
 
+var characters = new List<IHuman> { playerPerson, significantOtherPerson };
+characters.AddRange(manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id).Select(c => c.Person).ToList());
+
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
-    Characters = [playerPerson, significantOtherPerson],
+    Characters = characters,
     LocationService = locationService,
     SimulationYears = 2,
     TickStep = WTimeSpan.FromHours(0.5),
@@ -119,7 +122,7 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
 
     ResolveCharacter = id =>
     {
-        var chars = new[] { playerPerson, significantOtherPerson };
+        var chars = characters.ToArray();
         var found = chars.FirstOrDefault(c => c.Id == id);
 
         return found is not null
