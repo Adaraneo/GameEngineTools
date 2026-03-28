@@ -85,7 +85,21 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         Like       = Lerp(e.Like,       fi.Like,       0.7),
                         Attraction = Lerp(e.Attraction,  fi.Attraction, 0.7),
                         Trust      = e.Trust <= 0 ? 45 : e.Trust,
-                        Closeness  = Math.Max(e.Closeness, 10)
+                        Closeness  = Math.Max(e.Closeness, 10),
+                        Breakdown  = e.Breakdown with
+                        {
+                            // BasePhysical (max 40) → normalised to [0, 100] for the Physical domain.
+                            // Models the immediate "this person is physically striking" impression
+                            // from evolutionary signals: WHR, height range, facial symmetry.
+                            Physical   = Lerp(e.Breakdown.Physical,
+                                             fi.BasePhysical / 40.0 * 100.0, 0.7),
+
+                            // PreferenceMatch (max 35) → normalised to [0, 100] for the Aesthetics domain.
+                            // Models personal taste — how closely the target matches the observer's
+                            // own physical ideal (height preference, frame, WHR preference).
+                            Aesthetics = Lerp(e.Breakdown.Aesthetics,
+                                             fi.PreferenceMatch / 35.0 * 100.0, 0.7)
+                        }
                     });
 
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
@@ -432,6 +446,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private void Upsert(HumanId self, HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
         {
+            if (self == other)
+                return;
+
             var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
 
             if (!dict.TryGetValue(other, out var e))

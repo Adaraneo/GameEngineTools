@@ -440,9 +440,11 @@ static void FireFirstImpressions(
                     : AttractionResult.Neutral;
 
                 a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
-                    aResult.FirstImpressionLike, aResult.Score));
+                    aResult.FirstImpressionLike, aResult.Score,
+                    aResult.BasePhysical, aResult.PreferenceMatch));
                 b.ReceiveEvent(new FirstImpressionFormed(now, b.Id, a.Id,
-                    bResult.FirstImpressionLike, bResult.Score));
+                    bResult.FirstImpressionLike, bResult.Score,
+                    bResult.BasePhysical, bResult.PreferenceMatch));
             }
     }
 }
