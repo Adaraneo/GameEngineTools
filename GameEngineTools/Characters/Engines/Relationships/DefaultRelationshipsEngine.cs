@@ -143,6 +143,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             _                        =>  0.0    // SmallTalk, Humor etc. do not build trust
                         };
 
+                        // Respect grows when the other person treats us as worthy of attention.
+                        // Validation = they acknowledge our worth; Meta = they take the relationship
+                        // seriously; Question = genuine curiosity signals regard.
+                        var respectDelta = io.Act switch
+                        {
+                            SpeechAct.Validation => +1.5,   // acknowledging the other person's worth
+                            SpeechAct.Meta       => +1.0,   // reflecting on the relationship shows regard
+                            SpeechAct.Question   => +0.5,   // genuine curiosity signals respect
+                            _                    =>  0.0
+                        };
+
                         Upsert(self, otherId, e =>
                         {
                             // Mere-exposure: incremental attraction boost from familiarity.
@@ -154,13 +165,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                             return e with
                             {
-                                Closeness              = Bump(e.Closeness, +1.5),
-                                Like                   = Bump(e.Like,      +0.5),
-                                Comfort                = Bump(e.Comfort,   +0.8),
-                                Trust                  = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
-                                Attraction             = Bump(e.Attraction, exposureDelta),
+                                Closeness                = Bump(e.Closeness, +1.5),
+                                Like                     = Bump(e.Like,      +0.5),
+                                Comfort                  = Bump(e.Comfort,   +0.8),
+                                Trust                    = trustDelta   > 0 ? Bump(e.Trust,   trustDelta)   : e.Trust,
+                                Respect                  = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
+                                Attraction               = Bump(e.Attraction, exposureDelta),
                                 PositiveInteractionCount = newCount,
-                                Breakdown              = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
+                                Breakdown                = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                             };
                         });
                         break;
@@ -219,7 +231,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     Closeness = Bump(e.Closeness, +1.0),
                                     Breakdown = e.Breakdown with
                                     {
-                                        Physical = BumpD(e.Breakdown.Physical, TouchBoost(to.Level))
+                                        Physical   = BumpD(e.Breakdown.Physical,   TouchBoost(to.Level)),
+                                        // Intimate touch signals aesthetic appreciation of the other person.
+                                        // Light/Friendly touches build the Physical domain only — intimacy
+                                        // is the threshold at which Aesthetics becomes relevant.
+                                        Aesthetics = to.Level == TouchLevel.Intimate
+                                            ? BumpD(e.Breakdown.Aesthetics, +3.0)
+                                            : e.Breakdown.Aesthetics
                                     }
                                 });
                             }
@@ -282,6 +300,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 var e = kv.Value;
                 var d = Config.DecayPerDay * days;
 
+                // Domain breakdown decays very slowly toward neutral (50) without reinforcement.
+                // Rate is 10× slower than Closeness — domains are more stable impressions than
+                // moment-to-moment feelings, but they do fade without continued confirmation.
+                // PositiveInteractionCount does not decay — it is a cumulative historical counter.
+                var dd = d * 0.1;
+
                 dict[kv.Key] = e with
                 {
                     Like       = Clamp(Approach(e.Like,       50,                              d)       + valenceEffect - stressEffect),
@@ -289,9 +313,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Attraction = Clamp(Approach(e.Attraction, e.Attraction > 50 ? 45.0 : 35.0, d * 0.4)),
                     Closeness  = Clamp(Approach(e.Closeness,  35,                              d * 1.2)),
                     Respect    = Clamp(Approach(e.Respect,    55,                              d * 0.3)),
-                    Comfort    = Clamp(Approach(e.Comfort,    45,                              d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5)
-                    // DomainBreakdown does not decay — domains are fixed by experience, not by time.
-                    // PositiveInteractionCount does not decay — it is a cumulative historical counter.
+                    Comfort    = Clamp(Approach(e.Comfort,    45,                              d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
+                    Breakdown  = new DomainBreakdown(
+                        Intellect:  Clamp(Approach(e.Breakdown.Intellect,  50, dd)),
+                        Humor:      Clamp(Approach(e.Breakdown.Humor,      50, dd)),
+                        Aesthetics: Clamp(Approach(e.Breakdown.Aesthetics, 50, dd)),
+                        Values:     Clamp(Approach(e.Breakdown.Values,     50, dd)),
+                        Physical:   Clamp(Approach(e.Breakdown.Physical,   50, dd))
+                    )
                 };
             }
 
