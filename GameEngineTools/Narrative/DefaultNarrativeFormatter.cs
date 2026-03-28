@@ -672,6 +672,18 @@ namespace GameEngineTools.Narrative
 
         private string Decl(NarrativeCharacterInfo actor, Case @case)
         {
+            string malePattern = string.Empty;
+            string femalePattern = string.Empty;
+
+            var pattern = actor.IsFemale switch
+            {
+                true when actor.Name.EndsWith("ia") => "žena",
+                true when actor.Name.EndsWith("e") => "růže",
+                false when actor.Name.EndsWith("us") => "muž",
+                false when actor.Name.EndsWith("tor") => "muž",
+                _ => "pán"
+            };
+
             var request = new CzechWordRequest
             {
                 Lemma = actor.Name,
@@ -680,7 +692,7 @@ namespace GameEngineTools.Narrative
                 Number = Number.Singular,
                 Gender = actor.IsFemale ? Gender.Feminine : Gender.Masculine,
                 IsAnimate = actor.IsFemale ? false : true,
-                Pattern = actor.IsFemale ? "žena" : "pán"
+                Pattern = pattern
             };
 
             return _wordComposer.GetFullForm(request).Form;

@@ -329,11 +329,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Respect    = Clamp(Approach(e.Respect,    55,                              d * 0.3)),
                     Comfort    = Clamp(Approach(e.Comfort,    45,                              d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
                     Breakdown  = new DomainBreakdown(
-                        Intellect:  Clamp(Approach(e.Breakdown.Intellect,  50, dd)),
-                        Humor:      Clamp(Approach(e.Breakdown.Humor,      50, dd)),
-                        Aesthetics: Clamp(Approach(e.Breakdown.Aesthetics, 50, dd)),
-                        Values:     Clamp(Approach(e.Breakdown.Values,     50, dd)),
-                        Physical:   Clamp(Approach(e.Breakdown.Physical,   50, dd))
+                        Intellect:  Clamp(Approach(e.Breakdown.Intellect, 50, dd)),
+                        Humor:      Clamp(Approach(e.Breakdown.Humor,     50, dd)),
+                        // Physical and Aesthetics do not decay — they are stable perceptual
+                        // impressions anchored in appearance, not in remembered interactions.
+                        // You do not forget whether someone was physically attractive.
+                        Aesthetics: e.Breakdown.Aesthetics,
+                        Values:     Clamp(Approach(e.Breakdown.Values,    50, dd)),
+                        Physical:   e.Breakdown.Physical
                     )
                 };
             }
@@ -446,6 +449,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private void Upsert(HumanId self, HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
         {
+            // A character cannot have a relationship with themselves.
+            // Guard against self-edges that would corrupt MeanCloseness and other graph metrics.
             if (self == other)
                 return;
 
