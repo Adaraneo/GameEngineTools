@@ -34,7 +34,7 @@ var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(game
 
 // ── Runtime ───────────────────────────────────────────────────────────────────
 await using var runtime = await GameEngineToolsRuntime.StartAsync(
-    consoleLogs: false,
+    consoleLogs: true,
     generatedFileOptions: new GeneratedFileOptions
     {
         PlayerDirectory = TFSC.player,
@@ -109,6 +109,24 @@ locationService.RegisterLocation(new LocationDescriptor(
     Capacity: 10,
     AllowsPrivacy: true,
     LocationType.Rest));
+
+locationService.RegisterLocation(new LocationDescriptor(
+    Id: "village_house_sleep_room",
+    DisplayName: "Village House Sleep Room",
+    BaseNoise: 0.2,
+    NoisePerPerson: 0.2,
+    Capacity: 2,
+    AllowsPrivacy: true,
+    LocationType.Rest));
+
+locationService.RegisterLocation(new LocationDescriptor(
+    Id: "castle_horse_stables",
+    DisplayName: "Castle Horse Stables",
+    BaseNoise: 0.3,
+    NoisePerPerson: 0.2,
+    Capacity: 10,
+    AllowsPrivacy: false,
+    LocationType.Work));
 
 if (locationService.GetLocation(playerPerson.Id) is null && locationService.GetLocation(significantOtherPerson.Id) is null)
 {
