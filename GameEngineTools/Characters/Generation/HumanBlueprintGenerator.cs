@@ -239,10 +239,6 @@ namespace GameEngineTools.Characters.Generation
                 rng);
 
             var identity = _identityGenerator.Generate(sex, birthDate, rng);
-            var personality = _personalityGenerator.Generate(
-                rng.Next(int.MinValue, int.MaxValue),
-                request.PersonalityHints,
-                request.PersonalitySpec);
 
             var id = new HumanId(Guid.NewGuid());
             var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
@@ -256,6 +252,11 @@ namespace GameEngineTools.Characters.Generation
             }
 
             var stadium = StadiumResolver.Resolve(Math.Max(0, ageYears));
+
+            var hints = request.PersonalityHints ?? PersonalityHints.ForStadium(stadium);
+            var spec = request.PersonalitySpec ?? PersonalitySpec.ForStadium(stadium);
+
+            var personality = _personalityGenerator.Generate(rng.Next(int.MinValue, int.MaxValue), hints, spec);
 
             var appearance = _appearanceGenerator.Generate(sex, seed, stadium);
             var attractionProfile = _attractionProfileGenerator.Generate(sex, rng);

@@ -31,7 +31,39 @@ public sealed record PersonalityHints(
     CommunicationStyle? Communication = null,
     Chronotype? Chronotype = null,
     Sociosexuality? Sociosexuality = null
-);
+)
+{
+    /// <summary>
+    /// Returns hard personality constraints appropriate for the given life stage.
+    /// These fix values that cannot vary — e.g. a child cannot be sexually unrestricted.
+    /// Soft statistical adjustments (BigFive distributions) are handled by
+    /// <see cref="PersonalitySpec.ForStadium"/>.
+    /// </summary>
+    /// <param name="stadium">Character's life stage.</param>
+    /// <returns>
+    /// A <see cref="PersonalityHints"/> instance with non-null fields only where
+    /// the stadium imposes a hard constraint. Remaining fields stay <c>null</c>
+    /// so the generator retains its normal randomness for those traits.
+    /// </returns>
+    public static PersonalityHints ForStadium(StadiumType stadium) => stadium switch
+    {
+        // Baby — no sexual dimension at all, direct communication only
+        StadiumType.Baby => new PersonalityHints(
+            Sociosexuality: Characters.Traits.Sociosexuality.Restricted,
+            Communication: CommunicationStyle.Direct),  // babies are very direct :)
+
+        // Child — no sexual dimension, attachment style still forming (Secure bias)
+        StadiumType.Child => new PersonalityHints(
+            Sociosexuality: Characters.Traits.Sociosexuality.Restricted),
+
+        // Teenager — restricted to Intermediate at most (no Unrestricted)
+        StadiumType.Teenager => new PersonalityHints(
+            Sociosexuality: Characters.Traits.Sociosexuality.Intermediate),
+
+        // Adult, MidAged, Old — no hard constraints
+        _ => new PersonalityHints()
+    };
+}
 
 /// <summary>
 /// Parametry generátoru – střed, rozptyl a korelace BigFive + mapování na motivace.
@@ -84,6 +116,134 @@ public sealed record PersonalitySpec(
                 MotivationMap: MotivationMapping.Default
             );
         }
+    }
+
+    /// <summary>
+    /// Returns a <see cref="PersonalitySpec"/> with BigFive distributions and motivation
+    /// mappings calibrated for the given life stage.
+    /// </summary>
+    /// <remarks>
+    /// Key adjustments per stage:
+    /// <list type="bullet">
+    ///   <item><b>Baby</b> — Sexuality bias zeroed, high Neuroticism, low Conscientiousness.</item>
+    ///   <item><b>Child</b> — Sexuality bias zeroed, high Openness, developing Conscientiousness.</item>
+    ///   <item><b>Teenager</b> — High Neuroticism variance (puberty volatility), elevated Sexuality bias.</item>
+    ///   <item><b>MidAged</b> — Lower Neuroticism, higher Conscientiousness (maturity).</item>
+    ///   <item><b>Old</b> — Lower Openness and Sexuality, higher Conscientiousness.</item>
+    ///   <item><b>Adult</b> — <see cref="Default"/> — no adjustments.</item>
+    /// </list>
+    /// </remarks>
+    public static PersonalitySpec ForStadium(StadiumType stadium) => stadium switch
+    {
+        StadiumType.Baby => BabySpec(),
+        StadiumType.Child => ChildSpec(),
+        StadiumType.Teenager => TeenagerSpec(),
+        StadiumType.MidAged => MidAgedSpec(),
+        StadiumType.Old => OldSpec(),
+        _ => Default  // Adult
+    };
+
+    // ── Private stadium spec factories ──────────────────────────────────────────
+
+    /// <summary>
+    /// Baby spec: no sexuality, high emotional reactivity, very low conscientiousness.
+    /// </summary>
+    private static PersonalitySpec BabySpec()
+    {
+        var m = MotivationMapping.Default;
+        return Default with
+        {
+            N = (Mean: 0.70, Dev: 0.15),   // high emotional reactivity
+            C = (Mean: 0.15, Dev: 0.10),   // almost no self-regulation yet
+            O = (Mean: 0.75, Dev: 0.12),   // everything is new and interesting
+            A = (Mean: 0.70, Dev: 0.12),   // dependent, trusting
+            MotivationMap = m with
+            {
+                // Zero out sexual motivation — not applicable
+                BiasSex = 0.0,
+                WSex = (0, 0, 0, 0, 0),
+                // Boost rest and affiliation — core baby needs
+                BiasRes = 0.80,
+                BiasAff = 0.75
+            }
+        };
+    }
+
+    /// <summary>
+    /// Child spec: curiosity-driven, no sexuality, Conscientiousness still developing.
+    /// </summary>
+    private static PersonalitySpec ChildSpec()
+    {
+        var m = MotivationMapping.Default;
+        return Default with
+        {
+            O = (Mean: 0.65, Dev: 0.14),   // naturally curious
+            C = (Mean: 0.35, Dev: 0.15),   // developing self-control
+            N = (Mean: 0.55, Dev: 0.16),   // still emotionally reactive
+            A = (Mean: 0.60, Dev: 0.14),
+            MotivationMap = m with
+            {
+                BiasSex = 0.0,
+                WSex = (0, 0, 0, 0, 0),
+                // Play and curiosity are dominant
+                BiasCur = 0.70,
+                BiasAff = 0.65
+            }
+        };
+    }
+
+    /// <summary>
+    /// Teenager spec: puberty volatility via high Neuroticism variance,
+    /// elevated but not dominant sexuality, forming identity (higher Openness).
+    /// </summary>
+    private static PersonalitySpec TeenagerSpec()
+    {
+        var m = MotivationMapping.Default;
+        return Default with
+        {
+            N = (Mean: 0.58, Dev: 0.22),   // high variance — puberty volatility
+            O = (Mean: 0.62, Dev: 0.16),   // identity exploration
+            C = (Mean: 0.42, Dev: 0.18),   // still developing
+            MotivationMap = m with
+            {
+                // Sexuality starts developing but not dominant yet
+                BiasSex = 0.30,
+                // Strong affiliation need — peer belonging
+                BiasAff = 0.65
+            }
+        };
+    }
+
+    /// <summary>
+    /// MidAged spec: emotional maturity — lower Neuroticism, higher Conscientiousness.
+    /// </summary>
+    private static PersonalitySpec MidAgedSpec() => Default with
+    {
+        N = (Mean: 0.42, Dev: 0.15),   // more emotionally stable
+        C = (Mean: 0.58, Dev: 0.14),   // more disciplined
+        A = (Mean: 0.54, Dev: 0.14)    // slightly more agreeable
+    };
+
+    /// <summary>
+    /// Old spec: lower Openness (set in ways), higher Conscientiousness,
+    /// reduced sexuality. Still full variance on most traits.
+    /// </summary>
+    private static PersonalitySpec OldSpec()
+    {
+        var m = MotivationMapping.Default;
+        return Default with
+        {
+            O = (Mean: 0.40, Dev: 0.14),   // less open to novelty
+            C = (Mean: 0.62, Dev: 0.12),   // disciplined, routine-oriented
+            N = (Mean: 0.38, Dev: 0.14),   // generally more stable
+            MotivationMap = m with
+            {
+                BiasSex = 0.20,            // reduced but not zero
+                WSex = (0.02, -0.05, 0.10, 0, 0.02),
+                // Rest becomes more important
+                BiasRes = 0.65
+            }
+        };
     }
 }
 
