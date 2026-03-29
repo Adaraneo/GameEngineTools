@@ -39,19 +39,27 @@ namespace EngineTests
     /// is genuinely bad or the character is at their chronotype peak.
     /// </para>
     /// <para>
-    /// Utility formulas (from <see cref="DefaultBehaviorEngine"/>):
+    /// Utility formulas (current model in <see cref="DefaultBehaviorEngine"/>):
     /// <code>
-    /// Util(need, weight)   = need * (0.5 + weight)
-    /// needBel              = 70 - MeanCloseness(empty=50) = 20  (Valence=0, no cooldown)
-    /// needComp             = 50 + (Competence-0.5)*80           (Stress=0)
-    /// noiseStress          = max(0, Noise-0.5) * 2 * (Stress/100) * 20
-    /// socialPull           = needBel * Affiliation * max(0, 1-Crowding)
-    /// chronoBonus          = max(0, 15 * (1 - |hour - peakHour| / 6))   peak window ±6h
-    /// MoveTo:Social        = socialPull + chronoBonus
-    /// MoveTo:Private       = noiseStress + chronoBonus * 0.5
-    /// MoveTo:Work          = needComp * 0.3 + chronoBonus
-    /// MoveTo:Rest          = noiseStress * 0.5
-    /// MoveTo:Public        = chronoBonus * 0.4
+    /// Util(need, weight)        = need * (0.5 + weight)
+    /// needBel                   = 70 - MeanCloseness(empty=50)
+    /// needComp                  = 50 + (Competence-0.5)*80           (Stress=0)
+    /// noiseStress               = max(0, Noise-0.5) * 2 * (Stress/100) * 20
+    /// socialPull                = needBel * Affiliation * max(0, 1-Crowding)
+    /// chronoBonus               = max(0, 15 * (1 - |hour - peakHour| / 6))
+    ///
+    /// rawWork                   = Util(needComp, Competence)
+    /// rawCreate                 = Util(needComp, Curiosity)
+    /// productiveMult            = multiplier by SurfaceKind
+    /// Work                      = rawWork * productiveMult
+    /// Create                    = rawCreate * productiveMult
+    /// productiveLoss            = max(rawWork - Work, rawCreate - Create)
+    /// MoveTo:Work               = productiveLoss * moveCostFactor (+ optional chrono component)
+    ///
+    /// MoveTo:Social             = socialPull + chronoBonus
+    /// MoveTo:Private            = noiseStress + chronoBonus * 0.5
+    /// MoveTo:Rest               = noiseStress * 0.5
+    /// MoveTo:Public             = chronoBonus * 0.4
     /// </code>
     /// </para>
     /// </remarks>
@@ -468,6 +476,169 @@ namespace EngineTests
 
         #endregion NaN guard
 
+        #region Productive surface model
+
+        /// <summary>
+        /// In a Work surface, productive actions should keep full strength
+        /// and derived MoveTo:Work must not win.
+        /// </summary>
+        [TestMethod]
+        public void Tick_WorkSurface_ProductiveActionBeatsMoveToWork()
+        {
+            // Arrange
+            var ctx = BuildContext(
+                noise: 0.3,
+                crowding: 0.3,
+                stress: 0,
+                affiliation: 0.2,
+                competence: 0.9,
+                curiosity: 0.4,
+                chronotype: Chronotype.Neutral,
+                surfaceKind: SurfaceKind.Work);
+
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
+
+            // Act
+            engine.Tick(DeadOfNight, WTimeSpan.FromHours(1), ctx, outbox);
+
+            // Assert
+            var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
+
+            Assert.AreEqual(Work, chosen.ActionName,
+                $"In Work surface, productive action should win. Chosen: {chosen.ActionName}");
+        }
+
+        /// <summary>
+        /// In a Social surface, strong competence need should weaken local Work enough
+        /// that derived MoveTo:Work can beat Work.
+        /// </summary>
+        [TestMethod]
+        public void Tick_SocialSurface_HighCompetence_MoveToWorkCanBeatWork()
+        {
+            // Calibration with your patch multipliers:
+            // competence=1.0 => needComp = 50 + (1.0-0.5)*80 = 90
+            // rawWork        = 90 * (0.5 + 1.0) = 135
+            // Work@Social    = 135 * 0.38 = 51.3
+            // productiveLoss = 83.7
+            // MoveToWork     ≈ 83.7 * 0.8 = 66.96 (dead of night => tiny/zero chrono effect)
+            //
+            // ReachOut is kept weak by low affiliation.
+            var ctx = BuildContext(
+                noise: 0.3,
+                crowding: 0.2,
+                stress: 0,
+                affiliation: 0.1,
+                competence: 1.0,
+                curiosity: 0.2,
+                chronotype: Chronotype.Neutral,
+                surfaceKind: SurfaceKind.Social);
+
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
+
+            // Act
+            engine.Tick(DeadOfNight, WTimeSpan.FromHours(1), ctx, outbox);
+
+            // Assert
+            var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
+
+            Assert.AreEqual(MoveToWork, chosen.ActionName,
+                $"In Social surface with strong competence drive, MoveTo:Work should win. Chosen: {chosen.ActionName}");
+        }
+
+        /// <summary>
+        /// Unknown surface must not penalize productive actions.
+        /// This protects unplaced / not-yet-contextualised characters.
+        /// </summary>
+        [TestMethod]
+        public void Tick_UnknownSurface_DoesNotPenalizeProductiveActions()
+        {
+            // Arrange
+            var ctx = BuildContext(
+                noise: 0.3,
+                crowding: 0.3,
+                stress: 0,
+                affiliation: 0.2,
+                competence: 0.9,
+                curiosity: 0.4,
+                chronotype: Chronotype.Neutral,
+                surfaceKind: SurfaceKind.Unknown);
+
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
+
+            // Act
+            engine.Tick(DeadOfNight, WTimeSpan.FromHours(1), ctx, outbox);
+
+            // Assert
+            var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
+
+            Assert.AreEqual(Work, chosen.ActionName,
+                $"Unknown surface must not suppress productive actions. Chosen: {chosen.ActionName}");
+        }
+
+        /// <summary>
+        /// Private surface should reduce productive actions compared to Work,
+        /// but not kill them completely.
+        /// </summary>
+        [TestMethod]
+        public void Tick_PrivateSurface_ProductiveActionsRemainViable()
+        {
+            // Arrange
+            var ctx = BuildContext(
+                noise: 0.2,
+                crowding: 0.1,
+                stress: 0,
+                affiliation: 0.1,
+                competence: 0.7,
+                curiosity: 0.4,
+                chronotype: Chronotype.Neutral,
+                surfaceKind: SurfaceKind.Private);
+
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
+
+            // Act
+            engine.Tick(DeadOfNight, WTimeSpan.FromHours(1), ctx, outbox);
+
+            // Assert
+            var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
+
+            Assert.IsTrue(
+                chosen.ActionName is Work or Create,
+                $"Private surface should still allow productive action to win. Chosen: {chosen.ActionName}");
+        }
+
+        [TestMethod]
+        public void Tick_WorkSurface_MoveToWorkIsNeverChosen()
+        {
+            // Arrange
+            var ctx = BuildContext(
+                noise: 0.3,
+                crowding: 0.3,
+                stress: 0,
+                affiliation: 0.1,
+                competence: 1.0,
+                curiosity: 0.9,
+                chronotype: Chronotype.Lark,
+                surfaceKind: SurfaceKind.Work);
+
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
+
+            // Act
+            engine.Tick(Hour8, WTimeSpan.FromHours(1), ctx, outbox);
+
+            // Assert
+            var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
+
+            Assert.AreNotEqual(MoveToWork, chosen.ActionName,
+                $"MoveTo:Work must never be chosen when already in Work surface. Chosen: {chosen.ActionName}");
+        }
+
+        #endregion Productive surface model
+
         #region Factory methods
 
         /// <summary>
@@ -500,7 +671,8 @@ namespace EngineTests
             double affiliation,
             double competence,
             double curiosity,
-            Chronotype chronotype)
+            Chronotype chronotype,
+            SurfaceKind surfaceKind = SurfaceKind.Unknown)
         {
             var physio = new PhysiologyState(
                 Energy: 95,
@@ -528,7 +700,7 @@ namespace EngineTests
                     HasPrivacy: false,
                     Noise: noise,
                     Crowding: crowding,
-                    Kind: SurfaceKind.Unknown),
+                    Kind: surfaceKind),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(
                     new List<EpisodicMemory>(),
