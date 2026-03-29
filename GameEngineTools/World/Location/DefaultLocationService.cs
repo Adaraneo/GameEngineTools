@@ -116,7 +116,8 @@ namespace GameEngineTools.World.Location
                     Location: locationId,
                     HasPrivacy: privacy,
                     Noise: noise,
-                    Crowding: crowding));
+                    Crowding: crowding,
+                    Kind: MapSurface(desc.Type)));
 
                 _lastDispatchedLocation[character.Id] = locationId;
             }
@@ -152,6 +153,17 @@ namespace GameEngineTools.World.Location
         /// <returns>Crowding level in [0, 1].</returns>
         private static double ComputeCrowding(LocationDescriptor desc, int characterCount)
             => Math.Clamp((double)characterCount / desc.Capacity, 0.0, 1.0);
+
+        private static SurfaceKind MapSurface(LocationType type)
+            => type switch
+            {
+                LocationType.Social => SurfaceKind.Social,
+                LocationType.Private => SurfaceKind.Private,
+                LocationType.Work => SurfaceKind.Work,
+                LocationType.Rest => SurfaceKind.Rest,
+                LocationType.Public => SurfaceKind.Public,
+                _ => SurfaceKind.Unknown
+            };
 
         #endregion
     }

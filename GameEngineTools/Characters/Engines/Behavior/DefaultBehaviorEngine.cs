@@ -5,7 +5,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
 {
     using System;
     using System.Collections.Generic;
+    using System.Runtime.InteropServices;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Traits;
@@ -373,23 +375,30 @@ namespace GameEngineTools.Characters.Engines.Behavior
             double needBel, double needComp, double needInti, double needSelfCare,
             Dictionary<string, double> updatedCooldowns)
         {
+            var surface = ctx.Snapshot.InteractionSurface;
+            var noise = double.IsNaN(surface.Noise) ? 0.5 : surface.Noise;
+            var crowding = double.IsNaN(surface.Crowding) ? 0.5 : surface.Crowding;
+            var surfaceKind = surface.Kind;
+
+            var rawWork = Util(needComp, ctx.Personality.Motivation.Competence);
+            var rawCreate = Util(needComp, ctx.Personality.Motivation.Curiosity);
+
+            var productiveMult = GetProductiveSurfaceMultiplier(surfaceKind);
+
+            var workHere = rawWork * productiveMult;
+            var createHere = rawCreate * productiveMult;
+
             var candidates = new List<(string Name, double Utility, WTimeSpan Dur)>
             {
                 (Eat,            Util(needFood,     1.2),                                    WTimeSpan.FromMinutes(30)),
                 (Drink,          Util(needWater,    1.1),                                    WTimeSpan.FromMinutes(10)),
                 (ReachOut,       Util(needBel,      ctx.Personality.Motivation.Affiliation), WTimeSpan.FromHours(1.0)),
-                (Work,           Util(needComp,     ctx.Personality.Motivation.Competence),  WTimeSpan.FromHours(2.0)),
-                (Create,         Util(needComp,     ctx.Personality.Motivation.Curiosity),   WTimeSpan.FromHours(1.5)),
+                (Work,           workHere,  WTimeSpan.FromHours(2.0)),
+                (Create,         createHere,   WTimeSpan.FromHours(1.5)),
                 (SelfCare,       Util(needSelfCare, 0.5),                                    WTimeSpan.FromHours(0.5)),
                 (InviteIntimacy, Util(needInti,     ctx.Personality.Motivation.Sexuality),   WTimeSpan.FromHours(1.0)),
                 (Idle,           Util(10,           0.3),                                    WTimeSpan.FromMinutes(30))
             };
-
-            // ── MoveTo candidates ──────────────────────────────────────────────────────
-            // Read current environment from snapshot — safe NaN guards for unplaced characters.
-            var surface = ctx.Snapshot.InteractionSurface;
-            var noise = double.IsNaN(surface.Noise) ? 0.5 : surface.Noise;
-            var crowding = double.IsNaN(surface.Crowding) ? 0.5 : surface.Crowding;
 
             // Escape drive: high noise + high stress pushes the character toward quieter spaces.
             // Max contribution: (1.0-0.5)*2 * (100/100) * 20 = 20.
@@ -401,25 +410,35 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var chronoBonus = ComputeChronoBonus(now, ctx.Personality.Chronotype);
 
             // Social pull: want company when lonely AND current location is not already crowded.
-            // Multiplying by (1 - crowding) prevents seeking a social space when already in one.
             var socialPull = needBel * ctx.Personality.Motivation.Affiliation
                            * Math.Max(0, 1.0 - crowding);
 
+            // Derived productive displacement:
+            // "How much productive value am I losing by trying to do this here?"
+            var productiveLoss = Math.Max(0.0, Math.Max(rawWork - workHere, rawCreate - createHere));
+
+            // Move has a friction cost. Small chrono bonus keeps movement slightly more likely
+            // during the character's natural active hours.
+            var moveToWorkDerived =
+                CanMoveToWorkLikeLocation(ctx, surfaceKind)
+                    ? productiveLoss * 0.80 + chronoBonus * 0.35
+                    : 0.0;
+
             candidates.AddRange(new[]
             {
-                // MoveTo:Social  — driven by loneliness + time-of-day peak
+                // MoveTo:Social — still an independent company-seeking movement
                 (MoveToSocial,  socialPull  + chronoBonus,        WTimeSpan.FromMinutes(20)),
 
-                // MoveTo:Private — driven by noise/stress escape + weak evening pull
+                // MoveTo:Private — still an escape / regulation movement
                 (MoveToPrivate, noiseStress + chronoBonus * 0.5,  WTimeSpan.FromMinutes(20)),
 
-                // MoveTo:Work    — weak pull from competence need + chrono peak
-                (MoveToWork,    needComp    * 0.3 + chronoBonus,  WTimeSpan.FromMinutes(20)),
+                // MoveTo:Work — now derived from lost productive utility in the current environment
+                (MoveToWork,    moveToWorkDerived,                WTimeSpan.FromMinutes(20)),
 
-                // MoveTo:Rest    — gentler version of escape, no chrono component
+                // MoveTo:Rest — still a gentler escape
                 (MoveToRest,    noiseStress * 0.5,                WTimeSpan.FromMinutes(20)),
 
-                // MoveTo:Public  — low-intensity wandering during active chrono hours
+                // MoveTo:Public — light wandering
                 (MoveToPublic,  chronoBonus * 0.4,                WTimeSpan.FromMinutes(20)),
             });
 
@@ -762,6 +781,29 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     top = Math.Max(top, e.Attraction);
                 return top;
             }
+        }
+
+        private static double GetProductiveSurfaceMultiplier(SurfaceKind kind)
+            => kind switch
+            {
+                SurfaceKind.Work => 1.00,
+                SurfaceKind.Private => 0.78,
+                SurfaceKind.Public => 0.52,
+                SurfaceKind.Social => 0.38,
+                SurfaceKind.Rest => 0.32,
+                SurfaceKind.Unknown => 1.00,
+                _ => 0.60
+            };
+
+        private static bool CanMoveToWorkLikeLocation(
+            IHumanContext ctx,
+            SurfaceKind currentKind)
+        {
+            // První bezpečný patch bez nové world query služby:
+            // derived MoveToWork povol jen pokud už nejsme ve Work typu.
+            // To sice ještě neověřuje skutečnou existenci cíle v mapě,
+            // ale zabrání to nejhoršímu "move while already there".
+            return currentKind != SurfaceKind.Work;
         }
 
         #endregion Pomocné metody

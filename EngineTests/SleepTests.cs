@@ -624,7 +624,7 @@ namespace EngineTests
 
             var snapshot = new EnginesSnapshot(
                 physio, psych, behavior,
-                new InteractionSurface(null, false, double.NaN, double.NaN),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
                 relationships,
                 memory);
 

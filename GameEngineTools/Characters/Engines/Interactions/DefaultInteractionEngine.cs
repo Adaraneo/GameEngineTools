@@ -61,7 +61,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             _log = loggerFactory.CreateLogger<DefaultInteractionEngine>();
 
             // Bezpečný výchozí stav — než hra nastaví reálný kontext přes ContextChanged
-            State = new InteractionSurface(Location: "Unknown", HasPrivacy: false, Noise: 0.5, Crowding: 0.5);
+            State = new InteractionSurface(Location: "Unknown", HasPrivacy: false, Noise: 0.5, Crowding: 0.5, Kind: SurfaceKind.Unknown);
         }
 
         #endregion Konstruktor
@@ -154,7 +154,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 Location: cc.Location,
                 HasPrivacy: cc.HasPrivacy,
                 Noise: Math.Clamp(cc.Noise, 0, 1),
-                Crowding: Math.Clamp(cc.Crowding, 0, 1));
+                Crowding: Math.Clamp(cc.Crowding, 0, 1),
+                Kind: cc.Kind);
         }
 
         /// <summary>

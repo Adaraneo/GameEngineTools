@@ -313,7 +313,7 @@ namespace EngineTests
                 new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
                 psych,
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
-                new InteractionSurface(null, false, 0.5, 0.5),
+                new InteractionSurface(null, false, 0.5, 0.5, SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>()));
 

@@ -508,7 +508,10 @@ static void RouteMoveTo(
             .ToList();
 
         if (candidates.Count == 0)
+        {
+            Console.WriteLine($"[MoveTo] {character.Id.Value} requested {requestedType}, but no alternative location exists.");
             continue;
+        }
 
         // Pick randomly — could be weighted by crowding in the future
         var chosen = candidates[rng.Next(candidates.Count)];

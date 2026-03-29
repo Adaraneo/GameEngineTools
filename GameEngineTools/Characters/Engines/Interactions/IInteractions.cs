@@ -27,7 +27,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
         string Location,
         bool HasPrivacy,
         double Noise,
-        double Crowding) : IDomainEvent;
+        double Crowding,
+        SurfaceKind Kind) : IDomainEvent;
 
     /// <summary>
     /// Popis aktuálního prostředí interakce — co je "po ruce".
@@ -37,7 +38,18 @@ namespace GameEngineTools.Characters.Engines.Interactions
         string Location,
         bool HasPrivacy,
         double Noise,
-        double Crowding);
+        double Crowding,
+        SurfaceKind Kind);
+
+    public enum SurfaceKind
+    {
+        Unknown = 0,
+        Social,
+        Private,
+        Work,
+        Rest,
+        Public
+    }
 
     /// <summary>Rozhraní pro engine řídící sociální interakce.</summary>
     public interface IInteractionEngine : IEngine<InteractionSurface, InteractionConfig>

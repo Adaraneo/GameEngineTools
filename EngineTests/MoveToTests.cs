@@ -527,7 +527,8 @@ namespace EngineTests
                     Location: "test_location",
                     HasPrivacy: false,
                     Noise: noise,
-                    Crowding: crowding),
+                    Crowding: crowding,
+                    Kind: SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(
                     new List<EpisodicMemory>(),

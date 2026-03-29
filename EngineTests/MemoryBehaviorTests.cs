@@ -332,7 +332,7 @@ namespace EngineTests
             var snapshot = new EnginesSnapshot(
                 physio, psych,
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),  // BehaviorState se v Tick() ignoruje
-                new InteractionSurface(null, false, double.NaN, double.NaN),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 memory);
 

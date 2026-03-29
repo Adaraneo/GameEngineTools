@@ -298,7 +298,7 @@ namespace EngineTests
             var snapshot = new EnginesSnapshot(
                 physio, psych,
                 new BehaviorState(40, 20, 15, 40, 50, 30, plan),
-                new InteractionSurface(null, false, double.NaN, double.NaN),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(
                     new List<EpisodicMemory>(),
