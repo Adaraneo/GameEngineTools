@@ -229,8 +229,11 @@ namespace GameEngineTools.Characters.Generation
         {
             request ??= new HumanBlueprintRequest();
 
+            var id = new HumanId(Guid.NewGuid());
+            var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
+
             var seed = request.Seed ?? Environment.TickCount;
-            var rng = _rngFactory.Create(seed);
+            var rng = _rngFactory.Create(runtimeSeed);
 
             var sex = request.Sex ?? PickSex(_spec.SexWeights, rng);
             var birthDate = PickBirthDate(
@@ -239,9 +242,6 @@ namespace GameEngineTools.Characters.Generation
                 rng);
 
             var identity = _identityGenerator.Generate(sex, birthDate, rng);
-
-            var id = new HumanId(Guid.NewGuid());
-            var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
 
             var today = WDateOnly.Today;
             var ageYears = today.Year - birthDate.Year;
@@ -258,7 +258,7 @@ namespace GameEngineTools.Characters.Generation
 
             var personality = _personalityGenerator.Generate(rng.Next(int.MinValue, int.MaxValue), hints, spec);
 
-            var appearance = _appearanceGenerator.Generate(sex, seed, stadium);
+            var appearance = _appearanceGenerator.Generate(sex, runtimeSeed, stadium);
             var attractionProfile = _attractionProfileGenerator.Generate(sex, rng);
 
             return new HumanBlueprint(id, identity, sex, personality, appearance, attractionProfile, runtimeSeed);
