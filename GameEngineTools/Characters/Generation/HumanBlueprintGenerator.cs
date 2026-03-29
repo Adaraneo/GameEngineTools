@@ -246,7 +246,18 @@ namespace GameEngineTools.Characters.Generation
 
             var id = new HumanId(Guid.NewGuid());
             var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
-            var appearance = _appearanceGenerator.Generate(sex, seed);
+
+            var today = WDateOnly.Today;
+            var ageYears = today.Year - birthDate.Year;
+            if (today.Month < birthDate.Month || 
+                (today.Month == birthDate.Month && today.Day < birthDate.Day))
+            {
+                ageYears--;
+            }
+
+            var stadium = StadiumResolver.Resolve(Math.Max(0, ageYears));
+
+            var appearance = _appearanceGenerator.Generate(sex, seed, stadium);
             var attractionProfile = _attractionProfileGenerator.Generate(sex, rng);
 
             return new HumanBlueprint(id, identity, sex, personality, appearance, attractionProfile, runtimeSeed);

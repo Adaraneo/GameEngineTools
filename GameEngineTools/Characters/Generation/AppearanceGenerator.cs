@@ -42,9 +42,9 @@ namespace GameEngineTools.Characters.Generation
         #region IAppearanceGenerator
 
         /// <inheritdoc/>
-        public PhysicalAppearance Generate(SexBiology sex, int seed, AppearanceGenSpec? spec = null)
+        public PhysicalAppearance Generate(SexBiology sex, int seed, StadiumType stadium = StadiumType.Adult, AppearanceGenSpec? spec = null)
         {
-            spec ??= AppearanceGenSpec.Default;
+            spec ??= AppearanceGenSpec.ForStadium(stadium, sex);
             var rng = _rngFactory.Create(seed);
 
             // ── 1) Height — primary latent variable ─────────────────────────

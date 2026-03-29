@@ -27,11 +27,16 @@ namespace GameEngineTools.Characters.Generation
         /// RNG seed. The same seed combined with the same <paramref name="sex"/>
         /// always produces identical output (deterministic generation).
         /// </param>
+        /// <param name="stadium">
+        /// Life stage of the character. Drives height ranges, proportions and facial feature
+        /// distributions appropriate for the character's age group.
+        /// Defaults to <see cref="StadiumType.Adult"/> for backwards compatibility.
+        /// </param>
         /// <param name="spec">
         /// Optional generation parameters.
         /// Defaults to <see cref="AppearanceGenSpec.Default"/> when <c>null</c>.
         /// </param>
         /// <returns>An immutable <see cref="PhysicalAppearance"/> record.</returns>
-        PhysicalAppearance Generate(SexBiology sex, int seed, AppearanceGenSpec? spec = null);
+        PhysicalAppearance Generate(SexBiology sex, int seed, StadiumType stadium = StadiumType.Adult, AppearanceGenSpec? spec = null);
     }
 }
