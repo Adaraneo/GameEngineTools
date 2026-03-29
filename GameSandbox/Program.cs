@@ -101,12 +101,27 @@ locationService.RegisterLocation(new LocationDescriptor(
     AllowsPrivacy: true,
     LocationType.Private));
 
-locationService.MoveCharacter(playerPerson.Id, "village_square");
-locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
+locationService.RegisterLocation(new LocationDescriptor(
+    Id: "castle_sleep_room",
+    DisplayName: "Castle Sleep Room",
+    BaseNoise: 0.1,
+    NoisePerPerson: 0.1,
+    Capacity: 10,
+    AllowsPrivacy: true,
+    LocationType.Rest));
+
+if (locationService.GetLocation(playerPerson.Id) is null && locationService.GetLocation(significantOtherPerson.Id) is null)
+{
+    locationService.MoveCharacter(playerPerson.Id, "village_square");
+    locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
+}
 
 foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != significantOtherPerson.Id && npc.Person.Id != playerPerson.Id))
 {
-    locationService.MoveCharacter(npc.Person.Id, "village_square");
+    if (locationService.GetLocation(npc.Person.Id) is null)
+    {
+        locationService.MoveCharacter(npc.Person.Id, "village_square");
+    }
 }
 
 var characters = new List<IHuman> { playerPerson, significantOtherPerson };
@@ -156,7 +171,7 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
         RouteMoveTo(now, chars, locationService, rng);
 
         // ── Location context — move both to Castle on day 16, evening ─────────
-        if (now.Day is 16 && now.Hour is 20)
+        if (now.Day is 16 && now.Hour is 20 && locationService.GetLocation(significantOtherPerson.Id).ToLowerInvariant() != "castle_hall" && locationService.GetLocation(playerPerson.Id).ToLowerInvariant() != "castle_hall")
         {
             locationService.MoveCharacter(playerPerson.Id, "castle_hall");
             locationService.MoveCharacter(significantOtherPerson.Id, "castle_hall");
