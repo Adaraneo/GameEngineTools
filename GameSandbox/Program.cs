@@ -104,7 +104,7 @@ locationService.RegisterLocation(new LocationDescriptor(
 locationService.MoveCharacter(playerPerson.Id, "village_square");
 locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
 
-foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != significantOtherPerson.Id))
+foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != significantOtherPerson.Id && npc.Person.Id != playerPerson.Id))
 {
     locationService.MoveCharacter(npc.Person.Id, "village_square");
 }
