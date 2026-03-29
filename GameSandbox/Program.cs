@@ -256,6 +256,11 @@ foreach (var entry in diary.OrderBy(e => e.OccurredAt))
 await File.WriteAllTextAsync(gameTimePath, clock.Now.WorldTicks.ToString());
 gf.Export(player);
 gf.Export((NPC)significantOther);
+var others = manager.Characters.Where(npc => !npc.Equals(significantOther) && !npc.Equals(player)).ToList();
+foreach (var other in others)
+{
+    gf.Export((NPC)other);
+}
 
 var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
