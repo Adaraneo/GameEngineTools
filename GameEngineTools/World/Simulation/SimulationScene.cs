@@ -92,7 +92,7 @@ namespace GameEngineTools.World.Simulation
 
         /// <summary>
         /// Spustí simulaci asynchronně.
-        /// Skončí po uplynutí <see cref="SimulationSceneOptions.SimulationYears"/> herních let.
+        /// Skončí po uplynutí <see cref="SimulationSceneOptions.SimulationYears"/>.
         /// </summary>
         /// <returns>Dokončená task po skončení simulace.</returns>
         public Task RunAsync()

@@ -13,6 +13,7 @@ namespace GameEngineTools
     using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
     using GameEngineTools.World.Core.Time;
+    using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;

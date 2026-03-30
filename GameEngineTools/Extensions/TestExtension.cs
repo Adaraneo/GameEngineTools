@@ -44,6 +44,7 @@ namespace GameEngineTools.Extensions
             var displayName = firstName.Familiar.FirstOrDefault(f => !string.IsNullOrEmpty(f))
                 ?? firstName.Original;
 
+            if (withDNA) sb.AppendLine(person.Id.Value.ToString());
             sb.AppendLine($"Name: {displayName} {surname}");
             sb.AppendLine($"Born in year: {identity.BirthDate.Year}");
             sb.AppendLine($"Gender: {person.Biology}");

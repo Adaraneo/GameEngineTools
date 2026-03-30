@@ -15,6 +15,7 @@ using GameEngineTools.World.Location;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.InteropServices;
 using System.Text;
 using static GameEngineTools.Characters.Engines.ActionNames;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
@@ -57,28 +58,48 @@ clock.SetNow(initTicks == defaultTicks
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
-// Find a significant other: opposite biology, close in age (within 5 years), at least 16
-var significantOther = manager.Characters
-    .Where(npc => npc is NPC
-        && npc.Person.Biology != player.Person.Biology
-        && (npc.Age >= 16
-        || Math.Abs(npc.Age - player.Age) <= 5))
-    .FirstOrDefault();
+Console.Write("Write here an ID of player: ");
+var input = Console.ReadLine();
 
-if (significantOther is null)
+if (!Guid.TryParse(input, out var pid) && !player.Person.Id.Value.Equals(pid))
 {
     Console.ForegroundColor = ConsoleColor.Red;
-    throw new InvalidOperationException(nameof(significantOther));
+    Console.WriteLine("Player's Id is not correct!");
+    return;
 }
+
+Console.ResetColor();
+Console.Write("Write here an ID of player's significatn other: ");
+input = Console.ReadLine();
+if (!Guid.TryParse(input, out var soid))
+{
+    Console.BackgroundColor = ConsoleColor.Red;
+    Console.WriteLine("ID is not in correct format!");
+    return;
+}
+
+var significantOther = manager.Characters.First(character => character.Person.Id.Value.Equals(soid));
+
+Console.ResetColor();
+Console.Write("Write here an ID of player's friend: ");
+input = Console.ReadLine();
+if (!Guid.TryParse(input, out var friendId))
+{
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.WriteLine("ID is not in correct format!");
+    return;
+}
+
+Console.ResetColor();
+
+var friend = manager.Characters.First(ch => ch.Person.Id.Value.Equals(friendId));
 
 var playerPerson = player.Person;
 var significantOtherPerson = significantOther.Person;
+var friendPerson = friend.Person;
 
 var diary = new List<NarrativeEntry>();
 
-// Shared random source for OnTick scene logic.
-// IHuman does not expose IRandomSource — that lives on IHumanContext (engine-internal).
-// System.Random is sufficient here: scene-level decisions are not deterministic anyway.
 var rng = new Random();
 
 var locationService = new DefaultLocationService();
@@ -110,14 +131,25 @@ locationService.RegisterLocation(new LocationDescriptor(
     AllowsPrivacy: true,
     LocationType.Rest));
 
-locationService.RegisterLocation(new LocationDescriptor(
-    Id: "village_house_sleep_room",
-    DisplayName: "Village House Sleep Room",
-    BaseNoise: 0.2,
-    NoisePerPerson: 0.2,
-    Capacity: 2,
-    AllowsPrivacy: true,
-    LocationType.Rest));
+for (int villageHouseIndex = 0; villageHouseIndex < (manager.Characters.Count - 3) / 5; villageHouseIndex++)
+{
+    locationService.RegisterLocation(new LocationDescriptor(
+        $"village_house{villageHouseIndex}",
+        $"Village House {villageHouseIndex + 1}",
+        BaseNoise: 0.2,
+        NoisePerPerson: 0.2,
+        Capacity: 5,
+        false,
+        LocationType.Private));
+    locationService.RegisterLocation(new LocationDescriptor(
+        Id: $"village_house{villageHouseIndex}_sleep_room",
+        DisplayName: $"Village House {villageHouseIndex + 1}: Sleep Room",
+        BaseNoise: 0.2,
+        NoisePerPerson: 0.2,
+        Capacity: 2,
+        AllowsPrivacy: true,
+        LocationType.Rest));
+}
 
 locationService.RegisterLocation(new LocationDescriptor(
     Id: "castle_horse_stables",
@@ -128,13 +160,23 @@ locationService.RegisterLocation(new LocationDescriptor(
     AllowsPrivacy: false,
     LocationType.Work));
 
-if (locationService.GetLocation(playerPerson.Id) is null && locationService.GetLocation(significantOtherPerson.Id) is null)
+locationService.RegisterLocation(new LocationDescriptor(
+    Id: "castle_forge",
+    DisplayName: "Castle Forge",
+    BaseNoise: 0.7,
+    NoisePerPerson: 0.2,
+    Capacity: 10,
+    AllowsPrivacy: false,
+    LocationType.Work));
+
+if (locationService.GetLocation(playerPerson.Id) is null && locationService.GetLocation(significantOtherPerson.Id) is null && locationService.GetLocation(friendPerson.Id) is null)
 {
     locationService.MoveCharacter(playerPerson.Id, "village_square");
     locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
+    locationService.MoveCharacter(friendPerson.Id, "village_square");
 }
 
-foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != significantOtherPerson.Id && npc.Person.Id != playerPerson.Id))
+foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != playerPerson.Id && npc.Person.Id != significantOtherPerson.Id && npc.Person.Id != friendPerson.Id))
 {
     if (locationService.GetLocation(npc.Person.Id) is null)
     {
@@ -142,20 +184,17 @@ foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != significant
     }
 }
 
-var characters = new List<IHuman> { playerPerson, significantOtherPerson };
-characters.AddRange(manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id).Select(c => c.Person).ToList());
-
-var scene = new SimulationScene(clock, new SimulationSceneOptions
+var mainTrioScene = new SimulationScene(clock, new SimulationSceneOptions
 {
-    Characters = characters,
+    Characters = [playerPerson, significantOtherPerson, friendPerson],
     LocationService = locationService,
-    SimulationYears = 2,
+    SimulationYears = 1,
     TickStep = WTimeSpan.FromHours(0.5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
 
     ResolveCharacter = id =>
     {
-        var chars = characters.ToArray();
+        var chars = new []{ playerPerson, significantOtherPerson, friendPerson };
         var found = chars.FirstOrDefault(c => c.Id == id);
 
         return found is not null
@@ -189,87 +228,44 @@ var scene = new SimulationScene(clock, new SimulationSceneOptions
         RouteMoveTo(now, chars, locationService, rng);
 
         // ── Location context — move both to Castle on day 16, evening ─────────
-        if (now.Day is 16 && now.Hour is 20 && locationService.GetLocation(significantOtherPerson.Id).ToLowerInvariant() != "castle_hall" && locationService.GetLocation(playerPerson.Id).ToLowerInvariant() != "castle_hall")
+        if (now.Day is 16 && now.Hour is 20 
+        && !locationService.GetLocation(significantOtherPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
+        && !locationService.GetLocation(playerPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
+        && !locationService.GetLocation(friendPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase))
         {
             locationService.MoveCharacter(playerPerson.Id, "castle_hall");
             locationService.MoveCharacter(significantOtherPerson.Id, "castle_hall");
+            locationService.MoveCharacter(friendPerson.Id, "castle_hall");
         }
 
-        // ── ReachOut routing — dynamic, relationship-aware ────────────────────
-        foreach (var character in chars)
-        {
-            var reachOut = character.LastOutbox
-                .OfType<ActionCommitted>()
-                .FirstOrDefault(a => a.ActionName == ReachOut);
+        DynamicReachOutRouting(now, chars, locationService, rng);
 
-            if (reachOut is null)
-                continue;
-
-            // Ask the location service who is in the same location right now.
-            var locationId = locationService.GetLocation(character.Id);
-            if (locationId is null)
-                continue;
-
-            var candidates = locationService
-                .GetCharactersAt(locationId)
-                .Where(id => id != character.Id)
-                .Select(id => chars.FirstOrDefault(c => c.Id == id))
-                .OfType<IHuman>()
-                .ToList();
-
-            if (candidates.Count == 0)
-                continue;
-
-            // Weighted random — prefer characters the initiator likes,
-            // but keep a chance to approach a stranger.
-            // Unknown character gets neutral weight 45 — openness to strangers.
-            var target = PickWeightedRandom(candidates, c =>
-            {
-                var edge = character.Snapshot.Relationships.Edges.GetValueOrDefault(c.Id);
-                return edge?.Like ?? 45.0;
-            }, rng);
-
-            var targetEdge = character.Snapshot.Relationships.Edges.GetValueOrDefault(target.Id);
-            var act = ChooseSpeechAct(targetEdge, rng);
-
-            target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null));
-            TryTouch(now, character, target, rng);
-        }
-
-        // ── Organic MicroPositive — witnessing effort ─────────────────────────
-        foreach (var character in chars)
-        {
-            var justCreated = character.LastOutbox
-                .OfType<ActionCommitted>()
-                .Any(a => a.ActionName is Create or Work);
-
-            if (!justCreated)
-                continue;
-
-            var locationId = locationService.GetLocation(character.Id);
-            if (locationId is null)
-                continue;
-
-            var witnesses = locationService
-                .GetCharactersAt(locationId)
-                .Where(id => id != character.Id)
-                .Select(id => chars.FirstOrDefault(c => c.Id == id))
-                .OfType<IHuman>()
-                .ToList();
-
-            if (witnesses.Count == 0)
-                continue;
-
-            // Pick one random witness — only one MicroPositive per creative action.
-            var witness = witnesses[rng.Next(witnesses.Count)];
-
-            if (rng.NextDouble() < 0.30)
-                character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, "noticed your work"));
-        }
+        OrganicMicroPositives(now, chars, locationService, rng);
     }
 });
 
-await scene.RunAsync();
+var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
+
+var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
+{
+    Characters = characters,
+    LocationService = locationService,
+    TickStep = WTimeSpan.FromHours(5),
+    SimulationYears = 2,
+    OnTick = (now, chars) =>
+    {
+        FireFirstImpressions(now, chars, attractionCalculator, locationService);
+
+        RouteMoveTo(now, chars, locationService, rng);
+
+        DynamicReachOutRouting(now, chars, locationService, rng);
+
+        OrganicMicroPositives(now, chars, locationService, rng);
+    }
+});
+
+await mainTrioScene.RunAsync();
+await otherCharactersScene.RunAsync();
 
 // ── Diary export ──────────────────────────────────────────────────────────────
 var sbDiary = new StringBuilder();
@@ -314,6 +310,82 @@ File.WriteAllText(
 Console.ReadKey();
 
 # region Helper Methods
+
+static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng)
+{
+    foreach (var character in chars)
+    {
+        var reachOut = character.LastOutbox
+            .OfType<ActionCommitted>()
+            .FirstOrDefault(a => a.ActionName == ReachOut);
+
+        if (reachOut is null)
+            continue;
+
+        // Ask the location service who is in the same location right now.
+        var locationId = locationService.GetLocation(character.Id);
+        if (locationId is null)
+            continue;
+
+        var candidates = locationService
+            .GetCharactersAt(locationId)
+            .Where(id => id != character.Id)
+            .Select(id => chars.FirstOrDefault(c => c.Id == id))
+            .OfType<IHuman>()
+            .ToList();
+
+        if (candidates.Count == 0)
+            continue;
+
+        // Weighted random — prefer characters the initiator likes,
+        // but keep a chance to approach a stranger.
+        // Unknown character gets neutral weight 45 — openness to strangers.
+        var target = PickWeightedRandom(candidates, c =>
+        {
+            var edge = character.Snapshot.Relationships.Edges.GetValueOrDefault(c.Id);
+            return edge?.Like ?? 45.0;
+        }, rng);
+
+        var targetEdge = character.Snapshot.Relationships.Edges.GetValueOrDefault(target.Id);
+        var act = ChooseSpeechAct(targetEdge, rng);
+
+        target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null));
+        TryTouch(now, character, target, rng);
+    }
+}
+
+static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng)
+{
+    foreach (var character in chars)
+    {
+        var justCreated = character.LastOutbox
+            .OfType<ActionCommitted>()
+            .Any(a => a.ActionName is Create or Work);
+
+        if (!justCreated)
+            continue;
+
+        var locationId = locationService.GetLocation(character.Id);
+        if (locationId is null)
+            continue;
+
+        var witnesses = locationService
+            .GetCharactersAt(locationId)
+            .Where(id => id != character.Id)
+            .Select(id => chars.FirstOrDefault(c => c.Id == id))
+            .OfType<IHuman>()
+            .ToList();
+
+        if (witnesses.Count == 0)
+            continue;
+
+        // Pick one random witness — only one MicroPositive per creative action.
+        var witness = witnesses[rng.Next(witnesses.Count)];
+
+        if (rng.NextDouble() < 0.30)
+            character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, "noticed your work"));
+    }
+}
 
 /// <summary>
 /// Chooses a <see cref="SpeechAct"/> appropriate for the current relationship depth.

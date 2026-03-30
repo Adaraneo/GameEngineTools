@@ -26,15 +26,27 @@
             }
         }
 
-        private static void ExportInfo(string directory, params CharacterBase[] nppcs)
+        private static void ClearLogsDirectory(string directory)
         {
-            foreach (var nppc in nppcs)
+            var logsDirInfo = new DirectoryInfo(Path.Combine(directory, "Logs"));
+            if (!logsDirInfo.Exists) return;
+
+            var files = logsDirInfo.GetFiles();
+            foreach(var file in files)
             {
-                var filename = string.Format("{2}_{0}_{1}.txt", nppc.Person.ToString(), nppc.Person.Id.Value, nppc.GetType().Name);
+                file.Delete();
+            }
+        }
+
+        private static void ExportInfo(string directory, params (string, CharacterBase)[] characters)
+        {
+            foreach (var (varName, character) in characters)
+            {
+                var filename = $"{character.GetType().Name}_{varName}_{character.Person.Id.Value}.txt";
                 var dirinfo = new DirectoryInfo(directory);
                 dirinfo.CreateSubdirectory("Logs");
                 var path = Path.Combine(directory, "Logs", filename);
-                File.WriteAllText(path, nppc.PrintInfo(false));
+                File.WriteAllText(path, character.PrintInfo(false, true));
             }
         }
 
@@ -79,10 +91,10 @@
             significantOther = new NPC(100, manager.RandomizePerson(player));
             friend = new NPC(100, manager.RandomizePerson(50, 18));
 
-            var nppcs = manager.Characters;
-            nppcs.Add(player);
-            nppcs.Add(significantOther);
-            nppcs.Add(friend);
+            var characters = manager.Characters;
+            characters.Add(player);
+            characters.Add(significantOther);
+            characters.Add(friend);
 
             Console.WriteLine("Done");
             Console.WriteLine("Would you like to generate other NPCs? [Y\\n]");
@@ -98,7 +110,7 @@
                         try
                         {
                             var npc = new NPC(100, manager.RandomizePerson(40, 18));
-                            nppcs.Add(npc);
+                            characters.Add(npc);
                             successfull++;
                         }
                         catch (Exception ex)
@@ -117,7 +129,8 @@
             Console.WriteLine("Characters will be exported to {0}", currentDirectory);
             genFile.ExportNPPCs();
 
-            ExportInfo(currentDirectory, player, significantOther, friend);
+            ClearLogsDirectory(currentDirectory);
+            ExportInfo(currentDirectory, (nameof(player), player), (nameof(significantOther), significantOther), (nameof(friend), friend));
 
             Console.WriteLine("Done. You may close the window right now.");
             Console.ReadKey();
