@@ -518,23 +518,108 @@ static void RouteMoveTo(
 
         var currentLocation = locations.GetLocation(character.Id);
 
-        // Find candidate locations of the requested type,
-        // excluding the current one and overcrowded ones.
-        var candidates = locations
-            .GetLocationsByType(requestedType)
-            .Where(id => id != currentLocation)
-            .ToList();
+        var chosen = FindBestMoveTarget(character, locations, currentLocation, requestedType);
 
-        if (candidates.Count == 0)
+        if (chosen is null)
         {
-            Console.WriteLine($"[MoveTo] {character.Id.Value} requested {requestedType}, but no alternative location exists.");
+            Console.WriteLine($"[MoveTo] {character.Id.Value} requested {requestedType}, but no suitable alternative location exists.");
             continue;
         }
 
-        // Pick randomly — could be weighted by crowding in the future
-        var chosen = candidates[rng.Next(candidates.Count)];
         locations.MoveCharacter(character.Id, chosen);
     }
+}
+
+static string? FindBestMoveTarget(
+    IHuman character,
+    ILocationService locations,
+    string? currentLocationId,
+    LocationType requestedType)
+{
+    var candidates = locations
+        .GetLocationsByType(requestedType)
+        .Where(id => id != currentLocationId)
+        .Select(id => new
+        {
+            Id = id,
+            Descriptor = locations.GetDescriptor(id),
+            Occupants = locations.GetCharactersAt(id).Count
+        })
+        .Where(x => x.Descriptor is not null)
+        .Select(x => new
+        {
+            x.Id,
+            Desc = x.Descriptor!,
+            x.Occupants,
+            Noise = Math.Clamp(
+                x.Descriptor!.BaseNoise + x.Descriptor.NoisePerPerson * x.Occupants,
+                0.0,
+                1.0),
+            Crowding = Math.Clamp(
+                x.Descriptor!.Capacity > 0 ? (double)x.Occupants / x.Descriptor.Capacity : 1.0,
+                0.0,
+                1.0),
+            Privacy = x.Descriptor!.AllowsPrivacy && x.Occupants <= 1
+        })
+        .ToList();
+
+    if (candidates.Count == 0)
+        return null;
+
+    var scored = candidates
+        .Select(x => new
+        {
+            x.Id,
+            Score = ScoreMoveTarget(character, requestedType, x.Noise, x.Crowding, x.Privacy)
+        })
+        .OrderByDescending(x => x.Score)
+        .ToList();
+
+    var best = scored[0];
+
+    // ochrana proti "move for no real gain" můžeš později zpřísnit
+    return best.Score > 0.0 ? best.Id : null;
+}
+
+static double ScoreMoveTarget(
+    IHuman character,
+    LocationType requestedType,
+    double noise,
+    double crowding,
+    bool privacy)
+{
+    var stress = character.Snapshot.Psychology.Stress / 100.0;
+
+    return requestedType switch
+    {
+        LocationType.Work =>
+            (1.0 - noise) * 0.45 +
+            (1.0 - crowding) * 0.40 +
+            (privacy ? 0.15 : 0.0),
+
+        LocationType.Rest =>
+            (1.0 - noise) * 0.50 +
+            (1.0 - crowding) * 0.20 +
+            (privacy ? 0.30 : 0.0) +
+            stress * 0.15,
+
+        LocationType.Private =>
+            (1.0 - noise) * 0.35 +
+            (1.0 - crowding) * 0.20 +
+            (privacy ? 0.45 : 0.0) +
+            stress * 0.20,
+
+        LocationType.Social =>
+            crowding * 0.45 +
+            (1.0 - noise) * 0.15 +
+            (privacy ? -0.10 : 0.0),
+
+        LocationType.Public =>
+            (1.0 - crowding) * 0.35 +
+            (1.0 - noise) * 0.15,
+
+        _ => 0.0
+    };
 }
 
 #endregion

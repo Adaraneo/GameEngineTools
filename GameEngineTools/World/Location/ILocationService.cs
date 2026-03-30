@@ -138,6 +138,8 @@ namespace GameEngineTools.World.Location
         /// </summary>
         /// <param name="type">The location type to query.</param>
         IReadOnlyList<string> GetLocationsByType(LocationType type);
+
+        LocationDescriptor? GetDescriptor(string locationId);
     }
 
     #endregion

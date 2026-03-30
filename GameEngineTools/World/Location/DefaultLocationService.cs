@@ -74,6 +74,9 @@ namespace GameEngineTools.World.Location
         public string? GetLocation(HumanId characterId)
             => _characterLocation.GetValueOrDefault(characterId);
 
+        public LocationDescriptor? GetDescriptor(string locationId)
+            => _descriptors.GetValueOrDefault(locationId);
+
         #endregion
 
         #region ILocationService — dispatch
