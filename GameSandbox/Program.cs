@@ -244,6 +244,8 @@ var mainTrioScene = new SimulationScene(clock, new SimulationSceneOptions
     }
 });
 
+clock.SetNow(clock.Now.AddYears(-2));
+
 var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
 
 var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
