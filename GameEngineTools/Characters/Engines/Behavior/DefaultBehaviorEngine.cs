@@ -267,6 +267,17 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var sleepCooldown = CooldownFor(cooldowns, Sleep);
             if (needRest >= _sleepCfg.SleepPromptThreshold && (sleepCooldown <= 0 || isEmergency))
             {
+                var surface = ctx.Snapshot.InteractionSurface;
+                var inRestLocation = surface.Kind == SurfaceKind.Rest || surface.Kind == SurfaceKind.Private;
+
+                if (!inRestLocation && !isEmergency)
+                {
+                    var moveDur = WTimeSpan.FromMinutes(20);
+                    outbox.Add(new ActionCommitted(now, ctx.Id, MoveToRest, moveDur));
+                    State = State with { CurrentPlan = new PlannedAction(MoveToRest, now, moveDur, needRest) };
+                    return true;
+                }
+
                 outbox.Add(new SleepPromptRequested(now, ctx.Id, needRest));
                 State = State with { WaitingForSleepConfirmation = true, SleepGraceExpiresAt = null };
                 using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine))))
@@ -364,9 +375,6 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// <summary>
         /// Sestaví seznam kandidátů, aplikuje setrvačnost a vybere akci s nejvyšší utilitou.
         /// </summary>
-        /// <remarks>
-        /// Sleep zde záměrně chybí — je řešen přes <see cref="CheckSleepPrompt"/>.
-        /// </remarks>
         private void SelectAction(
             WDateTime now,
             IHumanContext ctx,
@@ -384,20 +392,24 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var rawCreate = Util(needComp, ctx.Personality.Motivation.Curiosity);
 
             var productiveMult = GetProductiveSurfaceMultiplier(surfaceKind);
+            var socialMult = GetSocialSurfaceMultiplier(surfaceKind);
+            var privateMult = GetPrivateSurfaceMultiplier(surfaceKind);
 
             var workHere = rawWork * productiveMult;
             var createHere = rawCreate * productiveMult;
+            var selfCareHere = Util(needSelfCare, 0.5) * privateMult;
+            var inviteIntimHere = Util(needInti, ctx.Personality.Motivation.Sexuality) * privateMult;
 
             var candidates = new List<(string Name, double Utility, WTimeSpan Dur)>
             {
-                (Eat,            Util(needFood,     1.2),                                    WTimeSpan.FromMinutes(30)),
-                (Drink,          Util(needWater,    1.1),                                    WTimeSpan.FromMinutes(10)),
-                (ReachOut,       Util(needBel,      ctx.Personality.Motivation.Affiliation), WTimeSpan.FromHours(1.0)),
-                (Work,           workHere,  WTimeSpan.FromHours(2.0)),
-                (Create,         createHere,   WTimeSpan.FromHours(1.5)),
-                (SelfCare,       Util(needSelfCare, 0.5),                                    WTimeSpan.FromHours(0.5)),
-                (InviteIntimacy, Util(needInti,     ctx.Personality.Motivation.Sexuality),   WTimeSpan.FromHours(1.0)),
-                (Idle,           Util(10,           0.3),                                    WTimeSpan.FromMinutes(30))
+                (Eat,            Util(needFood, 1.2), WTimeSpan.FromMinutes(30)),
+                (Drink,          Util(needWater, 1.1), WTimeSpan.FromMinutes(10)),
+                (ReachOut,       Util(needBel, ctx.Personality.Motivation.Affiliation), WTimeSpan.FromHours(1.0)),
+                (Work,           workHere, WTimeSpan.FromHours(2.0)),
+                (Create,         createHere, WTimeSpan.FromHours(1.5)),
+                (SelfCare,       selfCareHere, WTimeSpan.FromHours(0.5)),
+                (InviteIntimacy, inviteIntimHere, WTimeSpan.FromHours(1.0)),
+                (Idle,           Util(10, 0.3), WTimeSpan.FromMinutes(30))
             };
 
             // Escape drive: high noise + high stress pushes the character toward quieter spaces.
@@ -410,8 +422,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var chronoBonus = ComputeChronoBonus(now, ctx.Personality.Chronotype);
 
             // Social pull: want company when lonely AND current location is not already crowded.
-            var socialPull = needBel * ctx.Personality.Motivation.Affiliation
-                           * Math.Max(0, 1.0 - crowding);
+            var socialPull = needBel * ctx.Personality.Motivation.Affiliation * socialMult;
 
             // Derived productive displacement:
             // "How much productive value am I losing by trying to do this here?"
@@ -424,6 +435,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     ? productiveLoss * 0.80 + chronoBonus * 0.35
                     : 0.0;
 
+            var restMult = GetRestSurfaceMultiplier(surfaceKind);
+            var restLoss = Math.Max(0, needRest * (1 - restMult));
+            var moveToRest = restLoss * 0.75 + noiseStress * 0.5;
+
             candidates.AddRange(new[]
             {
                 // MoveTo:Social — still an independent company-seeking movement
@@ -435,8 +450,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 // MoveTo:Work — now derived from lost productive utility in the current environment
                 (MoveToWork,    moveToWorkDerived,                WTimeSpan.FromMinutes(20)),
 
-                // MoveTo:Rest — still a gentler escape
-                (MoveToRest,    noiseStress * 0.5,                WTimeSpan.FromMinutes(20)),
+                (MoveToRest,    moveToRest,                WTimeSpan.FromMinutes(20)),
 
                 // MoveTo:Public — light wandering
                 (MoveToPublic,  chronoBonus * 0.4,                WTimeSpan.FromMinutes(20)),
@@ -793,6 +807,37 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 SurfaceKind.Rest => 0.32,
                 SurfaceKind.Unknown => 1.00,
                 _ => 0.60
+            };
+
+        private static double GetSocialSurfaceMultiplier(SurfaceKind kind)
+            => kind switch
+            {
+                SurfaceKind.Social => 1.00,
+                SurfaceKind.Public => 0.75,
+                SurfaceKind.Work => 0.45,
+                SurfaceKind.Private => 0.60,  // lze, ale méně přirozeně
+                SurfaceKind.Rest => 0.35,
+                SurfaceKind.Unknown => 1.00,
+                _ => 0.60
+            };
+
+        private static double GetPrivateSurfaceMultiplier(SurfaceKind kind)
+            => kind switch
+            {
+                SurfaceKind.Private => 1.00,
+                SurfaceKind.Rest => 0.90,
+                SurfaceKind.Work => 0.50,
+                SurfaceKind.Social => 0.20,  // SelfCare veřejně — nepříjemné
+                SurfaceKind.Unknown => 1.00,
+                _ => 0.60
+            };
+
+        private static double GetRestSurfaceMultiplier(SurfaceKind kind)
+            => kind switch
+            {
+                SurfaceKind.Private => 1.00,
+                SurfaceKind.Rest => 0.95,
+                _ => 0.5
             };
 
         private static bool CanMoveToWorkLikeLocation(
