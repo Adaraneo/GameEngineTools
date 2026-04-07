@@ -90,7 +90,7 @@ public sealed record PersonalitySpec(
     MotivationMapping MotivationMap
 )
 {
-    public static PersonalitySpec Default
+    public static readonly PersonalitySpec Default
     {
         get
         {
@@ -266,7 +266,7 @@ public sealed record MotivationMapping(
     double BiasSex, (double wO, double wC, double wE, double wA, double wN) WSex
 )
 {
-    public static MotivationMapping Default => new(
+    public static readonly MotivationMapping Default => new(
         BiasAff: 0.50, WAff: (wO: +0.10, wC: -0.05, wE: +0.25, wA: +0.20, wN: -0.05), // extraverze/agreeab.
         BiasAch: 0.50, WAch: (wO: 0.00, wC: +0.30, wE: +0.05, wA: +0.05, wN: -0.10), // conscientiousness
         BiasPow: 0.45, WPow: (wO: -0.05, wC: +0.10, wE: +0.25, wA: -0.15, wN: +0.05), // dominance vs. agreeab.
@@ -407,7 +407,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
 
     private static double[,] CholeskyLike(double[,] corr)
     {
-        int n = 5;
+        int n = corr.GetLength(0);
         var L = new double[n, n];
         for (int i = 0; i < n; i++)
         {
