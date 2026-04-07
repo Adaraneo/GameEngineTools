@@ -204,6 +204,7 @@ public sealed record PersonalitySpec(
             N = (Mean: 0.58, Dev: 0.22),   // high variance — puberty volatility
             O = (Mean: 0.62, Dev: 0.16),   // identity exploration
             C = (Mean: 0.42, Dev: 0.18),   // still developing
+            A = (Mean: 0.44, Dev: 0.16),
             MotivationMap = m with
             {
                 // Sexuality starts developing but not dominant yet
@@ -221,7 +222,7 @@ public sealed record PersonalitySpec(
     {
         N = (Mean: 0.42, Dev: 0.15),   // more emotionally stable
         C = (Mean: 0.58, Dev: 0.14),   // more disciplined
-        A = (Mean: 0.54, Dev: 0.14)    // slightly more agreeable
+        A = (Mean: 0.58, Dev: 0.13)    // slightly more agreeable
     };
 
     /// <summary>
@@ -233,9 +234,10 @@ public sealed record PersonalitySpec(
         var m = MotivationMapping.Default;
         return Default with
         {
-            O = (Mean: 0.40, Dev: 0.14),   // less open to novelty
+            O = (Mean: 0.44, Dev: 0.14),   // less open to novelty
             C = (Mean: 0.62, Dev: 0.12),   // disciplined, routine-oriented
             N = (Mean: 0.38, Dev: 0.14),   // generally more stable
+            E = (Mean: 0.44, DEv: 0.14),
             MotivationMap = m with
             {
                 BiasSex = 0.20,            // reduced but not zero
