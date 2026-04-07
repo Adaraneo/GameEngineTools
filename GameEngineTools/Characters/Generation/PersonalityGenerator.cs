@@ -65,17 +65,29 @@ public sealed record PersonalityHints(
     };
 }
 
+public sealed record TraitDistribution(
+    double Mean,
+    double Dev,
+    double Skew = 0.0,
+    double Concentration = 1.0
+)
+{
+    public double ClampedMean => Math.Clamp(Mean, 1e-6, 1.0 - 1e-6);
+    public double ClampedDev => Math.Max(Dev, 1e-6);
+    public double ClampedConcentration => Math.Max(Concentration, 1e-6);
+}
+
 /// <summary>
 /// Parametry generátoru – střed, rozptyl a korelace BigFive + mapování na motivace.
 /// Vše v [0..1].
 /// </summary>
 public sealed record PersonalitySpec(
     // BigFive baselines
-    (double Mean, double Dev) O,
-    (double Mean, double Dev) C,
-    (double Mean, double Dev) E,
-    (double Mean, double Dev) A,
-    (double Mean, double Dev) N,
+    TraitDistribution O,
+    TraitDistribution C,
+    TraitDistribution E,
+    TraitDistribution A,
+    TraitDistribution N,
 
     // Korelace mezi rysy (sym. 5x5, diag = 1). Hodnoty -1..1. Slabé defaulty.
     double[,] Corr,
@@ -96,18 +108,18 @@ public sealed record PersonalitySpec(
         {
             var corr = new double[5, 5]
             {
-                { 1.00,  0.10,  0.10,  0.15, -0.10 },    // O
-                { 0.10,  1.00,  0.10,  0.10, -0.35 },    // C
-                { 0.10,  0.10,  1.00,  0.05, -0.20 },    // E
-                { 0.15,  0.10,  0.05,  1.00, -0.20 },    // A
-                {-0.10, -0.35, -0.20, -0.20,  1.00 }     // N
+                { 1.00,  0.12,  0.12,  0.15, -0.12 },    // O
+                { 0.12,  1.00,  0.10,  0.10, -0.35 },    // C
+                { 0.12,  0.10,  1.00,  0.08, -0.20 },    // E
+                { 0.15,  0.10,  0.08,  1.00, -0.20 },    // A
+                {-0.12, -0.35, -0.20, -0.20,  1.00 }     // N
             };
             return new PersonalitySpec(
-                O: (0.50, 0.16),
-                C: (0.50, 0.16),
-                E: (0.50, 0.18),
-                A: (0.50, 0.16),
-                N: (0.50, 0.18),
+                O: new TraitDistribution(Mean: 0.50, Dev: 0.16, Skew: 0.00, Concentration: 1.0),
+                C: new TraitDistribution(Mean: 0.50, Dev: 0.16, Skew: 0.00, Concentration: 1.1),
+                E: new TraitDistribution(Mean: 0.50, Dev: 0.18, Skew: 0.00, Concentration: 0.95),
+                A: new TraitDistribution(Mean: 0.50, Dev: 0.16, Skew: 0.05, Concentration: 1.05),
+                N: new TraitDistribution(Mean: 0.50, Dev: 0.18, Skew: 0.05, Concentration: 0.95),
                 Corr: corr,
                 AttachmentWeights: (Secure: 0.58, Anxious: 0.18, Avoidant: 0.18, Disorganized: 0.06),
                 CommunicationWeights: (Indirect: 0.25, Direct: 0.25, LowContext: 0.25, HighContext: 0.25),
@@ -386,16 +398,12 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             y[i] = s;
         }
 
-        double Sig(double x) => 1.0 / (1.0 + Math.Exp(-x));
-        double Map((double Mean, double Dev) p, double v)
-            => Clamp01(p.Mean + p.Dev * (Sig(v) - 0.5) * 2.0);
-
         return (
-            O: Map(spec.O, y[0]),
-            C: Map(spec.C, y[1]),
-            E: Map(spec.E, y[2]),
-            A: Map(spec.A, y[3]),
-            N: Map(spec.N, y[4])
+            O: MapToBoundedTrait(spec.O, y[0]),
+            C: MapToBoundedTrait(spec.C, y[1]),
+            E: MapToBoundedTrait(spec.E, y[2]),
+            A: MapToBoundedTrait(spec.A, y[3]),
+            N: MapToBoundedTrait(spec.N, y[4])
         );
     }
 
@@ -562,10 +570,10 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
     private static double StandardNormalPdf(double x)
         => 0.3989422804014327 * Math.Exp(-0.5 * x * x);
     
-    private static double MapToBoundedTrait((double Mean, double Dev) p, double latent)
+    private static double MapToBoundedTrait(TraitDistribution p, double latent)
     {
-        double mean = Math.Clamp(p.Mean, 1e-6, 1.0 - 1e-6);
-        double dev = Math.Max(p.Dev, 1e-6);
+        double mean = p.ClampedMean;
+        double dev = p.ClampedDev;
     
         // latent mean
         double mu = InverseNormalCdf(mean);
@@ -573,12 +581,20 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // delta-method approx: sd_out ≈ phi(mu) * sigma_latent
         // => sigma_latent ≈ sd_out / phi(mu)
         double phi = Math.Max(StandardNormalPdf(mu), 1e-4);
-        double sigma = dev / phi;
+        double sigma = p.ClampedConcentration;
     
         // ochrana proti přehnanému roztahování
         sigma = Math.Clamp(sigma, 0.05, 3.0);
+
+        var x = mu + sigma * latent;
+
+        // lehká asymetrie v latentním prostoru
+        if (Math.Abs(p.Skew) > 1e-9)
+        {
+            x += p.Skew * 0.35 * (latent * latent - 1.0);
+        }
     
-        return Clamp01(NormalCdf(mu + sigma * latent));
+        return Clamp01(NormalCdf(x));
     }
 
     #region Old helper methods
