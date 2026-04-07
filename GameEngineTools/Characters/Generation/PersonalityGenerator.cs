@@ -412,7 +412,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         while (true)
         {
             var u = 2.0 * rng.NextUnit() - 1.0;
-            var v = 2.0 * rng.NetxUnit() - 1.0;
+            var v = 2.0 * rng.NextUnit() - 1.0;
             var s = u * u + v * v;
 
             if (s <= 0 || s >= 1)
@@ -581,7 +581,9 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // delta-method approx: sd_out ≈ phi(mu) * sigma_latent
         // => sigma_latent ≈ sd_out / phi(mu)
         double phi = Math.Max(StandardNormalPdf(mu), 1e-4);
-        double sigma = p.ClampedConcentration;
+        double sigma = dev / phi;
+
+        sigma /= p.ClampedConcetration;
     
         // ochrana proti přehnanému roztahování
         sigma = Math.Clamp(sigma, 0.05, 3.0);
