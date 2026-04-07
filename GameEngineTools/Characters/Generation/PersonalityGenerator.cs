@@ -109,10 +109,10 @@ public sealed record PersonalitySpec(
                 A: (0.50, 0.16),
                 N: (0.50, 0.18),
                 Corr: corr,
-                AttachmentWeights: (Secure: 0.55, Anxious: 0.15, Avoidant: 0.15, Disorganized: 0.15),
+                AttachmentWeights: (Secure: 0.58, Anxious: 0.18, Avoidant: 0.18, Disorganized: 0.06),
                 CommunicationWeights: (Indirect: 0.25, Direct: 0.25, LowContext: 0.25, HighContext: 0.25),
                 ChronotypeWeights: (Lark: 0.33, Neutral: 0.34, Owl: 0.33),
-                SociosexualityWeights: (Restricted: 0.33, Intermediate: 0.34, Unrestricted: 0.33),
+                SociosexualityWeights: (Restricted: 0.40, Intermediate: 0.35, Unrestricted: 0.25),
                 MotivationMap: MotivationMapping.Default
             );
         }
@@ -274,7 +274,7 @@ public sealed record MotivationMapping(
         BiasCmp: 0.52, WCmp: (wO: +0.08, wC: +0.34, wE: 0.04, wA: 0.02, wN: -0.12),
         BiasAut: 0.50, WAut: (wO: +0.10, wC: +0.05, wE: -0.10, wA: -0.10, wN: +0.05), // autonomie vs. afiliace
         BiasCur: 0.50, WCur: (wO: +0.35, wC: 0.00, wE: +0.05, wA: 0.00, wN: -0.05), // otevřenost
-        BiasRes: 0.50, WRes: (wO: -0.05, wC: +0.05, wE: -0.10, wA: +0.05, wN: +0.30), // neurotic.=potřeba odpočinku
+        BiasRes: 0.50, WRes: (wO: -0.05, wC: +0.05, wE: -0.20, wA: +0.05, wN: +0.15),
         BiasSex: 0.50, WSex: (wO: +0.05, wC: -0.10, wE: +0.20, wA: 0.00, wN: +0.05)
     );
 }
