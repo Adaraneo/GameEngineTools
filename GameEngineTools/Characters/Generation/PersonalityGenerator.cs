@@ -237,7 +237,7 @@ public sealed record PersonalitySpec(
             O = (Mean: 0.44, Dev: 0.14),   // less open to novelty
             C = (Mean: 0.62, Dev: 0.12),   // disciplined, routine-oriented
             N = (Mean: 0.38, Dev: 0.14),   // generally more stable
-            E = (Mean: 0.44, DEv: 0.14),
+            E = (Mean: 0.44, Dev: 0.14),
             MotivationMap = m with
             {
                 BiasSex = 0.20,            // reduced but not zero
