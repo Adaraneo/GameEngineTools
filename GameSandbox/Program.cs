@@ -61,36 +61,35 @@ foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
 Console.Write("Write here an ID of player: ");
 var input = Console.ReadLine();
 
-if (!Guid.TryParse(input, out var pid) && !player.Person.Id.Value.Equals(pid))
+if (!Guid.TryParse(input, out var pid) || !player.Person.Id.Value.Equals(pid))
 {
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine("Player's Id is not correct!");
+    Console.ResetColor();
     return;
 }
 
-Console.ResetColor();
 Console.Write("Write here an ID of player's significatn other: ");
 input = Console.ReadLine();
 if (!Guid.TryParse(input, out var soid))
 {
     Console.BackgroundColor = ConsoleColor.Red;
     Console.WriteLine("ID is not in correct format!");
+    Console.ResetColor();
     return;
 }
 
 var significantOther = manager.Characters.First(character => character.Person.Id.Value.Equals(soid));
 
-Console.ResetColor();
 Console.Write("Write here an ID of player's friend: ");
 input = Console.ReadLine();
 if (!Guid.TryParse(input, out var friendId))
 {
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine("ID is not in correct format!");
+    Console.ResetColor();
     return;
 }
-
-Console.ResetColor();
 
 var friend = manager.Characters.First(ch => ch.Person.Id.Value.Equals(friendId));
 
