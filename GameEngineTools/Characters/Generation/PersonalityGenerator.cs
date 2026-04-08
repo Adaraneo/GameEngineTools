@@ -102,7 +102,7 @@ public sealed record PersonalitySpec(
     MotivationMapping MotivationMap
 )
 {
-    public static readonly PersonalitySpec Default
+    public static PersonalitySpec Default
     {
         get
         {
@@ -165,10 +165,11 @@ public sealed record PersonalitySpec(
         var m = MotivationMapping.Default;
         return Default with
         {
-            N = (Mean: 0.70, Dev: 0.15),   // high emotional reactivity
-            C = (Mean: 0.15, Dev: 0.10),   // almost no self-regulation yet
-            O = (Mean: 0.75, Dev: 0.12),   // everything is new and interesting
-            A = (Mean: 0.70, Dev: 0.12),   // dependent, trusting
+            O = new TraitDistribution(Mean: 0.72, Dev: 0.10, Skew: +0.08, Concentration: 1.15),
+            C = new TraitDistribution(Mean: 0.15, Dev: 0.08, Skew: +0.20, Concentration: 1.35),
+            E = new TraitDistribution(Mean: 0.52, Dev: 0.12, Skew: 0.00, Concentration: 1.05),
+            A = new TraitDistribution(Mean: 0.68, Dev: 0.10, Skew: +0.10, Concentration: 1.10),
+            N = new TraitDistribution(Mean: 0.72, Dev: 0.12, Skew: -0.10, Concentration: 1.00),
             MotivationMap = m with
             {
                 // Zero out sexual motivation — not applicable
@@ -189,10 +190,11 @@ public sealed record PersonalitySpec(
         var m = MotivationMapping.Default;
         return Default with
         {
-            O = (Mean: 0.65, Dev: 0.14),   // naturally curious
-            C = (Mean: 0.35, Dev: 0.15),   // developing self-control
-            N = (Mean: 0.55, Dev: 0.16),   // still emotionally reactive
-            A = (Mean: 0.60, Dev: 0.14),
+            O = new TraitDistribution(Mean: 0.66, Dev: 0.13, Skew: +0.06, Concentration: 1.05),
+            C = new TraitDistribution(Mean: 0.34, Dev: 0.13, Skew: +0.12, Concentration: 1.10),
+            E = new TraitDistribution(Mean: 0.55, Dev: 0.15, Skew: 0.00, Concentration: 1.00),
+            A = new TraitDistribution(Mean: 0.60, Dev: 0.12, Skew: +0.05, Concentration: 1.05),
+            N = new TraitDistribution(Mean: 0.56, Dev: 0.14, Skew: -0.04, Concentration: 0.98),
             MotivationMap = m with
             {
                 BiasSex = 0.0,
@@ -213,10 +215,11 @@ public sealed record PersonalitySpec(
         var m = MotivationMapping.Default;
         return Default with
         {
-            N = (Mean: 0.58, Dev: 0.22),   // high variance — puberty volatility
-            O = (Mean: 0.62, Dev: 0.16),   // identity exploration
-            C = (Mean: 0.42, Dev: 0.18),   // still developing
-            A = (Mean: 0.44, Dev: 0.16),
+            O = new TraitDistribution(Mean: 0.62, Dev: 0.16, Skew: +0.04, Concentration: 0.98),
+            C = new TraitDistribution(Mean: 0.42, Dev: 0.17, Skew: +0.06, Concentration: 0.95),
+            E = new TraitDistribution(Mean: 0.53, Dev: 0.18, Skew: 0.00, Concentration: 0.95),
+            A = new TraitDistribution(Mean: 0.45, Dev: 0.15, Skew: -0.06, Concentration: 0.98),
+            N = new TraitDistribution(Mean: 0.58, Dev: 0.20, Skew: -0.08, Concentration: 0.92),
             MotivationMap = m with
             {
                 // Sexuality starts developing but not dominant yet
@@ -232,9 +235,11 @@ public sealed record PersonalitySpec(
     /// </summary>
     private static PersonalitySpec MidAgedSpec() => Default with
     {
-        N = (Mean: 0.42, Dev: 0.15),   // more emotionally stable
-        C = (Mean: 0.58, Dev: 0.14),   // more disciplined
-        A = (Mean: 0.58, Dev: 0.13)    // slightly more agreeable
+        O = new TraitDistribution(Mean: 0.50, Dev: 0.15, Skew: 0.00, Concentration: 1.02),
+        C = new TraitDistribution(Mean: 0.58, Dev: 0.13, Skew: -0.03, Concentration: 1.08),
+        E = new TraitDistribution(Mean: 0.49, Dev: 0.16, Skew: 0.00, Concentration: 1.00),
+        A = new TraitDistribution(Mean: 0.58, Dev: 0.12, Skew: -0.03, Concentration: 1.08),
+        N = new TraitDistribution(Mean: 0.42, Dev: 0.14, Skew: +0.05, Concentration: 1.05)
     };
 
     /// <summary>
@@ -246,10 +251,11 @@ public sealed record PersonalitySpec(
         var m = MotivationMapping.Default;
         return Default with
         {
-            O = (Mean: 0.44, Dev: 0.14),   // less open to novelty
-            C = (Mean: 0.62, Dev: 0.12),   // disciplined, routine-oriented
-            N = (Mean: 0.38, Dev: 0.14),   // generally more stable
-            E = (Mean: 0.44, Dev: 0.14),
+            O = new TraitDistribution(Mean: 0.44, Dev: 0.13, Skew: +0.05, Concentration: 1.10),
+            C = new TraitDistribution(Mean: 0.62, Dev: 0.11, Skew: -0.04, Concentration: 1.12),
+            E = new TraitDistribution(Mean: 0.44, Dev: 0.13, Skew: +0.03, Concentration: 1.08),
+            A = new TraitDistribution(Mean: 0.56, Dev: 0.12, Skew: -0.02, Concentration: 1.08),
+            N = new TraitDistribution(Mean: 0.38, Dev: 0.13, Skew: +0.06, Concentration: 1.08),
             MotivationMap = m with
             {
                 BiasSex = 0.20,            // reduced but not zero
@@ -278,7 +284,7 @@ public sealed record MotivationMapping(
     double BiasSex, (double wO, double wC, double wE, double wA, double wN) WSex
 )
 {
-    public static readonly MotivationMapping Default => new(
+    public static MotivationMapping Default => new(
         BiasAff: 0.50, WAff: (wO: +0.10, wC: -0.05, wE: +0.25, wA: +0.20, wN: -0.05), // extraverze/agreeab.
         BiasAch: 0.50, WAch: (wO: 0.00, wC: +0.30, wE: +0.05, wA: +0.05, wN: -0.10), // conscientiousness
         BiasPow: 0.45, WPow: (wO: -0.05, wC: +0.10, wE: +0.25, wA: -0.15, wN: +0.05), // dominance vs. agreeab.
@@ -583,7 +589,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         double phi = Math.Max(StandardNormalPdf(mu), 1e-4);
         double sigma = dev / phi;
 
-        sigma /= p.ClampedConcetration;
+        sigma /= p.ClampedConcentration;
     
         // ochrana proti přehnanému roztahování
         sigma = Math.Clamp(sigma, 0.05, 3.0);
