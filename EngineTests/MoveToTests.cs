@@ -58,7 +58,9 @@ namespace EngineTests
     ///
     /// MoveTo:Social             = socialPull + chronoBonus
     /// MoveTo:Private            = noiseStress + chronoBonus * 0.5
-    /// MoveTo:Rest               = noiseStress * 0.5
+    /// restMult                  = multiplier by SurfaceKind for resting suitability
+    /// restLoss                  = max(0, needRest * (1 - restMult))
+    /// MoveTo:Rest               = restLoss * 0.75 + noiseStress * 0.5
     /// MoveTo:Public             = chronoBonus * 0.4
     /// </code>
     /// </para>
@@ -250,40 +252,72 @@ namespace EngineTests
         // ════════════════════════════════════════════════════════════════════
         // Section 3 — Noise/stress escape
         //
-        // Calibration (Noise=0.9, Stress=100, Competence=0.25, hour=3):
+        // Current model note:
+        //   MoveTo:Private = noiseStress + chronoBonus * 0.5
+        //   MoveTo:Rest    = restLoss * 0.75 + noiseStress * 0.5
+        //   restLoss       = max(0, needRest * (1 - restMult))
         //
-        //   noiseStress  = (0.9-0.5)*2 * (100/100) * 20 = 16.0
-        //   chronoBonus  = 0  (hour 3)
+        // Therefore, high stress can strengthen BOTH:
+        //   · MoveTo:Private  (escape / regulation)
+        //   · MoveTo:Rest     (rest displacement on a bad surface)
+        //
+        // To test privacy escape in isolation, the surface must suppress restLoss.
+        // On SurfaceKind.Private:
+        //   restMult = 1.0
+        //   restLoss = 0
+        //
+        // Calibration (Noise=0.9, Stress=100, Competence=0.25, hour=3,
+        //              SurfaceKind=Private):
+        //
+        //   noiseStress    = (0.9-0.5)*2 * (100/100) * 20 = 16.0
+        //   chronoBonus    = 0  (hour 3)
         //   MoveTo:Private = 16.0 + 0*0.5 = 16.0
-        //   MoveTo:Rest    = 16.0 * 0.5 = 8.0
+        //   MoveTo:Rest    = 0*0.75 + 16*0.5 = 8.0
         //
-        //   needComp = 50 + (0.25-0.5)*80 - 100*0.2 = 10
-        //   Work     = 10 * (0.5+0.25) = 7.5   << MoveTo:Private=16 ✓
+        //   needComp       = 50 + (0.25-0.5)*80 - 100*0.2 = 10
+        //   Work           = 10 * (0.5+0.25) = 7.5
+        //
+        // Thus MoveTo:Private cleanly beats both Work and MoveTo:Rest.
+        //
+        // On SurfaceKind.Unknown the same inputs may legitimately favor MoveTo:Rest,
+        // because restLoss is no longer zero and becomes part of movement utility.
         // ════════════════════════════════════════════════════════════════════
 
         #region Noise/stress escape
 
         /// <summary>
-        /// Maximum noise + maximum stress → MoveTo:Private wins over Work.
+        /// Maximum noise + maximum stress on an already private surface
+        /// should favor MoveTo:Private over Work and MoveTo:Rest.
+        /// This isolates the escape drive from rest-surface loss.
         /// </summary>
         [TestMethod]
-        public void Tick_MaxNoiseMaxStress_MoveToPrivateWinsOverWork()
+        public void Tick_MaxNoiseMaxStress_OnPrivateSurface_MoveToPrivateWinsOverWork()
         {
             // Arrange
             //
             // noiseStress    = (0.9-0.5)*2 * (100/100) * 20 = 16.0
-            // MoveTo:Private = 16 + 0 = 16
+            // chronoBonus    = 0
+            // MoveTo:Private = 16.0
             //
-            // needBel  = 20, Affiliation=0.1 → ReachOut = 20*(0.5+0.1) = 12.0
+            // needRest = 20 + 6*0 + (100-95)*0.5 + 100*0.2 = 42.5
+            // SurfaceKind.Private -> restMult = 1.0
+            // restLoss     = 42.5 * (1 - 1.0) = 0
+            // MoveTo:Rest  = 0*0.75 + 16*0.5 = 8.0
+            //
+            // needBel  = 20, Affiliation=0.1 -> ReachOut = 20*(0.5+0.1) = 12.0
             // needComp = 50 + (0.25-0.5)*80 - 100*0.2 = 10
             // Work     = 10*(0.5+0.25) = 7.5
             //
-            // MoveTo:Private=16 > ReachOut=12 > Work=7.5 ✓
+            // MoveTo:Private=16 > ReachOut=12 > MoveTo:Rest=8 > Work=7.5 ✓
             var ctx = BuildContext(
-                noise: 0.9, crowding: 0.5,
-                stress: 100, affiliation: 0.1,
-                competence: 0.25, curiosity: 0.25,
-                chronotype: Chronotype.Neutral);
+                noise: 0.9,
+                crowding: 0.5,
+                stress: 100,
+                affiliation: 0.1,
+                competence: 0.25,
+                curiosity: 0.25,
+                chronotype: Chronotype.Neutral,
+                surfaceKind: SurfaceKind.Private);
 
             var engine = BuildEngine();
             var outbox = new EventCollector();
@@ -293,8 +327,53 @@ namespace EngineTests
 
             // Assert
             var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
-            Assert.AreEqual(MoveToPrivate, chosen.ActionName,
-                $"Max noise + max stress must choose MoveTo:Private. Chosen: {chosen.ActionName}");
+            Assert.AreEqual(
+                MoveToPrivate,
+                chosen.ActionName,
+                $"Max noise + max stress on a private surface must choose MoveTo:Private. Chosen: {chosen.ActionName}");
+        }
+
+        /// <summary>
+        /// Maximum noise + maximum stress on an unknown surface
+        /// may favor MoveTo:Rest because rest-surface loss is added
+        /// on top of noise regulation.
+        /// </summary>
+        [TestMethod]
+        public void Tick_MaxNoiseMaxStress_OnUnknownSurface_MoveToRestWins()
+        {
+            // Arrange
+            //
+            // noiseStress = 16.0
+            //
+            // needRest = 20 + 6*0 + (100-95)*0.5 + 100*0.2 = 42.5
+            // SurfaceKind.Unknown -> restMult = 0.5
+            // restLoss     = 42.5 * (1 - 0.5) = 21.25
+            // MoveTo:Rest  = 21.25*0.75 + 16*0.5 = 23.9375
+            // MoveTo:Private = 16.0
+            //
+            // Therefore MoveTo:Rest > MoveTo:Private in the current model.
+            var ctx = BuildContext(
+                noise: 0.9,
+                crowding: 0.5,
+                stress: 100,
+                affiliation: 0.1,
+                competence: 0.25,
+                curiosity: 0.25,
+                chronotype: Chronotype.Neutral,
+                surfaceKind: SurfaceKind.Unknown);
+
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
+
+            // Act
+            engine.Tick(DeadOfNight, WTimeSpan.FromHours(1), ctx, outbox);
+
+            // Assert
+            var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
+            Assert.AreEqual(
+                MoveToRest,
+                chosen.ActionName,
+                $"Max noise + max stress on an unknown surface should currently choose MoveTo:Rest. Chosen: {chosen.ActionName}");
         }
 
         /// <summary>
@@ -303,22 +382,27 @@ namespace EngineTests
         [TestMethod]
         public void Tick_NoiseBelowThreshold_NoEscapeDrive()
         {
-            // Arrange — Noise=0.4 < 0.5 → noiseStress = max(0, 0.4-0.5)*... = 0
+            // Arrange — Noise=0.4 < 0.5 -> noiseStress = max(0, 0.4-0.5)*... = 0
             var ctx = BuildContext(
-                noise: 0.4, crowding: 0.5,
-                stress: 100, affiliation: 0.5,
-                competence: 0.5, curiosity: 0.5,
+                noise: 0.4,
+                crowding: 0.5,
+                stress: 100,
+                affiliation: 0.5,
+                competence: 0.5,
+                curiosity: 0.5,
                 chronotype: Chronotype.Neutral);
 
             var engine = BuildEngine();
             var outbox = new EventCollector();
 
+            // Act
             engine.Tick(DeadOfNight, WTimeSpan.FromHours(1), ctx, outbox);
 
-            // Assert — with Noise<0.5 noiseStress=0, so even high Stress can't push MoveTo
+            // Assert — with Noise<0.5 noiseStress=0, so the explicit escape drive is absent
             var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
-            Assert.IsFalse(chosen.ActionName.StartsWith("MoveTo:"),
-                $"Noise below threshold must produce no escape drive. Chosen: {chosen.ActionName}");
+            Assert.IsFalse(
+                chosen.ActionName == MoveToPrivate,
+                $"Noise below threshold must not choose MoveTo:Private. Chosen: {chosen.ActionName}");
         }
 
         #endregion Noise/stress escape
@@ -329,92 +413,160 @@ namespace EngineTests
         // chronoBonus formula:
         //   distance = |hour - peakHour|
         //   if distance > 6 → bonus = 0
-        //   else             → bonus = 15 * (1 - distance/6)
+        //   else            → bonus = 15 * (1 - distance / 6)
         //
-        // Full bonus (15) at exactly peak hour.
-        // Zero bonus at ±6 hours from peak or further.
+        // This section should distinguish:
+        //   1) mechanical chrono behavior: the same context yields higher MoveTo utility at peak
+        //   2) behavioral outcome: under favorable conditions, chrono peak can tip MoveTo:Social
+        //      over productive actions
         //
-        // These tests verify bonus shape — not which action wins,
-        // but that MoveTo:Social scores HIGHER at peak vs. off-peak.
+        // Winner-based tests alone are insufficient to verify chrono shape,
+        // because final action selection also depends on Work/Create/ReachOut utilities.
         // ════════════════════════════════════════════════════════════════════
 
         #region Chronotype peak
 
         /// <summary>
-        /// Morning chronotype at hour 8 produces higher MoveTo:Social utility
-        /// than the same character at hour 20 (far from peak).
+        /// In a strongly social and weakly productive context,
+        /// a morning chronotype should choose MoveTo:Social at its peak hour,
+        /// but not at a distant off-peak hour.
         /// </summary>
         [TestMethod]
         public void Tick_MorningChronotype_PeakHourBoostsMoveToSocialOverOffPeak()
         {
-            // Peak   (hour 8):   chronoBonus=15, MoveTo:Social = 20+15 = 35, Work=10.8 → MoveTo wins
-            // OffPeak (hour 20): chronoBonus=0,  MoveTo:Social = 20+0  = 20, Work=50   → Work wins
-            var ctxPeak = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
-                                         affiliation: 1.0, competence: 0.1, curiosity: 0.1,
-                                         chronotype: Chronotype.Lark);
-            var ctxOffPeak = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
-                                         affiliation: 1.0, competence: 0.5, curiosity: 0.5,
-                                         chronotype: Chronotype.Lark);
+            // Arrange
+            var ctxPeak = BuildContext(
+                noise: 0.3,
+                crowding: 0.0,
+                stress: 0,
+                affiliation: 1.0,
+                competence: 0.1,
+                curiosity: 0.1,
+                chronotype: Chronotype.Lark);
+
+            var ctxOffPeak = BuildContext(
+                noise: 0.3,
+                crowding: 0.0,
+                stress: 0,
+                affiliation: 1.0,
+                competence: 0.1,
+                curiosity: 0.1,
+                chronotype: Chronotype.Lark);
 
             var enginePeak = BuildEngine();
             var engineOffPeak = BuildEngine();
             var outboxPeak = new EventCollector();
             var outboxOffPeak = new EventCollector();
 
+            // Act
             enginePeak.Tick(Hour8, WTimeSpan.FromHours(1), ctxPeak, outboxPeak);
             engineOffPeak.Tick(Hour20, WTimeSpan.FromHours(1), ctxOffPeak, outboxOffPeak);
 
+            // Assert
             var chosenPeak = outboxPeak.Drain().OfType<ActionCommitted>().Single();
             var chosenOffPeak = outboxOffPeak.Drain().OfType<ActionCommitted>().Single();
 
-            Assert.AreEqual(MoveToSocial, chosenPeak.ActionName,
-                $"Morning peak (hour 8) must choose MoveTo:Social. Chosen: {chosenPeak.ActionName}");
-            Assert.AreNotEqual(MoveToSocial, chosenOffPeak.ActionName,
-                $"Off-peak (hour 20, high competence) must NOT choose MoveTo:Social. Chosen: {chosenOffPeak.ActionName}");
+            Assert.AreEqual(
+                MoveToSocial,
+                chosenPeak.ActionName,
+                $"Morning peak should choose MoveTo:Social. Chosen: {chosenPeak.ActionName}");
+
+            Assert.AreNotEqual(
+                MoveToSocial,
+                chosenOffPeak.ActionName,
+                $"Far off-peak should not choose MoveTo:Social. Chosen: {chosenOffPeak.ActionName}");
         }
 
         /// <summary>
-        /// Evening chronotype peaks at hour 20 — at that hour MoveTo utility must be
-        /// higher than at hour 8 (which is far from the evening peak).
+        /// In a strongly social and weakly productive context,
+        /// an evening chronotype should choose MoveTo:Social at hour 20,
+        /// but not at hour 8.
         /// </summary>
         [TestMethod]
         public void Tick_EveningChronotype_PeakAt20HigherThanAt8()
         {
-            // Peak   (hour 20): chronoBonus=15, MoveTo:Social = 20+15 = 35, Work=10.8 → MoveTo wins
-            // OffPeak (hour 8):  chronoBonus=0,  MoveTo:Social = 20+0  = 20, Work=50   → Work wins
-            var ctxAt20 = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
-                                       affiliation: 1.0, competence: 0.1, curiosity: 0.1,
-                                       chronotype: Chronotype.Owl);
-            var ctxAt8 = BuildContext(noise: 0.3, crowding: 0.0, stress: 0,
-                                       affiliation: 1.0, competence: 0.5, curiosity: 0.5,
-                                       chronotype: Chronotype.Owl);
+            // Arrange
+            var ctxPeak = BuildContext(
+                noise: 0.3,
+                crowding: 0.0,
+                stress: 0,
+                affiliation: 1.0,
+                competence: 0.1,
+                curiosity: 0.1,
+                chronotype: Chronotype.Owl);
 
-            var engineAt20 = BuildEngine();
-            var engineAt8 = BuildEngine();
-            var outboxAt20 = new EventCollector();
-            var outboxAt8 = new EventCollector();
+            var ctxOffPeak = BuildContext(
+                noise: 0.3,
+                crowding: 0.0,
+                stress: 0,
+                affiliation: 1.0,
+                competence: 0.1,
+                curiosity: 0.1,
+                chronotype: Chronotype.Owl);
 
-            engineAt20.Tick(Hour20, WTimeSpan.FromHours(1), ctxAt20, outboxAt20);
-            engineAt8.Tick(Hour8, WTimeSpan.FromHours(1), ctxAt8, outboxAt8);
+            var enginePeak = BuildEngine();
+            var engineOffPeak = BuildEngine();
+            var outboxPeak = new EventCollector();
+            var outboxOffPeak = new EventCollector();
 
-            var chosenAt20 = outboxAt20.Drain().OfType<ActionCommitted>().Single();
-            var chosenAt8 = outboxAt8.Drain().OfType<ActionCommitted>().Single();
+            // Act
+            enginePeak.Tick(Hour20, WTimeSpan.FromHours(1), ctxPeak, outboxPeak);
+            engineOffPeak.Tick(Hour8, WTimeSpan.FromHours(1), ctxOffPeak, outboxOffPeak);
 
-            Assert.AreEqual(MoveToSocial, chosenAt20.ActionName,
-                $"Evening peak (hour 20) must choose MoveTo:Social. Chosen: {chosenAt20.ActionName}");
-            Assert.AreNotEqual(MoveToSocial, chosenAt8.ActionName,
-                $"Off-peak (hour 8, high competence) must NOT choose MoveTo:Social. Chosen: {chosenAt8.ActionName}");
+            // Assert
+            var chosenPeak = outboxPeak.Drain().OfType<ActionCommitted>().Single();
+            var chosenOffPeak = outboxOffPeak.Drain().OfType<ActionCommitted>().Single();
+
+            Assert.AreEqual(
+                MoveToSocial,
+                chosenPeak.ActionName,
+                $"Evening peak should choose MoveTo:Social. Chosen: {chosenPeak.ActionName}");
+
+            Assert.AreNotEqual(
+                MoveToSocial,
+                chosenOffPeak.ActionName,
+                $"Morning off-peak should not choose MoveTo:Social. Chosen: {chosenOffPeak.ActionName}");
+        }
+
+        /// <summary>
+        /// In a strongly social and low-productivity context, chronotype peak
+        /// can tip the final decision toward MoveTo:Social.
+        /// </summary>
+        [TestMethod]
+        public void Tick_MorningChronotype_FavorableContext_PeakCanMakeMoveToSocialWin()
+        {
+            var ctx = BuildContext(
+                noise: 0.3,
+                crowding: 0.0,
+                stress: 0,
+                affiliation: 1.0,
+                competence: 0.1,
+                curiosity: 0.1,
+                chronotype: Chronotype.Lark);
+
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
+
+            engine.Tick(Hour8, WTimeSpan.FromHours(1), ctx, outbox);
+
+            var chosen = outbox.Drain().OfType<ActionCommitted>().Single();
+
+            Assert.AreEqual(
+                MoveToSocial,
+                chosen.ActionName,
+                $"In a favorable social context, morning peak should allow MoveTo:Social to win. Chosen: {chosen.ActionName}");
         }
 
         /// <summary>
         /// At 3am — more than 6 hours from every chronotype peak — chronoBonus must be zero.
-        /// Verified by checking MoveTo:Public utility (which is chronoBonus * 0.4 only).
+        /// In a calm context with no noise or social pressure, no MoveTo action should win.
         /// </summary>
         [TestMethod]
         public void Tick_DeadOfNight_ChronoBonusIsZeroForAllChronotypes()
         {
-            // At 3am all chronoBonus=0 → MoveTo:* wins only via social pull or noise stress.
-            // With Affiliation=0.5, Noise=0.3 (below threshold), Stress=0 → no MoveTo should win.
+            // At 3am all chronoBonus=0.
+            // With Noise=0.3, Stress=0, Affiliation=0.5 and mild Crowding,
+            // there is no strong independent movement pressure either.
             foreach (var chronotype in new[] { Chronotype.Lark, Chronotype.Owl, Chronotype.Neutral })
             {
                 var ctx    = BuildContext(noise: 0.3, crowding: 0.3, stress: 0,
