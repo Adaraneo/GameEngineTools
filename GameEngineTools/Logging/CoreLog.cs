@@ -495,6 +495,34 @@ namespace GameEngineTools.Logging
 
         /// <summary>Nová relationship hrana vytvořena — první kontakt mezi dvěma postavami.</summary>
         [LoggerMessage(
+            EventId = 2001,
+            Level = LogLevel.Information,
+            Message = "[REL/EVENT] {HumanId} {EventType}: self={Self}, other={Other}, outcome={Outcome}, detail={Detail}.")]
+        public static partial void RelEventReceived(
+            this ILogger logger,
+            string HumanId,
+            string EventType,
+            string Self,
+            string Other,
+            string Outcome,
+            string Detail);
+
+        /// <summary>Výsledek relationship mutace po zpracování eventu — změněná pole před/po.</summary>
+        [LoggerMessage(
+            EventId = 2002,
+            Level = LogLevel.Information,
+            Message = "[REL/APPLY] {HumanId} {EventType}: self={Self}, other={Other}, outcome={Outcome}, changes={Changes}.")]
+        public static partial void RelEventApplied(
+            this ILogger logger,
+            string HumanId,
+            string EventType,
+            string Self,
+            string Other,
+            string Outcome,
+            string Changes);
+
+        /// <summary>Nová relationship hrana vytvořena — první kontakt mezi dvěma postavami.</summary>
+        [LoggerMessage(
             EventId = 2004,
             Level = LogLevel.Information,
             Message = "[REL/EDGE] {HumanId} Nová hrana: {From} → {To}.")]

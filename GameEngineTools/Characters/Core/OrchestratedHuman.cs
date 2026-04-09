@@ -221,21 +221,14 @@ namespace GameEngineTools.Characters.Core
             _relations.Tick(now, dt, _ctx, outbox);
             _memory.Tick(now, dt, _ctx, outbox);
 
-            // After-tick: build new snapshot from the current engine states (double-buffering)
-            var newSnapshot = new EnginesSnapshot(
-                _physio.State,
-                _psych.State,
-                _behavior.State,
-                _interact.State,
-                _relations.State,
-                _memory.State);
-
-            Snapshot      = newSnapshot;
-            _ctx.Snapshot = Snapshot; // context always carries the last completed state
+            // After-tick: build a snapshot from the current engine states before self-delivery.
+            RefreshSnapshot();
 
             // Phase C: self-deliver — character reacts to its own Phase B events
             var toPublish = new EventCollector();
             SelfDeliver(outbox, toPublish);
+            // Self-delivery can still mutate engine state (for example interaction outcomes feeding relationships).
+            RefreshSnapshot();
 
             // Publish events produced during Phase B (other characters receive them next tick)
             PublishOutbox(toPublish);
@@ -392,6 +385,23 @@ namespace GameEngineTools.Characters.Core
                     _log.LogError(ex, "[{Human}] EventBus.Publish failed for {EventType}.", Id.Value, ev.GetType().Name);
                 }
             }
+        }
+
+        /// <summary>
+        /// Rebuilds the externally visible snapshot from the current live engine states.
+        /// Called after both Phase B and Phase C so consumers see the final state of the tick.
+        /// </summary>
+        private void RefreshSnapshot()
+        {
+            Snapshot = new EnginesSnapshot(
+                _physio.State,
+                _psych.State,
+                _behavior.State,
+                _interact.State,
+                _relations.State,
+                _memory.State);
+
+            _ctx.Snapshot = Snapshot;
         }
 
         private void LogState()

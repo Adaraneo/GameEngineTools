@@ -86,9 +86,33 @@ namespace GameEngineTools.Characters.Engines.Behavior
         internal static double ComputeTopIntimacyPotential(RelationshipState rel)
         {
             var top = 0.0;
+
             foreach (var e in rel.Edges.Values)
             {
-                var potential = (e.SexualInterest * 0.45) + (e.RomanticInterest * 0.30) + (e.Comfort * 0.15) + (e.Closeness * 0.10);
+                var basePotential =
+                    (e.SexualInterest * 0.50) +
+                    (e.RomanticInterest * 0.25) +
+                    (e.Comfort * 0.15) +
+                    (e.Closeness * 0.10);
+
+                double gate = 1.0;
+
+                if (e.Comfort < 35)
+                {
+                    gate *= 0.35;
+                }
+
+                if (e.Closeness < 20)
+                {
+                    gate *= 0.45;
+                }
+
+                if (e.Familiarity < 10)
+                {
+                    gate *= 0.70;
+                }
+
+                var potential = basePotential * gate;
                 top = Math.Max(top, potential);
             }
 
