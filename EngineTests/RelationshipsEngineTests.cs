@@ -292,6 +292,139 @@ namespace EngineTests
 
         #endregion Odmítnutí — pokles Like a Comfort
 
+        #region Relationship signals
+
+        /// <summary>
+        /// Accepted conversation should build familiarity first and only nudge sexual interest modestly.
+        /// </summary>
+        [TestMethod]
+        public void Handle_InteractionOutcome_Accepted_IncreasesFamiliarityWithoutAutomaticSexualInterestSpike()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 55, Attraction: 45), ctx, _outbox);
+
+            var before = engine.State.Edges[other];
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.SmallTalk), ctx, _outbox);
+
+            var after = engine.State.Edges[other];
+            Assert.IsTrue(after.Familiarity > before.Familiarity);
+            Assert.IsTrue(after.SexualInterest - before.SexualInterest < 2.0);
+        }
+
+        /// <summary>
+        /// First impression should keep physical and aesthetic seeding as distinct signals.
+        /// </summary>
+        [TestMethod]
+        public void Handle_FirstImpression_SeedsPhysicalAndAestheticAttractionSeparately()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40, BasePhysical: 40, PreferenceMatch: 0), ctx, _outbox);
+            var first = engine.State.Edges[other];
+            Assert.IsTrue(first.PhysicalAttraction > first.AestheticAttraction);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()));
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40, BasePhysical: 0, PreferenceMatch: 35), ctx, _outbox);
+            var second = engine.State.Edges[other];
+            Assert.IsTrue(second.AestheticAttraction > second.PhysicalAttraction);
+        }
+
+        /// <summary>
+        /// Intimate touch should create a stronger sexual-interest increase than light touch.
+        /// </summary>
+        [TestMethod]
+        public void Handle_TouchOutcome_IntimateTouchRaisesSexualInterestMoreThanLightTouch()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 55, Attraction: 45), ctx, _outbox);
+            var start = engine.State.Edges[other].SexualInterest;
+
+            engine.Handle(new TouchOutcome(_now, other, self, TouchLevel.Light, Accepted: true, Reason: "ok"), ctx, _outbox);
+            var light = engine.State.Edges[other].SexualInterest;
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()));
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 55, Attraction: 45), ctx, _outbox);
+            engine.Handle(new TouchOutcome(_now, other, self, TouchLevel.Intimate, Accepted: true, Reason: "ok"), ctx, _outbox);
+            var intimate = engine.State.Edges[other].SexualInterest;
+
+            Assert.IsTrue((light - start) < (intimate - start));
+        }
+
+        /// <summary>
+        /// Familiarity should decay much more slowly than closeness.
+        /// </summary>
+        [TestMethod]
+        public void Tick_DecaysClosenessFasterThanFamiliarity()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 60, Trust: 60, Attraction: 60,
+                    Familiarity: 80, AestheticAttraction: 70, PhysicalAttraction: 70, RomanticInterest: 65, SexualInterest: 60,
+                    Closeness: 80, Respect: 60, Comfort: 60,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 5)
+            }));
+
+            var before = engine.State.Edges[other];
+            engine.Tick(_now, WTimeSpan.FromDays(10), ctx, _outbox);
+            var after = engine.State.Edges[other];
+
+            Assert.IsTrue((before.Closeness - after.Closeness) > (before.Familiarity - after.Familiarity));
+        }
+
+        /// <summary>
+        /// Behavior intimacy should be driven by explicit intimacy-relevant signals.
+        /// </summary>
+        [TestMethod]
+        public void ComputeIntimacyNeed_UsesExplicitSignalsInsteadOfOnlyLegacyAttraction()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var otherA = new HumanId(Guid.NewGuid());
+            var otherB = new HumanId(Guid.NewGuid());
+
+            var rel = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [otherA] = new RelationshipEdge(
+                    self, otherA,
+                    Like: 55, Trust: 55, Attraction: 90,
+                    Familiarity: 40, AestheticAttraction: 35, PhysicalAttraction: 35, RomanticInterest: 20, SexualInterest: 15,
+                    Closeness: 25, Respect: 55, Comfort: 30,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 0),
+                [otherB] = new RelationshipEdge(
+                    self, otherB,
+                    Like: 60, Trust: 70, Attraction: 60,
+                    Familiarity: 55, AestheticAttraction: 60, PhysicalAttraction: 60, RomanticInterest: 75, SexualInterest: 80,
+                    Closeness: 70, Respect: 60, Comfort: 75,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 0)
+            });
+
+            var top = BehaviorMath.ComputeTopIntimacyPotential(rel);
+            Assert.IsTrue(top > 60);
+            Assert.IsTrue(top < 90);
+        }
+
+        #endregion Relationship signals
+
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>

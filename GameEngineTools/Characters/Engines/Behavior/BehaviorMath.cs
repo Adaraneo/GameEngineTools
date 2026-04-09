@@ -71,12 +71,28 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         internal static double ComputeIntimacyNeed(IHumanContext ctx, PhysiologyState ph, RelationshipState rel, PsychologyState ps)
         {
-            var topAttraction = 0.0;
-            foreach (var e in rel.Edges.Values)
-                topAttraction = Math.Max(topAttraction, e.Attraction);
+            // Intimacy need now looks for the strongest contextually viable target
+            // rather than trusting the legacy aggregate attraction field alone.
+            var topAttraction = ComputeTopIntimacyPotential(rel);
 
             var stressPenalty = Math.Max(0, ps.Stress - 50) * 0.3;
             return Math.Clamp(35.0 * (0.5 + ctx.Personality.Motivation.Sexuality) + 0.6 * topAttraction + 25 * ((ph.Cycle?.LibidoMod ?? 1.0) - 1.0) - stressPenalty, 0, 100);
+        }
+
+        /// <summary>
+        /// Computes the highest intimacy potential among all current relationship targets.
+        /// Sexual interest leads, romantic interest follows, and comfort/closeness gate the result.
+        /// </summary>
+        internal static double ComputeTopIntimacyPotential(RelationshipState rel)
+        {
+            var top = 0.0;
+            foreach (var e in rel.Edges.Values)
+            {
+                var potential = (e.SexualInterest * 0.45) + (e.RomanticInterest * 0.30) + (e.Comfort * 0.15) + (e.Closeness * 0.10);
+                top = Math.Max(top, potential);
+            }
+
+            return top;
         }
 
         #endregion Need formulas

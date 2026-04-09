@@ -37,10 +37,28 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Kept temporarily for backward compatibility with older callers.
         /// </summary>
         double Attraction,
+        /// <summary>
+        /// Accumulated familiarity from repeated exposure and accepted contact.
+        /// Higher values mean A feels more acquainted with B.
+        /// </summary>
         double Familiarity,
+        /// <summary>
+        /// Perceived aesthetic appeal driven mainly by taste and preference matching.
+        /// </summary>
         double AestheticAttraction,
+        /// <summary>
+        /// Perceived physical appeal driven mainly by baseline appearance cues.
+        /// </summary>
         double PhysicalAttraction,
+        /// <summary>
+        /// Romantic inclination toward B.
+        /// More context-dependent than raw physical attraction.
+        /// </summary>
         double RomanticInterest,
+        /// <summary>
+        /// Sexual inclination toward B.
+        /// Strongly shaped by physical attraction plus comfort and intimacy context.
+        /// </summary>
         double SexualInterest,
         double Closeness,
         double Respect,
