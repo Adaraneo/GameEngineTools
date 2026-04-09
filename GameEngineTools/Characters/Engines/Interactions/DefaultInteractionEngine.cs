@@ -128,7 +128,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var accepted = ctx.Random.Chance(pAcc);
 
             // Intimate bez dostatečné Closeness/Attraction vždy odmítnuto
-            if (attempted.Level == TouchLevel.Intimate && (closeness < 60 || attraction < 55))
+            if (attempted.Level == TouchLevel.Intimate && (closeness < 60 || intimacyInterest < 55))
             {
                 accepted = false;
             }
