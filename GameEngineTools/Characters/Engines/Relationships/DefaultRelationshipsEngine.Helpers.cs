@@ -26,15 +26,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             return act switch
             {
-                SpeechAct.SmallTalk      => bd with { Humor = BumpD(bd.Humor, +1.5 * mul) },
-                SpeechAct.Question       => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
+                SpeechAct.SmallTalk => bd with { Humor = BumpD(bd.Humor, +1.5 * mul) },
+                SpeechAct.Question => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
                 SpeechAct.SelfDisclosure => bd with { Values = BumpD(bd.Values, +2.0 * mul) },
-                SpeechAct.Validation     => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
-                SpeechAct.Humor          => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
-                SpeechAct.Meta           => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
-                SpeechAct.Invite         => bd with { Physical = BumpD(bd.Physical, +0.5 * mul) },
-                SpeechAct.Boundary       => bd with { Values = BumpD(bd.Values, -1.0 * mul) },
-                _                        => bd
+                SpeechAct.Validation => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
+                SpeechAct.Humor => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
+                SpeechAct.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
+                SpeechAct.Invite => bd with { Physical = BumpD(bd.Physical, +0.5 * mul) },
+                SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.0 * mul) },
+                _ => bd
             };
         }
 
@@ -117,10 +117,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private static double TouchBoost(TouchLevel level) => level switch
         {
-            TouchLevel.Light    => +1.5,
+            TouchLevel.Light => +1.5,
             TouchLevel.Friendly => +3.0,
             TouchLevel.Intimate => +5.0,
-            _                   => 0.0
+            _ => 0.0
         };
 
         /// <summary>
