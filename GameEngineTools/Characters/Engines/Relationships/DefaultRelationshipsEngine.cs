@@ -37,7 +37,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     /// This keeps the effect in the engine that owns Attraction — no external calculator needed.
     /// </para>
     /// </remarks>
-    internal sealed class DefaultRelationshipsEngine : IRelationshipsEngine
+    internal sealed partial class DefaultRelationshipsEngine : IRelationshipsEngine
     {
         #region State and configuration
 
@@ -377,6 +377,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         public void RestoreState(RelationshipState state) => State = state;
 
         #endregion RestoreState
+        #if false
 
         #region Private methods — DomainBreakdown
 
@@ -577,5 +578,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 : Math.Max(target, cur - amount);
 
         #endregion Private methods — helpers
+        #endif
     }
 }
