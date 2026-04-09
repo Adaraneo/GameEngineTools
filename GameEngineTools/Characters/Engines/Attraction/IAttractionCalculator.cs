@@ -78,7 +78,7 @@ namespace GameEngineTools.Characters.Engines.Attraction
     /// </summary>
     /// <param name="Score">
     /// Final attraction score in [0, 100]. This is the value that goes into
-    /// <c>FirstImpressionFormed.Attraction</c> or a <c>RelationshipEdge</c>.
+    /// <c>FirstImpressionFormed.Attraction</c> for first-impression seeding.
     /// </param>
     /// <param name="BasePhysical">
     /// Contribution from evolutionary baseline signals (WHR, height, symmetry).

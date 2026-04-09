@@ -253,7 +253,7 @@ namespace EngineTests
         // ── MereExposure — přesunuto do RelationshipsEngine ─────────────────────
         // Mere-exposure effect je nyní zodpovědností DefaultRelationshipsEngine.
         // Testuj ho v RelationshipsEngineTests přes InteractionOutcome accepted
-        // a ověř že RelationshipEdge.Attraction roste logaritmicky s PositiveInteractionCount.
+        // a ověř že relationship familiarity roste logaritmicky s PositiveInteractionCount.
 
         // ── FirstImpressionLike ──────────────────────────────────────────────────
 

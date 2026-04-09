@@ -104,7 +104,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
             rels.TryGetValue(attempted.From, out var edge);
 
             var closeness = edge?.Closeness ?? 0;
-            var attraction = edge?.Attraction ?? 0;
+            var intimacyInterest = edge is null
+                ? 0
+                : (edge.SexualInterest * 0.65) + (edge.RomanticInterest * 0.35);
             var comfort = edge?.Comfort ?? 0;
             var psych = ctx.Snapshot.Psychology;
 
@@ -113,7 +115,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             {
                 TouchLevel.Light => 0.5 + closeness * 0.005,
                 TouchLevel.Friendly => 0.3 + closeness * 0.007 + comfort * 0.003,
-                TouchLevel.Intimate => 0.05 + closeness * 0.006 + attraction * 0.007,
+                TouchLevel.Intimate => 0.05 + closeness * 0.006 + intimacyInterest * 0.007,
                 _ => 0
             };
 

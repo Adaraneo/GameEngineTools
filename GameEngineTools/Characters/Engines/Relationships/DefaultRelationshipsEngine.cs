@@ -78,7 +78,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             {
                 // ── First impression ─────────────────────────────────────────────────────
                 case FirstImpressionFormed fi:
-                    Upsert(self, fi.B, e => RecomputeLegacy(e with
+                    Upsert(self, fi.B, e => e with
                     {
                         // Lerp 70% toward the first impression — does not fully override
                         // if the character already knows the person slightly.
@@ -104,14 +104,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             Aesthetics = Lerp(e.Breakdown.Aesthetics,
                                              fi.PreferenceMatch / 35.0 * 100.0, 0.7)
                         }
-                    }));
+                    });
 
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
                     {
                         _log.RelFirstImpression(
                             ctx.Id.Value.ToString(),
                             fi.A.Value.ToString(), fi.B.Value.ToString(),
-                            fi.Like, fi.Attraction);
+                        fi.Like, fi.Attraction);
                     }
 
                     break;

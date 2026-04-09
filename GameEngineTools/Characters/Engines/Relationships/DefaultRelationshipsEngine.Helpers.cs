@@ -40,7 +40,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
         #endregion Private methods — DomainBreakdown
 
-        #region Private methods — legacy attraction and signal deltas
+        #region Private methods — signal deltas
 
         /// <summary>
         /// Computes the total familiarity bonus produced by repeated accepted interactions.
@@ -55,19 +55,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
             var saturation = Math.Log(1.0 + count) / Math.Log(1.0 + config.MereExposureSaturation);
             return Math.Clamp(saturation * config.MereExposureMaxBoost, 0.0, config.MereExposureMaxBoost);
         }
-
-        /// <summary>
-        /// Rebuilds the compatibility attraction score from the explicit relationship signals.
-        /// </summary>
-        private static double ComputeLegacyAttraction(RelationshipEdge e)
-            => Clamp(
-                (e.Familiarity * 0.20)
-              + (e.AestheticAttraction * 0.24)
-              + (e.PhysicalAttraction * 0.24)
-              + (e.RomanticInterest * 0.16)
-              + (e.SexualInterest * 0.18)
-              + (e.Comfort * 0.12)
-              + (e.Closeness * 0.10));
 
         /// <summary>
         /// Computes a context-sensitive romantic-interest gain.
@@ -96,7 +83,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         private double ComputeFamiliarityExposureDelta(int previousCount, int newCount)
             => MereExposureBoost(newCount, Config) - MereExposureBoost(previousCount, Config);
 
-        #endregion Private methods — legacy attraction and signal deltas
+        #endregion Private methods — signal deltas
 
         #region Private methods — helpers
 
@@ -143,7 +130,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     B: other,
                     Like: 45,
                     Trust: 45,
-                    Attraction: 35,
                     Familiarity: 10,
                     AestheticAttraction: 35,
                     PhysicalAttraction: 35,
@@ -161,23 +147,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 }
             }
 
-            var updated = RecomputeLegacy(mut(e));
+            var updated = mut(e);
 
             using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
             {
                 _log.RelEdgeUpdated(
                     self.Value.ToString(), self.Value.ToString(), other.Value.ToString(),
                     updated.Like, updated.Trust, updated.Closeness,
-                    updated.Attraction, updated.Comfort, updated.Respect);
+                    updated.Comfort, updated.Respect);
             }
 
             dict[other] = updated;
             State = new RelationshipState(dict);
         }
-
-        /// <summary>Recomputes the legacy attraction aggregate from explicit relationship signals.</summary>
-        private static RelationshipEdge RecomputeLegacy(RelationshipEdge edge)
-            => edge with { Attraction = ComputeLegacyAttraction(edge) };
 
         /// <summary>Bumps a primary relationship dimension by <paramref name="by"/> and clamps to [0, 100].</summary>
         private static double Bump(double v, double by)

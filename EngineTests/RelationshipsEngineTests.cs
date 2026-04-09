@@ -376,7 +376,7 @@ namespace EngineTests
             {
                 [other] = new RelationshipEdge(
                     self, other,
-                    Like: 60, Trust: 60, Attraction: 60,
+                    Like: 60, Trust: 60,
                     Familiarity: 80, AestheticAttraction: 70, PhysicalAttraction: 70, RomanticInterest: 65, SexualInterest: 60,
                     Closeness: 80, Respect: 60, Comfort: 60,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
@@ -404,14 +404,14 @@ namespace EngineTests
             {
                 [otherA] = new RelationshipEdge(
                     self, otherA,
-                    Like: 55, Trust: 55, Attraction: 90,
+                    Like: 55, Trust: 55,
                     Familiarity: 40, AestheticAttraction: 35, PhysicalAttraction: 35, RomanticInterest: 20, SexualInterest: 15,
                     Closeness: 25, Respect: 55, Comfort: 30,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
                     PositiveInteractionCount: 0),
                 [otherB] = new RelationshipEdge(
                     self, otherB,
-                    Like: 60, Trust: 70, Attraction: 60,
+                    Like: 60, Trust: 70,
                     Familiarity: 55, AestheticAttraction: 60, PhysicalAttraction: 60, RomanticInterest: 75, SexualInterest: 80,
                     Closeness: 70, Respect: 60, Comfort: 75,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),

@@ -18,11 +18,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
         double Like,
         double Trust,
         /// <summary>
-        /// Legacy aggregate attraction score derived from the explicit relationship signals.
-        /// Kept temporarily for backward compatibility with older callers.
-        /// </summary>
-        double Attraction,
-        /// <summary>
         /// Accumulated familiarity from repeated exposure and accepted contact.
         /// Higher values mean A feels more acquainted with B.
         /// </summary>
