@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using System.Collections.Generic;
     using Arbitration;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Behavior.Intent;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
     using GameEngineTools.Characters.Engines.Behavior.Needs;
     using GameEngineTools.Characters.Engines.Behavior.Sleep;
@@ -23,6 +24,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private readonly IReadOnlyList<IBehaviorNeedEngine> _needEngines;
         private readonly IReadOnlyList<IBehaviorModifierEngine> _modifierEngines;
         private readonly ISleepCoordinator _sleepCoordinator;
+        private readonly IIntentManagementEngine _intentManagementEngine;
         private readonly IActionArbitrationEngine _arbitrationEngine;
 
         public BehaviorState State { get; private set; }
@@ -36,6 +38,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine() };
             _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
+            _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
         }
 
@@ -53,9 +56,19 @@ namespace GameEngineTools.Characters.Engines.Behavior
             foreach (var engine in _needEngines) candidates.AddRange(engine.Evaluate(context).Candidates);
             foreach (var modifier in _modifierEngines) modifier.Modify(context, candidates);
 
+            if (Config.UseIntentManagement)
+            {
+                State = _intentManagementEngine.UpdateIntent(context, candidates);
+                context = context with { State = State };
+                _intentManagementEngine.ApplyBias(context, candidates);
+            }
+
             var result = _arbitrationEngine.Arbitrate(context, candidates);
             State = result.NewState;
             if (result.KeepRunningPlan || result.SelectedCandidate is null) return;
+
+            if (State.ActiveIntent is { } active)
+                State = State with { ActiveIntent = active with { UpdatedAt = now, Commitment = active.Commitment + (BehaviorIntentMapper.Matches(active, result.SelectedCandidate.Name) ? 1 : -1), Strength = result.SelectedCandidate.Utility } };
 
             outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility));
             outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration));
