@@ -342,8 +342,20 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
             return edge?.Like ?? 45.0;
         }, rng);
 
-        var targetEdge = character.Snapshot.Relationships.Edges.GetValueOrDefault(target.Id);
-        var act = ChooseSpeechAct(targetEdge, rng);
+        var selection = ReachOutSpeechActSelector.SelectSpeechAct(character, target, now, rng);
+        var act = selection.Act;
+
+        Console.WriteLine(
+            "[ReachOut] {0} -> {1}: action={2}, familiarity={3:F1}, trust={4:F1}, comfort={5:F1}, closeness={6:F1}, romantic={7:F1}, privacy={8}.",
+            character.Id.Value,
+            target.Id.Value,
+            act,
+            selection.Familiarity,
+            selection.Trust,
+            selection.Comfort,
+            selection.Closeness,
+            selection.RomanticInterest,
+            selection.HasPrivacy ? "yes" : "no");
 
         target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null));
         TryTouch(now, character, target, rng);
@@ -381,41 +393,6 @@ static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, IL
         if (rng.NextDouble() < 0.30)
             character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, "noticed your work"));
     }
-}
-
-/// <summary>
-/// Chooses a <see cref="SpeechAct"/> appropriate for the current relationship depth.
-/// </summary>
-/// <remarks>
-/// The progression mirrors real-world social dynamics:
-/// strangers exchange small talk, acquaintances begin asking questions,
-/// close friends risk self-disclosure and vulnerability.
-/// </remarks>
-/// <param name="edge">Current relationship edge, or <c>null</c> if characters have not met.</param>
-/// <param name="rng">Random source from the initiating character's context.</param>
-/// <returns>The most contextually appropriate <see cref="SpeechAct"/>.</returns>
-static SpeechAct ChooseSpeechAct(RelationshipEdge? edge, Random rng)
-{
-    // Strangers or very early acquaintance — safe, low-risk opening
-    if (edge is null || edge.Closeness < 20)
-        return SpeechAct.SmallTalk;
-
-    // Getting to know each other — curiosity starts showing
-    if (edge.Closeness < 40)
-        return rng.NextDouble() < 0.40 ? SpeechAct.Question : SpeechAct.SmallTalk;
-
-    // Established acquaintance — humor and deeper curiosity become natural
-    if (edge.Closeness < 60)
-    {
-        if (rng.NextDouble() < 0.30) return SpeechAct.SelfDisclosure;
-        if (rng.NextDouble() < 0.40) return SpeechAct.Humor;
-        return SpeechAct.Question;
-    }
-
-    // Close relationship — validation, meta-commentary, vulnerability
-    if (rng.NextDouble() < 0.25) return SpeechAct.Validation;
-    if (rng.NextDouble() < 0.35) return SpeechAct.SelfDisclosure;
-    return SpeechAct.Meta;
 }
 
 /// <summary>
