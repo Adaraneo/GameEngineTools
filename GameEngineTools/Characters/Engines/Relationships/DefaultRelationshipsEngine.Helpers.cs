@@ -64,7 +64,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         {
             var context =((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
                  + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.9)
-                 + ((Math.Max(0.0, e.Closeness - 40.0) / 60.0) * 1.1)
+                 + ((Math.Max(0.0, e.Closeness - 25.0) / 75.0) * 1.1)
                  + ((Math.Max(0.0, e.Like - 45.0) / 55.0) * 0.6)
                  + ((Math.Max(0.0, e.Breakdown.Values - 50.0) / 50.0) * 0.8);
 
@@ -125,8 +125,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
         private static double TouchBoost(TouchLevel level) => level switch
         {
             TouchLevel.Light => +0.1,
-            TouchLevel.Friendly => +1.0,
-            TouchLevel.Intimate => +4.0,
+            TouchLevel.Friendly => +0.8,
+            TouchLevel.Intimate => +3.5,
             _ => 0.0
         };
 

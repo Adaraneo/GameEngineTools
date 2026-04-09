@@ -177,8 +177,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             // Delta = total boost at (N+1) minus total boost at N.
                             // Logarithmic growth → fast early, levels off near saturation.
                             var newCount = e.PositiveInteractionCount + 1;
-                            var exposureDelta = MereExposureBoost(newCount, Config)
-                                              - MereExposureBoost(e.PositiveInteractionCount, Config);
+                            var familiarityDelta = ComputeFamiliarityExposureDelta(e.PositiveInteractionCount, newCount);
 
                             return e with
                             {
@@ -189,7 +188,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act)),
                                 Trust = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
                                 Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
-                                Familiarity = Bump(e.Familiarity, exposureDelta),
+                                Familiarity = Bump(e.Familiarity, familiarityDelta),
                                 PositiveInteractionCount = newCount,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                             };
