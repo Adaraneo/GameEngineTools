@@ -176,7 +176,7 @@ foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != playerPerso
     }
 }
 
-var mainTrioScene = new SimulationScene(clock, new SimulationSceneOptions
+var mainTrioSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson],
     LocationService = locationService,
@@ -186,7 +186,7 @@ var mainTrioScene = new SimulationScene(clock, new SimulationSceneOptions
 
     ResolveCharacter = id =>
     {
-        var chars = new []{ playerPerson, significantOtherPerson, friendPerson };
+        var chars = new[] { playerPerson, significantOtherPerson, friendPerson };
         var found = chars.FirstOrDefault(c => c.Id == id);
 
         return found is not null
@@ -220,7 +220,7 @@ var mainTrioScene = new SimulationScene(clock, new SimulationSceneOptions
         RouteMoveTo(now, chars, locationService, rng);
 
         // ── Location context — move both to Castle on day 16, evening ─────────
-        if (now.Day is 16 && now.Hour is 20 
+        if (now.Day is 16 && now.Hour is 20
         && !locationService.GetLocation(significantOtherPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
         && !locationService.GetLocation(playerPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
         && !locationService.GetLocation(friendPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase))
@@ -234,9 +234,11 @@ var mainTrioScene = new SimulationScene(clock, new SimulationSceneOptions
 
         OrganicMicroPositives(now, chars, locationService, rng);
     }
-});
+};
 
-clock.SetNow(clock.Now.AddYears(-2));
+var mainTrioScene = new SimulationScene(clock, mainTrioSceneOpts);
+
+clock.SetNow(clock.Now.AddYears(-mainTrioSceneOpts.SimulationYears));
 
 var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
 

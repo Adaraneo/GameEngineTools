@@ -60,22 +60,42 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Computes a context-sensitive romantic-interest gain.
         /// Trust, comfort, closeness, like, and value alignment matter more than raw appearance.
         /// </summary>
-        private static double ComputeRomanticInterestDelta(RelationshipEdge e)
-            => ((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
-             + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.9)
-             + ((Math.Max(0.0, e.Closeness - 40.0) / 60.0) * 1.1)
-             + ((Math.Max(0.0, e.Like - 45.0) / 55.0) * 0.6)
-             + ((Math.Max(0.0, e.Breakdown.Values - 50.0) / 50.0) * 0.8);
+        private static double ComputeRomanticInterestDelta(RelationshipEdge e, SpeechAct act)
+        {
+            var context =((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
+                 + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.9)
+                 + ((Math.Max(0.0, e.Closeness - 40.0) / 60.0) * 1.1)
+                 + ((Math.Max(0.0, e.Like - 45.0) / 55.0) * 0.6)
+                 + ((Math.Max(0.0, e.Breakdown.Values - 50.0) / 50.0) * 0.8);
+
+            return act switch
+            {
+                SpeechAct.SelfDisclosure => context * 0.7,
+                SpeechAct.Validation => context * 0.45,
+                SpeechAct.Meta => context * 0.35,
+                SpeechAct.Invite => context * 0.3,
+                _ => 0
+            };
+        }
 
         /// <summary>
         /// Computes a context-sensitive sexual-interest gain.
         /// Physical and aesthetic attraction lead, while comfort and closeness act as gates.
         /// </summary>
-        private static double ComputeSexualInterestDelta(RelationshipEdge e)
-            => ((Math.Max(0.0, e.PhysicalAttraction - 45.0) / 55.0) * 0.8)
-             + ((Math.Max(0.0, e.AestheticAttraction - 45.0) / 55.0) * 0.6)
-             + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.3)
-             + ((Math.Max(0.0, e.Closeness - 40.0) / 60.0) * 0.25);
+        private static double ComputeSexualInterestDelta(RelationshipEdge e, SpeechAct act)
+        {
+            var context = ((Math.Max(0, e.PhysicalAttraction - 50) / 50) * 0.9)
+                + ((Math.Max(0, e.AestheticAttraction - 50) / 50) * 0.6);
+
+            var gate = ((Math.Max(0, e.Comfort - 40) / 60) * 0.35)
+                + ((Math.Max(0, e.Closeness - 20) / 80) * 0.25);
+
+            return act switch
+            {
+                SpeechAct.Invite => (context + gate) * 0.18,
+                _ => 0
+            };
+        }
 
         /// <summary>
         /// Converts a change in accepted interaction count into an incremental familiarity delta.
@@ -104,9 +124,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private static double TouchBoost(TouchLevel level) => level switch
         {
-            TouchLevel.Light => +1.5,
-            TouchLevel.Friendly => +3.0,
-            TouchLevel.Intimate => +5.0,
+            TouchLevel.Light => +0.1,
+            TouchLevel.Friendly => +1.0,
+            TouchLevel.Intimate => +4.0,
             _ => 0.0
         };
 
@@ -128,16 +148,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 e = new RelationshipEdge(
                     A: self,
                     B: other,
-                    Like: 45,
-                    Trust: 45,
-                    Familiarity: 10,
-                    AestheticAttraction: 35,
-                    PhysicalAttraction: 35,
-                    RomanticInterest: 35,
-                    SexualInterest: 30,
-                    Closeness: 10,
-                    Respect: 55,
-                    Comfort: 40,
+                    Like: 50,
+                    Trust: 50,
+                    Familiarity: 0,
+                    AestheticAttraction: 0,
+                    PhysicalAttraction: 0,
+                    RomanticInterest: 0,
+                    SexualInterest: 0,
+                    Closeness: 0,
+                    Respect: 50,
+                    Comfort: 45,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
                     PositiveInteractionCount: 0);
 

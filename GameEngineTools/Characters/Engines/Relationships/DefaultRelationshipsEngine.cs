@@ -82,26 +82,26 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         // Lerp 70% toward the first impression — does not fully override
                         // if the character already knows the person slightly.
                         Like = Lerp(e.Like, fi.Like, 0.7),
-                        Familiarity = Math.Max(e.Familiarity, 8),
-                        Trust = e.Trust <= 0 ? 45 : e.Trust,
-                        Closeness = Math.Max(e.Closeness, 10),
-                        AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.7),
-                        PhysicalAttraction = Lerp(e.PhysicalAttraction, fi.BasePhysical / 40.0 * 100.0, 0.7),
-                        RomanticInterest = Lerp(e.RomanticInterest, Math.Max(35.0, fi.Like * 0.55), 0.15),
-                        SexualInterest = Lerp(e.SexualInterest, Math.Max(30.0, fi.Attraction * 0.45), 0.10),
+                        Familiarity = Math.Max(e.Familiarity, 2),
+                        Trust = e.Trust <= 0 ? 50 : e.Trust,
+                        Closeness = Math.Max(e.Closeness, 0),
+                        AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.8),
+                        PhysicalAttraction = Lerp(e.PhysicalAttraction, fi.BasePhysical / 40.0 * 100.0, 0.8),
+                        RomanticInterest = e.RomanticInterest,
+                        SexualInterest = e.SexualInterest,
                         Breakdown = e.Breakdown with
                         {
                             // BasePhysical (max 40) → normalised to [0, 100] for the Physical domain.
                             // Models the immediate "this person is physically striking" impression
                             // from evolutionary signals: WHR, height range, facial symmetry.
                             Physical = Lerp(e.Breakdown.Physical,
-                                             fi.BasePhysical / 40.0 * 100.0, 0.7),
+                                             fi.BasePhysical / 40.0 * 100.0, 0.8),
 
                             // PreferenceMatch (max 35) → normalised to [0, 100] for the Aesthetics domain.
                             // Models personal taste — how closely the target matches the observer's
                             // own physical ideal (height preference, frame, WHR preference).
                             Aesthetics = Lerp(e.Breakdown.Aesthetics,
-                                             fi.PreferenceMatch / 35.0 * 100.0, 0.7)
+                                             fi.PreferenceMatch / 35.0 * 100.0, 0.8)
                         }
                     });
 
@@ -185,8 +185,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Closeness = Bump(e.Closeness, +1.5),
                                 Like = Bump(e.Like, +0.5),
                                 Comfort = Bump(e.Comfort, +0.8),
-                                RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e)),
-                                SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e)),
+                                RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act)),
+                                SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act)),
                                 Trust = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
                                 Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
                                 Familiarity = Bump(e.Familiarity, exposureDelta),
@@ -340,12 +340,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 {
                     Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect),
                     Trust = Clamp(Approach(e.Trust, 50, d * 0.5)),
-                    Familiarity = Clamp(Approach(e.Familiarity, 25, d * 0.08)),
+                    Familiarity = Clamp(Approach(e.Familiarity, 10, d * 0.08)),
                     AestheticAttraction = e.AestheticAttraction,
                     PhysicalAttraction = e.PhysicalAttraction,
-                    RomanticInterest = Clamp(Approach(e.RomanticInterest, 35, d * 0.45)),
-                    SexualInterest = Clamp(Approach(e.SexualInterest, 30, d * 0.70)),
-                    Closeness = Clamp(Approach(e.Closeness, 35, d * 1.2)),
+                    RomanticInterest = Clamp(Approach(e.RomanticInterest, 5, d * 0.45)),
+                    SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * 0.70)),
+                    Closeness = Clamp(Approach(e.Closeness, 5, d * 1.2)),
                     Respect = Clamp(Approach(e.Respect, 55, d * 0.3)),
                     Comfort = Clamp(Approach(e.Comfort, 45, d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
                     Breakdown = new DomainBreakdown(
