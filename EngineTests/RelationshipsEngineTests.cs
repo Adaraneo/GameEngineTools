@@ -10,10 +10,13 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System.Linq;
     using System.Collections.Generic;
 
     /// <summary>
@@ -425,12 +428,194 @@ namespace EngineTests
 
         #endregion Relationship signals
 
+        #region Runtime wiring
+
+        /// <summary>
+        /// Recipient-generated interaction outcomes must reach both directional relationship snapshots.
+        /// </summary>
+        [TestMethod]
+        public void RuntimeFlow_InteractionOutcome_UpdatesRelationshipSnapshotsOnBothSides()
+        {
+            var now = new WDateTime(0);
+            var dt = WTimeSpan.FromHours(0.5);
+            var initiator = CreateRuntimeHuman(SexBiology.Male);
+            var recipient = CreateRuntimeHuman(SexBiology.Female);
+
+            SeedRelationship(recipient, initiator.Id, closeness: 80, comfort: 85, trust: 85, romanticInterest: 60, sexualInterest: 55);
+
+            var recipientBefore = recipient.Snapshot.Relationships.Edges[initiator.Id];
+
+            recipient.ReceiveEvent(new InteractionProposed(now, initiator.Id, recipient.Id, SpeechAct.SmallTalk, "Ahoj"));
+            recipient.Tick(now, dt);
+
+            Assert.IsTrue(
+                recipient.LastOutbox.OfType<InteractionOutcome>().Any(o => o.From == initiator.Id && o.To == recipient.Id && o.Accepted),
+                "Recipient should publish an accepted InteractionOutcome.");
+
+            var outcome = recipient.LastOutbox.OfType<InteractionOutcome>().First(o => o.From == initiator.Id && o.To == recipient.Id);
+            initiator.ReceiveEvent(outcome);
+            initiator.Tick(now + dt, dt);
+
+            var recipientAfter = recipient.Snapshot.Relationships.Edges[initiator.Id];
+            var initiatorAfter = initiator.Snapshot.Relationships.Edges[recipient.Id];
+
+            Assert.IsTrue(recipientAfter.PositiveInteractionCount > recipientBefore.PositiveInteractionCount);
+            Assert.IsTrue(recipientAfter.Familiarity > recipientBefore.Familiarity);
+            Assert.IsTrue(initiatorAfter.PositiveInteractionCount > 0);
+            Assert.IsTrue(initiatorAfter.Familiarity > 0);
+        }
+
+        /// <summary>
+        /// Recipient-generated touch outcomes must reach both directional relationship snapshots.
+        /// </summary>
+        [TestMethod]
+        public void RuntimeFlow_TouchOutcome_UpdatesRelationshipSnapshotsOnBothSides()
+        {
+            var now = new WDateTime(0);
+            var dt = WTimeSpan.FromHours(0.5);
+            var initiator = CreateRuntimeHuman(SexBiology.Male);
+            var recipient = CreateRuntimeHuman(SexBiology.Female);
+
+            SeedRelationship(recipient, initiator.Id, closeness: 85, comfort: 90, trust: 85, romanticInterest: 70, sexualInterest: 75);
+            SeedRelationship(initiator, recipient.Id, closeness: 80, comfort: 85, trust: 80, romanticInterest: 65, sexualInterest: 70);
+
+            var recipientBefore = recipient.Snapshot.Relationships.Edges[initiator.Id];
+            var initiatorBefore = initiator.Snapshot.Relationships.Edges[recipient.Id];
+
+            recipient.ReceiveEvent(new TouchAttempted(now, initiator.Id, recipient.Id, TouchLevel.Intimate));
+            recipient.Tick(now, dt);
+
+            Assert.IsTrue(
+                recipient.LastOutbox.OfType<TouchOutcome>().Any(o => o.From == initiator.Id && o.To == recipient.Id && o.Accepted),
+                "Recipient should publish an accepted TouchOutcome.");
+
+            var outcome = recipient.LastOutbox.OfType<TouchOutcome>().First(o => o.From == initiator.Id && o.To == recipient.Id);
+            initiator.ReceiveEvent(outcome);
+            initiator.Tick(now + dt, dt);
+
+            var recipientAfter = recipient.Snapshot.Relationships.Edges[initiator.Id];
+            var initiatorAfter = initiator.Snapshot.Relationships.Edges[recipient.Id];
+
+            Assert.IsTrue(recipientAfter.SexualInterest > recipientBefore.SexualInterest);
+            Assert.IsTrue(recipientAfter.Comfort > recipientBefore.Comfort);
+            Assert.IsTrue(initiatorAfter.SexualInterest > initiatorBefore.SexualInterest);
+            Assert.IsTrue(initiatorAfter.Comfort > initiatorBefore.Comfort);
+        }
+
+        #endregion Runtime wiring
+
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>
         private DefaultRelationshipsEngine BuildEngine() => new DefaultRelationshipsEngine(
             Options.Create(DefaultCfg),
             LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+
+        /// <summary>
+        /// Creates a fully wired runtime human with deterministic acceptance for event-flow tests.
+        /// </summary>
+        private IHuman CreateRuntimeHuman(SexBiology biology)
+        {
+            var loggerFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var physioFactory = ServiceProvider.GetRequiredService<IPhysiologyEngineFactory>();
+            var psychFactory = ServiceProvider.GetRequiredService<IPsychologyEngineFactory>();
+            var random = new AlwaysTrueRandom();
+
+            var id = new HumanId(Guid.NewGuid());
+            var identity = new Identity(
+                new Name { Original = "Test", Familiar = new[] { "Test" } },
+                new Surname { Male = "Human", Female = "Human" },
+                WDateOnly.New(80, 1, 1));
+
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                AttachmentStyle.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var appearance = new PhysicalAppearance(
+                HeightCm: 170,
+                Frame: BodyFrame.Medium,
+                SkinTone: SkinTone.Medium,
+                EyeColor: EyeColor.Brown,
+                HairColor: HairColorNatural.Brown,
+                HairType: HairType.Wavy,
+                FaceShape: FaceShape.Oval,
+                ShoulderBreadthCm: 40,
+                HipBreadthCm: 38,
+                NoseProminence: 0.5,
+                LipFullness: 0.5);
+
+            var physio = physioFactory.Create(random, biology, identity.BirthDate, WDateOnly.New(100, 1, 1));
+            var psych = psychFactory.Create(random);
+            var behavior = ServiceProvider.GetRequiredService<IBehaviorEngine>();
+            var interact = ServiceProvider.GetRequiredService<IInteractionEngine>();
+            var relations = ServiceProvider.GetRequiredService<IRelationshipsEngine>();
+            var memory = ServiceProvider.GetRequiredService<IMemoryEngine>();
+
+            var snapshot = new EnginesSnapshot(
+                physio.State,
+                psych.State,
+                behavior.State,
+                interact.State,
+                relations.State,
+                memory.State);
+
+            return new OrchestratedHuman(
+                id,
+                identity,
+                biology,
+                personality,
+                appearance,
+                attractionProfile: null,
+                bus: new NullEventBus(),
+                scheduler: new NullScheduler(),
+                random: random,
+                logger: loggerFactory.CreateLogger($"TestHuman[{id.Value}]"),
+                physio: physio,
+                psych: psych,
+                behavior: behavior,
+                interact: interact,
+                relations: relations,
+                memory: memory,
+                initialSnapshot: snapshot);
+        }
+
+        /// <summary>
+        /// Seeds one directed relationship edge into a runtime human snapshot.
+        /// </summary>
+        private static void SeedRelationship(
+            IHuman owner,
+            HumanId other,
+            double closeness,
+            double comfort,
+            double trust,
+            double romanticInterest,
+            double sexualInterest)
+        {
+            var relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    owner.Id,
+                    other,
+                    Like: 60,
+                    Trust: trust,
+                    Familiarity: 40,
+                    AestheticAttraction: 65,
+                    PhysicalAttraction: 65,
+                    RomanticInterest: romanticInterest,
+                    SexualInterest: sexualInterest,
+                    Closeness: closeness,
+                    Respect: 60,
+                    Comfort: comfort,
+                    Breakdown: new DomainBreakdown(50, 50, 60, 55, 60),
+                    PositiveInteractionCount: 2)
+            });
+
+            owner.RestoreSnapshot(owner.Snapshot with { Relationships = relationships });
+        }
 
         /// <summary>
         /// Sestaví minimální kontext — RelationshipsEngine nepotřebuje v Handle() téměř nic

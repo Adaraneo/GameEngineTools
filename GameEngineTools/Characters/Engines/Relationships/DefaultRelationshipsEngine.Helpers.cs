@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Logging;
@@ -120,6 +121,70 @@ namespace GameEngineTools.Characters.Engines.Relationships
         }
 
         /// <summary>
+        /// Creates a neutral directed edge for a newly known target.
+        /// </summary>
+        private static RelationshipEdge CreateDefaultEdge(HumanId self, HumanId other)
+            => new(
+                A: self,
+                B: other,
+                Like: 50,
+                Trust: 50,
+                Familiarity: 0,
+                AestheticAttraction: 0,
+                PhysicalAttraction: 0,
+                RomanticInterest: 0,
+                SexualInterest: 0,
+                Closeness: 0,
+                Respect: 50,
+                Comfort: 45,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                PositiveInteractionCount: 0);
+
+        /// <summary>
+        /// Produces a compact before/after diff for relationship-relevant fields.
+        /// </summary>
+        private static string DescribeEdgeChanges(RelationshipEdge before, RelationshipEdge after)
+        {
+            var changes = new List<string>();
+
+            AppendChange(changes, nameof(RelationshipEdge.Like), before.Like, after.Like);
+            AppendChange(changes, nameof(RelationshipEdge.Trust), before.Trust, after.Trust);
+            AppendChange(changes, nameof(RelationshipEdge.Familiarity), before.Familiarity, after.Familiarity);
+            AppendChange(changes, nameof(RelationshipEdge.Closeness), before.Closeness, after.Closeness);
+            AppendChange(changes, nameof(RelationshipEdge.Comfort), before.Comfort, after.Comfort);
+            AppendChange(changes, nameof(RelationshipEdge.Respect), before.Respect, after.Respect);
+            AppendChange(changes, nameof(RelationshipEdge.AestheticAttraction), before.AestheticAttraction, after.AestheticAttraction);
+            AppendChange(changes, nameof(RelationshipEdge.PhysicalAttraction), before.PhysicalAttraction, after.PhysicalAttraction);
+            AppendChange(changes, nameof(RelationshipEdge.RomanticInterest), before.RomanticInterest, after.RomanticInterest);
+            AppendChange(changes, nameof(RelationshipEdge.SexualInterest), before.SexualInterest, after.SexualInterest);
+
+            if (before.PositiveInteractionCount != after.PositiveInteractionCount)
+            {
+                changes.Add($"{nameof(RelationshipEdge.PositiveInteractionCount)}:{before.PositiveInteractionCount}->{after.PositiveInteractionCount}");
+            }
+
+            if (!changes.Any())
+            {
+                return "none";
+            }
+
+            return string.Join(", ", changes);
+        }
+
+        /// <summary>
+        /// Appends a numeric field diff when the value changed materially.
+        /// </summary>
+        private static void AppendChange(List<string> changes, string field, double before, double after)
+        {
+            if (Math.Abs(before - after) < 0.001)
+            {
+                return;
+            }
+
+            changes.Add($"{field}:{before:F1}->{after:F1}");
+        }
+
+        /// <summary>
         /// Maps touch intensity to a physical-domain reinforcement.
         /// </summary>
         private static double TouchBoost(TouchLevel level) => level switch
@@ -134,7 +199,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Inserts or updates an edge in the relationship graph.
         /// If the edge does not exist, initialises it with neutral default values.
         /// </summary>
-        private void Upsert(HumanId self, HumanId other, Func<RelationshipEdge, RelationshipEdge> mut)
+        private void Upsert(
+            HumanId self,
+            HumanId other,
+            Func<RelationshipEdge, RelationshipEdge> mut,
+            string? eventType = null,
+            string? outcome = null,
+            string? detail = null)
         {
             if (self == other)
             {
@@ -145,21 +216,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             if (!dict.TryGetValue(other, out var e))
             {
-                e = new RelationshipEdge(
-                    A: self,
-                    B: other,
-                    Like: 50,
-                    Trust: 50,
-                    Familiarity: 0,
-                    AestheticAttraction: 0,
-                    PhysicalAttraction: 0,
-                    RomanticInterest: 0,
-                    SexualInterest: 0,
-                    Closeness: 0,
-                    Respect: 50,
-                    Comfort: 45,
-                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
-                    PositiveInteractionCount: 0);
+                e = CreateDefaultEdge(self, other);
 
                 using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
                 {
@@ -167,10 +224,35 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(eventType))
+            {
+                using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
+                {
+                    _log.RelEventReceived(
+                        self.Value.ToString(),
+                        eventType,
+                        self.Value.ToString(),
+                        other.Value.ToString(),
+                        outcome ?? "n/a",
+                        detail ?? "n/a");
+                }
+            }
+
             var updated = mut(e);
 
             using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
             {
+                if (!string.IsNullOrWhiteSpace(eventType))
+                {
+                    _log.RelEventApplied(
+                        self.Value.ToString(),
+                        eventType,
+                        self.Value.ToString(),
+                        other.Value.ToString(),
+                        outcome ?? "n/a",
+                        DescribeEdgeChanges(e, updated));
+                }
+
                 _log.RelEdgeUpdated(
                     self.Value.ToString(), self.Value.ToString(), other.Value.ToString(),
                     updated.Like, updated.Trust, updated.Closeness,

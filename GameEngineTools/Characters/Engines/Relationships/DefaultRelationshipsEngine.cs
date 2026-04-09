@@ -103,7 +103,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             Aesthetics = Lerp(e.Breakdown.Aesthetics,
                                              fi.PreferenceMatch / 35.0 * 100.0, 0.8)
                         }
-                    });
+                    },
+                    eventType: nameof(FirstImpressionFormed),
+                    outcome: "formed",
+                    detail: $"source={fi.A.Value}, like={fi.Like:F1}, basePhysical={fi.BasePhysical:F1}, preferenceMatch={fi.PreferenceMatch:F1}");
 
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
                     {
@@ -123,7 +126,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         Trust = Bump(e.Trust, +1.0),
                         Closeness = Bump(e.Closeness, +1.5),
                         Comfort = Bump(e.Comfort, +2.0)
-                    });
+                    },
+                    eventType: nameof(MicroPositive),
+                    outcome: "positive",
+                    detail: mp.What ?? "n/a");
                     break;
 
                 // ── Micro-negative (criticism, ignoring, cold response…) ─────────────────
@@ -133,7 +139,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         Like = Bump(e.Like, -2.5),
                         Trust = Bump(e.Trust, -2.0),
                         Comfort = Bump(e.Comfort, -2.0)
-                    });
+                    },
+                    eventType: nameof(MicroNegative),
+                    outcome: "negative",
+                    detail: mn.What ?? "n/a");
                     break;
 
                 // ── Repair attempt ───────────────────────────────────────────────────────
@@ -142,14 +151,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     {
                         Trust = Bump(e.Trust, ra.Accepted ? +Config.RepairGain : -Config.RupturePenalty),
                         Closeness = Bump(e.Closeness, ra.Accepted ? +Config.RepairGain * 0.5 : -Config.RupturePenalty * 0.4)
-                    });
+                    },
+                    eventType: nameof(RepairAttempt),
+                    outcome: ra.Accepted ? "accepted" : "rejected",
+                    detail: $"source={ra.A.Value}->{ra.B.Value}");
                     break;
 
                 // ── Interaction outcome — ACCEPTED ───────────────────────────────────────
                 case InteractionOutcome io when io.Accepted:
                     {
                         var otherId = io.From == self ? io.To : io.From;
-                        EnsureEdge(self, otherId);
 
                         // Trust grows only through vulnerability and acknowledgement
                         var trustDelta = io.Act switch
@@ -192,7 +203,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 PositiveInteractionCount = newCount,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                             };
-                        });
+                        },
+                        eventType: nameof(InteractionOutcome),
+                        outcome: "accepted",
+                        detail: $"act={io.Act}, self={(io.From == self ? "initiator" : "recipient")}, from={io.From.Value}, to={io.To.Value}");
                         break;
                     }
 
@@ -200,7 +214,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case InteractionOutcome io when !io.Accepted:
                     {
                         var otherId = io.From == self ? io.To : io.From;
-                        EnsureEdge(self, otherId);
 
                         // Rejected SelfDisclosure hurts more — vulnerability was turned away
                         var trustPenalty = io.Act switch
@@ -218,7 +231,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
                                 RomanticInterest = Bump(e.RomanticInterest, -0.5),
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
-                            });
+                            },
+                            eventType: nameof(InteractionOutcome),
+                            outcome: "rejected",
+                            detail: $"act={io.Act}, self=recipient, from={io.From.Value}, to={io.To.Value}");
                         }
                         else // I was rejected
                         {
@@ -229,7 +245,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
                                 RomanticInterest = Bump(e.RomanticInterest, io.Act == SpeechAct.Invite ? -2.0 : -1.0),
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
-                            });
+                            },
+                            eventType: nameof(InteractionOutcome),
+                            outcome: "rejected",
+                            detail: $"act={io.Act}, self=initiator, from={io.From.Value}, to={io.To.Value}");
                         }
 
                         break;
@@ -239,7 +258,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case TouchOutcome to:
                     {
                         var otherId = to.From == self ? to.To : to.From;
-                        EnsureEdge(self, otherId);
 
                         if (to.To == self) // I was touched — I decided
                         {
@@ -263,7 +281,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                             ? BumpD(e.Breakdown.Aesthetics, +3.0)
                                             : e.Breakdown.Aesthetics
                                     }
-                                });
+                                },
+                                eventType: nameof(TouchOutcome),
+                                outcome: "accepted",
+                                detail: $"level={to.Level}, self=recipient, from={to.From.Value}, to={to.To.Value}");
                             }
                             else
                             {
@@ -272,7 +293,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 {
                                     Comfort = Bump(e.Comfort, -1.0),
                                     RomanticInterest = Bump(e.RomanticInterest, to.Level == TouchLevel.Intimate ? -1.5 : -0.5)
-                                });
+                                },
+                                eventType: nameof(TouchOutcome),
+                                outcome: "rejected",
+                                detail: $"level={to.Level}, self=recipient, from={to.From.Value}, to={to.To.Value}");
                             }
                         }
                         else // I was rejected
@@ -284,7 +308,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 SexualInterest = Bump(e.SexualInterest, to.Accepted
                                     ? (to.Level == TouchLevel.Intimate ? +2.5 : +0.5)
                                     : (to.Level == TouchLevel.Intimate ? -2.0 : -0.5))
-                            });
+                            },
+                            eventType: nameof(TouchOutcome),
+                            outcome: to.Accepted ? "accepted" : "rejected",
+                            detail: $"level={to.Level}, self=initiator, from={to.From.Value}, to={to.To.Value}");
                         }
 
                         break;
