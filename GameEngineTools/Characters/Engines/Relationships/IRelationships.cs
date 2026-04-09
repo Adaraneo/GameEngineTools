@@ -3,6 +3,9 @@
 
 namespace GameEngineTools.Characters.Engines.Relationships
 {
+    // Relationship contracts were split into dedicated files in this folder.
+    // Keep this file only as a compatibility placeholder for older references.
+#if false
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
@@ -124,4 +127,5 @@ namespace GameEngineTools.Characters.Engines.Relationships
     /// <summary>An attempt to repair a damaged relationship, accepted or rejected.</summary>
     public sealed record RepairAttempt(
         WDateTime OccurredAt, HumanId A, HumanId B, bool Accepted) : IDomainEvent;
+#endif
 }
