@@ -3,5 +3,10 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Sleep
 {
-    internal sealed record SleepDecisionResult(bool ConsumedTick, BehaviorState NewState);
+    /// <summary>
+    /// Result of sleep handling for the current tick, including early-return semantics.
+    /// </summary>
+    internal sealed record SleepDecisionResult(
+        bool ConsumedTick,
+        BehaviorState NewState);
 }

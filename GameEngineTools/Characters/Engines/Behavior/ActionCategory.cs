@@ -3,25 +3,28 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior
 {
+    /// <summary>
+    /// Groups actions into coarse continuity buckets for inertia and novelty shaping.
+    /// </summary>
     internal enum ActionCategory
     {
         /// <summary>
-        /// Soustředěná tvorba - Work, Create
+        /// Focused productive work such as <c>Work</c> and <c>Create</c>.
         /// </summary>
         Productive,
 
         /// <summary>
-        /// Sociální interakce - ReachOut, InviteIntimacy
+        /// Social approach and intimacy actions.
         /// </summary>
         Social,
 
         /// <summary>
-        /// Tělesné potřeby - Eat, Drink, SelfCare
+        /// Biological regulation such as eating, drinking, and self-care.
         /// </summary>
         Biological,
 
         /// <summary>
-        /// Pasivní odpočinek - Idle
+        /// Passive rest or low-engagement recovery.
         /// </summary>
         Rest
     }

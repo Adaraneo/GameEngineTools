@@ -7,12 +7,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
+    /// <summary>
+    /// Produces baseline body-regulation candidates such as food, water, self-care, and rest movement.
+    /// </summary>
     internal sealed class PhysiologicalNeedsEngine : IBehaviorNeedEngine
     {
+        #region IBehaviorNeedEngine
+
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
         {
             var ph = context.HumanContext.Snapshot.Physiology;
             var needSelfCare = BehaviorMath.ComputeSelfCareNeed(ph);
+
             return new BehaviorNeedOutput(
                 new[]
                 {
@@ -30,5 +36,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     new BehaviorCandidate(MoveToRest, context.State.NeedRest, WTimeSpan.FromMinutes(20), BehaviorDomain.Physiological, new[] { "EnvironmentMovement" })
                 });
         }
+
+        #endregion IBehaviorNeedEngine
     }
 }

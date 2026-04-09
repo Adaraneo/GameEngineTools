@@ -3,5 +3,15 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior
 {
-    internal enum BehaviorDomain { Physiological, Social, Competence, Autonomy, Exploration }
+    /// <summary>
+    /// Broad motivational domains used to keep behavior drives and candidates grouped coherently.
+    /// </summary>
+    internal enum BehaviorDomain
+    {
+        Physiological,
+        Social,
+        Competence,
+        Autonomy,
+        Exploration,
+    }
 }

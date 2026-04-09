@@ -6,13 +6,19 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     using GameEngineTools.Characters.Engines.Memory;
     using static ActionNames;
 
+    /// <summary>
+    /// Replays emotionally salient episodes into current candidate utilities.
+    /// </summary>
     internal sealed class MemoryInfluenceEngine : IBehaviorModifierEngine
     {
+        #region IBehaviorModifierEngine
+
         public void Modify(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
             var episodes = context.HumanContext.Snapshot.Memory.Episodes;
             if (episodes.Count == 0) return;
 
+            // Social memory can either dampen or reinforce outreach based on recent emotional tone.
             var negativeInteractions = episodes.Where(e => e.What.StartsWith("Interaction:") && e.Emotion == EmotionalTag.Negative && e.Strength > 0.4).ToList();
             foreach (var e in negativeInteractions) context.Outbox.Add(new MemoryRecalled(context.Now, context.HumanContext.Id, e.Id));
             if (negativeInteractions.Count > 0) BehaviorCandidateEditor.Multiply(candidates, ReachOut, 1.0 - Math.Min(0.40, negativeInteractions.Count * 0.10));
@@ -30,5 +36,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             var loadSum = negativeLoad.Sum(e => e.Strength);
             if (loadSum > 0.5) BehaviorCandidateEditor.Multiply(candidates, SelfCare, 1.0 + Math.Min(0.35, loadSum * 0.08));
         }
+
+        #endregion
     }
 }

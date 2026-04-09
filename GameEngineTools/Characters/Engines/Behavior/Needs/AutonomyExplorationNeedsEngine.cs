@@ -7,8 +7,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
+    /// <summary>
+    /// Produces low-pressure novelty and wandering behavior from autonomy and curiosity.
+    /// </summary>
     internal sealed class AutonomyExplorationNeedsEngine : IBehaviorNeedEngine
     {
+        #region IBehaviorNeedEngine
+
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
         {
             var novelty = 10 * context.HumanContext.Personality.Motivation.Curiosity;
@@ -19,5 +24,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     new BehaviorCandidate(MoveToPublic, 0, WTimeSpan.FromMinutes(20), BehaviorDomain.Exploration, new[] { "EnvironmentMovement" })
                 });
         }
+
+        #endregion
     }
 }

@@ -6,8 +6,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     using System.Collections.Generic;
     using static ActionNames;
 
+    /// <summary>
+    /// Preserves short-horizon behavioral continuity through inertia and novelty shaping.
+    /// </summary>
     internal sealed class HabitRoutineEngine : IBehaviorModifierEngine
     {
+        #region Static data
+
         private static readonly HashSet<string> InertiaEligible = new() { Work, Create, ReachOut };
         private static readonly Dictionary<string, ActionCategory> ActionCategories = new()
         {
@@ -15,6 +20,10 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             { Eat, ActionCategory.Biological }, { Drink, ActionCategory.Biological }, { SelfCare, ActionCategory.Biological }, { Idle, ActionCategory.Rest },
             { MoveToSocial, ActionCategory.Social }, { MoveToPrivate, ActionCategory.Rest }, { MoveToWork, ActionCategory.Productive }, { MoveToRest, ActionCategory.Rest }, { MoveToPublic, ActionCategory.Social },
         };
+
+        #endregion
+
+        #region IBehaviorModifierEngine
 
         public void Modify(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
@@ -30,10 +39,17 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 }
                 var candidateCategory = GetCategory(candidate.Name);
                 if (candidateCategory != currentCategory && candidateCategory != ActionCategory.Biological)
+                    // Biological regulation should be able to break routine more easily than elective behavior.
                     candidates[i] = candidate with { Utility = candidate.Utility * (1.0 - context.Config.NoveltyPenalty) };
             }
         }
 
+        #endregion
+
+        #region Helpers
+
         private static ActionCategory GetCategory(string actionName) => ActionCategories.TryGetValue(actionName, out var cat) ? cat : ActionCategory.Rest;
+
+        #endregion
     }
 }

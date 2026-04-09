@@ -7,8 +7,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
+    /// <summary>
+    /// Generates affiliation and intimacy pressure together with socially relevant movement.
+    /// </summary>
     internal sealed class SocialNeedsEngine : IBehaviorNeedEngine
     {
+        #region IBehaviorNeedEngine
+
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
         {
             var m = context.HumanContext.Personality.Motivation;
@@ -26,5 +31,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     new BehaviorCandidate(MoveToPrivate, 0, WTimeSpan.FromMinutes(20), BehaviorDomain.Social, new[] { "EnvironmentMovement" })
                 });
         }
+
+        #endregion
     }
 }

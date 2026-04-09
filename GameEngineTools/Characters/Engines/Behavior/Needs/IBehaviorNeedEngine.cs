@@ -3,5 +3,11 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Needs
 {
-    internal interface IBehaviorNeedEngine { BehaviorNeedOutput Evaluate(BehaviorContext context); }
+    /// <summary>
+    /// Produces domain-specific drives and initial candidates from the current context.
+    /// </summary>
+    internal interface IBehaviorNeedEngine
+    {
+        BehaviorNeedOutput Evaluate(BehaviorContext context);
+    }
 }

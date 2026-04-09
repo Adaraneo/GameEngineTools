@@ -7,8 +7,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
+    /// <summary>
+    /// Generates productive and mastery-oriented pressure from competence needs.
+    /// </summary>
     internal sealed class CompetenceNeedsEngine : IBehaviorNeedEngine
     {
+        #region IBehaviorNeedEngine
+
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
         {
             var m = context.HumanContext.Personality.Motivation;
@@ -21,5 +26,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     new BehaviorCandidate(MoveToWork, 0, WTimeSpan.FromMinutes(20), BehaviorDomain.Competence, new[] { "EnvironmentMovement" })
                 });
         }
+
+        #endregion
     }
 }

@@ -209,6 +209,69 @@ namespace GameEngineTools.Logging
             string Action,
             double Hours);
 
+        [LoggerMessage(
+            EventId = 1005,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/INTENT] {HumanId} intent selected {IntentKind} -> {Action} (score={Score:F2}).")]
+        public static partial void BehaviorIntentSelected(
+            this ILogger logger,
+            string HumanId,
+            string IntentKind,
+            string Action,
+            double Score);
+
+        [LoggerMessage(
+            EventId = 1006,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/INTENT] {HumanId} intent retained {IntentKind} -> {Action} (score={Score:F2}).")]
+        public static partial void BehaviorIntentRetained(
+            this ILogger logger,
+            string HumanId,
+            string IntentKind,
+            string Action,
+            double Score);
+
+        [LoggerMessage(
+            EventId = 1007,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/INTENT] {HumanId} intent switched {IntentKind} -> {Action} (score={Score:F2}).")]
+        public static partial void BehaviorIntentSwitched(
+            this ILogger logger,
+            string HumanId,
+            string IntentKind,
+            string Action,
+            double Score);
+
+        [LoggerMessage(
+            EventId = 1008,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/INTENT] {HumanId} intent expired {IntentKind}.")]
+        public static partial void BehaviorIntentExpired(
+            this ILogger logger,
+            string HumanId,
+            string IntentKind);
+
+        [LoggerMessage(
+            EventId = 1009,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/INTENT] {HumanId} emergency override {IntentKind} -> {Action} (score={Score:F2}).")]
+        public static partial void BehaviorIntentEmergencyOverride(
+            this ILogger logger,
+            string HumanId,
+            string IntentKind,
+            string Action,
+            double Score);
+
+        [LoggerMessage(
+            EventId = 1010,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/INTENT] {HumanId} bias applied to {Action}: +{Bias:F2}.")]
+        public static partial void BehaviorIntentBiasApplied(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            double Bias);
+
         #endregion Behavior — rozhodování
 
         #region Behavior/Sleep — spánkový subsystém

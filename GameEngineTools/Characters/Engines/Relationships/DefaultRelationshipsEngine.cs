@@ -78,14 +78,18 @@ namespace GameEngineTools.Characters.Engines.Relationships
             {
                 // ── First impression ─────────────────────────────────────────────────────
                 case FirstImpressionFormed fi:
-                    Upsert(self, fi.B, e => e with
+                    Upsert(self, fi.B, e => RecomputeLegacy(e with
                     {
                         // Lerp 70% toward the first impression — does not fully override
                         // if the character already knows the person slightly.
-                        Like       = Lerp(e.Like,       fi.Like,       0.7),
-                        Attraction = Lerp(e.Attraction,  fi.Attraction, 0.7),
-                        Trust      = e.Trust <= 0 ? 45 : e.Trust,
-                        Closeness  = Math.Max(e.Closeness, 10),
+                        Like = Lerp(e.Like, fi.Like, 0.7),
+                        Familiarity = Math.Max(e.Familiarity, 8),
+                        Trust = e.Trust <= 0 ? 45 : e.Trust,
+                        Closeness = Math.Max(e.Closeness, 10),
+                        AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.7),
+                        PhysicalAttraction = Lerp(e.PhysicalAttraction, fi.BasePhysical / 40.0 * 100.0, 0.7),
+                        RomanticInterest = Lerp(e.RomanticInterest, Math.Max(35.0, fi.Like * 0.55), 0.15),
+                        SexualInterest = Lerp(e.SexualInterest, Math.Max(30.0, fi.Attraction * 0.45), 0.10),
                         Breakdown  = e.Breakdown with
                         {
                             // BasePhysical (max 40) → normalised to [0, 100] for the Physical domain.
@@ -100,7 +104,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             Aesthetics = Lerp(e.Breakdown.Aesthetics,
                                              fi.PreferenceMatch / 35.0 * 100.0, 0.7)
                         }
-                    });
+                    }));
 
                     using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
                     {
@@ -182,9 +186,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Closeness                = Bump(e.Closeness, +1.5),
                                 Like                     = Bump(e.Like,      +0.5),
                                 Comfort                  = Bump(e.Comfort,   +0.8),
+                                RomanticInterest         = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e)),
+                                SexualInterest           = Bump(e.SexualInterest, ComputeSexualInterestDelta(e)),
                                 Trust                    = trustDelta   > 0 ? Bump(e.Trust,   trustDelta)   : e.Trust,
                                 Respect                  = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
-                                Attraction               = Bump(e.Attraction, exposureDelta),
+                                Familiarity              = Bump(e.Familiarity, exposureDelta),
                                 PositiveInteractionCount = newCount,
                                 Breakdown                = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                             };
@@ -212,6 +218,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 Comfort  = Bump(e.Comfort, -0.5),
                                 Trust    = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
+                                RomanticInterest = Bump(e.RomanticInterest, -0.5),
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                             });
                         }
@@ -222,6 +229,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Like      = Bump(e.Like,    -1.5),
                                 Comfort   = Bump(e.Comfort, -2.0),
                                 Trust     = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
+                                RomanticInterest = Bump(e.RomanticInterest, io.Act == SpeechAct.Invite ? -2.0 : -1.0),
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                             });
                         }
@@ -243,6 +251,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 {
                                     Comfort   = Bump(e.Comfort,   +1.5),
                                     Closeness = Bump(e.Closeness, +1.0),
+                                    SexualInterest = Bump(e.SexualInterest, to.Level == TouchLevel.Intimate ? +4.0 : to.Level == TouchLevel.Friendly ? +1.5 : +0.4),
+                                    RomanticInterest = to.Level == TouchLevel.Intimate && e.Trust >= 60 && e.Comfort >= 60
+                                        ? Bump(e.RomanticInterest, +1.5)
+                                        : e.RomanticInterest,
                                     Breakdown = e.Breakdown with
                                     {
                                         Physical   = BumpD(e.Breakdown.Physical,   TouchBoost(to.Level)),
@@ -260,7 +272,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 // I rejected — mild discomfort
                                 Upsert(self, otherId, e => e with
                                 {
-                                    Comfort = Bump(e.Comfort, -1.0)
+                                    Comfort = Bump(e.Comfort, -1.0),
+                                    RomanticInterest = Bump(e.RomanticInterest, to.Level == TouchLevel.Intimate ? -1.5 : -0.5)
                                 });
                             }
                         }
@@ -269,7 +282,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             Upsert(self, otherId, e => e with
                             {
                                 Like    = Bump(e.Like,    to.Accepted ? +0.5 : -2.0),
-                                Comfort = Bump(e.Comfort, to.Accepted ? +1.0 : -3.0)
+                                Comfort = Bump(e.Comfort, to.Accepted ? +1.0 : -3.0),
+                                SexualInterest = Bump(e.SexualInterest, to.Accepted
+                                    ? (to.Level == TouchLevel.Intimate ? +2.5 : +0.5)
+                                    : (to.Level == TouchLevel.Intimate ? -2.0 : -0.5))
                             });
                         }
 
@@ -322,12 +338,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 dict[kv.Key] = e with
                 {
-                    Like       = Clamp(Approach(e.Like,       50,                              d)       + valenceEffect - stressEffect),
-                    Trust      = Clamp(Approach(e.Trust,      50,                              d * 0.5)),
-                    Attraction = Clamp(Approach(e.Attraction, e.Attraction > 50 ? 45.0 : 35.0, d * 0.4)),
-                    Closeness  = Clamp(Approach(e.Closeness,  35,                              d * 1.2)),
-                    Respect    = Clamp(Approach(e.Respect,    55,                              d * 0.3)),
-                    Comfort    = Clamp(Approach(e.Comfort,    45,                              d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
+                    Like                = Clamp(Approach(e.Like,               50, d)       + valenceEffect - stressEffect),
+                    Trust               = Clamp(Approach(e.Trust,              50, d * 0.5)),
+                    Familiarity         = Clamp(Approach(e.Familiarity,        25, d * 0.08)),
+                    AestheticAttraction = e.AestheticAttraction,
+                    PhysicalAttraction  = e.PhysicalAttraction,
+                    RomanticInterest    = Clamp(Approach(e.RomanticInterest,   35, d * 0.45)),
+                    SexualInterest      = Clamp(Approach(e.SexualInterest,     30, d * 0.70)),
+                    Closeness           = Clamp(Approach(e.Closeness,          35, d * 1.2)),
+                    Respect             = Clamp(Approach(e.Respect,            55, d * 0.3)),
+                    Comfort             = Clamp(Approach(e.Comfort,            45, d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
                     Breakdown  = new DomainBreakdown(
                         Intellect:  Clamp(Approach(e.Breakdown.Intellect, 50, dd)),
                         Humor:      Clamp(Approach(e.Breakdown.Humor,     50, dd)),
@@ -419,6 +439,46 @@ namespace GameEngineTools.Characters.Engines.Relationships
             return Math.Clamp(saturation * config.MereExposureMaxBoost, 0.0, config.MereExposureMaxBoost);
         }
 
+        /// <summary>
+        /// Rebuilds the compatibility attraction score from the explicit relationship signals.
+        /// </summary>
+        private static double ComputeLegacyAttraction(RelationshipEdge e)
+            => Clamp(
+                (e.Familiarity * 0.20)
+              + (e.AestheticAttraction * 0.24)
+              + (e.PhysicalAttraction * 0.24)
+              + (e.RomanticInterest * 0.16)
+              + (e.SexualInterest * 0.18)
+              + (e.Comfort * 0.12)
+              + (e.Closeness * 0.10));
+
+        /// <summary>
+        /// Computes a context-sensitive romantic-interest gain.
+        /// Trust, comfort, closeness, like, and value alignment matter more than raw appearance.
+        /// </summary>
+        private static double ComputeRomanticInterestDelta(RelationshipEdge e)
+            => ((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
+             + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.9)
+             + ((Math.Max(0.0, e.Closeness - 40.0) / 60.0) * 1.1)
+             + ((Math.Max(0.0, e.Like - 45.0) / 55.0) * 0.6)
+             + ((Math.Max(0.0, e.Breakdown.Values - 50.0) / 50.0) * 0.8);
+
+        /// <summary>
+        /// Computes a context-sensitive sexual-interest gain.
+        /// Physical and aesthetic attraction lead, while comfort and closeness act as gates.
+        /// </summary>
+        private static double ComputeSexualInterestDelta(RelationshipEdge e)
+            => ((Math.Max(0.0, e.PhysicalAttraction - 45.0) / 55.0) * 0.8)
+             + ((Math.Max(0.0, e.AestheticAttraction - 45.0) / 55.0) * 0.6)
+             + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.3)
+             + ((Math.Max(0.0, e.Closeness - 40.0) / 60.0) * 0.25);
+
+        /// <summary>
+        /// Converts a change in accepted interaction count into an incremental familiarity delta.
+        /// </summary>
+        private double ComputeFamiliarityExposureDelta(int previousCount, int newCount)
+            => MereExposureBoost(newCount, Config) - MereExposureBoost(previousCount, Config);
+
         #endregion Private methods — mere-exposure
 
         #region Private methods — helpers
@@ -462,6 +522,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 e = new RelationshipEdge(
                     A: self, B: other,
                     Like: 45, Trust: 45, Attraction: 35,
+                    Familiarity: 10, AestheticAttraction: 35, PhysicalAttraction: 35, RomanticInterest: 35, SexualInterest: 30,
                     Closeness: 10, Respect: 55, Comfort: 40,
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
                     PositiveInteractionCount: 0);
@@ -472,7 +533,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 }
             }
 
-            var updated = mut(e);
+            var updated = RecomputeLegacy(mut(e));
 
             using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
             {
@@ -485,6 +546,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
             dict[other] = updated;
             State = new RelationshipState(dict);
         }
+
+        /// <summary>Recomputes the legacy attraction aggregate from explicit relationship signals.</summary>
+        private static RelationshipEdge RecomputeLegacy(RelationshipEdge edge)
+            => edge with { Attraction = ComputeLegacyAttraction(edge) };
 
         /// <summary>Bumps a primary relationship dimension by <paramref name="by"/> and clamps to [0, 100].</summary>
         private static double Bump(double v, double by)
