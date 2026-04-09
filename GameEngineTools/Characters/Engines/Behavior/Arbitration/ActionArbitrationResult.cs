@@ -3,5 +3,12 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
 {
-    internal sealed record ActionArbitrationResult(bool KeepRunningPlan, PlannedAction? SelectedPlan, BehaviorCandidate? SelectedCandidate, BehaviorState NewState);
+    /// <summary>
+    /// Final arbitration result returned to the orchestrator after candidate resolution.
+    /// </summary>
+    internal sealed record ActionArbitrationResult(
+        bool KeepRunningPlan,
+        PlannedAction? SelectedPlan,
+        BehaviorCandidate? SelectedCandidate,
+        BehaviorState NewState);
 }

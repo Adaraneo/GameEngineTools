@@ -3,5 +3,11 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
-    internal interface IBehaviorModifierEngine { void Modify(BehaviorContext context, List<BehaviorCandidate> candidates); }
+    /// <summary>
+    /// Adjusts candidate utility or availability without making the final action choice.
+    /// </summary>
+    internal interface IBehaviorModifierEngine
+    {
+        void Modify(BehaviorContext context, List<BehaviorCandidate> candidates);
+    }
 }

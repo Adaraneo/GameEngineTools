@@ -32,7 +32,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
         HumanId B,
         double Like,
         double Trust,
+        /// <summary>
+        /// Legacy aggregate attraction score derived from the explicit relationship signals.
+        /// Kept temporarily for backward compatibility with older callers.
+        /// </summary>
         double Attraction,
+        double Familiarity,
+        double AestheticAttraction,
+        double PhysicalAttraction,
+        double RomanticInterest,
+        double SexualInterest,
         double Closeness,
         double Respect,
         double Comfort,

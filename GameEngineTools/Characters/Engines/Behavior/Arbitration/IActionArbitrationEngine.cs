@@ -3,5 +3,11 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
 {
-    internal interface IActionArbitrationEngine { ActionArbitrationResult Arbitrate(BehaviorContext context, List<BehaviorCandidate> candidates); }
+    /// <summary>
+    /// Resolves the fully shaped candidate list into the final action plan for the tick.
+    /// </summary>
+    internal interface IActionArbitrationEngine
+    {
+        ActionArbitrationResult Arbitrate(BehaviorContext context, List<BehaviorCandidate> candidates);
+    }
 }

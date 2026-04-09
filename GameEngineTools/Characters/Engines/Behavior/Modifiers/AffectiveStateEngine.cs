@@ -5,14 +5,23 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
     using static ActionNames;
 
+    /// <summary>
+    /// Nudges behavior toward recovery when stress or negative affect rises.
+    /// </summary>
     internal sealed class AffectiveStateEngine : IBehaviorModifierEngine
     {
+        #region IBehaviorModifierEngine
+
         public void Modify(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
             var ps = context.HumanContext.Snapshot.Psychology;
             if (ps.Stress <= 60 && ps.Valence >= -0.5) return;
+
+            // Recovery pressure scales gently with stress load and sustained negative valence.
             var selfCareBoost = 1.0 + Math.Max(0, ps.Stress - 60) / 400.0 + Math.Max(0, -ps.Valence - 0.5) * 0.1;
             BehaviorCandidateEditor.Multiply(candidates, SelfCare, selfCareBoost);
         }
+
+        #endregion
     }
 }

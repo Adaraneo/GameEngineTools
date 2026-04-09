@@ -10,19 +10,39 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
 
+    /// <summary>
+    /// Maintains a lightweight directional intent that can bias candidates across adjacent ticks.
+    /// </summary>
     internal sealed class DefaultIntentManagementEngine : IIntentManagementEngine
     {
+        #region Constants
+
         internal const int MinCommitment = 0;
         internal const int MaxCommitment = 10;
 
+        #endregion Constants
+
+        #region Private fields
+
         private readonly ILogger _log;
+
+        #endregion Private fields
+
+        #region Construction
+
         public DefaultIntentManagementEngine(ILogger log) => _log = log;
+
+        #endregion Construction
+
+        #region IIntentManagementEngine
 
         public BehaviorState UpdateIntent(BehaviorContext context, IReadOnlyList<BehaviorCandidate> candidates)
         {
             var current = context.State.ActiveIntent;
             var scoredGroups = ScoreGroups(candidates);
             var emergency = candidates.Where(c => c.Domain == BehaviorDomain.Physiological && c.Utility >= context.Config.EmergencyIntentOverrideThreshold).OrderByDescending(c => c.Utility).FirstOrDefault();
+
+            // Emergency physiological pressure is allowed to override the current direction immediately.
             if (emergency is not null)
             {
                 var overrideIntent = NewIntent(context, emergency.Name, emergency.Utility);
@@ -46,6 +66,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
             var winning = scoredGroups.OrderByDescending(kv => kv.Value).FirstOrDefault();
             if (current is null)
             {
+                // "None" is a classification helper for candidates like Idle, not a persisted active intent.
                 if (winning.Key == BehaviorIntentKind.None || winning.Value <= 0)
                     return context.State with { ActiveIntent = null };
 
@@ -66,6 +87,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
                 return context.State with { ActiveIntent = switched };
             }
 
+            // When we retain an intent, refresh its target action so the state stays informative.
             var retainedTarget = HighestCandidateForKind(candidates, current.Kind)?.Name ?? current.TargetAction;
             var retained = current with
             {
@@ -84,6 +106,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
             var intent = context.State.ActiveIntent;
             if (intent is null || intent.Kind == BehaviorIntentKind.None) return;
             if (intent.Commitment <= 0) return;
+
+            // Intent is only allowed to boost matching candidates; it never suppresses the rest of the field.
             var bias = Math.Max(0.0, context.Config.IntentBaseBias + (intent.Commitment * context.Config.IntentCommitmentBiasStep));
             for (var i = 0; i < candidates.Count; i++)
             {
@@ -93,6 +117,10 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
                     _log.BehaviorIntentBiasApplied(context.HumanContext.Id.Value.ToString(), candidates[i].Name, bias);
             }
         }
+
+        #endregion IIntentManagementEngine
+
+        #region Helpers
 
         internal static int ClampCommitment(int commitment)
             => Math.Clamp(commitment, MinCommitment, MaxCommitment);
@@ -104,6 +132,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
                     g => g.Key,
                     g =>
                     {
+                        // Top1 + weighted top2 keeps intent scoring lightweight while reducing spike sensitivity.
                         var utilities = g.Select(c => c.Utility).OrderByDescending(v => v).ToArray();
                         return utilities.Length == 0 ? 0.0 : utilities[0] + (utilities.Length > 1 ? 0.35 * utilities[1] : 0.0);
                     });
@@ -117,5 +146,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
         private static ActiveIntent NewIntent(BehaviorContext context, string actionName, double strength)
             => new(BehaviorIntentMapper.Resolve(actionName), actionName, context.Now, context.Now, strength, MinCommitment, context.Now + WTimeSpan.FromHours(context.Config.IntentTimeoutHours));
 
+        #endregion Helpers
     }
 }
