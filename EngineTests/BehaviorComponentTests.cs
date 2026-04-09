@@ -133,6 +133,28 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void CommitmentDoesNotGoBelowZero()
+        {
+            Assert.AreEqual(0, DefaultIntentManagementEngine.ClampCommitment(-5));
+            Assert.AreEqual(0, DefaultIntentManagementEngine.ClampCommitment(0));
+        }
+
+        [TestMethod]
+        public void ApplyBias_NeverProducesNegativeBias()
+        {
+            var intent = new ActiveIntent(BehaviorIntentKind.WorkSession, Work, new WDateTime(0), new WDateTime(0), 20, -50, new WDateTime(WTimeSpan.FromHours(2).Ticks));
+            var context = BehaviorComponentTestFactory.Context(
+                state: new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                now: new WDateTime(0)) with
+            {
+                State = new BehaviorState(10, 5, 5, 20, 50, 30, null, ActiveIntent: intent)
+            };
+            var candidates = new List<BehaviorCandidate> { new(Work, 10, WTimeSpan.FromHours(1), BehaviorDomain.Competence) };
+            BuildEngine().ApplyBias(context, candidates);
+            Assert.IsTrue(candidates[0].Utility >= 10);
+        }
+
+        [TestMethod]
         public void EmergencyOverridesIntent()
         {
             var intent = new ActiveIntent(BehaviorIntentKind.WorkSession, Work, new WDateTime(0), new WDateTime(0), 20, 1, new WDateTime(WTimeSpan.FromHours(2).Ticks));
@@ -148,6 +170,68 @@ namespace EngineTests
             var context = BehaviorComponentTestFactory.Context(now: new WDateTime(WTimeSpan.FromHours(3).Ticks), state: new BehaviorState(10, 5, 5, 20, 50, 30, null, ActiveIntent: intent));
             var state = BuildEngine().UpdateIntent(context, new List<BehaviorCandidate> { new(MoveToPublic, 15, WTimeSpan.FromHours(1), BehaviorDomain.Exploration) });
             Assert.AreEqual(BehaviorIntentKind.Exploration, state.ActiveIntent?.Kind);
+        }
+
+        [TestMethod]
+        public void UpdateIntent_SelectsStrongestTargetActionWithinWinningIntent()
+        {
+            var context = BehaviorComponentTestFactory.Context();
+            var state = BuildEngine().UpdateIntent(
+                context,
+                new List<BehaviorCandidate>
+                {
+                    new(MoveToWork, 20, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                    new(Work, 30, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                    new(MoveToSocial, 5, WTimeSpan.FromHours(1), BehaviorDomain.Social)
+                });
+            Assert.AreEqual(BehaviorIntentKind.WorkSession, state.ActiveIntent?.Kind);
+            Assert.AreEqual(Work, state.ActiveIntent?.TargetAction);
+        }
+
+        [TestMethod]
+        public void UpdateIntent_WinningNoneIntent_DoesNotCreateActiveIntent()
+        {
+            var context = BehaviorComponentTestFactory.Context();
+            var state = BuildEngine().UpdateIntent(
+                context,
+                new List<BehaviorCandidate>
+                {
+                    new(Idle, 25, WTimeSpan.FromHours(1), BehaviorDomain.Physiological),
+                    new(MoveToPublic, 5, WTimeSpan.FromHours(1), BehaviorDomain.Exploration)
+                });
+            Assert.IsNull(state.ActiveIntent);
+        }
+
+        [TestMethod]
+        public void UpdateIntent_GroupScoring_UsesTop1PlusWeightedTop2()
+        {
+            var context = BehaviorComponentTestFactory.Context();
+            var state = BuildEngine().UpdateIntent(
+                context,
+                new List<BehaviorCandidate>
+                {
+                    new(Work, 20, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                    new(Create, 19, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                    new(MoveToSocial, 24, WTimeSpan.FromHours(1), BehaviorDomain.Social)
+                });
+            Assert.AreEqual(BehaviorIntentKind.WorkSession, state.ActiveIntent?.Kind);
+        }
+
+        [TestMethod]
+        public void UpdateIntent_RetainedIntent_RefreshesTargetAction()
+        {
+            var intent = new ActiveIntent(BehaviorIntentKind.WorkSession, MoveToWork, new WDateTime(0), new WDateTime(0), 20, 1, new WDateTime(WTimeSpan.FromHours(2).Ticks));
+            var context = BehaviorComponentTestFactory.Context(state: new BehaviorState(10, 5, 5, 20, 50, 30, null, ActiveIntent: intent));
+            var state = BuildEngine().UpdateIntent(
+                context,
+                new List<BehaviorCandidate>
+                {
+                    new(MoveToWork, 15, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                    new(Work, 18, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                    new(MoveToSocial, 20, WTimeSpan.FromHours(1), BehaviorDomain.Social)
+                });
+            Assert.AreEqual(BehaviorIntentKind.WorkSession, state.ActiveIntent?.Kind);
+            Assert.AreEqual(Work, state.ActiveIntent?.TargetAction);
         }
 
         [TestMethod]

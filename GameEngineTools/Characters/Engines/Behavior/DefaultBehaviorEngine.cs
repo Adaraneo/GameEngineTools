@@ -68,7 +68,18 @@ namespace GameEngineTools.Characters.Engines.Behavior
             if (result.KeepRunningPlan || result.SelectedCandidate is null) return;
 
             if (State.ActiveIntent is { } active)
-                State = State with { ActiveIntent = active with { UpdatedAt = now, Commitment = active.Commitment + (BehaviorIntentMapper.Matches(active, result.SelectedCandidate.Name) ? 1 : -1), Strength = result.SelectedCandidate.Utility } };
+            {
+                var commitmentDelta = BehaviorIntentMapper.Matches(active, result.SelectedCandidate.Name) ? 1 : -1;
+                State = State with
+                {
+                    ActiveIntent = active with
+                    {
+                        UpdatedAt = now,
+                        Commitment = DefaultIntentManagementEngine.ClampCommitment(active.Commitment + commitmentDelta),
+                        Strength = result.SelectedCandidate.Utility
+                    }
+                };
+            }
 
             outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility));
             outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration));
