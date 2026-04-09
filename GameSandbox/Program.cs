@@ -14,7 +14,9 @@ using GameEngineTools.Narrative;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Text;
 using static GameEngineTools.Characters.Engines.ActionNames;
@@ -58,38 +60,29 @@ clock.SetNow(initTicks == defaultTicks
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
-Console.Write("Write here an ID of player: ");
-var input = Console.ReadLine();
+var currDir = Directory.GetCurrentDirectory();
 
-if (!Guid.TryParse(input, out var pid) || !player.Person.Id.Value.Equals(pid))
+var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.json").Build();
+var generatedPeopleLogsFilePath = configProvider.GetValue<string>("GenFilesPath");
+
+var files = new DirectoryInfo(generatedPeopleLogsFilePath!).GetFiles().ToImmutableList();
+
+var ids = new Dictionary<string, Guid>();
+const string so = "significantOther";
+const string fr = "friend";
+
+foreach (var file in files)
 {
-    Console.ForegroundColor = ConsoleColor.Red;
-    Console.WriteLine("Player's Id is not correct!");
-    Console.ResetColor();
-    return;
+    using (var reader = new StreamReader(file.OpenRead()))
+    {
+        ids.Add(file.Name.Split("_")[1], Guid.Parse(reader.ReadLine()!));
+    }
 }
 
-Console.Write("Write here an ID of player's significatn other: ");
-input = Console.ReadLine();
-if (!Guid.TryParse(input, out var soid))
-{
-    Console.BackgroundColor = ConsoleColor.Red;
-    Console.WriteLine("ID is not in correct format!");
-    Console.ResetColor();
-    return;
-}
+var soid = ids.FirstOrDefault(npc => npc.Key == so).Value;
+var friendId = ids.FirstOrDefault(npc => npc.Key == fr).Value;
 
 var significantOther = manager.Characters.First(character => character.Person.Id.Value.Equals(soid));
-
-Console.Write("Write here an ID of player's friend: ");
-input = Console.ReadLine();
-if (!Guid.TryParse(input, out var friendId))
-{
-    Console.ForegroundColor = ConsoleColor.Red;
-    Console.WriteLine("ID is not in correct format!");
-    Console.ResetColor();
-    return;
-}
 
 var friend = manager.Characters.First(ch => ch.Person.Id.Value.Equals(friendId));
 
@@ -453,7 +446,7 @@ static void TryTouch(WDateTime now, IHuman from, IHuman to, Random rng)
 
     // Friendly touch — hug or equivalent. Requires deeper closeness, more attraction,
     // and privacy — open spaces make this socially awkward.
-    if (edge.Closeness > 70 && edge.Attraction > 55 && hasPrivacy && rng.NextDouble() < 0.07)
+    if (edge.Closeness > 70 && edge.SexualInterest > 50 && hasPrivacy && rng.NextDouble() < 0.07)
     {
         to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, TouchLevel.Friendly));
     }
