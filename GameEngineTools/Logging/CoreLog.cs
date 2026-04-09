@@ -534,14 +534,13 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 2007,
             Level = LogLevel.Information,
-            Message = "[REL/IMPRESSION] {HumanId} První dojem: {A} → {B} Like={Like:F1} Attraction={Attraction:F1}.")]
+            Message = "[REL/IMPRESSION] {HumanId} První dojem: {A} → {B} Like={Like:F1}.")]
         public static partial void RelFirstImpression(
             this ILogger logger,
             string HumanId,
             string A,
             string B,
-            double Like,
-            double Attraction);
+            double Like);
 
         [LoggerMessage(
             EventId = 1202,

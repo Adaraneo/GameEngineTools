@@ -119,13 +119,8 @@ namespace GameEngineTools.Narrative
                 _ => "negativní dojem"
             };
 
-            // Přitažlivost — jen pokud je výrazná
-            var attractionText = fi.Attraction >= 60
-                ? $" {Conj(a, "Cítil k ní přitažlivost.", "Cítila k němu přitažlivost.")}"
-                : string.Empty;
-
             var text = $"{a.Name} {Conj(a, "poznal", "poznala")} {Decl(b, Grammar.Core.Enums.Case.Accusative)} " +
-                       $"— {likeText}.{attractionText}";
+                       $"— {likeText}.";
 
             return new NarrativeEntry(fi.OccurredAt, fi.A, text, NarrativePriority.High);
         }

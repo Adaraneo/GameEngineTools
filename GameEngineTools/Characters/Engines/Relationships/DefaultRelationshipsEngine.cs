@@ -32,9 +32,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
     /// <para>
     /// <b>Mere-exposure effect:</b>
     /// Each accepted interaction increments <see cref="RelationshipEdge.PositiveInteractionCount"/>.
-    /// A logarithmic bonus is applied to <c>Attraction</c> on every increment,
+    /// A logarithmic bonus is applied to <see cref="RelationshipEdge.Familiarity"/>,
     /// saturating at <see cref="RelationshipsConfig.MereExposureSaturation"/> interactions.
-    /// This keeps the effect in the engine that owns Attraction — no external calculator needed.
     /// </para>
     /// </remarks>
     internal sealed partial class DefaultRelationshipsEngine : IRelationshipsEngine
@@ -111,7 +110,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         _log.RelFirstImpression(
                             ctx.Id.Value.ToString(),
                             fi.A.Value.ToString(), fi.B.Value.ToString(),
-                        fi.Like, fi.Attraction);
+                        fi.Like);
                     }
 
                     break;
@@ -174,7 +173,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                         Upsert(self, otherId, e =>
                         {
-                            // Mere-exposure: incremental attraction boost from familiarity.
+                            // Mere-exposure: incremental familiarity boost from repeated accepted contact.
                             // Delta = total boost at (N+1) minus total boost at N.
                             // Logarithmic growth → fast early, levels off near saturation.
                             var newCount = e.PositiveInteractionCount + 1;
@@ -305,7 +304,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// <list type="bullet">
         ///   <item>Closeness — fastest decay (distance is felt quickly)</item>
         ///   <item>Trust — slowest decay (trust earned persists)</item>
-        ///   <item>Attraction — slow, drifts toward 35 or 45 based on initial value</item>
+        ///   <item>Familiarity — very slow decay (repeated exposure leaves a long memory)</item>
+        ///   <item>RomanticInterest / SexualInterest — drift back toward soft neutral when not reinforced</item>
         /// </list>
         /// Note: <c>PositiveInteractionCount</c> does <b>not</b> decay — it is a cumulative
         /// historical counter, not a relationship intensity measure.
