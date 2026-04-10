@@ -188,7 +188,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var trust = edge?.Trust ?? 30;
 
             var psych = ctx.Snapshot.Psychology;
-            var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty).ExpectedAcceptance(p.From, p.Act);
+            var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
+                .ExpectedAcceptance(p.From, p.Act, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
 
             // Základní pravděpodobnost přijetí — lineární kombinace vztahů a psychiky
             var baseP = 0.30

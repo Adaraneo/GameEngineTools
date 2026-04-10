@@ -41,7 +41,14 @@ namespace GameEngineTools.World.Simulation
             _ = now;
 
             var edge = initiator.Snapshot.Relationships.Edges.GetValueOrDefault(target.Id);
-            return SelectSpeechAct(edge, initiator.Snapshot.InteractionSurface, rng, initiator.Snapshot.SemanticMemory, target.Id);
+            return SelectSpeechAct(
+                edge,
+                initiator.Snapshot.InteractionSurface,
+                rng,
+                initiator.Snapshot.SemanticMemory,
+                target.Id,
+                initiator.PsychologyProfile,
+                initiator.Snapshot.Memory.Episodes);
         }
 
         /// <summary>
@@ -55,14 +62,16 @@ namespace GameEngineTools.World.Simulation
             RelationshipEdge? edge,
             InteractionSurface surface,
             Random rng)
-            => SelectSpeechAct(edge, surface, rng, null, null);
+            => SelectSpeechAct(edge, surface, rng, null, null, null, null);
 
         public static ReachOutSpeechActSelection SelectSpeechAct(
             RelationshipEdge? edge,
             InteractionSurface surface,
             Random rng,
             SemanticMemoryState? semanticMemory,
-            HumanId? targetId)
+            HumanId? targetId,
+            Characters.Traits.PsychologicalProfile? profile = null,
+            IReadOnlyList<Characters.Engines.Memory.EpisodicMemory>? episodes = null)
         {
             ArgumentNullException.ThrowIfNull(rng);
 
@@ -72,7 +81,7 @@ namespace GameEngineTools.World.Simulation
             var closeness = edge?.Closeness ?? 0.0;
             var romanticInterest = edge?.RomanticInterest ?? 0.0;
             var expectedAcceptance = targetId is { } other
-                ? SemanticMemoryMath.ExpectedAcceptance(semanticMemory, other, SpeechAct.SmallTalk)
+                ? SemanticMemoryMath.ExpectedAcceptance(semanticMemory, other, SpeechAct.SmallTalk, edge, profile, episodes)
                 : 0.5;
             var warmBelief = targetId is { } warmOther && semanticMemory is not null
                 ? semanticMemory.GetStrength(warmOther, PersonBeliefKind.Warm)

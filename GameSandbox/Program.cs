@@ -7,6 +7,7 @@ using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Traits;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
@@ -336,14 +337,12 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
         if (candidates.Count == 0)
             continue;
 
-        // Weighted random — prefer characters the initiator likes,
-        // but keep a chance to approach a stranger.
-        // Unknown character gets neutral weight 45 — openness to strangers.
-        var target = PickWeightedRandom(candidates, c =>
-        {
-            var edge = character.Snapshot.Relationships.Edges.GetValueOrDefault(c.Id);
-            return edge?.Like ?? 45.0;
-        }, rng);
+        var targetMode = character.Snapshot.Behavior.NeedIntimacy >= 55
+            ? SocialTargetMode.Intimacy
+            : SocialTargetMode.ReachOut;
+        var target = SemanticTargeting.ChooseTarget(character, candidates, targetMode);
+        if (target is null)
+            continue;
 
         var selection = ReachOutSpeechActSelector.SelectSpeechAct(character, target, now, rng);
         var act = selection.Act;

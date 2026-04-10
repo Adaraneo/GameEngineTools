@@ -50,8 +50,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             var semantic = context.HumanContext.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty;
             if (semantic.People.Count > 0)
             {
-                var bestReachOut = semantic.People.Keys.Max(other => semantic.ExpectedAcceptance(other, SpeechAct.SmallTalk));
-                var bestInvite = semantic.People.Keys.Max(other => semantic.ExpectedAcceptance(other, SpeechAct.Invite));
+                var relationships = context.HumanContext.Snapshot.Relationships.Edges;
+                var profile = context.HumanContext.PsychologyProfile;
+                var memory = context.HumanContext.Snapshot.Memory.Episodes;
+
+                var bestReachOut = semantic.People.Keys.Max(other =>
+                    semantic.ExpectedAcceptance(other, SpeechAct.SmallTalk, relationships.GetValueOrDefault(other), profile, memory));
+                var bestInvite = semantic.People.Keys.Max(other =>
+                    semantic.ExpectedAcceptance(other, SpeechAct.Invite, relationships.GetValueOrDefault(other), profile, memory));
 
                 if (bestReachOut >= 0.62)
                 {

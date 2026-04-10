@@ -6,6 +6,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using System;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Traits;
 
     public static class SemanticMemoryMath
     {
@@ -13,17 +16,21 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             SemanticMemoryState? state,
             HumanId other,
             SpeechAct act)
-        {
-            if (state is null)
-            {
-                return 0.5;
-            }
+            => ExpectedAcceptance(state, other, act, null, null, null);
 
-            var warm = state.GetStrength(other, PersonBeliefKind.Warm);
-            var safe = state.GetStrength(other, PersonBeliefKind.EmotionallySafe);
-            var reliable = state.GetStrength(other, PersonBeliefKind.Reliable);
-            var rejecting = state.GetStrength(other, PersonBeliefKind.Rejecting);
-            var critical = state.GetStrength(other, PersonBeliefKind.Critical);
+        public static double ExpectedAcceptance(
+            SemanticMemoryState? state,
+            HumanId other,
+            SpeechAct act,
+            RelationshipEdge? relationship,
+            PsychologicalProfile? profile,
+            IReadOnlyList<EpisodicMemory>? episodes)
+        {
+            var warm = state?.GetStrength(other, PersonBeliefKind.Warm) ?? 0.0;
+            var safe = state?.GetStrength(other, PersonBeliefKind.EmotionallySafe) ?? 0.0;
+            var reliable = state?.GetStrength(other, PersonBeliefKind.Reliable) ?? 0.0;
+            var rejecting = state?.GetStrength(other, PersonBeliefKind.Rejecting) ?? 0.0;
+            var critical = state?.GetStrength(other, PersonBeliefKind.Critical) ?? 0.0;
 
             var vulnerabilityWeight = act switch
             {
@@ -36,7 +43,113 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
             var positive = warm * 0.28 + safe * 0.32 * vulnerabilityWeight + reliable * 0.22;
             var negative = rejecting * 0.34 * vulnerabilityWeight + critical * 0.24;
-            return Math.Clamp(0.5 + positive - negative, 0.05, 0.95);
+            var relationshipBias = RelationshipBias(relationship, act);
+            var recentBias = RecentEpisodeBias(episodes, other, act);
+            var profileBias = ProfileBias(profile, act, safe, rejecting, critical);
+            return Math.Clamp(0.5 + positive - negative + relationshipBias + recentBias + profileBias, 0.05, 0.95);
+        }
+
+        internal static double ScoreApproachTarget(
+            SemanticMemoryState? state,
+            HumanId other,
+            RelationshipEdge? relationship,
+            PsychologicalProfile? profile,
+            IReadOnlyList<EpisodicMemory>? episodes,
+            SpeechAct act)
+        {
+            var expected = ExpectedAcceptance(state, other, act, relationship, profile, episodes);
+            var familiarity = (relationship?.Familiarity ?? 0.0) / 100.0;
+            var closeness = (relationship?.Closeness ?? 0.0) / 100.0;
+            var trust = (relationship?.Trust ?? 30.0) / 100.0;
+
+            return Math.Clamp(
+                expected * 0.60
+                + familiarity * 0.12
+                + closeness * 0.16
+                + trust * 0.12,
+                0.0,
+                1.0);
+        }
+
+        private static double RelationshipBias(RelationshipEdge? relationship, SpeechAct act)
+        {
+            if (relationship is null)
+            {
+                return 0.0;
+            }
+
+            var trust = (relationship.Trust - 50.0) / 100.0;
+            var comfort = (relationship.Comfort - 50.0) / 100.0;
+            var closeness = relationship.Closeness / 100.0;
+
+            return act switch
+            {
+                SpeechAct.SelfDisclosure or SpeechAct.Meta
+                    => trust * 0.12 + comfort * 0.08 + closeness * 0.06,
+                SpeechAct.Invite
+                    => trust * 0.08 + comfort * 0.06 + closeness * 0.10,
+                _
+                    => trust * 0.05 + comfort * 0.04
+            };
+        }
+
+        private static double RecentEpisodeBias(
+            IReadOnlyList<EpisodicMemory>? episodes,
+            HumanId other,
+            SpeechAct act)
+        {
+            if (episodes is null || episodes.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var recent = episodes
+                .Where(e => e.OtherPerson == other && e.Strength > 0.35)
+                .OrderByDescending(e => e.When)
+                .Take(3)
+                .ToList();
+
+            if (recent.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var positive = recent.Sum(e => e.Emotion == EmotionalTag.Positive ? e.Strength : 0.0);
+            var negative = recent.Sum(e => e.Emotion == EmotionalTag.Negative ? e.Strength : 0.0);
+            var threatPenalty = recent.Count(e => (e.PerceivedWhat ?? e.What).StartsWith("PerceivedThreat:", StringComparison.Ordinal)) * 0.04;
+            var vulnerabilityMultiplier = act is SpeechAct.SelfDisclosure or SpeechAct.Meta or SpeechAct.Invite ? 1.25 : 0.85;
+
+            return Math.Clamp((positive - negative) * 0.06 * vulnerabilityMultiplier - threatPenalty, -0.12, 0.12);
+        }
+
+        private static double ProfileBias(
+            PsychologicalProfile? profile,
+            SpeechAct act,
+            double safe,
+            double rejecting,
+            double critical)
+        {
+            if (profile is null)
+            {
+                return 0.0;
+            }
+
+            var vulnerableAct = act is SpeechAct.SelfDisclosure or SpeechAct.Meta or SpeechAct.Invite;
+            var selfProtective = profile.Coping is CopingStyle.Avoidant or CopingStyle.AggressiveCompensation
+                ? 0.05 + profile.Narrative.ToughnessIdentity * 0.08
+                : 0.0;
+            var affiliative = profile.Coping == CopingStyle.PeoplePleasing
+                ? 0.03 + profile.Narrative.BelongingIdentity * 0.05
+                : profile.Narrative.BelongingIdentity * 0.02;
+
+            if (!vulnerableAct)
+            {
+                return affiliative * 0.5 - Math.Max(0.0, rejecting - safe) * selfProtective * 0.3;
+            }
+
+            var guardedPenalty = (Math.Max(0.0, rejecting - safe) + critical * 0.5) * selfProtective;
+            var approachBonus = safe * affiliative * 0.35;
+            return Math.Clamp(approachBonus - guardedPenalty, -0.15, 0.08);
         }
     }
 }
