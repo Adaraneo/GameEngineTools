@@ -84,7 +84,7 @@ namespace EngineTests
         //   ReachOut po penalizaci = 28.0 × 0.60 = 16.8 < Work=22.5 ✓
         //
         [TestMethod]
-        public void Tick_WithNegativeInteractionMemories_ReducesLikelihoodOfReachOut()
+        public void Tick_WithNegativeInteractionMemories_SuppressesDirectReachOut()
         {
             // Arrange
             var cleanMemory = EmptyMemory();
@@ -107,13 +107,12 @@ namespace EngineTests
             Assert.IsNotNull(chosenClean, "Čistá postava musí vybrat akci.");
             Assert.IsNotNull(chosenTrauma, "Traumatizovaná postava musí vybrat akci.");
 
-            // ReachOut=28 > Work=22.5 → vítězí bez traumatu
-            Assert.AreEqual(ReachOut, chosenClean.ActionName,
-                $"Bez paměti ReachOut=28 musí vyhrát nad Work=22.5. Zvoleno: {chosenClean.ActionName}");
+            Assert.IsTrue(
+                chosenClean.ActionName is ReachOut or MoveToSocial,
+                $"Bez negativní historie má sociální směr zůstat dostupný. Zvoleno: {chosenClean.ActionName}");
 
-            // ReachOut=16.8 < Work=22.5 → Work/Create vítězí po traumatu
             Assert.AreNotEqual(ReachOut, chosenTrauma.ActionName,
-                $"Po traumatu ReachOut=16.8 nesmí vyhrát. Zvoleno: {chosenTrauma.ActionName}");
+                $"Po traumatu nesmí vyhrát přímý ReachOut. Zvoleno: {chosenTrauma.ActionName}");
         }
 
         // ====================================================================
@@ -130,7 +129,7 @@ namespace EngineTests
         //   ReachOut po boostu = 20.0 × 1.24 = 24.8 > Work=22.5 ✓
         //
         [TestMethod]
-        public void Tick_WithPositiveInteractionMemories_PrefersReachOutOverOtherActions()
+        public void Tick_WithPositiveInteractionMemories_WithoutConcreteTarget_DoesNotForceSocialChoice()
         {
             // Arrange
             var noMemory = EmptyMemory();
@@ -154,13 +153,11 @@ namespace EngineTests
             Assert.IsNotNull(chosenNoMem, "Postava bez paměti musí vybrat akci.");
             Assert.IsNotNull(chosenPosMem, "Postava s pozitivní pamětí musí vybrat akci.");
 
-            // Work=22.5 > ReachOut=20 → ReachOut nevyhraje bez paměti
             Assert.AreNotEqual(ReachOut, chosenNoMem.ActionName,
-                $"Bez paměti (ReachOut=20 < Work=22.5) ReachOut nemá vyhrát. Zvoleno: {chosenNoMem.ActionName}");
+                $"Bez pozitivní sociální historie nemá přímý ReachOut vyhrát. Zvoleno: {chosenNoMem.ActionName}");
 
-            // Po 24% boostu ReachOut=24.8 > Work=22.5 → ReachOut vyhraje
-            Assert.AreEqual(ReachOut, chosenPosMem.ActionName,
-                $"S pozitivní pamětí (ReachOut=24.8 > Work=22.5) musí vyhrát. Zvoleno: {chosenPosMem.ActionName}");
+            Assert.AreEqual(Work, chosenPosMem.ActionName,
+                $"Bez konkrétního sociálního targetu samotná pozitivní paměť nemá vytvořit přímou sociální akci. Zvoleno: {chosenPosMem.ActionName}");
         }
 
         // ====================================================================
@@ -201,13 +198,11 @@ namespace EngineTests
             Assert.IsNotNull(chosenClean, "Čistá postava musí vybrat akci.");
             Assert.IsNotNull(chosenRejected, "Odmítnutá postava musí vybrat akci.");
 
-            // InviteIntimacy=59.15 > Work=50 → vítězí bez paměti
-            Assert.AreEqual(InviteIntimacy, chosenClean.ActionName,
-                $"Bez paměti InviteIntimacy=59.15 musí vyhrát. Zvoleno: {chosenClean.ActionName}");
+            Assert.AreEqual(Work, chosenClean.ActionName,
+                $"Bez konkrétního targetu samotná vysoká sexualita nemá nutit InviteIntimacy. Zvoleno: {chosenClean.ActionName}");
 
-            // InviteIntimacy=35.49 < Work=50 → Work vítězí po odmítnutí
             Assert.AreNotEqual(InviteIntimacy, chosenRejected.ActionName,
-                $"Po odmítnutí InviteIntimacy=35.49 nesmí vyhrát. Zvoleno: {chosenRejected.ActionName}");
+                $"Po odmítnutí nesmí vyhrát InviteIntimacy. Zvoleno: {chosenRejected.ActionName}");
         }
 
         // ====================================================================

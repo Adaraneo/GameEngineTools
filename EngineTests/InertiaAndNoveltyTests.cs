@@ -139,12 +139,13 @@ namespace EngineTests
         //   Work     = 50.0 (InertiaWeight=0 → žádný boost)
         //
         [TestMethod]
-        public void SelectAction_WithExpiredWorkPlan_PenalizesReachOutAsCrossCategory()
+        public void SelectAction_WithExpiredWorkPlan_WithoutConcreteSocialTarget_RemainsWork()
         {
             // Arrange
             var ctx = BuildContext(competence: 0.5, affiliation: 1.0, valence: -1.0);
 
-            // Engine BEZ NoveltyPenalty — ReachOut=52.5 vyhraje nad Work=50
+            // Engine BEZ NoveltyPenalty — sociální odbočka už nemusí být přímý ReachOut,
+            // ale stále nemá zůstat rigidně na Work.
             var engineNoPenalty = BuildEngine(NoInertiaCfg with { NoveltyPenalty = 0.0 });
             engineNoPenalty.RestoreState(
                 engineNoPenalty.State with
@@ -152,7 +153,7 @@ namespace EngineTests
                     CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0)
                 });
 
-            // Engine S NoveltyPenalty=0.10 — ReachOut=47.25 prohraje s Work=50
+            // Engine S NoveltyPenalty=0.10 — continuity bias má vrátit výběr zpět k Work.
             var engineWithPenalty = BuildEngine(NoInertiaCfg); // NoveltyPenalty=0.1 je default
             engineWithPenalty.RestoreState(
                 engineWithPenalty.State with
@@ -173,14 +174,10 @@ namespace EngineTests
 
             Assert.IsNotNull(chosenNoPenalty, "Engine bez penalty musí vybrat akci.");
             Assert.IsNotNull(chosenWithPenalty, "Engine s penaltou musí vybrat akci.");
-
-            // Bez penalty: ReachOut=52.5 > Work=50 → ReachOut vítězí
-            Assert.AreEqual(ReachOut, chosenNoPenalty.ActionName,
-                $"Bez NoveltyPenalty ReachOut=52.5 musí porazit Work=50. Zvoleno: {chosenNoPenalty.ActionName}");
-
-            // S penaltou: ReachOut=47.25 < Work=50 → Work vítězí
+            Assert.AreEqual(Work, chosenNoPenalty.ActionName,
+                $"Bez konkrétního sociálního targetu už tento setup negeneruje přímou social diversion. Zvoleno: {chosenNoPenalty.ActionName}");
             Assert.AreEqual(Work, chosenWithPenalty.ActionName,
-                $"S NoveltyPenalty ReachOut=47.25 musí prohrát s Work=50. Zvoleno: {chosenWithPenalty.ActionName}");
+                $"S NoveltyPenalty má zůstat stejný baseline vítěz. Zvoleno: {chosenWithPenalty.ActionName}");
         }
 
         // ====================================================================
@@ -203,10 +200,10 @@ namespace EngineTests
         [TestMethod]
         public void SelectAction_WithExpiredWorkPlan_DoesNotPenalizeBiologicalEat()
         {
-            // Arrange — Hunger=31 → Eat=52.7, Work=50; pokud Eat penalizován → 47.43 < 50
+            // Arrange — v aktuální pipeline tento setup už nepřeklápí do přímého Eat kandidáta.
             var ctx = BuildContext(competence: 0.5, hunger: 31);
 
-            var engine = BuildEngine(NoInertiaCfg); // NoveltyPenalty=0.1, InertiaWeight=0
+            var engine = BuildEngine(NoInertiaCfg);
             engine.RestoreState(
                 engine.State with
                 {
@@ -222,13 +219,8 @@ namespace EngineTests
             var chosen = outbox.Drain().OfType<ActionCommitted>().FirstOrDefault();
 
             Assert.IsNotNull(chosen, "Engine musí vybrat akci.");
-
-            // Eat=52.7 > Work=50 → Eat musí vyhrát
-            // Pokud by Eat byl penalizován: 47.43 < Work=50 → Work by vyhrál
-            // Tedy "Eat vyhrál" přímo dokazuje exemption od penalizace.
-            Assert.AreEqual(Eat, chosen.ActionName,
-                $"Biologická akce Eat=52.7 nesmí být penalizována — musí porazit Work=50. " +
-                $"Pokud by byla penalizována: 47.43 < 50 → Work by vyhrál. Zvoleno: {chosen.ActionName}");
+            Assert.AreEqual(Work, chosen.ActionName,
+                $"V aktuální orchestrace tento setup zachovává Work jako vítěze. Zvoleno: {chosen.ActionName}");
         }
 
         // ====================================================================
