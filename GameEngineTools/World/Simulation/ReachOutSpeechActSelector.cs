@@ -68,22 +68,19 @@ namespace GameEngineTools.World.Simulation
                 (SpeechAct.SmallTalk, ComputeSmallTalkWeight(familiarity, comfort, closeness))
             };
 
-            if (familiarity >= 8 || comfort >= 47)
-            {
-                weightedActs.Add((SpeechAct.Question, ComputeQuestionWeight(familiarity, comfort, closeness)));
-            }
+            weightedActs.Add((SpeechAct.Question, ComputeQuestionWeight(familiarity, comfort, closeness)));
 
-            if (familiarity >= 12 || comfort >= 50)
+            if (familiarity >= 10 || comfort >= 48)
             {
                 weightedActs.Add((SpeechAct.Validation, ComputeValidationWeight(trust, comfort, closeness)));
             }
 
-            if (trust >= 52 && comfort >= 50 && closeness >= 15)
+            if (trust >= 50 && comfort >= 50 && closeness >= 6)
             {
                 weightedActs.Add((SpeechAct.SelfDisclosure, ComputeSelfDisclosureWeight(trust, comfort, closeness)));
             }
 
-            if (trust >= 56 && comfort >= 53 && closeness >= 22)
+            if (trust >= 52 && comfort >= 52 && closeness >= 8)
             {
                 weightedActs.Add((SpeechAct.Meta, ComputeMetaWeight(trust, comfort, closeness)));
             }
@@ -111,56 +108,56 @@ namespace GameEngineTools.World.Simulation
 
         private static double ComputeSmallTalkWeight(double familiarity, double comfort, double closeness)
         {
-            if (familiarity < 8 && comfort < 47)
+            if (familiarity < 10 && comfort < 48)
             {
-                return 1.35;
+                return 1.45;
             }
 
-            if (closeness < 20)
+            if (closeness < 8)
             {
-                return 1.05;
+                return 1.10;
             }
 
-            if (closeness < 40)
+            if (closeness < 14)
             {
-                return 0.85;
+                return 0.90;
             }
 
-            return 0.65;
+            return 0.75;
         }
 
         private static double ComputeQuestionWeight(double familiarity, double comfort, double closeness)
-            => 0.18
-                + Math.Max(0.0, familiarity - 8.0) * 0.020
+            => 0.28
+                + Math.Max(0.0, familiarity - 8.0) * 0.018
                 + Math.Max(0.0, comfort - 47.0) * 0.010
-                + Math.Max(0.0, closeness - 10.0) * 0.004;
+                + Math.Max(0.0, closeness - 6.0) * 0.006;
 
         private static double ComputeValidationWeight(double trust, double comfort, double closeness)
             => 0.06
-                + Math.Max(0.0, comfort - 50.0) * 0.018
+                + Math.Max(0.0, comfort - 48.0) * 0.018
                 + Math.Max(0.0, trust - 50.0) * 0.012
-                + Math.Max(0.0, closeness - 12.0) * 0.005;
+                + Math.Max(0.0, closeness - 6.0) * 0.006;
 
         private static double ComputeSelfDisclosureWeight(double trust, double comfort, double closeness)
             => 0.03
-                + Math.Max(0.0, trust - 52.0) * 0.020
+                + Math.Max(0.0, trust - 50.0) * 0.018
                 + Math.Max(0.0, comfort - 50.0) * 0.015
-                + Math.Max(0.0, closeness - 15.0) * 0.008;
+                + Math.Max(0.0, closeness - 6.0) * 0.010;
 
         private static double ComputeMetaWeight(double trust, double comfort, double closeness)
             => 0.02
-                + Math.Max(0.0, trust - 56.0) * 0.016
-                + Math.Max(0.0, comfort - 53.0) * 0.012
-                + Math.Max(0.0, closeness - 22.0) * 0.008;
+                + Math.Max(0.0, trust - 52.0) * 0.015
+                + Math.Max(0.0, comfort - 52.0) * 0.012
+                + Math.Max(0.0, closeness - 8.0) * 0.010;
 
         private static bool CanInvite(
             InteractionSurface surface,
             double comfort,
             double closeness,
             double romanticInterest)
-            => comfort >= 58
-                && closeness >= 35
-                && romanticInterest >= 30
+            => comfort >= 55
+                && closeness >= 12
+                && romanticInterest >= 10
                 && (surface.HasPrivacy || surface.Kind is SurfaceKind.Social or SurfaceKind.Private);
 
         private static double ComputeInviteWeight(
@@ -173,9 +170,9 @@ namespace GameEngineTools.World.Simulation
 
             return 0.008
                 + privacyBonus
-                + Math.Max(0.0, romanticInterest - 30.0) * 0.006
-                + Math.Max(0.0, comfort - 58.0) * 0.004
-                + Math.Max(0.0, closeness - 35.0) * 0.003;
+                + Math.Max(0.0, romanticInterest - 10.0) * 0.004
+                + Math.Max(0.0, comfort - 55.0) * 0.003
+                + Math.Max(0.0, closeness - 12.0) * 0.002;
         }
 
         private static SpeechAct PickWeightedRandom(IReadOnlyList<(SpeechAct Act, double Weight)> weightedActs, Random rng)

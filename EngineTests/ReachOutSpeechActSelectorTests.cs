@@ -40,7 +40,7 @@ namespace EngineTests
         public void SelectSpeechAct_LowFamiliarity_PrefersSmallTalkAndQuestion()
         {
             var counts = SampleActs(
-                BuildEdge(familiarity: 8, trust: 50, comfort: 46, closeness: 8, romanticInterest: 5),
+                BuildEdge(familiarity: 7, trust: 50, comfort: 46, closeness: 5, romanticInterest: 5),
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 300);
 
@@ -57,12 +57,26 @@ namespace EngineTests
         public void SelectSpeechAct_Question_UnlocksAtEarlierThreshold()
         {
             var counts = SampleActs(
-                BuildEdge(familiarity: 8, trust: 50, comfort: 47, closeness: 6, romanticInterest: 5),
+                BuildEdge(familiarity: 8, trust: 50, comfort: 47, closeness: 5, romanticInterest: 5),
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 240);
 
             Assert.IsTrue(counts.ContainsKey(SpeechAct.Question));
             Assert.IsTrue(counts[SpeechAct.Question] > 0);
+        }
+
+        /// <summary>
+        /// Validation should be reachable around the current top end of yearly familiarity values.
+        /// </summary>
+        [TestMethod]
+        public void SelectSpeechAct_Validation_IsReachableAtCurrentSimulationRange()
+        {
+            var counts = SampleActs(
+                BuildEdge(familiarity: 10.5, trust: 50, comfort: 48, closeness: 5.5, romanticInterest: 5),
+                new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
+                draws: 320);
+
+            Assert.IsTrue(counts.ContainsKey(SpeechAct.Validation));
         }
 
         /// <summary>
@@ -88,11 +102,25 @@ namespace EngineTests
         public void SelectSpeechAct_SelfDisclosure_IsReachableAtModerateRelationshipState()
         {
             var counts = SampleActs(
-                BuildEdge(familiarity: 24, trust: 54, comfort: 52, closeness: 18, romanticInterest: 12),
+                BuildEdge(familiarity: 11, trust: 50, comfort: 50, closeness: 6.2, romanticInterest: 6),
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 320);
 
             Assert.IsTrue(counts.ContainsKey(SpeechAct.SelfDisclosure));
+        }
+
+        /// <summary>
+        /// Meta should unlock slightly above self-disclosure without requiring unrealistically high closeness.
+        /// </summary>
+        [TestMethod]
+        public void SelectSpeechAct_Meta_IsReachableNearCurrentUpperBand()
+        {
+            var counts = SampleActs(
+                BuildEdge(familiarity: 12, trust: 52, comfort: 52, closeness: 8.4, romanticInterest: 7),
+                new InteractionSurface("Room", true, 0.1, 0.1, SurfaceKind.Private),
+                draws: 360);
+
+            Assert.IsTrue(counts.ContainsKey(SpeechAct.Meta));
         }
 
         /// <summary>
@@ -102,20 +130,20 @@ namespace EngineTests
         public void SelectSpeechAct_Invite_RemainsRareAndConditioned()
         {
             var weakCounts = SampleActs(
-                BuildEdge(familiarity: 50, trust: 60, comfort: 57, closeness: 34, romanticInterest: 28),
+                BuildEdge(familiarity: 10, trust: 51, comfort: 54, closeness: 11, romanticInterest: 9),
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 400);
 
             Assert.IsFalse(weakCounts.ContainsKey(SpeechAct.Invite));
 
             var strongCounts = SampleActs(
-                BuildEdge(familiarity: 70, trust: 82, comfort: 80, closeness: 72, romanticInterest: 78),
+                BuildEdge(familiarity: 13, trust: 55, comfort: 56, closeness: 12.5, romanticInterest: 11),
                 new InteractionSurface("Room", true, 0.1, 0.1, SurfaceKind.Private),
-                draws: 600);
+                draws: 800);
 
             Assert.IsTrue(strongCounts.ContainsKey(SpeechAct.Invite));
+            Assert.IsTrue(strongCounts[SpeechAct.Invite] < strongCounts[SpeechAct.Question]);
             Assert.IsTrue(strongCounts[SpeechAct.Invite] < strongCounts[SpeechAct.Validation]);
-            Assert.IsTrue(strongCounts[SpeechAct.Invite] < strongCounts[SpeechAct.SelfDisclosure]);
         }
 
         #endregion ReachOut routing
@@ -128,9 +156,9 @@ namespace EngineTests
         [TestMethod]
         public void TouchSelector_LightTouch_IsReachableEarlierThanFriendlyTouch()
         {
-            var earlyEdge = BuildEdge(familiarity: 20, trust: 50, comfort: 49, closeness: 21, romanticInterest: 8) with
+            var earlyEdge = BuildEdge(familiarity: 12, trust: 50, comfort: 51, closeness: 16, romanticInterest: 8) with
             {
-                SexualInterest = 10
+                SexualInterest = 20
             };
 
             Assert.IsTrue(ReachOutTouchSelector.CanAttemptLightTouch(earlyEdge));
@@ -143,9 +171,9 @@ namespace EngineTests
         [TestMethod]
         public void TouchSelector_FriendlyTouch_StaysMoreRestrictedThanLightTouch()
         {
-            var warmEdge = BuildEdge(familiarity: 40, trust: 60, comfort: 58, closeness: 45, romanticInterest: 20) with
+            var warmEdge = BuildEdge(familiarity: 13, trust: 52, comfort: 54, closeness: 31, romanticInterest: 10) with
             {
-                SexualInterest = 24
+                SexualInterest = 31
             };
 
             Assert.IsTrue(ReachOutTouchSelector.CanAttemptLightTouch(warmEdge));

@@ -39,7 +39,7 @@ namespace GameEngineTools.World.Simulation
                 return TouchLevel.Friendly;
             }
 
-            if (CanAttemptLightTouch(edge) && rng.NextDouble() < 0.08)
+            if (CanAttemptLightTouch(edge) && rng.NextDouble() < 0.06)
             {
                 return TouchLevel.Light;
             }
@@ -52,8 +52,8 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         public static bool CanAttemptLightTouch(RelationshipEdge? edge)
             => edge is not null
-                && edge.Closeness > 20
-                && edge.Comfort > 48;
+                && edge.Closeness > 15
+                && edge.Comfort > 50;
 
         /// <summary>
         /// Determines whether friendly touch is relationship-plausible, before randomness is applied.
@@ -61,9 +61,8 @@ namespace GameEngineTools.World.Simulation
         public static bool CanAttemptFriendlyTouch(RelationshipEdge? edge, bool hasPrivacy)
             => edge is not null
                 && hasPrivacy
-                && edge.Closeness > 40
-                && edge.Comfort > 55
-                && edge.SexualInterest > 20;
+                && edge.Closeness > 30
+                && edge.SexualInterest > 30;
 
         #endregion Public API
     }
