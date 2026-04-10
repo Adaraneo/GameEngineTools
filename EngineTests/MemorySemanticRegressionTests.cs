@@ -142,7 +142,7 @@ namespace EngineTests
         public void GetMicroEventKind_HelpWithTask_IsNotCanonicalHelpToken()
         {
             // Arrange
-            const string what = "Relation:MicroPositive|what=help-with-task|from=11111111-1111-1111-1111-111111111111";
+            const string what = "Relation:MicroPositive|what=help|from=11111111-1111-1111-1111-111111111111";
             var descriptor = MemoryWhatParser.ParseDescriptor(what, null);
 
             // Act
@@ -156,7 +156,7 @@ namespace EngineTests
         public void GetMicroEventKind_IgnoreAfterReachout_NormalizesToCanonicalIgnore()
         {
             // Arrange
-            const string what = "Relation:MicroNegative|what=ignore-after-reachout|from=11111111-1111-1111-1111-111111111111";
+            const string what = "Relation:MicroNegative|what=ignore|from=11111111-1111-1111-1111-111111111111";
             var descriptor = MemoryWhatParser.ParseDescriptor(what, null);
 
             // Act

@@ -30,7 +30,7 @@ namespace GameEngineTools.Narrative
     ///   <item><b>Chování</b> — <see cref="ActionCommitted"/></item>
     ///   <item><b>Spánek</b> — <see cref="SleepEnded"/>, <see cref="NightmareTriggered"/>,
     ///     <see cref="SleepInterrupted"/></item>
-    ///   <item><b>Paměť</b> — <see cref="MemoryEncoded"/> (jen pokud má <c>What</c>),
+    ///   <item><b>Paměť</b> — <see cref="MemoryEncoded"/> (jen pokud má <c>Kind</c>),
     ///     <see cref="MemoryConsolidated"/></item>
     /// </list>
     /// </para>
@@ -79,8 +79,8 @@ namespace GameEngineTools.Narrative
                 SleepInterrupted si => FormatSleepInterrupted(si, resolveCharacter),
 
                 // ── Paměť ─────────────────────────────────────────────────────────
-                // Property pattern: zpracujeme jen pokud What není null.
-                // Proč? MemoryEncoded bez What je narativně slepý — máme jen GUID.
+                // Property pattern: zpracujeme jen pokud Kind není null.
+                // Proč? MemoryEncoded bez Kind je narativně slepý — máme jen GUID.
                 MemoryEncoded { What: not null } me => FormatMemoryEncoded(me, resolveCharacter),
                 MemoryConsolidated mc => FormatMemoryConsolidated(mc, resolveCharacter),
 
@@ -191,7 +191,7 @@ namespace GameEngineTools.Narrative
             var a = resolve(mp.A);
             var b = resolve(mp.B);
 
-            var text = $"{a.Name} {Conj(a, "udělal", "udělala")} {Decl(b, Grammar.Core.Enums.Case.Dative)} radost: {mp.What}.";
+            var text = $"{a.Name} {Conj(a, "udělal", "udělala")} {Decl(b, Grammar.Core.Enums.Case.Dative)} radost: {mp.Kind}.";
             return new NarrativeEntry(mp.OccurredAt, mp.A, text, NarrativePriority.Medium);
         }
 
@@ -205,7 +205,7 @@ namespace GameEngineTools.Narrative
             var a = resolve(mn.A);
             var b = resolve(mn.B);
 
-            var text = $"{a.Name} {Conj(a, "zranil", "zranila")} {Decl(b, Grammar.Core.Enums.Case.Accusative)} city: {mn.What}.";
+            var text = $"{a.Name} {Conj(a, "zranil", "zranila")} {Decl(b, Grammar.Core.Enums.Case.Accusative)} city: {mn.Kind}.";
             return new NarrativeEntry(mn.OccurredAt, mn.A, text, NarrativePriority.Medium);
         }
 

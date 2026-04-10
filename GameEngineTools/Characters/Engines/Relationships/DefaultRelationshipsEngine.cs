@@ -135,7 +135,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     },
                     eventType: nameof(MicroPositive),
                     outcome: "positive",
-                    detail: mp.What ?? "n/a");
+                    detail: mp.Kind ?? "n/a");
                     break;
 
                 // ── Micro-negative (criticism, ignoring, cold response…) ─────────────────
@@ -148,7 +148,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     },
                     eventType: nameof(MicroNegative),
                     outcome: "negative",
-                    detail: mn.What ?? "n/a");
+                    detail: mn.Kind ?? "n/a");
                     break;
 
                 // ── Repair attempt ───────────────────────────────────────────────────────

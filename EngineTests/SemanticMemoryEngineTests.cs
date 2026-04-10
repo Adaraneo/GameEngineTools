@@ -401,7 +401,7 @@ namespace EngineTests
                 self,
                 Guid.NewGuid(),
                 0.60,
-                "Relation:MicroNegative|what=ignore-after-reachout|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "Relation:MicroNegative|what=ignore|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
                 "PerceivedSlight:Relation:MicroNegative",
                 other,
                 null);
@@ -433,7 +433,7 @@ namespace EngineTests
                 self,
                 Guid.NewGuid(),
                 0.65,
-                "Relation:MicroPositive|what=help-with-task|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "Relation:MicroPositive|what=help|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
                 null,
                 other,
                 null);
