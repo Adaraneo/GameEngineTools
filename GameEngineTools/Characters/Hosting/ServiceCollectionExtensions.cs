@@ -12,6 +12,7 @@ using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.Generation;
+using GameEngineTools.Characters.Generation.Portraits;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Constants;
 using GameEngineTools.FileSystem;
@@ -119,7 +120,12 @@ namespace GameEngineTools.Characters.Hosting
             => services.AddSingleton<IPersonalityGenerator, PersonalityGenerator>();
 
         private static IServiceCollection AddAppearanceGenerator(this IServiceCollection services)
-            => services.AddSingleton<IAppearanceGenerator, AppearanceGenerator>();
+        {
+            services.AddSingleton<IAppearanceGenerator, AppearanceGenerator>();
+            services.AddSingleton<IPortraitSpecBuilder, PortraitSpecBuilder>();
+            services.AddSingleton<IPortraitPromptFormatter, PortraitPromptFormatter>();
+            return services;
+        }
 
         #endregion CharacterGeneration
 

@@ -8,6 +8,7 @@ namespace GameEngineTools.Extensions
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.GameObjects;
+    using GameEngineTools.Characters.Generation.Portraits;
 
     public static class TestExtension
     {
@@ -76,6 +77,22 @@ namespace GameEngineTools.Extensions
                 sb.AppendLine();
             }
 
+            return sb.ToString();
+        }
+
+        public static string PrintPortraitInfo(this CharacterBase nppc, IPortraitSpecBuilder builder, IPortraitPromptFormatter formatter)
+        {
+            ArgumentNullException.ThrowIfNull(nppc);
+            ArgumentNullException.ThrowIfNull(builder);
+            ArgumentNullException.ThrowIfNull(formatter);
+
+            var portrait = nppc.Person.BuildPortraitSpec(builder);
+            var sb = new StringBuilder();
+            sb.AppendLine("[PORTRAIT SPEC]");
+            AppendValue(sb, portrait, indent: 1);
+            sb.AppendLine();
+            sb.AppendLine("[PORTRAIT PROMPT]");
+            sb.AppendLine(formatter.Format(portrait));
             return sb.ToString();
         }
 

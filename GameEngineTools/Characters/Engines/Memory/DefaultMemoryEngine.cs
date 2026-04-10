@@ -298,7 +298,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             SalienceForAction(ac.ActionName, ctx),
                             EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence),
-                            Strength: Config.BaseEncoding),
+                            Strength: Config.BaseEncoding,
+                            OtherPerson: ac.TargetHuman),
                             ctx, outbox);
                         break;
                     }
