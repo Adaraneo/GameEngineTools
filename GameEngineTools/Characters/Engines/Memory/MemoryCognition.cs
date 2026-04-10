@@ -15,6 +15,8 @@ namespace GameEngineTools.Characters.Engines.Memory
     /// </summary>
     internal static class MemoryCognition
     {
+        private const double MinimumRecallRelevance = 0.20;
+
         #region Public API
 
         public static MemoryRecallResult Recall(MemoryIndex memory, MemoryRecallQuery query, WDateTime now)
@@ -36,7 +38,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         public static DecisionWorkingSet BuildWorkingSet(MemoryIndex memory, MemoryRecallQuery query, WDateTime now)
         {
             var recall = Recall(memory, query, now);
-            var reflections = BuildReflections(query, recall.Items, now);
+            var reflectionEpisodes = CollectReflectionEpisodes(memory, query, now);
+            var reflections = BuildReflections(query, reflectionEpisodes, now);
             return new DecisionWorkingSet(
                 query.TargetHuman,
                 query.ActionName,
@@ -57,14 +60,19 @@ namespace GameEngineTools.Characters.Engines.Memory
                 return null;
             }
 
-            var targetMatched = query.TargetHuman is null || episode.OtherPerson == query.TargetHuman;
-            if (query.TargetHuman is not null && !targetMatched && episode.OtherPerson is not null)
+            var targetMatched = query.TargetHuman is not null && episode.OtherPerson == query.TargetHuman;
+            if (query.TargetHuman is not null && !targetMatched)
             {
                 return null;
             }
 
             var situationScore = ComputeSituationScore(episode, query);
-            if (query.ActionName is not null && situationScore <= 0.0 && targetMatched && query.TargetHuman is null)
+            if (query.ActionName is not null && situationScore <= 0.15)
+            {
+                return null;
+            }
+
+            if (query.EmotionalValence is not null && !IsEmotionCompatible(episode.Emotion, query.EmotionalValence.Value, query.ActionName))
             {
                 return null;
             }
@@ -72,18 +80,20 @@ namespace GameEngineTools.Characters.Engines.Memory
             var emotionalMatched = query.EmotionalValence is null || episode.Emotion == query.EmotionalValence;
             var emotionScore = query.EmotionalValence is null
                 ? EmotionalIntensity(episode.Emotion)
-                : emotionalMatched ? 1.0 : 0.15;
+                : emotionalMatched ? 1.0 : 0.0;
             var recencyWeight = ComputeRecencyWeight(age, query.RecencyWindow);
-            var targetScore = targetMatched && query.TargetHuman is not null ? 1.0 : episode.OtherPerson is null ? 0.25 : 0.0;
+            var targetScore = ComputeTargetScore(episode, query);
+            var confidenceScore = Math.Clamp(episode.RecallConfidence, 0.0, 1.0);
             var relevance =
-                (targetScore * 0.34) +
+                (targetScore * 0.30) +
                 (situationScore * 0.24) +
-                (recencyWeight * 0.22) +
+                (recencyWeight * 0.20) +
                 (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.12) +
                 (Math.Clamp(episode.Salience, 0.0, 1.0) * 0.08) +
+                (confidenceScore * 0.03) +
                 (emotionScore * 0.10);
 
-            if (relevance <= 0.12)
+            if (relevance < MinimumRecallRelevance)
             {
                 return null;
             }
@@ -91,8 +101,8 @@ namespace GameEngineTools.Characters.Engines.Memory
             return new MemoryRecallItem(
                 episode,
                 Math.Round(relevance, 6),
-                targetMatched && query.TargetHuman is not null,
-                situationScore >= 0.50,
+                targetMatched,
+                situationScore >= 0.55,
                 emotionalMatched,
                 Math.Round(recencyWeight, 6));
         }
@@ -111,7 +121,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             if (string.IsNullOrWhiteSpace(actionName))
             {
-                return header.StartsWith("Interaction:", StringComparison.Ordinal) ? 0.45 : 0.20;
+                return header.StartsWith("Interaction:", StringComparison.Ordinal) ? 0.55 : IsSocialEpisode(episode) ? 0.28 : 0.10;
             }
 
             if (header == $"Action:{actionName}")
@@ -132,8 +142,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                     || header.StartsWith("Interaction:Invite:", StringComparison.Ordinal)
                     => 0.95,
                 InviteIntimacy when IsRejectedIntimacyEpisode(episode) => 0.85,
-                SelfCare when episode.Emotion == EmotionalTag.Negative => IsSocialEpisode(episode) ? 0.75 : 0.55,
-                _ when IsSocialEpisode(episode) => 0.35,
+                SelfCare when episode.Emotion == EmotionalTag.Negative || episode.Emotion == EmotionalTag.Mixed
+                    => IsSocialEpisode(episode) ? 0.82 : 0.60,
+                SelfCare => 0.05,
+                _ when IsSocialEpisode(episode) => 0.22,
                 _ => 0.0
             };
         }
@@ -147,7 +159,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             }
 
             var ratio = Math.Clamp(1.0 - ((double)age.Ticks / window.Ticks), 0.0, 1.0);
-            return Math.Sqrt(ratio);
+            return Math.Pow(ratio, 0.70);
         }
 
         private static double EmotionalIntensity(EmotionalTag emotion)
@@ -163,77 +175,109 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         #region Reflection
 
-        private static IReadOnlyList<ReflectionSummary> BuildReflections(MemoryRecallQuery query, IReadOnlyList<MemoryRecallItem> recalledItems, WDateTime now)
+        private static IReadOnlyList<EpisodicMemory> CollectReflectionEpisodes(MemoryIndex memory, MemoryRecallQuery query, WDateTime now)
+        {
+            var window = query.RecencyWindow ?? WTimeSpan.FromDays(21);
+            return memory.Episodes
+                .Select(Reconstruct)
+                .Where(episode => WTimeSpan.Abs(now - episode.When) <= window)
+                .Where(episode => query.TargetHuman is null || episode.OtherPerson == query.TargetHuman)
+                .Where(episode => ComputeSituationScore(episode, query) >= 0.20 || IsSocialEpisode(episode))
+                .OrderByDescending(episode => episode.When.WorldTicks)
+                .ThenBy(episode => episode.Id)
+                .Take(10)
+                .ToList();
+        }
+
+        private static IReadOnlyList<ReflectionSummary> BuildReflections(MemoryRecallQuery query, IReadOnlyList<EpisodicMemory> episodes, WDateTime now)
         {
             var reflections = new List<ReflectionSummary>();
-            var targetEpisodes = recalledItems
-                .Where(item => query.TargetHuman is null || item.Episode.OtherPerson == query.TargetHuman)
-                .Select(item => item.Episode)
-                .ToList();
+            var targetEpisodes = episodes.ToList();
 
             if (query.TargetHuman is not null)
             {
                 var warmthSignals = targetEpisodes.Count(IsWarmLowStakesEpisode);
                 var safeSignals = targetEpisodes.Count(IsSafeEpisode);
                 var intimacyRejections = targetEpisodes.Count(IsRejectedIntimacyEpisode);
+                var positiveVulnerability = targetEpisodes.Count(IsPositiveVulnerabilityEpisode);
                 var recentNegativeSocial = targetEpisodes.Count(episode =>
                     IsSocialEpisode(episode) &&
-                    episode.Emotion == EmotionalTag.Negative &&
+                    (episode.Emotion == EmotionalTag.Negative || episode.Emotion == EmotionalTag.Mixed) &&
                     now - episode.When <= WTimeSpan.FromDays(5));
+                var recentPositiveSocial = targetEpisodes.Count(episode =>
+                    IsWarmLowStakesEpisode(episode) &&
+                    now - episode.When <= WTimeSpan.FromDays(7));
 
                 if (warmthSignals >= 2)
                 {
+                    var strength = Math.Clamp(0.10 + (warmthSignals * 0.12) - (recentNegativeSocial * 0.05), 0.0, 0.65);
+                    if (strength >= 0.20)
+                    {
                     reflections.Add(new ReflectionSummary(
                         ReflectionSummaryKind.WarmForCasualContact,
                         query.TargetHuman,
-                        Math.Min(1.0, (warmthSignals * 0.18) + 0.12),
+                        strength,
                         warmthSignals,
                         "Repeated low-stakes contact felt warm."));
+                    }
                 }
 
                 if (safeSignals >= 2)
                 {
+                    var strength = Math.Clamp(0.08 + (safeSignals * 0.14) + (recentPositiveSocial * 0.03) - (recentNegativeSocial * 0.06), 0.0, 0.70);
+                    if (strength >= 0.22)
+                    {
                     reflections.Add(new ReflectionSummary(
                         ReflectionSummaryKind.SafeForReachOut,
                         query.TargetHuman,
-                        Math.Min(1.0, (safeSignals * 0.20) + 0.10),
+                        strength,
                         safeSignals,
                         "Recent contact with this person has been safe enough for outreach."));
+                    }
                 }
 
                 if (intimacyRejections >= 2)
                 {
+                    var strength = Math.Clamp(0.14 + (intimacyRejections * 0.18) - (positiveVulnerability * 0.10), 0.0, 0.78);
+                    if (strength >= 0.25)
+                    {
                     reflections.Add(new ReflectionSummary(
                         ReflectionSummaryKind.RejectsIntimacy,
                         query.TargetHuman,
-                        Math.Min(1.0, (intimacyRejections * 0.22) + 0.16),
+                        strength,
                         intimacyRejections,
                         "Repeated vulnerable contact was rejected or emotionally costly."));
+                    }
                 }
 
                 if (recentNegativeSocial >= 2)
                 {
+                    var strength = Math.Clamp(0.08 + (recentNegativeSocial * 0.14) - (recentPositiveSocial * 0.05), 0.0, 0.68);
+                    if (strength >= 0.20)
+                    {
                     reflections.Add(new ReflectionSummary(
                         ReflectionSummaryKind.RecentSocialCost,
                         query.TargetHuman,
-                        Math.Min(1.0, (recentNegativeSocial * 0.16) + 0.12),
+                        strength,
                         recentNegativeSocial,
                         "Recent interactions with this person have been emotionally costly."));
+                    }
                 }
             }
             else
             {
-                var recentNegativeSocial = recalledItems.Count(item =>
-                    item.Episode.Emotion == EmotionalTag.Negative &&
-                    IsSocialEpisode(item.Episode) &&
-                    now - item.Episode.When <= WTimeSpan.FromDays(5));
+                var recentNegativeSocial = targetEpisodes.Count(episode =>
+                    (episode.Emotion == EmotionalTag.Negative || episode.Emotion == EmotionalTag.Mixed) &&
+                    IsSocialEpisode(episode) &&
+                    now - episode.When <= WTimeSpan.FromDays(5));
 
                 if (recentNegativeSocial >= 2)
                 {
+                    var strength = Math.Clamp(0.10 + (recentNegativeSocial * 0.14), 0.0, 0.62);
                     reflections.Add(new ReflectionSummary(
                         ReflectionSummaryKind.RecentSocialCost,
                         null,
-                        Math.Min(1.0, (recentNegativeSocial * 0.18) + 0.12),
+                        strength,
                         recentNegativeSocial,
                         "Recent social contact has been emotionally costly overall."));
                 }
@@ -304,6 +348,46 @@ namespace GameEngineTools.Characters.Engines.Memory
                     || header.StartsWith("Interaction:Meta:Rejected", StringComparison.Ordinal)
                     || header.StartsWith("Relation:Repair:Rejected", StringComparison.Ordinal)
                     || perceived.StartsWith("PerceivedThreat:Interaction:Invite", StringComparison.Ordinal));
+        }
+
+        private static bool IsPositiveVulnerabilityEpisode(EpisodicMemory episode)
+        {
+            var perceived = episode.PerceivedWhat ?? episode.What;
+            var header = MemoryWhatParser.GetHeader(perceived);
+            return episode.Emotion == EmotionalTag.Positive &&
+                   (header.StartsWith("Interaction:Invite:Accepted", StringComparison.Ordinal)
+                    || header.StartsWith("Interaction:SelfDisclosure:Accepted", StringComparison.Ordinal)
+                    || header.StartsWith("Interaction:Validation:Accepted", StringComparison.Ordinal)
+                    || header.StartsWith("Interaction:Meta:Accepted", StringComparison.Ordinal));
+        }
+
+        private static bool IsEmotionCompatible(EmotionalTag episodeEmotion, EmotionalTag queryEmotion, string? actionName)
+            => actionName switch
+            {
+                SelfCare => queryEmotion == EmotionalTag.Negative
+                    ? episodeEmotion is EmotionalTag.Negative or EmotionalTag.Mixed
+                    : episodeEmotion == queryEmotion,
+                _ => episodeEmotion == queryEmotion
+            };
+
+        private static double ComputeTargetScore(EpisodicMemory episode, MemoryRecallQuery query)
+        {
+            if (query.TargetHuman is not null)
+            {
+                return episode.OtherPerson == query.TargetHuman ? 1.0 : 0.0;
+            }
+
+            if (query.ActionName is SelfCare)
+            {
+                return episode.OtherPerson is not null && IsSocialEpisode(episode) ? 0.70 : IsSocialEpisode(episode) ? 0.45 : 0.18;
+            }
+
+            if (query.ActionName is ReachOut or InviteIntimacy)
+            {
+                return episode.OtherPerson is not null ? 0.72 : IsSocialEpisode(episode) ? 0.30 : 0.08;
+            }
+
+            return episode.OtherPerson is not null ? 0.55 : 0.15;
         }
 
         #endregion Episode helpers

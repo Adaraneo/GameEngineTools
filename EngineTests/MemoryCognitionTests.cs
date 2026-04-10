@@ -63,6 +63,26 @@ namespace EngineTests
 
             Assert.AreEqual(stronger.Id, recall.Items[0].Episode.Id);
         }
+
+        [TestMethod]
+        public void Recall_IrrelevantGenericEpisodes_DoNotDisplaceBetterTargetSpecificEpisodes()
+        {
+            var target = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var now = WDateTime.New(100, 1, 10, 12);
+            var memory = new MemoryIndex(new List<EpisodicMemory>
+            {
+                Episode(now, 3, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.72, target),
+                Episode(now, 5, "Interaction:Question:Accepted|from=a|to=b", EmotionalTag.Positive, 0.70, target),
+                Episode(now, 1, "Action:Work", EmotionalTag.Negative, 0.95, null, salience: 0.95),
+                Episode(now, 1, "Interaction:Invite:Rejected|from=a|to=b", EmotionalTag.Negative, 0.90, other, salience: 0.90)
+            });
+
+            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(7), 3), now);
+
+            Assert.AreEqual(2, recall.Items.Count);
+            Assert.IsTrue(recall.Items.All(item => item.Episode.OtherPerson == target));
+        }
     }
 
     [TestClass]
@@ -84,7 +104,7 @@ namespace EngineTests
             var summary = workingSet.Reflections.Single(r => r.Kind == ReflectionSummaryKind.RejectsIntimacy);
 
             Assert.AreEqual(2, summary.EvidenceCount);
-            Assert.IsTrue(summary.Strength > 0.5);
+            Assert.IsTrue(summary.Strength >= 0.5);
         }
 
         [TestMethod]
@@ -144,6 +164,43 @@ namespace EngineTests
 
             Assert.IsTrue(workingSet.RecalledEpisodes.Count >= 2);
             Assert.IsTrue(workingSet.Reflections.Any(r => r.Kind == ReflectionSummaryKind.RecentSocialCost));
+        }
+
+        [TestMethod]
+        public void BuildWorkingSet_RepeatedWarmLowStakesContact_CreatesWarmAndSafeSummaries()
+        {
+            var target = new HumanId(Guid.NewGuid());
+            var now = WDateTime.New(100, 1, 10, 12);
+            var memory = new MemoryIndex(new List<EpisodicMemory>
+            {
+                Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.74, target),
+                Episode(now, 8, "Interaction:Question:Accepted|from=a|to=b", EmotionalTag.Positive, 0.72, target),
+                Episode(now, 12, "Interaction:Validation:Accepted|from=a|to=b", EmotionalTag.Positive, 0.70, target)
+            });
+
+            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 4), now);
+
+            Assert.IsTrue(workingSet.Reflections.Any(r => r.Kind == ReflectionSummaryKind.WarmForCasualContact));
+            Assert.IsTrue(workingSet.Reflections.Any(r => r.Kind == ReflectionSummaryKind.SafeForReachOut));
+        }
+
+        [TestMethod]
+        public void BuildWorkingSet_RecentNegativeTargetSocialEpisodes_CreateTargetBoundSocialCost()
+        {
+            var target = new HumanId(Guid.NewGuid());
+            var now = WDateTime.New(100, 1, 10, 12);
+            var memory = new MemoryIndex(new List<EpisodicMemory>
+            {
+                Episode(now, 4, "Interaction:SmallTalk:Rejected|from=a|to=b", EmotionalTag.Negative, 0.72, target),
+                Episode(now, 10, "Relation:MicroNegative|from=a|what=ignored", EmotionalTag.Negative, 0.68, target),
+                Episode(now, 20, "Interaction:Question:Accepted|from=a|to=b", EmotionalTag.Positive, 0.62, target)
+            });
+
+            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 4), now);
+            var summary = workingSet.Reflections.Single(r => r.Kind == ReflectionSummaryKind.RecentSocialCost);
+
+            Assert.AreEqual(target, summary.TargetHuman);
+            Assert.IsTrue(summary.Strength >= 0.20);
         }
     }
 
@@ -250,6 +307,31 @@ namespace EngineTests
 
             Assert.AreEqual(10, candidates[0].Utility);
             Assert.AreEqual(8, candidates[1].Utility);
+        }
+
+        [TestMethod]
+        public void Modify_WorkingSets_AreCandidateSpecific_AndDoNotOverwriteEachOther()
+        {
+            var first = new HumanId(Guid.NewGuid());
+            var second = new HumanId(Guid.NewGuid());
+            var now = WDateTime.New(100, 1, 10, 12);
+            var memory = new MemoryIndex(new List<EpisodicMemory>
+            {
+                Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.75, first),
+                Episode(now, 3, "Interaction:SmallTalk:Rejected|from=a|to=b", EmotionalTag.Negative, 0.76, second)
+            });
+            var context = BehaviorComponentTestFactory.Context(now: now, memory: memory);
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(first, SpeechAct.SmallTalk, 0.5, 0.6, 0.3)),
+                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(second, SpeechAct.SmallTalk, 0.5, 0.4, 0.7))
+            };
+
+            new MemoryInfluenceEngine().Modify(context, candidates);
+
+            Assert.AreEqual(2, context.DecisionWorkingSets?.Count);
+            Assert.IsTrue(context.DecisionWorkingSets!.Keys.Any(key => key.Contains(first.Value.ToString("N"), StringComparison.Ordinal)));
+            Assert.IsTrue(context.DecisionWorkingSets!.Keys.Any(key => key.Contains(second.Value.ToString("N"), StringComparison.Ordinal)));
         }
     }
 

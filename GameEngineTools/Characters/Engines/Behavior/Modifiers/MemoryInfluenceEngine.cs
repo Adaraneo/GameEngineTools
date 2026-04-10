@@ -84,8 +84,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
         private static string BuildWorkingSetKey(BehaviorCandidate candidate)
             => candidate.SocialTargeting is { } targeting
-                ? $"{candidate.Name}:{targeting.TargetHuman.Value:N}:{targeting.SpeechAct}"
-                : candidate.Name;
+                ? $"action={candidate.Name}|target={targeting.TargetHuman.Value:N}|act={targeting.SpeechAct}"
+                : $"action={candidate.Name}|target=none|act=none";
 
         #endregion
 
@@ -137,55 +137,63 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
         private static double ComputeReachOutMultiplier(DecisionWorkingSet workingSet)
         {
-            var positive = workingSet.RecalledEpisodes
-                .Where(item => item.Episode.Emotion == EmotionalTag.Positive)
-                .Sum(item => (item.Episode.Strength * 0.16) + (item.Relevance * 0.10));
-            var negative = workingSet.RecalledEpisodes
-                .Where(item => item.Episode.Emotion == EmotionalTag.Negative)
-                .Sum(item => (item.Episode.Strength * 0.18) + (item.Relevance * 0.12));
+            var positive = SumEpisodeSignal(
+                workingSet.RecalledEpisodes,
+                item => item.Episode.Emotion == EmotionalTag.Positive && item.SituationMatched,
+                0.17);
+            var negative = SumEpisodeSignal(
+                workingSet.RecalledEpisodes,
+                item => (item.Episode.Emotion == EmotionalTag.Negative || item.Episode.Emotion == EmotionalTag.Mixed) && IsSocialEpisode(item),
+                0.18);
             var safe = workingSet.Reflections
                 .Where(summary => summary.Kind is ReflectionSummaryKind.SafeForReachOut or ReflectionSummaryKind.WarmForCasualContact)
-                .Sum(summary => summary.Strength * 0.18);
+                .Sum(summary => summary.Strength * 0.16);
             var costly = workingSet.Reflections
                 .Where(summary => summary.Kind == ReflectionSummaryKind.RecentSocialCost)
-                .Sum(summary => summary.Strength * 0.16);
+                .Sum(summary => summary.Strength * 0.18);
 
-            var boost = Math.Min(0.28, positive + safe);
-            var penalty = Math.Min(0.40, negative + costly);
-            return Math.Clamp(1.0 + boost - penalty, 0.60, 1.28);
+            var boost = Math.Min(0.24, positive + safe);
+            var penalty = Math.Min(0.32, negative + costly);
+            return Math.Clamp(1.0 + boost - penalty, 0.68, 1.24);
         }
 
         private static double ComputeInviteIntimacyMultiplier(DecisionWorkingSet workingSet)
         {
-            var positiveVulnerability = workingSet.RecalledEpisodes
-                .Where(item => item.Episode.Emotion == EmotionalTag.Positive && item.SituationMatched)
-                .Sum(item => (item.Episode.Strength * 0.14) + (item.Relevance * 0.08));
-            var negativeVulnerability = workingSet.RecalledEpisodes
-                .Where(item => item.Episode.Emotion != EmotionalTag.Positive && item.SituationMatched)
-                .Sum(item => (item.Episode.Strength * 0.22) + (item.Relevance * 0.12));
+            var positiveVulnerability = SumEpisodeSignal(
+                workingSet.RecalledEpisodes,
+                item => item.Episode.Emotion == EmotionalTag.Positive && item.SituationMatched,
+                0.12);
+            var negativeVulnerability = SumEpisodeSignal(
+                workingSet.RecalledEpisodes,
+                item => (item.Episode.Emotion == EmotionalTag.Negative || item.Episode.Emotion == EmotionalTag.Mixed) && item.SituationMatched,
+                0.24);
             var rejectionPattern = workingSet.Reflections
                 .Where(summary => summary.Kind == ReflectionSummaryKind.RejectsIntimacy)
-                .Sum(summary => summary.Strength * 0.34);
+                .Sum(summary => summary.Strength * 0.32);
             var safety = workingSet.Reflections
                 .Where(summary => summary.Kind == ReflectionSummaryKind.SafeForReachOut)
+                .Sum(summary => summary.Strength * 0.08);
+            var socialCost = workingSet.Reflections
+                .Where(summary => summary.Kind == ReflectionSummaryKind.RecentSocialCost)
                 .Sum(summary => summary.Strength * 0.12);
 
-            var boost = Math.Min(0.22, positiveVulnerability + safety);
-            var penalty = Math.Min(0.55, negativeVulnerability + rejectionPattern);
-            return Math.Clamp(1.0 + boost - penalty, 0.40, 1.22);
+            var boost = Math.Min(0.18, positiveVulnerability + safety);
+            var penalty = Math.Min(0.58, negativeVulnerability + rejectionPattern + socialCost);
+            return Math.Clamp(1.0 + boost - penalty, 0.35, 1.18);
         }
 
         private static double ComputeSelfCareMultiplier(DecisionWorkingSet workingSet)
         {
-            var negativeLoad = workingSet.RecalledEpisodes
-                .Where(item => item.Episode.Emotion == EmotionalTag.Negative)
-                .Sum(item => (item.Episode.Strength * 0.14) + (item.Relevance * 0.10));
+            var negativeLoad = SumEpisodeSignal(
+                workingSet.RecalledEpisodes,
+                item => item.Episode.Emotion is EmotionalTag.Negative or EmotionalTag.Mixed,
+                0.15);
             var socialCost = workingSet.Reflections
                 .Where(summary => summary.Kind == ReflectionSummaryKind.RecentSocialCost)
                 .Sum(summary => summary.Strength * 0.22);
 
-            var boost = Math.Min(0.35, negativeLoad + socialCost);
-            return 1.0 + boost;
+            var boost = Math.Min(0.32, negativeLoad + socialCost);
+            return Math.Clamp(1.0 + boost, 1.0, 1.32);
         }
 
         private static double ComputeSemanticFallbackMultiplier(BehaviorContext context, BehaviorCandidate candidate)
@@ -231,6 +239,22 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 _ => 1.0
             };
         }
+
+        private static double SumEpisodeSignal(
+            IReadOnlyList<MemoryRecallItem> items,
+            Func<MemoryRecallItem, bool> predicate,
+            double scale)
+            => Math.Min(
+                0.35,
+                items
+                    .Where(predicate)
+                    .Take(3)
+                    .Sum(item => (((item.Episode.Strength * 0.45) + (item.Relevance * 0.35) + (item.RecencyWeight * 0.20)) * scale)));
+
+        private static bool IsSocialEpisode(MemoryRecallItem item)
+            => item.Episode.OtherPerson is not null
+                || (item.Episode.PerceivedWhat ?? item.Episode.What).Contains("Interaction:", StringComparison.Ordinal)
+                || (item.Episode.PerceivedWhat ?? item.Episode.What).Contains("Relation:", StringComparison.Ordinal);
 
         #endregion
     }
