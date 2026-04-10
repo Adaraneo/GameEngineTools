@@ -8,6 +8,7 @@ using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.SemanticMemory;
+using GameEngineTools.Characters.Generation.Portraits;
 using GameEngineTools.Characters.Traits;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
@@ -299,6 +300,13 @@ await File.WriteAllTextAsync(
 await File.WriteAllTextAsync(
     Path.Combine(desktopPath, $"significantOther.{significantOtherPerson.Id.Value}.txt"),
     significantOther.PrintInfo(false));
+
+var promptDir = Directory.CreateDirectory(Path.Combine(desktopPath, "Prompts")).FullName;
+foreach (var character in manager.Characters)
+{
+    await File.WriteAllTextAsync(Path.Combine(promptDir, $"{character.Person.Id.Value.ToString()}.txt"), character.PrintPortraitInfo(
+        runtime.Services.GetRequiredService<IPortraitSpecBuilder>(), runtime.Services.GetRequiredService<IPortraitPromptFormatter>()));
+}
 
 Console.WriteLine("Simulation complete. Game time: {0}", clock.Now);
 
