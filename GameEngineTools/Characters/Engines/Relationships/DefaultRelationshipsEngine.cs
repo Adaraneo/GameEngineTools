@@ -77,7 +77,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
             {
                 // ── First impression ─────────────────────────────────────────────────────
                 case FirstImpressionFormed fi:
-                    Upsert(self, fi.B, e => e with
+                    var other = self == fi.A ? fi.B : self == fi.B ? fi.A : fi.B;
+                    if (other == self)
+                    {
+                        break;
+                    }
+
+                    Upsert(self, other, e => e with
                     {
                         // Lerp 70% toward the first impression — does not fully override
                         // if the character already knows the person slightly.

@@ -4,6 +4,7 @@
 namespace GameEngineTools.Characters.Engines.Behavior
 {
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -16,5 +17,6 @@ namespace GameEngineTools.Characters.Engines.Behavior
         IEventCollector Outbox,
         BehaviorState State,
         BehaviorConfig Config,
-        IReadOnlyDictionary<string, double> Cooldowns);
+        IReadOnlyDictionary<string, double> Cooldowns,
+        IDictionary<string, DecisionWorkingSet>? DecisionWorkingSets = null);
 }

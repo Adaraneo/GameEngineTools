@@ -11,6 +11,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
     using GameEngineTools.Characters.Engines.Behavior.Needs;
     using GameEngineTools.Characters.Engines.Behavior.Sleep;
+    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -50,7 +51,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine() };
-            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
+            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
@@ -65,7 +66,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             // Build the tick-local behavior context before delegating to sub-engines.
             var updatedCooldowns = BehaviorMath.UpdateCooldowns(State.Cooldowns, Math.Max(0, dt.TotalHours));
             var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, State) with { Cooldowns = updatedCooldowns };
-            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns);
+            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>());
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.
             var sleep = _sleepCoordinator.Tick(context);
@@ -104,8 +105,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 };
             }
 
-            outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility));
-            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration));
+            outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason));
+            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason));
+            EmitInteractionProposalIfNeeded(now, ctx, outbox, result.SelectedCandidate);
             SetCooldownsForCommittedAction(ctx.Id, result.SelectedCandidate.Name);
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine)))) _log.BehaviorActionChosen(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.Duration.ToString());
         }
@@ -125,6 +127,21 @@ namespace GameEngineTools.Characters.Engines.Behavior
             dict[chosen] = hours;
             State = State with { Cooldowns = dict };
             _log.BehaviorCooldownSet(owner.Value.ToString(), chosen, hours);
+        }
+
+        private static void EmitInteractionProposalIfNeeded(WDateTime now, IHumanContext ctx, IEventCollector outbox, BehaviorCandidate candidate)
+        {
+            if (candidate.SocialTargeting is not { } targeting)
+            {
+                return;
+            }
+
+            if (candidate.Name is not (ReachOut or InviteIntimacy))
+            {
+                return;
+            }
+
+            outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, targeting.SpeechAct, targeting.Reason));
         }
 
         #endregion Cooldowns

@@ -226,6 +226,143 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         #endregion Parse — čtení What
 
+        #region Percieved Memory
+
+        internal enum PerceivedMemoryTone
+        {
+            Neutral = 0,
+            Warm = 1,
+            Threat = 2,
+            Slight = 3
+        }
+
+        internal sealed record MemoryEpisodeDescriptor(
+            string Category,
+            string Type,
+            string? Outcome,
+            IReadOnlyDictionary<string, string> Parameters,
+            PerceivedMemoryTone PerceivedTone);
+
+        /// <summary>
+        /// Naparsuje <c>What</c> a <c>PerceivedWhat</c> do strukturovaného deskriptoru,
+        /// aby nad ním šly stavět semantické inference bez křehkého <c>Contains(...)</c>.
+        /// </summary>
+        public static MemoryEpisodeDescriptor ParseDescriptor(string? what, string? perceivedWhat)
+        {
+            var raw = what ?? string.Empty;
+            var header = GetHeader(raw);
+
+            var parts = header.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            var category = parts.Length > 0 ? parts[0] : string.Empty;
+            var type = parts.Length > 1 ? parts[1] : string.Empty;
+            var outcome = parts.Length > 2 ? parts[2] : null;
+
+            var parameters = ParseParams(raw);
+
+            var tone = PerceivedMemoryTone.Neutral;
+            if (!string.IsNullOrWhiteSpace(perceivedWhat))
+            {
+                if (perceivedWhat.StartsWith("PerceivedThreat:", StringComparison.Ordinal))
+                {
+                    tone = PerceivedMemoryTone.Threat;
+                }
+                else if (perceivedWhat.StartsWith("PerceivedWarmth:", StringComparison.Ordinal))
+                {
+                    tone = PerceivedMemoryTone.Warm;
+                }
+                else if (perceivedWhat.StartsWith("PerceivedSlight:", StringComparison.Ordinal))
+                {
+                    tone = PerceivedMemoryTone.Slight;
+                }
+            }
+
+            return new MemoryEpisodeDescriptor(category, type, outcome, parameters, tone);
+        }
+
+        /// <summary>
+        /// Vrátí canonical token mikro-události z parametru <c>what</c>.
+        /// Pokud parametr není přítomen nebo je prázdný, vrátí <see langword="null" />.
+        /// </summary>
+        public static string? GetMicroEventKind(MemoryEpisodeDescriptor descriptor)
+        {
+            if (!descriptor.Parameters.TryGetValue("what", out var value))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var normalized = value.Trim().ToLowerInvariant();
+
+            return NormalizeLegacyMicroEventKind(normalized);
+        }
+
+        private static string NormalizeLegacyMicroEventKind(string value)
+            => value switch
+            {
+                MemoryMicroEventKinds.Help => MemoryMicroEventKinds.Help,
+                MemoryMicroEventKinds.Support => MemoryMicroEventKinds.Support,
+                MemoryMicroEventKinds.Repair => MemoryMicroEventKinds.Repair,
+                MemoryMicroEventKinds.Warmth => MemoryMicroEventKinds.Warmth,
+                MemoryMicroEventKinds.Validation => MemoryMicroEventKinds.Validation,
+
+                MemoryMicroEventKinds.Ignore => MemoryMicroEventKinds.Ignore,
+                MemoryMicroEventKinds.Cold => MemoryMicroEventKinds.Cold,
+                MemoryMicroEventKinds.Criticism => MemoryMicroEventKinds.Criticism,
+                MemoryMicroEventKinds.Dismissal => MemoryMicroEventKinds.Dismissal,
+                MemoryMicroEventKinds.Slight => MemoryMicroEventKinds.Slight,
+
+                "help-with-task" => MemoryMicroEventKinds.Help,
+                "support-after-stress" => MemoryMicroEventKinds.Support,
+                "repair-after-conflict" => MemoryMicroEventKinds.Repair,
+                "warm-response" => MemoryMicroEventKinds.Warmth,
+                "validation-response" => MemoryMicroEventKinds.Validation,
+
+                "ignore-after-reachout" => MemoryMicroEventKinds.Ignore,
+                "cold-response" => MemoryMicroEventKinds.Cold,
+                "critical-response" => MemoryMicroEventKinds.Criticism,
+                "dismissive-response" => MemoryMicroEventKinds.Dismissal,
+                "slight-response" => MemoryMicroEventKinds.Slight,
+
+                _ => value
+            };
+
+        /// <summary>
+        /// Naparsuje část za hlavičkou na mapu parametrů <c>key=value</c>.
+        /// </summary>
+        private static IReadOnlyDictionary<string, string> ParseParams(string what)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            var idx = what.IndexOf('|');
+            if (idx < 0 || idx >= what.Length - 1)
+            {
+                return result;
+            }
+
+            var tail = what[(idx + 1)..];
+            foreach (var segment in tail.Split('|', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var eq = segment.IndexOf('=');
+                if (eq <= 0 || eq >= segment.Length - 1)
+                {
+                    continue;
+                }
+
+                var key = segment[..eq];
+                var value = segment[(eq + 1)..];
+                result[key] = value;
+            }
+
+            return result;
+        }
+
+        #endregion
+
+
         // ══════════════════════════════════════════════════════════════════════════
         // Privátní pomocné metody
         // ══════════════════════════════════════════════════════════════════════════

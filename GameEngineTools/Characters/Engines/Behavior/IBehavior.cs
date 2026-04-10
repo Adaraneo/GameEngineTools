@@ -64,17 +64,17 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// <summary>
     /// Represents the currently committed action and its expected runtime.
     /// </summary>
-    public sealed record PlannedAction(string Name, WDateTime Start, WTimeSpan ExpectedDuration, double Utility);
+    public sealed record PlannedAction(string Name, WDateTime Start, WTimeSpan ExpectedDuration, double Utility, HumanId? TargetHuman = null);
 
     /// <summary>
     /// Emitted when the engine proposes a winning action for the current tick.
     /// </summary>
-    public sealed record ActionProposed(WDateTime OccurredAt, HumanId Human, string ActionName, double Utility) : IDomainEvent;
+    public sealed record ActionProposed(WDateTime OccurredAt, HumanId Human, string ActionName, double Utility, HumanId? TargetHuman = null, string? IntendedActionName = null, string? ConflictReason = null) : IDomainEvent;
 
     /// <summary>
     /// Emitted when the orchestrator commits an action to the behavior state.
     /// </summary>
-    public sealed record ActionCommitted(WDateTime OccurredAt, HumanId Human, string ActionName, WTimeSpan Duration) : IDomainEvent;
+    public sealed record ActionCommitted(WDateTime OccurredAt, HumanId Human, string ActionName, WTimeSpan Duration, HumanId? TargetHuman = null, string? IntendedActionName = null, string? ConflictReason = null) : IDomainEvent;
 
     #endregion
 }

@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -44,6 +45,9 @@ namespace GameEngineTools.Characters.Core
 
         /// <inheritdoc/>
         public Personality Personality { get; }
+
+        /// <inheritdoc/>
+        public PsychologicalProfile PsychologyProfile { get; }
 
         /// <inheritdoc/>
         public PhysicalAppearance PhysicalAppearance { get; }
@@ -99,6 +103,7 @@ namespace GameEngineTools.Characters.Core
         private readonly IInteractionEngine _interact;
         private readonly IRelationshipsEngine _relations;
         private readonly IMemoryEngine _memory;
+        private readonly ISemanticMemoryEngine _semanticMemory;
 
         // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
         private readonly ConcurrentQueue<IDomainEvent> _inbox = new();
@@ -152,6 +157,7 @@ namespace GameEngineTools.Characters.Core
             IInteractionEngine interact,
             IRelationshipsEngine relations,
             IMemoryEngine memory,
+            ISemanticMemoryEngine semanticMemory,
             // initial snapshot (from factory)
             EnginesSnapshot initialSnapshot)
         {
@@ -159,6 +165,7 @@ namespace GameEngineTools.Characters.Core
             Identity          = identity;
             Biology           = biology;
             Personality       = personality;
+            PsychologyProfile = PsychologicalProfile.FromPersonality(personality);
             PhysicalAppearance = appearance;
             AttractionProfile  = attractionProfile;
 
@@ -173,6 +180,7 @@ namespace GameEngineTools.Characters.Core
             _interact  = interact;
             _relations = relations;
             _memory    = memory;
+            _semanticMemory = semanticMemory;
 
             Snapshot = initialSnapshot;
 
@@ -182,6 +190,7 @@ namespace GameEngineTools.Characters.Core
                 Identity    = Identity,
                 Biology     = Biology,
                 Personality = Personality,
+                PsychologyProfile = PsychologyProfile,
                 EventBus    = _bus,
                 Scheduler   = _scheduler,
                 Random      = _random,
@@ -220,6 +229,7 @@ namespace GameEngineTools.Characters.Core
             _interact.Tick(now, dt, _ctx, outbox);
             _relations.Tick(now, dt, _ctx, outbox);
             _memory.Tick(now, dt, _ctx, outbox);
+            _semanticMemory.Tick(now, dt, _ctx, outbox);
 
             // After-tick: build a snapshot from the current engine states before self-delivery.
             RefreshSnapshot();
@@ -248,6 +258,7 @@ namespace GameEngineTools.Characters.Core
             _interact.RestoreState(snapshot.InteractionSurface);
             _relations.RestoreState(snapshot.Relationships);
             _memory.RestoreState(snapshot.Memory);
+            _semanticMemory.RestoreState(snapshot.SemanticMemory ?? SemanticMemoryState.Empty);
         }
 
         #endregion IHuman — public API
@@ -338,6 +349,7 @@ namespace GameEngineTools.Characters.Core
             try { _interact.Handle(ev, _ctx, outbox); }  catch (Exception ex) { _log.LogError(ex, "[{Human}] Interactions.Handle failed.", Id.Value); }
             try { _relations.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Relationships.Handle failed.", Id.Value); }
             try { _memory.Handle(ev, _ctx, outbox); }    catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
+            try { _semanticMemory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SemanticMemory.Handle failed.", Id.Value); }
         }
 
         private void Deliver(IEventCollector collector)
@@ -399,7 +411,8 @@ namespace GameEngineTools.Characters.Core
                 _behavior.State,
                 _interact.State,
                 _relations.State,
-                _memory.State);
+                _memory.State,
+                _semanticMemory.State);
 
             _ctx.Snapshot = Snapshot;
         }

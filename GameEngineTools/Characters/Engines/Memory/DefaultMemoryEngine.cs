@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -62,8 +63,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             // Inicializuj prázdný stav — žádné vzpomínky, žádná sémantika
             State = new MemoryIndex(
-                new List<EpisodicMemory>(),
-                new Dictionary<string, SemanticFact>());
+                new List<EpisodicMemory>());
         }
 
         #endregion Konstruktor
@@ -85,12 +85,21 @@ namespace GameEngineTools.Characters.Engines.Memory
         {
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
             {
+                if (episode.OtherPerson == ctx.Id)
+                {
+                    episode = episode with { OtherPerson = null };
+                }
+
                 var episodes = State.Episodes.ToList();
 
                 // --- REINFORCEMENT (spacing effect) ---
-                // Hledáme existující epizodu se stejným What, která ještě "žije"
-                var existingIndex = episodes.FindIndex(
-                    e => e.What == episode.What && e.Strength >= Config.PruneThreshold);
+                // Nehledáme shodu podle syrového What stringu,
+                // ale podle explicitního reinforcement klíče.
+                var incomingKey = MemoryReinforcementKeyBuilder.From(episode);
+
+                var existingIndex = episodes.FindIndex(e =>
+                    e.Strength >= Config.PruneThreshold
+                    && MemoryReinforcementKeyBuilder.From(e) == incomingKey);
 
                 if (existingIndex >= 0)
                 {
@@ -100,12 +109,21 @@ namespace GameEngineTools.Characters.Engines.Memory
                     var reinforced = existing with
                     {
                         Strength = Math.Min(1.0, existing.Strength + Config.ReinforcementBoost),
-                        // Aktualizuj timestamp — "naposledy se to stalo teď"
-                        When = episode.When
+
+                        // Aktualizuj timestamp - "naposledy se to stalo teď"
+                        When = episode.When,
+
+                        // Udržuj poslední reprezentaci raw What / PercievedWhat.
+                        // Díky explicitnímu reinforcement klíči už What nemusí být identita.
+                        What = episode.What,
+                        PerceivedWhat = episode.PerceivedWhat ?? existing.PerceivedWhat,
+
+                        Distortion = Math.Max(existing.Distortion, episode.Distortion),
+                        RecallConfidence = Math.Min(existing.RecallConfidence, episode.RecallConfidence)
                     };
 
                     episodes[existingIndex] = reinforced;
-                    State = new MemoryIndex(episodes, State.Semantics);
+                    State = new MemoryIndex(episodes);
 
                     _log.MemoryEncoded(
                         ctx.Id.Value.ToString(),
@@ -114,21 +132,28 @@ namespace GameEngineTools.Characters.Engines.Memory
                         reinforced.Emotion.ToString());
 
                     // Vyzvaň událost i pro reinforcement — Strength je aktualizovaná
-                    outbox.Add(new MemoryEncoded(episode.When, ctx.Id, existing.Id, reinforced.Strength, episode.What));
+                    outbox.Add(new MemoryEncoded(episode.When, ctx.Id, existing.Id, reinforced.Strength, episode.What, reinforced.PerceivedWhat, reinforced.OtherPerson, reinforced.BeliefEvidence));
                     return;
                 }
 
                 // --- NOVÁ EPIZODA ---
-                episodes.Add(episode);
-                State = new MemoryIndex(episodes, State.Semantics);
+                var encoded = episode with
+                {
+                    PerceivedWhat = episode.PerceivedWhat ?? BuildPerceivedWhat(episode, ctx),
+                    Distortion = Math.Max(0.0, episode.Distortion + ComputeDistortion(ctx, episode)),
+                    RecallConfidence = Math.Clamp(episode.RecallConfidence - ComputeDistortion(ctx, episode) * 0.5, 0.2, 1.0)
+                };
+
+                episodes.Add(encoded);
+                State = new MemoryIndex(episodes);
 
                 _log.MemoryEncoded(
                     ctx.Id.Value.ToString(),
-                    episode.What,
-                    episode.Salience,
-                    episode.Emotion.ToString());
+                    encoded.What,
+                    encoded.Salience,
+                    encoded.Emotion.ToString());
 
-                outbox.Add(new MemoryEncoded(episode.When, ctx.Id, episode.Id, episode.Strength, episode.What));
+                outbox.Add(new MemoryEncoded(encoded.When, ctx.Id, encoded.Id, encoded.Strength, encoded.What, encoded.PerceivedWhat, encoded.OtherPerson, encoded.BeliefEvidence));
             }
         }
 
@@ -139,7 +164,13 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <param name="predicate">Filtrační podmínka.</param>
         /// <returns>Filtrovaný seznam epizod (read-only snapshot).</returns>
         public IReadOnlyList<EpisodicMemory> Recall(Func<EpisodicMemory, bool> predicate)
-            => State.Episodes.Where(predicate).ToList();
+            => State.Episodes.Where(predicate).Select(Reconstruct).ToList();
+
+        public MemoryRecallResult Recall(MemoryRecallQuery query, WDateTime now)
+            => MemoryCognition.Recall(State, query, now);
+
+        public DecisionWorkingSet BuildWorkingSet(MemoryRecallQuery query, WDateTime now)
+            => MemoryCognition.BuildWorkingSet(State, query, now);
 
         #endregion Veřejné API
 
@@ -172,6 +203,114 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </list>
         /// </para>
         /// </remarks>
+        private EpisodicMemory Reconstruct(EpisodicMemory episode)
+        {
+            if (episode.Distortion <= 0.01)
+            {
+                return episode with { PerceivedWhat = episode.PerceivedWhat ?? episode.What };
+            }
+
+            return episode with
+            {
+                PerceivedWhat = episode.PerceivedWhat ?? episode.What,
+                RecallConfidence = Math.Clamp(episode.RecallConfidence - episode.Distortion * 0.15, 0.1, 1.0)
+            };
+        }
+
+        private double ComputeDistortion(IHumanContext ctx, EpisodicMemory episode)
+        {
+            var stress = ctx.Snapshot.Psychology.Stress / 100.0;
+            var emotionalWeight = episode.Emotion switch
+            {
+                EmotionalTag.Negative => 1.0,
+                EmotionalTag.Mixed => 0.8,
+                EmotionalTag.Positive => 0.35,
+                _ => 0.2
+            };
+
+            return Math.Clamp(stress * emotionalWeight * Config.StressDistortionWeight, 0.0, 0.8);
+        }
+
+        private string BuildPerceivedWhat(EpisodicMemory episode, IHumanContext ctx)
+        {
+            var distortion = ComputeDistortion(ctx, episode);
+            if (distortion < 0.1)
+            {
+                return episode.What;
+            }
+
+            return episode.Emotion switch
+            {
+                EmotionalTag.Negative => $"PerceivedThreat:{episode.What}",
+                EmotionalTag.Mixed => $"PerceivedSlight:{episode.What}",
+                EmotionalTag.Positive when ctx.Snapshot.Psychology.Valence > 0.3 => $"PerceivedWarmth:{episode.What}",
+                _ => episode.What
+            };
+        }
+
+        private static HumanId? ResolveOtherPerson(HumanId self, HumanId a, HumanId b)
+            => self == a ? b : self == b ? a : b;
+
+        private static PersonBeliefEvidence? CreateFirstImpressionBeliefEvidence(HumanId self, FirstImpressionFormed impression)
+        {
+            var other = ResolveOtherPerson(self, impression.A, impression.B);
+            if (other is null)
+            {
+                return null;
+            }
+
+            return impression.Like >= 70
+                ? new PersonBeliefEvidence(other.Value, PersonBeliefKind.Warm, 0.18, "first-impression-positive")
+                : impression.Like < 45
+                    ? new PersonBeliefEvidence(other.Value, PersonBeliefKind.Critical, 0.12, "first-impression-negative")
+                    : null;
+        }
+
+        private static PersonBeliefEvidence? CreateInteractionBeliefEvidence(HumanId self, InteractionOutcome outcome)
+        {
+            if (outcome.From == self)
+            {
+                return outcome.Accepted
+                    ? new PersonBeliefEvidence(
+                        outcome.To,
+                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Validation or SpeechAct.Meta ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
+                        outcome.Act is SpeechAct.Invite ? 0.24 : 0.18,
+                        $"interaction-accepted:{outcome.Act}")
+                    : new PersonBeliefEvidence(
+                        outcome.To,
+                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Validation ? PersonBeliefKind.Critical : PersonBeliefKind.Rejecting,
+                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Invite ? 0.24 : 0.18,
+                        $"interaction-rejected:{outcome.Act}");
+            }
+
+            if (outcome.To == self && outcome.Accepted)
+            {
+                return new PersonBeliefEvidence(
+                    outcome.From,
+                    outcome.Act is SpeechAct.Validation or SpeechAct.SelfDisclosure ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
+                    0.16,
+                    $"interaction-received:{outcome.Act}");
+            }
+
+            return null;
+        }
+
+        private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string source)
+        {
+            var other = ResolveOtherPerson(self, a, b) ?? b;
+            return positive
+                ? new PersonBeliefEvidence(other, source.Contains("help", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Reliable : PersonBeliefKind.Warm, 0.14, $"micro-positive:{source}")
+                : new PersonBeliefEvidence(other, source.Contains("ignore", StringComparison.OrdinalIgnoreCase) || source.Contains("cold", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Rejecting : PersonBeliefKind.Critical, 0.16, $"micro-negative:{source}");
+        }
+
+        private static PersonBeliefEvidence CreateRepairBeliefEvidence(HumanId self, RepairAttempt attempt)
+        {
+            var other = ResolveOtherPerson(self, attempt.A, attempt.B) ?? attempt.B;
+            return attempt.Accepted
+                ? new PersonBeliefEvidence(other, PersonBeliefKind.Reliable, 0.20, "repair-accepted")
+                : new PersonBeliefEvidence(other, PersonBeliefKind.Rejecting, 0.18, "repair-rejected");
+        }
+
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
             switch (@event)
@@ -181,6 +320,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     {
                         // Vlastní akce — nejjednodušší schema, žádní aktéři
                         var what = MemoryWhatParser.Action(ac.ActionName);
+                        var other = ac.TargetHuman == ctx.Id ? null : ac.TargetHuman;
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -188,7 +328,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             SalienceForAction(ac.ActionName, ctx),
                             EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence),
-                            Strength: Config.BaseEncoding),
+                            Strength: Config.BaseEncoding,
+                            OtherPerson: other),
                             ctx, outbox);
                         break;
                     }
@@ -208,7 +349,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             salience,
                             emotion,
-                            Strength: Config.BaseEncoding + 0.2),
+                            Strength: Config.BaseEncoding + 0.2,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, io.From, io.To),
+                            BeliefEvidence: CreateInteractionBeliefEvidence(ctx.Id, io)),
                             ctx, outbox);
                         break;
                     }
@@ -222,13 +365,17 @@ namespace GameEngineTools.Characters.Engines.Memory
                                     : fi.Like >= 45 ? EmotionalTag.Neutral
                                     : EmotionalTag.Negative;
 
+                        var other = ResolveOtherPerson(ctx.Id, fi.A, fi.B);
+
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
                             fi.OccurredAt,
                             what,
                             Salience: 0.85,   // první dojem je velmi salinetní — evolučně důležitý
                             emotion,
-                            Strength: Config.BaseEncoding + 0.3),
+                            Strength: Config.BaseEncoding + 0.3,
+                            OtherPerson: other,
+                            BeliefEvidence: CreateFirstImpressionBeliefEvidence(ctx.Id, fi)),
                             ctx, outbox);
                         break;
                     }
@@ -237,7 +384,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 case MicroPositive mp:
                     {
                         var fromId = ctx.Id == mp.A ? mp.B.Value : mp.A.Value;
-                        var what = MemoryWhatParser.MicroPositive(fromId, mp.What);
+                        var what = MemoryWhatFactory.RelationMicroPositive(mp.What, new HumanId(fromId), ctx.Id);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -245,7 +392,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.6,
                             EmotionalTag.Positive,
-                            Strength: Config.BaseEncoding),
+                            Strength: Config.BaseEncoding,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, mp.A, mp.B),
+                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mp.A, mp.B, positive: true, mp.What)),
                             ctx, outbox);
                         break;
                     }
@@ -255,7 +404,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         // Negativní mikrointerakce — o něco vyšší salience než pozitivní
                         // (negativní bias: nepříjemné věci si pamatujeme lépe)
                         var fromId = ctx.Id == mn.A ? mn.B.Value : mn.A.Value;
-                        var what = MemoryWhatParser.MicroNegative(fromId, mn.What);
+                        var what = MemoryWhatFactory.RelationMicroNegative(mn.What, new HumanId(fromId), ctx.Id);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -263,7 +412,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.65,
                             EmotionalTag.Negative,
-                            Strength: Config.BaseEncoding + 0.1),
+                            Strength: Config.BaseEncoding + 0.1,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, mn.A, mn.B),
+                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mn.A, mn.B, positive: false, mn.What)),
                             ctx, outbox);
                         break;
                     }
@@ -281,7 +432,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.8,   // smíření/odmítnutí smíru je výrazná událost
                             emotion,
-                            Strength: Config.BaseEncoding + 0.2),
+                            Strength: Config.BaseEncoding + 0.2,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, ra.A, ra.B),
+                            BeliefEvidence: CreateRepairBeliefEvidence(ctx.Id, ra)),
                             ctx, outbox);
                         break;
                     }
@@ -361,7 +514,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 .Where(e => e.Strength >= Config.PruneThreshold)
                 .ToList();
 
-            State = new MemoryIndex(episodes, State.Semantics);
+            State = new MemoryIndex(episodes);
         }
 
         #endregion Tick — zapomínání (Ebbinghausova křivka)
@@ -409,7 +562,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 lookup[boosted.Id] = boosted;
             }
 
-            State = new MemoryIndex(lookup.Values.ToList(), State.Semantics);
+            State = new MemoryIndex(lookup.Values.ToList());
 
             outbox.Add(new MemoryConsolidated(at, ctx.Id, toBoost.Count));
 

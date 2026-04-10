@@ -43,11 +43,31 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
                 return new ActionArbitrationResult(false, null, null, context.State with { Cooldowns = context.Cooldowns });
 
             candidates.Sort((a, b) => b.Utility.CompareTo(a.Utility));
-            var chosen = candidates[0];
-            var plan = new PlannedAction(chosen.Name, context.Now, chosen.Duration, chosen.Utility);
-            return new ActionArbitrationResult(false, plan, chosen, context.State with { CurrentPlan = plan, Cooldowns = context.Cooldowns });
+            var intended = candidates[0];
+            var chosen = ChooseWithConflict(context, candidates, intended, out var reason);
+            var plan = new PlannedAction(chosen.Name, context.Now, chosen.Duration, chosen.Utility, chosen.SocialTargeting?.TargetHuman);
+            return new ActionArbitrationResult(false, plan, chosen, context.State with { CurrentPlan = plan, Cooldowns = context.Cooldowns }, intended, reason);
         }
 
         #endregion
+
+        private static BehaviorCandidate ChooseWithConflict(BehaviorContext context, List<BehaviorCandidate> candidates, BehaviorCandidate intended, out string? reason)
+        {
+            var profile = context.HumanContext.PsychologyProfile;
+            var ambivalence = Math.Clamp(profile.Ambivalence + (context.HumanContext.Snapshot.Psychology.Stress / 100.0) * 0.25, 0.0, 1.0);
+            var topDelta = candidates.Count > 1 ? intended.Utility - candidates[1].Utility : intended.Utility;
+            var tension = Math.Clamp(1.0 - (topDelta / 20.0), 0.0, 1.0);
+            var conflictChance = ambivalence * tension * (1.0 - profile.FollowThrough * 0.5);
+
+            if (candidates.Count > 1 && context.HumanContext.Random.Chance(conflictChance))
+            {
+                var conflicted = candidates[1];
+                reason = $"wanted:{intended.Name}->did:{conflicted.Name}";
+                return conflicted;
+            }
+
+            reason = null;
+            return intended;
+        }
     }
 }

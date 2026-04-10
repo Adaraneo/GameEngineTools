@@ -11,6 +11,7 @@ namespace GameEngineTools.Characters.Core
     using Characters.Engines.Physiology;
     using Characters.Engines.Psychology;
     using Characters.Engines.Relationships;
+    using Characters.Engines.SemanticMemory;
     using Characters.Traits;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.World.Utils.Time;
@@ -38,6 +39,7 @@ namespace GameEngineTools.Characters.Core
         Identity Identity { get; }
         SexBiology Biology { get; }   // Female/Male/Intersex etc.
         Personality Personality { get; } // Trait modul (nemění se rychle)
+        PsychologicalProfile PsychologyProfile { get; }
         PhysicalAppearance PhysicalAppearance { get; }
 
         AttractionProfile AttractionProfile { get; }
@@ -91,6 +93,7 @@ namespace GameEngineTools.Characters.Core
         Identity Identity { get; }
         SexBiology Biology { get; }
         Personality Personality { get; }
+        PsychologicalProfile PsychologyProfile { get; }
 
         EnginesSnapshot Snapshot { get; }
 
@@ -152,5 +155,6 @@ namespace GameEngineTools.Characters.Core
         BehaviorState Behavior,
         InteractionSurface InteractionSurface,
         RelationshipState Relationships,
-        MemoryIndex Memory);
+        MemoryIndex Memory,
+        SemanticMemoryState? SemanticMemory = null);
 }

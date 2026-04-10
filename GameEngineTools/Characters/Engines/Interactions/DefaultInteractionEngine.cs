@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -187,6 +188,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var trust = edge?.Trust ?? 30;
 
             var psych = ctx.Snapshot.Psychology;
+            var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
+                .ExpectedAcceptance(p.From, p.Act, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
 
             // Základní pravděpodobnost přijetí — lineární kombinace vztahů a psychiky
             var baseP = 0.30
@@ -196,7 +199,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                         + 0.10 * Math.Max(0, psych.Valence)
                         + (State.HasPrivacy ? 0.05 : 0)
                         - 0.05 * State.Crowding
-                        - 0.0015 * psych.Stress;
+                        - 0.0015 * psych.Stress
+                        + (expectedAcceptance - 0.5) * 0.25;
 
             // Misattribution: vyšší stres → větší šance na špatné čtení záměru
             var misattrib = Config.MisattributionRateBase * (psych.Stress / 100.0);

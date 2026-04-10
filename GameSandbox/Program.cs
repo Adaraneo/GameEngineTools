@@ -6,7 +6,10 @@ using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
+using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.SemanticMemory;
+using GameEngineTools.Characters.Generation.Portraits;
 using GameEngineTools.Characters.Traits;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
@@ -180,7 +183,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson],
     LocationService = locationService,
-    SimulationYears = 1,
+    SimulationYears = 5,
     TickStep = WTimeSpan.FromHours(0.5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
 
@@ -237,31 +240,33 @@ var mainTrioSceneOpts = new SimulationSceneOptions
 };
 
 var mainTrioScene = new SimulationScene(clock, mainTrioSceneOpts);
-
-clock.SetNow(clock.Now.AddYears(-mainTrioSceneOpts.SimulationYears));
+await mainTrioScene.RunAsync();
 
 var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
 
-var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
+if (characters.Count > 0)
 {
-    Characters = characters,
-    LocationService = locationService,
-    TickStep = WTimeSpan.FromHours(5),
-    SimulationYears = 2,
-    OnTick = (now, chars) =>
+    clock.SetNow(clock.Now.AddYears(-mainTrioSceneOpts.SimulationYears));
+    var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
-        FireFirstImpressions(now, chars, attractionCalculator, locationService);
+        Characters = characters,
+        LocationService = locationService,
+        TickStep = WTimeSpan.FromHours(5),
+        SimulationYears = 5,
+        OnTick = (now, chars) =>
+        {
+            FireFirstImpressions(now, chars, attractionCalculator, locationService);
 
-        RouteMoveTo(now, chars, locationService, rng);
+            RouteMoveTo(now, chars, locationService, rng);
 
-        DynamicReachOutRouting(now, chars, locationService, rng);
+            DynamicReachOutRouting(now, chars, locationService, rng);
 
-        OrganicMicroPositives(now, chars, locationService, rng);
-    }
-});
+            OrganicMicroPositives(now, chars, locationService, rng);
+        }
+    });
 
-await mainTrioScene.RunAsync();
-await otherCharactersScene.RunAsync();
+    await otherCharactersScene.RunAsync();
+}
 
 // ── Diary export ──────────────────────────────────────────────────────────────
 var sbDiary = new StringBuilder();
@@ -296,6 +301,13 @@ await File.WriteAllTextAsync(
 await File.WriteAllTextAsync(
     Path.Combine(desktopPath, $"significantOther.{significantOtherPerson.Id.Value}.txt"),
     significantOther.PrintInfo(false));
+
+var promptDir = Directory.CreateDirectory(Path.Combine(desktopPath, "Prompts")).FullName;
+foreach (var character in manager.Characters)
+{
+    await File.WriteAllTextAsync(Path.Combine(promptDir, $"{character.Person.Id.Value.ToString()}.txt"), character.PrintPortraitInfo(
+        runtime.Services.GetRequiredService<IPortraitSpecBuilder>(), runtime.Services.GetRequiredService<IPortraitPromptFormatter>()));
+}
 
 Console.WriteLine("Simulation complete. Game time: {0}", clock.Now);
 
@@ -333,14 +345,12 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
         if (candidates.Count == 0)
             continue;
 
-        // Weighted random — prefer characters the initiator likes,
-        // but keep a chance to approach a stranger.
-        // Unknown character gets neutral weight 45 — openness to strangers.
-        var target = PickWeightedRandom(candidates, c =>
-        {
-            var edge = character.Snapshot.Relationships.Edges.GetValueOrDefault(c.Id);
-            return edge?.Like ?? 45.0;
-        }, rng);
+        var targetMode = character.Snapshot.Behavior.NeedIntimacy >= 55
+            ? SocialTargetMode.Intimacy
+            : SocialTargetMode.ReachOut;
+        var target = SemanticTargeting.ChooseTarget(character, candidates, targetMode);
+        if (target is null)
+            continue;
 
         var selection = ReachOutSpeechActSelector.SelectSpeechAct(character, target, now, rng);
         var act = selection.Act;
@@ -391,7 +401,7 @@ static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, IL
         var witness = witnesses[rng.Next(witnesses.Count)];
 
         if (rng.NextDouble() < 0.30)
-            character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, "noticed your work"));
+            character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, MemoryMicroEventKinds.Validation));
     }
 }
 
@@ -410,24 +420,11 @@ static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, IL
 static void TryTouch(WDateTime now, IHuman from, IHuman to, Random rng)
 {
     var edge = from.Snapshot.Relationships.Edges.GetValueOrDefault(to.Id);
-    if (edge is null)
-        return;
-
     var hasPrivacy = from.Snapshot.InteractionSurface.HasPrivacy;
-
-    // Light touch — shoulder, arm. Requires moderate closeness and comfort.
-    // 12% base chance keeps it rare enough to feel meaningful.
-    if (edge.Closeness > 50 && edge.Comfort > 45 && rng.NextDouble() < 0.12)
+    var level = ReachOutTouchSelector.SelectTouchLevel(edge, hasPrivacy, rng);
+    if (level is not null)
     {
-        to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, TouchLevel.Light));
-        return; // One touch attempt per tick is enough
-    }
-
-    // Friendly touch — hug or equivalent. Requires deeper closeness, more attraction,
-    // and privacy — open spaces make this socially awkward.
-    if (edge.Closeness > 70 && edge.SexualInterest > 50 && hasPrivacy && rng.NextDouble() < 0.07)
-    {
-        to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, TouchLevel.Friendly));
+        to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, level.Value));
     }
 }
 

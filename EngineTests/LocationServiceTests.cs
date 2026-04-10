@@ -618,6 +618,8 @@ namespace EngineTests
 
             public Personality Personality => throw new NotImplementedException();
 
+            public PsychologicalProfile PsychologyProfile => PsychologicalProfile.Default;
+
             public PhysicalAppearance PhysicalAppearance => throw new NotImplementedException();
 
             public AttractionProfile AttractionProfile => throw new NotImplementedException();

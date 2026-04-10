@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Hosting
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Core.Time;
@@ -118,16 +119,17 @@ namespace GameEngineTools.Characters.Hosting
             var inter  = _sp.GetRequiredService<IInteractionEngine>();
             var rel    = _sp.GetRequiredService<IRelationshipsEngine>();
             var mem    = _sp.GetRequiredService<IMemoryEngine>();
+            var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
 
             // Initial snapshot — State is always valid immediately after factory creation
             var snapshot = new EnginesSnapshot(
-                physio.State, psych.State, behav.State, inter.State, rel.State, mem.State);
+                physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State);
 
             return new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.PhysicalAppearance,
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
-                physio, psych, behav, inter, rel, mem,
+                physio, psych, behav, inter, rel, mem, semantic,
                 snapshot);
         }
 

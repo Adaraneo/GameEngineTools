@@ -10,5 +10,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
         bool KeepRunningPlan,
         PlannedAction? SelectedPlan,
         BehaviorCandidate? SelectedCandidate,
-        BehaviorState NewState);
+        BehaviorState NewState,
+        BehaviorCandidate? IntendedCandidate = null,
+        string? ConflictReason = null);
 }

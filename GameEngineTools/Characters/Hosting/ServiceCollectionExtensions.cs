@@ -9,8 +9,10 @@ using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.Generation;
+using GameEngineTools.Characters.Generation.Portraits;
 using GameEngineTools.Characters.Hosting.Defaults;
 using GameEngineTools.Constants;
 using GameEngineTools.FileSystem;
@@ -118,7 +120,12 @@ namespace GameEngineTools.Characters.Hosting
             => services.AddSingleton<IPersonalityGenerator, PersonalityGenerator>();
 
         private static IServiceCollection AddAppearanceGenerator(this IServiceCollection services)
-            => services.AddSingleton<IAppearanceGenerator, AppearanceGenerator>();
+        {
+            services.AddSingleton<IAppearanceGenerator, AppearanceGenerator>();
+            services.AddSingleton<IPortraitSpecBuilder, PortraitSpecBuilder>();
+            services.AddSingleton<IPortraitPromptFormatter, PortraitPromptFormatter>();
+            return services;
+        }
 
         #endregion CharacterGeneration
 
@@ -252,6 +259,25 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
+        public static IServiceCollection AddSemanticMemoryEngine<TImpl>(
+            this IServiceCollection services,
+            Action<SemanticMemoryConfig>? configure = null)
+            where TImpl : class, ISemanticMemoryEngine
+        {
+            services.AddTransient<ISemanticMemoryEngine, TImpl>();
+            var ob = services.AddOptions<SemanticMemoryConfig>();
+            if (configure != null)
+            {
+                ob.Configure(configure);
+            }
+            else
+            {
+                ob.BindConfiguration("Characters:SemanticMemory");
+            }
+
+            return services;
+        }
+
         #endregion Engine registrace
 
         #region Zkrácená registrace všeho najednou
@@ -271,7 +297,7 @@ namespace GameEngineTools.Characters.Hosting
         ///     DefaultMemoryEngine&gt;();
         /// </code>
         /// </example>
-        public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem>(
+        public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem>(
             this IServiceCollection services,
             Action<PhysiologyConfig>? physio = null,
             Action<PsychologyConfig>? psych = null,
@@ -279,13 +305,15 @@ namespace GameEngineTools.Characters.Hosting
             Action<SleepConfig>? sleep = null,
             Action<InteractionConfig>? inter = null,
             Action<RelationshipsConfig>? rel = null,
-            Action<MemoryConfig>? mem = null)
+            Action<MemoryConfig>? mem = null,
+            Action<SemanticMemoryConfig>? semantic = null)
             where TPhysio : class, IPhysiologyEngine
             where TPsych : class, IPsychologyEngine
             where TBehav : class, IBehaviorEngine
             where TInter : class, IInteractionEngine
             where TRel : class, IRelationshipsEngine
             where TMem : class, IMemoryEngine
+            where TSem : class, ISemanticMemoryEngine
         {
             services.AddCharactersCore()
                     .AddPhysiologyEngine<TPhysio>(physio)
@@ -293,7 +321,8 @@ namespace GameEngineTools.Characters.Hosting
                     .AddBehaviorEngine<TBehav>(behav, sleep)
                     .AddInteractionEngine<TInter>(inter)
                     .AddRelationshipsEngine<TRel>(rel)
-                    .AddMemoryEngine<TMem>(mem);
+                    .AddMemoryEngine<TMem>(mem)
+                    .AddSemanticMemoryEngine<TSem>(semantic);
 
             return services;
         }
