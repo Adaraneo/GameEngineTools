@@ -672,7 +672,7 @@ namespace GameEngineTools.Narrative
 
             var pattern = actor.IsFemale switch
             {
-                true when actor.Name.EndsWith("ia") => "žena",
+                true when actor.Name.EndsWith("a") || actor.Name.EndsWith("ia") => "žena",
                 true when actor.Name.EndsWith("e") => "růže",
                 false when actor.Name.EndsWith("us") => "muž",
                 false when actor.Name.EndsWith("tor") => "muž",
