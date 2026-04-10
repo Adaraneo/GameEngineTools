@@ -6,7 +6,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     /// <summary>
     /// Canonical tokeny pro mikro-události v relation paměti.
     /// </summary>
-    internal static class MemoryMicroEventKinds
+    public static class MemoryMicroEventKinds
     {
         #region Positive
 

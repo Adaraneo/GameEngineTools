@@ -149,8 +149,21 @@ namespace EngineTests
             var microKind = MemoryWhatParser.GetMicroEventKind(descriptor);
 
             // Assert
-            Assert.AreEqual("help-with-task", microKind);
-            Assert.AreNotEqual(MemoryMicroEventKinds.Help, microKind);
+            Assert.AreEqual(MemoryMicroEventKinds.Help, microKind);
+        }
+
+        [TestMethod]
+        public void GetMicroEventKind_IgnoreAfterReachout_NormalizesToCanonicalIgnore()
+        {
+            // Arrange
+            const string what = "Relation:MicroNegative|what=ignore-after-reachout|from=11111111-1111-1111-1111-111111111111";
+            var descriptor = MemoryWhatParser.ParseDescriptor(what, null);
+
+            // Act
+            var microKind = MemoryWhatParser.GetMicroEventKind(descriptor);
+
+            // Assert
+            Assert.AreEqual(MemoryMicroEventKinds.Ignore, microKind);
         }
     }
 }

@@ -6,6 +6,7 @@ using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
+using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Generation.Portraits;
@@ -400,7 +401,7 @@ static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, IL
         var witness = witnesses[rng.Next(witnesses.Count)];
 
         if (rng.NextDouble() < 0.30)
-            character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, "noticed your work"));
+            character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, MemoryMicroEventKinds.Validation));
     }
 }
 

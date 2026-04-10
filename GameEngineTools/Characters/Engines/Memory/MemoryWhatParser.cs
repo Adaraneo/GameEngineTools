@@ -295,8 +295,40 @@ namespace GameEngineTools.Characters.Engines.Memory
                 return null;
             }
 
-            return value.Trim().ToLowerInvariant();
+            var normalized = value.Trim().ToLowerInvariant();
+
+            return NormalizeLegacyMicroEventKind(normalized);
         }
+
+        private static string NormalizeLegacyMicroEventKind(string value)
+            => value switch
+            {
+                MemoryMicroEventKinds.Help => MemoryMicroEventKinds.Help,
+                MemoryMicroEventKinds.Support => MemoryMicroEventKinds.Support,
+                MemoryMicroEventKinds.Repair => MemoryMicroEventKinds.Repair,
+                MemoryMicroEventKinds.Warmth => MemoryMicroEventKinds.Warmth,
+                MemoryMicroEventKinds.Validation => MemoryMicroEventKinds.Validation,
+
+                MemoryMicroEventKinds.Ignore => MemoryMicroEventKinds.Ignore,
+                MemoryMicroEventKinds.Cold => MemoryMicroEventKinds.Cold,
+                MemoryMicroEventKinds.Criticism => MemoryMicroEventKinds.Criticism,
+                MemoryMicroEventKinds.Dismissal => MemoryMicroEventKinds.Dismissal,
+                MemoryMicroEventKinds.Slight => MemoryMicroEventKinds.Slight,
+
+                "help-with-task" => MemoryMicroEventKinds.Help,
+                "support-after-stress" => MemoryMicroEventKinds.Support,
+                "repair-after-conflict" => MemoryMicroEventKinds.Repair,
+                "warm-response" => MemoryMicroEventKinds.Warmth,
+                "validation-response" => MemoryMicroEventKinds.Validation,
+
+                "ignore-after-reachout" => MemoryMicroEventKinds.Ignore,
+                "cold-response" => MemoryMicroEventKinds.Cold,
+                "critical-response" => MemoryMicroEventKinds.Criticism,
+                "dismissive-response" => MemoryMicroEventKinds.Dismissal,
+                "slight-response" => MemoryMicroEventKinds.Slight,
+
+                _ => value
+            };
 
         /// <summary>
         /// Naparsuje část za hlavičkou na mapu parametrů <c>key=value</c>.
