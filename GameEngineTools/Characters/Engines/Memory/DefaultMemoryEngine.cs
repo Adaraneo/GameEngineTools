@@ -151,6 +151,12 @@ namespace GameEngineTools.Characters.Engines.Memory
         public IReadOnlyList<EpisodicMemory> Recall(Func<EpisodicMemory, bool> predicate)
             => State.Episodes.Where(predicate).Select(Reconstruct).ToList();
 
+        public MemoryRecallResult Recall(MemoryRecallQuery query, WDateTime now)
+            => MemoryCognition.Recall(State, query, now);
+
+        public DecisionWorkingSet BuildWorkingSet(MemoryRecallQuery query, WDateTime now)
+            => MemoryCognition.BuildWorkingSet(State, query, now);
+
         #endregion Veřejné API
 
         #region Handle — zpracování doménových událostí

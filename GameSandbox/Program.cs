@@ -182,7 +182,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson],
     LocationService = locationService,
-    SimulationYears = 1,
+    SimulationYears = 5,
     TickStep = WTimeSpan.FromHours(0.5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
 
@@ -251,7 +251,7 @@ if (characters.Count > 0)
         Characters = characters,
         LocationService = locationService,
         TickStep = WTimeSpan.FromHours(5),
-        SimulationYears = 2,
+        SimulationYears = 5,
         OnTick = (now, chars) =>
         {
             FireFirstImpressions(now, chars, attractionCalculator, locationService);

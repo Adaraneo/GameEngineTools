@@ -35,6 +35,10 @@ namespace GameEngineTools.Characters.Engines.Memory
         void Encode(EpisodicMemory episode, IHumanContext ctx, IEventCollector outbox);
 
         IReadOnlyList<EpisodicMemory> Recall(Func<EpisodicMemory, bool> predicate);
+
+        MemoryRecallResult Recall(MemoryRecallQuery query, WDateTime now);
+
+        DecisionWorkingSet BuildWorkingSet(MemoryRecallQuery query, WDateTime now);
     }
 
     // Události
@@ -48,5 +52,18 @@ namespace GameEngineTools.Characters.Engines.Memory
         HumanId? OtherPerson = null,
         PersonBeliefEvidence? BeliefEvidence = null) : IDomainEvent;
     public sealed record MemoryRecalled(WDateTime OccurredAt, HumanId Human, Guid EpisodeId) : IDomainEvent;
+    public sealed record MemoryRecallEvaluated(
+        WDateTime OccurredAt,
+        HumanId Human,
+        string? ActionName,
+        HumanId? TargetHuman,
+        int RecalledCount) : IDomainEvent;
+    public sealed record ReflectionApplied(
+        WDateTime OccurredAt,
+        HumanId Human,
+        string? ActionName,
+        HumanId? TargetHuman,
+        ReflectionSummaryKind Kind,
+        double Strength) : IDomainEvent;
     public sealed record MemoryConsolidated(WDateTime OccurredAt, HumanId Human, int Count) : IDomainEvent;
 }

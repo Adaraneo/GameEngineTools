@@ -66,7 +66,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             // Build the tick-local behavior context before delegating to sub-engines.
             var updatedCooldowns = BehaviorMath.UpdateCooldowns(State.Cooldowns, Math.Max(0, dt.TotalHours));
             var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, State) with { Cooldowns = updatedCooldowns };
-            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns);
+            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>());
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.
             var sleep = _sleepCoordinator.Tick(context);

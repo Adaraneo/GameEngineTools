@@ -51,7 +51,7 @@ namespace EngineTests
         {
             var ctx = Human(memory, semanticMemory, relationships, surfaceKind, noise, crowding, stress, valence, hunger, thirst, energy, competence, curiosity, affiliation, chronotype, personality, random, selfId);
             var s = BehaviorMath.ComputeNeedState(ctx, new Dictionary<string, double>(), state ?? new BehaviorState(10, 5, 5, 20, 50, 30, null));
-            return new BehaviorContext(now ?? new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector(), s, new BehaviorConfig(), new Dictionary<string, double>());
+            return new BehaviorContext(now ?? new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector(), s, new BehaviorConfig(), new Dictionary<string, double>(), new Dictionary<string, DecisionWorkingSet>());
         }
 
         internal static IHumanContext Human(MemoryIndex? memory, SemanticMemoryState? semanticMemory, RelationshipState? relationships, SurfaceKind surfaceKind, double noise, double crowding, double stress, double valence, double hunger, double thirst, double energy, double competence, double curiosity, double affiliation, Chronotype chronotype, Personality? personality = null, IRandomSource? random = null, HumanId? selfId = null)

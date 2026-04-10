@@ -1,16 +1,20 @@
-﻿// MemoryInfluenceEngine.cs
+// MemoryInfluenceEngine.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
     using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.SemanticMemory;
-    using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
     /// <summary>
-    /// Replays emotionally salient episodes into current candidate utilities.
+    /// Applies candidate-specific memory influence from targeted recall and compact reflections.
     /// </summary>
     internal sealed class MemoryInfluenceEngine : IBehaviorModifierEngine
     {
@@ -18,69 +22,216 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
         public void Modify(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
-            var episodes = context.HumanContext.Snapshot.Memory.Episodes;
-            if (episodes.Count > 0)
+            var memory = context.HumanContext.Snapshot.Memory;
+            for (var i = 0; i < candidates.Count; i++)
             {
-                // Social memory can either dampen or reinforce outreach based on recent emotional tone.
-                var negativeInteractions = episodes.Where(e => Perceived(e).Contains("Interaction:") && e.Emotion == EmotionalTag.Negative && e.Strength > 0.4).ToList();
-                foreach (var e in negativeInteractions) context.Outbox.Add(new MemoryRecalled(context.Now, context.HumanContext.Id, e.Id));
-                if (negativeInteractions.Count > 0) BehaviorCandidateEditor.Multiply(candidates, ReachOut, 1.0 - Math.Min(0.55, negativeInteractions.Sum(e => 0.08 + e.Distortion * 0.12)));
-
-                var positiveInteractions = episodes.Where(e => Perceived(e).Contains("Interaction:") && e.Emotion == EmotionalTag.Positive && e.Strength > 0.4).ToList();
-                foreach (var e in positiveInteractions) context.Outbox.Add(new MemoryRecalled(context.Now, context.HumanContext.Id, e.Id));
-                if (positiveInteractions.Count > 0) BehaviorCandidateEditor.Multiply(candidates, ReachOut, 1.0 + Math.Min(0.25, positiveInteractions.Count * 0.08));
-
-                var rejectedIntimacy = episodes.Where(e => Perceived(e).Contains("InviteIntimacy") && e.Emotion == EmotionalTag.Negative && e.Strength > 0.35).ToList();
-                foreach (var e in rejectedIntimacy) context.Outbox.Add(new MemoryRecalled(context.Now, context.HumanContext.Id, e.Id));
-                if (rejectedIntimacy.Count > 0) BehaviorCandidateEditor.Multiply(candidates, InviteIntimacy, 1.0 - Math.Min(0.65, rejectedIntimacy.Sum(e => 0.16 + e.Distortion * 0.15)));
-
-                var negativeLoad = episodes.Where(e => e.Emotion == EmotionalTag.Negative && e.Strength > 0.3).ToList();
-                foreach (var e in negativeLoad) context.Outbox.Add(new MemoryRecalled(context.Now, context.HumanContext.Id, e.Id));
-                var loadSum = negativeLoad.Sum(e => e.Strength);
-                if (loadSum > 0.5) BehaviorCandidateEditor.Multiply(candidates, SelfCare, 1.0 + Math.Min(0.35, loadSum * 0.08));
-
-                var threateningMemories = episodes.Where(e => Perceived(e).StartsWith("PerceivedThreat:", StringComparison.Ordinal)).ToList();
-                if (threateningMemories.Count > 0)
+                var candidate = candidates[i];
+                var query = BuildQuery(candidate);
+                if (query is null)
                 {
-                    BehaviorCandidateEditor.Multiply(candidates, ReachOut, 1.0 - Math.Min(0.45, threateningMemories.Count * 0.08));
-                    BehaviorCandidateEditor.Multiply(candidates, SelfCare, 1.0 + Math.Min(0.25, threateningMemories.Count * 0.06));
-                }
-            }
-
-            var semantic = context.HumanContext.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty;
-            if (semantic.People.Count > 0)
-            {
-                var relationships = context.HumanContext.Snapshot.Relationships.Edges;
-                var profile = context.HumanContext.PsychologyProfile;
-                var memory = context.HumanContext.Snapshot.Memory.Episodes;
-
-                var bestReachOut = semantic.People.Keys.Max(other =>
-                    semantic.ExpectedAcceptance(other, SpeechAct.SmallTalk, relationships.GetValueOrDefault(other), profile, memory));
-                var bestInvite = semantic.People.Keys.Max(other =>
-                    semantic.ExpectedAcceptance(other, SpeechAct.Invite, relationships.GetValueOrDefault(other), profile, memory));
-
-                if (bestReachOut >= 0.62)
-                {
-                    BehaviorCandidateEditor.Multiply(candidates, ReachOut, 1.0 + Math.Min(0.30, (bestReachOut - 0.5) * 0.9));
-                }
-                else if (bestReachOut <= 0.40)
-                {
-                    BehaviorCandidateEditor.Multiply(candidates, ReachOut, 1.0 - Math.Min(0.35, (0.5 - bestReachOut) * 1.1));
+                    continue;
                 }
 
-                if (bestInvite >= 0.65)
-                {
-                    BehaviorCandidateEditor.Multiply(candidates, InviteIntimacy, 1.0 + Math.Min(0.22, (bestInvite - 0.5) * 0.7));
-                }
-                else if (bestInvite <= 0.38)
-                {
-                    BehaviorCandidateEditor.Multiply(candidates, InviteIntimacy, 1.0 - Math.Min(0.30, (0.5 - bestInvite) * 0.8));
-                }
+                var workingSet = MemoryCognition.BuildWorkingSet(memory, query, context.Now);
+                RememberWorkingSet(context, candidate, workingSet);
+                EmitRecallEvents(context, candidate, workingSet);
+                var multiplier = ComputeMultiplier(candidate, workingSet);
+                multiplier *= ComputeSemanticFallbackMultiplier(context, candidate);
+                candidates[i] = candidate with { Utility = Math.Max(0.0, candidate.Utility * multiplier) };
             }
         }
 
         #endregion
 
-        private static string Perceived(EpisodicMemory episode) => episode.PerceivedWhat ?? episode.What;
+        #region Query building
+
+        private static MemoryRecallQuery? BuildQuery(BehaviorCandidate candidate)
+            => candidate.Name switch
+            {
+                ReachOut => new MemoryRecallQuery(
+                    candidate.SocialTargeting?.TargetHuman,
+                    ReachOut,
+                    candidate.SocialTargeting?.SpeechAct,
+                    null,
+                    RecencyWindow: WTimeSpan.FromDays(14),
+                    Take: 4),
+                InviteIntimacy => new MemoryRecallQuery(
+                    candidate.SocialTargeting?.TargetHuman,
+                    InviteIntimacy,
+                    candidate.SocialTargeting?.SpeechAct,
+                    null,
+                    RecencyWindow: WTimeSpan.FromDays(21),
+                    Take: 4),
+                SelfCare => new MemoryRecallQuery(
+                    null,
+                    SelfCare,
+                    null,
+                    EmotionalTag.Negative,
+                    RecencyWindow: WTimeSpan.FromDays(7),
+                    Take: 4),
+                _ => null
+            };
+
+        private static void RememberWorkingSet(BehaviorContext context, BehaviorCandidate candidate, DecisionWorkingSet workingSet)
+        {
+            if (context.DecisionWorkingSets is null)
+            {
+                return;
+            }
+
+            context.DecisionWorkingSets[BuildWorkingSetKey(candidate)] = workingSet;
+        }
+
+        private static string BuildWorkingSetKey(BehaviorCandidate candidate)
+            => candidate.SocialTargeting is { } targeting
+                ? $"{candidate.Name}:{targeting.TargetHuman.Value:N}:{targeting.SpeechAct}"
+                : candidate.Name;
+
+        #endregion
+
+        #region Events
+
+        private static void EmitRecallEvents(BehaviorContext context, BehaviorCandidate candidate, DecisionWorkingSet workingSet)
+        {
+            if (workingSet.RecalledEpisodes.Count == 0 && workingSet.Reflections.Count == 0)
+            {
+                return;
+            }
+
+            context.Outbox.Add(new MemoryRecallEvaluated(
+                context.Now,
+                context.HumanContext.Id,
+                candidate.Name,
+                workingSet.TargetHuman,
+                workingSet.RecalledEpisodes.Count));
+
+            foreach (var item in workingSet.RecalledEpisodes)
+            {
+                context.Outbox.Add(new MemoryRecalled(context.Now, context.HumanContext.Id, item.Episode.Id));
+            }
+
+            foreach (var reflection in workingSet.Reflections)
+            {
+                context.Outbox.Add(new ReflectionApplied(
+                    context.Now,
+                    context.HumanContext.Id,
+                    candidate.Name,
+                    reflection.TargetHuman,
+                    reflection.Kind,
+                    reflection.Strength));
+            }
+        }
+
+        #endregion
+
+        #region Influence scoring
+
+        private static double ComputeMultiplier(BehaviorCandidate candidate, DecisionWorkingSet workingSet)
+            => candidate.Name switch
+            {
+                ReachOut => ComputeReachOutMultiplier(workingSet),
+                InviteIntimacy => ComputeInviteIntimacyMultiplier(workingSet),
+                SelfCare => ComputeSelfCareMultiplier(workingSet),
+                _ => 1.0
+            };
+
+        private static double ComputeReachOutMultiplier(DecisionWorkingSet workingSet)
+        {
+            var positive = workingSet.RecalledEpisodes
+                .Where(item => item.Episode.Emotion == EmotionalTag.Positive)
+                .Sum(item => (item.Episode.Strength * 0.16) + (item.Relevance * 0.10));
+            var negative = workingSet.RecalledEpisodes
+                .Where(item => item.Episode.Emotion == EmotionalTag.Negative)
+                .Sum(item => (item.Episode.Strength * 0.18) + (item.Relevance * 0.12));
+            var safe = workingSet.Reflections
+                .Where(summary => summary.Kind is ReflectionSummaryKind.SafeForReachOut or ReflectionSummaryKind.WarmForCasualContact)
+                .Sum(summary => summary.Strength * 0.18);
+            var costly = workingSet.Reflections
+                .Where(summary => summary.Kind == ReflectionSummaryKind.RecentSocialCost)
+                .Sum(summary => summary.Strength * 0.16);
+
+            var boost = Math.Min(0.28, positive + safe);
+            var penalty = Math.Min(0.40, negative + costly);
+            return Math.Clamp(1.0 + boost - penalty, 0.60, 1.28);
+        }
+
+        private static double ComputeInviteIntimacyMultiplier(DecisionWorkingSet workingSet)
+        {
+            var positiveVulnerability = workingSet.RecalledEpisodes
+                .Where(item => item.Episode.Emotion == EmotionalTag.Positive && item.SituationMatched)
+                .Sum(item => (item.Episode.Strength * 0.14) + (item.Relevance * 0.08));
+            var negativeVulnerability = workingSet.RecalledEpisodes
+                .Where(item => item.Episode.Emotion != EmotionalTag.Positive && item.SituationMatched)
+                .Sum(item => (item.Episode.Strength * 0.22) + (item.Relevance * 0.12));
+            var rejectionPattern = workingSet.Reflections
+                .Where(summary => summary.Kind == ReflectionSummaryKind.RejectsIntimacy)
+                .Sum(summary => summary.Strength * 0.34);
+            var safety = workingSet.Reflections
+                .Where(summary => summary.Kind == ReflectionSummaryKind.SafeForReachOut)
+                .Sum(summary => summary.Strength * 0.12);
+
+            var boost = Math.Min(0.22, positiveVulnerability + safety);
+            var penalty = Math.Min(0.55, negativeVulnerability + rejectionPattern);
+            return Math.Clamp(1.0 + boost - penalty, 0.40, 1.22);
+        }
+
+        private static double ComputeSelfCareMultiplier(DecisionWorkingSet workingSet)
+        {
+            var negativeLoad = workingSet.RecalledEpisodes
+                .Where(item => item.Episode.Emotion == EmotionalTag.Negative)
+                .Sum(item => (item.Episode.Strength * 0.14) + (item.Relevance * 0.10));
+            var socialCost = workingSet.Reflections
+                .Where(summary => summary.Kind == ReflectionSummaryKind.RecentSocialCost)
+                .Sum(summary => summary.Strength * 0.22);
+
+            var boost = Math.Min(0.35, negativeLoad + socialCost);
+            return 1.0 + boost;
+        }
+
+        private static double ComputeSemanticFallbackMultiplier(BehaviorContext context, BehaviorCandidate candidate)
+        {
+            if (candidate.Name is not (ReachOut or InviteIntimacy))
+            {
+                return 1.0;
+            }
+
+            var semantic = context.HumanContext.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty;
+            if (semantic.People.Count == 0)
+            {
+                return 1.0;
+            }
+
+            var relationships = context.HumanContext.Snapshot.Relationships.Edges;
+            var profile = context.HumanContext.PsychologyProfile;
+            var episodes = context.HumanContext.Snapshot.Memory.Episodes;
+            var act = candidate.Name == InviteIntimacy ? SpeechAct.Invite : SpeechAct.SmallTalk;
+
+            double expected;
+            if (candidate.SocialTargeting is { } targeting)
+            {
+                expected = semantic.ExpectedAcceptance(
+                    targeting.TargetHuman,
+                    targeting.SpeechAct,
+                    relationships.GetValueOrDefault(targeting.TargetHuman),
+                    profile,
+                    episodes);
+            }
+            else
+            {
+                expected = semantic.People.Keys.Max(other =>
+                    semantic.ExpectedAcceptance(other, act, relationships.GetValueOrDefault(other), profile, episodes));
+            }
+
+            return candidate.Name switch
+            {
+                ReachOut when expected >= 0.62 => 1.0 + Math.Min(0.18, (expected - 0.5) * 0.6),
+                ReachOut when expected <= 0.40 => 1.0 - Math.Min(0.22, (0.5 - expected) * 0.8),
+                InviteIntimacy when expected >= 0.65 => 1.0 + Math.Min(0.15, (expected - 0.5) * 0.5),
+                InviteIntimacy when expected <= 0.38 => 1.0 - Math.Min(0.24, (0.5 - expected) * 0.7),
+                _ => 1.0
+            };
+        }
+
+        #endregion
     }
 }
