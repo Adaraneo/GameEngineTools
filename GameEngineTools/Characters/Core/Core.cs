@@ -11,6 +11,7 @@ namespace GameEngineTools.Characters.Core
     using Characters.Engines.Physiology;
     using Characters.Engines.Psychology;
     using Characters.Engines.Relationships;
+    using Characters.Engines.SemanticMemory;
     using Characters.Traits;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.World.Utils.Time;
@@ -154,5 +155,6 @@ namespace GameEngineTools.Characters.Core
         BehaviorState Behavior,
         InteractionSurface InteractionSurface,
         RelationshipState Relationships,
-        MemoryIndex Memory);
+        MemoryIndex Memory,
+        SemanticMemoryState? SemanticMemory = null);
 }

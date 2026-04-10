@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -117,7 +118,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         reinforced.Emotion.ToString());
 
                     // Vyzvaň událost i pro reinforcement — Strength je aktualizovaná
-                    outbox.Add(new MemoryEncoded(episode.When, ctx.Id, existing.Id, reinforced.Strength, episode.What));
+                    outbox.Add(new MemoryEncoded(episode.When, ctx.Id, existing.Id, reinforced.Strength, episode.What, reinforced.PerceivedWhat, reinforced.OtherPerson, reinforced.BeliefEvidence));
                     return;
                 }
 
@@ -138,7 +139,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     encoded.Salience,
                     encoded.Emotion.ToString());
 
-                outbox.Add(new MemoryEncoded(encoded.When, ctx.Id, encoded.Id, encoded.Strength, encoded.What));
+                outbox.Add(new MemoryEncoded(encoded.When, ctx.Id, encoded.Id, encoded.Strength, encoded.What, encoded.PerceivedWhat, encoded.OtherPerson, encoded.BeliefEvidence));
             }
         }
 
@@ -227,6 +228,61 @@ namespace GameEngineTools.Characters.Engines.Memory
             };
         }
 
+        private static HumanId? ResolveOtherPerson(HumanId self, HumanId a, HumanId b)
+            => self == a ? b : self == b ? a : b;
+
+        private static PersonBeliefEvidence? CreateFirstImpressionBeliefEvidence(FirstImpressionFormed impression)
+            => impression.Like >= 70
+                ? new PersonBeliefEvidence(impression.B, PersonBeliefKind.Warm, 0.18, "first-impression-positive")
+                : impression.Like < 45
+                    ? new PersonBeliefEvidence(impression.B, PersonBeliefKind.Critical, 0.12, "first-impression-negative")
+                    : null;
+
+        private static PersonBeliefEvidence? CreateInteractionBeliefEvidence(HumanId self, InteractionOutcome outcome)
+        {
+            if (outcome.From == self)
+            {
+                return outcome.Accepted
+                    ? new PersonBeliefEvidence(
+                        outcome.To,
+                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Validation or SpeechAct.Meta ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
+                        outcome.Act is SpeechAct.Invite ? 0.24 : 0.18,
+                        $"interaction-accepted:{outcome.Act}")
+                    : new PersonBeliefEvidence(
+                        outcome.To,
+                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Validation ? PersonBeliefKind.Critical : PersonBeliefKind.Rejecting,
+                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Invite ? 0.24 : 0.18,
+                        $"interaction-rejected:{outcome.Act}");
+            }
+
+            if (outcome.To == self && outcome.Accepted)
+            {
+                return new PersonBeliefEvidence(
+                    outcome.From,
+                    outcome.Act is SpeechAct.Validation or SpeechAct.SelfDisclosure ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
+                    0.16,
+                    $"interaction-received:{outcome.Act}");
+            }
+
+            return null;
+        }
+
+        private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string source)
+        {
+            var other = ResolveOtherPerson(self, a, b) ?? b;
+            return positive
+                ? new PersonBeliefEvidence(other, source.Contains("help", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Reliable : PersonBeliefKind.Warm, 0.14, $"micro-positive:{source}")
+                : new PersonBeliefEvidence(other, source.Contains("ignore", StringComparison.OrdinalIgnoreCase) || source.Contains("cold", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Rejecting : PersonBeliefKind.Critical, 0.16, $"micro-negative:{source}");
+        }
+
+        private static PersonBeliefEvidence CreateRepairBeliefEvidence(HumanId self, RepairAttempt attempt)
+        {
+            var other = ResolveOtherPerson(self, attempt.A, attempt.B) ?? attempt.B;
+            return attempt.Accepted
+                ? new PersonBeliefEvidence(other, PersonBeliefKind.Reliable, 0.20, "repair-accepted")
+                : new PersonBeliefEvidence(other, PersonBeliefKind.Rejecting, 0.18, "repair-rejected");
+        }
+
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
             switch (@event)
@@ -263,7 +319,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             salience,
                             emotion,
-                            Strength: Config.BaseEncoding + 0.2),
+                            Strength: Config.BaseEncoding + 0.2,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, io.From, io.To),
+                            BeliefEvidence: CreateInteractionBeliefEvidence(ctx.Id, io)),
                             ctx, outbox);
                         break;
                     }
@@ -283,7 +341,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.85,   // první dojem je velmi salinetní — evolučně důležitý
                             emotion,
-                            Strength: Config.BaseEncoding + 0.3),
+                            Strength: Config.BaseEncoding + 0.3,
+                            OtherPerson: fi.B,
+                            BeliefEvidence: CreateFirstImpressionBeliefEvidence(fi)),
                             ctx, outbox);
                         break;
                     }
@@ -300,7 +360,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.6,
                             EmotionalTag.Positive,
-                            Strength: Config.BaseEncoding),
+                            Strength: Config.BaseEncoding,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, mp.A, mp.B),
+                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mp.A, mp.B, positive: true, mp.What)),
                             ctx, outbox);
                         break;
                     }
@@ -318,7 +380,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.65,
                             EmotionalTag.Negative,
-                            Strength: Config.BaseEncoding + 0.1),
+                            Strength: Config.BaseEncoding + 0.1,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, mn.A, mn.B),
+                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mn.A, mn.B, positive: false, mn.What)),
                             ctx, outbox);
                         break;
                     }
@@ -336,7 +400,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.8,   // smíření/odmítnutí smíru je výrazná událost
                             emotion,
-                            Strength: Config.BaseEncoding + 0.2),
+                            Strength: Config.BaseEncoding + 0.2,
+                            OtherPerson: ResolveOtherPerson(ctx.Id, ra.A, ra.B),
+                            BeliefEvidence: CreateRepairBeliefEvidence(ctx.Id, ra)),
                             ctx, outbox);
                         break;
                     }

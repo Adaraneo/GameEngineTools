@@ -4,6 +4,7 @@
 namespace GameEngineTools.Characters.Engines.Memory
 {
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.World.Utils.Time;
 
     public sealed record MemoryConfig(
@@ -24,7 +25,8 @@ namespace GameEngineTools.Characters.Engines.Memory
 
     public sealed record EpisodicMemory(
         Guid Id, WDateTime When, string What, double Salience, EmotionalTag Emotion, double Strength,
-        string? PerceivedWhat = null, double RecallConfidence = 1.0, double Distortion = 0.0);
+        string? PerceivedWhat = null, double RecallConfidence = 1.0, double Distortion = 0.0,
+        HumanId? OtherPerson = null, PersonBeliefEvidence? BeliefEvidence = null);
 
     public sealed record SemanticFact(string Key, string Value, double Confidence);
 
@@ -39,7 +41,15 @@ namespace GameEngineTools.Characters.Engines.Memory
     }
 
     // Události
-    public sealed record MemoryEncoded(WDateTime OccurredAt, HumanId Human, Guid EpisodeId, double Strength, string? What = null) : IDomainEvent;
+    public sealed record MemoryEncoded(
+        WDateTime OccurredAt,
+        HumanId Human,
+        Guid EpisodeId,
+        double Strength,
+        string? What = null,
+        string? PerceivedWhat = null,
+        HumanId? OtherPerson = null,
+        PersonBeliefEvidence? BeliefEvidence = null) : IDomainEvent;
     public sealed record MemoryRecalled(WDateTime OccurredAt, HumanId Human, Guid EpisodeId) : IDomainEvent;
     public sealed record MemoryConsolidated(WDateTime OccurredAt, HumanId Human, int Count) : IDomainEvent;
 }
