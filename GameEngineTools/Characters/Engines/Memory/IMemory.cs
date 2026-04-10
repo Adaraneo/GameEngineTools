@@ -12,9 +12,10 @@ namespace GameEngineTools.Characters.Engines.Memory
         double ForgettingRate = 0.06,
         double PruneThreshold = 0.01,
         double ReinforcementBoost = 0.15,
-        double EmotionDecayMod = 0.5)
+        double EmotionDecayMod = 0.5,
+        double StressDistortionWeight = 0.35)
     {
-        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5) { }
+        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35) { }
     }
 
     public sealed record MemoryIndex(
@@ -22,7 +23,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         IReadOnlyDictionary<string, SemanticFact> Semantics);
 
     public sealed record EpisodicMemory(
-        Guid Id, WDateTime When, string What, double Salience, EmotionalTag Emotion, double Strength);
+        Guid Id, WDateTime When, string What, double Salience, EmotionalTag Emotion, double Strength,
+        string? PerceivedWhat = null, double RecallConfidence = 1.0, double Distortion = 0.0);
 
     public sealed record SemanticFact(string Key, string Value, double Confidence);
 

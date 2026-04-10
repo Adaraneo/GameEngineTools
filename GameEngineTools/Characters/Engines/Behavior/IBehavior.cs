@@ -69,12 +69,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// <summary>
     /// Emitted when the engine proposes a winning action for the current tick.
     /// </summary>
-    public sealed record ActionProposed(WDateTime OccurredAt, HumanId Human, string ActionName, double Utility) : IDomainEvent;
+    public sealed record ActionProposed(WDateTime OccurredAt, HumanId Human, string ActionName, double Utility, string? IntendedActionName = null, string? ConflictReason = null) : IDomainEvent;
 
     /// <summary>
     /// Emitted when the orchestrator commits an action to the behavior state.
     /// </summary>
-    public sealed record ActionCommitted(WDateTime OccurredAt, HumanId Human, string ActionName, WTimeSpan Duration) : IDomainEvent;
+    public sealed record ActionCommitted(WDateTime OccurredAt, HumanId Human, string ActionName, WTimeSpan Duration, string? IntendedActionName = null, string? ConflictReason = null) : IDomainEvent;
 
     #endregion
 }

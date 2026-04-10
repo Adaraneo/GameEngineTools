@@ -38,6 +38,7 @@ namespace GameEngineTools.Characters.Core
         Identity Identity { get; }
         SexBiology Biology { get; }   // Female/Male/Intersex etc.
         Personality Personality { get; } // Trait modul (nemění se rychle)
+        PsychologicalProfile PsychologyProfile { get; }
         PhysicalAppearance PhysicalAppearance { get; }
 
         AttractionProfile AttractionProfile { get; }
@@ -91,6 +92,7 @@ namespace GameEngineTools.Characters.Core
         Identity Identity { get; }
         SexBiology Biology { get; }
         Personality Personality { get; }
+        PsychologicalProfile PsychologyProfile { get; }
 
         EnginesSnapshot Snapshot { get; }
 

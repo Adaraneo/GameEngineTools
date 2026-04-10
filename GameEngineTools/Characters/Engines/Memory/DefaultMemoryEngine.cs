@@ -101,7 +101,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                     {
                         Strength = Math.Min(1.0, existing.Strength + Config.ReinforcementBoost),
                         // Aktualizuj timestamp — "naposledy se to stalo teď"
-                        When = episode.When
+                        When = episode.When,
+                        Distortion = Math.Max(existing.Distortion, episode.Distortion),
+                        RecallConfidence = Math.Min(existing.RecallConfidence, episode.RecallConfidence),
+                        PerceivedWhat = episode.PerceivedWhat ?? existing.PerceivedWhat
                     };
 
                     episodes[existingIndex] = reinforced;
@@ -119,16 +122,23 @@ namespace GameEngineTools.Characters.Engines.Memory
                 }
 
                 // --- NOVÁ EPIZODA ---
-                episodes.Add(episode);
+                var encoded = episode with
+                {
+                    PerceivedWhat = episode.PerceivedWhat ?? BuildPerceivedWhat(episode, ctx),
+                    Distortion = Math.Max(0.0, episode.Distortion + ComputeDistortion(ctx, episode)),
+                    RecallConfidence = Math.Clamp(episode.RecallConfidence - ComputeDistortion(ctx, episode) * 0.5, 0.2, 1.0)
+                };
+
+                episodes.Add(encoded);
                 State = new MemoryIndex(episodes, State.Semantics);
 
                 _log.MemoryEncoded(
                     ctx.Id.Value.ToString(),
-                    episode.What,
-                    episode.Salience,
-                    episode.Emotion.ToString());
+                    encoded.What,
+                    encoded.Salience,
+                    encoded.Emotion.ToString());
 
-                outbox.Add(new MemoryEncoded(episode.When, ctx.Id, episode.Id, episode.Strength, episode.What));
+                outbox.Add(new MemoryEncoded(encoded.When, ctx.Id, encoded.Id, encoded.Strength, encoded.What));
             }
         }
 
@@ -139,7 +149,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <param name="predicate">Filtrační podmínka.</param>
         /// <returns>Filtrovaný seznam epizod (read-only snapshot).</returns>
         public IReadOnlyList<EpisodicMemory> Recall(Func<EpisodicMemory, bool> predicate)
-            => State.Episodes.Where(predicate).ToList();
+            => State.Episodes.Where(predicate).Select(Reconstruct).ToList();
 
         #endregion Veřejné API
 
@@ -172,6 +182,51 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </list>
         /// </para>
         /// </remarks>
+        private EpisodicMemory Reconstruct(EpisodicMemory episode)
+        {
+            if (episode.Distortion <= 0.01)
+            {
+                return episode with { PerceivedWhat = episode.PerceivedWhat ?? episode.What };
+            }
+
+            return episode with
+            {
+                PerceivedWhat = episode.PerceivedWhat ?? episode.What,
+                RecallConfidence = Math.Clamp(episode.RecallConfidence - episode.Distortion * 0.15, 0.1, 1.0)
+            };
+        }
+
+        private double ComputeDistortion(IHumanContext ctx, EpisodicMemory episode)
+        {
+            var stress = ctx.Snapshot.Psychology.Stress / 100.0;
+            var emotionalWeight = episode.Emotion switch
+            {
+                EmotionalTag.Negative => 1.0,
+                EmotionalTag.Mixed => 0.8,
+                EmotionalTag.Positive => 0.35,
+                _ => 0.2
+            };
+
+            return Math.Clamp(stress * emotionalWeight * Config.StressDistortionWeight, 0.0, 0.8);
+        }
+
+        private string BuildPerceivedWhat(EpisodicMemory episode, IHumanContext ctx)
+        {
+            var distortion = ComputeDistortion(ctx, episode);
+            if (distortion < 0.1)
+            {
+                return episode.What;
+            }
+
+            return episode.Emotion switch
+            {
+                EmotionalTag.Negative => $"PerceivedThreat:{episode.What}",
+                EmotionalTag.Mixed => $"PerceivedSlight:{episode.What}",
+                EmotionalTag.Positive when ctx.Snapshot.Psychology.Valence > 0.3 => $"PerceivedWarmth:{episode.What}",
+                _ => episode.What
+            };
+        }
+
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
             switch (@event)

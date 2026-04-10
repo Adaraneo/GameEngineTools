@@ -46,6 +46,9 @@ namespace GameEngineTools.Characters.Core
         public Personality Personality { get; }
 
         /// <inheritdoc/>
+        public PsychologicalProfile PsychologyProfile { get; }
+
+        /// <inheritdoc/>
         public PhysicalAppearance PhysicalAppearance { get; }
 
         /// <inheritdoc/>
@@ -159,6 +162,7 @@ namespace GameEngineTools.Characters.Core
             Identity          = identity;
             Biology           = biology;
             Personality       = personality;
+            PsychologyProfile = PsychologicalProfile.FromPersonality(personality);
             PhysicalAppearance = appearance;
             AttractionProfile  = attractionProfile;
 
@@ -182,6 +186,7 @@ namespace GameEngineTools.Characters.Core
                 Identity    = Identity,
                 Biology     = Biology,
                 Personality = Personality,
+                PsychologyProfile = PsychologyProfile,
                 EventBus    = _bus,
                 Scheduler   = _scheduler,
                 Random      = _random,

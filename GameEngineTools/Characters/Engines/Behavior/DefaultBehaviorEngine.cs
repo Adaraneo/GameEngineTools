@@ -104,8 +104,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 };
             }
 
-            outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility));
-            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration));
+            outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.IntendedCandidate?.Name, result.ConflictReason));
+            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration, result.IntendedCandidate?.Name, result.ConflictReason));
             SetCooldownsForCommittedAction(ctx.Id, result.SelectedCandidate.Name);
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine)))) _log.BehaviorActionChosen(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.Duration.ToString());
         }
