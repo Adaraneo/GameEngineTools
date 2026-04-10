@@ -28,8 +28,6 @@ namespace GameEngineTools.Extensions
             }
         }
 
-        #region ByClaude
-
         public static string PrintInfo(this CharacterBase nppc, bool basicInfo = true, bool withDNA = false)
         {
             var person = nppc.Person;
@@ -178,7 +176,5 @@ namespace GameEngineTools.Extensions
                 }
             }
         }
-
-        #endregion ByClaude
     }
 }

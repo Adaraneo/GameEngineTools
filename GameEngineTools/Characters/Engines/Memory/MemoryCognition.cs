@@ -236,6 +236,32 @@ namespace GameEngineTools.Characters.Engines.Memory
                     }
                 }
 
+                #region edit
+
+                var strongRecentRejection = targetEpisodes
+                    .Where(e =>
+                        IsRejectedIntimacyEpisode(e) &&
+                        now - e.When <= WTimeSpan.FromDays(2) &&
+                        e.Strength >= 0.90 &&
+                        e.Salience >= 0.85)
+                    .ToList();
+
+                if (strongRecentRejection.Count >= 1 &&
+                    !reflections.Any(r => r.Kind == ReflectionSummaryKind.RejectsIntimacy))
+                {
+                    var episode = strongRecentRejection[0];
+                    var strength = Math.Clamp(0.18 + (episode.Strength * 0.18), 0.18, 0.38);
+
+                    reflections.Add(new ReflectionSummary(
+                        ReflectionSummaryKind.RejectsIntimacy,
+                        query.TargetHuman,
+                        strength,
+                        1,
+                        "A recent intense rejection still weighs on vulnerable contact."));
+                }
+
+                #endregion
+
                 if (intimacyRejections >= 2)
                 {
                     var strength = Math.Clamp(0.14 + (intimacyRejections * 0.18) - (positiveVulnerability * 0.10), 0.0, 0.78);
