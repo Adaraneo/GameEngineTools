@@ -240,12 +240,11 @@ var mainTrioSceneOpts = new SimulationSceneOptions
 var mainTrioScene = new SimulationScene(clock, mainTrioSceneOpts);
 await mainTrioScene.RunAsync();
 
-clock.SetNow(clock.Now.AddYears(-mainTrioSceneOpts.SimulationYears));
-
 var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
 
 if (characters.Count > 0)
 {
+    clock.SetNow(clock.Now.AddYears(-mainTrioSceneOpts.SimulationYears));
     var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
         Characters = characters,
