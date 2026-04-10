@@ -295,12 +295,59 @@ namespace GameEngineTools.Characters.Engines.Memory
             return null;
         }
 
-        private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string source)
+        //private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string source)
+        //{
+        //    var other = ResolveOtherPerson(self, a, b) ?? b;
+        //    return positive
+        //        ? new PersonBeliefEvidence(other, source.Contains("help", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Reliable : PersonBeliefKind.Warm, 0.14, $"micro-positive:{source}")
+        //        : new PersonBeliefEvidence(other, source.Contains("ignore", StringComparison.OrdinalIgnoreCase) || source.Contains("cold", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Rejecting : PersonBeliefKind.Critical, 0.16, $"micro-negative:{source}");
+        //}
+
+        private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string kind)
         {
             var other = ResolveOtherPerson(self, a, b) ?? b;
-            return positive
-                ? new PersonBeliefEvidence(other, source.Contains("help", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Reliable : PersonBeliefKind.Warm, 0.14, $"micro-positive:{source}")
-                : new PersonBeliefEvidence(other, source.Contains("ignore", StringComparison.OrdinalIgnoreCase) || source.Contains("cold", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Rejecting : PersonBeliefKind.Critical, 0.16, $"micro-negative:{source}");
+            var normalized = kind.Trim().ToLowerInvariant();
+
+            PersonBeliefKind beliefKind;
+
+            if (positive)
+            {
+                beliefKind = normalized switch
+                {
+                    MemoryMicroEventKinds.Help => PersonBeliefKind.Reliable,
+                    MemoryMicroEventKinds.Support => PersonBeliefKind.Reliable,
+                    MemoryMicroEventKinds.Repair => PersonBeliefKind.Reliable,
+
+                    MemoryMicroEventKinds.Warmth => PersonBeliefKind.EmotionallySafe,
+                    MemoryMicroEventKinds.Validation => PersonBeliefKind.EmotionallySafe,
+
+                    _ => PersonBeliefKind.Warm
+                };
+
+                return new PersonBeliefEvidence(
+                    other,
+                    beliefKind,
+                    0.14,
+                    $"micro-positive:{normalized}");
+            }
+
+            beliefKind = normalized switch
+            {
+                MemoryMicroEventKinds.Ignore => PersonBeliefKind.Rejecting,
+                MemoryMicroEventKinds.Cold => PersonBeliefKind.Rejecting,
+                MemoryMicroEventKinds.Dismissal => PersonBeliefKind.Rejecting,
+
+                MemoryMicroEventKinds.Criticism => PersonBeliefKind.Critical,
+                MemoryMicroEventKinds.Slight => PersonBeliefKind.Critical,
+
+                _ => PersonBeliefKind.Critical
+            };
+
+            return new PersonBeliefEvidence(
+                other,
+                beliefKind,
+                0.16,
+                $"micro-negative:{normalized}");
         }
 
         private static PersonBeliefEvidence CreateRepairBeliefEvidence(HumanId self, RepairAttempt attempt)

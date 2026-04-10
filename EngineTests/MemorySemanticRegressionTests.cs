@@ -56,7 +56,7 @@ namespace EngineTests
             var help = new EpisodicMemory(
                 Guid.NewGuid(),
                 new WDateTime(1),
-                "Relation:MicroPositive|what=help-with-task|from=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "Relation:MicroPositive|what=help|from=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
                 0.60,
                 EmotionalTag.Positive,
                 0.50,
@@ -65,7 +65,7 @@ namespace EngineTests
             var support = new EpisodicMemory(
                 Guid.NewGuid(),
                 new WDateTime(2),
-                "Relation:MicroPositive|what=support-after-stress|from=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "Relation:MicroPositive|what=support|from=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
                 0.60,
                 EmotionalTag.Positive,
                 0.50,
@@ -139,7 +139,7 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void GetMicroEventKind_HelpWithTask_IsNotCanonicalHelpToken()
+        public void GetMicroEventKind_HelpWithTask_IsCanonicalHelpToken()
         {
             // Arrange
             const string what = "Relation:MicroPositive|what=help|from=11111111-1111-1111-1111-111111111111";
