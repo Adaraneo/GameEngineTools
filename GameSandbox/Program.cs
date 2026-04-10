@@ -237,31 +237,34 @@ var mainTrioSceneOpts = new SimulationSceneOptions
 };
 
 var mainTrioScene = new SimulationScene(clock, mainTrioSceneOpts);
+await mainTrioScene.RunAsync();
 
 clock.SetNow(clock.Now.AddYears(-mainTrioSceneOpts.SimulationYears));
 
 var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
 
-var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
+if (characters.Count > 0)
 {
-    Characters = characters,
-    LocationService = locationService,
-    TickStep = WTimeSpan.FromHours(5),
-    SimulationYears = 2,
-    OnTick = (now, chars) =>
+    var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
-        FireFirstImpressions(now, chars, attractionCalculator, locationService);
+        Characters = characters,
+        LocationService = locationService,
+        TickStep = WTimeSpan.FromHours(5),
+        SimulationYears = 2,
+        OnTick = (now, chars) =>
+        {
+            FireFirstImpressions(now, chars, attractionCalculator, locationService);
 
-        RouteMoveTo(now, chars, locationService, rng);
+            RouteMoveTo(now, chars, locationService, rng);
 
-        DynamicReachOutRouting(now, chars, locationService, rng);
+            DynamicReachOutRouting(now, chars, locationService, rng);
 
-        OrganicMicroPositives(now, chars, locationService, rng);
-    }
-});
+            OrganicMicroPositives(now, chars, locationService, rng);
+        }
+    });
 
-await mainTrioScene.RunAsync();
-await otherCharactersScene.RunAsync();
+    await otherCharactersScene.RunAsync();
+}
 
 // ── Diary export ──────────────────────────────────────────────────────────────
 var sbDiary = new StringBuilder();

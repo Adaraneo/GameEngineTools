@@ -10,14 +10,25 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
     internal sealed class DefaultSemanticMemoryEngine : ISemanticMemoryEngine
     {
+        #region State and configuration
+
         public SemanticMemoryState State { get; private set; }
+
         public SemanticMemoryConfig Config { get; }
+
+        #endregion
+
+        #region Construction
 
         public DefaultSemanticMemoryEngine(IOptions<SemanticMemoryConfig> cfg)
         {
             Config = cfg.Value;
             State = SemanticMemoryState.Empty;
         }
+
+        #endregion
+
+        #region IEngine
 
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
@@ -87,6 +98,10 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         public void RestoreState(SemanticMemoryState state) => State = state;
 
+        #endregion
+
+        #region Private helpers
+
         private void ApplyContradiction(
             WDateTime now,
             IDictionary<PersonBeliefKind, PersonBelief> beliefs,
@@ -120,5 +135,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 PersonBeliefKind.Critical => new[] { PersonBeliefKind.Warm, PersonBeliefKind.EmotionallySafe },
                 _ => Array.Empty<PersonBeliefKind>()
             };
+
+        #endregion
     }
 }
