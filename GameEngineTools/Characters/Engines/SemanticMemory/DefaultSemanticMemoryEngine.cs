@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Options;
+    using static GameEngineTools.Characters.Engines.Memory.MemoryWhatParser;
 
     internal sealed class DefaultSemanticMemoryEngine : ISemanticMemoryEngine
     {
@@ -178,50 +179,79 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         private static IEnumerable<InterpretedBeliefSignal> InterpretEpisode(SemanticEpisodeSample episode)
         {
-            var perceived = episode.PerceivedWhat ?? episode.What ?? string.Empty;
-            var text = $"{episode.What}|{perceived}";
+            var descriptor = MemoryWhatParser.ParseDescriptor(episode.What, episode.PerceivedWhat);
 
             if (episode.DirectEvidence is { } direct)
             {
-                yield return new InterpretedBeliefSignal(direct.Kind, Math.Clamp(direct.Weight, 0.0, 1.0), direct.Source);
+                yield return new InterpretedBeliefSignal(
+                    direct.Kind,
+                    Math.Clamp(direct.Weight, 0.0, 1.0),
+                    direct.Source);
             }
 
-            if (text.Contains("accepted", StringComparison.OrdinalIgnoreCase))
+            if (descriptor.Category == "Interaction")
             {
-                yield return new InterpretedBeliefSignal(PersonBeliefKind.Warm, 0.20, "pattern-accepted");
-                if (text.Contains("Validation", StringComparison.OrdinalIgnoreCase)
-                    || text.Contains("SelfDisclosure", StringComparison.OrdinalIgnoreCase)
-                    || perceived.Contains("PerceivedWarmth:", StringComparison.Ordinal))
+                var accepted = string.Equals(descriptor.Outcome, "Accepted", StringComparison.OrdinalIgnoreCase);
+                var rejected = string.Equals(descriptor.Outcome, "Rejected", StringComparison.OrdinalIgnoreCase);
+
+                if (accepted)
                 {
-                    yield return new InterpretedBeliefSignal(PersonBeliefKind.EmotionallySafe, 0.24, "pattern-safe");
+                    yield return new InterpretedBeliefSignal(PersonBeliefKind.Warm, 0.20, "pattern-accepted");
+
+                    if (descriptor.Type is "Validation" or "SelfDisclosure" or "Meta"
+                        || descriptor.PerceivedTone == PerceivedMemoryTone.Warm)
+                    {
+                        yield return new InterpretedBeliefSignal(PersonBeliefKind.EmotionallySafe, 0.24, "pattern-safe");
+                    }
+
+                    if (descriptor.Type is "Invite"
+                        || descriptor.Parameters.ContainsKey("repair"))
+                    {
+                        yield return new InterpretedBeliefSignal(PersonBeliefKind.Reliable, 0.22, "pattern-follow-through");
+                    }
                 }
 
-                if (text.Contains("Invite", StringComparison.OrdinalIgnoreCase)
-                    || text.Contains("repair", StringComparison.OrdinalIgnoreCase)
-                    || text.Contains("help", StringComparison.OrdinalIgnoreCase))
+                if (rejected || descriptor.PerceivedTone == PerceivedMemoryTone.Threat)
                 {
-                    yield return new InterpretedBeliefSignal(PersonBeliefKind.Reliable, 0.22, "pattern-follow-through");
+                    yield return new InterpretedBeliefSignal(PersonBeliefKind.Rejecting, 0.24, "pattern-rejection");
                 }
             }
 
-            if (text.Contains("declined", StringComparison.OrdinalIgnoreCase) || perceived.Contains("PerceivedThreat:", StringComparison.Ordinal))
+            if (descriptor.Category == "Relation" && descriptor.Type == "MicroNegative")
             {
-                yield return new InterpretedBeliefSignal(PersonBeliefKind.Rejecting, 0.24, "pattern-rejection");
+                if (descriptor.PerceivedTone == PerceivedMemoryTone.Slight)
+                {
+                    yield return new InterpretedBeliefSignal(PersonBeliefKind.Critical, 0.18, "pattern-critical");
+                }
+
+                if (descriptor.Parameters.TryGetValue("what", out var microWhat))
+                {
+                    if (microWhat.Contains("ignore", StringComparison.OrdinalIgnoreCase)
+                        || microWhat.Contains("cold", StringComparison.OrdinalIgnoreCase)
+                        || microWhat.Contains("critical", StringComparison.OrdinalIgnoreCase))
+                    {
+                        yield return new InterpretedBeliefSignal(PersonBeliefKind.Critical, 0.18, "pattern-critical");
+                    }
+                }
             }
 
-            if (text.Contains("cold", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("ignore", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("Critical", StringComparison.OrdinalIgnoreCase)
-                || perceived.Contains("PerceivedSlight:", StringComparison.Ordinal))
+            if (descriptor.Category == "Relation"
+                && descriptor.Type == "Repair"
+                && string.Equals(descriptor.Outcome, "Accepted", StringComparison.OrdinalIgnoreCase))
             {
-                yield return new InterpretedBeliefSignal(PersonBeliefKind.Critical, 0.18, "pattern-critical");
+                yield return new InterpretedBeliefSignal(PersonBeliefKind.Reliable, 0.20, "repair-accepted");
             }
 
-            if (text.Contains("help", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("repair-accepted", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("interaction-received", StringComparison.OrdinalIgnoreCase))
+            if (descriptor.Category == "Relation"
+                && descriptor.Type == "MicroPositive"
+                && descriptor.Parameters.TryGetValue("what", out var positiveWhat))
             {
-                yield return new InterpretedBeliefSignal(PersonBeliefKind.Reliable, 0.18, "pattern-reliable");
+                if (positiveWhat.Contains("help", StringComparison.OrdinalIgnoreCase)
+                    || positiveWhat.Contains("support", StringComparison.OrdinalIgnoreCase)
+                    || positiveWhat.Contains("repair", StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return new InterpretedBeliefSignal(PersonBeliefKind.Reliable, 0.18, "pattern-reliable");
+                }
             }
         }
 

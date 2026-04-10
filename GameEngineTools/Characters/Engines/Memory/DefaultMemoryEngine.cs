@@ -85,6 +85,11 @@ namespace GameEngineTools.Characters.Engines.Memory
         {
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
             {
+                if (episode.OtherPerson == ctx.Id)
+                {
+                    episode = episode with { OtherPerson = null };
+                }
+
                 var episodes = State.Episodes.ToList();
 
                 // --- REINFORCEMENT (spacing effect) ---
@@ -236,12 +241,20 @@ namespace GameEngineTools.Characters.Engines.Memory
         private static HumanId? ResolveOtherPerson(HumanId self, HumanId a, HumanId b)
             => self == a ? b : self == b ? a : b;
 
-        private static PersonBeliefEvidence? CreateFirstImpressionBeliefEvidence(FirstImpressionFormed impression)
-            => impression.Like >= 70
-                ? new PersonBeliefEvidence(impression.B, PersonBeliefKind.Warm, 0.18, "first-impression-positive")
+        private static PersonBeliefEvidence? CreateFirstImpressionBeliefEvidence(HumanId self, FirstImpressionFormed impression)
+        {
+            var other = ResolveOtherPerson(self, impression.A, impression.B);
+            if (other is null)
+            {
+                return null;
+            }
+
+            return impression.Like >= 70
+                ? new PersonBeliefEvidence(other.Value, PersonBeliefKind.Warm, 0.18, "first-impression-positive")
                 : impression.Like < 45
-                    ? new PersonBeliefEvidence(impression.B, PersonBeliefKind.Critical, 0.12, "first-impression-negative")
+                    ? new PersonBeliefEvidence(other.Value, PersonBeliefKind.Critical, 0.12, "first-impression-negative")
                     : null;
+        }
 
         private static PersonBeliefEvidence? CreateInteractionBeliefEvidence(HumanId self, InteractionOutcome outcome)
         {
@@ -297,6 +310,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     {
                         // Vlastní akce — nejjednodušší schema, žádní aktéři
                         var what = MemoryWhatParser.Action(ac.ActionName);
+                        var other = ac.TargetHuman == ctx.Id ? null : ac.TargetHuman;
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -305,7 +319,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             SalienceForAction(ac.ActionName, ctx),
                             EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence),
                             Strength: Config.BaseEncoding,
-                            OtherPerson: ac.TargetHuman),
+                            OtherPerson: other),
                             ctx, outbox);
                         break;
                     }
@@ -341,6 +355,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                                     : fi.Like >= 45 ? EmotionalTag.Neutral
                                     : EmotionalTag.Negative;
 
+                        var other = ResolveOtherPerson(ctx.Id, fi.A, fi.B);
+
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
                             fi.OccurredAt,
@@ -348,8 +364,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                             Salience: 0.85,   // první dojem je velmi salinetní — evolučně důležitý
                             emotion,
                             Strength: Config.BaseEncoding + 0.3,
-                            OtherPerson: fi.B,
-                            BeliefEvidence: CreateFirstImpressionBeliefEvidence(fi)),
+                            OtherPerson: other,
+                            BeliefEvidence: CreateFirstImpressionBeliefEvidence(ctx.Id, fi)),
                             ctx, outbox);
                         break;
                     }

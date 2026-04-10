@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -20,7 +17,11 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
+    using static GameEngineTools.Characters.Engines.Memory.MemoryWhatParser;
 
     [TestClass]
     public class SemanticMemoryEngineTests : TestBase
@@ -276,6 +277,215 @@ namespace EngineTests
             Assert.IsNotNull(selected1);
             Assert.IsNotNull(selected2);
             Assert.AreEqual(selected1.Id, selected2.Id);
+        }
+
+        [TestMethod]
+        public void ParseDescriptor_InteractionWithParameters_ParsesStructuredParts()
+        {
+            // Arrange
+            const string what = "Interaction:Invite:Accepted|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222|repair=true";
+            const string perceivedWhat = "PerceivedWarmth:Interaction:Invite:Accepted";
+
+            // Act
+            var descriptor = MemoryWhatParser.ParseDescriptor(what, perceivedWhat);
+
+            // Assert
+            Assert.AreEqual("Interaction", descriptor.Category);
+            Assert.AreEqual("Invite", descriptor.Type);
+            Assert.AreEqual("Accepted", descriptor.Outcome);
+            Assert.AreEqual(PerceivedMemoryTone.Warm, descriptor.PerceivedTone);
+
+            Assert.IsTrue(descriptor.Parameters.ContainsKey("from"));
+            Assert.IsTrue(descriptor.Parameters.ContainsKey("to"));
+            Assert.IsTrue(descriptor.Parameters.ContainsKey("repair"));
+            Assert.AreEqual("true", descriptor.Parameters["repair"]);
+        }
+
+        [TestMethod]
+        public void ParseDescriptor_PerceivedThreat_MapsThreatTone()
+        {
+            // Arrange
+            const string what = "Interaction:Question:Rejected|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222";
+            const string perceivedWhat = "PerceivedThreat:Interaction:Question:Rejected";
+
+            // Act
+            var descriptor = MemoryWhatParser.ParseDescriptor(what, perceivedWhat);
+
+            // Assert
+            Assert.AreEqual("Interaction", descriptor.Category);
+            Assert.AreEqual("Question", descriptor.Type);
+            Assert.AreEqual("Rejected", descriptor.Outcome);
+            Assert.AreEqual(PerceivedMemoryTone.Threat, descriptor.PerceivedTone);
+        }
+
+        [TestMethod]
+        public void Handle_AcceptedValidationWithWarmth_BuildsWarmAndEmotionallySafeBeliefs()
+        {
+            // Arrange
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            var encoded = new MemoryEncoded(
+                new WDateTime(1),
+                self,
+                Guid.NewGuid(),
+                0.75,
+                "Interaction:Validation:Accepted|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "PerceivedWarmth:Interaction:Validation:Accepted",
+                other,
+                null);
+
+            // Act
+            engine.Handle(encoded, ctx, outbox);
+
+            // Assert
+            var beliefs = engine.State.GetBeliefs(other);
+            Assert.IsNotNull(beliefs);
+
+            Assert.IsTrue(
+                beliefs!.StrengthOf(PersonBeliefKind.Warm) > 0.0,
+                "Accepted Validation má budovat Warm belief.");
+
+            Assert.IsTrue(
+                beliefs.StrengthOf(PersonBeliefKind.EmotionallySafe) > 0.0,
+                "Accepted Validation s PerceivedWarmth má budovat EmotionallySafe belief.");
+        }
+
+        [TestMethod]
+        public void Handle_RejectedInteractionWithThreat_BuildsRejectingBelief()
+        {
+            // Arrange
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            var encoded = new MemoryEncoded(
+                new WDateTime(2),
+                self,
+                Guid.NewGuid(),
+                0.75,
+                "Interaction:Invite:Rejected|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "PerceivedThreat:Interaction:Invite:Rejected",
+                other,
+                null);
+
+            // Act
+            engine.Handle(encoded, ctx, outbox);
+
+            // Assert
+            var beliefs = engine.State.GetBeliefs(other);
+            Assert.IsNotNull(beliefs);
+
+            Assert.IsTrue(
+                beliefs!.StrengthOf(PersonBeliefKind.Rejecting) > 0.0,
+                "Rejected interaction nebo PerceivedThreat má budovat Rejecting belief.");
+        }
+
+        [TestMethod]
+        public void Handle_MicroNegativeIgnore_BuildsCriticalBelief()
+        {
+            // Arrange
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            var encoded = new MemoryEncoded(
+                new WDateTime(3),
+                self,
+                Guid.NewGuid(),
+                0.60,
+                "Relation:MicroNegative|what=ignore-after-reachout|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "PerceivedSlight:Relation:MicroNegative",
+                other,
+                null);
+
+            // Act
+            engine.Handle(encoded, ctx, outbox);
+
+            // Assert
+            var beliefs = engine.State.GetBeliefs(other);
+            Assert.IsNotNull(beliefs);
+
+            Assert.IsTrue(
+                beliefs!.StrengthOf(PersonBeliefKind.Critical) > 0.0,
+                "MicroNegative s parametrem what=ignore má budovat Critical belief.");
+        }
+
+        [TestMethod]
+        public void Handle_MicroPositiveHelp_BuildsReliableBelief()
+        {
+            // Arrange
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            var encoded = new MemoryEncoded(
+                new WDateTime(4),
+                self,
+                Guid.NewGuid(),
+                0.65,
+                "Relation:MicroPositive|what=help-with-task|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                null,
+                other,
+                null);
+
+            // Act
+            engine.Handle(encoded, ctx, outbox);
+
+            // Assert
+            var beliefs = engine.State.GetBeliefs(other);
+            Assert.IsNotNull(beliefs);
+
+            Assert.IsTrue(
+                beliefs!.StrengthOf(PersonBeliefKind.Reliable) > 0.0,
+                "MicroPositive s parametrem what=help má budovat Reliable belief.");
+        }
+
+        [TestMethod]
+        public void Handle_NonSemanticHelpSubstring_DoesNotCreateReliableBelief()
+        {
+            // Arrange
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            var encoded = new MemoryEncoded(
+                new WDateTime(5),
+                self,
+                Guid.NewGuid(),
+                0.55,
+                "Interaction:Question:Rejected|note=help-text-only|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "PerceivedThreat:Interaction:Question:Rejected",
+                other,
+                null);
+
+            // Act
+            engine.Handle(encoded, ctx, outbox);
+
+            // Assert
+            var beliefs = engine.State.GetBeliefs(other);
+            Assert.IsNotNull(beliefs);
+
+            Assert.IsTrue(
+                beliefs!.StrengthOf(PersonBeliefKind.Rejecting) > 0.0,
+                "Threat + Rejected interaction má stále budovat Rejecting belief.");
+
+            Assert.AreEqual(
+                0.0,
+                beliefs.StrengthOf(PersonBeliefKind.Reliable),
+                0.000001,
+                "Pouhá přítomnost substringu 'help' v nesémantickém parametru nesmí vytvořit Reliable belief.");
         }
 
         private static DefaultSemanticMemoryEngine BuildEngine()
