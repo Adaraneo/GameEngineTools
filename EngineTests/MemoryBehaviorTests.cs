@@ -365,10 +365,10 @@ namespace EngineTests
         }
 
         private static MemoryIndex EmptyMemory()
-            => new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>());
+            => new MemoryIndex(new List<EpisodicMemory>());
 
         private static MemoryIndex Memory(List<EpisodicMemory> episodes)
-            => new MemoryIndex(episodes, new Dictionary<string, SemanticFact>());
+            => new MemoryIndex(episodes);
 
         /// <summary>4 negativní interakce → penalty = min(0.40, 4×0.10) = 0.40 (cap)</summary>
         private static List<EpisodicMemory> NegativeInteractions(int count, double strength)

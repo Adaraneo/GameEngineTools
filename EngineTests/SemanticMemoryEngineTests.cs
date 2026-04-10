@@ -195,7 +195,7 @@ namespace EngineTests
                     new BehaviorState(10, 5, 5, 20, 50, 30, null),
                     new InteractionSurface("test", false, 0.2, 0.2, SurfaceKind.Social),
                     new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
-                    new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>()),
+                    new MemoryIndex(new List<EpisodicMemory>()),
                     semantic ?? SemanticMemoryState.Empty),
                 Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("SemanticTests"),

@@ -620,7 +620,7 @@ namespace EngineTests
             var relationships = new RelationshipState(
                 new Dictionary<HumanId, RelationshipEdge>());
 
-            var memory = new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>());
+            var memory = new MemoryIndex(new List<EpisodicMemory>());
 
             var snapshot = new EnginesSnapshot(
                 physio, psych, behavior,

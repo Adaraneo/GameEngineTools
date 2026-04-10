@@ -885,8 +885,7 @@ namespace EngineTests
                     Kind: surfaceKind),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(
-                    new List<EpisodicMemory>(),
-                    new Dictionary<string, SemanticFact>()));
+                    new List<EpisodicMemory>()));
 
             return new HumanContext
             {

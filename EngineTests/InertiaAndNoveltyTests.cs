@@ -334,7 +334,7 @@ namespace EngineTests
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
                 new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
-                new MemoryIndex(new List<EpisodicMemory>(), new Dictionary<string, SemanticFact>()));
+                new MemoryIndex(new List<EpisodicMemory>()));
 
             return new HumanContext
             {

@@ -20,15 +20,12 @@ namespace GameEngineTools.Characters.Engines.Memory
     }
 
     public sealed record MemoryIndex(
-        IReadOnlyList<EpisodicMemory> Episodes,
-        IReadOnlyDictionary<string, SemanticFact> Semantics);
+        IReadOnlyList<EpisodicMemory> Episodes);
 
     public sealed record EpisodicMemory(
         Guid Id, WDateTime When, string What, double Salience, EmotionalTag Emotion, double Strength,
         string? PerceivedWhat = null, double RecallConfidence = 1.0, double Distortion = 0.0,
         HumanId? OtherPerson = null, PersonBeliefEvidence? BeliefEvidence = null);
-
-    public sealed record SemanticFact(string Key, string Value, double Confidence);
 
     public enum EmotionalTag
     { Neutral, Positive, Negative, Mixed }

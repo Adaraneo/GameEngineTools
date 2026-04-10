@@ -63,8 +63,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             // Inicializuj prázdný stav — žádné vzpomínky, žádná sémantika
             State = new MemoryIndex(
-                new List<EpisodicMemory>(),
-                new Dictionary<string, SemanticFact>());
+                new List<EpisodicMemory>());
         }
 
         #endregion Konstruktor
@@ -109,7 +108,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     };
 
                     episodes[existingIndex] = reinforced;
-                    State = new MemoryIndex(episodes, State.Semantics);
+                    State = new MemoryIndex(episodes);
 
                     _log.MemoryEncoded(
                         ctx.Id.Value.ToString(),
@@ -131,7 +130,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 };
 
                 episodes.Add(encoded);
-                State = new MemoryIndex(episodes, State.Semantics);
+                State = new MemoryIndex(episodes);
 
                 _log.MemoryEncoded(
                     ctx.Id.Value.ToString(),
@@ -482,7 +481,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 .Where(e => e.Strength >= Config.PruneThreshold)
                 .ToList();
 
-            State = new MemoryIndex(episodes, State.Semantics);
+            State = new MemoryIndex(episodes);
         }
 
         #endregion Tick — zapomínání (Ebbinghausova křivka)
@@ -530,7 +529,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 lookup[boosted.Id] = boosted;
             }
 
-            State = new MemoryIndex(lookup.Values.ToList(), State.Semantics);
+            State = new MemoryIndex(lookup.Values.ToList());
 
             outbox.Add(new MemoryConsolidated(at, ctx.Id, toBoost.Count));
 
