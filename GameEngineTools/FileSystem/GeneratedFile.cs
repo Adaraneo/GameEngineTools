@@ -137,7 +137,7 @@ namespace GameEngineTools.FileSystem
         /// <returns>Rekonstruovaná NPC postava.</returns>
         public NPC ImportNPC(string filename)
         {
-            var data = ReadJson(Path.Combine(NPCDirectory, filename));
+            var data = ReadJson(ResolveFileUnderRoot(NPCDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance, data.AttractionProfile);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
@@ -159,7 +159,7 @@ namespace GameEngineTools.FileSystem
         /// <returns>Rekonstruovaná hráčská postava.</returns>
         public PC ImportPC(string filename)
         {
-            var data = ReadJson(Path.Combine(PlayerDirectory, filename));
+            var data = ReadJson(ResolveFileUnderRoot(PlayerDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance, data.AttractionProfile);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
@@ -209,6 +209,40 @@ namespace GameEngineTools.FileSystem
             Weapon = character.Weapon,
             Protection = character.Protection
         };
+
+        /// <summary>
+        /// Resolves a plain filename under the configured root directory and rejects path traversal.
+        /// </summary>
+        private static string ResolveFileUnderRoot(string root, string filename)
+        {
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                throw new InvalidOperationException("Configured root directory must not be empty.");
+            }
+
+            if (string.IsNullOrWhiteSpace(filename))
+            {
+                throw new ArgumentException("Filename must not be empty.", nameof(filename));
+            }
+
+            var safeName = Path.GetFileName(filename);
+            if (!string.Equals(filename, safeName, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("Only plain file names are allowed.", nameof(filename));
+            }
+
+            var fullRoot = Path.GetFullPath(root);
+            var fullPath = Path.GetFullPath(Path.Combine(fullRoot, safeName));
+            var normalizedRoot = fullRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+
+            if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Resolved path escaped the configured directory.");
+            }
+
+            return fullPath;
+        }
 
         /// <summary>Zapíše data jako JSON do souboru.</summary>
         private void WriteJson(string path, CharacterData data)
