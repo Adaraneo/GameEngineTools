@@ -280,6 +280,25 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
+        /// Vrátí canonical token mikro-události z parametru <c>what</c>.
+        /// Pokud parametr není přítomen nebo je prázdný, vrátí <see langword="null" />.
+        /// </summary>
+        public static string? GetMicroEventKind(MemoryEpisodeDescriptor descriptor)
+        {
+            if (!descriptor.Parameters.TryGetValue("what", out var value))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value.Trim().ToLowerInvariant();
+        }
+
+        /// <summary>
         /// Naparsuje část za hlavičkou na mapu parametrů <c>key=value</c>.
         /// </summary>
         private static IReadOnlyDictionary<string, string> ParseParams(string what)

@@ -93,9 +93,13 @@ namespace GameEngineTools.Characters.Engines.Memory
                 var episodes = State.Episodes.ToList();
 
                 // --- REINFORCEMENT (spacing effect) ---
-                // Hledáme existující epizodu se stejným What, která ještě "žije"
-                var existingIndex = episodes.FindIndex(
-                    e => e.What == episode.What && e.Strength >= Config.PruneThreshold);
+                // Nehledáme shodu podle syrového What stringu,
+                // ale podle explicitního reinforcement klíče.
+                var incomingKey = MemoryReinforcementKeyBuilder.From(episode);
+
+                var existingIndex = episodes.FindIndex(e =>
+                    e.Strength >= Config.PruneThreshold
+                    && MemoryReinforcementKeyBuilder.From(e) == incomingKey);
 
                 if (existingIndex >= 0)
                 {
@@ -105,11 +109,17 @@ namespace GameEngineTools.Characters.Engines.Memory
                     var reinforced = existing with
                     {
                         Strength = Math.Min(1.0, existing.Strength + Config.ReinforcementBoost),
-                        // Aktualizuj timestamp — "naposledy se to stalo teď"
+
+                        // Aktualizuj timestamp - "naposledy se to stalo teď"
                         When = episode.When,
+
+                        // Udržuj poslední reprezentaci raw What / PercievedWhat.
+                        // Díky explicitnímu reinforcement klíči už What nemusí být identita.
+                        What = episode.What,
+                        PerceivedWhat = episode.PerceivedWhat ?? existing.PerceivedWhat,
+
                         Distortion = Math.Max(existing.Distortion, episode.Distortion),
-                        RecallConfidence = Math.Min(existing.RecallConfidence, episode.RecallConfidence),
-                        PerceivedWhat = episode.PerceivedWhat ?? existing.PerceivedWhat
+                        RecallConfidence = Math.Min(existing.RecallConfidence, episode.RecallConfidence)
                     };
 
                     episodes[existingIndex] = reinforced;

@@ -219,19 +219,20 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
             if (descriptor.Category == "Relation" && descriptor.Type == "MicroNegative")
             {
+                var microKind = MemoryWhatParser.GetMicroEventKind(descriptor);
+
                 if (descriptor.PerceivedTone == PerceivedMemoryTone.Slight)
                 {
                     yield return new InterpretedBeliefSignal(PersonBeliefKind.Critical, 0.18, "pattern-critical");
                 }
 
-                if (descriptor.Parameters.TryGetValue("what", out var microWhat))
+                if (microKind is MemoryMicroEventKinds.Ignore
+                    or MemoryMicroEventKinds.Cold
+                    or MemoryMicroEventKinds.Criticism
+                    or MemoryMicroEventKinds.Dismissal
+                    or MemoryMicroEventKinds.Slight)
                 {
-                    if (microWhat.Contains("ignore", StringComparison.OrdinalIgnoreCase)
-                        || microWhat.Contains("cold", StringComparison.OrdinalIgnoreCase)
-                        || microWhat.Contains("critical", StringComparison.OrdinalIgnoreCase))
-                    {
-                        yield return new InterpretedBeliefSignal(PersonBeliefKind.Critical, 0.18, "pattern-critical");
-                    }
+                    yield return new InterpretedBeliefSignal(PersonBeliefKind.Critical, 0.18, "pattern-critical");
                 }
             }
 
@@ -243,14 +244,21 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             }
 
             if (descriptor.Category == "Relation"
-                && descriptor.Type == "MicroPositive"
-                && descriptor.Parameters.TryGetValue("what", out var positiveWhat))
+                && descriptor.Type == "MicroPositive")
             {
-                if (positiveWhat.Contains("help", StringComparison.OrdinalIgnoreCase)
-                    || positiveWhat.Contains("support", StringComparison.OrdinalIgnoreCase)
-                    || positiveWhat.Contains("repair", StringComparison.OrdinalIgnoreCase))
+                var microKind = MemoryWhatParser.GetMicroEventKind(descriptor);
+
+                if (microKind is MemoryMicroEventKinds.Help
+                    or MemoryMicroEventKinds.Support
+                    or MemoryMicroEventKinds.Repair)
                 {
                     yield return new InterpretedBeliefSignal(PersonBeliefKind.Reliable, 0.18, "pattern-reliable");
+                }
+
+                if (microKind is MemoryMicroEventKinds.Warmth
+                    or MemoryMicroEventKinds.Validation)
+                {
+                    yield return new InterpretedBeliefSignal(PersonBeliefKind.EmotionallySafe, 0.18, "pattern-safe");
                 }
             }
         }
