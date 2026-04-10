@@ -410,24 +410,11 @@ static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, IL
 static void TryTouch(WDateTime now, IHuman from, IHuman to, Random rng)
 {
     var edge = from.Snapshot.Relationships.Edges.GetValueOrDefault(to.Id);
-    if (edge is null)
-        return;
-
     var hasPrivacy = from.Snapshot.InteractionSurface.HasPrivacy;
-
-    // Light touch — shoulder, arm. Requires moderate closeness and comfort.
-    // 12% base chance keeps it rare enough to feel meaningful.
-    if (edge.Closeness > 50 && edge.Comfort > 45 && rng.NextDouble() < 0.12)
+    var level = ReachOutTouchSelector.SelectTouchLevel(edge, hasPrivacy, rng);
+    if (level is not null)
     {
-        to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, TouchLevel.Light));
-        return; // One touch attempt per tick is enough
-    }
-
-    // Friendly touch — hug or equivalent. Requires deeper closeness, more attraction,
-    // and privacy — open spaces make this socially awkward.
-    if (edge.Closeness > 70 && edge.SexualInterest > 50 && hasPrivacy && rng.NextDouble() < 0.07)
-    {
-        to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, TouchLevel.Friendly));
+        to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, level.Value));
     }
 }
 
