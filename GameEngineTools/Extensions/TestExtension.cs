@@ -101,11 +101,18 @@ namespace GameEngineTools.Extensions
                 return;
             }
 
+            const int maxDepth = 12;
+            if (indent > maxDepth)
+            {
+                sb.AppendLine($"{new string(' ', indent * 2)}[max depth]");
+                return;
+            }
+
             var pad = new string(' ', indent * 2);
             var type = obj.GetType();
 
             // Primitivy, string, enum, Guid — rovnou vypíšeme
-            if (type.IsPrimitive || type.IsEnum || obj is string || obj is Guid)
+            if (type.IsPrimitive || type.IsEnum || obj is string || obj is Guid || obj is Type)
             {
                 sb.AppendLine($"{pad}{obj}");
                 return;
@@ -155,12 +162,21 @@ namespace GameEngineTools.Extensions
             // Record / komplexní objekt
             foreach (var prop in type.GetProperties())
             {
+                if (prop.GetIndexParameters().Length > 0 ||
+                    prop.Name == "EqualityContract" ||
+                    prop.Name == "DeclaringMethod" ||
+                    prop.Name == "ReflectedType")
+                {
+                    continue;
+                }
+
                 var value = prop.GetValue(obj);
                 var valueType = value?.GetType();
 
                 bool isSimple = value is null
                     || value is string
                     || value is Guid
+                    || value is Type
                     || (valueType?.IsPrimitive ?? false)
                     || (valueType?.IsEnum ?? false)
                     || valueType?.Namespace == "GameEngineTools.World.Utils.Time";
