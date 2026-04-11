@@ -3,6 +3,7 @@
 
 namespace EngineTests
 {
+    using System.Text.Json;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
@@ -140,6 +141,25 @@ namespace EngineTests
         }
 
         #endregion Sex overlap
+
+        #region Serialization
+
+        [TestMethod]
+        public void Serialize_PhysicalAppearance_DoesNotWriteConvenienceAliases()
+        {
+            var appearance = _generator.Generate(SexBiology.Female, 777, StadiumType.Adult);
+
+            var json = JsonSerializer.Serialize(appearance);
+
+            Assert.IsTrue(json.Contains("\"BodyMorphology\""));
+            Assert.IsTrue(json.Contains("\"FacialMorphology\""));
+            Assert.IsFalse(json.Contains("\"Body\":"));
+            Assert.IsFalse(json.Contains("\"Face\":"));
+            Assert.IsFalse(json.Contains("\"Surface\":"));
+            Assert.IsFalse(json.Contains("\"Colors\":"));
+        }
+
+        #endregion Serialization
 
         #region Test infrastructure
 

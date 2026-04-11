@@ -3,6 +3,7 @@
 
 namespace GameEngineTools.Characters.Traits
 {
+    using System.Text.Json.Serialization;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
 
@@ -26,15 +27,19 @@ namespace GameEngineTools.Characters.Traits
         ColorTraits? ColorTraits = null)
     {
         /// <summary>Structured body morphology. Legacy records receive a conservative projection.</summary>
+        [JsonIgnore]
         public BodyMorphology Body => BodyMorphology ?? BodyMorphology.FromLegacy(HeightCm, ShoulderBreadthCm, HipBreadthCm, Frame);
 
         /// <summary>Structured facial morphology. Legacy records receive a conservative projection.</summary>
+        [JsonIgnore]
         public FacialMorphology Face => FacialMorphology ?? FacialMorphology.FromLegacy(FaceShape, NoseProminence, LipFullness);
 
         /// <summary>Structured surface traits. Legacy records receive neutral surface values.</summary>
+        [JsonIgnore]
         public SurfaceTraits Surface => SurfaceTraits ?? SurfaceTraits.Neutral;
 
         /// <summary>Structured colour traits projected from legacy colour labels.</summary>
+        [JsonIgnore]
         public ColorTraits Colors => ColorTraits ?? new(SkinTone, EyeColor, HairColor, HairType);
     }
 
