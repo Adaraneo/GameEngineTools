@@ -12,6 +12,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -46,6 +47,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         #region Privátní pole
 
         private readonly ILogger _log;
+        private readonly IMemoryFidelityPolicy? _memoryFidelityPolicy;
 
         #endregion Privátní pole
 
@@ -56,10 +58,14 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </summary>
         /// <param name="cfg">Konfigurace injektovaná přes Options pattern.</param>
         /// <param name="loggerFactory">Továrna na logger — umožňuje scope per postava.</param>
-        public DefaultMemoryEngine(IOptions<MemoryConfig> cfg, ILoggerFactory loggerFactory)
+        public DefaultMemoryEngine(
+            IOptions<MemoryConfig> cfg,
+            ILoggerFactory loggerFactory,
+            IMemoryFidelityPolicy? memoryFidelityPolicy = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultMemoryEngine>();
+            _memoryFidelityPolicy = memoryFidelityPolicy;
 
             // Inicializuj prázdný stav — žádné vzpomínky, žádná sémantika
             State = new MemoryIndex(
@@ -360,6 +366,11 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
+            if (!ShouldStoreEvent(@event, ctx))
+            {
+                return;
+            }
+
             switch (@event)
             {
                 // ── Akce ─────────────────────────────────────────────────────────────────
@@ -577,6 +588,9 @@ namespace GameEngineTools.Characters.Engines.Memory
         #endregion Obnovení stavu
 
         #region Privátní metody
+
+        private bool ShouldStoreEvent(IDomainEvent @event, IHumanContext ctx)
+            => _memoryFidelityPolicy?.ShouldStoreEvent(ctx, @event) ?? true;
 
         /// <summary>
         /// Konsoliduje paměti po skončení spánku.

@@ -52,7 +52,7 @@ var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
 var attractionCalculator = (DefaultAttractionCalculator)runtime.Services.GetRequiredService<IAttractionCalculator>();
-var lodRuntime = (DefaultCognitiveResolutionLevelRuntime)runtime.Services.GetRequiredService<ICognitiveResolutionLevelRuntime>();
+var lodRuntime = runtime.Services.GetRequiredService<ICognitiveResolutionLevelRuntime>();
 
 // ── Characters ────────────────────────────────────────────────────────────────
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);

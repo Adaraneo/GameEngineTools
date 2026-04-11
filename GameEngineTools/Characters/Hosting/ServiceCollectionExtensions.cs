@@ -40,10 +40,16 @@ namespace GameEngineTools.Characters.Hosting
             services.TryAddSingleton<IRandomSourceFactory, RandomSourceFactory>();
             services.TryAddSingleton<ICognitiveResolutionLevelRuntime, DefaultCognitiveResolutionLevelRuntime>();
             services.TryAddSingleton<IBehaviorCadencePolicy, DefaultBehaviorCadencePolicy>();
+            services.TryAddSingleton<IMemoryFidelityPolicy, DefaultMemoryFidelityPolicy>();
+            services.TryAddSingleton<IPerceptionFidelityPolicy, DefaultPerceptionFidelityPolicy>();
+            services.TryAddSingleton<ISocialFidelityPolicy, DefaultSocialFidelityPolicy>();
             services.TryAddSingleton<IHumanFactory, DefaultHumanFactory>();
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();
             lodOb.BindConfiguration("Characters:Lod");
+
+            var fidelityOb = services.AddOptions<CharacterFidelityConfig>();
+            fidelityOb.BindConfiguration("Characters:Fidelity");
 
             return services;
         }
