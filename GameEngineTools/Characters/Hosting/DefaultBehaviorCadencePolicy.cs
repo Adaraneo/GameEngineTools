@@ -12,12 +12,12 @@ namespace GameEngineTools.Characters.Hosting
     /// </summary>
     public sealed class DefaultBehaviorCadencePolicy : IBehaviorCadencePolicy
     {
-        private readonly CharacterLodConfig _cfg;
-        private readonly ICharacterLodRuntime _lodRuntime;
+        private readonly CognitiveResolutionLevelConfig _cfg;
+        private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
 
         public DefaultBehaviorCadencePolicy(
-            IOptions<CharacterLodConfig> cfg,
-            ICharacterLodRuntime lodRuntime)
+            IOptions<CognitiveResolutionLevelConfig> cfg,
+            ICognitiveResolutionLevelRuntime lodRuntime)
         {
             _cfg = cfg.Value;
             _lodRuntime = lodRuntime;
@@ -27,9 +27,9 @@ namespace GameEngineTools.Characters.Hosting
         {
             var ts = _lodRuntime.Get(human.Id) switch
             {
-                CharacterLodLevel.Player => _cfg.PlayerBehaviorDecisionStep,
-                CharacterLodLevel.Nearby => _cfg.NearbyBehaviorDecisionStep,
-                CharacterLodLevel.Background => _cfg.BackgroundBehaviorDecisionStep,
+                CognitiveResolutionLevel.Player => _cfg.PlayerBehaviorDecisionStep,
+                CognitiveResolutionLevel.Nearby => _cfg.NearbyBehaviorDecisionStep,
+                CognitiveResolutionLevel.Background => _cfg.BackgroundBehaviorDecisionStep,
                 _ => null
             };
 

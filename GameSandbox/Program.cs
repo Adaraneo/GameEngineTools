@@ -52,7 +52,7 @@ var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
 var attractionCalculator = (DefaultAttractionCalculator)runtime.Services.GetRequiredService<IAttractionCalculator>();
-var lodRuntime = (DefaultCharacterLodRuntime)runtime.Services.GetRequiredService<ICharacterLodRuntime>();
+var lodRuntime = (DefaultCognitiveResolutionLevelRuntime)runtime.Services.GetRequiredService<ICognitiveResolutionLevelRuntime>();
 
 // ── Characters ────────────────────────────────────────────────────────────────
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
@@ -189,7 +189,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
-    DefaultCharacterLod = CharacterLodLevel.Player,
+    DefaultCharacterLod = CognitiveResolutionLevel.Player,
 
     ResolveCharacter = id =>
     {
@@ -258,7 +258,7 @@ if (characters.Count > 0)
         TickStep = WTimeSpan.FromHours(5),
         InternalSubstep = WTimeSpan.FromHours(1),
         SimulationYears = 5,
-        DefaultCharacterLod = CharacterLodLevel.Background,
+        DefaultCharacterLod = CognitiveResolutionLevel.Background,
         OnTick = (now, chars) =>
         {
             FireFirstImpressions(now, chars, attractionCalculator, locationService);

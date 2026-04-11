@@ -84,9 +84,9 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         public WTimeSpan? InternalSubstep { get; init; }
 
-        public CharacterLodLevel DefaultCharacterLod { get; init; } = CharacterLodLevel.Nearby;
+        public CognitiveResolutionLevel DefaultCharacterLod { get; init; } = CognitiveResolutionLevel.Nearby;
 
-        public Func<IHuman, CharacterLodLevel>? ResolveCharacterLod { get; init; }
+        public Func<IHuman, CognitiveResolutionLevel>? ResolveCharacterLod { get; init; }
 
         #endregion Časování simulace
 

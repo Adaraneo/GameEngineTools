@@ -1,4 +1,4 @@
-﻿// DefaultCharacterLodRuntime.cs
+﻿// DefaultCognitiveResolutionLevelRuntime.cs
 // Copyright (c) 50PSoftware
 
 using System.Collections.Concurrent;
@@ -9,16 +9,16 @@ namespace GameEngineTools.Characters.Hosting
     /// <summary>
     /// In-memory runtime LOD registry for characters.
     /// </summary>
-    public sealed class DefaultCharacterLodRuntime : ICharacterLodRuntime
+    public sealed class DefaultCognitiveResolutionLevelRuntime : ICognitiveResolutionLevelRuntime
     {
-        private readonly ConcurrentDictionary<HumanId, CharacterLodLevel> _levels = new();
+        private readonly ConcurrentDictionary<HumanId, CognitiveResolutionLevel> _levels = new();
 
-        public CharacterLodLevel Get(HumanId id)
+        public CognitiveResolutionLevel Get(HumanId id)
             => _levels.TryGetValue(id, out var level)
                 ? level
-                : CharacterLodLevel.Nearby;
+                : CognitiveResolutionLevel.Nearby;
 
-        public void Set(HumanId id, CharacterLodLevel level)
+        public void Set(HumanId id, CognitiveResolutionLevel level)
             => _levels[id] = level;
 
         public void Clear(HumanId id)

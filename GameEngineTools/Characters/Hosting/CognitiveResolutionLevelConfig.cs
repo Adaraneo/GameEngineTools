@@ -1,4 +1,4 @@
-﻿// CharacterLodConfig.cs
+﻿// CognitiveResolutionLevelConfig.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.Hosting
@@ -6,11 +6,11 @@ namespace GameEngineTools.Characters.Hosting
     /// <summary>
     /// Runtime LOD cadence configuration loaded from appsettings.Characters.json.
     /// </summary>
-    public sealed record CharacterLodConfig(
+    public sealed record CognitiveResolutionLevelConfig(
         TimeSpan? PlayerBehaviorDecisionStep = null,
         TimeSpan? NearbyBehaviorDecisionStep = null,
         TimeSpan? BackgroundBehaviorDecisionStep = null)
     {
-        public CharacterLodConfig() : this(null, null, null) { }
+        public CognitiveResolutionLevelConfig() : this(null, null, null) { }
     }
 }

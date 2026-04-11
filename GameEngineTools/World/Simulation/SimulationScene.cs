@@ -56,7 +56,7 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Konfigurace scény předaná zvenku.</summary>
         private readonly SimulationSceneOptions _options;
 
-        private readonly ICharacterLodRuntime _lodRuntime;
+        private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
 
         #endregion Privátní pole
 
@@ -76,7 +76,7 @@ namespace GameEngineTools.World.Simulation
         /// <exception cref="ArgumentException">
         /// Pokud <see cref="SimulationSceneOptions.Characters"/> je prázdný seznam.
         /// </exception>
-        public SimulationScene(SystemClock clock, SimulationSceneOptions options, ICharacterLodRuntime characterLodRuntime)
+        public SimulationScene(SystemClock clock, SimulationSceneOptions options, ICognitiveResolutionLevelRuntime characterLodRuntime)
         {
             ArgumentNullException.ThrowIfNull(clock);
             ArgumentNullException.ThrowIfNull(options);
