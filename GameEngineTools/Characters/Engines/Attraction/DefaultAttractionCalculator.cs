@@ -58,8 +58,9 @@ namespace GameEngineTools.Characters.Engines.Attraction
             SexBiology targetBiology,
             double observerValence = 0.0)
         {
-            var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology);
-            var preferenceMatch = ComputePreferenceMatch(observerProfile, targetAppearance, targetBiology);
+            var orientationWeight = TargetAttractionWeight(observerProfile, targetBiology);
+            var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology) * orientationWeight;
+            var preferenceMatch = ComputePreferenceMatch(observerProfile, targetAppearance, targetBiology) * orientationWeight;
             var stateModifier   = ComputeStateModifier(targetView);
 
             var raw   = basePhysical + preferenceMatch + stateModifier;
@@ -220,6 +221,17 @@ namespace GameEngineTools.Characters.Engines.Attraction
                 _                 => BodyFramePreference.None
             };
         }
+
+        /// <summary>
+        /// Applies the observer's sexual-orientation target weights to attraction-specific components.
+        /// </summary>
+        private static double TargetAttractionWeight(AttractionProfile profile, SexBiology targetBiology)
+            => targetBiology switch
+            {
+                SexBiology.Female => Math.Clamp(profile.FemaleTargetAttraction, 0.0, 1.0),
+                SexBiology.Male => Math.Clamp(profile.MaleTargetAttraction, 0.0, 1.0),
+                _ => Math.Clamp(profile.OtherTargetAttraction, 0.0, 1.0)
+            };
 
         #endregion Helpers
     }

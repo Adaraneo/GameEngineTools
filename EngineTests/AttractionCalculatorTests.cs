@@ -200,6 +200,89 @@ namespace EngineTests
 
         // ── StateModifier ────────────────────────────────────────────────────────
 
+        #region SexualOrientation
+
+        /// <summary>
+        /// A heterosexual male-oriented profile should score female targets higher than male targets.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_HeterosexualMaleProfile_PrefersFemaleTarget()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                Orientation = SexualOrientation.Heterosexual,
+                FemaleTargetAttraction = 1.0,
+                MaleTargetAttraction = 0.12,
+                OtherTargetAttraction = 0.65,
+                PreferredWhr = 0.70
+            };
+
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+
+            var femaleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Female);
+            var maleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Male);
+
+            Assert.IsTrue(femaleTarget.Score > maleTarget.Score);
+        }
+
+        /// <summary>
+        /// A homosexual male-oriented profile should score male targets higher than female targets.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_HomosexualMaleProfile_PrefersMaleTarget()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                Orientation = SexualOrientation.Homosexual,
+                FemaleTargetAttraction = 0.12,
+                MaleTargetAttraction = 1.0,
+                OtherTargetAttraction = 0.65,
+                PreferredWhr = 0.90
+            };
+
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+
+            var femaleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Female);
+            var maleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Male);
+
+            Assert.IsTrue(maleTarget.Score > femaleTarget.Score);
+        }
+
+        /// <summary>
+        /// Asexual profiles should keep attraction low even when appearance cues are favourable.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_AsexualProfile_KeepsAttractionLow()
+        {
+            var bisexualProfile = BuildNeutralProfile() with
+            {
+                Orientation = SexualOrientation.Bisexual,
+                FemaleTargetAttraction = 1.0,
+                MaleTargetAttraction = 1.0,
+                PreferredWhr = 0.70
+            };
+
+            var asexualProfile = bisexualProfile with
+            {
+                Orientation = SexualOrientation.Asexual,
+                FemaleTargetAttraction = 0.08,
+                MaleTargetAttraction = 0.08,
+                OtherTargetAttraction = 0.08
+            };
+
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+
+            var bisexual = _sut.Calculate(bisexualProfile, appearance, view, SexBiology.Female);
+            var asexual = _sut.Calculate(asexualProfile, appearance, view, SexBiology.Female);
+
+            Assert.IsTrue(asexual.Score < bisexual.Score * 0.35);
+        }
+
+        #endregion
+
         #region StateModifier
 
         /// <summary>

@@ -74,10 +74,12 @@ namespace GameEngineTools.Characters.Generation
             // Frame preference — uniform pick (no sex bias intentionally)
             var framePreference = PickFramePreference(rng);
 
-            // WHR preference — depends on which sex the observer is typically attracted to.
-            // For simplicity we use the observer's own biology as a proxy for orientation baseline.
-            // A future IAttractionProfileGenerator overload could accept orientation explicitly.
-            var whrMean = biology == SexBiology.Male ? WhrMeanFemaleTarget : WhrMeanMaleTarget;
+            var orientation = PickOrientation(rng);
+            var targetWeights = BuildTargetWeights(biology, orientation);
+
+            // WHR preference follows the primary target-sex preference for binary-sex observers.
+            // Bisexual profiles use an intermediate midpoint; asexual profiles keep weak weights.
+            var whrMean = ResolvePreferredWhrMean(targetWeights);
             var preferredWhr = Math.Clamp(whrMean + SampleNormal(rng) * WhrStdDev, 0.55, 1.05);
 
             // Symmetry weight — how much the observer cares about facial symmetry
@@ -91,7 +93,11 @@ namespace GameEngineTools.Characters.Generation
                 HeightToleranceCm:   Math.Round(heightTolerance, 1),
                 FramePreference:     framePreference,
                 PreferredWhr:        Math.Round(preferredWhr, 3),
-                SymmetryWeight:      Math.Round(symmetryWeight, 3));
+                SymmetryWeight:      Math.Round(symmetryWeight, 3),
+                Orientation:         orientation,
+                FemaleTargetAttraction: Math.Round(targetWeights.Female, 3),
+                MaleTargetAttraction: Math.Round(targetWeights.Male, 3),
+                OtherTargetAttraction: Math.Round(targetWeights.Other, 3));
         }
 
         // ── Private helpers ──────────────────────────────────────────────────────
@@ -112,6 +118,67 @@ namespace GameEngineTools.Characters.Generation
             var values = (BodyFramePreference[])Enum.GetValues(typeof(BodyFramePreference));
             var index  = (int)(rng.NextUnit() * values.Length);
             return values[Math.Clamp(index, 0, values.Length - 1)];
+        }
+
+        private static SexualOrientation PickOrientation(IRandomSource rng)
+        {
+            var r = rng.NextUnit();
+
+            return r switch
+            {
+                < 0.88 => SexualOrientation.Heterosexual,
+                < 0.93 => SexualOrientation.Homosexual,
+                < 0.99 => SexualOrientation.Bisexual,
+                _ => SexualOrientation.Asexual
+            };
+        }
+
+        private static (double Female, double Male, double Other) BuildTargetWeights(
+            SexBiology observerBiology,
+            SexualOrientation orientation)
+        {
+            const double primary = 1.0;
+            const double secondary = 0.12;
+            const double asexual = 0.08;
+            const double ambiguous = 0.65;
+
+            if (orientation == SexualOrientation.Bisexual)
+            {
+                return (primary, primary, ambiguous);
+            }
+
+            if (orientation == SexualOrientation.Asexual)
+            {
+                return (asexual, asexual, asexual);
+            }
+
+            if (observerBiology is not (SexBiology.Female or SexBiology.Male))
+            {
+                return (ambiguous, ambiguous, ambiguous);
+            }
+
+            var attractedToFemale =
+                (orientation == SexualOrientation.Heterosexual && observerBiology == SexBiology.Male) ||
+                (orientation == SexualOrientation.Homosexual && observerBiology == SexBiology.Female);
+
+            return attractedToFemale
+                ? (primary, secondary, ambiguous)
+                : (secondary, primary, ambiguous);
+        }
+
+        private static double ResolvePreferredWhrMean((double Female, double Male, double Other) weights)
+        {
+            if (weights.Female > weights.Male)
+            {
+                return WhrMeanFemaleTarget;
+            }
+
+            if (weights.Male > weights.Female)
+            {
+                return WhrMeanMaleTarget;
+            }
+
+            return (WhrMeanFemaleTarget + WhrMeanMaleTarget) * 0.5;
         }
     }
 }
