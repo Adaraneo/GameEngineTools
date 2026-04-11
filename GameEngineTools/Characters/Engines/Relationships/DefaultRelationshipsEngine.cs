@@ -196,15 +196,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             // Logarithmic growth → fast early, levels off near saturation.
                             var newCount = e.PositiveInteractionCount + 1;
                             var familiarityDelta = ComputeFamiliarityExposureDelta(e.PositiveInteractionCount, newCount);
+                            var stabilization = ComputeRelationalStabilization(e, ctx.PsychologyProfile);
+                            var trustConsolidation = trustDelta > 0
+                                ? stabilization * 0.28
+                                : stabilization * 0.10;
 
                             return e with
                             {
-                                Closeness = Bump(e.Closeness, +1.5),
-                                Like = Bump(e.Like, +0.5),
-                                Comfort = Bump(e.Comfort, +0.8 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
+                                Closeness = Bump(e.Closeness, +1.5 + stabilization * 0.35),
+                                Like = Bump(e.Like, +0.5 + stabilization * 0.20),
+                                Comfort = Bump(e.Comfort, +0.8 + stabilization * 0.45 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
                                 RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality)),
                                 SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act, ctx.Personality.Sociosexuality)),
-                                Trust = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
+                                Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation),
                                 Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
                                 Familiarity = Bump(e.Familiarity, familiarityDelta),
                                 PositiveInteractionCount = newCount,
@@ -245,13 +249,18 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         }
                         else // I was rejected
                         {
-                            Upsert(self, otherId, e => e with
+                            Upsert(self, otherId, e =>
                             {
-                                Like = Bump(e.Like, -1.5),
-                                Comfort = Bump(e.Comfort, -2.0),
-                                Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
-                                RomanticInterest = Bump(e.RomanticInterest, io.Act == SpeechAct.Invite ? -2.0 : -1.0),
-                                Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
+                                var stingMultiplier = ComputeRejectionStingMultiplier(e, ctx.PsychologyProfile);
+
+                                return e with
+                                {
+                                    Like = Bump(e.Like, -1.5 * stingMultiplier),
+                                    Comfort = Bump(e.Comfort, -2.0 * stingMultiplier),
+                                    Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty * stingMultiplier) : e.Trust,
+                                    RomanticInterest = Bump(e.RomanticInterest, (io.Act == SpeechAct.Invite ? -2.0 : -1.0) * stingMultiplier),
+                                    Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
+                                };
                             },
                             eventType: nameof(InteractionOutcome),
                             outcome: "rejected",

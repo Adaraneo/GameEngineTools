@@ -320,6 +320,51 @@ namespace EngineTests
         }
 
         /// <summary>
+        /// Repeated accepted low-stakes contact should gradually consolidate safety for sensitive characters.
+        /// </summary>
+        [TestMethod]
+        public void Handle_RepeatedAcceptedLowStakesContact_ConsolidatesSensitiveRelationship()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var personality = new Personality(
+                new BigFive(0.5, 0.25, 0.45, 0.65, 0.9),
+                AttachmentStyle.Anxious,
+                CommunicationStyle.Indirect,
+                new MotivationWeights(0.8, 0.4, 0.2, 0.5, 0.4, 0.4, 0.5, 0.5, 0.3),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+            var ctx = BuildContext(self, personality);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 52, Attraction: 40), ctx, _outbox);
+            var initial = engine.State.Edges[other];
+
+            for (var i = 0; i < 8; i++)
+            {
+                engine.Handle(
+                    new InteractionOutcome(_now + WTimeSpan.FromHours(i + 1), other, self, Accepted: true, Reason: "accepted", Act: SpeechAct.SmallTalk),
+                    ctx,
+                    _outbox);
+            }
+
+            var stabilized = engine.State.Edges[other];
+            Assert.IsTrue(stabilized.PositiveInteractionCount >= 8);
+            Assert.IsTrue(stabilized.Trust > initial.Trust, "Low-stakes accepted contact should now build some trust consolidation.");
+            Assert.IsTrue(stabilized.Comfort > initial.Comfort + 6.4);
+            Assert.IsTrue(stabilized.Closeness > initial.Closeness + 12.0);
+
+            engine.Handle(
+                new InteractionOutcome(_now + WTimeSpan.FromHours(12), self, other, Accepted: false, Reason: "declined", Act: SpeechAct.SmallTalk),
+                ctx,
+                _outbox);
+
+            var afterSetback = engine.State.Edges[other];
+            Assert.IsTrue(afterSetback.Comfort > initial.Comfort, "One later setback should not erase the whole positive trend.");
+            Assert.IsTrue(afterSetback.Trust >= initial.Trust);
+        }
+
+        /// <summary>
         /// First impression should keep physical and aesthetic seeding as distinct signals.
         /// </summary>
         [TestMethod]
@@ -656,8 +701,16 @@ namespace EngineTests
         /// Sestaví minimální kontext — RelationshipsEngine nepotřebuje v Handle() téměř nic
         /// kromě ctx.Id a ctx.Snapshot.Psychology (pro Tick).
         /// </summary>
-        private IHumanContext BuildContext(HumanId id)
+        private IHumanContext BuildContext(HumanId id, Personality? personality = null)
         {
+            personality ??= new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                AttachmentStyle.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
             var psych = new PsychologyState(
                 Valence: 0.0, Arousal: 0.5, Dominance: 0.5,
                 Stress: 0, CognitiveLoad: 0, DominantEmotion: DiscreteEmotion.Neutral);
@@ -674,13 +727,8 @@ namespace EngineTests
             {
                 Id = id,
                 Biology = SexBiology.Female,
-                Personality = new Personality(
-                    new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                    AttachmentStyle.Secure,
-                    CommunicationStyle.Direct,
-                    new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
-                    Sociosexuality.Intermediate,
-                    Chronotype.Neutral),
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
                 Snapshot = snapshot,
                 Random = new AlwaysTrueRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),

@@ -119,6 +119,48 @@ namespace GameEngineTools.Characters.Engines.Relationships
         private double ComputeFamiliarityExposureDelta(int previousCount, int newCount)
             => MereExposureBoost(newCount, Config) - MereExposureBoost(previousCount, Config);
 
+        /// <summary>
+        /// Converts repeated accepted contact into a small safety consolidation signal.
+        /// Uses smooth exposure and current relationship quality; it is intentionally not a threshold gate.
+        /// </summary>
+        private double ComputeRelationalStabilization(RelationshipEdge edge, PsychologicalProfile? profile)
+        {
+            var exposure = Math.Clamp(
+                Math.Log(1.0 + edge.PositiveInteractionCount) / Math.Log(1.0 + Config.MereExposureSaturation),
+                0.0,
+                1.0);
+            var relationshipSafety =
+                Math.Max(0.0, edge.Trust - 45.0) / 55.0 * 0.35
+                + Math.Max(0.0, edge.Comfort - 42.0) / 58.0 * 0.40
+                + edge.Closeness / 100.0 * 0.25;
+            var ambivalenceGain = 0.85 + Math.Clamp(profile?.Ambivalence ?? PsychologicalProfile.Default.Ambivalence, 0.0, 1.0) * 0.30;
+
+            return Math.Clamp(exposure * (0.45 + Math.Clamp(relationshipSafety, 0.0, 1.0) * 0.55) * ambivalenceGain, 0.0, 1.0);
+        }
+
+        /// <summary>
+        /// Lets established safe contact soften, but not erase, the sting of a later rejection.
+        /// Ambivalent characters retain more immediate sensitivity.
+        /// </summary>
+        private double ComputeRejectionStingMultiplier(RelationshipEdge edge, PsychologicalProfile? profile)
+        {
+            var exposure = Math.Clamp(
+                Math.Log(1.0 + edge.PositiveInteractionCount) / Math.Log(1.0 + Config.MereExposureSaturation),
+                0.0,
+                1.0);
+            var safety = Math.Clamp(
+                Math.Max(0.0, edge.Trust - 50.0) / 50.0 * 0.35
+                + Math.Max(0.0, edge.Comfort - 50.0) / 50.0 * 0.40
+                + edge.Closeness / 100.0 * 0.25,
+                0.0,
+                1.0);
+            var sensitivity = Math.Clamp(profile?.Ambivalence ?? PsychologicalProfile.Default.Ambivalence, 0.0, 1.0);
+            var followThrough = Math.Clamp(profile?.FollowThrough ?? PsychologicalProfile.Default.FollowThrough, 0.0, 1.0);
+            var protection = exposure * safety * (0.30 + followThrough * 0.35) * (1.0 - sensitivity * 0.45);
+
+            return Math.Clamp(1.0 - protection, 0.72, 1.0);
+        }
+
         #endregion Private methods — signal deltas
 
         #region Private methods — helpers
