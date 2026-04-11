@@ -3,6 +3,7 @@
 
 namespace EngineTests
 {
+    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -630,6 +631,7 @@ namespace EngineTests
             public EnginesSnapshot Snapshot { get; private set; }
             public IReadOnlyList<IDomainEvent> LastOutbox => Array.Empty<IDomainEvent>();
             public int Age => 20;
+            public StadiumType Stadium => StadiumType.Adult;
             public void Tick(WDateTime now, WTimeSpan dt) { }
             public void ReceiveEvent(IDomainEvent @event) { }
             public void RestoreSnapshot(EnginesSnapshot snapshot) => Snapshot = snapshot;

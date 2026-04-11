@@ -39,6 +39,7 @@ namespace GameEngineTools.Characters.Hosting
             services.TryAddTransient<IScheduler, SimpleScheduler>();
             services.TryAddSingleton<IRandomSourceFactory, RandomSourceFactory>();
             services.TryAddSingleton<ICognitiveResolutionLevelRuntime, DefaultCognitiveResolutionLevelRuntime>();
+            services.TryAddSingleton<ICharacterDevelopmentPolicy, DefaultCharacterDevelopmentPolicy>();
             services.TryAddSingleton<IBehaviorCadencePolicy, DefaultBehaviorCadencePolicy>();
             services.TryAddSingleton<IMemoryFidelityPolicy, DefaultMemoryFidelityPolicy>();
             services.TryAddSingleton<IPerceptionFidelityPolicy, DefaultPerceptionFidelityPolicy>();
@@ -107,6 +108,7 @@ namespace GameEngineTools.Characters.Hosting
         private static IServiceCollection AddCharacterGenerationCore(this IServiceCollection services)
         {
             services.AddSingleton<IHumanBlueprintGenerator, HumanBlueprintGenerator>();
+            services.AddSingleton<IChildBlueprintGenerator, ChildBlueprintGenerator>();
             services.AddSingleton<IIdentityGenerator>(_ =>
             {
                 var femaleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.femaleNames,

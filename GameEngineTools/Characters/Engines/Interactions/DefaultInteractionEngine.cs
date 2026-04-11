@@ -321,7 +321,20 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 || (initiatorBiology == SexBiology.Female && recipientBiology == SexBiology.Male);
 
         private static bool IsAdult(IHumanContext ctx, WDateTime now)
-            => ctx.Identity is not null && ctx.Identity.BirthDate.DaysUntil(now.Date) >= 18L * 365L;
+            => ctx.Identity is not null
+                && StadiumResolver.Resolve(AgeYears(ctx.Identity.BirthDate, now.Date)) is StadiumType.Adult or StadiumType.MidAged or StadiumType.Old;
+
+        private static int AgeYears(WDateOnly birth, WDateOnly today)
+        {
+            var age = today.Year - birth.Year;
+            if (today.Month < birth.Month ||
+                (today.Month == birth.Month && today.Day < birth.Day))
+            {
+                age--;
+            }
+
+            return Math.Max(0, age);
+        }
 
         #region RestoreState
 

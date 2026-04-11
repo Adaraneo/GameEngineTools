@@ -78,6 +78,9 @@ namespace GameEngineTools.Characters.GameObjects
         [JsonIgnore]
         public int Age => Person.Age;
 
+        [JsonIgnore]
+        public StadiumType Stadium => Person.Stadium;
+
         public virtual void DecreaseHealth(double amount)
         {
             this.health -= amount;

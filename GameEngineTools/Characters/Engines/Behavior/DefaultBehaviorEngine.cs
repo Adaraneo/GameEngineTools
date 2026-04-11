@@ -32,6 +32,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private readonly ISleepCoordinator _sleepCoordinator;
         private readonly IIntentManagementEngine _intentManagementEngine;
         private readonly IActionArbitrationEngine _arbitrationEngine;
+        private readonly ICharacterDevelopmentPolicy _developmentPolicy;
 
         #endregion Private fields
 
@@ -45,7 +46,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         #region Construction
 
-        public DefaultBehaviorEngine(IOptions<BehaviorConfig> cfg, IOptions<SleepConfig> sleepCfg, ILoggerFactory loggerFactory)
+        public DefaultBehaviorEngine(
+            IOptions<BehaviorConfig> cfg,
+            IOptions<SleepConfig> sleepCfg,
+            ILoggerFactory loggerFactory,
+            ICharacterDevelopmentPolicy? developmentPolicy = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
@@ -55,6 +60,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
+            _developmentPolicy = developmentPolicy ?? new DefaultCharacterDevelopmentPolicy();
         }
 
         #endregion Construction
@@ -76,6 +82,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             context = context with { State = State };
             var candidates = new List<BehaviorCandidate>();
             foreach (var engine in _needEngines) candidates.AddRange(engine.Evaluate(context).Candidates);
+            ApplyDevelopmentGate(context, candidates);
             foreach (var modifier in _modifierEngines) modifier.Modify(context, candidates);
 
             // Intent management stabilizes direction across ticks but still leaves final choice to arbitration.
@@ -142,6 +149,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
             }
 
             outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, targeting.SpeechAct, targeting.Reason, ctx.Biology));
+        }
+
+        private void ApplyDevelopmentGate(BehaviorContext context, List<BehaviorCandidate> candidates)
+        {
+            var stadium = _developmentPolicy.ResolveStadium(context.HumanContext, context.Now);
+            candidates.RemoveAll(candidate => !_developmentPolicy.AllowsAction(stadium, candidate.Name));
         }
 
         #endregion Cooldowns

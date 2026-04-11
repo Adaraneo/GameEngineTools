@@ -84,6 +84,9 @@ namespace GameEngineTools.Characters.Core
             }
         }
 
+        /// <inheritdoc/>
+        public StadiumType Stadium => StadiumResolver.Resolve(Math.Max(0, Age));
+
         #endregion Public properties — runtime state
 
         #region Private fields

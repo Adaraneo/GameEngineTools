@@ -42,7 +42,7 @@ namespace GameEngineTools.Characters.Core
         PsychologicalProfile PsychologyProfile { get; }
         PhysicalAppearance PhysicalAppearance { get; }
 
-        AttractionProfile AttractionProfile { get; }
+        AttractionProfile? AttractionProfile { get; }
 
         // Přístup ke stavům (read-only snapshoty)
         EnginesSnapshot Snapshot { get; }
@@ -50,6 +50,8 @@ namespace GameEngineTools.Characters.Core
         IReadOnlyList<IDomainEvent> LastOutbox { get; }
 
         int Age { get; }
+
+        StadiumType Stadium { get; }
 
         // Orchestrace jednoho kroku simulace
         void Tick(WDateTime now, WTimeSpan dt);
