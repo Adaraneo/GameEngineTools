@@ -2,6 +2,7 @@
 {
     using GameEngineTools;
     using GameEngineTools.Characters.GameObjects;
+    using GameEngineTools.Characters.Generation.Portraits;
     using GameEngineTools.Extensions;
     using GameEngineTools.FileSystem;
     using GameEngineTools.World.Utils.Time;
@@ -38,15 +39,47 @@
             }
         }
 
+        private static void ClearPromtpsDirectory(string directory)
+        {
+            var promptsDirInfo = new DirectoryInfo(Path.Combine(directory, "Logs", "Prompts"));
+            if (!promptsDirInfo.Exists) return;
+
+            var files = promptsDirInfo.GetFiles();
+            foreach (var file in files)
+            {
+                file.Delete();
+            }
+        }
+
         private static void ExportInfo(string directory, params (string, CharacterBase)[] characters)
         {
+            var dirinfo = new DirectoryInfo(directory);
+            dirinfo = dirinfo.CreateSubdirectory("Logs");
+
             foreach (var (varName, character) in characters)
             {
                 var filename = $"{character.GetType().Name}_{varName}_{character.Person.Id.Value}.txt";
-                var dirinfo = new DirectoryInfo(directory);
-                dirinfo.CreateSubdirectory("Logs");
-                var path = Path.Combine(directory, "Logs", filename);
+                var path = Path.Combine(dirinfo.FullName, filename);
                 File.WriteAllText(path, character.PrintInfo(false, true));
+            }
+        }
+
+        private static void ExportPrompts(string directory, IEnumerable<CharacterBase> characters, bool femaleOnly = false)
+        {
+            var psb = new PortraitSpecBuilder();
+            var ppf = new PortraitPromptFormatter();
+            var dirinfo = new DirectoryInfo(directory);
+            dirinfo = dirinfo.CreateSubdirectory("Logs").CreateSubdirectory("Prompts");
+
+            foreach (var character in characters)
+            {
+                if (femaleOnly && character.Person.Biology != GameEngineTools.Characters.Core.SexBiology.Female)
+                    continue;
+
+                var filename = $"{character.Person.Id.Value}.txt";
+                
+                var path = Path.Combine(dirinfo.FullName, filename);
+                File.WriteAllText(path, character.PrintPortraitInfo(psb, ppf));
             }
         }
 
@@ -133,7 +166,9 @@
             genFile.ExportNPPCs();
 
             ClearLogsDirectory(currentDirectory);
+            ClearPromtpsDirectory(currentDirectory);
             ExportInfo(currentDirectory, (nameof(player), player), (nameof(significantOther), significantOther), (nameof(friend), friend), (nameof(friendSignificantOther), friendSignificantOther));
+            ExportPrompts(currentDirectory, characters, true);
 
             Console.WriteLine("Done. You may close the window right now.");
             Console.ReadKey();
