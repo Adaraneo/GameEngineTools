@@ -207,7 +207,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
 
     ResolveCharacter = id =>
     {
-        var chars = new[] { playerPerson, significantOtherPerson, friendPerson };
+        var chars = new[] { playerPerson, significantOtherPerson, friendPerson, friendSOPerson };
         var found = chars.FirstOrDefault(c => c.Id == id);
 
         return found is not null
@@ -219,16 +219,16 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     {
         diary.Add(entry);
 
-        if (entry.Priority == NarrativePriority.High)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"* [{entry.OccurredAt}] {entry.Text}");
-            Console.ResetColor();
-        }
-        else if (entry.Priority == NarrativePriority.Medium)
-        {
-            Console.WriteLine($"  [{entry.OccurredAt}] {entry.Text}");
-        }
+        //if (entry.Priority == NarrativePriority.High)
+        //{
+        //    Console.ForegroundColor = ConsoleColor.Yellow;
+        //    Console.WriteLine($"* [{entry.OccurredAt}] {entry.Text}");
+        //    Console.ResetColor();
+        //}
+        //else if (entry.Priority == NarrativePriority.Medium)
+        //{
+        //    Console.WriteLine($"  [{entry.OccurredAt}] {entry.Text}");
+        //}
     },
 
     OnTick = (now, chars) =>
