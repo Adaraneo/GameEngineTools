@@ -40,7 +40,7 @@ var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(game
 
 // ── Runtime ───────────────────────────────────────────────────────────────────
 await using var runtime = await GameEngineToolsRuntime.StartAsync(
-    consoleLogs: true,
+    consoleLogs: false,
     generatedFileOptions: new GeneratedFileOptions
     {
         PlayerDirectory = TFSC.player,
@@ -184,7 +184,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     Characters = [playerPerson, significantOtherPerson, friendPerson],
     LocationService = locationService,
     SimulationYears = 5,
-    TickStep = WTimeSpan.FromHours(0.5),
+    TickStep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
 
     ResolveCharacter = id =>
@@ -251,7 +251,7 @@ if (characters.Count > 0)
     {
         Characters = characters,
         LocationService = locationService,
-        TickStep = WTimeSpan.FromHours(5),
+        TickStep = WTimeSpan.FromHours(1),
         SimulationYears = 5,
         OnTick = (now, chars) =>
         {
