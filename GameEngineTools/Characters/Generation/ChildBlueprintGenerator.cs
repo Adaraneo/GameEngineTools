@@ -106,7 +106,11 @@ namespace GameEngineTools.Characters.Generation
                 HairType = PickInherited(parentA.HairType, parentB.HairType, baseline.HairType, rng),
                 FaceShape = PickInherited(parentA.FaceShape, parentB.FaceShape, baseline.FaceShape, rng),
                 NoseProminence = Clamp01(Blend(parentA.NoseProminence, parentB.NoseProminence, baseline.NoseProminence, rng, parentWeight: 0.35)),
-                LipFullness = Clamp01(Blend(parentA.LipFullness, parentB.LipFullness, baseline.LipFullness, rng, parentWeight: 0.45))
+                LipFullness = Clamp01(Blend(parentA.LipFullness, parentB.LipFullness, baseline.LipFullness, rng, parentWeight: 0.45)),
+                BodyMorphology = null,
+                FacialMorphology = null,
+                SurfaceTraits = null,
+                ColorTraits = null
             };
         }
 

@@ -19,7 +19,24 @@ namespace GameEngineTools.Characters.Traits
         double HipBreadthCm,
         double NoseProminence,   // 0..1
         double LipFullness,      // 0..1
-        IReadOnlyList<string>? DistinctiveMarks = null);
+        IReadOnlyList<string>? DistinctiveMarks = null,
+        BodyMorphology? BodyMorphology = null,
+        FacialMorphology? FacialMorphology = null,
+        SurfaceTraits? SurfaceTraits = null,
+        ColorTraits? ColorTraits = null)
+    {
+        /// <summary>Structured body morphology. Legacy records receive a conservative projection.</summary>
+        public BodyMorphology Body => BodyMorphology ?? BodyMorphology.FromLegacy(HeightCm, ShoulderBreadthCm, HipBreadthCm, Frame);
+
+        /// <summary>Structured facial morphology. Legacy records receive a conservative projection.</summary>
+        public FacialMorphology Face => FacialMorphology ?? FacialMorphology.FromLegacy(FaceShape, NoseProminence, LipFullness);
+
+        /// <summary>Structured surface traits. Legacy records receive neutral surface values.</summary>
+        public SurfaceTraits Surface => SurfaceTraits ?? SurfaceTraits.Neutral;
+
+        /// <summary>Structured colour traits projected from legacy colour labels.</summary>
+        public ColorTraits Colors => ColorTraits ?? new(SkinTone, EyeColor, HairColor, HairType);
+    }
 
     public enum BodyFrame
     { Petite, Medium, Large, Strong }

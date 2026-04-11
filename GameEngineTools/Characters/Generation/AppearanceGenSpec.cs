@@ -136,7 +136,13 @@ namespace GameEngineTools.Characters.Generation
         /// while guaranteeing dimorphism. Range: 0..1.
         /// </para>
         /// </remarks>
-        double SexRatioBias
+        double SexRatioBias,
+
+        /// <summary>
+        /// Optional high-resolution morphology generation settings.
+        /// When omitted, stadium-aware morphology defaults are resolved at generation time.
+        /// </summary>
+        MorphologyGenerationSpec? Morphology = null
     )
     {
         /// <summary>
