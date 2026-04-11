@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
@@ -96,6 +97,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
                 case TouchAttempted t when t.To == ctx.Id:
                     HandleTouchAttempted(t, ctx, outbox);
+                    break;
+
+                case SexualEncounterProposed se when se.To == ctx.Id:
+                    HandleSexualEncounterProposed(se, ctx, outbox);
                     break;
             }
         }
@@ -236,16 +241,87 @@ namespace GameEngineTools.Characters.Engines.Interactions
             }
 
             // Přenášíme p.Act — RelationshipsEngine ho potřebuje pro DomainBreakdown
-            outbox.Add(new InteractionOutcome(
+            var outcome = new InteractionOutcome(
                 OccurredAt: p.OccurredAt,
                 From: p.From,
                 To: p.To,
                 Accepted: accepted,
                 Reason: accepted ? "accepted" : "declined",
-                Act: p.Act));
+                Act: p.Act);
+
+            outbox.Add(outcome);
+
+            if (accepted && p.Act == SpeechAct.Invite && CanConsiderSexualEncounter(p.OccurredAt, ctx, edge))
+            {
+                var proposed = new SexualEncounterProposed(
+                    p.OccurredAt,
+                    p.From,
+                    p.To,
+                    ReproductiveIntent.Indifferent,
+                    ContraceptionLevel.Unspecified,
+                    HasReproductivePotential(p.FromBiology, ctx.Biology));
+
+                outbox.Add(proposed);
+            }
         }
 
         #endregion Handle — zpracování doménových událostí
+
+        private void HandleSexualEncounterProposed(SexualEncounterProposed proposed, IHumanContext ctx, IEventCollector outbox)
+        {
+            ctx.Snapshot.Relationships.Edges.TryGetValue(proposed.From, out var edge);
+            var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
+                .ExpectedAcceptance(proposed.From, SpeechAct.Invite, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
+            var accepted = ShouldResolveSexualEncounter(proposed.OccurredAt, ctx, edge, expectedAcceptance);
+
+            outbox.Add(new SexualEncounterOutcome(
+                proposed.OccurredAt,
+                proposed.From,
+                proposed.To,
+                accepted,
+                accepted ? "accepted" : "declined",
+                proposed.Intent,
+                proposed.Contraception,
+                proposed.ReproductivePotential));
+        }
+
+        private bool ShouldResolveSexualEncounter(
+            WDateTime occurredAt,
+            IHumanContext ctx,
+            RelationshipEdge? edge,
+            double expectedAcceptance)
+        {
+            if (!CanConsiderSexualEncounter(occurredAt, ctx, edge))
+            {
+                return false;
+            }
+
+            var bias = SociosexualityBehaviorMath.InviteAcceptanceBias(ctx.Personality.Sociosexuality, edge, expectedAcceptance, State.HasPrivacy);
+            var p = Math.Clamp(0.18 + expectedAcceptance * 0.28 + bias - ctx.Snapshot.Psychology.Stress * 0.001, 0.02, 0.82);
+            return ctx.Random.Chance(p);
+        }
+
+        private bool CanConsiderSexualEncounter(WDateTime occurredAt, IHumanContext ctx, RelationshipEdge? edge)
+        {
+            if (!State.HasPrivacy || ctx.Snapshot.Physiology.Pain > 55 || ctx.Snapshot.Physiology.Energy < 25)
+            {
+                return false;
+            }
+
+            if (ctx.Snapshot.Psychology.Stress > 70 || !IsAdult(ctx, occurredAt))
+            {
+                return false;
+            }
+
+            return !SociosexualityBehaviorMath.BlocksIntimateTouch(ctx.Personality.Sociosexuality, edge);
+        }
+
+        private static bool HasReproductivePotential(SexBiology? initiatorBiology, SexBiology recipientBiology)
+            => (initiatorBiology == SexBiology.Male && recipientBiology == SexBiology.Female)
+                || (initiatorBiology == SexBiology.Female && recipientBiology == SexBiology.Male);
+
+        private static bool IsAdult(IHumanContext ctx, WDateTime now)
+            => ctx.Identity is not null && ctx.Identity.BirthDate.DaysUntil(now.Date) >= 18L * 365L;
 
         #region RestoreState
 

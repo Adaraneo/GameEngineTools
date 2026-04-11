@@ -141,7 +141,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return;
             }
 
-            outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, targeting.SpeechAct, targeting.Reason));
+            outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, targeting.SpeechAct, targeting.Reason, ctx.Biology));
         }
 
         #endregion Cooldowns

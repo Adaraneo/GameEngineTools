@@ -323,6 +323,43 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                         break;
                     }
+
+                case SexualEncounterOutcome se:
+                    {
+                        var otherId = se.From == self ? se.To : se.From;
+
+                        if (se.Accepted)
+                        {
+                            Upsert(self, otherId, e => e with
+                            {
+                                Comfort = Bump(e.Comfort, +1.2 + SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality)),
+                                Closeness = Bump(e.Closeness, +2.0),
+                                RomanticInterest = Bump(e.RomanticInterest, 0.8 * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(ctx.Personality.Sociosexuality)),
+                                SexualInterest = Bump(e.SexualInterest, 2.4 * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(ctx.Personality.Sociosexuality)),
+                                Breakdown = e.Breakdown with
+                                {
+                                    Physical = BumpD(e.Breakdown.Physical, +3.0)
+                                }
+                            },
+                            eventType: nameof(SexualEncounterOutcome),
+                            outcome: "accepted",
+                            detail: $"self={(se.From == self ? "initiator" : "recipient")}, reproductive={se.ReproductivePotential}");
+                        }
+                        else
+                        {
+                            Upsert(self, otherId, e => e with
+                            {
+                                Comfort = Bump(e.Comfort, -2.0),
+                                Trust = Bump(e.Trust, -0.8),
+                                RomanticInterest = Bump(e.RomanticInterest, -1.2)
+                            },
+                            eventType: nameof(SexualEncounterOutcome),
+                            outcome: "declined",
+                            detail: $"self={(se.From == self ? "initiator" : "recipient")}");
+                        }
+
+                        break;
+                    }
             }
         }
 

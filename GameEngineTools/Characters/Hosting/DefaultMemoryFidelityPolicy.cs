@@ -69,6 +69,7 @@ namespace GameEngineTools.Characters.Hosting
                 MicroPositive => true,
                 MicroNegative => true,
                 RepairAttempt => true,
+                SexualEncounterOutcome => true,
                 NightmareTriggered => true,
                 SleepEnded => true,
                 _ => true
@@ -83,6 +84,7 @@ namespace GameEngineTools.Characters.Hosting
                 MicroPositive mp => IsImportantPositiveMicroKind(mp.Kind),
                 MicroNegative => true,
                 RepairAttempt => true,
+                SexualEncounterOutcome => true,
                 NightmareTriggered => true,
                 SleepEnded => true,
                 _ => false

@@ -372,7 +372,7 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
             selection.RomanticInterest,
             selection.HasPrivacy ? "yes" : "no");
 
-        target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null));
+        target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null, character.Biology));
         TryTouch(now, character, target, rng);
     }
 }

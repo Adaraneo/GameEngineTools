@@ -497,7 +497,30 @@ namespace GameEngineTools.Characters.Engines.Memory
                         break;
                     }
 
-                // ── Noční můra ────────────────────────────────────────────────────────────
+                // ── Sexuální setkání ──────────────────────────────────────────────────────
+                case SexualEncounterOutcome se:
+                    {
+                        var other = ResolveOtherPerson(ctx.Id, se.From, se.To);
+                        var what = $"SexualEncounter:{(se.Accepted ? "Accepted" : "Declined")}|from={se.From.Value}|to={se.To.Value}";
+
+                        Encode(new EpisodicMemory(
+                            Guid.NewGuid(),
+                            se.OccurredAt,
+                            what,
+                            Salience: 0.95,
+                            se.Accepted ? EmotionalTag.Positive : EmotionalTag.Mixed,
+                            Strength: Config.BaseEncoding + 0.3,
+                            OtherPerson: other,
+                            BeliefEvidence: other.HasValue
+                                ? se.Accepted
+                                    ? new PersonBeliefEvidence(other.Value, PersonBeliefKind.EmotionallySafe, 0.18, "sexual-encounter-accepted")
+                                    : new PersonBeliefEvidence(other.Value, PersonBeliefKind.Rejecting, 0.18, "sexual-encounter-declined")
+                                : null),
+                            ctx,
+                            outbox);
+                        break;
+                    }
+
                 case NightmareTriggered nt:
                     {
                         // Noční můra — nejvyšší salience ze spánkových událostí
