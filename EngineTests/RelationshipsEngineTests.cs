@@ -585,7 +585,7 @@ namespace EngineTests
                 memory: memory,
                 semanticMemory: semanticMemory,
                 initialSnapshot: snapshot,
-                behaviorDecisionStep: null);
+                behaviorCadencePolicy: null);
         }
 
         /// <summary>

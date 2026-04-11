@@ -5,6 +5,7 @@ namespace GameEngineTools.World.Simulation
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;
@@ -82,6 +83,10 @@ namespace GameEngineTools.World.Simulation
         /// zmenšit hlavní <see cref="TickStep"/> pro celý sandbox.
         /// </remarks>
         public WTimeSpan? InternalSubstep { get; init; }
+
+        public CharacterLodLevel DefaultCharacterLod { get; init; } = CharacterLodLevel.Nearby;
+
+        public Func<IHuman, CharacterLodLevel>? ResolveCharacterLod { get; init; }
 
         #endregion Časování simulace
 

@@ -38,7 +38,13 @@ namespace GameEngineTools.Characters.Hosting
             services.TryAddTransient<IEventBus, InMemoryEventBus>();
             services.TryAddTransient<IScheduler, SimpleScheduler>();
             services.TryAddSingleton<IRandomSourceFactory, RandomSourceFactory>();
+            services.TryAddSingleton<ICharacterLodRuntime, DefaultCharacterLodRuntime>();
+            services.TryAddSingleton<IBehaviorCadencePolicy, DefaultBehaviorCadencePolicy>();
             services.TryAddSingleton<IHumanFactory, DefaultHumanFactory>();
+
+            var lodOb = services.AddOptions<CharacterLodConfig>();
+            lodOb.BindConfiguration("Characters:Lod");
+
             return services;
         }
 

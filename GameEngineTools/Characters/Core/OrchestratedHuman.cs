@@ -113,7 +113,7 @@ namespace GameEngineTools.Characters.Core
 
         // Optional cadence decoupling for behaviour-level reasoning.
         // When zero, behavior runs every incoming Tick(dt).
-        private readonly WTimeSpan _behaviorDecisionStep;
+        private readonly Hosting.IBehaviorCadencePolicy? _behaviorCadencePolicy;
         private WTimeSpan _behaviorAccumulated;
 
         #endregion Private fields
@@ -166,7 +166,7 @@ namespace GameEngineTools.Characters.Core
             // initial snapshot (from factory)
             EnginesSnapshot initialSnapshot,
             // optional behavior cadence override
-            WTimeSpan? behaviorDecisionStep = null)
+            Hosting.IBehaviorCadencePolicy? behaviorCadencePolicy = null)
         {
             Id = id;
             Identity = identity;
@@ -190,7 +190,7 @@ namespace GameEngineTools.Characters.Core
             _semanticMemory = semanticMemory;
 
             Snapshot = initialSnapshot;
-            _behaviorDecisionStep = NormalizeBehaviorDecisionStep(behaviorDecisionStep);
+            _behaviorCadencePolicy = behaviorCadencePolicy;
             _behaviorAccumulated = WTimeSpan.Zero;
 
             _ctx = new HumanContext
@@ -212,16 +212,6 @@ namespace GameEngineTools.Characters.Core
 
         #region Cadence helpers
 
-        private static WTimeSpan NormalizeBehaviorDecisionStep(WTimeSpan? behaviorDecisionStep)
-        {
-            if (behaviorDecisionStep is null || behaviorDecisionStep.Value <= WTimeSpan.Zero)
-            {
-                return WTimeSpan.Zero;
-            }
-
-            return behaviorDecisionStep.Value;
-        }
-
         private WTimeSpan ConsumeBehaviorDelta(WTimeSpan dt)
         {
             if (dt <= WTimeSpan.Zero)
@@ -229,13 +219,15 @@ namespace GameEngineTools.Characters.Core
                 return WTimeSpan.Zero;
             }
 
-            if (_behaviorDecisionStep == WTimeSpan.Zero)
+            var decisionStep = _behaviorCadencePolicy?.GetDecisionStep(this) ?? WTimeSpan.Zero;
+
+            if (decisionStep <= WTimeSpan.Zero)
             {
                 return dt;
             }
 
             _behaviorAccumulated += dt;
-            if (_behaviorAccumulated < _behaviorDecisionStep)
+            if (_behaviorAccumulated < decisionStep)
             {
                 return WTimeSpan.Zero;
             }

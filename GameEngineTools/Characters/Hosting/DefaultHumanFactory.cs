@@ -73,7 +73,7 @@ namespace GameEngineTools.Characters.Hosting
         private readonly IPhysiologyEngineFactory _physioFactory;
         private readonly IPsychologyEngineFactory _psychFactory;
         private readonly IClock _clock;
-        private readonly HumanRuntimeOptions? _runtimeOptions;
+        private readonly IBehaviorCadencePolicy _behaviorCadencePolicy;
 
         #endregion Private fields
 
@@ -89,7 +89,7 @@ namespace GameEngineTools.Characters.Hosting
             IPhysiologyEngineFactory physioFactory,
             IPsychologyEngineFactory psychFactory,
             IClock clock,
-            HumanRuntimeOptions? runtimeOptions = null)
+            IBehaviorCadencePolicy behaviorCadencePolicy)
         {
             _sp = sp;
             _rngFactory = rngFactory;
@@ -97,7 +97,7 @@ namespace GameEngineTools.Characters.Hosting
             _physioFactory = physioFactory;
             _psychFactory = psychFactory;
             _clock = clock;
-            _runtimeOptions = runtimeOptions;
+            _behaviorCadencePolicy = behaviorCadencePolicy;
         }
 
         #endregion Constructor
@@ -134,7 +134,7 @@ namespace GameEngineTools.Characters.Hosting
                 bus, scheduler, rng, logger,
                 physio, psych, behav, inter, rel, mem, semantic,
                 snapshot,
-                _runtimeOptions?.BehaviorDecisionStep);
+                _behaviorCadencePolicy);
         }
 
         #endregion IHumanFactory

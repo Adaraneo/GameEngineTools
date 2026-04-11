@@ -10,6 +10,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
     using GameEngineTools.World.Utils.Time;
 
@@ -55,6 +56,8 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Konfigurace scény předaná zvenku.</summary>
         private readonly SimulationSceneOptions _options;
 
+        private readonly ICharacterLodRuntime _lodRuntime;
+
         #endregion Privátní pole
 
         #region Konstruktor
@@ -73,10 +76,11 @@ namespace GameEngineTools.World.Simulation
         /// <exception cref="ArgumentException">
         /// Pokud <see cref="SimulationSceneOptions.Characters"/> je prázdný seznam.
         /// </exception>
-        public SimulationScene(SystemClock clock, SimulationSceneOptions options)
+        public SimulationScene(SystemClock clock, SimulationSceneOptions options, ICharacterLodRuntime characterLodRuntime)
         {
             ArgumentNullException.ThrowIfNull(clock);
             ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(characterLodRuntime);
 
             if (options.Characters.Count == 0)
                 throw new ArgumentException(
@@ -84,6 +88,7 @@ namespace GameEngineTools.World.Simulation
 
             _clock = clock;
             _options = options;
+            _lodRuntime = characterLodRuntime;
         }
 
         #endregion Konstruktor
@@ -131,6 +136,8 @@ namespace GameEngineTools.World.Simulation
 
         private void SimulateSingleStep(WDateTime startTime, IReadOnlyList<IHuman> chars, WTimeSpan dt)
         {
+            ApplyCharacterLods(chars);
+
             var now = _clock.Now;
 
             _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
@@ -283,5 +290,18 @@ namespace GameEngineTools.World.Simulation
         }
 
         #endregion Sleep handling
+
+        #region Private Helpers
+
+        private void ApplyCharacterLods(IReadOnlyList<IHuman> characters)
+        {
+            foreach (var c in characters)
+            {
+                var lod = _options.ResolveCharacterLod?.Invoke(c) ?? _options.DefaultCharacterLod;
+                _lodRuntime.Set(c.Id, lod);
+            }
+        }
+
+        #endregion
     }
 }

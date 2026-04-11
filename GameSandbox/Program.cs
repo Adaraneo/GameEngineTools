@@ -10,6 +10,7 @@ using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Generation.Portraits;
+using GameEngineTools.Characters.Hosting;
 using GameEngineTools.Characters.Traits;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
@@ -51,6 +52,7 @@ var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
 var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
 var clock = (SystemClock)runtime.Clock;
 var attractionCalculator = (DefaultAttractionCalculator)runtime.Services.GetRequiredService<IAttractionCalculator>();
+var lodRuntime = (DefaultCharacterLodRuntime)runtime.Services.GetRequiredService<ICharacterLodRuntime>();
 
 // ── Characters ────────────────────────────────────────────────────────────────
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
@@ -187,6 +189,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
+    DefaultCharacterLod = CharacterLodLevel.Player,
 
     ResolveCharacter = id =>
     {
@@ -240,7 +243,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     }
 };
 
-var mainTrioScene = new SimulationScene(clock, mainTrioSceneOpts);
+var mainTrioScene = new SimulationScene(clock, mainTrioSceneOpts, lodRuntime);
 await mainTrioScene.RunAsync();
 
 var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
@@ -255,6 +258,7 @@ if (characters.Count > 0)
         TickStep = WTimeSpan.FromHours(5),
         InternalSubstep = WTimeSpan.FromHours(1),
         SimulationYears = 5,
+        DefaultCharacterLod = CharacterLodLevel.Background,
         OnTick = (now, chars) =>
         {
             FireFirstImpressions(now, chars, attractionCalculator, locationService);
@@ -265,7 +269,7 @@ if (characters.Count > 0)
 
             OrganicMicroPositives(now, chars, locationService, rng);
         }
-    });
+    }, lodRuntime);
 
     await otherCharactersScene.RunAsync();
 }
