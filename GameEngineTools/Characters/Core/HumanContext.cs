@@ -12,6 +12,7 @@ namespace GameEngineTools.Characters.Core
         public SexBiology Biology { get; init; }
         public Traits.Personality Personality { get; init; } = default!;
         public Traits.PsychologicalProfile PsychologyProfile { get; init; } = Traits.PsychologicalProfile.Default;
+        public Traits.AttractionProfile? AttractionProfile { get; init; }
         public EnginesSnapshot Snapshot { get; internal set; } = default!;
         public IEventBus EventBus { get; init; } = default!;
         public IScheduler Scheduler { get; init; } = default!;

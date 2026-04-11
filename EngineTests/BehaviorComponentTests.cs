@@ -47,14 +47,16 @@ namespace EngineTests
             Chronotype chronotype = Chronotype.Neutral,
             Personality? personality = null,
             IRandomSource? random = null,
-            HumanId? selfId = null)
+            HumanId? selfId = null,
+            SexBiology biology = SexBiology.Female,
+            AttractionProfile? attractionProfile = null)
         {
-            var ctx = Human(memory, semanticMemory, relationships, surfaceKind, noise, crowding, stress, valence, hunger, thirst, energy, competence, curiosity, affiliation, chronotype, personality, random, selfId);
+            var ctx = Human(memory, semanticMemory, relationships, surfaceKind, noise, crowding, stress, valence, hunger, thirst, energy, competence, curiosity, affiliation, chronotype, personality, random, selfId, biology, attractionProfile);
             var s = BehaviorMath.ComputeNeedState(ctx, new Dictionary<string, double>(), state ?? new BehaviorState(10, 5, 5, 20, 50, 30, null));
             return new BehaviorContext(now ?? new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector(), s, new BehaviorConfig(), new Dictionary<string, double>(), new Dictionary<string, DecisionWorkingSet>());
         }
 
-        internal static IHumanContext Human(MemoryIndex? memory, SemanticMemoryState? semanticMemory, RelationshipState? relationships, SurfaceKind surfaceKind, double noise, double crowding, double stress, double valence, double hunger, double thirst, double energy, double competence, double curiosity, double affiliation, Chronotype chronotype, Personality? personality = null, IRandomSource? random = null, HumanId? selfId = null)
+        internal static IHumanContext Human(MemoryIndex? memory, SemanticMemoryState? semanticMemory, RelationshipState? relationships, SurfaceKind surfaceKind, double noise, double crowding, double stress, double valence, double hunger, double thirst, double energy, double competence, double curiosity, double affiliation, Chronotype chronotype, Personality? personality = null, IRandomSource? random = null, HumanId? selfId = null, SexBiology biology = SexBiology.Female, AttractionProfile? attractionProfile = null)
         {
             var effectivePersonality = personality ?? new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentStyle.Secure, CommunicationStyle.Direct,
                 new MotivationWeights(affiliation, 0.5, 0.3, 0.4, competence, 0.5, curiosity, 0.6, 0.3), Sociosexuality.Intermediate, chronotype);
@@ -70,9 +72,10 @@ namespace EngineTests
             return new HumanContext
             {
                 Id = selfId ?? new HumanId(Guid.NewGuid()),
-                Biology = SexBiology.Female,
+                Biology = biology,
                 Personality = effectivePersonality,
                 PsychologyProfile = PsychologicalProfile.FromPersonality(effectivePersonality),
+                AttractionProfile = attractionProfile,
                 Snapshot = snapshot,
                 Random = random ?? new LocalZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),

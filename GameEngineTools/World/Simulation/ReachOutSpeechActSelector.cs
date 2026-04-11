@@ -10,6 +10,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -48,7 +49,9 @@ namespace GameEngineTools.World.Simulation
                 initiator.Snapshot.SemanticMemory,
                 target.Id,
                 initiator.PsychologyProfile,
-                initiator.Snapshot.Memory.Episodes);
+                initiator.Snapshot.Memory.Episodes,
+                initiator.AttractionProfile,
+                target.Biology);
         }
 
         /// <summary>
@@ -71,7 +74,9 @@ namespace GameEngineTools.World.Simulation
             SemanticMemoryState? semanticMemory,
             HumanId? targetId,
             Characters.Traits.PsychologicalProfile? profile = null,
-            IReadOnlyList<Characters.Engines.Memory.EpisodicMemory>? episodes = null)
+            IReadOnlyList<Characters.Engines.Memory.EpisodicMemory>? episodes = null,
+            AttractionProfile? attractionProfile = null,
+            SexBiology? targetBiology = null)
         {
             ArgumentNullException.ThrowIfNull(rng);
 
@@ -89,6 +94,7 @@ namespace GameEngineTools.World.Simulation
             var safeBelief = targetId is { } safeOther && semanticMemory is not null
                 ? semanticMemory.GetStrength(safeOther, PersonBeliefKind.EmotionallySafe)
                 : 0.0;
+            var orientationMultiplier = SexualOrientationBehaviorMath.IntimacyTargetScoreMultiplier(attractionProfile, targetBiology);
 
             var weightedActs = new List<(SpeechAct Act, double Weight)>
             {
@@ -112,9 +118,9 @@ namespace GameEngineTools.World.Simulation
                 weightedActs.Add((SpeechAct.Meta, ComputeMetaWeight(trust, comfort, closeness, safeBelief)));
             }
 
-            if (CanInvite(surface, comfort, closeness, romanticInterest) || expectedAcceptance >= 0.66)
+            if (CanInvite(surface, comfort, closeness, romanticInterest, orientationMultiplier) || expectedAcceptance >= 0.66)
             {
-                weightedActs.Add((SpeechAct.Invite, ComputeInviteWeight(surface, comfort, closeness, romanticInterest, expectedAcceptance)));
+                weightedActs.Add((SpeechAct.Invite, ComputeInviteWeight(surface, comfort, closeness, romanticInterest, expectedAcceptance) * orientationMultiplier));
             }
 
             var chosen = PickWeightedRandom(weightedActs, rng);
@@ -186,10 +192,11 @@ namespace GameEngineTools.World.Simulation
             InteractionSurface surface,
             double comfort,
             double closeness,
-            double romanticInterest)
+            double romanticInterest,
+            double orientationMultiplier)
             => comfort >= 55
                 && closeness >= 12
-                && romanticInterest >= 10
+                && romanticInterest * orientationMultiplier >= 10
                 && (surface.HasPrivacy || surface.Kind is SurfaceKind.Social or SurfaceKind.Private);
 
         private static double ComputeInviteWeight(

@@ -221,6 +221,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     edge,
                     expectedAcceptance,
                     State.HasPrivacy);
+                baseP += SexualOrientationBehaviorMath.InviteAcceptanceBias(ctx.AttractionProfile, p.FromBiology);
             }
 
             // Misattribution: vyšší stres → větší šance na špatné čtení záměru
@@ -247,7 +248,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 To: p.To,
                 Accepted: accepted,
                 Reason: accepted ? "accepted" : "declined",
-                Act: p.Act);
+                Act: p.Act,
+                FromBiology: p.FromBiology,
+                ToBiology: ctx.Biology);
 
             outbox.Add(outcome);
 
@@ -259,7 +262,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     p.To,
                     ReproductiveIntent.Indifferent,
                     ContraceptionLevel.Unspecified,
-                    HasReproductivePotential(p.FromBiology, ctx.Biology));
+                    HasReproductivePotential(p.FromBiology, ctx.Biology),
+                    FromBiology: p.FromBiology,
+                    ToBiology: ctx.Biology);
 
                 outbox.Add(proposed);
             }
@@ -272,7 +277,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             ctx.Snapshot.Relationships.Edges.TryGetValue(proposed.From, out var edge);
             var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
                 .ExpectedAcceptance(proposed.From, SpeechAct.Invite, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
-            var accepted = ShouldResolveSexualEncounter(proposed.OccurredAt, ctx, edge, expectedAcceptance);
+            var accepted = ShouldResolveSexualEncounter(proposed.OccurredAt, ctx, edge, expectedAcceptance, proposed.FromBiology);
 
             outbox.Add(new SexualEncounterOutcome(
                 proposed.OccurredAt,
@@ -282,14 +287,17 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 accepted ? "accepted" : "declined",
                 proposed.Intent,
                 proposed.Contraception,
-                proposed.ReproductivePotential));
+                proposed.ReproductivePotential,
+                proposed.FromBiology,
+                proposed.ToBiology ?? ctx.Biology));
         }
 
         private bool ShouldResolveSexualEncounter(
             WDateTime occurredAt,
             IHumanContext ctx,
             RelationshipEdge? edge,
-            double expectedAcceptance)
+            double expectedAcceptance,
+            SexBiology? targetBiology)
         {
             if (!CanConsiderSexualEncounter(occurredAt, ctx, edge))
             {
@@ -297,6 +305,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             }
 
             var bias = SociosexualityBehaviorMath.InviteAcceptanceBias(ctx.Personality.Sociosexuality, edge, expectedAcceptance, State.HasPrivacy);
+            bias += SexualOrientationBehaviorMath.SexualEncounterAcceptanceBias(ctx.AttractionProfile, targetBiology);
             var p = Math.Clamp(0.18 + expectedAcceptance * 0.28 + bias - ctx.Snapshot.Psychology.Stress * 0.001, 0.02, 0.82);
             return ctx.Random.Chance(p);
         }

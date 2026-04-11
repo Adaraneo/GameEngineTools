@@ -108,7 +108,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
         HumanId To,
         SpeechAct Act,
         string? Content,
-        SexBiology? FromBiology = null) : IDomainEvent;
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
 
     /// <summary>Událost — postava A se pokouší o fyzický kontakt s postavou B.</summary>
     public sealed record TouchAttempted(
@@ -131,7 +132,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
         HumanId To,
         bool Accepted,
         string Reason,
-        SpeechAct Act = SpeechAct.SmallTalk) : IDomainEvent;
+        SpeechAct Act = SpeechAct.SmallTalk,
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
 
     /// <summary>Záměr vůči případnému těhotenství u abstraktního sexuálního setkání.</summary>
     public enum ReproductiveIntent
@@ -159,7 +162,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
         HumanId To,
         ReproductiveIntent Intent = ReproductiveIntent.Indifferent,
         ContraceptionLevel Contraception = ContraceptionLevel.Unspecified,
-        bool ReproductivePotential = false) : IDomainEvent;
+        bool ReproductivePotential = false,
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
 
     /// <summary>Událost — abstraktní intimní setkání bylo přijato nebo odmítnuto.</summary>
     public sealed record SexualEncounterOutcome(
@@ -170,5 +175,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         string Reason,
         ReproductiveIntent Intent = ReproductiveIntent.Indifferent,
         ContraceptionLevel Contraception = ContraceptionLevel.Unspecified,
-        bool ReproductivePotential = false) : IDomainEvent;
+        bool ReproductivePotential = false,
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
 }

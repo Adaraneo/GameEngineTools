@@ -30,13 +30,13 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             IHuman initiator,
             IHuman target,
             SocialTargetMode mode)
-            => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target.Id, mode);
+            => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.AttractionProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target.Id, mode, target.Biology);
 
         public static SocialTargetScore ScoreTarget(
             IHumanContext initiator,
             HumanId target,
             SocialTargetMode mode)
-            => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target, mode);
+            => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.AttractionProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target, mode, null);
 
         public static IReadOnlyList<SocialTargetScore> RankTargets(
             IHumanContext initiator,
@@ -71,11 +71,13 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             HumanId initiatorId,
             Sociosexuality sociosexuality,
             PsychologicalProfile profile,
+            AttractionProfile? attractionProfile,
             RelationshipState relationships,
             MemoryIndex memoryIndex,
             SemanticMemoryState? semanticMemory,
             HumanId target,
-            SocialTargetMode mode)
+            SocialTargetMode mode,
+            SexBiology? targetBiology)
         {
             var act = mode switch
             {
@@ -85,6 +87,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             };
 
             var relationship = relationships.Edges.GetValueOrDefault(target);
+            var effectiveTargetBiology = targetBiology ?? relationship?.TargetBiology;
             var memory = memoryIndex.Episodes;
             var expected = SemanticMemoryMath.ExpectedAcceptance(semanticMemory, target, act, relationship, profile, memory);
             var baseScore = SemanticMemoryMath.ScoreApproachTarget(semanticMemory, target, relationship, profile, memory, act);
@@ -98,10 +101,15 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             var sociosexualityAdjustment = mode == SocialTargetMode.Intimacy
                 ? SociosexualityBehaviorMath.IntimacyTargetScoreAdjustment(sociosexuality, relationship, vulnerabilitySafety, rejectionRisk, expected)
                 : 0.0;
-            var score = blocked ? 0.0 : Math.Clamp(baseScore + RecentSalience(memory, target) * 0.10 + sociosexualityAdjustment, 0.0, 1.0);
+            var orientationMultiplier = mode == SocialTargetMode.Intimacy && effectiveTargetBiology is not null
+                ? SexualOrientationBehaviorMath.IntimacyTargetScoreMultiplier(attractionProfile, effectiveTargetBiology)
+                : 1.0;
+            var score = blocked
+                ? 0.0
+                : Math.Clamp((baseScore + RecentSalience(memory, target) * 0.10 + sociosexualityAdjustment) * orientationMultiplier, 0.0, 1.0);
             var reason = blocked
                 ? $"blocked:{mode}:risk={rejectionRisk:0.00}:safe={vulnerabilitySafety:0.00}"
-                : $"mode={mode};expected={expected:0.00};safe={vulnerabilitySafety:0.00};risk={rejectionRisk:0.00};socio={sociosexuality}";
+                : $"mode={mode};expected={expected:0.00};safe={vulnerabilitySafety:0.00};risk={rejectionRisk:0.00};socio={sociosexuality};orientation={orientationMultiplier:0.00}";
 
             return new SocialTargetScore(target, score, expected, act, vulnerabilitySafety, rejectionRisk, blocked, reason);
         }

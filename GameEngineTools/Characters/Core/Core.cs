@@ -96,6 +96,7 @@ namespace GameEngineTools.Characters.Core
         SexBiology Biology { get; }
         Personality Personality { get; }
         PsychologicalProfile PsychologyProfile { get; }
+        AttractionProfile? AttractionProfile { get; }
 
         EnginesSnapshot Snapshot { get; }
 

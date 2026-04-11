@@ -121,14 +121,104 @@ namespace EngineTests
             Assert.IsTrue(restricted.Comfort > unrestricted.Comfort);
         }
 
-        private static IReadOnlyList<IDomainEvent> EvaluateInvite(IHumanContext ctx, HumanId from, HumanId to)
+        [TestMethod]
+        public void RelationshipInviteDelta_SexualOrientationShapesRomanticAndSexualGrowth()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var femaleTarget = new HumanId(Guid.NewGuid());
+            var maleTarget = new HumanId(Guid.NewGuid());
+            var profile = HeterosexualMaleProfile();
+            var femaleStart = Edge(self, femaleTarget, trust: 72, comfort: 74, closeness: 72, physical: 82, aesthetic: 80, romantic: 35, sexual: 35)
+                with { TargetBiology = SexBiology.Female };
+            var maleStart = Edge(self, maleTarget, trust: 72, comfort: 74, closeness: 72, physical: 82, aesthetic: 80, romantic: 35, sexual: 35)
+                with { TargetBiology = SexBiology.Male };
+
+            var femaleAfter = ApplyAcceptedInvite(self, femaleTarget, femaleStart, Sociosexuality.Intermediate, profile, SexBiology.Male, SexBiology.Female);
+            var maleAfter = ApplyAcceptedInvite(self, maleTarget, maleStart, Sociosexuality.Intermediate, profile, SexBiology.Male, SexBiology.Male);
+
+            Assert.IsTrue(femaleAfter.RomanticInterest - femaleStart.RomanticInterest > maleAfter.RomanticInterest - maleStart.RomanticInterest);
+            Assert.IsTrue(femaleAfter.SexualInterest - femaleStart.SexualInterest > maleAfter.SexualInterest - maleStart.SexualInterest);
+        }
+
+        [TestMethod]
+        public void InteractionInviteAcceptance_SexualOrientationBiasesIntimacyInviteAcceptance()
+        {
+            var femaleFrom = new HumanId(Guid.NewGuid());
+            var maleFrom = new HumanId(Guid.NewGuid());
+            var to = new HumanId(Guid.NewGuid());
+            var profile = HeterosexualMaleProfile();
+            var femaleRelationship = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [femaleFrom] = Edge(to, femaleFrom, trust: 55, comfort: 55, closeness: 55, physical: 80, aesthetic: 78, romantic: 55, sexual: 70)
+                    with { TargetBiology = SexBiology.Female }
+            });
+            var maleRelationship = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [maleFrom] = Edge(to, maleFrom, trust: 55, comfort: 55, closeness: 55, physical: 80, aesthetic: 78, romantic: 55, sexual: 70)
+                    with { TargetBiology = SexBiology.Male }
+            });
+            var femaleCtx = BehaviorComponentTestFactory.Context(
+                selfId: to,
+                relationships: femaleRelationship,
+                personality: Personality(Sociosexuality.Intermediate, sexuality: 0.8),
+                random: new ThresholdRandom(0.76),
+                biology: SexBiology.Male,
+                attractionProfile: profile).HumanContext;
+            var maleCtx = BehaviorComponentTestFactory.Context(
+                selfId: to,
+                relationships: maleRelationship,
+                personality: Personality(Sociosexuality.Intermediate, sexuality: 0.8),
+                random: new ThresholdRandom(0.76),
+                biology: SexBiology.Male,
+                attractionProfile: profile).HumanContext;
+
+            var femaleOutbox = EvaluateInvite(femaleCtx, femaleFrom, to, SexBiology.Female);
+            var maleOutbox = EvaluateInvite(maleCtx, maleFrom, to, SexBiology.Male);
+
+            Assert.IsTrue(femaleOutbox.OfType<InteractionOutcome>().Single().Accepted);
+            Assert.IsFalse(maleOutbox.OfType<InteractionOutcome>().Single().Accepted);
+        }
+
+        [TestMethod]
+        public void SemanticTargeting_IntimacyModeUsesKnownTargetBiologyWhenAvailable()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var femaleTarget = new HumanId(Guid.NewGuid());
+            var maleTarget = new HumanId(Guid.NewGuid());
+            var relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [femaleTarget] = Edge(self, femaleTarget, trust: 56, comfort: 58, closeness: 42, physical: 58, aesthetic: 58, romantic: 28, sexual: 30)
+                    with { TargetBiology = SexBiology.Female },
+                [maleTarget] = Edge(self, maleTarget, trust: 56, comfort: 58, closeness: 42, physical: 58, aesthetic: 58, romantic: 28, sexual: 30)
+                    with { TargetBiology = SexBiology.Male }
+            });
+            var semantic = new SemanticMemoryState(new Dictionary<HumanId, PersonBeliefSet>
+            {
+                [femaleTarget] = SafeBeliefs(femaleTarget),
+                [maleTarget] = SafeBeliefs(maleTarget)
+            });
+            var context = BehaviorComponentTestFactory.Context(
+                selfId: self,
+                relationships: relationships,
+                semanticMemory: semantic,
+                personality: Personality(Sociosexuality.Intermediate, sexuality: 0.8),
+                biology: SexBiology.Male,
+                attractionProfile: HeterosexualMaleProfile()).HumanContext;
+
+            var ranked = SemanticTargeting.RankTargets(context, new[] { maleTarget, femaleTarget }, SocialTargetMode.Intimacy, take: 2);
+
+            Assert.AreEqual(femaleTarget, ranked[0].Target);
+            Assert.IsTrue(ranked[0].Score > ranked[1].Score);
+        }
+
+        private static IReadOnlyList<IDomainEvent> EvaluateInvite(IHumanContext ctx, HumanId from, HumanId to, SexBiology? fromBiology = null)
         {
             var engine = new DefaultInteractionEngine(
                 Options.Create(new InteractionConfig()),
                 LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
             engine.RestoreState(new InteractionSurface("private", true, 0.1, 0.1, SurfaceKind.Private));
             var outbox = new EventCollector();
-            engine.Handle(new InteractionProposed(new WDateTime(0), from, to, SpeechAct.Invite, null), ctx, outbox);
+            engine.Handle(new InteractionProposed(new WDateTime(0), from, to, SpeechAct.Invite, null, fromBiology), ctx, outbox);
             return outbox.Drain();
         }
 
@@ -136,7 +226,10 @@ namespace EngineTests
             HumanId self,
             HumanId other,
             RelationshipEdge start,
-            Sociosexuality sociosexuality)
+            Sociosexuality sociosexuality,
+            AttractionProfile? attractionProfile = null,
+            SexBiology selfBiology = SexBiology.Female,
+            SexBiology? targetBiology = null)
         {
             var engine = new DefaultRelationshipsEngine(
                 Options.Create(new RelationshipsConfig()),
@@ -145,9 +238,11 @@ namespace EngineTests
             var context = BehaviorComponentTestFactory.Context(
                 selfId: self,
                 relationships: engine.State,
-                personality: Personality(sociosexuality, sexuality: 0.8)).HumanContext;
+                personality: Personality(sociosexuality, sexuality: 0.8),
+                biology: selfBiology,
+                attractionProfile: attractionProfile).HumanContext;
 
-            engine.Handle(new InteractionOutcome(new WDateTime(0), self, other, true, "accepted", SpeechAct.Invite), context, new EventCollector());
+            engine.Handle(new InteractionOutcome(new WDateTime(0), self, other, true, "accepted", SpeechAct.Invite, selfBiology, targetBiology), context, new EventCollector());
             return engine.State.Edges[other];
         }
 
@@ -184,6 +279,25 @@ namespace EngineTests
                 new MotivationWeights(0.6, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.5, sexuality),
                 sociosexuality,
                 Chronotype.Neutral);
+
+        private static AttractionProfile HeterosexualMaleProfile()
+            => new(
+                PreferredHeightCm: 168,
+                HeightToleranceCm: 20,
+                FramePreference: BodyFramePreference.Medium,
+                PreferredWhr: 0.72,
+                SymmetryWeight: 0.5,
+                Orientation: SexualOrientation.Heterosexual,
+                FemaleTargetAttraction: 1.0,
+                MaleTargetAttraction: 0.12,
+                OtherTargetAttraction: 0.65);
+
+        private static PersonBeliefSet SafeBeliefs(HumanId target)
+            => new(target, new Dictionary<PersonBeliefKind, PersonBelief>
+            {
+                [PersonBeliefKind.Warm] = new(target, PersonBeliefKind.Warm, 0.45, 0.5, 2, new WDateTime(0)),
+                [PersonBeliefKind.EmotionallySafe] = new(target, PersonBeliefKind.EmotionallySafe, 0.45, 0.5, 2, new WDateTime(0))
+            });
 
         private sealed class ThresholdRandom : IRandomSource
         {

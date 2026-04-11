@@ -65,9 +65,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
         private static double ComputeRomanticInterestDelta(
             RelationshipEdge e,
             SpeechAct act,
-            Sociosexuality sociosexuality)
+            Sociosexuality sociosexuality,
+            AttractionProfile? attractionProfile,
+            SexBiology? targetBiology)
         {
-            var context =((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
+            var context = ((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
                  + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.9)
                  + ((Math.Max(0.0, e.Closeness - 25.0) / 75.0) * 1.1)
                  + ((Math.Max(0.0, e.Like - 45.0) / 55.0) * 0.6)
@@ -82,9 +84,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 _ => 0
             };
 
+            var orientedDelta = delta * SexualOrientationBehaviorMath.RomanticInterestMultiplier(attractionProfile, targetBiology);
+
             return act == SpeechAct.Invite
-                ? delta * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(sociosexuality)
-                : delta;
+                ? orientedDelta * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(sociosexuality)
+                : orientedDelta;
         }
 
         /// <summary>
@@ -94,7 +98,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
         private static double ComputeSexualInterestDelta(
             RelationshipEdge e,
             SpeechAct act,
-            Sociosexuality sociosexuality)
+            Sociosexuality sociosexuality,
+            AttractionProfile? attractionProfile,
+            SexBiology? targetBiology)
         {
             var context = ((Math.Max(0, e.PhysicalAttraction - 50) / 50) * 0.9)
                 + ((Math.Max(0, e.AestheticAttraction - 50) / 50) * 0.6);
@@ -108,9 +114,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 _ => 0
             };
 
+            var orientedDelta = delta * SexualOrientationBehaviorMath.SexualInterestMultiplier(attractionProfile, targetBiology);
+
             return act == SpeechAct.Invite
-                ? delta * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(sociosexuality)
-                : delta;
+                ? orientedDelta * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(sociosexuality)
+                : orientedDelta;
         }
 
         /// <summary>
@@ -251,6 +259,24 @@ namespace GameEngineTools.Characters.Engines.Relationships
             TouchLevel.Intimate => +3.5,
             _ => 0.0
         };
+
+        /// <summary>
+        /// Resolves the biology of the person opposite <paramref name="self"/> in a two-person event.
+        /// </summary>
+        private static SexBiology? ResolveOtherBiology(
+            HumanId self,
+            HumanId first,
+            SexBiology? firstBiology,
+            HumanId second,
+            SexBiology? secondBiology)
+        {
+            if (self == first)
+            {
+                return secondBiology;
+            }
+
+            return self == second ? firstBiology : null;
+        }
 
         /// <summary>
         /// Inserts or updates an edge in the relationship graph.

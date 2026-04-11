@@ -203,6 +203,7 @@ namespace GameEngineTools.Characters.Core
                 Biology = Biology,
                 Personality = Personality,
                 PsychologyProfile = PsychologyProfile,
+                AttractionProfile = AttractionProfile,
                 EventBus = _bus,
                 Scheduler = _scheduler,
                 Random = _random,
