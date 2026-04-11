@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
@@ -54,8 +55,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
         private static BehaviorCandidate BuildInviteIntimacyCandidate(BehaviorContext context, SocialTargetScore target, double sexuality)
         {
+            context.HumanContext.Snapshot.Relationships.Edges.TryGetValue(target.Target, out var relationship);
+            var sociosexuality = context.HumanContext.Personality.Sociosexuality;
+            var sociosexualityMultiplier = SociosexualityBehaviorMath.InviteIntimacyUtilityMultiplier(
+                sociosexuality,
+                relationship,
+                target.VulnerabilitySafety,
+                target.RejectionRisk,
+                target.ExpectedAcceptance);
+
             var utility = BehaviorMath.Util(context.State.NeedIntimacy, sexuality)
                 * (0.35 + target.Score * 0.65)
+                * sociosexualityMultiplier
                 + target.VulnerabilitySafety * 10.0
                 - target.RejectionRisk * 6.0;
 

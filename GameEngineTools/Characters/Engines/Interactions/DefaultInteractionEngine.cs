@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
     using System;
     using Characters.Core;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -120,6 +121,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 _ => 0
             };
 
+            if (attempted.Level == TouchLevel.Intimate)
+            {
+                baseP += SociosexualityBehaviorMath.IntimateTouchAcceptanceBias(ctx.Personality.Sociosexuality, edge, State.HasPrivacy);
+            }
+
             // Soukromí a psychika modulují
             baseP += State.HasPrivacy ? 0.05 : -0.05;
             baseP -= psych.Stress * 0.002;
@@ -129,7 +135,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var accepted = ctx.Random.Chance(pAcc);
 
             // Intimate bez dostatečné Closeness/Attraction vždy odmítnuto
-            if (attempted.Level == TouchLevel.Intimate && (closeness < 60 || intimacyInterest < 55))
+            if (attempted.Level == TouchLevel.Intimate
+                && SociosexualityBehaviorMath.BlocksIntimateTouch(ctx.Personality.Sociosexuality, edge))
             {
                 accepted = false;
             }
@@ -201,6 +208,15 @@ namespace GameEngineTools.Characters.Engines.Interactions
                         - 0.05 * State.Crowding
                         - 0.0015 * psych.Stress
                         + (expectedAcceptance - 0.5) * 0.25;
+
+            if (p.Act == SpeechAct.Invite)
+            {
+                baseP += SociosexualityBehaviorMath.InviteAcceptanceBias(
+                    ctx.Personality.Sociosexuality,
+                    edge,
+                    expectedAcceptance,
+                    State.HasPrivacy);
+            }
 
             // Misattribution: vyšší stres → větší šance na špatné čtení záměru
             var misattrib = Config.MisattributionRateBase * (psych.Stress / 100.0);

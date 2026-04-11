@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -200,9 +201,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 Closeness = Bump(e.Closeness, +1.5),
                                 Like = Bump(e.Like, +0.5),
-                                Comfort = Bump(e.Comfort, +0.8),
-                                RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act)),
-                                SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act)),
+                                Comfort = Bump(e.Comfort, +0.8 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
+                                RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality)),
+                                SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act, ctx.Personality.Sociosexuality)),
                                 Trust = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
                                 Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
                                 Familiarity = Bump(e.Familiarity, familiarityDelta),

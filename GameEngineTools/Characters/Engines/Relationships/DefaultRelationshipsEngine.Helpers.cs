@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
 
     internal sealed partial class DefaultRelationshipsEngine
@@ -61,7 +62,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Computes a context-sensitive romantic-interest gain.
         /// Trust, comfort, closeness, like, and value alignment matter more than raw appearance.
         /// </summary>
-        private static double ComputeRomanticInterestDelta(RelationshipEdge e, SpeechAct act)
+        private static double ComputeRomanticInterestDelta(
+            RelationshipEdge e,
+            SpeechAct act,
+            Sociosexuality sociosexuality)
         {
             var context =((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
                  + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.9)
@@ -69,7 +73,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                  + ((Math.Max(0.0, e.Like - 45.0) / 55.0) * 0.6)
                  + ((Math.Max(0.0, e.Breakdown.Values - 50.0) / 50.0) * 0.8);
 
-            return act switch
+            var delta = act switch
             {
                 SpeechAct.SelfDisclosure => context * 0.7,
                 SpeechAct.Validation => context * 0.45,
@@ -77,13 +81,20 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 SpeechAct.Invite => context * 0.3,
                 _ => 0
             };
+
+            return act == SpeechAct.Invite
+                ? delta * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(sociosexuality)
+                : delta;
         }
 
         /// <summary>
         /// Computes a context-sensitive sexual-interest gain.
         /// Physical and aesthetic attraction lead, while comfort and closeness act as gates.
         /// </summary>
-        private static double ComputeSexualInterestDelta(RelationshipEdge e, SpeechAct act)
+        private static double ComputeSexualInterestDelta(
+            RelationshipEdge e,
+            SpeechAct act,
+            Sociosexuality sociosexuality)
         {
             var context = ((Math.Max(0, e.PhysicalAttraction - 50) / 50) * 0.9)
                 + ((Math.Max(0, e.AestheticAttraction - 50) / 50) * 0.6);
@@ -91,11 +102,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
             var gate = ((Math.Max(0, e.Comfort - 40) / 60) * 0.35)
                 + ((Math.Max(0, e.Closeness - 20) / 80) * 0.25);
 
-            return act switch
+            var delta = act switch
             {
                 SpeechAct.Invite => (context + gate) * 0.18,
                 _ => 0
             };
+
+            return act == SpeechAct.Invite
+                ? delta * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(sociosexuality)
+                : delta;
         }
 
         /// <summary>

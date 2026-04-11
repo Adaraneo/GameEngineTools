@@ -256,9 +256,8 @@ if (characters.Count > 0)
         Characters = characters,
         LocationService = locationService,
         TickStep = WTimeSpan.FromHours(5),
-        InternalSubstep = WTimeSpan.FromHours(1),
         SimulationYears = 5,
-        DefaultCharacterLod = CognitiveResolutionLevel.Background,
+        DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
         OnTick = (now, chars) =>
         {
             FireFirstImpressions(now, chars, attractionCalculator, locationService);

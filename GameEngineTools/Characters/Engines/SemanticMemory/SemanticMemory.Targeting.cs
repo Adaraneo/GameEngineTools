@@ -30,13 +30,13 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             IHuman initiator,
             IHuman target,
             SocialTargetMode mode)
-            => ScoreTarget(initiator.Id, initiator.PsychologyProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target.Id, mode);
+            => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target.Id, mode);
 
         public static SocialTargetScore ScoreTarget(
             IHumanContext initiator,
             HumanId target,
             SocialTargetMode mode)
-            => ScoreTarget(initiator.Id, initiator.PsychologyProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target, mode);
+            => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target, mode);
 
         public static IReadOnlyList<SocialTargetScore> RankTargets(
             IHumanContext initiator,
@@ -69,6 +69,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         private static SocialTargetScore ScoreTarget(
             HumanId initiatorId,
+            Sociosexuality sociosexuality,
             PsychologicalProfile profile,
             RelationshipState relationships,
             MemoryIndex memoryIndex,
@@ -93,17 +94,21 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             var critical = semanticMemory?.GetStrength(target, PersonBeliefKind.Critical) ?? 0.0;
             var vulnerabilitySafety = Math.Clamp(expected * 0.55 + safe * 0.30 + warm * 0.15, 0.0, 1.0);
             var rejectionRisk = Math.Clamp((1.0 - expected) * 0.55 + rejecting * 0.30 + critical * 0.15, 0.0, 1.0);
-            var blocked = IsPsychologicallyBlocked(mode, profile, vulnerabilitySafety, rejectionRisk, relationship);
-            var score = blocked ? 0.0 : Math.Clamp(baseScore + RecentSalience(memory, target) * 0.10, 0.0, 1.0);
+            var blocked = IsPsychologicallyBlocked(mode, sociosexuality, profile, vulnerabilitySafety, rejectionRisk, relationship);
+            var sociosexualityAdjustment = mode == SocialTargetMode.Intimacy
+                ? SociosexualityBehaviorMath.IntimacyTargetScoreAdjustment(sociosexuality, relationship, vulnerabilitySafety, rejectionRisk, expected)
+                : 0.0;
+            var score = blocked ? 0.0 : Math.Clamp(baseScore + RecentSalience(memory, target) * 0.10 + sociosexualityAdjustment, 0.0, 1.0);
             var reason = blocked
                 ? $"blocked:{mode}:risk={rejectionRisk:0.00}:safe={vulnerabilitySafety:0.00}"
-                : $"mode={mode};expected={expected:0.00};safe={vulnerabilitySafety:0.00};risk={rejectionRisk:0.00}";
+                : $"mode={mode};expected={expected:0.00};safe={vulnerabilitySafety:0.00};risk={rejectionRisk:0.00};socio={sociosexuality}";
 
             return new SocialTargetScore(target, score, expected, act, vulnerabilitySafety, rejectionRisk, blocked, reason);
         }
 
         private static bool IsPsychologicallyBlocked(
             SocialTargetMode mode,
+            Sociosexuality sociosexuality,
             PsychologicalProfile profile,
             double vulnerabilitySafety,
             double rejectionRisk,
@@ -117,7 +122,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             var closeness = (relationship?.Closeness ?? 0.0) / 100.0;
             if (mode == SocialTargetMode.Intimacy)
             {
-                return vulnerabilitySafety < 0.38 || rejectionRisk > 0.72 || closeness < 0.40;
+                return SociosexualityBehaviorMath.BlocksIntimacy(sociosexuality, relationship, vulnerabilitySafety, rejectionRisk);
             }
 
             var selfProtective = profile.Coping is CopingStyle.Avoidant or CopingStyle.AggressiveCompensation;
