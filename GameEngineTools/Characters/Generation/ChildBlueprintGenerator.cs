@@ -110,7 +110,8 @@ namespace GameEngineTools.Characters.Generation
                 BodyMorphology = null,
                 FacialMorphology = null,
                 SurfaceTraits = null,
-                ColorTraits = null
+                ColorTraits = null,
+                HairLengthCm = Round1(Math.Clamp(baseline.HairLengthCm + Normalish(rng) * 1.5, 0.0, 12.0))
             };
         }
 

@@ -24,7 +24,8 @@ namespace GameEngineTools.Characters.Traits
         BodyMorphology? BodyMorphology = null,
         FacialMorphology? FacialMorphology = null,
         SurfaceTraits? SurfaceTraits = null,
-        ColorTraits? ColorTraits = null)
+        ColorTraits? ColorTraits = null,
+        double HairLengthCm = 35.0)
     {
         /// <summary>Structured body morphology. Legacy records receive a conservative projection.</summary>
         [JsonIgnore]
@@ -93,15 +94,22 @@ namespace GameEngineTools.Characters.Traits
             // Energy (dlouhodobě) a ImmuneLoad (krátkodobě zhorší vzhled pleti).
             // Tady volíme rozumné defaulty; můžeš je nahradit vlastní evidencí hmotnosti.
             var baselineBmi = BaselineBmiFor(trait.Frame, biology);
-            var bmiJitter = (50 - physio.Energy) * 0.03; // nízká energie → mírně horší BMI proxy
-            var bmi = Math.Clamp(baselineBmi + bmiJitter / 10.0, 16.0, 30.0);
+            var morphologyBmi = 18.5 + trait.Body.SoftTissue.Adiposity * 8.0 + trait.Body.SoftTissue.Muscularity * 2.2;
+            var bmiJitter = (50 - physio.Energy) * 0.003; // nízká energie → mírně horší BMI proxy
+            var bmi = Math.Clamp((baselineBmi * 0.35) + (morphologyBmi * 0.65) + bmiJitter, 16.0, 30.0);
             var weight = bmi * Math.Pow(trait.HeightCm / 100.0, 2);
 
-            var bodyFat = Math.Clamp(BodyFatFor(bmi, biology), 8, 45);
+            var bodyFat = Math.Clamp(
+                BodyFatFor(bmi, biology) * 0.45 + (8.0 + trait.Body.SoftTissue.Adiposity * 37.0) * 0.55,
+                8,
+                45);
 
             // Vzhled pleti (velmi hrubě): žlázy + zánět ↔ ImmuneLoad, hormonální vlivy z cyklu přes SymptomBloat.
-            var oil = Math.Clamp(20 + physio.ImmuneLoad * 0.6, 0, 100);
-            var acne = Math.Clamp(10 + physio.ImmuneLoad * 0.7 + physio.BodyTempDelta * 5, 0, 100);
+            var oil = Math.Clamp(18 + physio.ImmuneLoad * 0.55 + (1.0 - trait.Surface.SkinThickness) * 12.0, 0, 100);
+            var acne = Math.Clamp(
+                8 + physio.ImmuneLoad * 0.65 + physio.BodyTempDelta * 5 + (1.0 - trait.Surface.SkinSmoothness) * 18.0,
+                0,
+                100);
 
             // Nadmutí (bloat) – PMS/menses/luteální fáze zvyšují retenci vody
             var bloat = BloatingLevel.None;
@@ -125,10 +133,12 @@ namespace GameEngineTools.Characters.Traits
             }
 
             // Držení těla a kvalita „vzhledu“ klesá s únavou/bolestí
-            var posture = Math.Clamp(80 - physio.SleepDebtHours * 5 - physio.Pain * 0.4, 0, 100);
+            var posture = Math.Clamp(
+                trait.Body.Posture.PostureUprightness * 100.0 - physio.SleepDebtHours * 5 - physio.Pain * 0.4,
+                0,
+                100);
 
-            // Délka vlasů: dlouhodobá metrika – tady jen placeholder (ponecháme na tobě, nebo ulož zvlášť)
-            var hairLen = 35.0; // cm – můžeš řídit zvláštní evidencí, nebo přidat do Persistence.
+            var hairLen = Math.Clamp(trait.HairLengthCm, 0.0, 120.0);
 
             return new AppearanceView(
                 WeightKg: Round1(weight),

@@ -41,6 +41,7 @@ namespace GameEngineTools.Characters.Generation
             var face = GenerateFace(body, ms, faceLatent, rng);
             var surface = GenerateSurface(stadium, ms, faceLatent, bodyLatent, rng);
             var colors = GenerateColors(spec, rng);
+            var hairLengthCm = GenerateHairLength(stadium, rng);
             var faceShape = DeriveFaceShape(face.Craniofacial);
             var frame = DeriveFrame(body);
             var marks = GenerateMarks(surface);
@@ -61,7 +62,8 @@ namespace GameEngineTools.Characters.Generation
                 BodyMorphology: body,
                 FacialMorphology: face,
                 SurfaceTraits: surface,
-                ColorTraits: colors);
+                ColorTraits: colors,
+                HairLengthCm: hairLengthCm);
         }
 
         #endregion IAppearanceGenerator
@@ -223,6 +225,21 @@ namespace GameEngineTools.Characters.Generation
                 Pick(new[] { EyeColor.Brown, EyeColor.Hazel, EyeColor.Green, EyeColor.Blue, EyeColor.Gray }, spec.EyeColorWeights, rng),
                 Pick(new[] { HairColorNatural.Black, HairColorNatural.DarkBrown, HairColorNatural.Brown, HairColorNatural.DarkBlond, HairColorNatural.Blond }, spec.HairColorWeights, rng),
                 Pick(new[] { HairType.Straight, HairType.Wavy, HairType.Curly }, spec.HairTypeWeights, rng));
+
+        private static double GenerateHairLength(StadiumType stadium, IRandomSource rng)
+        {
+            var (min, max) = stadium switch
+            {
+                StadiumType.Baby => (0.0, 8.0),
+                StadiumType.Child => (2.0, 55.0),
+                StadiumType.Teenager => (3.0, 85.0),
+                StadiumType.Old => (0.0, 70.0),
+                _ => (1.0, 100.0)
+            };
+
+            var t = Math.Pow(rng.NextUnit(), 1.25);
+            return R1(Lerp(t, min, max));
+        }
 
         private static IReadOnlyList<string>? GenerateMarks(SurfaceTraits s)
         {

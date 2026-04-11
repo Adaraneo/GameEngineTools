@@ -196,6 +196,51 @@ namespace EngineTests
                 $"frame mismatch ({resultMismatch.PreferenceMatch:F2}).");
         }
 
+        /// <summary>
+        /// Structured morphology should override the legacy shoulder/hip WHR approximation.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_StructuredWaistHipRatio_AffectsPreferenceMatch()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                PreferredWhr = 0.70
+            };
+
+            var view = BuildView(50, 0, BloatingLevel.None);
+            var baseAppearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var matching = WithStructuredWhr(baseAppearance, 0.70);
+            var mismatching = WithStructuredWhr(baseAppearance, 1.05);
+
+            var matchingResult = _sut.Calculate(profile, matching, view, SexBiology.Female);
+            var mismatchingResult = _sut.Calculate(profile, mismatching, view, SexBiology.Female);
+
+            Assert.IsTrue(matchingResult.PreferenceMatch > mismatchingResult.PreferenceMatch);
+        }
+
+        /// <summary>
+        /// SymmetryWeight should have an observable effect now that asymmetry is modeled explicitly.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_SymmetryWeight_UsesFacialAsymmetry()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                SymmetryWeight = 1.0
+            };
+
+            var view = BuildView(50, 0, BloatingLevel.None);
+            var baseAppearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var lowAsymmetry = WithFacialAsymmetry(baseAppearance, 0.02);
+            var highAsymmetry = WithFacialAsymmetry(baseAppearance, 0.14);
+
+            var low = _sut.Calculate(profile, lowAsymmetry, view, SexBiology.Female);
+            var high = _sut.Calculate(profile, highAsymmetry, view, SexBiology.Female);
+
+            Assert.IsTrue(low.PreferenceMatch > high.PreferenceMatch);
+            Assert.IsTrue(low.BasePhysical > high.BasePhysical);
+        }
+
         #endregion
 
         // ── StateModifier ────────────────────────────────────────────────────────
@@ -493,6 +538,45 @@ namespace EngineTests
                 SkinOiliness:  20.0,
                 AcneLevel:     acneLevel,
                 Bloating:      bloating);
+
+        private static PhysicalAppearance WithStructuredWhr(PhysicalAppearance appearance, double whr)
+        {
+            var body = BodyMorphology.FromLegacy(
+                appearance.HeightCm,
+                appearance.ShoulderBreadthCm,
+                appearance.HipBreadthCm,
+                appearance.Frame);
+
+            return appearance with
+            {
+                BodyMorphology = body with
+                {
+                    Proportions = body.Proportions with
+                    {
+                        WaistToHipRatio = whr
+                    }
+                }
+            };
+        }
+
+        private static PhysicalAppearance WithFacialAsymmetry(PhysicalAppearance appearance, double asymmetry)
+        {
+            var face = FacialMorphology.FromLegacy(
+                appearance.FaceShape,
+                appearance.NoseProminence,
+                appearance.LipFullness);
+
+            return appearance with
+            {
+                FacialMorphology = face with
+                {
+                    Asymmetry = new AsymmetryMorphology(
+                        FacialAsymmetry: asymmetry,
+                        LeftRightVariationAmplitude: asymmetry * 0.8,
+                        BodyAsymmetryAmplitude: 0.03)
+                }
+            };
+        }
 
         #endregion
     }

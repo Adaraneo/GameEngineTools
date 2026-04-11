@@ -30,7 +30,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
                 Body: BuildBody(appearance),
                 Skin: BuildSkin(appearance.SkinTone),
                 Eyes: BuildEyes(appearance.EyeColor),
-                Hair: BuildHair(appearance.HairColor, appearance.HairType),
+                Hair: BuildHair(appearance.HairColor, appearance.HairType, appearance.HairLengthCm),
                 Face: BuildFace(appearance),
                 Expression: BuildExpression(snapshot),
                 BiasGuard: DefaultBiasGuard,
@@ -60,9 +60,11 @@ namespace GameEngineTools.Characters.Generation.Portraits
                 HeightCm: Math.Round(appearance.HeightCm, 2),
                 ShoulderBreadthCm: Math.Round(appearance.ShoulderBreadthCm, 2),
                 HipBreadthCm: Math.Round(appearance.HipBreadthCm, 2),
+                WaistToHipRatio: Math.Round(appearance.Body.Proportions.WaistToHipRatio, 3),
                 Frame: appearance.Frame,
                 HeightBucket: BucketHeight(appearance.HeightCm),
                 ProportionBucket: BucketProportions(shoulderToHeight, hipToHeight),
+                PostureBucket: BucketPosture(appearance.Body.Posture.PostureUprightness),
                 FrameImpression: BucketFrameImpression(appearance.Frame, shoulderHipDelta));
         }
 
@@ -97,7 +99,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
             };
         }
 
-        private static HairRenderSpec BuildHair(HairColorNatural color, HairType type)
+        private static HairRenderSpec BuildHair(HairColorNatural color, HairType type, double lengthCm)
         {
             var (baseColorFamily, brightnessRange) = color switch
             {
@@ -125,6 +127,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
                 BrightnessRange: brightnessRange,
                 Texture: texture,
                 Straightness: straightness,
+                LengthBucket: BucketHairLength(lengthCm),
                 VolumePolicy: "natural volume only");
         }
 
@@ -135,6 +138,9 @@ namespace GameEngineTools.Characters.Generation.Portraits
                 WidthHeightTendency: FaceWidthHeightTendency(appearance.FaceShape),
                 NoseProjectionBucket: BucketNoseProjection(appearance.NoseProminence),
                 LipFullnessBucket: BucketLipFullness(appearance.LipFullness),
+                EyeScaleBucket: BucketEyeScale(appearance.Face.EyeRegion.EyeSize),
+                JawDefinitionBucket: BucketJawDefinition(appearance.Face.Jaw.JawProminence, appearance.Face.Jaw.JawRoundness),
+                FacialAsymmetryBucket: BucketFacialAsymmetry(appearance.Face.Asymmetry.FacialAsymmetry),
                 SymmetryPolicy: "preserve natural asymmetry");
         }
 
@@ -227,6 +233,51 @@ namespace GameEngineTools.Characters.Generation.Portraits
             };
         }
 
+        private static string BucketPosture(double postureUprightness)
+        {
+            if (postureUprightness < 0.40)
+            {
+                return "noticeably slouched carriage";
+            }
+
+            if (postureUprightness < 0.62)
+            {
+                return "softly relaxed carriage";
+            }
+
+            if (postureUprightness < 0.82)
+            {
+                return "neutral upright carriage";
+            }
+
+            return "very upright carriage";
+        }
+
+        private static string BucketHairLength(double lengthCm)
+        {
+            if (lengthCm < 2.0)
+            {
+                return "shaved or very short";
+            }
+
+            if (lengthCm < 10.0)
+            {
+                return "short";
+            }
+
+            if (lengthCm < 30.0)
+            {
+                return "medium length";
+            }
+
+            if (lengthCm < 65.0)
+            {
+                return "long";
+            }
+
+            return "very long";
+        }
+
         private static string FaceShapeLabel(FaceShape faceShape)
         {
             return faceShape switch
@@ -303,6 +354,51 @@ namespace GameEngineTools.Characters.Generation.Portraits
             }
 
             return "very full";
+        }
+
+        private static string BucketEyeScale(double eyeSize)
+        {
+            if (eyeSize < 0.36)
+            {
+                return "small eye scale";
+            }
+
+            if (eyeSize < 0.62)
+            {
+                return "medium eye scale";
+            }
+
+            return "large eye scale";
+        }
+
+        private static string BucketJawDefinition(double jawProminence, double jawRoundness)
+        {
+            if (jawProminence >= 0.62 && jawRoundness <= 0.48)
+            {
+                return "angular jaw definition";
+            }
+
+            if (jawProminence <= 0.38 && jawRoundness >= 0.58)
+            {
+                return "soft rounded jaw definition";
+            }
+
+            return "moderate jaw definition";
+        }
+
+        private static string BucketFacialAsymmetry(double asymmetry)
+        {
+            if (asymmetry < 0.04)
+            {
+                return "very subtle natural asymmetry";
+            }
+
+            if (asymmetry < 0.09)
+            {
+                return "subtle natural asymmetry";
+            }
+
+            return "noticeable natural asymmetry";
         }
     }
 }

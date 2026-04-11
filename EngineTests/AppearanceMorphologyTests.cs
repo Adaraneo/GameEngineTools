@@ -5,6 +5,7 @@ namespace EngineTests
 {
     using System.Text.Json;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
@@ -122,6 +123,23 @@ namespace EngineTests
         }
 
         #endregion Stadiums
+
+        #region Projection
+
+        [TestMethod]
+        public void Projector_UsesGeneratedHairLengthAndMorphology()
+        {
+            var appearance = _generator.Generate(SexBiology.Female, 888, StadiumType.Adult);
+            var physio = new PhysiologyState(70, 0, 25, 20, 5, 10, 0, null);
+
+            var view = AppearanceProjector.Compute(appearance, physio, SexBiology.Female);
+
+            Assert.AreEqual(appearance.HairLengthCm, view.HairLengthCm, delta: 0.05);
+            Assert.IsTrue(view.PostureScore <= Math.Round(appearance.Body.Posture.PostureUprightness * 100.0, 1));
+            Assert.IsTrue(view.PostureScore >= Math.Round(appearance.Body.Posture.PostureUprightness * 100.0, 1) - 10.0);
+        }
+
+        #endregion Projection
 
         #region Sex overlap
 

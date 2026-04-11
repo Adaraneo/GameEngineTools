@@ -37,6 +37,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
         string BrightnessRange,
         string Texture,
         string Straightness,
+        string LengthBucket,
         string VolumePolicy);
 
     /// <summary>
@@ -58,6 +59,9 @@ namespace GameEngineTools.Characters.Generation.Portraits
         string WidthHeightTendency,
         string NoseProjectionBucket,
         string LipFullnessBucket,
+        string EyeScaleBucket,
+        string JawDefinitionBucket,
+        string FacialAsymmetryBucket,
         string SymmetryPolicy);
 
     /// <summary>
@@ -77,9 +81,11 @@ namespace GameEngineTools.Characters.Generation.Portraits
         double HeightCm,
         double ShoulderBreadthCm,
         double HipBreadthCm,
+        double WaistToHipRatio,
         BodyFrame Frame,
         string HeightBucket,
         string ProportionBucket,
+        string PostureBucket,
         string FrameImpression);
 
     /// <summary>
