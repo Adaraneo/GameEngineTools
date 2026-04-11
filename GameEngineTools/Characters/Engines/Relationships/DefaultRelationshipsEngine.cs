@@ -351,7 +351,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 Comfort = Bump(e.Comfort, -2.0),
                                 Trust = Bump(e.Trust, -0.8),
-                                RomanticInterest = Bump(e.RomanticInterest, -1.2)
+                                RomanticInterest = Bump(e.RomanticInterest, -1.2),
+                                SexualInterest = Bump(e.SexualInterest, se.From == self ? -2.4 : -0.8)
                             },
                             eventType: nameof(SexualEncounterOutcome),
                             outcome: "declined",

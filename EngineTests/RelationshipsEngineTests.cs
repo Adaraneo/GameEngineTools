@@ -366,6 +366,36 @@ namespace EngineTests
         }
 
         /// <summary>
+        /// Declined sexual encounters should reduce sexual interest toward the person involved.
+        /// </summary>
+        [TestMethod]
+        public void Handle_SexualEncounterOutcome_Declined_DecreasesSexualInterest()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 60, Trust: 70,
+                    Familiarity: 50, AestheticAttraction: 65, PhysicalAttraction: 65, RomanticInterest: 55, SexualInterest: 60,
+                    Closeness: 70, Respect: 60, Comfort: 75,
+                    Breakdown: new DomainBreakdown(50, 50, 60, 55, 60),
+                    PositiveInteractionCount: 3)
+            }));
+
+            var before = engine.State.Edges[other].SexualInterest;
+
+            engine.Handle(new SexualEncounterOutcome(_now, self, other, Accepted: false, Reason: "declined"), ctx, _outbox);
+
+            var after = engine.State.Edges[other].SexualInterest;
+            Assert.IsTrue(after < before);
+        }
+
+        /// <summary>
         /// Familiarity should decay much more slowly than closeness.
         /// </summary>
         [TestMethod]
