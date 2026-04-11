@@ -75,6 +75,7 @@ var files = new DirectoryInfo(generatedPeopleLogsFilePath!).GetFiles().ToImmutab
 var ids = new Dictionary<string, Guid>();
 const string so = "significantOther";
 const string fr = "friend";
+const string frso = "friendSignificantOther";
 
 foreach (var file in files)
 {
@@ -86,14 +87,17 @@ foreach (var file in files)
 
 var soid = ids.FirstOrDefault(npc => npc.Key == so).Value;
 var friendId = ids.FirstOrDefault(npc => npc.Key == fr).Value;
+var friendSOId = ids.FirstOrDefault(npc => npc.Key == frso).Value;
 
 var significantOther = manager.Characters.First(character => character.Person.Id.Value.Equals(soid));
 
 var friend = manager.Characters.First(ch => ch.Person.Id.Value.Equals(friendId));
+var friendSO = manager.Characters.First(ch => ch.Person.Id.Value.Equals(friendSOId));
 
 var playerPerson = player.Person;
 var significantOtherPerson = significantOther.Person;
 var friendPerson = friend.Person;
+var friendSOPerson = friendSO.Person;
 
 var diary = new List<NarrativeEntry>();
 
@@ -105,7 +109,7 @@ locationService.RegisterLocation(new LocationDescriptor(
     Id: "village_square",
     DisplayName: "Village Square",
     BaseNoise: 0.3,
-    NoisePerPerson: 0.05,
+    NoisePerPerson: 0.1,
     Capacity: 20,
     AllowsPrivacy: false,
     LocationType.Social));
@@ -114,7 +118,7 @@ locationService.RegisterLocation(new LocationDescriptor(
     Id: "castle_hall",
     DisplayName: "Castle Hall",
     BaseNoise: 0.1,
-    NoisePerPerson: 0.02,
+    NoisePerPerson: 0.05,
     Capacity: 10,
     AllowsPrivacy: true,
     LocationType.Private));
@@ -123,7 +127,7 @@ locationService.RegisterLocation(new LocationDescriptor(
     Id: "castle_sleep_room",
     DisplayName: "Castle Sleep Room",
     BaseNoise: 0.1,
-    NoisePerPerson: 0.1,
+    NoisePerPerson: 0.01,
     Capacity: 10,
     AllowsPrivacy: true,
     LocationType.Rest));
@@ -166,14 +170,24 @@ locationService.RegisterLocation(new LocationDescriptor(
     AllowsPrivacy: false,
     LocationType.Work));
 
-if (locationService.GetLocation(playerPerson.Id) is null && locationService.GetLocation(significantOtherPerson.Id) is null && locationService.GetLocation(friendPerson.Id) is null)
+locationService.RegisterLocation(new LocationDescriptor(
+    Id: "forest_behinf_village",
+    DisplayName: "Forest Behing the vilage",
+    BaseNoise: 0.3,
+    NoisePerPerson: 0.1,
+    Capacity: 100,
+    AllowsPrivacy: true,
+    LocationType.Public));
+
+if (locationService.GetLocation(playerPerson.Id) is null && locationService.GetLocation(significantOtherPerson.Id) is null && locationService.GetLocation(friendPerson.Id) is null && locationService.GetLocation(friendSOPerson.Id) is null)
 {
     locationService.MoveCharacter(playerPerson.Id, "village_square");
     locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
     locationService.MoveCharacter(friendPerson.Id, "village_square");
+    locationService.MoveCharacter(friendSOPerson.Id, "village_square");
 }
 
-foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != playerPerson.Id && npc.Person.Id != significantOtherPerson.Id && npc.Person.Id != friendPerson.Id))
+foreach (var npc in manager.Characters.Where(npc => ids.ContainsKey(npc.Person.Id.Value.ToString()) == false))
 {
     if (locationService.GetLocation(npc.Person.Id) is null)
     {
@@ -183,7 +197,7 @@ foreach (var npc in manager.Characters.Where(npc => npc.Person.Id != playerPerso
 
 var mainTrioSceneOpts = new SimulationSceneOptions
 {
-    Characters = [playerPerson, significantOtherPerson, friendPerson],
+    Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
     LocationService = locationService,
     SimulationYears = 5,
     TickStep = WTimeSpan.FromHours(0.5),
@@ -230,11 +244,13 @@ var mainTrioSceneOpts = new SimulationSceneOptions
         if (now.Day is 16 && now.Hour is 20
         && !locationService.GetLocation(significantOtherPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
         && !locationService.GetLocation(playerPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
-        && !locationService.GetLocation(friendPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase))
+        && !locationService.GetLocation(friendPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
+        && !locationService.GetLocation(friendSOPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase))
         {
             locationService.MoveCharacter(playerPerson.Id, "castle_hall");
             locationService.MoveCharacter(significantOtherPerson.Id, "castle_hall");
             locationService.MoveCharacter(friendPerson.Id, "castle_hall");
+            locationService.MoveCharacter(friendSOPerson.Id, "castle_hall");
         }
 
         DynamicReachOutRouting(now, chars, locationService, rng);

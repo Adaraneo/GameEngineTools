@@ -84,17 +84,20 @@
             PC player = null;
             NPC significantOther = null;
             NPC friend = null;
+            NPC friendSignificatnOther = null;
 
             Console.WriteLine("Generator will generate player's character and non-playable character's...");
 
             player = new PC(100, manager.RandomizePerson(40, 18));
             significantOther = new NPC(100, manager.RandomizePerson(player));
             friend = new NPC(100, manager.RandomizePerson(50, 18));
+            friendSignificatnOther = new NPC(100, manager.RandomizePerson(friend));
 
             var characters = manager.Characters;
             characters.Add(player);
             characters.Add(significantOther);
             characters.Add(friend);
+            characters.Add(friendSignificatnOther);
 
             Console.WriteLine("Done");
             Console.WriteLine("Would you like to generate other NPCs? [Y\\n]");
@@ -130,7 +133,7 @@
             genFile.ExportNPPCs();
 
             ClearLogsDirectory(currentDirectory);
-            ExportInfo(currentDirectory, (nameof(player), player), (nameof(significantOther), significantOther), (nameof(friend), friend));
+            ExportInfo(currentDirectory, (nameof(player), player), (nameof(significantOther), significantOther), (nameof(friend), friend), (nameof(friendSignificatnOther), friendSignificatnOther));
 
             Console.WriteLine("Done. You may close the window right now.");
             Console.ReadKey();
