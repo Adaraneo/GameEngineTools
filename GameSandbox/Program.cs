@@ -184,7 +184,8 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     Characters = [playerPerson, significantOtherPerson, friendPerson],
     LocationService = locationService,
     SimulationYears = 5,
-    TickStep = WTimeSpan.FromMinutes(5),
+    TickStep = WTimeSpan.FromHours(0.5),
+    InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
 
     ResolveCharacter = id =>
@@ -251,7 +252,8 @@ if (characters.Count > 0)
     {
         Characters = characters,
         LocationService = locationService,
-        TickStep = WTimeSpan.FromHours(1),
+        TickStep = WTimeSpan.FromHours(5),
+        InternalSubstep = WTimeSpan.FromHours(1),
         SimulationYears = 5,
         OnTick = (now, chars) =>
         {

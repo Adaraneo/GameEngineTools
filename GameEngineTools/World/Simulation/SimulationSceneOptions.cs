@@ -63,14 +63,25 @@ namespace GameEngineTools.World.Simulation
         public int SimulationYears { get; init; } = 2;
 
         /// <summary>
-        /// Délka jednoho simulačního kroku — jak daleko enginy posunout logiku v každé iteraci.
+        /// Délka jednoho vnějšího simulačního kroku — jak daleko se má svět ideálně posunout
+        /// v jedné iteraci hlavní smyčky.
         /// Výchozí hodnota: <c>0.5 herní hodiny</c>.
         /// </summary>
         /// <remarks>
-        /// Čím kratší krok, tím přesnější simulace — ale tím víc iterací a pomalejší běh.
-        /// 0.5h je dobrý kompromis pro sandbox.
+        /// Pokud je nastaven <see cref="InternalSubstep"/>, scéna tento krok rozseká na jemnější
+        /// dílčí kroky kvůli nižší latenci mezi postavami a přesnějšímu časování.
         /// </remarks>
         public WTimeSpan TickStep { get; init; } = WTimeSpan.FromHours(0.5);
+
+        /// <summary>
+        /// Volitelný jemnější dílčí krok scény.
+        /// </summary>
+        /// <remarks>
+        /// Pokud je menší než <see cref="TickStep"/>, scéna provede více interních kroků uvnitř
+        /// jednoho vnějšího ticku. To zmenšuje latenci interakcí a zpřesňuje plánování bez nutnosti
+        /// zmenšit hlavní <see cref="TickStep"/> pro celý sandbox.
+        /// </remarks>
+        public WTimeSpan? InternalSubstep { get; init; }
 
         #endregion Časování simulace
 

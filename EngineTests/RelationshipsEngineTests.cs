@@ -584,7 +584,8 @@ namespace EngineTests
                 relations: relations,
                 memory: memory,
                 semanticMemory: semanticMemory,
-                initialSnapshot: snapshot);
+                initialSnapshot: snapshot,
+                behaviorDecisionStep: null);
         }
 
         /// <summary>

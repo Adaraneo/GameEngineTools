@@ -72,7 +72,7 @@ namespace GameEngineTools.Characters.Core
             {
                 var today = WDateTime.Now.Date;
                 var birth = Identity.BirthDate;
-                var age   = today.Year - birth.Year;
+                var age = today.Year - birth.Year;
 
                 if (today.Month < birth.Month ||
                    (today.Month == birth.Month && today.Day < birth.Day))
@@ -110,6 +110,11 @@ namespace GameEngineTools.Characters.Core
 
         // Context shared across a single tick; Snapshot inside is always the previous completed state
         private readonly HumanContext _ctx;
+
+        // Optional cadence decoupling for behaviour-level reasoning.
+        // When zero, behavior runs every incoming Tick(dt).
+        private readonly WTimeSpan _behaviorDecisionStep;
+        private WTimeSpan _behaviorAccumulated;
 
         #endregion Private fields
 
@@ -159,47 +164,88 @@ namespace GameEngineTools.Characters.Core
             IMemoryEngine memory,
             ISemanticMemoryEngine semanticMemory,
             // initial snapshot (from factory)
-            EnginesSnapshot initialSnapshot)
+            EnginesSnapshot initialSnapshot,
+            // optional behavior cadence override
+            WTimeSpan? behaviorDecisionStep = null)
         {
-            Id                = id;
-            Identity          = identity;
-            Biology           = biology;
-            Personality       = personality;
+            Id = id;
+            Identity = identity;
+            Biology = biology;
+            Personality = personality;
             PsychologyProfile = PsychologicalProfile.FromPersonality(personality);
             PhysicalAppearance = appearance;
-            AttractionProfile  = attractionProfile;
+            AttractionProfile = attractionProfile;
 
-            _bus       = bus;
+            _bus = bus;
             _scheduler = scheduler;
-            _random    = random;
-            _log       = logger;
+            _random = random;
+            _log = logger;
 
-            _physio    = physio;
-            _psych     = psych;
-            _behavior  = behavior;
-            _interact  = interact;
+            _physio = physio;
+            _psych = psych;
+            _behavior = behavior;
+            _interact = interact;
             _relations = relations;
-            _memory    = memory;
+            _memory = memory;
             _semanticMemory = semanticMemory;
 
             Snapshot = initialSnapshot;
+            _behaviorDecisionStep = NormalizeBehaviorDecisionStep(behaviorDecisionStep);
+            _behaviorAccumulated = WTimeSpan.Zero;
 
             _ctx = new HumanContext
             {
-                Id          = Id,
-                Identity    = Identity,
-                Biology     = Biology,
+                Id = Id,
+                Identity = Identity,
+                Biology = Biology,
                 Personality = Personality,
                 PsychologyProfile = PsychologyProfile,
-                EventBus    = _bus,
-                Scheduler   = _scheduler,
-                Random      = _random,
-                Logger      = _log,
-                Snapshot    = Snapshot
+                EventBus = _bus,
+                Scheduler = _scheduler,
+                Random = _random,
+                Logger = _log,
+                Snapshot = Snapshot
             };
         }
 
         #endregion Constructor
+
+        #region Cadence helpers
+
+        private static WTimeSpan NormalizeBehaviorDecisionStep(WTimeSpan? behaviorDecisionStep)
+        {
+            if (behaviorDecisionStep is null || behaviorDecisionStep.Value <= WTimeSpan.Zero)
+            {
+                return WTimeSpan.Zero;
+            }
+
+            return behaviorDecisionStep.Value;
+        }
+
+        private WTimeSpan ConsumeBehaviorDelta(WTimeSpan dt)
+        {
+            if (dt <= WTimeSpan.Zero)
+            {
+                return WTimeSpan.Zero;
+            }
+
+            if (_behaviorDecisionStep == WTimeSpan.Zero)
+            {
+                return dt;
+            }
+
+            _behaviorAccumulated += dt;
+            if (_behaviorAccumulated < _behaviorDecisionStep)
+            {
+                return WTimeSpan.Zero;
+            }
+
+            var behaviorDt = _behaviorAccumulated;
+            _behaviorAccumulated = WTimeSpan.Zero;
+            return behaviorDt;
+        }
+
+        #endregion Cadence helpers
 
         #region IHuman — public API
 
@@ -219,11 +265,16 @@ namespace GameEngineTools.Characters.Core
             PhaseA_HandleScheduled(now);
             PhaseA_HandleInbox();
 
-            // Phase B: advance each engine in the fixed order.
-            // Events accumulate in the outbox and are only published after all engines complete.
+            // Phase B: advance engines. Physiology / psychology / memory always progress with world time,
+            // while behaviour-level reasoning can optionally run on a coarser cadence.
             var outbox = new EventCollector();
+            var behaviorDt = ConsumeBehaviorDelta(dt);
 
-            _behavior.Tick(now, dt, _ctx, outbox);
+            if (behaviorDt > WTimeSpan.Zero)
+            {
+                _behavior.Tick(now, behaviorDt, _ctx, outbox);
+            }
+
             _physio.Tick(now, dt, _ctx, outbox);
             _psych.Tick(now, dt, _ctx, outbox);
             _interact.Tick(now, dt, _ctx, outbox);
@@ -249,7 +300,7 @@ namespace GameEngineTools.Characters.Core
         /// <inheritdoc/>
         public void RestoreSnapshot(EnginesSnapshot snapshot)
         {
-            Snapshot      = snapshot;
+            Snapshot = snapshot;
             _ctx.Snapshot = snapshot;
 
             _physio.RestoreState(snapshot.Physiology);
@@ -312,7 +363,7 @@ namespace GameEngineTools.Characters.Core
         private void SelfDeliver(IEventCollector collector, IEventCollector toPublish)
         {
             const int maxPasses = 8;
-            var pass       = 0;
+            var pass = 0;
             var localOutbox = new EventCollector();
 
             while (pass++ < maxPasses)
@@ -343,19 +394,19 @@ namespace GameEngineTools.Characters.Core
 
         private void SafeHandle(IDomainEvent ev, IEventCollector outbox)
         {
-            try { _physio.Handle(ev, _ctx, outbox); }    catch (Exception ex) { _log.LogError(ex, "[{Human}] Physiology.Handle failed.", Id.Value); }
-            try { _psych.Handle(ev, _ctx, outbox); }     catch (Exception ex) { _log.LogError(ex, "[{Human}] Psychology.Handle failed.", Id.Value); }
-            try { _behavior.Handle(ev, _ctx, outbox); }  catch (Exception ex) { _log.LogError(ex, "[{Human}] Behavior.Handle failed.", Id.Value); }
-            try { _interact.Handle(ev, _ctx, outbox); }  catch (Exception ex) { _log.LogError(ex, "[{Human}] Interactions.Handle failed.", Id.Value); }
+            try { _physio.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Physiology.Handle failed.", Id.Value); }
+            try { _psych.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Psychology.Handle failed.", Id.Value); }
+            try { _behavior.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Behavior.Handle failed.", Id.Value); }
+            try { _interact.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Interactions.Handle failed.", Id.Value); }
             try { _relations.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Relationships.Handle failed.", Id.Value); }
-            try { _memory.Handle(ev, _ctx, outbox); }    catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
+            try { _memory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
             try { _semanticMemory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SemanticMemory.Handle failed.", Id.Value); }
         }
 
         private void Deliver(IEventCollector collector)
         {
             const int maxPasses = 8;
-            var pass      = 0;
+            var pass = 0;
             var toPublish = new EventCollector();
 
             while (pass++ < maxPasses)

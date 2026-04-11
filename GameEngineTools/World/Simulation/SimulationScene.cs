@@ -110,56 +110,81 @@ namespace GameEngineTools.World.Simulation
             var startTime = _clock.Now;
             var endTime = _clock.Now.AddYears(_options.SimulationYears);
             var chars = _options.Characters;
-            var dt = _options.TickStep;
+            var macroStep = _options.TickStep;
+            var internalSubstep = ResolveInternalSubstep(macroStep);
 
             while (_clock.Now < endTime)
             {
-                var now = _clock.Now;
+                var macroRemaining = macroStep;
 
-                _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
-
-                // ── Krok 1: OnTick callback ─────────────────────────────────────────────
-                // Zavolej scénář / ReachOut routing.
-                // POZOR: LastOutbox každé postavy je zde stále z PŘEDCHOZÍHO ticku —
-                // proto je to správné místo pro detekci ReachOut a routování.
-                _options.OnTick?.Invoke(now, chars);
-
-                // ── Krok 2: Tick všech postav + okamžité routování outcomes ────────────
-                foreach (var character in chars)
+                while (macroRemaining > WTimeSpan.Zero && _clock.Now < endTime)
                 {
-                    character.Tick(now, dt);
-                    RouteOutcomes(character, chars);
+                    var remainingToEnd = endTime - _clock.Now;
+                    var dt = WTimeSpan.Min(internalSubstep, WTimeSpan.Min(macroRemaining, remainingToEnd));
+                    SimulateSingleStep(startTime, chars, dt);
+                    macroRemaining -= dt;
                 }
-
-                // --- Narrative scan ----
-                if (_options.NarrativeFormatter is { } formatter && _options.OnNarrative is { } onNarrative)
-                {
-                    var resolver = _options.ResolveCharacter ?? (id => new NarrativeCharacterInfo(id.Value.ToString(), SexBiology.Unknown));
-
-                    foreach (var character in chars)
-                    {
-                        foreach (var ev in character.LastOutbox)
-                        {
-                            var entry = formatter.Format(ev, resolver);
-                            if (entry is not null)
-                            {
-                                onNarrative(entry);
-                            }
-                        }
-                    }
-                }
-
-                // ── Krok 3: Sleep prompty ───────────────────────────────────────────────
-                foreach (var character in chars)
-                {
-                    HandleSleepPrompt(now, character);
-                }
-
-                // ── Krok 4: Posun hodin ────────────────────────────────────────────────
-                _clock.Advance(_options.TickStep);
             }
 
             return Task.CompletedTask;
+        }
+
+        private void SimulateSingleStep(WDateTime startTime, IReadOnlyList<IHuman> chars, WTimeSpan dt)
+        {
+            var now = _clock.Now;
+
+            _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
+
+            // ── Krok 1: OnTick callback ─────────────────────────────────────────────
+            // Zavolej scénář / ReachOut routing.
+            // POZOR: LastOutbox každé postavy je zde stále z PŘEDCHOZÍHO ticku —
+            // proto je to správné místo pro detekci ReachOut a routování.
+            _options.OnTick?.Invoke(now, chars);
+
+            // ── Krok 2: Tick všech postav + okamžité routování outcomes ────────────
+            foreach (var character in chars)
+            {
+                character.Tick(now, dt);
+                RouteOutcomes(character, chars);
+            }
+
+            // --- Narrative scan ----
+            if (_options.NarrativeFormatter is { } formatter && _options.OnNarrative is { } onNarrative)
+            {
+                var resolver = _options.ResolveCharacter ?? (id => new NarrativeCharacterInfo(id.Value.ToString(), SexBiology.Unknown));
+
+                foreach (var character in chars)
+                {
+                    foreach (var ev in character.LastOutbox)
+                    {
+                        var entry = formatter.Format(ev, resolver);
+                        if (entry is not null)
+                        {
+                            onNarrative(entry);
+                        }
+                    }
+                }
+            }
+
+            // ── Krok 3: Sleep prompty ───────────────────────────────────────────────
+            foreach (var character in chars)
+            {
+                HandleSleepPrompt(now, character);
+            }
+
+            // ── Krok 4: Posun hodin ────────────────────────────────────────────────
+            _clock.Advance(dt);
+        }
+
+        private WTimeSpan ResolveInternalSubstep(WTimeSpan macroStep)
+        {
+            var configured = _options.InternalSubstep;
+            if (configured is null || configured.Value <= WTimeSpan.Zero)
+            {
+                return macroStep;
+            }
+
+            return WTimeSpan.Min(configured.Value, macroStep);
         }
 
         #endregion Simulační smyčka
