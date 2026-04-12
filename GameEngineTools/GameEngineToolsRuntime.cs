@@ -138,6 +138,7 @@ namespace GameEngineTools
                         : Path.Combine("logs", "Characters");
                     opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
+                    opt.WorldTimeTextAccessor = () => WDateTime.Now.ToString();
                 });
             });
 
@@ -310,7 +311,10 @@ namespace GameEngineTools
         /// odstraněno spolu s <c>IHost</c>.
         /// </summary>
         public async ValueTask DisposeAsync()
-            => await _provider.DisposeAsync().ConfigureAwait(false);
+        {
+            _provider.GetService<ICharactersLogControl>()?.FlushAll();
+            await _provider.DisposeAsync().ConfigureAwait(false);
+        }
 
         #endregion IAsyncDisposable
     }

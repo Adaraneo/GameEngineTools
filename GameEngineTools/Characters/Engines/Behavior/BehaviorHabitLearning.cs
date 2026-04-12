@@ -525,7 +525,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return;
             }
 
-            using (logger.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(BehaviorHabitLearning))))
+            using (logger.BeginCharacterScope(ctx.Id.Value, nameof(BehaviorHabitLearning)))
             {
                 logger.BehaviorHabitLearned(
                     ctx.Id.Value.ToString(),
@@ -558,7 +558,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return;
             }
 
-            using (logger.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(BehaviorHabitLearning))))
+            using (logger.BeginCharacterScope(ctx.Id.Value, nameof(BehaviorHabitLearning)))
             {
                 logger.BehaviorHabitDecayed(
                     ctx.Id.Value.ToString(),
@@ -577,7 +577,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return;
             }
 
-            using (logger.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(BehaviorHabitLearning))))
+            using (logger.BeginCharacterScope(ctx.Id.Value, nameof(BehaviorHabitLearning)))
             {
                 logger.BehaviorHabitPruned(ctx.Id.Value.ToString(), beforeCount, afterCount, maxTraces);
             }

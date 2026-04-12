@@ -181,7 +181,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         {
                             var stressDelta = (1.0 - se.Quality / 100.0) * 10.0 * sensitivityMod;
                             s = s with { Stress = Math.Clamp(s.Stress + stressDelta, 0, 100) };
-                            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPsychologyEngine))))
+                            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
                             {
                         _log.PsychSleepInterrupted(se.Quality, stressDelta);
                             }
@@ -216,7 +216,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         };
 
                         outbox.Add(new StressSpiked(nm.OccurredAt, ctx.Id, s.Stress));
-                        using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPsychologyEngine))))
+                        using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
                         {
                             _log.PsychNightmareEffect(ctx.Id.Value.ToString(), stressSpike, valencePenalty);
                         }

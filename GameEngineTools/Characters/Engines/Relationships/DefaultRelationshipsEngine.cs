@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -52,16 +53,20 @@ namespace GameEngineTools.Characters.Engines.Relationships
         #region Private fields
 
         private readonly ILogger _log;
+        private readonly ISocialFidelityPolicy _socialFidelityPolicy;
+        private double _deferredDecayDays;
 
         #endregion Private fields
 
         #region Constructor
 
         /// <summary>Creates an engine instance with an empty relationship graph.</summary>
-        public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory)
+        public DefaultRelationshipsEngine(IOptions<RelationshipsConfig> cfg, ILoggerFactory loggerFactory, ISocialFidelityPolicy socialFidelityPolicy)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultRelationshipsEngine>();
+            _socialFidelityPolicy = socialFidelityPolicy;
+            _deferredDecayDays = 0;
             State = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>());
         }
 
@@ -118,7 +123,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         outcome: "formed",
                         detail: $"source={fi.A.Value}, like={fi.Like:F1}, basePhysical={fi.BasePhysical:F1}, preferenceMatch={fi.PreferenceMatch:F1}");
 
-                        using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
+                        using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
                         {
                             _log.RelFirstImpression(
                                 ctx.Id.Value.ToString(),
@@ -417,6 +422,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 return;
             }
 
+            var fidelity = _socialFidelityPolicy.GetLevel(ctx.Id);
+            _deferredDecayDays += days;
+
+            if (!ShouldApplySocialDecay(_deferredDecayDays, fidelity))
+            {
+                return;
+            }
+
+            days = _deferredDecayDays;
+            _deferredDecayDays = 0;
+
             var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges);
             var psych = ctx.Snapshot.Psychology;
 
@@ -462,9 +478,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             State = new RelationshipState(dict);
 
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
             {
                 _log.RelDecayApplied(ctx.Id.Value.ToString(), State.Edges.Count, days);
+                // TODO: For debug purpose only
+                _log.LogDebug("Relationships social decay applied for {HumanId} with fidelity {Fidelity} over {Days:F3} day(s).", ctx.Id.Value, fidelity, days);
             }
         }
 

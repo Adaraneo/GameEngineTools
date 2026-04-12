@@ -21,6 +21,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EngineTests", "EngineTests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameEngineTools", "GameEngineTools\GameEngineTools.csproj", "{F63F3301-D1BE-2B84-9D92-E19572248ADE}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Logs", "Logs", "{0D4717DD-1A04-4C4F-AE21-0DD2D4ADA2FD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogsResolver", "LogsResolver\LogsResolver.csproj", "{6E570233-D301-4BF0-815E-1426E7B5D70B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +49,10 @@ Global
 		{F63F3301-D1BE-2B84-9D92-E19572248ADE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F63F3301-D1BE-2B84-9D92-E19572248ADE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F63F3301-D1BE-2B84-9D92-E19572248ADE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E570233-D301-4BF0-815E-1426E7B5D70B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E570233-D301-4BF0-815E-1426E7B5D70B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E570233-D301-4BF0-815E-1426E7B5D70B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E570233-D301-4BF0-815E-1426E7B5D70B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -55,6 +63,7 @@ Global
 		{333E59D0-D969-4B56-80E7-7B5CED47512A} = {427FFDCB-7D57-476F-842C-38BD7BF9E468}
 		{BA435300-7123-BAE1-AFFC-BC54B062B3A5} = {ABA92169-3963-4908-88D4-FFDC5BCE8974}
 		{F63F3301-D1BE-2B84-9D92-E19572248ADE} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{6E570233-D301-4BF0-815E-1426E7B5D70B} = {0D4717DD-1A04-4C4F-AE21-0DD2D4ADA2FD}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {568A774F-A99D-4CC4-BE74-F37C90684526}

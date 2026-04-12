@@ -71,7 +71,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 return;
             }
 
-            using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(LearnedHabitEngine))))
+            using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(LearnedHabitEngine)))
             {
                 _log.BehaviorHabitBiasApplied(
                     context.HumanContext.Id.Value.ToString(),

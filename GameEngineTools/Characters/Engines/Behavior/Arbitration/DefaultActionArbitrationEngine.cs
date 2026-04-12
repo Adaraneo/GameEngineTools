@@ -33,7 +33,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
                 if (elapsed < running.ExpectedDuration)
                 {
                     // Keep the current plan alive until its expected window has elapsed.
-                    using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(DefaultActionArbitrationEngine))))
+                    using (_log.BeginCharacterScope(
+                        context.HumanContext.Id.Value,
+                        nameof(DefaultActionArbitrationEngine),
+                        relatedPersonId: running.TargetHuman?.Value,
+                        tickKey: context.Now.WorldTicks.ToString()))
                         _log.BehaviorActionRunning(context.HumanContext.Id.Value.ToString(), running.Name, (running.ExpectedDuration - elapsed).ToString());
                     return new ActionArbitrationResult(true, running, null, context.State with { CurrentPlan = running, Cooldowns = context.Cooldowns });
                 }

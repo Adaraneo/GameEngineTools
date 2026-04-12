@@ -121,7 +121,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
             outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason));
             EmitInteractionProposalIfNeeded(now, ctx, outbox, result.SelectedCandidate);
             SetCooldownsForCommittedAction(ctx.Id, result.SelectedCandidate.Name);
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine)))) _log.BehaviorActionChosen(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.Duration.ToString());
+            using (_log.BeginCharacterScope(
+                ctx.Id.Value,
+                nameof(DefaultBehaviorEngine),
+                relatedPersonId: result.SelectedCandidate.SocialTargeting?.TargetHuman.Value,
+                tickKey: now.WorldTicks.ToString())) _log.BehaviorActionChosen(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.Duration.ToString());
         }
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)

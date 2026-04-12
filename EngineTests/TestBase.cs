@@ -351,6 +351,18 @@ namespace EngineTests
                 => Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
+        protected sealed class FixedSocialFidelityPolicy : ISocialFidelityPolicy
+        {
+            private readonly SocialFidelityLevel _level;
+
+            public FixedSocialFidelityPolicy(SocialFidelityLevel level)
+            {
+                _level = level;
+            }
+
+            public SocialFidelityLevel GetLevel(HumanId human) => _level;
+        }
+
         #endregion Pomocné metody
     }
 }

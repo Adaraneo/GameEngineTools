@@ -89,7 +89,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <param name="outbox">Výstupní fronta doménových událostí.</param>
         public void Encode(EpisodicMemory episode, IHumanContext ctx, IEventCollector outbox)
         {
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultMemoryEngine)))
             {
                 if (episode.OtherPerson == ctx.Id)
                 {
@@ -650,7 +650,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             outbox.Add(new MemoryConsolidated(at, ctx.Id, toBoost.Count));
 
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultMemoryEngine))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultMemoryEngine)))
             {
                 _log.MemoryConsolidated(ctx.Id.Value.ToString(), toBoost.Count);
             }
