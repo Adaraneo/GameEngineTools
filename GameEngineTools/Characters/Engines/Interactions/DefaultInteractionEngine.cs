@@ -304,6 +304,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 proposed.ReproductivePotential,
                 proposed.FromBiology,
                 proposed.ToBiology ?? ctx.Biology));
+
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultInteractionEngine)))
+            {
+                _log.SexualEncounterProposed(ctx.Id.Value.ToString(), proposed.From.Value.ToString(), proposed.To.Value.ToString(), proposed.Intent.ToString(), proposed.ReproductivePotential.ToString(), proposed.Contraception.ToString());
+            }
         }
 
         private bool ShouldResolveSexualEncounter(

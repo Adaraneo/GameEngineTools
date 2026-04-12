@@ -223,6 +223,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             };
 
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
+            {
+                _log.PhysiologyCycle(ctx.Id.Value.ToString(), s.Cycle.Phase.ToString(), s.Cycle.DayInCycle);
+            }
+
             return s;
         }
 
