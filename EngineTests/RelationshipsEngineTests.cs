@@ -460,14 +460,14 @@ namespace EngineTests
 
             var before = engine.State.Edges[other];
 
-            engine.Tick(_now, WTimeSpan.FromHours(6), ctx, _outbox);
+            engine.Tick(_now, WTimeSpan.FromDays(0.25), ctx, _outbox);
             var afterFirstTick = engine.State.Edges[other];
 
             Assert.AreEqual(before.Closeness, afterFirstTick.Closeness, 0.0001);
             Assert.AreEqual(before.Trust, afterFirstTick.Trust, 0.0001);
             Assert.AreEqual(before.Familiarity, afterFirstTick.Familiarity, 0.0001);
 
-            engine.Tick(_now + WTimeSpan.FromHours(6), WTimeSpan.FromHours(6), ctx, _outbox);
+            engine.Tick(_now + WTimeSpan.FromDays(0.25), WTimeSpan.FromDays(0.25), ctx, _outbox);
             var afterSecondTick = engine.State.Edges[other];
 
             Assert.IsTrue(afterSecondTick.Closeness < before.Closeness || afterSecondTick.Trust < before.Trust);
@@ -493,14 +493,14 @@ namespace EngineTests
 
             var before = engine.State.Edges[other];
 
-            engine.Tick(_now, WTimeSpan.FromHours(12), ctx, _outbox);
+            engine.Tick(_now, WTimeSpan.FromDays(0.5), ctx, _outbox);
             var afterFirstTick = engine.State.Edges[other];
 
             Assert.AreEqual(before.Closeness, afterFirstTick.Closeness, 0.0001);
             Assert.AreEqual(before.Trust, afterFirstTick.Trust, 0.0001);
             Assert.AreEqual(before.Familiarity, afterFirstTick.Familiarity, 0.0001);
 
-            engine.Tick(_now + WTimeSpan.FromHours(12), WTimeSpan.FromHours(12), ctx, _outbox);
+            engine.Tick(_now + WTimeSpan.FromDays(0.5), WTimeSpan.FromDays(0.5), ctx, _outbox);
             var afterSecondTick = engine.State.Edges[other];
 
             Assert.IsTrue(afterSecondTick.Closeness < before.Closeness || afterSecondTick.Trust < before.Trust);
