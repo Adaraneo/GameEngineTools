@@ -144,6 +144,7 @@
                             <RowDefinition />
                             <RowDefinition />
                             <RowDefinition />
+                            <RowDefinition />
                         </Grid.RowDefinitions>
 
                         <TextBox Grid.Row="0" Grid.Column="0" Text="{Binding EventsExplorer.FreeText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Text search" />
@@ -162,7 +163,7 @@
 
                         <TextBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding EventsExplorer.FromText, UpdateSourceTrigger=PropertyChanged}" ToolTip="From timestamp" />
                         <TextBox Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="2" Text="{Binding EventsExplorer.ToText, UpdateSourceTrigger=PropertyChanged}" ToolTip="To timestamp" />
-                        <TextBox Grid.Row="3" Grid.Column="4" Text="{Binding EventsExplorer.MaxResultsText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Max grid rows; prevents loading millions of rows into WPF" />
+                        <TextBox Grid.Row="3" Grid.Column="4" Text="{Binding EventsExplorer.PageSizeText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Page size; prevents loading millions of rows into WPF" />
 
                         <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal">
                             <CheckBox Content="Exceptions only" IsChecked="{Binding EventsExplorer.ExceptionsOnly}" Margin="0,4,12,0" />
@@ -172,6 +173,13 @@
                         <StackPanel Grid.Row="4" Grid.Column="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Content="Apply Filters" Command="{Binding EventsExplorer.ApplyFiltersCommand}" />
                             <Button Content="Clear" Command="{Binding EventsExplorer.ClearFiltersCommand}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="5" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="|&lt;" Command="{Binding EventsExplorer.FirstPageCommand}" />
+                            <Button Content="&lt;" Command="{Binding EventsExplorer.PreviousPageCommand}" />
+                            <TextBlock Text="{Binding EventsExplorer.PageNumberText}" VerticalAlignment="Center" Margin="8,0" />
+                            <Button Content="&gt;" Command="{Binding EventsExplorer.NextPageCommand}" />
+                            <Button Content="&gt;|" Command="{Binding EventsExplorer.LastPageCommand}" />
                         </StackPanel>
                     </Grid>
                 </GroupBox>

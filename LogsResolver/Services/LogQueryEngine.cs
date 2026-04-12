@@ -18,7 +18,7 @@ public sealed class LogQueryEngine
         }
     }
 
-    public IReadOnlyList<ResolvedLogEvent> Query(LogQuery query)
+    public LogQueryResult Query(LogQuery query)
     {
         IEnumerable<ResolvedLogEvent> candidates = _events;
 
@@ -46,7 +46,47 @@ public sealed class LogQueryEngine
                 || Contains(e.StackTrace, query.FreeText));
         }
 
-        return candidates.Take(Math.Max(1, query.MaxResults)).ToList();
+        var pageSize = Math.Clamp(query.PageSize, 100, 100_000);
+        var pageIndex = Math.Max(0, query.PageIndex);
+        var skip = pageIndex * pageSize;
+        var totalMatches = 0;
+        var pageItems = new List<ResolvedLogEvent>(Math.Min(pageSize, 4096));
+
+        foreach (var candidate in candidates)
+        {
+            if (totalMatches >= skip && pageItems.Count < pageSize)
+            {
+                pageItems.Add(candidate);
+            }
+
+            totalMatches++;
+        }
+
+        if (skip >= totalMatches && totalMatches > 0)
+        {
+            pageIndex = Math.Max(0, (int)Math.Ceiling((double)totalMatches / pageSize) - 1);
+            skip = pageIndex * pageSize;
+            pageItems.Clear();
+
+            var index = 0;
+            foreach (var candidate in candidates)
+            {
+                if (index >= skip && pageItems.Count < pageSize)
+                {
+                    pageItems.Add(candidate);
+                }
+
+                index++;
+            }
+        }
+
+        return new LogQueryResult
+        {
+            Items = pageItems,
+            TotalMatches = totalMatches,
+            PageIndex = pageIndex,
+            PageSize = pageSize
+        };
     }
 
     public ResolvedLogEvent? GetByEventInstanceId(long eventInstanceId)

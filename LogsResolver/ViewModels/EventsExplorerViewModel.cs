@@ -23,7 +23,10 @@ public sealed class EventsExplorerViewModel : ViewModelBase
     private string? _tickKey;
     private string? _fromText;
     private string? _toText;
-    private string _maxResultsText = "2000";
+    private string _pageSizeText = "2000";
+    private int _pageIndex;
+    private int _totalMatches;
+    private int _totalPages;
     private bool _exceptionsOnly;
     private bool _globalOnly;
     private bool _scopedOnly;
@@ -33,6 +36,10 @@ public sealed class EventsExplorerViewModel : ViewModelBase
         _queryEngine = queryEngine;
         ApplyFiltersCommand = new RelayCommand(ApplyFilters);
         ClearFiltersCommand = new RelayCommand(ClearFilters);
+        FirstPageCommand = new RelayCommand(FirstPage, () => PageIndex > 0);
+        PreviousPageCommand = new RelayCommand(PreviousPage, () => PageIndex > 0);
+        NextPageCommand = new RelayCommand(NextPage, () => PageIndex + 1 < TotalPages);
+        LastPageCommand = new RelayCommand(LastPage, () => PageIndex + 1 < TotalPages);
     }
 
     public event EventHandler<ResolvedLogEvent?>? SelectedEventChanged;
@@ -42,6 +49,14 @@ public sealed class EventsExplorerViewModel : ViewModelBase
     public ICommand ApplyFiltersCommand { get; }
 
     public ICommand ClearFiltersCommand { get; }
+
+    public ICommand FirstPageCommand { get; }
+
+    public ICommand PreviousPageCommand { get; }
+
+    public ICommand NextPageCommand { get; }
+
+    public ICommand LastPageCommand { get; }
 
     public ResolvedLogEvent? SelectedEvent
     {
@@ -151,11 +166,53 @@ public sealed class EventsExplorerViewModel : ViewModelBase
         set => SetProperty(ref _scopedOnly, value);
     }
 
-    public string MaxResultsText
+    public string PageSizeText
     {
-        get => _maxResultsText;
-        set => SetProperty(ref _maxResultsText, value);
+        get => _pageSizeText;
+        set => SetProperty(ref _pageSizeText, value);
     }
+
+    public int PageIndex
+    {
+        get => _pageIndex;
+        private set
+        {
+            if (SetProperty(ref _pageIndex, value))
+            {
+                OnPropertyChanged(nameof(PageNumberText));
+                RaisePagingCommands();
+            }
+        }
+    }
+
+    public int TotalMatches
+    {
+        get => _totalMatches;
+        private set
+        {
+            if (SetProperty(ref _totalMatches, value))
+            {
+                OnPropertyChanged(nameof(PageNumberText));
+            }
+        }
+    }
+
+    public int TotalPages
+    {
+        get => _totalPages;
+        private set
+        {
+            if (SetProperty(ref _totalPages, value))
+            {
+                OnPropertyChanged(nameof(PageNumberText));
+                RaisePagingCommands();
+            }
+        }
+    }
+
+    public string PageNumberText => TotalPages == 0
+        ? $"0 / 0 ({TotalMatches:N0} matches)"
+        : $"{PageIndex + 1:N0} / {TotalPages:N0} ({TotalMatches:N0} matches)";
 
     public void Load(IReadOnlyList<ResolvedLogEvent> events)
     {
@@ -167,15 +224,27 @@ public sealed class EventsExplorerViewModel : ViewModelBase
     {
         PersonIdText = personId;
         Subsystem = subsystem;
+        PageIndex = 0;
         ApplyFilters();
     }
 
     public void ApplyFilters()
     {
+        PageIndex = 0;
+        ApplyCurrentPage();
+    }
+
+    private void ApplyCurrentPage()
+    {
         var query = BuildQuery();
         var selectedId = SelectedEvent?.EventInstanceId;
         Events.Clear();
-        foreach (var ev in _queryEngine.Query(query))
+        var result = _queryEngine.Query(query);
+        PageIndex = result.PageIndex;
+        TotalMatches = result.TotalMatches;
+        TotalPages = result.TotalPages;
+
+        foreach (var ev in result.Items)
         {
             Events.Add(ev);
         }
@@ -203,8 +272,33 @@ public sealed class EventsExplorerViewModel : ViewModelBase
         ExceptionsOnly = false;
         GlobalOnly = false;
         ScopedOnly = false;
-        MaxResultsText = "2000";
+        PageSizeText = "2000";
+        PageIndex = 0;
         ApplyFilters();
+    }
+
+    private void FirstPage()
+    {
+        PageIndex = 0;
+        ApplyCurrentPage();
+    }
+
+    private void PreviousPage()
+    {
+        PageIndex = Math.Max(0, PageIndex - 1);
+        ApplyCurrentPage();
+    }
+
+    private void NextPage()
+    {
+        PageIndex++;
+        ApplyCurrentPage();
+    }
+
+    private void LastPage()
+    {
+        PageIndex = Math.Max(0, TotalPages - 1);
+        ApplyCurrentPage();
     }
 
     private LogQuery BuildQuery()
@@ -214,7 +308,7 @@ public sealed class EventsExplorerViewModel : ViewModelBase
         _ = int.TryParse(EventIdText, out var eventId);
         _ = DateTimeOffset.TryParse(FromText, out var from);
         _ = DateTimeOffset.TryParse(ToText, out var to);
-        _ = int.TryParse(MaxResultsText, out var maxResults);
+        _ = int.TryParse(PageSizeText, out var pageSize);
 
         return new LogQuery
         {
@@ -234,9 +328,18 @@ public sealed class EventsExplorerViewModel : ViewModelBase
             ExceptionsOnly = ExceptionsOnly,
             GlobalOnly = GlobalOnly,
             ScopedOnly = ScopedOnly,
-            MaxResults = int.TryParse(MaxResultsText, out maxResults)
-                ? Math.Clamp(maxResults, 100, 100_000)
+            PageIndex = PageIndex,
+            PageSize = int.TryParse(PageSizeText, out pageSize)
+                ? Math.Clamp(pageSize, 100, 100_000)
                 : 2_000
         };
+    }
+
+    private void RaisePagingCommands()
+    {
+        if (FirstPageCommand is RelayCommand first) first.RaiseCanExecuteChanged();
+        if (PreviousPageCommand is RelayCommand previous) previous.RaiseCanExecuteChanged();
+        if (NextPageCommand is RelayCommand next) next.RaiseCanExecuteChanged();
+        if (LastPageCommand is RelayCommand last) last.RaiseCanExecuteChanged();
     }
 }

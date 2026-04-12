@@ -34,5 +34,7 @@ public sealed class LogQuery
 
     public bool ScopedOnly { get; set; }
 
-    public int MaxResults { get; set; } = 2_000;
+    public int PageIndex { get; set; }
+
+    public int PageSize { get; set; } = 2_000;
 }
