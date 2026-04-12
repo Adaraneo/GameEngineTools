@@ -36,12 +36,14 @@ public partial class App : Application
         services.AddSingleton<LogSessionLoader>();
         services.AddSingleton<LogQueryEngine>();
         services.AddSingleton<RawFileService>();
+        services.AddSingleton<NpcCharacterJsonReader>();
 
         services.AddSingleton<SessionSummaryViewModel>();
         services.AddSingleton<EventsExplorerViewModel>();
         services.AddSingleton<EventDetailsViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<RawFileViewModel>();
+        services.AddSingleton<CharacterTimelineViewModel>();
         services.AddSingleton<ShellViewModel>();
 
         services.AddSingleton<MainWindow>();

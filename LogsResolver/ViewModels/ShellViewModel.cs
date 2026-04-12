@@ -9,7 +9,9 @@ public sealed class ShellViewModel : ViewModelBase
 {
     private readonly FolderPickerService _folderPicker;
     private readonly LogSessionLoader _loader;
+    private readonly NpcCharacterJsonReader _npcReader;
     private string? _currentFolder;
+    private string? _currentNpcFolder;
     private string _statusText = "Open a GameEngineTools Characters log folder to begin.";
     private string? _loadingProgressText;
     private bool _isLoading;
@@ -18,26 +20,35 @@ public sealed class ShellViewModel : ViewModelBase
     public ShellViewModel(
         FolderPickerService folderPicker,
         LogSessionLoader loader,
+        NpcCharacterJsonReader npcReader,
         SessionSummaryViewModel summary,
         EventsExplorerViewModel eventsExplorer,
         EventDetailsViewModel eventDetails,
         DiagnosticsViewModel diagnostics,
-        RawFileViewModel rawFile)
+        RawFileViewModel rawFile,
+        CharacterTimelineViewModel characterTimeline)
     {
         _folderPicker = folderPicker;
         _loader = loader;
+        _npcReader = npcReader;
         Summary = summary;
         EventsExplorer = eventsExplorer;
         EventDetails = eventDetails;
         Diagnostics = diagnostics;
         RawFile = rawFile;
+        CharacterTimeline = characterTimeline;
 
         OpenFolderCommand = new AsyncRelayCommand(OpenFolderAsync, () => !IsLoading);
+        OpenNpcFolderCommand = new AsyncRelayCommand(OpenNpcFolderAsync, () => !IsLoading);
         ReloadSessionCommand = new AsyncRelayCommand(ReloadSessionAsync, () => !IsLoading && !string.IsNullOrWhiteSpace(CurrentFolder));
         ApplyQuickFiltersCommand = new RelayCommand(ApplyQuickFilters);
         OpenSelectedRawFileCommand = new AsyncRelayCommand(OpenSelectedRawFileAsync, () => !string.IsNullOrWhiteSpace(SelectedRawFile));
 
-        EventsExplorer.SelectedEventChanged += (_, ev) => EventDetails.SelectedEvent = ev;
+        EventsExplorer.SelectedEventChanged += (_, ev) =>
+        {
+            EventDetails.SelectedEvent = ev;
+            CharacterTimeline.FocusEvent(ev);
+        };
     }
 
     public SessionSummaryViewModel Summary { get; }
@@ -50,7 +61,11 @@ public sealed class ShellViewModel : ViewModelBase
 
     public RawFileViewModel RawFile { get; }
 
+    public CharacterTimelineViewModel CharacterTimeline { get; }
+
     public ICommand OpenFolderCommand { get; }
+
+    public ICommand OpenNpcFolderCommand { get; }
 
     public ICommand ReloadSessionCommand { get; }
 
@@ -62,6 +77,12 @@ public sealed class ShellViewModel : ViewModelBase
     {
         get => _currentFolder;
         private set => SetProperty(ref _currentFolder, value);
+    }
+
+    public string? CurrentNpcFolder
+    {
+        get => _currentNpcFolder;
+        private set => SetProperty(ref _currentNpcFolder, value);
     }
 
     public string StatusText
@@ -102,7 +123,7 @@ public sealed class ShellViewModel : ViewModelBase
 
     private async Task OpenFolderAsync()
     {
-        var folder = _folderPicker.PickFolder();
+        var folder = _folderPicker.PickFolder("Select Characters logs folder, logs folder, or repository root");
         if (folder is null)
         {
             return;
@@ -110,6 +131,36 @@ public sealed class ShellViewModel : ViewModelBase
 
         CurrentFolder = folder;
         await LoadSessionAsync(folder).ConfigureAwait(true);
+    }
+
+    private async Task OpenNpcFolderAsync()
+    {
+        var folder = _folderPicker.PickFolder("Select NPC JSON export folder");
+        if (folder is null)
+        {
+            return;
+        }
+
+        IsLoading = true;
+        CurrentNpcFolder = folder;
+        StatusText = "Loading NPC JSON files...";
+        LoadingProgressText = "Loading NPC JSON files...";
+        try
+        {
+            var characters = await _npcReader.LoadAsync(folder).ConfigureAwait(true);
+            CharacterTimeline.LoadCharacters(characters);
+            StatusText = $"Loaded {characters.Count} NPC character JSON file(s).";
+            LoadingProgressText = StatusText;
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"NPC load failed: {ex.Message}";
+            LoadingProgressText = StatusText;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task ReloadSessionAsync()
@@ -151,6 +202,7 @@ public sealed class ShellViewModel : ViewModelBase
     {
         Summary.Load(result);
         EventsExplorer.Load(result.Events);
+        CharacterTimeline.LoadEvents(result.Events);
         Diagnostics.Load(result.Diagnostics);
         SelectedRawFile = Summary.RawFiles.FirstOrDefault();
     }
@@ -169,6 +221,7 @@ public sealed class ShellViewModel : ViewModelBase
     private void RaiseCommandStates()
     {
         if (OpenFolderCommand is AsyncRelayCommand open) open.RaiseCanExecuteChanged();
+        if (OpenNpcFolderCommand is AsyncRelayCommand npc) npc.RaiseCanExecuteChanged();
         if (ReloadSessionCommand is AsyncRelayCommand reload) reload.RaiseCanExecuteChanged();
         if (OpenSelectedRawFileCommand is AsyncRelayCommand raw) raw.RaiseCanExecuteChanged();
     }

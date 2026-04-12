@@ -34,10 +34,14 @@
 
         <ToolBar DockPanel.Dock="Top">
             <Button Content="Open Folder" Command="{Binding OpenFolderCommand}" />
+            <Button Content="Open NPC JSON" Command="{Binding OpenNpcFolderCommand}" />
             <Button Content="Reload" Command="{Binding ReloadSessionCommand}" />
             <Separator />
             <TextBlock Text="Root:" VerticalAlignment="Center" />
             <TextBlock Text="{Binding Summary.RootPath}" VerticalAlignment="Center" />
+            <Separator />
+            <TextBlock Text="NPC:" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding CurrentNpcFolder}" VerticalAlignment="Center" />
         </ToolBar>
 
         <Grid DockPanel.Dock="Top" Margin="8,4,8,0">
@@ -107,6 +111,21 @@
                                 <Button Content="Apply" Command="{Binding ApplyQuickFiltersCommand}" />
                                 <Button Content="Clear" Command="{Binding EventsExplorer.ClearFiltersCommand}" />
                             </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Header="NPC Timeline">
+                        <StackPanel>
+                            <TextBlock Text="NPC JSON files:" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding CharacterTimeline.CharacterCount}" />
+                            <TextBlock Text="Selected PersonId" FontWeight="SemiBold" />
+                            <TextBox Text="{Binding CharacterTimeline.SelectedPersonIdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="Loaded NPCs" FontWeight="SemiBold" />
+                            <ListBox ItemsSource="{Binding CharacterTimeline.Characters}"
+                                     SelectedItem="{Binding CharacterTimeline.SelectedCharacter, Mode=TwoWay}"
+                                     DisplayMemberPath="Label"
+                                     MinHeight="140" />
+                            <TextBlock Text="{Binding CharacterTimeline.SummaryText}" />
                         </StackPanel>
                     </GroupBox>
 
@@ -240,6 +259,49 @@
                             <TextBox Text="{Binding EventDetails.SelectedEvent.TickKey, Mode=OneWay}" IsReadOnly="True" ToolTip="TickKey" />
                         </StackPanel>
                     </ScrollViewer>
+                </TabItem>
+                <TabItem Header="Vývoj">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="{Binding CharacterTimeline.SummaryText}" FontWeight="SemiBold" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Person:" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" Text="{Binding CharacterTimeline.SelectedPersonIdText}" />
+                                <TextBlock Grid.Column="2" Text="Events:" FontWeight="SemiBold" Margin="12,2,4,2" />
+                                <TextBlock Grid.Column="3" Text="{Binding CharacterTimeline.MatchingEventCount}" />
+                            </Grid>
+                        </StackPanel>
+                        <DataGrid Grid.Row="1"
+                                  ItemsSource="{Binding CharacterTimeline.Entries}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserSortColumns="True"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="130" />
+                                <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="155" />
+                                <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="70" />
+                                <DataGridTextColumn Header="Role" Binding="{Binding Involvement}" Width="70" />
+                                <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="55" />
+                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="145" />
+                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="180" />
+                                <DataGridTextColumn Header="Tick" Binding="{Binding TickKey}" Width="80" />
+                                <DataGridTextColumn Header="Related" Binding="{Binding RelatedPersonId}" Width="170" />
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
                 </TabItem>
                 <TabItem Header="Exception">
                     <Grid Margin="8">
