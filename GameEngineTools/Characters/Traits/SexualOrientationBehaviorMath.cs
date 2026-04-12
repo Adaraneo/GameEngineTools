@@ -17,7 +17,7 @@ namespace GameEngineTools.Characters.Traits
 
         /// <summary>
         /// Returns the target-sex attraction weight in [0, 1].
-        /// Missing profile or target biology means legacy-neutral behavior.
+        /// Missing profile or target biology means neutral behavior.
         /// </summary>
         public static double TargetAttractionWeight(AttractionProfile? profile, SexBiology? targetBiology)
         {

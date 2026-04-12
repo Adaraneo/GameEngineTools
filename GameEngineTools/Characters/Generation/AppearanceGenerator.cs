@@ -37,32 +37,19 @@ namespace GameEngineTools.Characters.Generation
 
             var bodyLatent = GenerateBodyLatent(sex, spec, ms, rng);
             var faceLatent = GenerateFaceLatent(ms, bodyLatent, rng);
-            var body = GenerateBody(spec, bodyLatent, rng);
+            var body = GenerateBody(bodyLatent, rng);
             var face = GenerateFace(body, ms, faceLatent, rng);
             var surface = GenerateSurface(stadium, ms, faceLatent, bodyLatent, rng);
             var colors = GenerateColors(spec, rng);
             var hairLengthCm = GenerateHairLength(stadium, rng);
-            var faceShape = DeriveFaceShape(face.Craniofacial);
-            var frame = DeriveFrame(body);
             var marks = GenerateMarks(surface);
 
             return new PhysicalAppearance(
-                HeightCm: body.Proportions.HeightCm,
-                Frame: frame,
-                SkinTone: colors.SkinTone,
-                EyeColor: colors.EyeColor,
-                HairColor: colors.HairColor,
-                HairType: colors.HairType,
-                FaceShape: faceShape,
-                ShoulderBreadthCm: body.Skeletal.ShoulderBreadth,
-                HipBreadthCm: body.Silhouette.HipWidth,
-                NoseProminence: face.Nose.NoseProjection,
-                LipFullness: R01((face.Mouth.UpperLipFullness + face.Mouth.LowerLipFullness) * 0.5),
+                Body: body,
+                Face: face,
+                Surface: surface,
+                Colors: colors,
                 DistinctiveMarks: marks,
-                BodyMorphology: body,
-                FacialMorphology: face,
-                SurfaceTraits: surface,
-                ColorTraits: colors,
                 HairLengthCm: hairLengthCm);
         }
 
@@ -109,7 +96,7 @@ namespace GameEngineTools.Characters.Generation
 
         #region Body generation
 
-        private static BodyMorphology GenerateBody(AppearanceGenSpec spec, BodyLatent l, IRandomSource rng)
+        private static BodyMorphology GenerateBody(BodyLatent l, IRandomSource rng)
         {
             var h = l.HeightCm;
             var sitting = h * Clamp(0.52 + l.Juvenility * 0.08 - l.Vertical * 0.025 + J(rng, 0.018), 0.49, 0.64);
@@ -248,29 +235,6 @@ namespace GameEngineTools.Characters.Generation
             if (s.FreckleDensity >= 0.55) marks.Add("visible freckles");
             if (s.ScarProbability >= 0.15) marks.Add("minor scar tendency");
             return marks.Count == 0 ? null : marks;
-        }
-
-        private static BodyFrame DeriveFrame(BodyMorphology body)
-        {
-            var r = body.Skeletal.SkeletalRobustness;
-            var m = body.SoftTissue.Muscularity;
-            var a = body.SoftTissue.Adiposity;
-            if (m >= 0.68 && r >= 0.58) return BodyFrame.Strong;
-            if (r <= 0.38 && a <= 0.48) return BodyFrame.Petite;
-            return r + a * 0.45 >= 0.78 ? BodyFrame.Large : BodyFrame.Medium;
-        }
-
-        private static FaceShape DeriveFaceShape(CraniofacialStructure c)
-        {
-            var ratio = c.FaceWidthToHeightRatio;
-            var jawToFace = c.JawWidth / Math.Max(1.0, c.FaceWidth);
-            var cheekToJaw = c.CheekboneWidth / Math.Max(1.0, c.JawWidth);
-            if (ratio >= 0.86 && jawToFace >= 0.80) return FaceShape.Square;
-            if (ratio >= 0.86) return FaceShape.Round;
-            if (ratio <= 0.72) return FaceShape.Oblong;
-            if (cheekToJaw >= 1.23) return FaceShape.Diamond;
-            if (jawToFace <= 0.68) return FaceShape.Heart;
-            return FaceShape.Oval;
         }
 
         #endregion Surface and labels

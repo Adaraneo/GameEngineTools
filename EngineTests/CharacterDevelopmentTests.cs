@@ -81,7 +81,7 @@ namespace EngineTests
             Assert.AreEqual(mother.Identity.LastName, a.Identity.LastName);
             Assert.AreEqual(a.PhysicalAppearance, b.PhysicalAppearance);
             Assert.AreEqual(a.Personality, b.Personality);
-            Assert.IsTrue(a.PhysicalAppearance.HeightCm is >= 45 and <= 95);
+            Assert.IsTrue(a.PhysicalAppearance.Body.Proportions.HeightCm is >= 45 and <= 95);
         }
 
         [TestMethod]
@@ -174,18 +174,18 @@ namespace EngineTests
                     WDateOnly.New(70, 1, 1)),
                 biology,
                 personality,
-                new PhysicalAppearance(
-                    height,
-                    BodyFrame.Medium,
-                    SkinTone.Light,
-                    EyeColor.Brown,
-                    hairColor,
-                    HairType.Wavy,
-                    FaceShape.Oval,
-                    42,
-                    38,
-                    0.5,
-                    0.55));
+                TestAppearanceFactory.Build(
+                    heightCm: height,
+                    frame: BodyFrame.Medium,
+                    skinTone: SkinTone.Light,
+                    eyeColor: EyeColor.Brown,
+                    hairColor: hairColor,
+                    hairType: HairType.Wavy,
+                    faceShape: FaceShape.Oval,
+                    shoulderBreadthCm: 42,
+                    hipBreadthCm: 38,
+                    noseProjection: 0.5,
+                    lipFullness: 0.55));
         }
 
         private sealed class LocalHuman : IHuman

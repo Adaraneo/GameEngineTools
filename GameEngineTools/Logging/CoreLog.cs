@@ -61,6 +61,51 @@ namespace GameEngineTools.Logging
             Message = "[PHYSIO/SLEEP] {HumanId} SleepEnded — délka: {Hours:F1}h, kvalita: {Quality:F0}, dluh po obnově: {Debt:F2}h.")]
         public static partial void PhysiologySleepEnded(this ILogger logger, string HumanId, double Hours, double Quality, double Debt);
 
+        [LoggerMessage(
+            EventId = 5003,
+            Level = LogLevel.Debug,
+            Message = "[PHYSIO/REPRO] {HumanId} conception evaluated with {OtherParent}: chance={Chance:F3}, ovulation={OvulationWindow}, intent={Intent}, contraception={Contraception}, result={Result}.")]
+        public static partial void PhysiologyConceptionEvaluated(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            double Chance,
+            bool OvulationWindow,
+            string Intent,
+            string Contraception,
+            string Result);
+
+        [LoggerMessage(
+            EventId = 5004,
+            Level = LogLevel.Information,
+            Message = "[PHYSIO/REPRO] {HumanId} pregnancy started with otherParent={OtherParent}, due={EstimatedDueDate}.")]
+        public static partial void PhysiologyPregnancyStarted(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            string EstimatedDueDate);
+
+        [LoggerMessage(
+            EventId = 5005,
+            Level = LogLevel.Information,
+            Message = "[PHYSIO/REPRO] {HumanId} pregnancy discovered, otherParent={OtherParent}, daysPregnant={DaysPregnant}.")]
+        public static partial void PhysiologyPregnancyDiscovered(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            long DaysPregnant);
+
+        [LoggerMessage(
+            EventId = 5006,
+            Level = LogLevel.Information,
+            Message = "[PHYSIO/REPRO] {HumanId} child born, otherParent={OtherParent}, conceivedOn={ConceivedOn}, due={EstimatedDueDate}.")]
+        public static partial void PhysiologyChildBorn(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            string ConceivedOn,
+            string EstimatedDueDate);
+
         #endregion Physiology
 
         #region Psychology
@@ -102,7 +147,7 @@ namespace GameEngineTools.Logging
             EventId = 5102,
             Level = LogLevel.Debug,
             Message = "[PSYCH/SLEEP] Nekvalitní spánek (kvalita={Quality:F0}) → stres +{StressDelta:F1}.")]
-        public static partial void PsychSleepInterrupted(this ILogger logger, string HumanId, double Quality, double StressDelta);
+        public static partial void PsychSleepInterrupted(this ILogger logger, double Quality, double StressDelta);
 
         #endregion Psychology
 

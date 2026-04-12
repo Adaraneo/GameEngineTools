@@ -235,11 +235,27 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 pregnancy = pregnancy with { Discovered = true, DiscoveredOn = now.Date };
                 s = s with { Pregnancy = pregnancy };
                 outbox.Add(new PregnancyDiscovered(now, ctx.Id, pregnancy.OtherParent));
+                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                {
+                    _log.PhysiologyPregnancyDiscovered(
+                        ctx.Id.Value.ToString(),
+                        pregnancy.OtherParent.Value.ToString(),
+                        daysPregnant);
+                }
             }
 
             if (now.Date >= pregnancy.EstimatedDueDate)
             {
                 outbox.Add(new ChildBorn(now, ctx.Id, pregnancy.OtherParent));
+                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                {
+                    _log.PhysiologyChildBorn(
+                        ctx.Id.Value.ToString(),
+                        pregnancy.OtherParent.Value.ToString(),
+                        pregnancy.ConceivedOn.ToString(),
+                        pregnancy.EstimatedDueDate.ToString());
+                }
+
                 return s with
                 {
                     Pregnancy = null,
@@ -269,7 +285,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 ? encounter.To
                 : encounter.From;
             var conceptionChance = ConceptionChance(s, encounter);
-            if (!ctx.Random.Chance(conceptionChance))
+            var conceived = ctx.Random.Chance(conceptionChance);
+
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+            {
+                _log.PhysiologyConceptionEvaluated(
+                    ctx.Id.Value.ToString(),
+                    otherParent.Value.ToString(),
+                    conceptionChance,
+                    s.Cycle?.OvulationWindow == true,
+                    encounter.Intent.ToString(),
+                    encounter.Contraception.ToString(),
+                    conceived ? "Conceived" : "NotConceived");
+            }
+
+            if (!conceived)
             {
                 return s;
             }
@@ -280,6 +310,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 encounter.OccurredAt.Date.AddDays(Config.PregnancyTermDays));
 
             outbox.Add(new PregnancyStarted(encounter.OccurredAt, ctx.Id, otherParent, pregnancy.EstimatedDueDate));
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+            {
+                _log.PhysiologyPregnancyStarted(
+                    ctx.Id.Value.ToString(),
+                    otherParent.Value.ToString(),
+                    pregnancy.EstimatedDueDate.ToString());
+            }
+
             return s with
             {
                 Pregnancy = pregnancy,

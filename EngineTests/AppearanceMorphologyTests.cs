@@ -88,11 +88,11 @@ namespace EngineTests
 
             if (ratio <= 0.72)
             {
-                Assert.AreEqual(FaceShape.Oblong, a.FaceShape);
+                Assert.AreEqual(FaceShape.Oblong, DeriveFaceShape(a.Face.Craniofacial));
             }
             else if (ratio >= 0.86)
             {
-                Assert.IsTrue(a.FaceShape is FaceShape.Round or FaceShape.Square);
+                Assert.IsTrue(DeriveFaceShape(a.Face.Craniofacial) is FaceShape.Round or FaceShape.Square);
             }
         }
 
@@ -151,8 +151,8 @@ namespace EngineTests
 
             for (var i = 0; i < 40; i++)
             {
-                femaleShoulders.Add(_generator.Generate(SexBiology.Female, 1000 + i, StadiumType.Adult).ShoulderBreadthCm);
-                maleShoulders.Add(_generator.Generate(SexBiology.Male, 2000 + i, StadiumType.Adult).ShoulderBreadthCm);
+                femaleShoulders.Add(_generator.Generate(SexBiology.Female, 1000 + i, StadiumType.Adult).Body.Skeletal.ShoulderBreadth);
+                maleShoulders.Add(_generator.Generate(SexBiology.Male, 2000 + i, StadiumType.Adult).Body.Skeletal.ShoulderBreadth);
             }
 
             Assert.IsTrue(femaleShoulders.Max() > maleShoulders.Min());
@@ -169,12 +169,12 @@ namespace EngineTests
 
             var json = JsonSerializer.Serialize(appearance);
 
-            Assert.IsTrue(json.Contains("\"BodyMorphology\""));
-            Assert.IsTrue(json.Contains("\"FacialMorphology\""));
-            Assert.IsFalse(json.Contains("\"Body\":"));
-            Assert.IsFalse(json.Contains("\"Face\":"));
-            Assert.IsFalse(json.Contains("\"Surface\":"));
-            Assert.IsFalse(json.Contains("\"Colors\":"));
+            Assert.IsTrue(json.Contains("\"Body\""));
+            Assert.IsTrue(json.Contains("\"Face\""));
+            Assert.IsTrue(json.Contains("\"Surface\""));
+            Assert.IsTrue(json.Contains("\"Colors\""));
+            Assert.IsFalse(json.Contains("\"BodyMorphology\""));
+            Assert.IsFalse(json.Contains("\"FacialMorphology\""));
         }
 
         #endregion Serialization
@@ -202,6 +202,34 @@ namespace EngineTests
 
             public bool Chance(double p)
                 => _random.NextDouble() < p;
+        }
+
+        private static FaceShape DeriveFaceShape(CraniofacialStructure c)
+        {
+            var ratio = c.FaceWidthToHeightRatio;
+            var jawToFace = c.JawWidth / Math.Max(1.0, c.FaceWidth);
+            var cheekToJaw = c.CheekboneWidth / Math.Max(1.0, c.JawWidth);
+            if (ratio >= 0.86 && jawToFace >= 0.80)
+            {
+                return FaceShape.Square;
+            }
+
+            if (ratio >= 0.86)
+            {
+                return FaceShape.Round;
+            }
+
+            if (ratio <= 0.72)
+            {
+                return FaceShape.Oblong;
+            }
+
+            if (cheekToJaw >= 1.23)
+            {
+                return FaceShape.Diamond;
+            }
+
+            return jawToFace <= 0.68 ? FaceShape.Heart : FaceShape.Oval;
         }
 
         #endregion Test infrastructure

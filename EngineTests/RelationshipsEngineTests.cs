@@ -611,18 +611,18 @@ namespace EngineTests
                 Sociosexuality.Intermediate,
                 Chronotype.Neutral);
 
-            var appearance = new PhysicalAppearance(
-                HeightCm: 170,
-                Frame: BodyFrame.Medium,
-                SkinTone: SkinTone.Medium,
-                EyeColor: EyeColor.Brown,
-                HairColor: HairColorNatural.Brown,
-                HairType: HairType.Wavy,
-                FaceShape: FaceShape.Oval,
-                ShoulderBreadthCm: 40,
-                HipBreadthCm: 38,
-                NoseProminence: 0.5,
-                LipFullness: 0.5);
+            var appearance = TestAppearanceFactory.Build(
+                heightCm: 170,
+                frame: BodyFrame.Medium,
+                skinTone: SkinTone.Medium,
+                eyeColor: EyeColor.Brown,
+                hairColor: HairColorNatural.Brown,
+                hairType: HairType.Wavy,
+                faceShape: FaceShape.Oval,
+                shoulderBreadthCm: 40,
+                hipBreadthCm: 38,
+                noseProjection: 0.5,
+                lipFullness: 0.5);
 
             var physio = physioFactory.Create(random, biology, identity.BirthDate, WDateOnly.New(100, 1, 1));
             var psych = psychFactory.Create(random);

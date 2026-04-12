@@ -94,7 +94,7 @@ namespace GameEngineTools.Characters.Engines.Attraction
             var whrScore   = TriangularScore(whr, whrOptimum, WhrToleranceHalf) * 18.0;
 
             // Height within a broad "plausible partner" range (population-level baseline)
-            var heightScore = TriangularScore(target.HeightCm, 170.0, HeightWindowHalf) * 12.0;
+            var heightScore = TriangularScore(target.Body.Proportions.HeightCm, 170.0, HeightWindowHalf) * 12.0;
 
             // Structured morphology provides an explicit subtle-asymmetry signal.
             var symmetryScore = EstimateSymmetry(target) * 10.0;
@@ -116,12 +116,12 @@ namespace GameEngineTools.Characters.Engines.Attraction
         {
             // Height preference match
             var heightMatch = TriangularScore(
-                target.HeightCm,
+                target.Body.Proportions.HeightCm,
                 profile.PreferredHeightCm,
                 profile.HeightToleranceCm) * 13.0;
 
             // Frame preference match
-            var targetFramePref = FrameToPreference(target.Frame);
+            var targetFramePref = FrameToPreference(DeriveFrame(target.Body));
             var frameMatch = (profile.FramePreference == BodyFramePreference.None ||
                               profile.FramePreference == targetFramePref)
                 ? 8.0
@@ -165,18 +165,8 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// </summary>
         private static double EstimateWhr(PhysicalAppearance target, SexBiology biology)
         {
-            if (target.BodyMorphology is not null)
-            {
-                return Math.Clamp(target.Body.Proportions.WaistToHipRatio, 0.55, 1.10);
-            }
-
-            // Crude proxy: hip/(shoulder + hip) normalised to a WHR-like range
-            var ratio = target.HipBreadthCm / (target.ShoulderBreadthCm + target.HipBreadthCm);
-
-            // Map to ~0.60..1.00 range
-            return biology == SexBiology.Female
-                ? 0.55 + ratio * 0.50
-                : 0.75 + ratio * 0.35;
+            _ = biology;
+            return Math.Clamp(target.Body.Proportions.WaistToHipRatio, 0.55, 1.10);
         }
 
         private static double EstimateSymmetry(PhysicalAppearance target)
@@ -230,6 +220,25 @@ namespace GameEngineTools.Characters.Engines.Attraction
                 BodyFrame.Strong  => BodyFramePreference.Large,
                 _                 => BodyFramePreference.None
             };
+        }
+
+        private static BodyFrame DeriveFrame(BodyMorphology body)
+        {
+            var robustness = body.Skeletal.SkeletalRobustness;
+            var muscularity = body.SoftTissue.Muscularity;
+            var adiposity = body.SoftTissue.Adiposity;
+
+            if (muscularity >= 0.68 && robustness >= 0.58)
+            {
+                return BodyFrame.Strong;
+            }
+
+            if (robustness <= 0.38 && adiposity <= 0.48)
+            {
+                return BodyFrame.Petite;
+            }
+
+            return robustness + adiposity * 0.45 >= 0.78 ? BodyFrame.Large : BodyFrame.Medium;
         }
 
         #endregion Helpers

@@ -647,18 +647,18 @@ namespace EngineTests
             public SexBiology Biology => SexBiology.Female;
             public Personality Personality { get; }
             public PsychologicalProfile PsychologyProfile { get; }
-            public PhysicalAppearance PhysicalAppearance => new(
-                170,
-                BodyFrame.Medium,
-                SkinTone.Light,
-                EyeColor.Brown,
-                HairColorNatural.Brown,
-                HairType.Wavy,
-                FaceShape.Oval,
-                42,
-                38,
-                0.5,
-                0.5);
+            public PhysicalAppearance PhysicalAppearance => TestAppearanceFactory.Build(
+                heightCm: 170,
+                frame: BodyFrame.Medium,
+                skinTone: SkinTone.Light,
+                eyeColor: EyeColor.Brown,
+                hairColor: HairColorNatural.Brown,
+                hairType: HairType.Wavy,
+                faceShape: FaceShape.Oval,
+                shoulderBreadthCm: 42,
+                hipBreadthCm: 38,
+                noseProjection: 0.5,
+                lipFullness: 0.5);
             public AttractionProfile AttractionProfile => null!;
             public EnginesSnapshot Snapshot { get; private set; }
             public IReadOnlyList<IDomainEvent> LastOutbox => Array.Empty<IDomainEvent>();

@@ -93,24 +93,26 @@ namespace GameEngineTools.Characters.Generation
             PhysicalAppearance baseline,
             IRandomSource rng)
         {
-            var parentHeightMean = (parentA.HeightCm + parentB.HeightCm) * 0.5;
+            var parentHeightMean = (parentA.Body.Proportions.HeightCm + parentB.Body.Proportions.HeightCm) * 0.5;
             var heightAdjustment = Math.Clamp((parentHeightMean - 170.0) * 0.06, -5.0, 5.0);
+            var height = Round1(Math.Clamp(baseline.Body.Proportions.HeightCm + heightAdjustment + Normalish(rng) * 1.5, 45.0, 95.0));
+            var noseProjection = Clamp01(Blend(parentA.Face.Nose.NoseProjection, parentB.Face.Nose.NoseProjection, baseline.Face.Nose.NoseProjection, rng, parentWeight: 0.35));
+            var lipFullness = Clamp01(Blend(
+                (parentA.Face.Mouth.UpperLipFullness + parentA.Face.Mouth.LowerLipFullness) * 0.5,
+                (parentB.Face.Mouth.UpperLipFullness + parentB.Face.Mouth.LowerLipFullness) * 0.5,
+                (baseline.Face.Mouth.UpperLipFullness + baseline.Face.Mouth.LowerLipFullness) * 0.5,
+                rng,
+                parentWeight: 0.45));
 
             return baseline with
             {
-                HeightCm = Round1(Math.Clamp(baseline.HeightCm + heightAdjustment + Normalish(rng) * 1.5, 45.0, 95.0)),
-                Frame = PickInherited(parentA.Frame, parentB.Frame, baseline.Frame, rng),
-                SkinTone = PickInherited(parentA.SkinTone, parentB.SkinTone, baseline.SkinTone, rng),
-                EyeColor = PickInherited(parentA.EyeColor, parentB.EyeColor, baseline.EyeColor, rng),
-                HairColor = PickInherited(parentA.HairColor, parentB.HairColor, baseline.HairColor, rng),
-                HairType = PickInherited(parentA.HairType, parentB.HairType, baseline.HairType, rng),
-                FaceShape = PickInherited(parentA.FaceShape, parentB.FaceShape, baseline.FaceShape, rng),
-                NoseProminence = Clamp01(Blend(parentA.NoseProminence, parentB.NoseProminence, baseline.NoseProminence, rng, parentWeight: 0.35)),
-                LipFullness = Clamp01(Blend(parentA.LipFullness, parentB.LipFullness, baseline.LipFullness, rng, parentWeight: 0.45)),
-                BodyMorphology = null,
-                FacialMorphology = null,
-                SurfaceTraits = null,
-                ColorTraits = null,
+                Body = ScaleBodyToHeight(baseline.Body, height),
+                Face = ApplyInheritedFaceSignals(baseline.Face, noseProjection, lipFullness),
+                Colors = new ColorTraits(
+                    PickInherited(parentA.Colors.SkinTone, parentB.Colors.SkinTone, baseline.Colors.SkinTone, rng),
+                    PickInherited(parentA.Colors.EyeColor, parentB.Colors.EyeColor, baseline.Colors.EyeColor, rng),
+                    PickInherited(parentA.Colors.HairColor, parentB.Colors.HairColor, baseline.Colors.HairColor, rng),
+                    PickInherited(parentA.Colors.HairType, parentB.Colors.HairType, baseline.Colors.HairType, rng)),
                 HairLengthCm = Round1(Math.Clamp(baseline.HairLengthCm + Normalish(rng) * 1.5, 0.0, 12.0))
             };
         }
@@ -180,6 +182,63 @@ namespace GameEngineTools.Characters.Generation
 
         private static double Round1(double value)
             => Math.Round(value, 1);
+
+        private static BodyMorphology ScaleBodyToHeight(BodyMorphology body, double heightCm)
+        {
+            var scale = heightCm / Math.Max(1.0, body.Proportions.HeightCm);
+            var proportions = body.Proportions with
+            {
+                HeightCm = heightCm,
+                SittingHeight = Round1(body.Proportions.SittingHeight * scale),
+                LegLength = Round1(body.Proportions.LegLength * scale),
+                TorsoLength = Round1(body.Proportions.TorsoLength * scale),
+                ArmLength = Round1(body.Proportions.ArmLength * scale),
+                ForearmLength = Round1(body.Proportions.ForearmLength * scale),
+                UpperArmLength = Round1(body.Proportions.UpperArmLength * scale),
+                NeckLength = Round1(body.Proportions.NeckLength * scale)
+            };
+
+            return body with
+            {
+                Proportions = proportions,
+                Skeletal = body.Skeletal with
+                {
+                    ClavicleBreadth = Round1(body.Skeletal.ClavicleBreadth * scale),
+                    ShoulderBreadth = Round1(body.Skeletal.ShoulderBreadth * scale),
+                    RibcageWidth = Round1(body.Skeletal.RibcageWidth * scale),
+                    RibcageDepth = Round1(body.Skeletal.RibcageDepth * scale),
+                    ChestBreadth = Round1(body.Skeletal.ChestBreadth * scale),
+                    PelvicBreadth = Round1(body.Skeletal.PelvicBreadth * scale),
+                    WaistBaseWidth = Round1(body.Skeletal.WaistBaseWidth * scale),
+                    NeckThickness = Round1(body.Skeletal.NeckThickness * scale),
+                    HandSize = Round1(body.Skeletal.HandSize * scale),
+                    FootSize = Round1(body.Skeletal.FootSize * scale)
+                },
+                Silhouette = body.Silhouette with
+                {
+                    WaistWidth = Round1(body.Silhouette.WaistWidth * scale),
+                    HipWidth = Round1(body.Silhouette.HipWidth * scale)
+                }
+            };
+        }
+
+        private static FacialMorphology ApplyInheritedFaceSignals(FacialMorphology face, double noseProjection, double lipFullness)
+        {
+            return face with
+            {
+                Nose = face.Nose with
+                {
+                    NoseProjection = noseProjection,
+                    NoseTipProjection = Clamp01((face.Nose.NoseTipProjection + noseProjection) * 0.5)
+                },
+                Mouth = face.Mouth with
+                {
+                    UpperLipFullness = Clamp01(lipFullness * 0.92),
+                    LowerLipFullness = lipFullness,
+                    VermilionHeight = Clamp01(0.22 + lipFullness * 0.31)
+                }
+            };
+        }
 
         private static int DeriveSeed(HumanId parentA, HumanId parentB, WDateOnly bornOn)
         {

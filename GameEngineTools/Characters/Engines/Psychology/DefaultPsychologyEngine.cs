@@ -183,7 +183,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             s = s with { Stress = Math.Clamp(s.Stress + stressDelta, 0, 100) };
                             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPsychologyEngine))))
                             {
-                                _log.PsychSleepInterrupted(ctx.Id.Value.ToString(), se.Quality, stressDelta);
+                        _log.PsychSleepInterrupted(se.Quality, stressDelta);
                             }
                         }
                         else

@@ -3,46 +3,18 @@
 
 namespace GameEngineTools.Characters.Traits
 {
-    using System.Text.Json.Serialization;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
 
     // --- Trait: stabilní rysy (genetika/morfologie) ---
     public sealed record PhysicalAppearance(
-        double HeightCm,
-        BodyFrame Frame,
-        SkinTone SkinTone,
-        EyeColor EyeColor,
-        HairColorNatural HairColor,
-        HairType HairType,
-        FaceShape FaceShape,
-        double ShoulderBreadthCm,
-        double HipBreadthCm,
-        double NoseProminence,   // 0..1
-        double LipFullness,      // 0..1
+        BodyMorphology Body,
+        FacialMorphology Face,
+        SurfaceTraits Surface,
+        ColorTraits Colors,
         IReadOnlyList<string>? DistinctiveMarks = null,
-        BodyMorphology? BodyMorphology = null,
-        FacialMorphology? FacialMorphology = null,
-        SurfaceTraits? SurfaceTraits = null,
-        ColorTraits? ColorTraits = null,
         double HairLengthCm = 35.0)
-    {
-        /// <summary>Structured body morphology. Legacy records receive a conservative projection.</summary>
-        [JsonIgnore]
-        public BodyMorphology Body => BodyMorphology ?? BodyMorphology.FromLegacy(HeightCm, ShoulderBreadthCm, HipBreadthCm, Frame);
-
-        /// <summary>Structured facial morphology. Legacy records receive a conservative projection.</summary>
-        [JsonIgnore]
-        public FacialMorphology Face => FacialMorphology ?? FacialMorphology.FromLegacy(FaceShape, NoseProminence, LipFullness);
-
-        /// <summary>Structured surface traits. Legacy records receive neutral surface values.</summary>
-        [JsonIgnore]
-        public SurfaceTraits Surface => SurfaceTraits ?? SurfaceTraits.Neutral;
-
-        /// <summary>Structured colour traits projected from legacy colour labels.</summary>
-        [JsonIgnore]
-        public ColorTraits Colors => ColorTraits ?? new(SkinTone, EyeColor, HairColor, HairType);
-    }
+    { }
 
     public enum BodyFrame
     { Petite, Medium, Large, Strong }
@@ -93,11 +65,12 @@ namespace GameEngineTools.Characters.Traits
             // Hmotnost je mimo sim – očekává se, že si ji buď držíš extra, nebo aproximujeme ze 2 indexů:
             // Energy (dlouhodobě) a ImmuneLoad (krátkodobě zhorší vzhled pleti).
             // Tady volíme rozumné defaulty; můžeš je nahradit vlastní evidencí hmotnosti.
-            var baselineBmi = BaselineBmiFor(trait.Frame, biology);
+            var baselineBmi = BaselineBmiFor(trait.Body, biology);
             var morphologyBmi = 18.5 + trait.Body.SoftTissue.Adiposity * 8.0 + trait.Body.SoftTissue.Muscularity * 2.2;
             var bmiJitter = (50 - physio.Energy) * 0.003; // nízká energie → mírně horší BMI proxy
             var bmi = Math.Clamp((baselineBmi * 0.35) + (morphologyBmi * 0.65) + bmiJitter, 16.0, 30.0);
-            var weight = bmi * Math.Pow(trait.HeightCm / 100.0, 2);
+            var heightCm = trait.Body.Proportions.HeightCm;
+            var weight = bmi * Math.Pow(heightCm / 100.0, 2);
 
             var bodyFat = Math.Clamp(
                 BodyFatFor(bmi, biology) * 0.45 + (8.0 + trait.Body.SoftTissue.Adiposity * 37.0) * 0.55,
@@ -152,15 +125,12 @@ namespace GameEngineTools.Characters.Traits
             );
         }
 
-        private static double BaselineBmiFor(BodyFrame frame, SexBiology biology)
+        private static double BaselineBmiFor(BodyMorphology body, SexBiology biology)
         {
             var mid = biology == SexBiology.Female ? 22.0 : 23.0;
-            return frame switch
-            {
-                BodyFrame.Petite => mid - 1.5,
-                BodyFrame.Large => mid + 1.5,
-                _ => mid
-            };
+            var robustnessShift = (body.Skeletal.SkeletalRobustness - 0.5) * 2.2;
+            var adiposityShift = (body.SoftTissue.Adiposity - 0.5) * 1.5;
+            return mid + robustnessShift + adiposityShift;
         }
 
         private static double BodyFatFor(double bmi, SexBiology biology)

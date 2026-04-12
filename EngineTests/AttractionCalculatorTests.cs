@@ -512,18 +512,18 @@ namespace EngineTests
             BodyFrame frame,
             double noseProminence = 0.5,
             double lipFullness    = 0.5)
-            => new(
-                HeightCm:          heightCm,
-                Frame:             frame,
-                SkinTone:          SkinTone.Medium,
-                EyeColor:          EyeColor.Brown,
-                HairColor:         HairColorNatural.Brown,
-                HairType:          HairType.Straight,
-                FaceShape:         FaceShape.Oval,
-                ShoulderBreadthCm: 40.0,
-                HipBreadthCm:      38.0,
-                NoseProminence:    noseProminence,
-                LipFullness:       lipFullness);
+            => TestAppearanceFactory.Build(
+                heightCm: heightCm,
+                frame: frame,
+                skinTone: SkinTone.Medium,
+                eyeColor: EyeColor.Brown,
+                hairColor: HairColorNatural.Brown,
+                hairType: HairType.Straight,
+                faceShape: FaceShape.Oval,
+                shoulderBreadthCm: 40.0,
+                hipBreadthCm: 38.0,
+                noseProjection: noseProminence,
+                lipFullness: lipFullness);
 
         private static AppearanceView BuildView(
             double postureScore,
@@ -541,15 +541,11 @@ namespace EngineTests
 
         private static PhysicalAppearance WithStructuredWhr(PhysicalAppearance appearance, double whr)
         {
-            var body = BodyMorphology.FromLegacy(
-                appearance.HeightCm,
-                appearance.ShoulderBreadthCm,
-                appearance.HipBreadthCm,
-                appearance.Frame);
+            var body = appearance.Body;
 
             return appearance with
             {
-                BodyMorphology = body with
+                Body = body with
                 {
                     Proportions = body.Proportions with
                     {
@@ -561,14 +557,11 @@ namespace EngineTests
 
         private static PhysicalAppearance WithFacialAsymmetry(PhysicalAppearance appearance, double asymmetry)
         {
-            var face = FacialMorphology.FromLegacy(
-                appearance.FaceShape,
-                appearance.NoseProminence,
-                appearance.LipFullness);
+            var face = appearance.Face;
 
             return appearance with
             {
-                FacialMorphology = face with
+                Face = face with
                 {
                     Asymmetry = new AsymmetryMorphology(
                         FacialAsymmetry: asymmetry,

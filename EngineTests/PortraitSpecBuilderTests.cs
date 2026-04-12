@@ -85,23 +85,16 @@ namespace EngineTests
         public void Build_StructuredMorphology_MapsDetailedFaceAndBodySignals()
         {
             var baseAppearance = BuildReferenceAppearance();
-            var body = BodyMorphology.FromLegacy(
-                baseAppearance.HeightCm,
-                baseAppearance.ShoulderBreadthCm,
-                baseAppearance.HipBreadthCm,
-                baseAppearance.Frame);
-            var face = FacialMorphology.FromLegacy(
-                baseAppearance.FaceShape,
-                baseAppearance.NoseProminence,
-                baseAppearance.LipFullness);
+            var body = baseAppearance.Body;
+            var face = baseAppearance.Face;
             var appearance = baseAppearance with
             {
-                BodyMorphology = body with
+                Body = body with
                 {
                     Proportions = body.Proportions with { WaistToHipRatio = 0.72 },
                     Posture = body.Posture with { PostureUprightness = 0.90 }
                 },
-                FacialMorphology = face with
+                Face = face with
                 {
                     EyeRegion = face.EyeRegion with { EyeSize = 0.74 },
                     Jaw = face.Jaw with { JawProminence = 0.72, JawRoundness = 0.35 },
@@ -196,19 +189,19 @@ namespace EngineTests
         }
 
         private static PhysicalAppearance BuildReferenceAppearance()
-            => new(
-                HeightCm: 163.43522575145366,
-                Frame: BodyFrame.Petite,
-                SkinTone: SkinTone.Fair,
-                EyeColor: EyeColor.Blue,
-                HairColor: HairColorNatural.DarkBlond,
-                HairType: HairType.Straight,
-                FaceShape: FaceShape.Oval,
-                ShoulderBreadthCm: 38.25361578154313,
-                HipBreadthCm: 39.84460565452852,
-                NoseProminence: 0.56,
-                LipFullness: 0.56,
-                DistinctiveMarks: new[] { "small scar above left eyebrow" });
+            => TestAppearanceFactory.Build(
+                heightCm: 163.43522575145366,
+                frame: BodyFrame.Petite,
+                skinTone: SkinTone.Fair,
+                eyeColor: EyeColor.Blue,
+                hairColor: HairColorNatural.DarkBlond,
+                hairType: HairType.Straight,
+                faceShape: FaceShape.Oval,
+                shoulderBreadthCm: 38.25361578154313,
+                hipBreadthCm: 39.84460565452852,
+                noseProjection: 0.56,
+                lipFullness: 0.56,
+                distinctiveMarks: new[] { "small scar above left eyebrow" });
 
         private static EnginesSnapshot BuildSnapshot(
             PhysiologyState? physiology = null,
