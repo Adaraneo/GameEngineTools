@@ -68,8 +68,9 @@ foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
 
 var currDir = Directory.GetCurrentDirectory();
 
-var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.json").Build();
+var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.json").AddJsonFile("appsettings.World.json").Build();
 var generatedPeopleLogsFilePath = configProvider.GetValue<string>("GenFilesPath");
+var perceptionOptions = configProvider.GetSection("World:Perception").Get<CharacterPerceptionOptions>() ?? new CharacterPerceptionOptions();
 
 var files = new DirectoryInfo(generatedPeopleLogsFilePath!).GetFiles().ToImmutableList();
 
@@ -240,7 +241,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     {
         // ── First impressions — all unmet pairs sharing a location ────────────
         // Replaces the old hardcoded p/so pair check.
-        FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy);
+        FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy, perceptionOptions);
 
         // ── NPC movement — route MoveTo:* actions from previous tick ─────────
         RouteMoveTo(now, chars, locationService, rng);
@@ -258,9 +259,9 @@ var mainTrioSceneOpts = new SimulationSceneOptions
             locationService.MoveCharacter(friendSOPerson.Id, "castle_hall");
         }
 
-        DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy);
+        DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
-        OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy);
+        OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
     }
 };
 
@@ -282,13 +283,13 @@ if (characters.Count > 0)
         ResolveCharacterLod = character => ResolveSceneLod(character, playerPerson.Id, locationService),
         OnTick = (now, chars) =>
         {
-            FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy);
+            FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy, perceptionOptions);
 
             RouteMoveTo(now, chars, locationService, rng);
 
-            DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy);
+            DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
-            OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy);
+            OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
         }
     }, lodRuntime);
 
@@ -346,7 +347,7 @@ Console.ReadKey();
 
 # region Helper Methods
 
-static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy)
+static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy, CharacterPerceptionOptions perceptionOptions)
 {
     foreach (var character in chars)
     {
@@ -362,7 +363,7 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
         if (locationId is null)
             continue;
 
-        var candidates = CharacterPerceptionResolver.GetPerceivedCharacters(character, chars, locationService, perceptionPolicy);
+        var candidates = CharacterPerceptionResolver.GetPerceivedCharacters(character, chars, locationService, perceptionPolicy, perceptionOptions);
 
         if (candidates.Count == 0)
             continue;
@@ -394,7 +395,7 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
     }
 }
 
-static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy)
+static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy, CharacterPerceptionOptions perceptionOptions)
 {
     foreach (var character in chars)
     {
@@ -409,7 +410,7 @@ static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, IL
         if (locationId is null)
             continue;
 
-        var witnesses = CharacterPerceptionResolver.GetPerceivedCharacters(character, chars, locationService, perceptionPolicy);
+        var witnesses = CharacterPerceptionResolver.GetPerceivedCharacters(character, chars, locationService, perceptionPolicy, perceptionOptions);
 
         if (witnesses.Count == 0)
             continue;
@@ -525,13 +526,14 @@ static void FireFirstImpressions(
     IReadOnlyList<IHuman> chars,
     IAttractionCalculator calculator,
     ILocationService locations,
-    IPerceptionFidelityPolicy perceptionPolicy)
+    IPerceptionFidelityPolicy perceptionPolicy,
+    CharacterPerceptionOptions perceptionOptions)
 {
     // Build a lookup: HumanId → IHuman for O(1) resolve inside the loop.
     var byId = chars.ToDictionary(c => c.Id);
     var perceivedBy = chars.ToDictionary(
     c => c.Id,
-    c => CharacterPerceptionResolver.GetPerceivedCharacters(c, chars, locations, perceptionPolicy)
+    c => CharacterPerceptionResolver.GetPerceivedCharacters(c, chars, locations, perceptionPolicy, perceptionOptions)
     .Select(x => x.Id)
     .ToHashSet());
 

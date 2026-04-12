@@ -6,6 +6,7 @@ namespace GameEngineTools.World.Simulation
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Net;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.World.Location;
@@ -91,12 +92,14 @@ namespace GameEngineTools.World.Simulation
                 PerceptionFidelityLevel.LocalOnly => ResolveLocalOnly(
                     sameLocation,
                     interactionSurface.Noise,
-                    interactionSurface.Crowding),
+                    interactionSurface.Crowding,
+                    options),
 
                 PerceptionFidelityLevel.Coarse => ResolveCoarse(
                     sameLocation,
                     interactionSurface.Noise,
-                    interactionSurface.Crowding),
+                    interactionSurface.Crowding,
+                    options),
 
                 _ => sameLocation
             };
@@ -105,30 +108,34 @@ namespace GameEngineTools.World.Simulation
         private static IReadOnlyList<IHuman> ResolveLocalOnly(
             IReadOnlyList<IHuman> sameLocation,
             double noise,
-            double crowding)
+            double crowding,
+            CharacterPerceptionOptions options)
         {
-            if (noise > 0.85 || crowding > 0.90)
+            if (noise > options.LocalOnlyNoiseThreshold
+                || crowding > options.LocalOnlyCrowdingThreshold)
             {
                 return Array.Empty<IHuman>();
             }
 
             return sameLocation
-                .Take(4)
+                .Take(Math.Max(0, options.MaxLocalOnlyTargets))
                 .ToList();
         }
 
         private static IReadOnlyList<IHuman> ResolveCoarse(
             IReadOnlyList<IHuman> sameLocation,
             double noise,
-            double crowding)
+            double crowding,
+            CharacterPerceptionOptions options)
         {
-            if (noise > 0.60 || crowding > 0.70)
+            if (noise > options.CoarseNoiseThreshold
+                || crowding > options.CoarseCrowdingThreshold)
             {
                 return Array.Empty<IHuman>();
             }
 
             return sameLocation
-                .Take(1)
+                .Take(Math.Max(0, options.MaxCoarseTargets))
                 .ToList();
         }
     }
