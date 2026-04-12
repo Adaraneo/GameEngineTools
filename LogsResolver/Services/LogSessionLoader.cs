@@ -15,18 +15,31 @@ public sealed class LogSessionLoader
         _analyzer = analyzer;
     }
 
-    public Task<LogSessionLoadResult> LoadAsync(string selectedPath)
-        => Task.Run(() => Load(selectedPath));
+    public Task<LogSessionLoadResult> LoadAsync(string selectedPath, IProgress<LogLoadProgress>? progress = null)
+        => Task.Run(() => Load(selectedPath, progress));
 
-    private LogSessionLoadResult Load(string selectedPath)
+    private LogSessionLoadResult Load(string selectedPath, IProgress<LogLoadProgress>? progress)
     {
         var diagnostics = new List<LogDiagnosticIssue>();
+        progress?.Report(new LogLoadProgress { Phase = "Discovering session" });
         var session = _discoveryService.Discover(selectedPath);
         var eventsById = new Dictionary<long, ResolvedLogEvent>();
+        var files = session.AllJsonLinesFiles.ToList();
+        var fileIndex = 0;
 
-        foreach (var file in session.AllJsonLinesFiles)
+        foreach (var file in files)
         {
-            foreach (var record in _reader.Read(file, diagnostics))
+            fileIndex++;
+            progress?.Report(new LogLoadProgress
+            {
+                Phase = "Reading JSONL",
+                FilePath = file.FilePath,
+                FileIndex = fileIndex,
+                FileCount = files.Count,
+                EventCount = eventsById.Count
+            });
+
+            foreach (var record in _reader.Read(file, diagnostics, progress))
             {
                 if (!TryMap(record, diagnostics, out var parsed))
                 {
@@ -64,10 +77,25 @@ public sealed class LogSessionLoader
                     parsed.Sources.Add(source);
                     eventsById.Add(parsed.EventInstanceId, parsed);
                 }
+
+                if (eventsById.Count % 10_000 == 0)
+                {
+                    progress?.Report(new LogLoadProgress
+                    {
+                        Phase = "Merging events",
+                        FilePath = file.FilePath,
+                        FileIndex = fileIndex,
+                        FileCount = files.Count,
+                        LineNumber = record.LineNumber,
+                        EventCount = eventsById.Count
+                    });
+                }
             }
         }
 
+        progress?.Report(new LogLoadProgress { Phase = "Sorting events", EventCount = eventsById.Count });
         var events = eventsById.Values.OrderBy(e => e.RealTimestamp).ThenBy(e => e.EventInstanceId).ToList();
+        progress?.Report(new LogLoadProgress { Phase = "Analyzing integrity", EventCount = events.Count });
         diagnostics.AddRange(_analyzer.Analyze(session, events));
 
         if (events.Count == 0 && session.AllTextLogFiles.Any())
@@ -80,6 +108,7 @@ public sealed class LogSessionLoader
             });
         }
 
+        progress?.Report(new LogLoadProgress { Phase = "Finalizing", EventCount = events.Count });
         return new LogSessionLoadResult
         {
             Session = session,

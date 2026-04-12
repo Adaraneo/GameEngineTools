@@ -10,7 +10,10 @@ public sealed class JsonLogFileReader
         PropertyNameCaseInsensitive = true
     };
 
-    public IEnumerable<JsonLogReadRecord> Read(JsonLogFileDescriptor file, IList<LogDiagnosticIssue> diagnostics)
+    public IEnumerable<JsonLogReadRecord> Read(
+        JsonLogFileDescriptor file,
+        IList<LogDiagnosticIssue> diagnostics,
+        IProgress<LogLoadProgress>? progress = null)
     {
         if (!File.Exists(file.FilePath))
         {
@@ -21,6 +24,16 @@ public sealed class JsonLogFileReader
         foreach (var line in File.ReadLines(file.FilePath))
         {
             lineNumber++;
+            if (lineNumber % 10_000 == 0)
+            {
+                progress?.Report(new LogLoadProgress
+                {
+                    Phase = "Reading JSONL",
+                    FilePath = file.FilePath,
+                    LineNumber = lineNumber
+                });
+            }
+
             if (string.IsNullOrWhiteSpace(line))
             {
                 continue;
@@ -45,7 +58,6 @@ public sealed class JsonLogFileReader
 
             yield return new JsonLogReadRecord(dto, file, lineNumber);
         }
-
     }
 
     private static void AddMalformedDiagnostic(IList<LogDiagnosticIssue> diagnostics, string filePath, int lineNumber, string message)

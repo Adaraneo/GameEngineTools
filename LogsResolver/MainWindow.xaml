@@ -40,6 +40,21 @@
             <TextBlock Text="{Binding Summary.RootPath}" VerticalAlignment="Center" />
         </ToolBar>
 
+        <Grid DockPanel.Dock="Top" Margin="8,4,8,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="180" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ProgressBar Height="14"
+                         IsIndeterminate="{Binding IsLoading}"
+                         Minimum="0"
+                         Maximum="100" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding LoadingProgressText}"
+                       VerticalAlignment="Center"
+                       Margin="8,0,0,0" />
+        </Grid>
+
         <Grid Margin="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="280" />

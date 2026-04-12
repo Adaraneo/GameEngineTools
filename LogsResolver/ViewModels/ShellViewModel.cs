@@ -11,6 +11,7 @@ public sealed class ShellViewModel : ViewModelBase
     private readonly LogSessionLoader _loader;
     private string? _currentFolder;
     private string _statusText = "Open a GameEngineTools Characters log folder to begin.";
+    private string? _loadingProgressText;
     private bool _isLoading;
     private string? _selectedRawFile;
 
@@ -81,6 +82,12 @@ public sealed class ShellViewModel : ViewModelBase
         }
     }
 
+    public string? LoadingProgressText
+    {
+        get => _loadingProgressText;
+        private set => SetProperty(ref _loadingProgressText, value);
+    }
+
     public string? SelectedRawFile
     {
         get => _selectedRawFile;
@@ -117,11 +124,18 @@ public sealed class ShellViewModel : ViewModelBase
     {
         IsLoading = true;
         StatusText = "Loading session...";
+        LoadingProgressText = "Starting load...";
         try
         {
-            var result = await _loader.LoadAsync(folder).ConfigureAwait(true);
+            var progress = new Progress<LogLoadProgress>(p =>
+            {
+                LoadingProgressText = p.DisplayText;
+                StatusText = p.DisplayText;
+            });
+            var result = await _loader.LoadAsync(folder, progress).ConfigureAwait(true);
             ApplyResult(result);
             StatusText = $"Loaded {result.Events.Count} logical events from {result.JsonFileCount} JSONL file(s).";
+            LoadingProgressText = StatusText;
         }
         catch (Exception ex)
         {
