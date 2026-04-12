@@ -25,7 +25,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         double IntentBaseBias = 8,
         double IntentCommitmentBiasStep = 1,
         double IntentTimeoutHours = 2,
-        double EmergencyIntentOverrideThreshold = 75)
+        double EmergencyIntentOverrideThreshold = 75,
+        double HabitLearningRate = 0.08,
+        double HabitDecayPerDay = 0.015,
+        double HabitMaxUtilityMultiplier = 0.18,
+        double HabitMaxFlatBias = 4.0,
+        int MaxHabitTraces = 64)
     {
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
     }
@@ -45,7 +50,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
         bool WaitingForSleepConfirmation = false,
         int SleepDeclineCount = 0,
         WDateTime? SleepGraceExpiresAt = null,
-        ActiveIntent? ActiveIntent = null);
+        ActiveIntent? ActiveIntent = null,
+        IReadOnlyDictionary<string, BehaviorHabitTrace>? HabitTraces = null);
 
     #endregion
 

@@ -107,7 +107,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
         HumanId From,
         HumanId To,
         SpeechAct Act,
-        string? Content) : IDomainEvent;
+        string? Content,
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
 
     /// <summary>Událost — postava A se pokouší o fyzický kontakt s postavou B.</summary>
     public sealed record TouchAttempted(
@@ -130,5 +132,50 @@ namespace GameEngineTools.Characters.Engines.Interactions
         HumanId To,
         bool Accepted,
         string Reason,
-        SpeechAct Act = SpeechAct.SmallTalk) : IDomainEvent;
+        SpeechAct Act = SpeechAct.SmallTalk,
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
+
+    /// <summary>Záměr vůči případnému těhotenství u abstraktního sexuálního setkání.</summary>
+    public enum ReproductiveIntent
+    {
+        AvoidPregnancy = 0,
+        Indifferent = 1,
+        OpenToPregnancy = 2,
+        TryingForChild = 3
+    }
+
+    /// <summary>Hrubá úroveň antikoncepční ochrany pro reprodukční výpočet.</summary>
+    public enum ContraceptionLevel
+    {
+        Unspecified = 0,
+        None = 1,
+        Low = 2,
+        Moderate = 3,
+        High = 4
+    }
+
+    /// <summary>Událost — intimní setkání bylo navrženo po přijaté vztahové iniciativě.</summary>
+    public sealed record SexualEncounterProposed(
+        WDateTime OccurredAt,
+        HumanId From,
+        HumanId To,
+        ReproductiveIntent Intent = ReproductiveIntent.Indifferent,
+        ContraceptionLevel Contraception = ContraceptionLevel.Unspecified,
+        bool ReproductivePotential = false,
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
+
+    /// <summary>Událost — abstraktní intimní setkání bylo přijato nebo odmítnuto.</summary>
+    public sealed record SexualEncounterOutcome(
+        WDateTime OccurredAt,
+        HumanId From,
+        HumanId To,
+        bool Accepted,
+        string Reason,
+        ReproductiveIntent Intent = ReproductiveIntent.Indifferent,
+        ContraceptionLevel Contraception = ContraceptionLevel.Unspecified,
+        bool ReproductivePotential = false,
+        SexBiology? FromBiology = null,
+        SexBiology? ToBiology = null) : IDomainEvent;
 }

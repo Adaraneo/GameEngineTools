@@ -5,7 +5,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -96,6 +98,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 case TouchAttempted t when t.To == ctx.Id:
                     HandleTouchAttempted(t, ctx, outbox);
                     break;
+
+                case SexualEncounterProposed se when se.To == ctx.Id:
+                    HandleSexualEncounterProposed(se, ctx, outbox);
+                    break;
             }
         }
 
@@ -120,6 +126,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 _ => 0
             };
 
+            if (attempted.Level == TouchLevel.Intimate)
+            {
+                baseP += SociosexualityBehaviorMath.IntimateTouchAcceptanceBias(ctx.Personality.Sociosexuality, edge, State.HasPrivacy);
+            }
+
             // Soukromí a psychika modulují
             baseP += State.HasPrivacy ? 0.05 : -0.05;
             baseP -= psych.Stress * 0.002;
@@ -129,7 +140,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var accepted = ctx.Random.Chance(pAcc);
 
             // Intimate bez dostatečné Closeness/Attraction vždy odmítnuto
-            if (attempted.Level == TouchLevel.Intimate && (closeness < 60 || intimacyInterest < 55))
+            if (attempted.Level == TouchLevel.Intimate
+                && SociosexualityBehaviorMath.BlocksIntimateTouch(ctx.Personality.Sociosexuality, edge))
             {
                 accepted = false;
             }
@@ -202,8 +214,18 @@ namespace GameEngineTools.Characters.Engines.Interactions
                         - 0.0015 * psych.Stress
                         + (expectedAcceptance - 0.5) * 0.25;
 
+            if (p.Act == SpeechAct.Invite)
+            {
+                baseP += SociosexualityBehaviorMath.InviteAcceptanceBias(
+                    ctx.Personality.Sociosexuality,
+                    edge,
+                    expectedAcceptance,
+                    State.HasPrivacy);
+                baseP += SexualOrientationBehaviorMath.InviteAcceptanceBias(ctx.AttractionProfile, p.FromBiology);
+            }
+
             // Misattribution: vyšší stres → větší šance na špatné čtení záměru
-            var misattrib = Config.MisattributionRateBase * (psych.Stress / 100.0);
+            var misattrib = ComputeMisattributionPenalty(p.Act, psych.Stress, trust, comfort, State.HasPrivacy);
             baseP -= misattrib;
 
             var pAcc = Math.Clamp(baseP, 0.05, 0.95);
@@ -220,16 +242,156 @@ namespace GameEngineTools.Characters.Engines.Interactions
             }
 
             // Přenášíme p.Act — RelationshipsEngine ho potřebuje pro DomainBreakdown
-            outbox.Add(new InteractionOutcome(
+            var outcome = new InteractionOutcome(
                 OccurredAt: p.OccurredAt,
                 From: p.From,
                 To: p.To,
                 Accepted: accepted,
                 Reason: accepted ? "accepted" : "declined",
-                Act: p.Act));
+                Act: p.Act,
+                FromBiology: p.FromBiology,
+                ToBiology: ctx.Biology);
+
+            outbox.Add(outcome);
+
+            if (accepted && p.Act == SpeechAct.Invite && HasSexualEncounterReadiness(p.OccurredAt, ctx, edge, expectedAcceptance))
+            {
+                var proposed = new SexualEncounterProposed(
+                    p.OccurredAt,
+                    p.From,
+                    p.To,
+                    ReproductiveIntent.Indifferent,
+                    ContraceptionLevel.Unspecified,
+                    HasReproductivePotential(p.FromBiology, ctx.Biology),
+                    FromBiology: p.FromBiology,
+                    ToBiology: ctx.Biology);
+
+                outbox.Add(proposed);
+            }
         }
 
         #endregion Handle — zpracování doménových událostí
+
+        private void HandleSexualEncounterProposed(SexualEncounterProposed proposed, IHumanContext ctx, IEventCollector outbox)
+        {
+            ctx.Snapshot.Relationships.Edges.TryGetValue(proposed.From, out var edge);
+            var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
+                .ExpectedAcceptance(proposed.From, SpeechAct.Invite, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
+            var accepted = ShouldResolveSexualEncounter(proposed.OccurredAt, ctx, edge, expectedAcceptance, proposed.FromBiology);
+
+            outbox.Add(new SexualEncounterOutcome(
+                proposed.OccurredAt,
+                proposed.From,
+                proposed.To,
+                accepted,
+                accepted ? "accepted" : "declined",
+                proposed.Intent,
+                proposed.Contraception,
+                proposed.ReproductivePotential,
+                proposed.FromBiology,
+                proposed.ToBiology ?? ctx.Biology));
+        }
+
+        private bool ShouldResolveSexualEncounter(
+            WDateTime occurredAt,
+            IHumanContext ctx,
+            RelationshipEdge? edge,
+            double expectedAcceptance,
+            SexBiology? targetBiology)
+        {
+            if (!CanConsiderSexualEncounter(occurredAt, ctx, edge))
+            {
+                return false;
+            }
+
+            var bias = SociosexualityBehaviorMath.InviteAcceptanceBias(ctx.Personality.Sociosexuality, edge, expectedAcceptance, State.HasPrivacy);
+            bias += SexualOrientationBehaviorMath.SexualEncounterAcceptanceBias(ctx.AttractionProfile, targetBiology);
+            var p = Math.Clamp(0.18 + expectedAcceptance * 0.28 + bias - ctx.Snapshot.Psychology.Stress * 0.001, 0.02, 0.82);
+            return ctx.Random.Chance(p);
+        }
+
+        private bool CanConsiderSexualEncounter(WDateTime occurredAt, IHumanContext ctx, RelationshipEdge? edge)
+        {
+            if (!State.HasPrivacy || ctx.Snapshot.Physiology.Pain > 55 || ctx.Snapshot.Physiology.Energy < 25)
+            {
+                return false;
+            }
+
+            if (ctx.Snapshot.Psychology.Stress > 70 || !IsAdult(ctx, occurredAt))
+            {
+                return false;
+            }
+
+            return !SociosexualityBehaviorMath.BlocksIntimateTouch(ctx.Personality.Sociosexuality, edge);
+        }
+
+        private bool HasSexualEncounterReadiness(
+            WDateTime occurredAt,
+            IHumanContext ctx,
+            RelationshipEdge? edge,
+            double expectedAcceptance)
+        {
+            if (!CanConsiderSexualEncounter(occurredAt, ctx, edge) || edge is null)
+            {
+                return false;
+            }
+
+            if (ctx.Snapshot.Psychology.Stress > 35 || expectedAcceptance < 0.74)
+            {
+                return false;
+            }
+
+            var relationalReadiness =
+                edge.Trust * 0.24
+                + edge.Comfort * 0.28
+                + edge.Closeness * 0.20
+                + edge.RomanticInterest * 0.14
+                + edge.SexualInterest * 0.14;
+
+            return edge.Trust >= 72
+                && edge.Comfort >= 72
+                && edge.Closeness >= 70
+                && edge.SexualInterest >= 68
+                && relationalReadiness >= 72.0;
+        }
+
+        private double ComputeMisattributionPenalty(SpeechAct act, double stress, double trust, double comfort, bool hasPrivacy)
+        {
+            var stressFactor = Math.Clamp(stress / 100.0, 0.0, 1.0);
+            var safety = Math.Clamp(((trust + comfort) * 0.5) / 100.0, 0.0, 1.0);
+            var unsafeMultiplier = 0.45 + (1.0 - safety) * 1.10;
+            var actMultiplier = act switch
+            {
+                SpeechAct.Invite => 1.35,
+                SpeechAct.SelfDisclosure => 1.20,
+                SpeechAct.Meta => 1.10,
+                SpeechAct.SmallTalk or SpeechAct.Question => 0.70,
+                _ => 1.0
+            };
+            var privacyRelief = hasPrivacy && safety >= 0.65 ? 0.78 : 1.0;
+
+            return Config.MisattributionRateBase * stressFactor * unsafeMultiplier * actMultiplier * privacyRelief;
+        }
+
+        private static bool HasReproductivePotential(SexBiology? initiatorBiology, SexBiology recipientBiology)
+            => (initiatorBiology == SexBiology.Male && recipientBiology == SexBiology.Female)
+                || (initiatorBiology == SexBiology.Female && recipientBiology == SexBiology.Male);
+
+        private static bool IsAdult(IHumanContext ctx, WDateTime now)
+            => ctx.Identity is not null
+                && StadiumResolver.Resolve(AgeYears(ctx.Identity.BirthDate, now.Date)) is StadiumType.Adult or StadiumType.MidAged or StadiumType.Old;
+
+        private static int AgeYears(WDateOnly birth, WDateOnly today)
+        {
+            var age = today.Year - birth.Year;
+            if (today.Month < birth.Month ||
+                (today.Month == birth.Month && today.Day < birth.Day))
+            {
+                age--;
+            }
+
+            return Math.Max(0, age);
+        }
 
         #region RestoreState
 

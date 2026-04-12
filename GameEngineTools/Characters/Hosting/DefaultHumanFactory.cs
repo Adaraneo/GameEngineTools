@@ -73,6 +73,7 @@ namespace GameEngineTools.Characters.Hosting
         private readonly IPhysiologyEngineFactory _physioFactory;
         private readonly IPsychologyEngineFactory _psychFactory;
         private readonly IClock _clock;
+        private readonly IBehaviorCadencePolicy _behaviorCadencePolicy;
 
         #endregion Private fields
 
@@ -87,7 +88,8 @@ namespace GameEngineTools.Characters.Hosting
             ILoggerFactory loggerFactory,
             IPhysiologyEngineFactory physioFactory,
             IPsychologyEngineFactory psychFactory,
-            IClock clock)
+            IClock clock,
+            IBehaviorCadencePolicy behaviorCadencePolicy)
         {
             _sp = sp;
             _rngFactory = rngFactory;
@@ -95,6 +97,7 @@ namespace GameEngineTools.Characters.Hosting
             _physioFactory = physioFactory;
             _psychFactory = psychFactory;
             _clock = clock;
+            _behaviorCadencePolicy = behaviorCadencePolicy;
         }
 
         #endregion Constructor
@@ -105,20 +108,20 @@ namespace GameEngineTools.Characters.Hosting
         public IHuman Create(HumanBlueprint b)
         {
             // Per-character services (transient → new instance each time)
-            var bus       = _sp.GetRequiredService<IEventBus>();
+            var bus = _sp.GetRequiredService<IEventBus>();
             var scheduler = _sp.GetRequiredService<IScheduler>();
-            var rng       = _rngFactory.Create(b.Seed ?? DeriveSeed(b.Id));
-            var logger    = _loggerFactory.CreateLogger($"Characters.Human[{b.Id.Value}]");
+            var rng = _rngFactory.Create(b.Seed ?? DeriveSeed(b.Id));
+            var logger = _loggerFactory.CreateLogger($"Characters.Human[{b.Id.Value}]");
 
             // Engines created via factories (require runtime parameters)
             var physio = _physioFactory.Create(rng, b.Biology, b.Identity.BirthDate, _clock.Now.Date);
-            var psych  = _psychFactory.Create(rng);
+            var psych = _psychFactory.Create(rng);
 
             // Engines without runtime parameters — resolved directly from DI
-            var behav  = _sp.GetRequiredService<IBehaviorEngine>();
-            var inter  = _sp.GetRequiredService<IInteractionEngine>();
-            var rel    = _sp.GetRequiredService<IRelationshipsEngine>();
-            var mem    = _sp.GetRequiredService<IMemoryEngine>();
+            var behav = _sp.GetRequiredService<IBehaviorEngine>();
+            var inter = _sp.GetRequiredService<IInteractionEngine>();
+            var rel = _sp.GetRequiredService<IRelationshipsEngine>();
+            var mem = _sp.GetRequiredService<IMemoryEngine>();
             var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
 
             // Initial snapshot — State is always valid immediately after factory creation
@@ -130,7 +133,8 @@ namespace GameEngineTools.Characters.Hosting
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
                 physio, psych, behav, inter, rel, mem, semantic,
-                snapshot);
+                snapshot,
+                _behaviorCadencePolicy);
         }
 
         #endregion IHumanFactory

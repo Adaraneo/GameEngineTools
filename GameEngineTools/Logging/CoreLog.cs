@@ -61,6 +61,51 @@ namespace GameEngineTools.Logging
             Message = "[PHYSIO/SLEEP] {HumanId} SleepEnded — délka: {Hours:F1}h, kvalita: {Quality:F0}, dluh po obnově: {Debt:F2}h.")]
         public static partial void PhysiologySleepEnded(this ILogger logger, string HumanId, double Hours, double Quality, double Debt);
 
+        [LoggerMessage(
+            EventId = 5003,
+            Level = LogLevel.Debug,
+            Message = "[PHYSIO/REPRO] {HumanId} conception evaluated with {OtherParent}: chance={Chance:F3}, ovulation={OvulationWindow}, intent={Intent}, contraception={Contraception}, result={Result}.")]
+        public static partial void PhysiologyConceptionEvaluated(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            double Chance,
+            bool OvulationWindow,
+            string Intent,
+            string Contraception,
+            string Result);
+
+        [LoggerMessage(
+            EventId = 5004,
+            Level = LogLevel.Information,
+            Message = "[PHYSIO/REPRO] {HumanId} pregnancy started with otherParent={OtherParent}, due={EstimatedDueDate}.")]
+        public static partial void PhysiologyPregnancyStarted(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            string EstimatedDueDate);
+
+        [LoggerMessage(
+            EventId = 5005,
+            Level = LogLevel.Information,
+            Message = "[PHYSIO/REPRO] {HumanId} pregnancy discovered, otherParent={OtherParent}, daysPregnant={DaysPregnant}.")]
+        public static partial void PhysiologyPregnancyDiscovered(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            long DaysPregnant);
+
+        [LoggerMessage(
+            EventId = 5006,
+            Level = LogLevel.Information,
+            Message = "[PHYSIO/REPRO] {HumanId} child born, otherParent={OtherParent}, conceivedOn={ConceivedOn}, due={EstimatedDueDate}.")]
+        public static partial void PhysiologyChildBorn(
+            this ILogger logger,
+            string HumanId,
+            string OtherParent,
+            string ConceivedOn,
+            string EstimatedDueDate);
+
         #endregion Physiology
 
         #region Psychology
@@ -102,7 +147,7 @@ namespace GameEngineTools.Logging
             EventId = 5102,
             Level = LogLevel.Debug,
             Message = "[PSYCH/SLEEP] Nekvalitní spánek (kvalita={Quality:F0}) → stres +{StressDelta:F1}.")]
-        public static partial void PsychSleepInterrupted(this ILogger logger, string HumanId, double Quality, double StressDelta);
+        public static partial void PsychSleepInterrupted(this ILogger logger, double Quality, double StressDelta);
 
         #endregion Psychology
 
@@ -271,6 +316,65 @@ namespace GameEngineTools.Logging
             string HumanId,
             string Action,
             double Bias);
+
+        [LoggerMessage(
+            EventId = 1011,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} learned {Action} cue={Cue} surface={Surface} time={TimeBand} strength {BeforeStrength:F3}->{AfterStrength:F3} learn={Learning:F3} cueFit={CueFit:F2} relief={ReliefFit:F2} coping={CopingFit:F2} constraint={ConstraintPenalty:F2} tendency={Tendency} reps={RepetitionCount}.")]
+        public static partial void BehaviorHabitLearned(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            string Cue,
+            string Surface,
+            string TimeBand,
+            double BeforeStrength,
+            double AfterStrength,
+            double Learning,
+            double CueFit,
+            double ReliefFit,
+            double CopingFit,
+            double ConstraintPenalty,
+            string Tendency,
+            int RepetitionCount);
+
+        [LoggerMessage(
+            EventId = 1012,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} decay days={Days:F3} retention={Retention:F4} traces {BeforeCount}->{AfterCount} removed={RemovedCount}.")]
+        public static partial void BehaviorHabitDecayed(
+            this ILogger logger,
+            string HumanId,
+            double Days,
+            double Retention,
+            int BeforeCount,
+            int AfterCount,
+            int RemovedCount);
+
+        [LoggerMessage(
+            EventId = 1013,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} pruned traces {BeforeCount}->{AfterCount} max={MaxTraces}.")]
+        public static partial void BehaviorHabitPruned(
+            this ILogger logger,
+            string HumanId,
+            int BeforeCount,
+            int AfterCount,
+            int MaxTraces);
+
+        [LoggerMessage(
+            EventId = 1014,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} bias {Action}: utility {BeforeUtility:F3}->{AfterUtility:F3}, applicability={Applicability:F3}, multiplier={Multiplier:F3}, flat={FlatBias:F3}.")]
+        public static partial void BehaviorHabitBiasApplied(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            double BeforeUtility,
+            double AfterUtility,
+            double Applicability,
+            double Multiplier,
+            double FlatBias);
 
         #endregion Behavior — rozhodování
 

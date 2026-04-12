@@ -166,16 +166,16 @@ namespace GameEngineTools
         /// Vygeneruje postavu jako potenciálního blízkého k zadanému hráči —
         /// podobný věk a opačné pohlaví.
         /// </summary>
-        /// <param name="player">Hráčská postava jako reference pro věk a pohlaví.</param>
+        /// <param name="referenceCharacter">Hráčská/NPC postava jako reference pro věk a pohlaví.</param>
         /// <returns>Nová náhodně vygenerovaná postava.</returns>
-        public IHuman RandomizePerson(PC player)
+        public IHuman RandomizePerson(CharacterBase referenceCharacter)
         {
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
                 new HumanBlueprintRequest(
-                    MinBirthDate: player.Person.Identity.BirthDate.AddYears(-5),
-                    MaxBirthDate: player.Person.Identity.BirthDate.AddYears(5),
-                    Sex: player.Person.Biology == SexBiology.Male
+                    MinBirthDate: referenceCharacter.Person.Identity.BirthDate.AddYears(-5),
+                    MaxBirthDate: referenceCharacter.Person.Identity.BirthDate.AddYears(5),
+                    Sex: referenceCharacter.Person.Biology == SexBiology.Male
                         ? SexBiology.Female
                         : SexBiology.Male));
 

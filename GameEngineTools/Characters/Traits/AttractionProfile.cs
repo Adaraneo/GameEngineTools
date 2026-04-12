@@ -39,7 +39,19 @@ namespace GameEngineTools.Characters.Traits
         /// Weight of facial symmetry in the score (0..1).
         /// Higher value means the character is more sensitive to symmetry cues.
         /// </summary>
-        double SymmetryWeight
+        double SymmetryWeight,
+
+        /// <summary>Stable sexual orientation category for debugging and persistence.</summary>
+        SexualOrientation Orientation = SexualOrientation.Bisexual,
+
+        /// <summary>Attraction weight for female targets in [0, 1].</summary>
+        double FemaleTargetAttraction = 1.0,
+
+        /// <summary>Attraction weight for male targets in [0, 1].</summary>
+        double MaleTargetAttraction = 1.0,
+
+        /// <summary>Fallback attraction weight for intersex or unknown targets in [0, 1].</summary>
+        double OtherTargetAttraction = 0.65
     );
 
     /// <summary>

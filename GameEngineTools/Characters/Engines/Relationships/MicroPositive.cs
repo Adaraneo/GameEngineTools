@@ -11,5 +11,5 @@ namespace GameEngineTools.Characters.Engines.Relationships
         WDateTime OccurredAt,
         HumanId A,
         HumanId B,
-        string What) : IDomainEvent;
+        string Kind) : IDomainEvent;
 }

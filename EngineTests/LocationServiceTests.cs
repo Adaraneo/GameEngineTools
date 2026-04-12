@@ -6,6 +6,7 @@ namespace EngineTests
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Traits;
@@ -625,6 +626,8 @@ namespace EngineTests
             public AttractionProfile AttractionProfile => throw new NotImplementedException();
 
             public int Age => throw new NotImplementedException();
+
+            public StadiumType Stadium => throw new NotImplementedException();
 
             #endregion Properties
 

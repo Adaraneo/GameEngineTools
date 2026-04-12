@@ -13,9 +13,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         int MenstrualCycleBeginsInAge = 12,
         double EnergyRecoveryPerSleepHour = 10.0,
         double PainPassiveRecoveryPerHour = 0.3,
-        double PainSleepRecoveryPerHour = 0.5)
+        double PainSleepRecoveryPerHour = 0.5,
+        double BaseConceptionChancePerEncounter = 0.03,
+        double OvulationConceptionMultiplier = 4.0,
+        int PregnancyDiscoveryMinDays = 21,
+        int PregnancyTermDays = 280)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280) { }
     }
 
     public sealed record PhysiologyState(
@@ -26,7 +30,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double Pain,            // 0..100
         double ImmuneLoad,      // 0..100
         double BodyTempDelta,   // °C deviation
-        MenstrualCycleState? Cycle);
+        MenstrualCycleState? Cycle,
+        PregnancyState? Pregnancy = null);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }
@@ -56,9 +61,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double LibidoMod,           // multiplikátor 0.5..1.5
         WDateOnly LastMensesStart);
 
+    /// <summary>Stav probíhajícího těhotenství postavy.</summary>
+    public sealed record PregnancyState(
+        HumanId OtherParent,
+        WDateOnly ConceivedOn,
+        WDateOnly EstimatedDueDate,
+        bool Discovered = false,
+        WDateOnly? DiscoveredOn = null);
+
     // Události
     public sealed record MensesStarted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     public sealed record MensesEnded(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     public sealed record OvulationWindowOpened(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     public sealed record CycleDayAdvanced(WDateTime OccurredAt, HumanId Human, int DayInCycle, CyclePhase Phase) : IDomainEvent;
+    /// <summary>Událost — postava otěhotněla po reprodukčně relevantním setkání.</summary>
+    public sealed record PregnancyStarted(WDateTime OccurredAt, HumanId Human, HumanId OtherParent, WDateOnly EstimatedDueDate) : IDomainEvent;
+    /// <summary>Událost — těhotenství je pro postavu zjistitelné / zjištěné.</summary>
+    public sealed record PregnancyDiscovered(WDateTime OccurredAt, HumanId Human, HumanId OtherParent) : IDomainEvent;
+    /// <summary>Událost — těhotenství doběhlo do porodu; nevytváří novou postavu.</summary>
+    public sealed record ChildBorn(WDateTime OccurredAt, HumanId ParentA, HumanId ParentB) : IDomainEvent;
 }

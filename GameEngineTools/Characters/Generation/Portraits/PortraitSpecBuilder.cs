@@ -28,9 +28,9 @@ namespace GameEngineTools.Characters.Generation.Portraits
             return new PortraitSpec(
                 Biology: biology,
                 Body: BuildBody(appearance),
-                Skin: BuildSkin(appearance.SkinTone),
-                Eyes: BuildEyes(appearance.EyeColor),
-                Hair: BuildHair(appearance.HairColor, appearance.HairType),
+                Skin: BuildSkin(appearance.Colors.SkinTone),
+                Eyes: BuildEyes(appearance.Colors.EyeColor),
+                Hair: BuildHair(appearance.Colors.HairColor, appearance.Colors.HairType, appearance.HairLengthCm),
                 Face: BuildFace(appearance),
                 Expression: BuildExpression(snapshot),
                 BiasGuard: DefaultBiasGuard,
@@ -52,18 +52,24 @@ namespace GameEngineTools.Characters.Generation.Portraits
 
         private static BodyRenderSpec BuildBody(PhysicalAppearance appearance)
         {
-            var shoulderToHeight = appearance.ShoulderBreadthCm / appearance.HeightCm;
-            var hipToHeight = appearance.HipBreadthCm / appearance.HeightCm;
-            var shoulderHipDelta = appearance.ShoulderBreadthCm - appearance.HipBreadthCm;
+            var heightCm = appearance.Body.Proportions.HeightCm;
+            var shoulderBreadth = appearance.Body.Skeletal.ShoulderBreadth;
+            var hipBreadth = appearance.Body.Silhouette.HipWidth;
+            var frame = DeriveFrame(appearance.Body);
+            var shoulderToHeight = shoulderBreadth / heightCm;
+            var hipToHeight = hipBreadth / heightCm;
+            var shoulderHipDelta = shoulderBreadth - hipBreadth;
 
             return new BodyRenderSpec(
-                HeightCm: Math.Round(appearance.HeightCm, 2),
-                ShoulderBreadthCm: Math.Round(appearance.ShoulderBreadthCm, 2),
-                HipBreadthCm: Math.Round(appearance.HipBreadthCm, 2),
-                Frame: appearance.Frame,
-                HeightBucket: BucketHeight(appearance.HeightCm),
+                HeightCm: Math.Round(heightCm, 2),
+                ShoulderBreadthCm: Math.Round(shoulderBreadth, 2),
+                HipBreadthCm: Math.Round(hipBreadth, 2),
+                WaistToHipRatio: Math.Round(appearance.Body.Proportions.WaistToHipRatio, 3),
+                Frame: frame,
+                HeightBucket: BucketHeight(heightCm),
                 ProportionBucket: BucketProportions(shoulderToHeight, hipToHeight),
-                FrameImpression: BucketFrameImpression(appearance.Frame, shoulderHipDelta));
+                PostureBucket: BucketPosture(appearance.Body.Posture.PostureUprightness),
+                FrameImpression: BucketFrameImpression(frame, shoulderHipDelta));
         }
 
         private static SkinRenderSpec BuildSkin(SkinTone tone)
@@ -97,7 +103,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
             };
         }
 
-        private static HairRenderSpec BuildHair(HairColorNatural color, HairType type)
+        private static HairRenderSpec BuildHair(HairColorNatural color, HairType type, double lengthCm)
         {
             var (baseColorFamily, brightnessRange) = color switch
             {
@@ -125,16 +131,23 @@ namespace GameEngineTools.Characters.Generation.Portraits
                 BrightnessRange: brightnessRange,
                 Texture: texture,
                 Straightness: straightness,
+                LengthBucket: BucketHairLength(lengthCm),
                 VolumePolicy: "natural volume only");
         }
 
         private static FaceRenderSpec BuildFace(PhysicalAppearance appearance)
         {
+            var faceShape = DeriveFaceShape(appearance.Face.Craniofacial);
+            var lipFullness = (appearance.Face.Mouth.UpperLipFullness + appearance.Face.Mouth.LowerLipFullness) * 0.5;
+
             return new FaceRenderSpec(
-                ShapeLabel: FaceShapeLabel(appearance.FaceShape),
-                WidthHeightTendency: FaceWidthHeightTendency(appearance.FaceShape),
-                NoseProjectionBucket: BucketNoseProjection(appearance.NoseProminence),
-                LipFullnessBucket: BucketLipFullness(appearance.LipFullness),
+                ShapeLabel: FaceShapeLabel(faceShape),
+                WidthHeightTendency: FaceWidthHeightTendency(faceShape),
+                NoseProjectionBucket: BucketNoseProjection(appearance.Face.Nose.NoseProjection),
+                LipFullnessBucket: BucketLipFullness(lipFullness),
+                EyeScaleBucket: BucketEyeScale(appearance.Face.EyeRegion.EyeSize),
+                JawDefinitionBucket: BucketJawDefinition(appearance.Face.Jaw.JawProminence, appearance.Face.Jaw.JawRoundness),
+                FacialAsymmetryBucket: BucketFacialAsymmetry(appearance.Face.Asymmetry.FacialAsymmetry),
                 SymmetryPolicy: "preserve natural asymmetry");
         }
 
@@ -227,6 +240,51 @@ namespace GameEngineTools.Characters.Generation.Portraits
             };
         }
 
+        private static string BucketPosture(double postureUprightness)
+        {
+            if (postureUprightness < 0.40)
+            {
+                return "noticeably slouched carriage";
+            }
+
+            if (postureUprightness < 0.62)
+            {
+                return "softly relaxed carriage";
+            }
+
+            if (postureUprightness < 0.82)
+            {
+                return "neutral upright carriage";
+            }
+
+            return "very upright carriage";
+        }
+
+        private static string BucketHairLength(double lengthCm)
+        {
+            if (lengthCm < 2.0)
+            {
+                return "shaved or very short";
+            }
+
+            if (lengthCm < 10.0)
+            {
+                return "short";
+            }
+
+            if (lengthCm < 30.0)
+            {
+                return "medium length";
+            }
+
+            if (lengthCm < 65.0)
+            {
+                return "long";
+            }
+
+            return "very long";
+        }
+
         private static string FaceShapeLabel(FaceShape faceShape)
         {
             return faceShape switch
@@ -303,6 +361,98 @@ namespace GameEngineTools.Characters.Generation.Portraits
             }
 
             return "very full";
+        }
+
+        private static string BucketEyeScale(double eyeSize)
+        {
+            if (eyeSize < 0.36)
+            {
+                return "small eye scale";
+            }
+
+            if (eyeSize < 0.62)
+            {
+                return "medium eye scale";
+            }
+
+            return "large eye scale";
+        }
+
+        private static string BucketJawDefinition(double jawProminence, double jawRoundness)
+        {
+            if (jawProminence >= 0.62 && jawRoundness <= 0.48)
+            {
+                return "angular jaw definition";
+            }
+
+            if (jawProminence <= 0.38 && jawRoundness >= 0.58)
+            {
+                return "soft rounded jaw definition";
+            }
+
+            return "moderate jaw definition";
+        }
+
+        private static string BucketFacialAsymmetry(double asymmetry)
+        {
+            if (asymmetry < 0.04)
+            {
+                return "very subtle natural asymmetry";
+            }
+
+            if (asymmetry < 0.09)
+            {
+                return "subtle natural asymmetry";
+            }
+
+            return "noticeable natural asymmetry";
+        }
+
+        private static BodyFrame DeriveFrame(BodyMorphology body)
+        {
+            var robustness = body.Skeletal.SkeletalRobustness;
+            var muscularity = body.SoftTissue.Muscularity;
+            var adiposity = body.SoftTissue.Adiposity;
+
+            if (muscularity >= 0.68 && robustness >= 0.58)
+            {
+                return BodyFrame.Strong;
+            }
+
+            if (robustness <= 0.38 && adiposity <= 0.48)
+            {
+                return BodyFrame.Petite;
+            }
+
+            return robustness + adiposity * 0.45 >= 0.78 ? BodyFrame.Large : BodyFrame.Medium;
+        }
+
+        private static FaceShape DeriveFaceShape(CraniofacialStructure c)
+        {
+            var ratio = c.FaceWidthToHeightRatio;
+            var jawToFace = c.JawWidth / Math.Max(1.0, c.FaceWidth);
+            var cheekToJaw = c.CheekboneWidth / Math.Max(1.0, c.JawWidth);
+            if (ratio >= 0.86 && jawToFace >= 0.80)
+            {
+                return FaceShape.Square;
+            }
+
+            if (ratio >= 0.86)
+            {
+                return FaceShape.Round;
+            }
+
+            if (ratio <= 0.72)
+            {
+                return FaceShape.Oblong;
+            }
+
+            if (cheekToJaw >= 1.23)
+            {
+                return FaceShape.Diamond;
+            }
+
+            return jawToFace <= 0.68 ? FaceShape.Heart : FaceShape.Oval;
         }
     }
 }

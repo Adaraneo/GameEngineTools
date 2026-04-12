@@ -12,6 +12,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -46,6 +47,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         #region Privátní pole
 
         private readonly ILogger _log;
+        private readonly IMemoryFidelityPolicy? _memoryFidelityPolicy;
 
         #endregion Privátní pole
 
@@ -56,10 +58,14 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </summary>
         /// <param name="cfg">Konfigurace injektovaná přes Options pattern.</param>
         /// <param name="loggerFactory">Továrna na logger — umožňuje scope per postava.</param>
-        public DefaultMemoryEngine(IOptions<MemoryConfig> cfg, ILoggerFactory loggerFactory)
+        public DefaultMemoryEngine(
+            IOptions<MemoryConfig> cfg,
+            ILoggerFactory loggerFactory,
+            IMemoryFidelityPolicy? memoryFidelityPolicy = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultMemoryEngine>();
+            _memoryFidelityPolicy = memoryFidelityPolicy;
 
             // Inicializuj prázdný stav — žádné vzpomínky, žádná sémantika
             State = new MemoryIndex(
@@ -73,7 +79,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <summary>
         /// Zakóduje novou epizodu do paměti.
         ///
-        /// Pokud epizoda se stejným klíčem <c>What</c> již existuje a je stále silná
+        /// Pokud epizoda se stejným klíčem <c>Kind</c> již existuje a je stále silná
         /// (nad prahem prořezání), aplikuje <b>reinforcement</b> — posílí stávající záznam
         /// a aktualizuje jeho timestamp. Tím se modeluje spacing effect:
         /// opakovaný zážitek upevňuje paměť, místo aby plodil duplicity.
@@ -93,7 +99,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 var episodes = State.Episodes.ToList();
 
                 // --- REINFORCEMENT (spacing effect) ---
-                // Nehledáme shodu podle syrového What stringu,
+                // Nehledáme shodu podle syrového Kind stringu,
                 // ale podle explicitního reinforcement klíče.
                 var incomingKey = MemoryReinforcementKeyBuilder.From(episode);
 
@@ -113,8 +119,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                         // Aktualizuj timestamp - "naposledy se to stalo teď"
                         When = episode.When,
 
-                        // Udržuj poslední reprezentaci raw What / PercievedWhat.
-                        // Díky explicitnímu reinforcement klíči už What nemusí být identita.
+                        // Udržuj poslední reprezentaci raw Kind / PercievedWhat.
+                        // Díky explicitnímu reinforcement klíči už Kind nemusí být identita.
                         What = episode.What,
                         PerceivedWhat = episode.PerceivedWhat ?? existing.PerceivedWhat,
 
@@ -181,12 +187,12 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <b>Schema <c>What</c>:</b> každý event se překládá do deterministického sémantického klíče
+        /// <b>Schema <c>Kind</c>:</b> každý event se překládá do deterministického sémantického klíče
         /// přes <see cref="MemoryWhatParser"/>. Formát: <c>{Kategorie}:{Typ}:{Výsledek}|{klíč}={hodnota}</c>
         /// </para>
         /// <para>
         /// <b>Proč deterministický klíč?</b>
-        /// <see cref="Encode"/> používá <c>What</c> jako klíč pro reinforcement (spacing effect) —
+        /// <see cref="Encode"/> používá <c>Kind</c> jako klíč pro reinforcement (spacing effect) —
         /// opakovaný zážitek stejného typu posílí existující vzpomínku místo vytvoření nové.
         /// Kdyby byl klíč pokaždé jiný (např. obsahoval timestamp), reinforcement by nefungoval.
         /// </para>
@@ -295,12 +301,59 @@ namespace GameEngineTools.Characters.Engines.Memory
             return null;
         }
 
-        private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string source)
+        //private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string source)
+        //{
+        //    var other = ResolveOtherPerson(self, a, b) ?? b;
+        //    return positive
+        //        ? new PersonBeliefEvidence(other, source.Contains("help", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Reliable : PersonBeliefKind.Warm, 0.14, $"micro-positive:{source}")
+        //        : new PersonBeliefEvidence(other, source.Contains("ignore", StringComparison.OrdinalIgnoreCase) || source.Contains("cold", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Rejecting : PersonBeliefKind.Critical, 0.16, $"micro-negative:{source}");
+        //}
+
+        private static PersonBeliefEvidence CreateMicroBeliefEvidence(HumanId self, HumanId a, HumanId b, bool positive, string kind)
         {
             var other = ResolveOtherPerson(self, a, b) ?? b;
-            return positive
-                ? new PersonBeliefEvidence(other, source.Contains("help", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Reliable : PersonBeliefKind.Warm, 0.14, $"micro-positive:{source}")
-                : new PersonBeliefEvidence(other, source.Contains("ignore", StringComparison.OrdinalIgnoreCase) || source.Contains("cold", StringComparison.OrdinalIgnoreCase) ? PersonBeliefKind.Rejecting : PersonBeliefKind.Critical, 0.16, $"micro-negative:{source}");
+            var normalized = kind.Trim().ToLowerInvariant();
+
+            PersonBeliefKind beliefKind;
+
+            if (positive)
+            {
+                beliefKind = normalized switch
+                {
+                    MemoryMicroEventKinds.Help => PersonBeliefKind.Reliable,
+                    MemoryMicroEventKinds.Support => PersonBeliefKind.Reliable,
+                    MemoryMicroEventKinds.Repair => PersonBeliefKind.Reliable,
+
+                    MemoryMicroEventKinds.Warmth => PersonBeliefKind.EmotionallySafe,
+                    MemoryMicroEventKinds.Validation => PersonBeliefKind.EmotionallySafe,
+
+                    _ => PersonBeliefKind.Warm
+                };
+
+                return new PersonBeliefEvidence(
+                    other,
+                    beliefKind,
+                    0.14,
+                    $"micro-positive:{normalized}");
+            }
+
+            beliefKind = normalized switch
+            {
+                MemoryMicroEventKinds.Ignore => PersonBeliefKind.Rejecting,
+                MemoryMicroEventKinds.Cold => PersonBeliefKind.Rejecting,
+                MemoryMicroEventKinds.Dismissal => PersonBeliefKind.Rejecting,
+
+                MemoryMicroEventKinds.Criticism => PersonBeliefKind.Critical,
+                MemoryMicroEventKinds.Slight => PersonBeliefKind.Critical,
+
+                _ => PersonBeliefKind.Critical
+            };
+
+            return new PersonBeliefEvidence(
+                other,
+                beliefKind,
+                0.16,
+                $"micro-negative:{normalized}");
         }
 
         private static PersonBeliefEvidence CreateRepairBeliefEvidence(HumanId self, RepairAttempt attempt)
@@ -313,6 +366,11 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
+            if (!ShouldStoreEvent(@event, ctx))
+            {
+                return;
+            }
+
             switch (@event)
             {
                 // ── Akce ─────────────────────────────────────────────────────────────────
@@ -384,7 +442,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 case MicroPositive mp:
                     {
                         var fromId = ctx.Id == mp.A ? mp.B.Value : mp.A.Value;
-                        var what = MemoryWhatFactory.RelationMicroPositive(mp.What, new HumanId(fromId), ctx.Id);
+                        var what = MemoryWhatFactory.RelationMicroPositive(mp.Kind, new HumanId(fromId), ctx.Id);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -394,7 +452,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             EmotionalTag.Positive,
                             Strength: Config.BaseEncoding,
                             OtherPerson: ResolveOtherPerson(ctx.Id, mp.A, mp.B),
-                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mp.A, mp.B, positive: true, mp.What)),
+                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mp.A, mp.B, positive: true, mp.Kind)),
                             ctx, outbox);
                         break;
                     }
@@ -404,7 +462,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         // Negativní mikrointerakce — o něco vyšší salience než pozitivní
                         // (negativní bias: nepříjemné věci si pamatujeme lépe)
                         var fromId = ctx.Id == mn.A ? mn.B.Value : mn.A.Value;
-                        var what = MemoryWhatFactory.RelationMicroNegative(mn.What, new HumanId(fromId), ctx.Id);
+                        var what = MemoryWhatFactory.RelationMicroNegative(mn.Kind, new HumanId(fromId), ctx.Id);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -414,7 +472,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             EmotionalTag.Negative,
                             Strength: Config.BaseEncoding + 0.1,
                             OtherPerson: ResolveOtherPerson(ctx.Id, mn.A, mn.B),
-                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mn.A, mn.B, positive: false, mn.What)),
+                            BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mn.A, mn.B, positive: false, mn.Kind)),
                             ctx, outbox);
                         break;
                     }
@@ -439,7 +497,30 @@ namespace GameEngineTools.Characters.Engines.Memory
                         break;
                     }
 
-                // ── Noční můra ────────────────────────────────────────────────────────────
+                // ── Sexuální setkání ──────────────────────────────────────────────────────
+                case SexualEncounterOutcome se:
+                    {
+                        var other = ResolveOtherPerson(ctx.Id, se.From, se.To);
+                        var what = $"SexualEncounter:{(se.Accepted ? "Accepted" : "Declined")}|from={se.From.Value}|to={se.To.Value}";
+
+                        Encode(new EpisodicMemory(
+                            Guid.NewGuid(),
+                            se.OccurredAt,
+                            what,
+                            Salience: 0.95,
+                            se.Accepted ? EmotionalTag.Positive : EmotionalTag.Mixed,
+                            Strength: Config.BaseEncoding + 0.3,
+                            OtherPerson: other,
+                            BeliefEvidence: other.HasValue
+                                ? se.Accepted
+                                    ? new PersonBeliefEvidence(other.Value, PersonBeliefKind.EmotionallySafe, 0.18, "sexual-encounter-accepted")
+                                    : new PersonBeliefEvidence(other.Value, PersonBeliefKind.Rejecting, 0.18, "sexual-encounter-declined")
+                                : null),
+                            ctx,
+                            outbox);
+                        break;
+                    }
+
                 case NightmareTriggered nt:
                     {
                         // Noční můra — nejvyšší salience ze spánkových událostí
@@ -530,6 +611,9 @@ namespace GameEngineTools.Characters.Engines.Memory
         #endregion Obnovení stavu
 
         #region Privátní metody
+
+        private bool ShouldStoreEvent(IDomainEvent @event, IHumanContext ctx)
+            => _memoryFidelityPolicy?.ShouldStoreEvent(ctx, @event) ?? true;
 
         /// <summary>
         /// Konsoliduje paměti po skončení spánku.

@@ -3,6 +3,7 @@
 
 namespace EngineTests
 {
+    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -254,6 +255,38 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void ExpectedAcceptance_UsesPositiveTrend_WhenBeliefsAreMixed()
+        {
+            var other = new HumanId(Guid.NewGuid());
+            var semantic = new SemanticMemoryState(new Dictionary<HumanId, PersonBeliefSet>
+            {
+                [other] = BeliefSet(
+                    new Dictionary<PersonBeliefKind, double>
+                    {
+                        [PersonBeliefKind.Warm] = 0.45,
+                        [PersonBeliefKind.EmotionallySafe] = 0.35,
+                        [PersonBeliefKind.Rejecting] = 0.45
+                    },
+                    other)
+            });
+
+            var profile = new PsychologicalProfile(CopingStyle.PeoplePleasing, new SelfNarrative(0.5, 0.35, 0.95), 0.75, 0.35);
+            var edge = new RelationshipEdge(default, other, 55, 58, 55, 50, 50, 15, 10, 28, 55, 60, new DomainBreakdown(50, 50, 50, 55, 50), 8);
+            var episodes = new List<EpisodicMemory>
+            {
+                new(Guid.NewGuid(), new WDateTime(108), "Interaction:SmallTalk:Accepted|from=a|to=b", 0.70, EmotionalTag.Positive, 0.86, OtherPerson: other),
+                new(Guid.NewGuid(), new WDateTime(105), "Interaction:Question:Accepted|from=a|to=b", 0.70, EmotionalTag.Positive, 0.82, OtherPerson: other),
+                new(Guid.NewGuid(), new WDateTime(101), "Interaction:Validation:Accepted|from=a|to=b", 0.75, EmotionalTag.Positive, 0.80, OtherPerson: other),
+                new(Guid.NewGuid(), new WDateTime(80), "Interaction:Invite:Rejected|from=a|to=b", 0.85, EmotionalTag.Negative, 0.70, OtherPerson: other)
+            };
+
+            var withoutTrend = semantic.ExpectedAcceptance(other, SpeechAct.SelfDisclosure, null, profile, Array.Empty<EpisodicMemory>());
+            var withTrend = semantic.ExpectedAcceptance(other, SpeechAct.SelfDisclosure, edge, profile, episodes);
+
+            Assert.IsTrue(withTrend > withoutTrend + 0.05);
+        }
+
+        [TestMethod]
         public void SemanticTargeting_IsDeterministic()
         {
             var a = new HumanId(Guid.NewGuid());
@@ -401,7 +434,7 @@ namespace EngineTests
                 self,
                 Guid.NewGuid(),
                 0.60,
-                "Relation:MicroNegative|what=ignore-after-reachout|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "Relation:MicroNegative|what=ignore|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
                 "PerceivedSlight:Relation:MicroNegative",
                 other,
                 null);
@@ -433,7 +466,7 @@ namespace EngineTests
                 self,
                 Guid.NewGuid(),
                 0.65,
-                "Relation:MicroPositive|what=help-with-task|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
+                "Relation:MicroPositive|what=help|from=11111111-1111-1111-1111-111111111111|to=22222222-2222-2222-2222-222222222222",
                 null,
                 other,
                 null);
@@ -614,22 +647,23 @@ namespace EngineTests
             public SexBiology Biology => SexBiology.Female;
             public Personality Personality { get; }
             public PsychologicalProfile PsychologyProfile { get; }
-            public PhysicalAppearance PhysicalAppearance => new(
-                170,
-                BodyFrame.Medium,
-                SkinTone.Light,
-                EyeColor.Brown,
-                HairColorNatural.Brown,
-                HairType.Wavy,
-                FaceShape.Oval,
-                42,
-                38,
-                0.5,
-                0.5);
+            public PhysicalAppearance PhysicalAppearance => TestAppearanceFactory.Build(
+                heightCm: 170,
+                frame: BodyFrame.Medium,
+                skinTone: SkinTone.Light,
+                eyeColor: EyeColor.Brown,
+                hairColor: HairColorNatural.Brown,
+                hairType: HairType.Wavy,
+                faceShape: FaceShape.Oval,
+                shoulderBreadthCm: 42,
+                hipBreadthCm: 38,
+                noseProjection: 0.5,
+                lipFullness: 0.5);
             public AttractionProfile AttractionProfile => null!;
             public EnginesSnapshot Snapshot { get; private set; }
             public IReadOnlyList<IDomainEvent> LastOutbox => Array.Empty<IDomainEvent>();
             public int Age => 20;
+            public StadiumType Stadium => StadiumType.Adult;
             public void Tick(WDateTime now, WTimeSpan dt) { }
             public void ReceiveEvent(IDomainEvent @event) { }
             public void RestoreSnapshot(EnginesSnapshot snapshot) => Snapshot = snapshot;

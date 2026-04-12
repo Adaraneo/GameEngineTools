@@ -196,9 +196,137 @@ namespace EngineTests
                 $"frame mismatch ({resultMismatch.PreferenceMatch:F2}).");
         }
 
+        /// <summary>
+        /// Structured morphology should override the legacy shoulder/hip WHR approximation.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_StructuredWaistHipRatio_AffectsPreferenceMatch()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                PreferredWhr = 0.70
+            };
+
+            var view = BuildView(50, 0, BloatingLevel.None);
+            var baseAppearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var matching = WithStructuredWhr(baseAppearance, 0.70);
+            var mismatching = WithStructuredWhr(baseAppearance, 1.05);
+
+            var matchingResult = _sut.Calculate(profile, matching, view, SexBiology.Female);
+            var mismatchingResult = _sut.Calculate(profile, mismatching, view, SexBiology.Female);
+
+            Assert.IsTrue(matchingResult.PreferenceMatch > mismatchingResult.PreferenceMatch);
+        }
+
+        /// <summary>
+        /// SymmetryWeight should have an observable effect now that asymmetry is modeled explicitly.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_SymmetryWeight_UsesFacialAsymmetry()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                SymmetryWeight = 1.0
+            };
+
+            var view = BuildView(50, 0, BloatingLevel.None);
+            var baseAppearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var lowAsymmetry = WithFacialAsymmetry(baseAppearance, 0.02);
+            var highAsymmetry = WithFacialAsymmetry(baseAppearance, 0.14);
+
+            var low = _sut.Calculate(profile, lowAsymmetry, view, SexBiology.Female);
+            var high = _sut.Calculate(profile, highAsymmetry, view, SexBiology.Female);
+
+            Assert.IsTrue(low.PreferenceMatch > high.PreferenceMatch);
+            Assert.IsTrue(low.BasePhysical > high.BasePhysical);
+        }
+
         #endregion
 
         // ── StateModifier ────────────────────────────────────────────────────────
+
+        #region SexualOrientation
+
+        /// <summary>
+        /// A heterosexual male-oriented profile should score female targets higher than male targets.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_HeterosexualMaleProfile_PrefersFemaleTarget()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                Orientation = SexualOrientation.Heterosexual,
+                FemaleTargetAttraction = 1.0,
+                MaleTargetAttraction = 0.12,
+                OtherTargetAttraction = 0.65,
+                PreferredWhr = 0.70
+            };
+
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+
+            var femaleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Female);
+            var maleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Male);
+
+            Assert.IsTrue(femaleTarget.Score > maleTarget.Score);
+        }
+
+        /// <summary>
+        /// A homosexual male-oriented profile should score male targets higher than female targets.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_HomosexualMaleProfile_PrefersMaleTarget()
+        {
+            var profile = BuildNeutralProfile() with
+            {
+                Orientation = SexualOrientation.Homosexual,
+                FemaleTargetAttraction = 0.12,
+                MaleTargetAttraction = 1.0,
+                OtherTargetAttraction = 0.65,
+                PreferredWhr = 0.90
+            };
+
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+
+            var femaleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Female);
+            var maleTarget = _sut.Calculate(profile, appearance, view, SexBiology.Male);
+
+            Assert.IsTrue(maleTarget.Score > femaleTarget.Score);
+        }
+
+        /// <summary>
+        /// Asexual profiles should keep attraction low even when appearance cues are favourable.
+        /// </summary>
+        [TestMethod]
+        public void Calculate_AsexualProfile_KeepsAttractionLow()
+        {
+            var bisexualProfile = BuildNeutralProfile() with
+            {
+                Orientation = SexualOrientation.Bisexual,
+                FemaleTargetAttraction = 1.0,
+                MaleTargetAttraction = 1.0,
+                PreferredWhr = 0.70
+            };
+
+            var asexualProfile = bisexualProfile with
+            {
+                Orientation = SexualOrientation.Asexual,
+                FemaleTargetAttraction = 0.08,
+                MaleTargetAttraction = 0.08,
+                OtherTargetAttraction = 0.08
+            };
+
+            var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
+            var view = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+
+            var bisexual = _sut.Calculate(bisexualProfile, appearance, view, SexBiology.Female);
+            var asexual = _sut.Calculate(asexualProfile, appearance, view, SexBiology.Female);
+
+            Assert.IsTrue(asexual.Score < bisexual.Score * 0.35);
+        }
+
+        #endregion
 
         #region StateModifier
 
@@ -384,18 +512,18 @@ namespace EngineTests
             BodyFrame frame,
             double noseProminence = 0.5,
             double lipFullness    = 0.5)
-            => new(
-                HeightCm:          heightCm,
-                Frame:             frame,
-                SkinTone:          SkinTone.Medium,
-                EyeColor:          EyeColor.Brown,
-                HairColor:         HairColorNatural.Brown,
-                HairType:          HairType.Straight,
-                FaceShape:         FaceShape.Oval,
-                ShoulderBreadthCm: 40.0,
-                HipBreadthCm:      38.0,
-                NoseProminence:    noseProminence,
-                LipFullness:       lipFullness);
+            => TestAppearanceFactory.Build(
+                heightCm: heightCm,
+                frame: frame,
+                skinTone: SkinTone.Medium,
+                eyeColor: EyeColor.Brown,
+                hairColor: HairColorNatural.Brown,
+                hairType: HairType.Straight,
+                faceShape: FaceShape.Oval,
+                shoulderBreadthCm: 40.0,
+                hipBreadthCm: 38.0,
+                noseProjection: noseProminence,
+                lipFullness: lipFullness);
 
         private static AppearanceView BuildView(
             double postureScore,
@@ -410,6 +538,38 @@ namespace EngineTests
                 SkinOiliness:  20.0,
                 AcneLevel:     acneLevel,
                 Bloating:      bloating);
+
+        private static PhysicalAppearance WithStructuredWhr(PhysicalAppearance appearance, double whr)
+        {
+            var body = appearance.Body;
+
+            return appearance with
+            {
+                Body = body with
+                {
+                    Proportions = body.Proportions with
+                    {
+                        WaistToHipRatio = whr
+                    }
+                }
+            };
+        }
+
+        private static PhysicalAppearance WithFacialAsymmetry(PhysicalAppearance appearance, double asymmetry)
+        {
+            var face = appearance.Face;
+
+            return appearance with
+            {
+                Face = face with
+                {
+                    Asymmetry = new AsymmetryMorphology(
+                        FacialAsymmetry: asymmetry,
+                        LeftRightVariationAmplitude: asymmetry * 0.8,
+                        BodyAsymmetryAmplitude: 0.03)
+                }
+            };
+        }
 
         #endregion
     }

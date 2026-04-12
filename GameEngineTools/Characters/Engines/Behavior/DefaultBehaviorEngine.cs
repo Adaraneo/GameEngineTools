@@ -32,6 +32,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private readonly ISleepCoordinator _sleepCoordinator;
         private readonly IIntentManagementEngine _intentManagementEngine;
         private readonly IActionArbitrationEngine _arbitrationEngine;
+        private readonly ICharacterDevelopmentPolicy _developmentPolicy;
+        private readonly IHabitApplicabilityModulator _habitApplicabilityModulator;
 
         #endregion Private fields
 
@@ -45,16 +47,23 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         #region Construction
 
-        public DefaultBehaviorEngine(IOptions<BehaviorConfig> cfg, IOptions<SleepConfig> sleepCfg, ILoggerFactory loggerFactory)
+        public DefaultBehaviorEngine(
+            IOptions<BehaviorConfig> cfg,
+            IOptions<SleepConfig> sleepCfg,
+            ILoggerFactory loggerFactory,
+            ICharacterDevelopmentPolicy? developmentPolicy = null,
+            IHabitApplicabilityModulator? habitApplicabilityModulator = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine() };
-            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
+            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
+            _developmentPolicy = developmentPolicy ?? new DefaultCharacterDevelopmentPolicy();
+            _habitApplicabilityModulator = habitApplicabilityModulator ?? NoOpHabitApplicabilityModulator.Instance;
         }
 
         #endregion Construction
@@ -65,8 +74,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
         {
             // Build the tick-local behavior context before delegating to sub-engines.
             var updatedCooldowns = BehaviorMath.UpdateCooldowns(State.Cooldowns, Math.Max(0, dt.TotalHours));
-            var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, State) with { Cooldowns = updatedCooldowns };
-            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>());
+            var stateWithHabits = State with { HabitTraces = BehaviorHabitLearning.Decay(State.HabitTraces, dt, Config, ctx, _log) };
+            var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, stateWithHabits) with { Cooldowns = updatedCooldowns };
+            State = stateWithNeeds;
+            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator);
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.
             var sleep = _sleepCoordinator.Tick(context);
@@ -76,6 +87,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             context = context with { State = State };
             var candidates = new List<BehaviorCandidate>();
             foreach (var engine in _needEngines) candidates.AddRange(engine.Evaluate(context).Candidates);
+            ApplyDevelopmentGate(context, candidates);
             foreach (var modifier in _modifierEngines) modifier.Modify(context, candidates);
 
             // Intent management stabilizes direction across ticks but still leaves final choice to arbitration.
@@ -112,7 +124,15 @@ namespace GameEngineTools.Characters.Engines.Behavior
             using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultBehaviorEngine)))) _log.BehaviorActionChosen(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.Duration.ToString());
         }
 
-        public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox) => State = _sleepCoordinator.Handle(@event, ctx, outbox, State);
+        public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
+        {
+            if (@event is ActionCommitted committed)
+            {
+                State = BehaviorHabitLearning.LearnFromCommitment(State, committed, ctx, Config, _log);
+            }
+
+            State = _sleepCoordinator.Handle(@event, ctx, outbox, State);
+        }
         public void RestoreState(BehaviorState state) { State = state; _sleepCoordinator.RestoreState(); }
 
         #endregion IEngine
@@ -141,7 +161,13 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return;
             }
 
-            outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, targeting.SpeechAct, targeting.Reason));
+            outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, targeting.SpeechAct, targeting.Reason, ctx.Biology));
+        }
+
+        private void ApplyDevelopmentGate(BehaviorContext context, List<BehaviorCandidate> candidates)
+        {
+            var stadium = _developmentPolicy.ResolveStadium(context.HumanContext, context.Now);
+            candidates.RemoveAll(candidate => !_developmentPolicy.AllowsAction(stadium, candidate.Name));
         }
 
         #endregion Cooldowns

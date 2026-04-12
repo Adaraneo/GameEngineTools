@@ -10,6 +10,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
     using GameEngineTools.World.Utils.Time;
 
@@ -55,6 +56,8 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Konfigurace scény předaná zvenku.</summary>
         private readonly SimulationSceneOptions _options;
 
+        private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
+
         #endregion Privátní pole
 
         #region Konstruktor
@@ -73,10 +76,11 @@ namespace GameEngineTools.World.Simulation
         /// <exception cref="ArgumentException">
         /// Pokud <see cref="SimulationSceneOptions.Characters"/> je prázdný seznam.
         /// </exception>
-        public SimulationScene(SystemClock clock, SimulationSceneOptions options)
+        public SimulationScene(SystemClock clock, SimulationSceneOptions options, ICognitiveResolutionLevelRuntime characterLodRuntime)
         {
             ArgumentNullException.ThrowIfNull(clock);
             ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(characterLodRuntime);
 
             if (options.Characters.Count == 0)
                 throw new ArgumentException(
@@ -84,6 +88,7 @@ namespace GameEngineTools.World.Simulation
 
             _clock = clock;
             _options = options;
+            _lodRuntime = characterLodRuntime;
         }
 
         #endregion Konstruktor
@@ -110,56 +115,83 @@ namespace GameEngineTools.World.Simulation
             var startTime = _clock.Now;
             var endTime = _clock.Now.AddYears(_options.SimulationYears);
             var chars = _options.Characters;
-            var dt = _options.TickStep;
+            var macroStep = _options.TickStep;
+            var internalSubstep = ResolveInternalSubstep(macroStep);
 
             while (_clock.Now < endTime)
             {
-                var now = _clock.Now;
+                var macroRemaining = macroStep;
 
-                _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
-
-                // ── Krok 1: OnTick callback ─────────────────────────────────────────────
-                // Zavolej scénář / ReachOut routing.
-                // POZOR: LastOutbox každé postavy je zde stále z PŘEDCHOZÍHO ticku —
-                // proto je to správné místo pro detekci ReachOut a routování.
-                _options.OnTick?.Invoke(now, chars);
-
-                // ── Krok 2: Tick všech postav + okamžité routování outcomes ────────────
-                foreach (var character in chars)
+                while (macroRemaining > WTimeSpan.Zero && _clock.Now < endTime)
                 {
-                    character.Tick(now, dt);
-                    RouteOutcomes(character, chars);
+                    var remainingToEnd = endTime - _clock.Now;
+                    var dt = WTimeSpan.Min(internalSubstep, WTimeSpan.Min(macroRemaining, remainingToEnd));
+                    SimulateSingleStep(startTime, chars, dt);
+                    macroRemaining -= dt;
                 }
-
-                // --- Narrative scan ----
-                if (_options.NarrativeFormatter is { } formatter && _options.OnNarrative is { } onNarrative)
-                {
-                    var resolver = _options.ResolveCharacter ?? (id => new NarrativeCharacterInfo(id.Value.ToString(), SexBiology.Unknown));
-
-                    foreach (var character in chars)
-                    {
-                        foreach (var ev in character.LastOutbox)
-                        {
-                            var entry = formatter.Format(ev, resolver);
-                            if (entry is not null)
-                            {
-                                onNarrative(entry);
-                            }
-                        }
-                    }
-                }
-
-                // ── Krok 3: Sleep prompty ───────────────────────────────────────────────
-                foreach (var character in chars)
-                {
-                    HandleSleepPrompt(now, character);
-                }
-
-                // ── Krok 4: Posun hodin ────────────────────────────────────────────────
-                _clock.Advance(_options.TickStep);
             }
 
             return Task.CompletedTask;
+        }
+
+        private void SimulateSingleStep(WDateTime startTime, IReadOnlyList<IHuman> chars, WTimeSpan dt)
+        {
+            ApplyCharacterLods(chars);
+
+            var now = _clock.Now;
+
+            _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
+
+            // ── Krok 1: OnTick callback ─────────────────────────────────────────────
+            // Zavolej scénář / ReachOut routing.
+            // POZOR: LastOutbox každé postavy je zde stále z PŘEDCHOZÍHO ticku —
+            // proto je to správné místo pro detekci ReachOut a routování.
+            _options.OnTick?.Invoke(now, chars);
+
+            // ── Krok 2: Tick všech postav + okamžité routování outcomes ────────────
+            foreach (var character in chars)
+            {
+                character.Tick(now, dt);
+                RouteOutcomes(character, chars);
+            }
+
+            // --- Narrative scan ----
+            if (_options.NarrativeFormatter is { } formatter && _options.OnNarrative is { } onNarrative)
+            {
+                var resolver = _options.ResolveCharacter ?? (id => new NarrativeCharacterInfo(id.Value.ToString(), SexBiology.Unknown));
+
+                foreach (var character in chars)
+                {
+                    foreach (var ev in character.LastOutbox)
+                    {
+                        var entry = formatter.Format(ev, resolver);
+                        if (entry is not null)
+                        {
+                            onNarrative(entry);
+                        }
+                    }
+                }
+            }
+
+            // ── Krok 3: Sleep prompty ───────────────────────────────────────────────
+            foreach (var character in chars)
+            {
+                HandleSleepPrompt(now, character);
+            }
+
+            // ── Krok 4: Posun hodin ────────────────────────────────────────────────
+            _clock.Advance(dt);
+        }
+
+        private WTimeSpan ResolveInternalSubstep(WTimeSpan macroStep)
+        {
+            var configured = _options.InternalSubstep;
+            if (configured is null || configured.Value <= WTimeSpan.Zero)
+            {
+                return macroStep;
+            }
+
+            return WTimeSpan.Min(configured.Value, macroStep);
         }
 
         #endregion Simulační smyčka
@@ -195,6 +227,12 @@ namespace GameEngineTools.World.Simulation
 
             // Touch outcome
             foreach (var outcome in sender.LastOutbox.OfType<TouchOutcome>())
+            {
+                var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
+                initiator?.ReceiveEvent(outcome);
+            }
+
+            foreach (var outcome in sender.LastOutbox.OfType<SexualEncounterOutcome>())
             {
                 var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
                 initiator?.ReceiveEvent(outcome);
@@ -258,5 +296,18 @@ namespace GameEngineTools.World.Simulation
         }
 
         #endregion Sleep handling
+
+        #region Private Helpers
+
+        private void ApplyCharacterLods(IReadOnlyList<IHuman> characters)
+        {
+            foreach (var c in characters)
+            {
+                var lod = _options.ResolveCharacterLod?.Invoke(c) ?? _options.DefaultCharacterLod;
+                _lodRuntime.Set(c.Id, lod);
+            }
+        }
+
+        #endregion
     }
 }

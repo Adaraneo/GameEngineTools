@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
 
     internal sealed partial class DefaultRelationshipsEngine
@@ -33,7 +34,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 SpeechAct.Validation => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
                 SpeechAct.Humor => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
                 SpeechAct.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
-                SpeechAct.Invite => bd with { Physical = BumpD(bd.Physical, +0.5 * mul) },
+                SpeechAct.Invite when accepted => bd with { Physical = BumpD(bd.Physical, +0.5) },
+                SpeechAct.Invite => bd,
                 SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.0 * mul) },
                 _ => bd
             };
@@ -61,15 +63,20 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Computes a context-sensitive romantic-interest gain.
         /// Trust, comfort, closeness, like, and value alignment matter more than raw appearance.
         /// </summary>
-        private static double ComputeRomanticInterestDelta(RelationshipEdge e, SpeechAct act)
+        private static double ComputeRomanticInterestDelta(
+            RelationshipEdge e,
+            SpeechAct act,
+            Sociosexuality sociosexuality,
+            AttractionProfile? attractionProfile,
+            SexBiology? targetBiology)
         {
-            var context =((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
+            var context = ((Math.Max(0.0, e.Trust - 50.0) / 50.0) * 1.3)
                  + ((Math.Max(0.0, e.Comfort - 45.0) / 55.0) * 0.9)
                  + ((Math.Max(0.0, e.Closeness - 25.0) / 75.0) * 1.1)
                  + ((Math.Max(0.0, e.Like - 45.0) / 55.0) * 0.6)
                  + ((Math.Max(0.0, e.Breakdown.Values - 50.0) / 50.0) * 0.8);
 
-            return act switch
+            var delta = act switch
             {
                 SpeechAct.SelfDisclosure => context * 0.7,
                 SpeechAct.Validation => context * 0.45,
@@ -77,13 +84,24 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 SpeechAct.Invite => context * 0.3,
                 _ => 0
             };
+
+            var orientedDelta = delta * SexualOrientationBehaviorMath.RomanticInterestMultiplier(attractionProfile, targetBiology);
+
+            return act == SpeechAct.Invite
+                ? orientedDelta * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(sociosexuality)
+                : orientedDelta;
         }
 
         /// <summary>
         /// Computes a context-sensitive sexual-interest gain.
         /// Physical and aesthetic attraction lead, while comfort and closeness act as gates.
         /// </summary>
-        private static double ComputeSexualInterestDelta(RelationshipEdge e, SpeechAct act)
+        private static double ComputeSexualInterestDelta(
+            RelationshipEdge e,
+            SpeechAct act,
+            Sociosexuality sociosexuality,
+            AttractionProfile? attractionProfile,
+            SexBiology? targetBiology)
         {
             var context = ((Math.Max(0, e.PhysicalAttraction - 50) / 50) * 0.9)
                 + ((Math.Max(0, e.AestheticAttraction - 50) / 50) * 0.6);
@@ -91,11 +109,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
             var gate = ((Math.Max(0, e.Comfort - 40) / 60) * 0.35)
                 + ((Math.Max(0, e.Closeness - 20) / 80) * 0.25);
 
-            return act switch
+            var delta = act switch
             {
                 SpeechAct.Invite => (context + gate) * 0.18,
                 _ => 0
             };
+
+            var orientedDelta = delta * SexualOrientationBehaviorMath.SexualInterestMultiplier(attractionProfile, targetBiology);
+
+            return act == SpeechAct.Invite
+                ? orientedDelta * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(sociosexuality)
+                : orientedDelta;
         }
 
         /// <summary>
@@ -103,6 +127,80 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private double ComputeFamiliarityExposureDelta(int previousCount, int newCount)
             => MereExposureBoost(newCount, Config) - MereExposureBoost(previousCount, Config);
+
+        /// <summary>
+        /// Produces small attraction plasticity from accumulated safe or costly relational experience.
+        /// Attraction remains mostly stable; this only models repeated relational colouring.
+        /// </summary>
+        private double ComputeAttractionPlasticity(RelationshipEdge edge, bool positive, SpeechAct act)
+        {
+            var amount = Math.Clamp(Config.AttractionPlasticityPerInteraction, 0.0, 1.0);
+            var exposureDamping = 1.0 / Math.Sqrt(1.0 + Math.Max(0, edge.PositiveInteractionCount) * 0.15);
+
+            if (positive)
+            {
+                var safety = Math.Clamp(
+                    Math.Max(0.0, edge.Trust - 45.0) / 55.0 * 0.40
+                    + Math.Max(0.0, edge.Comfort - 45.0) / 55.0 * 0.40
+                    + Math.Max(0.0, edge.Like - 45.0) / 55.0 * 0.20,
+                    0.0,
+                    1.0);
+                var actScale = act is SpeechAct.Validation or SpeechAct.SelfDisclosure ? 1.10 : 0.75;
+                return amount * exposureDamping * safety * actScale;
+            }
+
+            var cost = Math.Clamp(
+                Math.Max(0.0, 55.0 - edge.Trust) / 55.0 * 0.35
+                + Math.Max(0.0, 55.0 - edge.Comfort) / 55.0 * 0.45
+                + Math.Max(0.0, 50.0 - edge.Like) / 50.0 * 0.20,
+                0.20,
+                1.0);
+            var rejectionScale = act == SpeechAct.Invite ? 1.25 : 0.85;
+
+            return -amount * exposureDamping * cost * rejectionScale;
+        }
+
+        /// <summary>
+        /// Converts repeated accepted contact into a small safety consolidation signal.
+        /// Uses smooth exposure and current relationship quality; it is intentionally not a threshold gate.
+        /// </summary>
+        private double ComputeRelationalStabilization(RelationshipEdge edge, PsychologicalProfile? profile)
+        {
+            var exposure = Math.Clamp(
+                Math.Log(1.0 + edge.PositiveInteractionCount) / Math.Log(1.0 + Config.MereExposureSaturation),
+                0.0,
+                1.0);
+            var relationshipSafety =
+                Math.Max(0.0, edge.Trust - 45.0) / 55.0 * 0.35
+                + Math.Max(0.0, edge.Comfort - 42.0) / 58.0 * 0.40
+                + edge.Closeness / 100.0 * 0.25;
+            var ambivalenceGain = 0.85 + Math.Clamp(profile?.Ambivalence ?? PsychologicalProfile.Default.Ambivalence, 0.0, 1.0) * 0.30;
+
+            return Math.Clamp(exposure * (0.45 + Math.Clamp(relationshipSafety, 0.0, 1.0) * 0.55) * ambivalenceGain, 0.0, 1.0);
+        }
+
+        /// <summary>
+        /// Lets established safe contact soften, but not erase, the sting of a later rejection.
+        /// Ambivalent characters retain more immediate sensitivity.
+        /// </summary>
+        private double ComputeRejectionStingMultiplier(RelationshipEdge edge, PsychologicalProfile? profile)
+        {
+            var exposure = Math.Clamp(
+                Math.Log(1.0 + edge.PositiveInteractionCount) / Math.Log(1.0 + Config.MereExposureSaturation),
+                0.0,
+                1.0);
+            var safety = Math.Clamp(
+                Math.Max(0.0, edge.Trust - 50.0) / 50.0 * 0.35
+                + Math.Max(0.0, edge.Comfort - 50.0) / 50.0 * 0.40
+                + edge.Closeness / 100.0 * 0.25,
+                0.0,
+                1.0);
+            var sensitivity = Math.Clamp(profile?.Ambivalence ?? PsychologicalProfile.Default.Ambivalence, 0.0, 1.0);
+            var followThrough = Math.Clamp(profile?.FollowThrough ?? PsychologicalProfile.Default.FollowThrough, 0.0, 1.0);
+            var protection = exposure * safety * (0.30 + followThrough * 0.35) * (1.0 - sensitivity * 0.45);
+
+            return Math.Clamp(1.0 - protection, 0.72, 1.0);
+        }
 
         #endregion Private methods — signal deltas
 
@@ -194,6 +292,24 @@ namespace GameEngineTools.Characters.Engines.Relationships
             TouchLevel.Intimate => +3.5,
             _ => 0.0
         };
+
+        /// <summary>
+        /// Resolves the biology of the person opposite <paramref name="self"/> in a two-person event.
+        /// </summary>
+        private static SexBiology? ResolveOtherBiology(
+            HumanId self,
+            HumanId first,
+            SexBiology? firstBiology,
+            HumanId second,
+            SexBiology? secondBiology)
+        {
+            if (self == first)
+            {
+                return secondBiology;
+            }
+
+            return self == second ? firstBiology : null;
+        }
 
         /// <summary>
         /// Inserts or updates an edge in the relationship graph.

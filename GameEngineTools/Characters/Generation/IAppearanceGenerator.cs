@@ -20,8 +20,7 @@ namespace GameEngineTools.Characters.Generation
         /// </summary>
         /// <param name="sex">
         /// Biological sex of the character.
-        /// Drives height ranges, shoulder/hip baselines, lip fullness bias,
-        /// and the sex-ratio silhouette nudge.
+        /// Drives soft statistical morphology tendencies through the effective spec.
         /// </param>
         /// <param name="seed">
         /// RNG seed. The same seed combined with the same <paramref name="sex"/>
@@ -30,7 +29,6 @@ namespace GameEngineTools.Characters.Generation
         /// <param name="stadium">
         /// Life stage of the character. Drives height ranges, proportions and facial feature
         /// distributions appropriate for the character's age group.
-        /// Defaults to <see cref="StadiumType.Adult"/> for backwards compatibility.
         /// </param>
         /// <param name="spec">
         /// Optional generation parameters.

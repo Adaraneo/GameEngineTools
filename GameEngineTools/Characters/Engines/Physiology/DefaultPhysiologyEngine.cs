@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -110,7 +111,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 BodyTempDelta = Approach(s.BodyTempDelta, 0, 0.1 * h)
             };
 
-            if (s.Cycle is not null)
+            if (s.Pregnancy is { } pregnancy)
+            {
+                s = AdvancePregnancy(s, now, ctx, outbox, pregnancy);
+            }
+            else if (s.Cycle is not null)
             {
                 _accHours += h;
                 while (_accHours >= 24.0)
@@ -165,6 +170,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                         break;
                     }
+
+                case SexualEncounterOutcome se when se.Accepted && se.ReproductivePotential:
+                    s = TryStartPregnancy(s, se, ctx, outbox);
+                    break;
             }
 
             State = s;
@@ -215,6 +224,136 @@ namespace GameEngineTools.Characters.Engines.Physiology
             };
 
             return s;
+        }
+
+        private PhysiologyState AdvancePregnancy(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector outbox, PregnancyState pregnancy)
+        {
+            var daysPregnant = pregnancy.ConceivedOn.DaysUntil(now.Date);
+
+            if (!pregnancy.Discovered && daysPregnant >= Config.PregnancyDiscoveryMinDays)
+            {
+                pregnancy = pregnancy with { Discovered = true, DiscoveredOn = now.Date };
+                s = s with { Pregnancy = pregnancy };
+                outbox.Add(new PregnancyDiscovered(now, ctx.Id, pregnancy.OtherParent));
+                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                {
+                    _log.PhysiologyPregnancyDiscovered(
+                        ctx.Id.Value.ToString(),
+                        pregnancy.OtherParent.Value.ToString(),
+                        daysPregnant);
+                }
+            }
+
+            if (now.Date >= pregnancy.EstimatedDueDate)
+            {
+                outbox.Add(new ChildBorn(now, ctx.Id, pregnancy.OtherParent));
+                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                {
+                    _log.PhysiologyChildBorn(
+                        ctx.Id.Value.ToString(),
+                        pregnancy.OtherParent.Value.ToString(),
+                        pregnancy.ConceivedOn.ToString(),
+                        pregnancy.EstimatedDueDate.ToString());
+                }
+
+                return s with
+                {
+                    Pregnancy = null,
+                    Cycle = s.Cycle is null
+                        ? null
+                        : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 }
+                };
+            }
+
+            return s with
+            {
+                Pregnancy = pregnancy,
+                Cycle = s.Cycle is null
+                    ? null
+                    : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 }
+            };
+        }
+
+        private PhysiologyState TryStartPregnancy(PhysiologyState s, SexualEncounterOutcome encounter, IHumanContext ctx, IEventCollector outbox)
+        {
+            if (ctx.Biology != SexBiology.Female || s.Pregnancy is not null || (encounter.From != ctx.Id && encounter.To != ctx.Id))
+            {
+                return s;
+            }
+
+            var otherParent = encounter.From == ctx.Id
+                ? encounter.To
+                : encounter.From;
+            var conceptionChance = ConceptionChance(s, encounter);
+            var conceived = ctx.Random.Chance(conceptionChance);
+
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+            {
+                _log.PhysiologyConceptionEvaluated(
+                    ctx.Id.Value.ToString(),
+                    otherParent.Value.ToString(),
+                    conceptionChance,
+                    s.Cycle?.OvulationWindow == true,
+                    encounter.Intent.ToString(),
+                    encounter.Contraception.ToString(),
+                    conceived ? "Conceived" : "NotConceived");
+            }
+
+            if (!conceived)
+            {
+                return s;
+            }
+
+            var pregnancy = new PregnancyState(
+                otherParent,
+                encounter.OccurredAt.Date,
+                encounter.OccurredAt.Date.AddDays(Config.PregnancyTermDays));
+
+            outbox.Add(new PregnancyStarted(encounter.OccurredAt, ctx.Id, otherParent, pregnancy.EstimatedDueDate));
+            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+            {
+                _log.PhysiologyPregnancyStarted(
+                    ctx.Id.Value.ToString(),
+                    otherParent.Value.ToString(),
+                    pregnancy.EstimatedDueDate.ToString());
+            }
+
+            return s with
+            {
+                Pregnancy = pregnancy,
+                Cycle = s.Cycle is null
+                    ? null
+                    : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 }
+            };
+        }
+
+        private double ConceptionChance(PhysiologyState s, SexualEncounterOutcome encounter)
+        {
+            var chance = Config.BaseConceptionChancePerEncounter;
+
+            if (s.Cycle?.OvulationWindow == true)
+            {
+                chance *= Config.OvulationConceptionMultiplier;
+            }
+
+            chance *= encounter.Intent switch
+            {
+                ReproductiveIntent.AvoidPregnancy => 0.35,
+                ReproductiveIntent.TryingForChild => 1.35,
+                ReproductiveIntent.OpenToPregnancy => 1.10,
+                _ => 1.0
+            };
+
+            chance *= encounter.Contraception switch
+            {
+                ContraceptionLevel.None => 1.0,
+                ContraceptionLevel.Low => 0.55,
+                ContraceptionLevel.Moderate => 0.25,
+                ContraceptionLevel.High => 0.04,
+                _ => 0.25
+            };
+
+            return Math.Clamp(chance, 0.0, 0.65);
         }
 
         private static (double pain, double bloat, double tender, double libidoMod) SymptomsFor(MenstrualCycleState c)

@@ -24,5 +24,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         double Like,
         double Attraction,
         double BasePhysical = 0.0,
-        double PreferenceMatch = 0.0) : IDomainEvent;
+        double PreferenceMatch = 0.0,
+        SexBiology? ABiology = null,
+        SexBiology? BBiology = null) : IDomainEvent;
 }

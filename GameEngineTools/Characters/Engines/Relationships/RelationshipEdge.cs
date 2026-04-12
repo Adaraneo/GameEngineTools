@@ -48,5 +48,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Running count of positive (accepted) interactions between A and B.
         /// Used to compute the familiarity bonus in <see cref="DefaultRelationshipsEngine"/>.
         /// </summary>
-        int PositiveInteractionCount = 0);
+        int PositiveInteractionCount = 0,
+        /// <summary>
+        /// Last known biological sex category of B, when the interaction source provided it.
+        /// Kept on the edge so later target scoring can use orientation without requiring a world lookup.
+        /// </summary>
+        SexBiology? TargetBiology = null);
 }

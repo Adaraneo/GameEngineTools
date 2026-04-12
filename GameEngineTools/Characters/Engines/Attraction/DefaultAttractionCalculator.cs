@@ -58,8 +58,9 @@ namespace GameEngineTools.Characters.Engines.Attraction
             SexBiology targetBiology,
             double observerValence = 0.0)
         {
-            var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology);
-            var preferenceMatch = ComputePreferenceMatch(observerProfile, targetAppearance, targetBiology);
+            var orientationWeight = SexualOrientationBehaviorMath.TargetAttractionWeight(observerProfile, targetBiology);
+            var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology) * orientationWeight;
+            var preferenceMatch = ComputePreferenceMatch(observerProfile, targetAppearance, targetBiology) * orientationWeight;
             var stateModifier   = ComputeStateModifier(targetView);
 
             var raw   = basePhysical + preferenceMatch + stateModifier;
@@ -93,12 +94,10 @@ namespace GameEngineTools.Characters.Engines.Attraction
             var whrScore   = TriangularScore(whr, whrOptimum, WhrToleranceHalf) * 18.0;
 
             // Height within a broad "plausible partner" range (population-level baseline)
-            var heightScore = TriangularScore(target.HeightCm, 170.0, HeightWindowHalf) * 12.0;
+            var heightScore = TriangularScore(target.Body.Proportions.HeightCm, 170.0, HeightWindowHalf) * 12.0;
 
-            // Facial symmetry proxy — NoseProminence and LipFullness both near 0.5 implies symmetry
-            var symmetryProxy = 1.0 - Math.Abs(target.NoseProminence - 0.5) * 2.0
-                                    - Math.Abs(target.LipFullness    - 0.5) * 2.0;
-            var symmetryScore = Math.Max(0.0, symmetryProxy) * 10.0;
+            // Structured morphology provides an explicit subtle-asymmetry signal.
+            var symmetryScore = EstimateSymmetry(target) * 10.0;
 
             return Math.Clamp(whrScore + heightScore + symmetryScore, 0.0, MaxBasePhysical);
         }
@@ -117,22 +116,23 @@ namespace GameEngineTools.Characters.Engines.Attraction
         {
             // Height preference match
             var heightMatch = TriangularScore(
-                target.HeightCm,
+                target.Body.Proportions.HeightCm,
                 profile.PreferredHeightCm,
-                profile.HeightToleranceCm) * 15.0;
+                profile.HeightToleranceCm) * 13.0;
 
             // Frame preference match
-            var targetFramePref = FrameToPreference(target.Frame);
+            var targetFramePref = FrameToPreference(DeriveFrame(target.Body));
             var frameMatch = (profile.FramePreference == BodyFramePreference.None ||
                               profile.FramePreference == targetFramePref)
-                ? 10.0
+                ? 8.0
                 : 0.0;
 
             // WHR preference match
             var whr      = EstimateWhr(target, targetBiology);
-            var whrMatch = TriangularScore(whr, profile.PreferredWhr, WhrToleranceHalf) * 10.0;
+            var whrMatch = TriangularScore(whr, profile.PreferredWhr, WhrToleranceHalf) * 9.0;
+            var symmetryMatch = EstimateSymmetry(target) * Math.Clamp(profile.SymmetryWeight, 0.0, 1.0) * 5.0;
 
-            return Math.Clamp(heightMatch + frameMatch + whrMatch, 0.0, MaxPreferenceMatch);
+            return Math.Clamp(heightMatch + frameMatch + whrMatch + symmetryMatch, 0.0, MaxPreferenceMatch);
         }
 
         #endregion PreferenceMatch
@@ -165,13 +165,14 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// </summary>
         private static double EstimateWhr(PhysicalAppearance target, SexBiology biology)
         {
-            // Crude proxy: hip/(shoulder + hip) normalised to a WHR-like range
-            var ratio = target.HipBreadthCm / (target.ShoulderBreadthCm + target.HipBreadthCm);
+            _ = biology;
+            return Math.Clamp(target.Body.Proportions.WaistToHipRatio, 0.55, 1.10);
+        }
 
-            // Map to ~0.60..1.00 range
-            return biology == SexBiology.Female
-                ? 0.55 + ratio * 0.50
-                : 0.75 + ratio * 0.35;
+        private static double EstimateSymmetry(PhysicalAppearance target)
+        {
+            var asymmetry = target.Face.Asymmetry.FacialAsymmetry;
+            return Math.Clamp(1.0 - asymmetry / 0.16, 0.0, 1.0);
         }
 
         /// <summary>
@@ -219,6 +220,25 @@ namespace GameEngineTools.Characters.Engines.Attraction
                 BodyFrame.Strong  => BodyFramePreference.Large,
                 _                 => BodyFramePreference.None
             };
+        }
+
+        private static BodyFrame DeriveFrame(BodyMorphology body)
+        {
+            var robustness = body.Skeletal.SkeletalRobustness;
+            var muscularity = body.SoftTissue.Muscularity;
+            var adiposity = body.SoftTissue.Adiposity;
+
+            if (muscularity >= 0.68 && robustness >= 0.58)
+            {
+                return BodyFrame.Strong;
+            }
+
+            if (robustness <= 0.38 && adiposity <= 0.48)
+            {
+                return BodyFrame.Petite;
+            }
+
+            return robustness + adiposity * 0.45 >= 0.78 ? BodyFrame.Large : BodyFrame.Medium;
         }
 
         #endregion Helpers

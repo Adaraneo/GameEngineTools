@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -77,14 +78,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
             {
                 // ── First impression ─────────────────────────────────────────────────────
                 case FirstImpressionFormed fi:
-                    var other = self == fi.A ? fi.B : self == fi.B ? fi.A : fi.B;
-                    if (other == self)
                     {
-                        break;
-                    }
+                        var other = self == fi.A ? fi.B : self == fi.B ? fi.A : fi.B;
+                        var otherBiology = ResolveOtherBiology(self, fi.A, fi.ABiology, fi.B, fi.BBiology);
+                        if (other == self)
+                        {
+                            break;
+                        }
 
-                    Upsert(self, other, e => e with
-                    {
+                        Upsert(self, other, e => e with
+                        {
                         // Lerp 70% toward the first impression — does not fully override
                         // if the character already knows the person slightly.
                         Like = Lerp(e.Like, fi.Like, 0.7),
@@ -108,21 +111,23 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             // own physical ideal (height preference, frame, WHR preference).
                             Aesthetics = Lerp(e.Breakdown.Aesthetics,
                                              fi.PreferenceMatch / 35.0 * 100.0, 0.8)
+                        },
+                        TargetBiology = otherBiology ?? e.TargetBiology
+                        },
+                        eventType: nameof(FirstImpressionFormed),
+                        outcome: "formed",
+                        detail: $"source={fi.A.Value}, like={fi.Like:F1}, basePhysical={fi.BasePhysical:F1}, preferenceMatch={fi.PreferenceMatch:F1}");
+
+                        using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
+                        {
+                            _log.RelFirstImpression(
+                                ctx.Id.Value.ToString(),
+                                fi.A.Value.ToString(), fi.B.Value.ToString(),
+                            fi.Like);
                         }
-                    },
-                    eventType: nameof(FirstImpressionFormed),
-                    outcome: "formed",
-                    detail: $"source={fi.A.Value}, like={fi.Like:F1}, basePhysical={fi.BasePhysical:F1}, preferenceMatch={fi.PreferenceMatch:F1}");
 
-                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
-                    {
-                        _log.RelFirstImpression(
-                            ctx.Id.Value.ToString(),
-                            fi.A.Value.ToString(), fi.B.Value.ToString(),
-                        fi.Like);
+                        break;
                     }
-
-                    break;
 
                 // ── Micro-positive (smile, compliment, small help…) ──────────────────────
                 case MicroPositive mp:
@@ -135,7 +140,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     },
                     eventType: nameof(MicroPositive),
                     outcome: "positive",
-                    detail: mp.What ?? "n/a");
+                    detail: mp.Kind ?? "n/a");
                     break;
 
                 // ── Micro-negative (criticism, ignoring, cold response…) ─────────────────
@@ -148,7 +153,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     },
                     eventType: nameof(MicroNegative),
                     outcome: "negative",
-                    detail: mn.What ?? "n/a");
+                    detail: mn.Kind ?? "n/a");
                     break;
 
                 // ── Repair attempt ───────────────────────────────────────────────────────
@@ -167,6 +172,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case InteractionOutcome io when io.Accepted:
                     {
                         var otherId = io.From == self ? io.To : io.From;
+                        var otherBiology = ResolveOtherBiology(self, io.From, io.FromBiology, io.To, io.ToBiology);
 
                         // Trust grows only through vulnerability and acknowledgement
                         var trustDelta = io.Act switch
@@ -195,18 +201,26 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             // Logarithmic growth → fast early, levels off near saturation.
                             var newCount = e.PositiveInteractionCount + 1;
                             var familiarityDelta = ComputeFamiliarityExposureDelta(e.PositiveInteractionCount, newCount);
+                            var stabilization = ComputeRelationalStabilization(e, ctx.PsychologyProfile);
+                            var trustConsolidation = trustDelta > 0
+                                ? stabilization * 0.28
+                                : stabilization * 0.10;
+                            var attractionPlasticity = ComputeAttractionPlasticity(e, positive: true, act: io.Act);
 
                             return e with
                             {
-                                Closeness = Bump(e.Closeness, +1.5),
-                                Like = Bump(e.Like, +0.5),
-                                Comfort = Bump(e.Comfort, +0.8),
-                                RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act)),
-                                SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act)),
-                                Trust = trustDelta > 0 ? Bump(e.Trust, trustDelta) : e.Trust,
+                                Closeness = Bump(e.Closeness, +1.5 + stabilization * 0.35),
+                                Like = Bump(e.Like, +0.5 + stabilization * 0.20),
+                                Comfort = Bump(e.Comfort, +0.8 + stabilization * 0.45 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
+                                RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
+                                SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
+                                Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation),
                                 Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
                                 Familiarity = Bump(e.Familiarity, familiarityDelta),
+                                AestheticAttraction = Bump(e.AestheticAttraction, attractionPlasticity),
+                                PhysicalAttraction = Bump(e.PhysicalAttraction, attractionPlasticity * 0.65),
                                 PositiveInteractionCount = newCount,
+                                TargetBiology = otherBiology ?? e.TargetBiology,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                             };
                         },
@@ -220,6 +234,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 case InteractionOutcome io when !io.Accepted:
                     {
                         var otherId = io.From == self ? io.To : io.From;
+                        var otherBiology = ResolveOtherBiology(self, io.From, io.FromBiology, io.To, io.ToBiology);
 
                         // Rejected SelfDisclosure hurts more — vulnerability was turned away
                         var trustPenalty = io.Act switch
@@ -236,6 +251,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Comfort = Bump(e.Comfort, -0.5),
                                 Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
                                 RomanticInterest = Bump(e.RomanticInterest, -0.5),
+                                AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.50),
+                                PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.35),
+                                TargetBiology = otherBiology ?? e.TargetBiology,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                             },
                             eventType: nameof(InteractionOutcome),
@@ -244,13 +262,21 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         }
                         else // I was rejected
                         {
-                            Upsert(self, otherId, e => e with
+                            Upsert(self, otherId, e =>
                             {
-                                Like = Bump(e.Like, -1.5),
-                                Comfort = Bump(e.Comfort, -2.0),
-                                Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
-                                RomanticInterest = Bump(e.RomanticInterest, io.Act == SpeechAct.Invite ? -2.0 : -1.0),
-                                Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
+                                var stingMultiplier = ComputeRejectionStingMultiplier(e, ctx.PsychologyProfile);
+
+                                return e with
+                                {
+                                    Like = Bump(e.Like, -1.5 * stingMultiplier),
+                                    Comfort = Bump(e.Comfort, -2.0 * stingMultiplier),
+                                    Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty * stingMultiplier) : e.Trust,
+                                    RomanticInterest = Bump(e.RomanticInterest, (io.Act == SpeechAct.Invite ? -2.0 : -1.0) * stingMultiplier),
+                                    AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act)),
+                                    PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.65),
+                                    TargetBiology = otherBiology ?? e.TargetBiology,
+                                    Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
+                                };
                             },
                             eventType: nameof(InteractionOutcome),
                             outcome: "rejected",
@@ -322,6 +348,47 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                         break;
                     }
+
+                case SexualEncounterOutcome se:
+                    {
+                        var otherId = se.From == self ? se.To : se.From;
+                        var otherBiology = ResolveOtherBiology(self, se.From, se.FromBiology, se.To, se.ToBiology);
+
+                        if (se.Accepted)
+                        {
+                            Upsert(self, otherId, e => e with
+                            {
+                                Comfort = Bump(e.Comfort, +1.2 + SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality)),
+                                Closeness = Bump(e.Closeness, +2.0),
+                                RomanticInterest = Bump(e.RomanticInterest, 0.8 * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(ctx.Personality.Sociosexuality) * SexualOrientationBehaviorMath.RomanticInterestMultiplier(ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
+                                SexualInterest = Bump(e.SexualInterest, 2.4 * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(ctx.Personality.Sociosexuality) * SexualOrientationBehaviorMath.SexualInterestMultiplier(ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
+                                TargetBiology = otherBiology ?? e.TargetBiology,
+                                Breakdown = e.Breakdown with
+                                {
+                                    Physical = BumpD(e.Breakdown.Physical, +3.0)
+                                }
+                            },
+                            eventType: nameof(SexualEncounterOutcome),
+                            outcome: "accepted",
+                            detail: $"self={(se.From == self ? "initiator" : "recipient")}, reproductive={se.ReproductivePotential}");
+                        }
+                        else
+                        {
+                            Upsert(self, otherId, e => e with
+                            {
+                                Comfort = Bump(e.Comfort, -2.0),
+                                Trust = Bump(e.Trust, -0.8),
+                                RomanticInterest = Bump(e.RomanticInterest, -1.2),
+                                SexualInterest = Bump(e.SexualInterest, se.From == self ? -2.4 : -0.8),
+                                TargetBiology = otherBiology ?? e.TargetBiology
+                            },
+                            eventType: nameof(SexualEncounterOutcome),
+                            outcome: "declined",
+                            detail: $"self={(se.From == self ? "initiator" : "recipient")}");
+                        }
+
+                        break;
+                    }
             }
         }
 
@@ -372,7 +439,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 {
                     Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect),
                     Trust = Clamp(Approach(e.Trust, 50, d * 0.5)),
-                    Familiarity = Clamp(Approach(e.Familiarity, 10, d * 0.08)),
+                    Familiarity = Clamp(Approach(e.Familiarity, Config.FamiliarityDecayFloor, d * 0.08)),
                     AestheticAttraction = e.AestheticAttraction,
                     PhysicalAttraction = e.PhysicalAttraction,
                     RomanticInterest = Clamp(Approach(e.RomanticInterest, 5, d * 0.45)),

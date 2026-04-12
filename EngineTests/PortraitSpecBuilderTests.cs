@@ -72,9 +72,45 @@ namespace EngineTests
 
             Assert.AreEqual("medium height", spec.Body.HeightBucket);
             Assert.AreEqual("balanced proportions", spec.Body.ProportionBucket);
+            Assert.AreEqual("neutral upright carriage", spec.Body.PostureBucket);
             Assert.AreEqual("petite frame with slightly hip-led silhouette", spec.Body.FrameImpression);
             Assert.AreEqual("moderate projection", spec.Face.NoseProjectionBucket);
             Assert.AreEqual("medium-full", spec.Face.LipFullnessBucket);
+            Assert.AreEqual("medium eye scale", spec.Face.EyeScaleBucket);
+            Assert.AreEqual("subtle natural asymmetry", spec.Face.FacialAsymmetryBucket);
+            Assert.AreEqual("long", spec.Hair.LengthBucket);
+        }
+
+        [TestMethod]
+        public void Build_StructuredMorphology_MapsDetailedFaceAndBodySignals()
+        {
+            var baseAppearance = BuildReferenceAppearance();
+            var body = baseAppearance.Body;
+            var face = baseAppearance.Face;
+            var appearance = baseAppearance with
+            {
+                Body = body with
+                {
+                    Proportions = body.Proportions with { WaistToHipRatio = 0.72 },
+                    Posture = body.Posture with { PostureUprightness = 0.90 }
+                },
+                Face = face with
+                {
+                    EyeRegion = face.EyeRegion with { EyeSize = 0.74 },
+                    Jaw = face.Jaw with { JawProminence = 0.72, JawRoundness = 0.35 },
+                    Asymmetry = face.Asymmetry with { FacialAsymmetry = 0.11 }
+                },
+                HairLengthCm = 6.0
+            };
+
+            var spec = _builder.Build(SexBiology.Female, appearance);
+
+            Assert.AreEqual(0.72, spec.Body.WaistToHipRatio);
+            Assert.AreEqual("very upright carriage", spec.Body.PostureBucket);
+            Assert.AreEqual("short", spec.Hair.LengthBucket);
+            Assert.AreEqual("large eye scale", spec.Face.EyeScaleBucket);
+            Assert.AreEqual("angular jaw definition", spec.Face.JawDefinitionBucket);
+            Assert.AreEqual("noticeable natural asymmetry", spec.Face.FacialAsymmetryBucket);
         }
 
         [TestMethod]
@@ -153,19 +189,19 @@ namespace EngineTests
         }
 
         private static PhysicalAppearance BuildReferenceAppearance()
-            => new(
-                HeightCm: 163.43522575145366,
-                Frame: BodyFrame.Petite,
-                SkinTone: SkinTone.Fair,
-                EyeColor: EyeColor.Blue,
-                HairColor: HairColorNatural.DarkBlond,
-                HairType: HairType.Straight,
-                FaceShape: FaceShape.Oval,
-                ShoulderBreadthCm: 38.25361578154313,
-                HipBreadthCm: 39.84460565452852,
-                NoseProminence: 0.56,
-                LipFullness: 0.56,
-                DistinctiveMarks: new[] { "small scar above left eyebrow" });
+            => TestAppearanceFactory.Build(
+                heightCm: 163.43522575145366,
+                frame: BodyFrame.Petite,
+                skinTone: SkinTone.Fair,
+                eyeColor: EyeColor.Blue,
+                hairColor: HairColorNatural.DarkBlond,
+                hairType: HairType.Straight,
+                faceShape: FaceShape.Oval,
+                shoulderBreadthCm: 38.25361578154313,
+                hipBreadthCm: 39.84460565452852,
+                noseProjection: 0.56,
+                lipFullness: 0.56,
+                distinctiveMarks: new[] { "small scar above left eyebrow" });
 
         private static EnginesSnapshot BuildSnapshot(
             PhysiologyState? physiology = null,

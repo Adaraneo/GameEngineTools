@@ -45,8 +45,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             var negative = rejecting * 0.34 * vulnerabilityWeight + critical * 0.24;
             var relationshipBias = RelationshipBias(relationship, act);
             var recentBias = RecentEpisodeBias(episodes, other, act);
+            var trendBias = PositiveTrendBias(relationship, episodes, other, act, profile);
             var profileBias = ProfileBias(profile, act, safe, rejecting, critical);
-            return Math.Clamp(0.5 + positive - negative + relationshipBias + recentBias + profileBias, 0.05, 0.95);
+            return Math.Clamp(0.5 + positive - negative + relationshipBias + recentBias + trendBias + profileBias, 0.05, 0.95);
         }
 
         internal static double ScoreApproachTarget(
@@ -120,6 +121,94 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             var vulnerabilityMultiplier = act is SpeechAct.SelfDisclosure or SpeechAct.Meta or SpeechAct.Invite ? 1.25 : 0.85;
 
             return Math.Clamp((positive - negative) * 0.06 * vulnerabilityMultiplier - threatPenalty, -0.12, 0.12);
+        }
+
+        private static double PositiveTrendBias(
+            RelationshipEdge? relationship,
+            IReadOnlyList<EpisodicMemory>? episodes,
+            HumanId other,
+            SpeechAct act,
+            PsychologicalProfile? profile)
+        {
+            var exposureBias = RelationshipExposureBias(relationship);
+            var memoryTrend = MemoryTrendBias(episodes, other, act, profile);
+
+            return Math.Clamp(exposureBias + memoryTrend, -0.10, 0.14);
+        }
+
+        private static double RelationshipExposureBias(RelationshipEdge? relationship)
+        {
+            if (relationship is null || relationship.PositiveInteractionCount <= 0)
+            {
+                return 0.0;
+            }
+
+            var exposure = Math.Clamp(Math.Log(1.0 + relationship.PositiveInteractionCount) / Math.Log(21.0), 0.0, 1.0);
+            var safety = Math.Clamp(
+                Math.Max(0.0, relationship.Trust - 48.0) / 52.0 * 0.35
+                + Math.Max(0.0, relationship.Comfort - 45.0) / 55.0 * 0.40
+                + relationship.Closeness / 100.0 * 0.25,
+                0.0,
+                1.0);
+
+            return exposure * (0.02 + safety * 0.06);
+        }
+
+        private static double MemoryTrendBias(
+            IReadOnlyList<EpisodicMemory>? episodes,
+            HumanId other,
+            SpeechAct act,
+            PsychologicalProfile? profile)
+        {
+            if (episodes is null || episodes.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var recent = episodes
+                .Where(e => e.OtherPerson == other)
+                .OrderByDescending(e => e.When)
+                .Take(6)
+                .ToList();
+
+            if (recent.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var weighted = 0.0;
+            var total = 0.0;
+            for (var i = 0; i < recent.Count; i++)
+            {
+                var episode = recent[i];
+                var recency = 1.0 / (1.0 + i * 0.55);
+                var strength = Math.Clamp(episode.Strength, 0.0, 1.0);
+                var polarity = episode.Emotion switch
+                {
+                    EmotionalTag.Positive => 1.0,
+                    EmotionalTag.Mixed => -0.35,
+                    EmotionalTag.Negative => -1.0,
+                    _ => 0.0
+                };
+
+                weighted += polarity * strength * recency;
+                total += strength * recency;
+            }
+
+            if (total <= 0.0)
+            {
+                return 0.0;
+            }
+
+            var trend = Math.Clamp(weighted / total, -1.0, 1.0);
+            var vulnerableAct = act is SpeechAct.SelfDisclosure or SpeechAct.Meta or SpeechAct.Invite;
+            var ambivalence = Math.Clamp(profile?.Ambivalence ?? PsychologicalProfile.Default.Ambivalence, 0.0, 1.0);
+            var positiveScale = vulnerableAct ? 0.08 + ambivalence * 0.04 : 0.06 + ambivalence * 0.025;
+            var negativeScale = vulnerableAct ? 0.08 + ambivalence * 0.035 : 0.06 + ambivalence * 0.02;
+
+            return trend >= 0.0
+                ? trend * positiveScale
+                : trend * negativeScale;
         }
 
         private static double ProfileBias(

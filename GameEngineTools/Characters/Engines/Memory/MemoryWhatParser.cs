@@ -135,24 +135,6 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Sestaví <c>What</c> pro mikrokladnou interakci.
-        /// </summary>
-        /// <remarks>
-        /// Výsledný formát: <c>Relation:MicroPositive|from={id}|what={what}</c>
-        /// </remarks>
-        public static string MicroPositive(Guid from, string what)
-            => $"Relation:MicroPositive|from={Full(from)}|what={what}";
-
-        /// <summary>
-        /// Sestaví <c>What</c> pro mikrozápornou interakci.
-        /// </summary>
-        /// <remarks>
-        /// Výsledný formát: <c>Relation:MicroNegative|from={id}|what={what}</c>
-        /// </remarks>
-        public static string MicroNegative(Guid from, string what)
-            => $"Relation:MicroNegative|from={Full(from)}|what={what}";
-
-        /// <summary>
         /// Sestaví <c>What</c> pro pokus o smíření.
         /// </summary>
         /// <remarks>
@@ -295,40 +277,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                 return null;
             }
 
-            var normalized = value.Trim().ToLowerInvariant();
-
-            return NormalizeLegacyMicroEventKind(normalized);
+            return value.Trim().ToLowerInvariant();
         }
-
-        private static string NormalizeLegacyMicroEventKind(string value)
-            => value switch
-            {
-                MemoryMicroEventKinds.Help => MemoryMicroEventKinds.Help,
-                MemoryMicroEventKinds.Support => MemoryMicroEventKinds.Support,
-                MemoryMicroEventKinds.Repair => MemoryMicroEventKinds.Repair,
-                MemoryMicroEventKinds.Warmth => MemoryMicroEventKinds.Warmth,
-                MemoryMicroEventKinds.Validation => MemoryMicroEventKinds.Validation,
-
-                MemoryMicroEventKinds.Ignore => MemoryMicroEventKinds.Ignore,
-                MemoryMicroEventKinds.Cold => MemoryMicroEventKinds.Cold,
-                MemoryMicroEventKinds.Criticism => MemoryMicroEventKinds.Criticism,
-                MemoryMicroEventKinds.Dismissal => MemoryMicroEventKinds.Dismissal,
-                MemoryMicroEventKinds.Slight => MemoryMicroEventKinds.Slight,
-
-                "help-with-task" => MemoryMicroEventKinds.Help,
-                "support-after-stress" => MemoryMicroEventKinds.Support,
-                "repair-after-conflict" => MemoryMicroEventKinds.Repair,
-                "warm-response" => MemoryMicroEventKinds.Warmth,
-                "validation-response" => MemoryMicroEventKinds.Validation,
-
-                "ignore-after-reachout" => MemoryMicroEventKinds.Ignore,
-                "cold-response" => MemoryMicroEventKinds.Cold,
-                "critical-response" => MemoryMicroEventKinds.Criticism,
-                "dismissive-response" => MemoryMicroEventKinds.Dismissal,
-                "slight-response" => MemoryMicroEventKinds.Slight,
-
-                _ => value
-            };
 
         /// <summary>
         /// Naparsuje část za hlavičkou na mapu parametrů <c>key=value</c>.
