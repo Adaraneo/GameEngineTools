@@ -193,27 +193,27 @@
                                     Command="{Binding EventDetails.CopyEventIdCommand}"
                                     HorizontalAlignment="Left" />
                             <TextBlock Text="EventInstanceId" FontWeight="SemiBold" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.EventInstanceId}" IsReadOnly="True" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.EventInstanceId, Mode=OneWay}" IsReadOnly="True" />
                             <TextBlock Text="RealTimestamp" FontWeight="SemiBold" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.RealTimestamp}" IsReadOnly="True" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.RealTimestamp, Mode=OneWay}" IsReadOnly="True" />
                             <TextBlock Text="WorldTimeText" FontWeight="SemiBold" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.WorldTimeText}" IsReadOnly="True" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.WorldTimeText, Mode=OneWay}" IsReadOnly="True" />
                             <TextBlock Text="Level / EventId" FontWeight="SemiBold" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.Level}" IsReadOnly="True" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.EventId}" IsReadOnly="True" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.Level, Mode=OneWay}" IsReadOnly="True" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.EventId, Mode=OneWay}" IsReadOnly="True" />
                             <TextBlock Text="Category" FontWeight="SemiBold" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.Category}" IsReadOnly="True" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.Category, Mode=OneWay}" IsReadOnly="True" />
                             <TextBlock Text="Message" FontWeight="SemiBold" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.Message}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="90" AcceptsReturn="True" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.Message, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="90" AcceptsReturn="True" />
                             <TextBlock Text="Metadata" FontWeight="SemiBold" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.PersonId}" IsReadOnly="True" ToolTip="PersonId" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.Subsystem}" IsReadOnly="True" ToolTip="Subsystem" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.CorrelationId}" IsReadOnly="True" ToolTip="CorrelationId" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.InteractionId}" IsReadOnly="True" ToolTip="InteractionId" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.DecisionId}" IsReadOnly="True" ToolTip="DecisionId" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.RelatedPersonId}" IsReadOnly="True" ToolTip="RelatedPersonId" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.LocationId}" IsReadOnly="True" ToolTip="LocationId" />
-                            <TextBox Text="{Binding EventDetails.SelectedEvent.TickKey}" IsReadOnly="True" ToolTip="TickKey" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.PersonId, Mode=OneWay}" IsReadOnly="True" ToolTip="PersonId" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.Subsystem, Mode=OneWay}" IsReadOnly="True" ToolTip="Subsystem" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.CorrelationId, Mode=OneWay}" IsReadOnly="True" ToolTip="CorrelationId" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.InteractionId, Mode=OneWay}" IsReadOnly="True" ToolTip="InteractionId" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.DecisionId, Mode=OneWay}" IsReadOnly="True" ToolTip="DecisionId" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.RelatedPersonId, Mode=OneWay}" IsReadOnly="True" ToolTip="RelatedPersonId" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.LocationId, Mode=OneWay}" IsReadOnly="True" ToolTip="LocationId" />
+                            <TextBox Text="{Binding EventDetails.SelectedEvent.TickKey, Mode=OneWay}" IsReadOnly="True" ToolTip="TickKey" />
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
@@ -224,9 +224,9 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <TextBox Grid.Row="0" Text="{Binding EventDetails.SelectedEvent.ExceptionType}" IsReadOnly="True" />
-                        <TextBox Grid.Row="1" Text="{Binding EventDetails.SelectedEvent.ExceptionMessage}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="70" />
-                        <TextBox Grid.Row="2" Text="{Binding EventDetails.SelectedEvent.StackTrace}" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                        <TextBox Grid.Row="0" Text="{Binding EventDetails.SelectedEvent.ExceptionType, Mode=OneWay}" IsReadOnly="True" />
+                        <TextBox Grid.Row="1" Text="{Binding EventDetails.SelectedEvent.ExceptionMessage, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="70" />
+                        <TextBox Grid.Row="2" Text="{Binding EventDetails.SelectedEvent.StackTrace, Mode=OneWay}" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
                     </Grid>
                 </TabItem>
                 <TabItem Header="Sources">
@@ -259,9 +259,9 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <TextBox Grid.Row="0" Text="{Binding RawFile.FilePath}" IsReadOnly="True" />
+                        <TextBox Grid.Row="0" Text="{Binding RawFile.FilePath, Mode=OneWay}" IsReadOnly="True" />
                         <TextBox Grid.Row="1"
-                                 Text="{Binding RawFile.Content}"
+                                 Text="{Binding RawFile.Content, Mode=OneWay}"
                                  IsReadOnly="True"
                                  AcceptsReturn="True"
                                  TextWrapping="NoWrap"
@@ -288,7 +288,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBox Grid.Column="1"
-                             Text="{Binding Diagnostics.SelectedIssue.Description}"
+                             Text="{Binding Diagnostics.SelectedIssue.Description, Mode=OneWay}"
                              IsReadOnly="True"
                              TextWrapping="Wrap"
                              AcceptsReturn="True"
