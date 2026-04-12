@@ -98,10 +98,13 @@ public sealed class ShellViewModel : ViewModelBase
         {
             if (SetProperty(ref _isLoading, value))
             {
+                OnPropertyChanged(nameof(IsInterfaceEnabled));
                 RaiseCommandStates();
             }
         }
     }
+
+    public bool IsInterfaceEnabled => !IsLoading;
 
     public string? LoadingProgressText
     {

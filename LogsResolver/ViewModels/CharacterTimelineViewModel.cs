@@ -1,23 +1,46 @@
 using System.Collections.ObjectModel;
+using System.Windows.Input;
+using LogsResolver.Commands;
 using LogsResolver.Models;
 
 namespace LogsResolver.ViewModels;
 
 public sealed class CharacterTimelineViewModel : ViewModelBase
 {
-    private const int MaxTimelineEntries = 5_000;
+    private const int DefaultPageSize = 500;
+    private const int MaxPageSize = 5_000;
 
     private IReadOnlyList<ResolvedLogEvent> _events = Array.Empty<ResolvedLogEvent>();
     private NpcCharacterDescriptor? _selectedCharacter;
     private string? _selectedPersonIdText;
     private string _summaryText = "Load logs and optionally NPC JSON files to inspect character progression.";
+    private string _pageSizeText = DefaultPageSize.ToString();
+    private string _pageNumberText = "Page 0 / 0";
     private int _characterCount;
     private int _matchingEventCount;
+    private int _pageIndex;
+    private int _totalPages;
     private bool _isUpdatingSelection;
+
+    public CharacterTimelineViewModel()
+    {
+        FirstPageCommand = new RelayCommand(() => MoveToPage(0), () => PageIndex > 0);
+        PreviousPageCommand = new RelayCommand(() => MoveToPage(PageIndex - 1), () => PageIndex > 0);
+        NextPageCommand = new RelayCommand(() => MoveToPage(PageIndex + 1), () => PageIndex + 1 < TotalPages);
+        LastPageCommand = new RelayCommand(() => MoveToPage(TotalPages - 1), () => TotalPages > 0 && PageIndex + 1 < TotalPages);
+    }
 
     public ObservableCollection<NpcCharacterDescriptor> Characters { get; } = new();
 
     public ObservableCollection<CharacterTimelineEntry> Entries { get; } = new();
+
+    public ICommand FirstPageCommand { get; }
+
+    public ICommand PreviousPageCommand { get; }
+
+    public ICommand NextPageCommand { get; }
+
+    public ICommand LastPageCommand { get; }
 
     public NpcCharacterDescriptor? SelectedCharacter
     {
@@ -40,6 +63,7 @@ public sealed class CharacterTimelineViewModel : ViewModelBase
                     }
                 }
 
+                PageIndex = 0;
                 Rebuild();
             }
         }
@@ -57,6 +81,7 @@ public sealed class CharacterTimelineViewModel : ViewModelBase
                     SyncSelectedCharacterFromText();
                 }
 
+                PageIndex = 0;
                 Rebuild();
             }
         }
@@ -77,7 +102,64 @@ public sealed class CharacterTimelineViewModel : ViewModelBase
     public int MatchingEventCount
     {
         get => _matchingEventCount;
-        private set => SetProperty(ref _matchingEventCount, value);
+        private set
+        {
+            if (SetProperty(ref _matchingEventCount, value))
+            {
+                TotalPages = CalculateTotalPages(value, PageSize);
+            }
+        }
+    }
+
+    public int PageIndex
+    {
+        get => _pageIndex;
+        private set
+        {
+            var normalized = Math.Max(0, value);
+            if (SetProperty(ref _pageIndex, normalized))
+            {
+                UpdatePageText();
+                RaisePageCommandStates();
+            }
+        }
+    }
+
+    public int TotalPages
+    {
+        get => _totalPages;
+        private set
+        {
+            if (SetProperty(ref _totalPages, value))
+            {
+                if (PageIndex >= value && value > 0)
+                {
+                    PageIndex = value - 1;
+                }
+
+                UpdatePageText();
+                RaisePageCommandStates();
+            }
+        }
+    }
+
+    public string PageSizeText
+    {
+        get => _pageSizeText;
+        set
+        {
+            if (SetProperty(ref _pageSizeText, value))
+            {
+                PageIndex = 0;
+                Rebuild();
+            }
+        }
+    }
+
+    public string PageNumberText
+    {
+        get => _pageNumberText;
+        private set => SetProperty(ref _pageNumberText, value);
     }
 
     public void LoadCharacters(IEnumerable<NpcCharacterDescriptor> characters)
@@ -124,6 +206,7 @@ public sealed class CharacterTimelineViewModel : ViewModelBase
             _isUpdatingSelection = false;
         }
 
+        PageIndex = 0;
         Rebuild();
     }
 
@@ -177,6 +260,8 @@ public sealed class CharacterTimelineViewModel : ViewModelBase
             return;
         }
 
+        var pageSize = PageSize;
+        var pageStart = PageIndex * pageSize;
         var matchingCount = 0;
         foreach (var logEvent in _events)
         {
@@ -186,33 +271,72 @@ public sealed class CharacterTimelineViewModel : ViewModelBase
             }
 
             matchingCount++;
-            if (Entries.Count < MaxTimelineEntries)
+            if (matchingCount <= pageStart || Entries.Count >= pageSize)
             {
-                Entries.Add(new CharacterTimelineEntry
-                {
-                    EventInstanceId = logEvent.EventInstanceId,
-                    RealTimestamp = logEvent.RealTimestamp,
-                    WorldTimeText = logEvent.WorldTimeText,
-                    Level = logEvent.Level,
-                    Category = logEvent.Category,
-                    EventId = logEvent.EventId,
-                    Message = logEvent.Message,
-                    PersonId = logEvent.PersonId,
-                    RelatedPersonId = logEvent.RelatedPersonId,
-                    Subsystem = logEvent.Subsystem,
-                    CorrelationId = logEvent.CorrelationId,
-                    InteractionId = logEvent.InteractionId,
-                    DecisionId = logEvent.DecisionId,
-                    TickKey = logEvent.TickKey,
-                    Involvement = logEvent.PersonId == personId ? "Primary" : "Related"
-                });
+                continue;
             }
+
+            Entries.Add(new CharacterTimelineEntry
+            {
+                EventInstanceId = logEvent.EventInstanceId,
+                RealTimestamp = logEvent.RealTimestamp,
+                WorldTimeText = logEvent.WorldTimeText,
+                Level = logEvent.Level,
+                Category = logEvent.Category,
+                EventId = logEvent.EventId,
+                Message = logEvent.Message,
+                PersonId = logEvent.PersonId,
+                RelatedPersonId = logEvent.RelatedPersonId,
+                Subsystem = logEvent.Subsystem,
+                CorrelationId = logEvent.CorrelationId,
+                InteractionId = logEvent.InteractionId,
+                DecisionId = logEvent.DecisionId,
+                TickKey = logEvent.TickKey,
+                Involvement = logEvent.PersonId == personId ? "Primary" : "Related"
+            });
         }
 
         MatchingEventCount = matchingCount;
+        if (Entries.Count == 0 && matchingCount > 0 && pageStart >= matchingCount && PageIndex > 0)
+        {
+            Rebuild();
+            return;
+        }
+
         var name = SelectedCharacter?.DisplayName ?? personId.ToString();
-        SummaryText = matchingCount > MaxTimelineEntries
-            ? $"{name}: showing first {MaxTimelineEntries} of {matchingCount} related event(s). Narrow filters in the main grid for a smaller working set."
+        SummaryText = matchingCount > pageSize
+            ? $"{name}: showing page {PageIndex + 1} of {TotalPages}, {matchingCount} related event(s)."
             : $"{name}: {matchingCount} related event(s) in timeline.";
+    }
+
+    private int PageSize
+        => int.TryParse(PageSizeText, out var pageSize)
+            ? Math.Clamp(pageSize, 1, MaxPageSize)
+            : DefaultPageSize;
+
+    private static int CalculateTotalPages(int totalCount, int pageSize)
+        => totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)Math.Max(1, pageSize));
+
+    private void MoveToPage(int pageIndex)
+    {
+        if (TotalPages <= 0)
+        {
+            PageIndex = 0;
+            return;
+        }
+
+        PageIndex = Math.Clamp(pageIndex, 0, TotalPages - 1);
+        Rebuild();
+    }
+
+    private void UpdatePageText()
+        => PageNumberText = TotalPages == 0 ? "Page 0 / 0" : $"Page {PageIndex + 1} / {TotalPages}";
+
+    private void RaisePageCommandStates()
+    {
+        if (FirstPageCommand is RelayCommand first) first.RaiseCanExecuteChanged();
+        if (PreviousPageCommand is RelayCommand previous) previous.RaiseCanExecuteChanged();
+        if (NextPageCommand is RelayCommand next) next.RaiseCanExecuteChanged();
+        if (LastPageCommand is RelayCommand last) last.RaiseCanExecuteChanged();
     }
 }

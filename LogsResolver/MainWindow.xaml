@@ -32,7 +32,7 @@
             <StatusBarItem Content="{Binding StatusText}" />
         </StatusBar>
 
-        <ToolBar DockPanel.Dock="Top">
+        <ToolBar DockPanel.Dock="Top" IsEnabled="{Binding IsInterfaceEnabled}" UseLayoutRounding="False">
             <Button Content="Open Folder" Command="{Binding OpenFolderCommand}" />
             <Button Content="Open NPC JSON" Command="{Binding OpenNpcFolderCommand}" />
             <Button Content="Reload" Command="{Binding ReloadSessionCommand}" />
@@ -59,7 +59,7 @@
                        Margin="8,0,0,0" />
         </Grid>
 
-        <Grid Margin="8">
+        <Grid Margin="8" IsEnabled="{Binding IsInterfaceEnabled}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="280" />
                 <ColumnDefinition Width="3*" />
@@ -113,7 +113,7 @@
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
-
+                    
                     <GroupBox Header="NPC Timeline">
                         <StackPanel>
                             <TextBlock Text="NPC JSON files:" FontWeight="SemiBold" />
@@ -212,7 +212,9 @@
                           SelectionMode="Single"
                           SelectionUnit="FullRow"
                           EnableRowVirtualization="True"
-                          EnableColumnVirtualization="True">
+                          EnableColumnVirtualization="True"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="80" />
                         <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="160" />
@@ -260,7 +262,7 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
-                <TabItem Header="Vývoj">
+                <TabItem Header="NPC Timeline">
                     <Grid Margin="8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -273,13 +275,27 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Person:" FontWeight="SemiBold" />
                                 <TextBlock Grid.Column="1" Text="{Binding CharacterTimeline.SelectedPersonIdText}" />
                                 <TextBlock Grid.Column="2" Text="Events:" FontWeight="SemiBold" Margin="12,2,4,2" />
                                 <TextBlock Grid.Column="3" Text="{Binding CharacterTimeline.MatchingEventCount}" />
+                                <TextBlock Grid.Column="4" Text="Page size:" FontWeight="SemiBold" Margin="12,2,4,2" />
+                                <TextBox Grid.Column="5" Text="{Binding CharacterTimeline.PageSizeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="60" />
+                                <Button Grid.Column="6" Content="|&lt;" Command="{Binding CharacterTimeline.FirstPageCommand}" />
+                                <Button Grid.Column="7" Content="&lt;" Command="{Binding CharacterTimeline.PreviousPageCommand}" />
+                                <TextBlock Grid.Column="8" Text="{Binding CharacterTimeline.PageNumberText}" VerticalAlignment="Center" Margin="8,0" />
                             </Grid>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="&gt;" Command="{Binding CharacterTimeline.NextPageCommand}" />
+                                <Button Content="&gt;|" Command="{Binding CharacterTimeline.LastPageCommand}" />
+                            </StackPanel>
                         </StackPanel>
                         <DataGrid Grid.Row="1"
                                   ItemsSource="{Binding CharacterTimeline.Entries}"
@@ -287,7 +303,9 @@
                                   IsReadOnly="True"
                                   CanUserSortColumns="True"
                                   EnableRowVirtualization="True"
-                                  EnableColumnVirtualization="True">
+                                  EnableColumnVirtualization="True"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="130" />
                                 <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="155" />
