@@ -225,7 +225,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             }
 
             // Misattribution: vyšší stres → větší šance na špatné čtení záměru
-            var misattrib = Config.MisattributionRateBase * (psych.Stress / 100.0);
+            var misattrib = ComputeMisattributionPenalty(p.Act, psych.Stress, trust, comfort, State.HasPrivacy);
             baseP -= misattrib;
 
             var pAcc = Math.Clamp(baseP, 0.05, 0.95);
@@ -254,7 +254,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
             outbox.Add(outcome);
 
-            if (accepted && p.Act == SpeechAct.Invite && CanConsiderSexualEncounter(p.OccurredAt, ctx, edge))
+            if (accepted && p.Act == SpeechAct.Invite && HasSexualEncounterReadiness(p.OccurredAt, ctx, edge, expectedAcceptance))
             {
                 var proposed = new SexualEncounterProposed(
                     p.OccurredAt,
@@ -323,6 +323,54 @@ namespace GameEngineTools.Characters.Engines.Interactions
             }
 
             return !SociosexualityBehaviorMath.BlocksIntimateTouch(ctx.Personality.Sociosexuality, edge);
+        }
+
+        private bool HasSexualEncounterReadiness(
+            WDateTime occurredAt,
+            IHumanContext ctx,
+            RelationshipEdge? edge,
+            double expectedAcceptance)
+        {
+            if (!CanConsiderSexualEncounter(occurredAt, ctx, edge) || edge is null)
+            {
+                return false;
+            }
+
+            if (ctx.Snapshot.Psychology.Stress > 35 || expectedAcceptance < 0.74)
+            {
+                return false;
+            }
+
+            var relationalReadiness =
+                edge.Trust * 0.24
+                + edge.Comfort * 0.28
+                + edge.Closeness * 0.20
+                + edge.RomanticInterest * 0.14
+                + edge.SexualInterest * 0.14;
+
+            return edge.Trust >= 72
+                && edge.Comfort >= 72
+                && edge.Closeness >= 70
+                && edge.SexualInterest >= 68
+                && relationalReadiness >= 72.0;
+        }
+
+        private double ComputeMisattributionPenalty(SpeechAct act, double stress, double trust, double comfort, bool hasPrivacy)
+        {
+            var stressFactor = Math.Clamp(stress / 100.0, 0.0, 1.0);
+            var safety = Math.Clamp(((trust + comfort) * 0.5) / 100.0, 0.0, 1.0);
+            var unsafeMultiplier = 0.45 + (1.0 - safety) * 1.10;
+            var actMultiplier = act switch
+            {
+                SpeechAct.Invite => 1.35,
+                SpeechAct.SelfDisclosure => 1.20,
+                SpeechAct.Meta => 1.10,
+                SpeechAct.SmallTalk or SpeechAct.Question => 0.70,
+                _ => 1.0
+            };
+            var privacyRelief = hasPrivacy && safety >= 0.65 ? 0.78 : 1.0;
+
+            return Config.MisattributionRateBase * stressFactor * unsafeMultiplier * actMultiplier * privacyRelief;
         }
 
         private static bool HasReproductivePotential(SexBiology? initiatorBiology, SexBiology recipientBiology)

@@ -76,6 +76,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var updatedCooldowns = BehaviorMath.UpdateCooldowns(State.Cooldowns, Math.Max(0, dt.TotalHours));
             var stateWithHabits = State with { HabitTraces = BehaviorHabitLearning.Decay(State.HabitTraces, dt, Config, ctx, _log) };
             var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, stateWithHabits) with { Cooldowns = updatedCooldowns };
+            State = stateWithNeeds;
             var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator);
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.

@@ -13,6 +13,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -22,7 +23,7 @@ namespace EngineTests
     public class SexualEncounterReproductionTests : TestBase
     {
         [TestMethod]
-        public void AcceptedInvite_InPrivateAdultContext_EmitsSexualEncounterProposalOnly()
+        public void AcceptedInvite_InPrivateAdultContext_DoesNotEscalateWhenReadinessIsInsufficient()
         {
             var from = new HumanId(Guid.NewGuid());
             var to = new HumanId(Guid.NewGuid());
@@ -41,8 +42,64 @@ namespace EngineTests
 
             var events = outbox.Drain();
             Assert.IsTrue(events.OfType<InteractionOutcome>().Single().Accepted);
+            Assert.AreEqual(0, events.OfType<SexualEncounterProposed>().Count());
+            Assert.AreEqual(0, events.OfType<SexualEncounterOutcome>().Count());
+        }
+
+        [TestMethod]
+        public void AcceptedInvite_InPrivateAdultContext_EscalatesOnlyWhenReadinessIsClearlyHigh()
+        {
+            var from = new HumanId(Guid.NewGuid());
+            var to = new HumanId(Guid.NewGuid());
+            var relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [from] = HighReadinessEdge(to, from)
+            });
+            var ctx = AdultContext(to, SexBiology.Female, relationships, new AlwaysAcceptRandom(), semanticMemory: PositiveSemanticMemory(from));
+            var engine = InteractionEngine();
+            var outbox = new EventCollector();
+
+            engine.Handle(
+                new InteractionProposed(WDateTime.New(100, 1, 1), from, to, SpeechAct.Invite, null, SexBiology.Male),
+                ctx,
+                outbox);
+
+            var events = outbox.Drain();
+            Assert.IsTrue(events.OfType<InteractionOutcome>().Single().Accepted);
             Assert.AreEqual(1, events.OfType<SexualEncounterProposed>().Count());
             Assert.AreEqual(0, events.OfType<SexualEncounterOutcome>().Count());
+        }
+
+        [TestMethod]
+        public void InteractionProposed_StressPenaltyIsStrongerAtLowTrustThanHighTrust()
+        {
+            var from = new HumanId(Guid.NewGuid());
+            var lowTrustRecipient = new HumanId(Guid.NewGuid());
+            var highTrustRecipient = new HumanId(Guid.NewGuid());
+            var lowRelationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [from] = LowTrustEdge(lowTrustRecipient, from)
+            });
+            var highRelationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [from] = HighReadinessEdge(highTrustRecipient, from)
+            });
+            var engine = InteractionEngine();
+            var lowOutbox = new EventCollector();
+            var highOutbox = new EventCollector();
+
+            engine.Handle(
+                new InteractionProposed(WDateTime.New(100, 1, 1), from, lowTrustRecipient, SpeechAct.Invite, null, SexBiology.Male),
+                AdultContext(lowTrustRecipient, SexBiology.Female, lowRelationships, new ThresholdRandom(0.45), stress: 85),
+                lowOutbox);
+
+            engine.Handle(
+                new InteractionProposed(WDateTime.New(100, 1, 1), from, highTrustRecipient, SpeechAct.Invite, null, SexBiology.Male),
+                AdultContext(highTrustRecipient, SexBiology.Female, highRelationships, new ThresholdRandom(0.45), stress: 85),
+                highOutbox);
+
+            Assert.IsFalse(lowOutbox.Drain().OfType<InteractionOutcome>().Single().Accepted);
+            Assert.IsTrue(highOutbox.Drain().OfType<InteractionOutcome>().Single().Accepted);
         }
 
         [TestMethod]
@@ -195,7 +252,7 @@ namespace EngineTests
             return engine;
         }
 
-        private static IHumanContext AdultContext(HumanId self, SexBiology biology, RelationshipState relationships, IRandomSource random)
+        private static IHumanContext AdultContext(HumanId self, SexBiology biology, RelationshipState relationships, IRandomSource random, double stress = 5, SemanticMemoryState? semanticMemory = null)
         {
             var personality = new Personality(
                 new BigFive(0.55, 0.55, 0.55, 0.6, 0.2),
@@ -206,11 +263,12 @@ namespace EngineTests
                 Chronotype.Neutral);
             var snapshot = new EnginesSnapshot(
                 new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null),
-                new PsychologyState(0.2, 0.5, 0.5, 5, 0, DiscreteEmotion.Neutral),
+                new PsychologyState(0.2, 0.5, 0.5, stress, 0, DiscreteEmotion.Neutral),
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
                 new InteractionSurface("private", true, 0.1, 0.1, SurfaceKind.Private),
                 relationships,
-                new MemoryIndex(new List<EpisodicMemory>()));
+                new MemoryIndex(new List<EpisodicMemory>()),
+                semanticMemory ?? SemanticMemoryState.Empty);
 
             return new HumanContext
             {
@@ -249,6 +307,52 @@ namespace EngineTests
                 Comfort: 76,
                 Breakdown: new DomainBreakdown(60, 60, 60, 60, 80));
 
+        private static SemanticMemoryState PositiveSemanticMemory(HumanId other)
+            => new(new Dictionary<HumanId, PersonBeliefSet>
+            {
+                [other] = new PersonBeliefSet(
+                    other,
+                    new Dictionary<PersonBeliefKind, PersonBelief>
+                    {
+                        [PersonBeliefKind.Warm] = new PersonBelief(other, PersonBeliefKind.Warm, 0.80, 0.70, 5, WDateTime.New(100, 1, 1)),
+                        [PersonBeliefKind.EmotionallySafe] = new PersonBelief(other, PersonBeliefKind.EmotionallySafe, 0.80, 0.70, 5, WDateTime.New(100, 1, 1)),
+                        [PersonBeliefKind.Reliable] = new PersonBelief(other, PersonBeliefKind.Reliable, 0.65, 0.60, 4, WDateTime.New(100, 1, 1))
+                    })
+            });
+
+        private static RelationshipEdge HighReadinessEdge(HumanId self, HumanId other)
+            => new(
+                self,
+                other,
+                Like: 90,
+                Trust: 92,
+                Familiarity: 90,
+                AestheticAttraction: 88,
+                PhysicalAttraction: 90,
+                RomanticInterest: 88,
+                SexualInterest: 90,
+                Closeness: 92,
+                Respect: 85,
+                Comfort: 94,
+                Breakdown: new DomainBreakdown(70, 70, 70, 70, 88),
+                PositiveInteractionCount: 10);
+
+        private static RelationshipEdge LowTrustEdge(HumanId self, HumanId other)
+            => new(
+                self,
+                other,
+                Like: 35,
+                Trust: 20,
+                Familiarity: 25,
+                AestheticAttraction: 45,
+                PhysicalAttraction: 45,
+                RomanticInterest: 20,
+                SexualInterest: 20,
+                Closeness: 20,
+                Respect: 35,
+                Comfort: 20,
+                Breakdown: new DomainBreakdown(40, 40, 40, 40, 45));
+
         private sealed class AlwaysAcceptRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
@@ -256,6 +360,15 @@ namespace EngineTests
             public double NextUnit() => 0;
 
             public bool Chance(double p) => p > 0;
+        }
+
+        private sealed class ThresholdRandom(double threshold) : IRandomSource
+        {
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => threshold;
+
+            public bool Chance(double p) => p >= threshold;
         }
     }
 }

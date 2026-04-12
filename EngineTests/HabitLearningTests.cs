@@ -128,6 +128,71 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Decay_WeakensAdaptiveAndCopingReinforcementMoreMildlyThanStrength()
+        {
+            var config = new BehaviorConfig(HabitDecayPerDay: 0.10);
+            var traces = new Dictionary<string, BehaviorHabitTrace>
+            {
+                ["work"] = new BehaviorHabitTrace(
+                    Work,
+                    SurfaceKind.Work,
+                    HabitTimeBand.Morning,
+                    HabitCueKind.CompetenceNeed,
+                    Strength: 0.80,
+                    AdaptiveReinforcement: 0.60,
+                    CopingReinforcement: 0.40,
+                    RepetitionCount: 6,
+                    LastUpdatedAt: new WDateTime(0),
+                    HabitTendency.Adaptive)
+            };
+
+            var decayed = BehaviorHabitLearning.Decay(traces, WTimeSpan.FromDays(2), config)!["work"];
+
+            Assert.IsTrue(decayed.Strength < 0.80);
+            Assert.IsTrue(decayed.AdaptiveReinforcement < 0.60);
+            Assert.IsTrue(decayed.CopingReinforcement < 0.40);
+            Assert.IsTrue(decayed.AdaptiveReinforcement / 0.60 > decayed.Strength / 0.80);
+            Assert.IsTrue(decayed.CopingReinforcement / 0.40 > decayed.Strength / 0.80);
+        }
+
+        [TestMethod]
+        public void ComputeCandidateBias_UsesBoundedWeightedAggregationAcrossTopHabitTraces()
+        {
+            var traces = new Dictionary<string, BehaviorHabitTrace>(StringComparer.Ordinal)
+            {
+                ["primary"] = Trace(SelfCare, SurfaceKind.Private, HabitTimeBand.Morning, HabitCueKind.BodyNeed, strength: 0.35, lastUpdatedAt: new WDateTime(0), repetitionCount: 4),
+                ["secondary"] = Trace(SelfCare, SurfaceKind.Private, HabitTimeBand.Morning, HabitCueKind.BodyNeed, strength: 0.30, lastUpdatedAt: new WDateTime(0), repetitionCount: 3),
+                ["tertiary"] = Trace(SelfCare, SurfaceKind.Private, HabitTimeBand.Morning, HabitCueKind.BodyNeed, strength: 0.20, lastUpdatedAt: new WDateTime(0), repetitionCount: 2)
+            };
+            var state = new BehaviorState(90, 5, 5, 20, 20, 20, null, HabitTraces: traces);
+            var context = BehaviorComponentTestFactory.Context(
+                now: new WDateTime(WTimeSpan.FromHours(8).Ticks),
+                state: state,
+                surfaceKind: SurfaceKind.Private,
+                stress: 0,
+                hunger: 5,
+                thirst: 5,
+                energy: 40);
+            var candidate = new BehaviorCandidate(SelfCare, 10, WTimeSpan.FromHours(1), BehaviorDomain.Physiological);
+
+            var bias = BehaviorHabitLearning.ComputeCandidateBias(context, candidate);
+            var singleTraceContext = context with
+            {
+                State = context.State with
+                {
+                    HabitTraces = new Dictionary<string, BehaviorHabitTrace>(StringComparer.Ordinal)
+                    {
+                        ["primary"] = traces["primary"]
+                    }
+                }
+            };
+            var singleTraceBias = BehaviorHabitLearning.ComputeCandidateBias(singleTraceContext, candidate);
+
+            Assert.IsTrue(bias > singleTraceBias, "Multiple applicable traces should aggregate above a pure max trace.");
+            Assert.IsTrue(bias <= 1.0);
+        }
+
+        [TestMethod]
         public void LearnFromCommitment_CueCongruentBeneficialAction_ReinforcesMoreThanWeakFitForcedAction()
         {
             var self = new HumanId(Guid.NewGuid());
@@ -159,6 +224,29 @@ namespace EngineTests
 
             Assert.IsTrue(beneficial.HabitTraces!.Values.Single().Strength > weak.HabitTraces!.Values.Single().Strength);
             Assert.IsTrue(beneficial.HabitTraces!.Values.Single().AdaptiveReinforcement > weak.HabitTraces!.Values.Single().AdaptiveReinforcement);
+        }
+
+        [TestMethod]
+        public void LearnFromCommitment_MoveToPrivateUnderStress_UsesStressReliefCue()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var state = new BehaviorState(20, 5, 5, 35, 15, 15, null);
+            var context = BehaviorComponentTestFactory.Context(
+                now: new WDateTime(WTimeSpan.FromHours(22).Ticks),
+                state: state,
+                surfaceKind: SurfaceKind.Private,
+                stress: 90,
+                valence: -0.45,
+                selfId: self).HumanContext;
+
+            var learned = BehaviorHabitLearning.LearnFromCommitment(
+                state,
+                new ActionCommitted(new WDateTime(WTimeSpan.FromHours(22).Ticks), self, MoveToPrivate, WTimeSpan.FromMinutes(30), IntendedActionName: MoveToPrivate),
+                context,
+                new BehaviorConfig());
+
+            var trace = learned.HabitTraces!.Values.Single();
+            Assert.AreEqual(HabitCueKind.StressRelief, trace.CueKind);
         }
 
         [TestMethod]

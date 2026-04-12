@@ -34,7 +34,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 SpeechAct.Validation => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
                 SpeechAct.Humor => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
                 SpeechAct.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
-                SpeechAct.Invite => bd with { Physical = BumpD(bd.Physical, +0.5 * mul) },
+                SpeechAct.Invite when accepted => bd with { Physical = BumpD(bd.Physical, +0.5) },
+                SpeechAct.Invite => bd,
                 SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.0 * mul) },
                 _ => bd
             };
@@ -126,6 +127,38 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private double ComputeFamiliarityExposureDelta(int previousCount, int newCount)
             => MereExposureBoost(newCount, Config) - MereExposureBoost(previousCount, Config);
+
+        /// <summary>
+        /// Produces small attraction plasticity from accumulated safe or costly relational experience.
+        /// Attraction remains mostly stable; this only models repeated relational colouring.
+        /// </summary>
+        private double ComputeAttractionPlasticity(RelationshipEdge edge, bool positive, SpeechAct act)
+        {
+            var amount = Math.Clamp(Config.AttractionPlasticityPerInteraction, 0.0, 1.0);
+            var exposureDamping = 1.0 / Math.Sqrt(1.0 + Math.Max(0, edge.PositiveInteractionCount) * 0.15);
+
+            if (positive)
+            {
+                var safety = Math.Clamp(
+                    Math.Max(0.0, edge.Trust - 45.0) / 55.0 * 0.40
+                    + Math.Max(0.0, edge.Comfort - 45.0) / 55.0 * 0.40
+                    + Math.Max(0.0, edge.Like - 45.0) / 55.0 * 0.20,
+                    0.0,
+                    1.0);
+                var actScale = act is SpeechAct.Validation or SpeechAct.SelfDisclosure ? 1.10 : 0.75;
+                return amount * exposureDamping * safety * actScale;
+            }
+
+            var cost = Math.Clamp(
+                Math.Max(0.0, 55.0 - edge.Trust) / 55.0 * 0.35
+                + Math.Max(0.0, 55.0 - edge.Comfort) / 55.0 * 0.45
+                + Math.Max(0.0, 50.0 - edge.Like) / 50.0 * 0.20,
+                0.20,
+                1.0);
+            var rejectionScale = act == SpeechAct.Invite ? 1.25 : 0.85;
+
+            return -amount * exposureDamping * cost * rejectionScale;
+        }
 
         /// <summary>
         /// Converts repeated accepted contact into a small safety consolidation signal.

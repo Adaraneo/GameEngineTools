@@ -92,10 +92,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
             }
 
             var retention = Math.Pow(1.0 - decayPerDay, elapsedDays);
+            var reinforcementRetention = ComputeReinforcementRetention(decayPerDay, elapsedDays);
             var decayed = traces
                 .Select(kv => new KeyValuePair<string, BehaviorHabitTrace>(
                     kv.Key,
-                    kv.Value with { Strength = Math.Clamp(kv.Value.Strength * retention, 0.0, 1.0) }))
+                    DecayTrace(kv.Value, retention, reinforcementRetention)))
                 .Where(kv => kv.Value.Strength >= 0.015 || kv.Value.RepetitionCount >= 3)
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
 
@@ -115,13 +116,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var surface = context.HumanContext.Snapshot.InteractionSurface.Kind;
             var timeBand = ResolveTimeBand(context.Now);
             var cue = ResolveCueKind(candidate.Name, context.State, context.HumanContext);
-            var best = traces.Values
+            var applicability = traces.Values
                 .Where(trace => trace.ActionName == candidate.Name)
                 .Select(trace => ComputeApplicability(trace, surface, timeBand, cue))
-                .DefaultIfEmpty(0.0)
-                .Max();
+                .OrderByDescending(v => v)
+                .Take(3)
+                .ToArray();
 
-            return Math.Clamp(best, 0.0, 1.0);
+            return AggregateApplicability(applicability);
         }
 
         public static double ComputeCandidateBias(BehaviorContext context, BehaviorCandidate candidate, IHabitApplicabilityModulator modulator)
@@ -135,17 +137,18 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var surface = context.HumanContext.Snapshot.InteractionSurface.Kind;
             var timeBand = ResolveTimeBand(context.Now);
             var cue = ResolveCueKind(candidate.Name, context.State, context.HumanContext);
-            var best = traces.Values
+            var applicability = traces.Values
                 .Where(trace => trace.ActionName == candidate.Name)
                 .Select(trace =>
                 {
                     var baseApplicability = ComputeApplicability(trace, surface, timeBand, cue);
                     return modulator.ModulateApplicability(context, candidate, trace, baseApplicability);
                 })
-                .DefaultIfEmpty(0.0)
-                .Max();
+                .OrderByDescending(v => v)
+                .Take(3)
+                .ToArray();
 
-            return Math.Clamp(best, 0.0, 1.0);
+            return AggregateApplicability(applicability);
         }
 
         #endregion Public API
@@ -157,7 +160,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var stressRelief = IsStressReliefCue(ctx);
             var needFit = ComputeNeedFit(actionName, state, ctx);
 
-            if (stressRelief && ComputeCopingAffinity(actionName, state, ctx) > Math.Max(0.35, needFit))
+            var copingAffinity = ComputeCopingAffinity(actionName, state, ctx);
+            if (stressRelief && copingAffinity > Math.Max(0.35, needFit))
             {
                 return HabitCueKind.StressRelief;
             }
@@ -167,7 +171,17 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return HabitCueKind.BodyNeed;
             }
 
-            if (actionName is ReachOut or InviteIntimacy or MoveToSocial or MoveToPrivate && state.NeedBelonging >= 45)
+            if (actionName is MoveToPrivate && stressRelief && copingAffinity >= 0.42)
+            {
+                return HabitCueKind.StressRelief;
+            }
+
+            if (actionName is ReachOut or InviteIntimacy or MoveToSocial && state.NeedBelonging >= 45)
+            {
+                return HabitCueKind.SocialNeed;
+            }
+
+            if (actionName is MoveToPrivate && state.NeedBelonging >= 60 && ctx.Snapshot.Psychology.Stress < 45)
             {
                 return HabitCueKind.SocialNeed;
             }
@@ -461,6 +475,40 @@ namespace GameEngineTools.Characters.Engines.Behavior
         }
 
         private static double Clamp01(double value) => Math.Clamp(value, 0.0, 1.0);
+
+        private static BehaviorHabitTrace DecayTrace(
+            BehaviorHabitTrace trace,
+            double strengthRetention,
+            double reinforcementRetention)
+            => trace with
+            {
+                Strength = Clamp01(trace.Strength * strengthRetention),
+                AdaptiveReinforcement = Clamp01(trace.AdaptiveReinforcement * reinforcementRetention),
+                CopingReinforcement = Clamp01(trace.CopingReinforcement * reinforcementRetention)
+            };
+
+        private static double ComputeReinforcementRetention(double decayPerDay, double elapsedDays)
+        {
+            var reinforcementDecay = Math.Clamp(decayPerDay * 0.45, 0.0, 0.95);
+            return Math.Pow(1.0 - reinforcementDecay, elapsedDays);
+        }
+
+        private static double AggregateApplicability(IReadOnlyList<double> applicability)
+        {
+            if (applicability.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var total = 0.0;
+            var weights = new[] { 1.0, 0.45, 0.20 };
+            for (var i = 0; i < applicability.Count && i < weights.Length; i++)
+            {
+                total += Math.Clamp(applicability[i], 0.0, 1.0) * weights[i];
+            }
+
+            return Clamp01(total);
+        }
 
         private static void LogHabitLearned(
             ILogger? logger,

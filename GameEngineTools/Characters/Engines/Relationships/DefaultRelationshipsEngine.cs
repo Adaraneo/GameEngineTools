@@ -205,6 +205,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             var trustConsolidation = trustDelta > 0
                                 ? stabilization * 0.28
                                 : stabilization * 0.10;
+                            var attractionPlasticity = ComputeAttractionPlasticity(e, positive: true, act: io.Act);
 
                             return e with
                             {
@@ -216,6 +217,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation),
                                 Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
                                 Familiarity = Bump(e.Familiarity, familiarityDelta),
+                                AestheticAttraction = Bump(e.AestheticAttraction, attractionPlasticity),
+                                PhysicalAttraction = Bump(e.PhysicalAttraction, attractionPlasticity * 0.65),
                                 PositiveInteractionCount = newCount,
                                 TargetBiology = otherBiology ?? e.TargetBiology,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
@@ -248,6 +251,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Comfort = Bump(e.Comfort, -0.5),
                                 Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
                                 RomanticInterest = Bump(e.RomanticInterest, -0.5),
+                                AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.50),
+                                PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.35),
                                 TargetBiology = otherBiology ?? e.TargetBiology,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                             },
@@ -267,6 +272,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     Comfort = Bump(e.Comfort, -2.0 * stingMultiplier),
                                     Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty * stingMultiplier) : e.Trust,
                                     RomanticInterest = Bump(e.RomanticInterest, (io.Act == SpeechAct.Invite ? -2.0 : -1.0) * stingMultiplier),
+                                    AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act)),
+                                    PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.65),
                                     TargetBiology = otherBiology ?? e.TargetBiology,
                                     Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                                 };
@@ -432,7 +439,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 {
                     Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect),
                     Trust = Clamp(Approach(e.Trust, 50, d * 0.5)),
-                    Familiarity = Clamp(Approach(e.Familiarity, 10, d * 0.08)),
+                    Familiarity = Clamp(Approach(e.Familiarity, Config.FamiliarityDecayFloor, d * 0.08)),
                     AestheticAttraction = e.AestheticAttraction,
                     PhysicalAttraction = e.PhysicalAttraction,
                     RomanticInterest = Clamp(Approach(e.RomanticInterest, 5, d * 0.45)),

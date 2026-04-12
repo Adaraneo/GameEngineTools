@@ -502,6 +502,113 @@ namespace EngineTests
             Assert.IsTrue(top < 90);
         }
 
+        /// <summary>
+        /// Rejected invites must not create positive physical-domain evidence.
+        /// </summary>
+        [TestMethod]
+        public void Handle_InteractionOutcome_RejectedInvite_DoesNotIncreasePhysicalDomain()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 55, Trust: 55,
+                    Familiarity: 45, AestheticAttraction: 55, PhysicalAttraction: 55, RomanticInterest: 45, SexualInterest: 45,
+                    Closeness: 45, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 55))
+            }));
+
+            var before = engine.State.Edges[other].Breakdown.Physical;
+            engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "declined", Act: SpeechAct.Invite), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].Breakdown.Physical <= before);
+        }
+
+        /// <summary>
+        /// Familiarity decay target should be configurable instead of hardcoded.
+        /// </summary>
+        [TestMethod]
+        public void Tick_FamiliarityMovesTowardConfiguredFloor()
+        {
+            var engine = BuildEngine(new RelationshipsConfig(DecayPerDay: 1.5, FamiliarityDecayFloor: 25.0));
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 55, Trust: 55,
+                    Familiarity: 5, AestheticAttraction: 55, PhysicalAttraction: 55, RomanticInterest: 45, SexualInterest: 45,
+                    Closeness: 45, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(10), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].Familiarity > 5);
+            Assert.IsTrue(engine.State.Edges[other].Familiarity <= 25.001);
+        }
+
+        /// <summary>
+        /// Attraction should be relatively stable but still plastic under repeated safe or negative interaction outcomes.
+        /// </summary>
+        [TestMethod]
+        public void Handle_RepeatedRelationshipOutcomes_NudgeSubjectiveAttraction()
+        {
+            var engine = BuildEngine(new RelationshipsConfig(AttractionPlasticityPerInteraction: 1.0));
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 75, Trust: 75,
+                    Familiarity: 60, AestheticAttraction: 50, PhysicalAttraction: 50, RomanticInterest: 45, SexualInterest: 45,
+                    Closeness: 55, Respect: 70, Comfort: 78,
+                    Breakdown: new DomainBreakdown(60, 60, 60, 60, 55),
+                    PositiveInteractionCount: 2)
+            }));
+
+            var beforePositive = engine.State.Edges[other];
+            for (var i = 0; i < 5; i++)
+            {
+                engine.Handle(new InteractionOutcome(_now + WTimeSpan.FromHours(i), other, self, Accepted: true, Reason: "accepted", Act: SpeechAct.Validation), ctx, _outbox);
+            }
+
+            var afterPositive = engine.State.Edges[other];
+            Assert.IsTrue(afterPositive.AestheticAttraction > beforePositive.AestheticAttraction);
+            Assert.IsTrue(afterPositive.PhysicalAttraction > beforePositive.PhysicalAttraction);
+            Assert.IsTrue(afterPositive.AestheticAttraction - beforePositive.AestheticAttraction < 6.0);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = beforePositive with
+                {
+                    Like = 35,
+                    Trust = 25,
+                    Comfort = 25,
+                    AestheticAttraction = 50,
+                    PhysicalAttraction = 50,
+                    PositiveInteractionCount = 0
+                }
+            }));
+
+            for (var i = 0; i < 5; i++)
+            {
+                engine.Handle(new InteractionOutcome(_now + WTimeSpan.FromHours(i), self, other, Accepted: false, Reason: "declined", Act: SpeechAct.Invite), ctx, _outbox);
+            }
+
+            var afterNegative = engine.State.Edges[other];
+            Assert.IsTrue(afterNegative.AestheticAttraction < 50);
+            Assert.IsTrue(afterNegative.PhysicalAttraction < 50);
+            Assert.IsTrue(50 - afterNegative.AestheticAttraction < 8.0);
+        }
         #endregion Relationship signals
 
         #region Runtime wiring
@@ -583,8 +690,8 @@ namespace EngineTests
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>
-        private DefaultRelationshipsEngine BuildEngine() => new DefaultRelationshipsEngine(
-            Options.Create(DefaultCfg),
+        private DefaultRelationshipsEngine BuildEngine(RelationshipsConfig? config = null) => new DefaultRelationshipsEngine(
+            Options.Create(config ?? DefaultCfg),
             LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
 
         /// <summary>

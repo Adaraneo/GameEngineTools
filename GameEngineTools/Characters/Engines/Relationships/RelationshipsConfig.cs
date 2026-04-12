@@ -11,9 +11,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
         double RepairGain = 6.0,
         double RupturePenalty = 8.0,
         double MereExposureMaxBoost = 15.0,
-        int MereExposureSaturation = 20)
+        int MereExposureSaturation = 20,
+        double FamiliarityDecayFloor = 10.0,
+        double AttractionPlasticityPerInteraction = 0.25)
     {
         /// <summary>Parameterless constructor required by DI options binding.</summary>
-        public RelationshipsConfig() : this(1.5, 6.0, 8.0, 15.0, 20) { }
+        public RelationshipsConfig() : this(1.5, 6.0, 8.0, 15.0, 20, 10.0, 0.25) { }
     }
 }
