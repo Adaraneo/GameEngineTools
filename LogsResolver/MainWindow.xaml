@@ -1,4 +1,5 @@
 <Window x:Class="LogsResolver.MainWindow"
+        x:Name="Root"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -10,6 +11,7 @@
         MinHeight="700"
         MinWidth="1100">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <Style TargetType="TextBlock">
             <Setter Property="Margin" Value="0,2,0,2" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -164,6 +166,7 @@
                             <RowDefinition />
                             <RowDefinition />
                             <RowDefinition />
+                            <RowDefinition />
                         </Grid.RowDefinitions>
 
                         <TextBox Grid.Row="0" Grid.Column="0" Text="{Binding EventsExplorer.FreeText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Text search" />
@@ -200,6 +203,19 @@
                             <Button Content="&gt;" Command="{Binding EventsExplorer.NextPageCommand}" />
                             <Button Content="&gt;|" Command="{Binding EventsExplorer.LastPageCommand}" />
                         </StackPanel>
+                        <WrapPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="5">
+                            <TextBlock Text="Columns:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,0" />
+                            <CheckBox Content="Seq" IsChecked="{Binding Columns.EventsSeq}" Margin="0,4,8,0" />
+                            <CheckBox Content="Real Time" IsChecked="{Binding Columns.EventsRealTime}" Margin="0,4,8,0" />
+                            <CheckBox Content="World" IsChecked="{Binding Columns.EventsWorld}" Margin="0,4,8,0" />
+                            <CheckBox Content="Level" IsChecked="{Binding Columns.EventsLevel}" Margin="0,4,8,0" />
+                            <CheckBox Content="Person" IsChecked="{Binding Columns.EventsPerson}" Margin="0,4,8,0" />
+                            <CheckBox Content="Subsystem" IsChecked="{Binding Columns.EventsSubsystem}" Margin="0,4,8,0" />
+                            <CheckBox Content="Event" IsChecked="{Binding Columns.EventsEventId}" Margin="0,4,8,0" />
+                            <CheckBox Content="Category" IsChecked="{Binding Columns.EventsCategory}" Margin="0,4,8,0" />
+                            <CheckBox Content="Message" IsChecked="{Binding Columns.EventsMessage}" Margin="0,4,8,0" />
+                            <CheckBox Content="Sources" IsChecked="{Binding Columns.EventsSources}" Margin="0,4,8,0" />
+                        </WrapPanel>
                     </Grid>
                 </GroupBox>
 
@@ -216,16 +232,16 @@
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="80" />
-                        <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="160" />
-                        <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="140" />
-                        <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="60" />
-                        <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="190" />
-                        <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="160" />
-                        <DataGridTextColumn Header="Event" Binding="{Binding EventId}" Width="70" />
-                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="220" />
-                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
-                        <DataGridTextColumn Header="Sources" Binding="{Binding SourceCount}" Width="70" />
+                        <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="80" Visibility="{Binding DataContext.Columns.EventsSeq, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="160" Visibility="{Binding DataContext.Columns.EventsRealTime, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="140" Visibility="{Binding DataContext.Columns.EventsWorld, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="60" Visibility="{Binding DataContext.Columns.EventsLevel, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="190" Visibility="{Binding DataContext.Columns.EventsPerson, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="160" Visibility="{Binding DataContext.Columns.EventsSubsystem, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Event" Binding="{Binding EventId}" Width="70" Visibility="{Binding DataContext.Columns.EventsEventId, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="220" Visibility="{Binding DataContext.Columns.EventsCategory, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" Visibility="{Binding DataContext.Columns.EventsMessage, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Sources" Binding="{Binding SourceCount}" Width="70" Visibility="{Binding DataContext.Columns.EventsSources, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
@@ -296,6 +312,19 @@
                                 <Button Content="&gt;" Command="{Binding CharacterTimeline.NextPageCommand}" />
                                 <Button Content="&gt;|" Command="{Binding CharacterTimeline.LastPageCommand}" />
                             </StackPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Columns:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,0" />
+                                <CheckBox Content="World" IsChecked="{Binding Columns.TimelineWorld}" Margin="0,4,8,0" />
+                                <CheckBox Content="Real Time" IsChecked="{Binding Columns.TimelineRealTime}" Margin="0,4,8,0" />
+                                <CheckBox Content="Seq" IsChecked="{Binding Columns.TimelineSeq}" Margin="0,4,8,0" />
+                                <CheckBox Content="Role" IsChecked="{Binding Columns.TimelineRole}" Margin="0,4,8,0" />
+                                <CheckBox Content="Level" IsChecked="{Binding Columns.TimelineLevel}" Margin="0,4,8,0" />
+                                <CheckBox Content="Subsystem" IsChecked="{Binding Columns.TimelineSubsystem}" Margin="0,4,8,0" />
+                                <CheckBox Content="Category" IsChecked="{Binding Columns.TimelineCategory}" Margin="0,4,8,0" />
+                                <CheckBox Content="Tick" IsChecked="{Binding Columns.TimelineTick}" Margin="0,4,8,0" />
+                                <CheckBox Content="Related" IsChecked="{Binding Columns.TimelineRelated}" Margin="0,4,8,0" />
+                                <CheckBox Content="Message" IsChecked="{Binding Columns.TimelineMessage}" Margin="0,4,8,0" />
+                            </WrapPanel>
                         </StackPanel>
                         <DataGrid Grid.Row="1"
                                   ItemsSource="{Binding CharacterTimeline.Entries}"
@@ -307,16 +336,16 @@
                                   HorizontalScrollBarVisibility="Auto"
                                   VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="130" />
-                                <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="155" />
-                                <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="70" />
-                                <DataGridTextColumn Header="Role" Binding="{Binding Involvement}" Width="70" />
-                                <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="55" />
-                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="145" />
-                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="180" />
-                                <DataGridTextColumn Header="Tick" Binding="{Binding TickKey}" Width="80" />
-                                <DataGridTextColumn Header="Related" Binding="{Binding RelatedPersonId}" Width="170" />
-                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
+                                <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="130" Visibility="{Binding DataContext.Columns.TimelineWorld, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="155" Visibility="{Binding DataContext.Columns.TimelineRealTime, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="70" Visibility="{Binding DataContext.Columns.TimelineSeq, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Role" Binding="{Binding Involvement}" Width="70" Visibility="{Binding DataContext.Columns.TimelineRole, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="55" Visibility="{Binding DataContext.Columns.TimelineLevel, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="145" Visibility="{Binding DataContext.Columns.TimelineSubsystem, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="180" Visibility="{Binding DataContext.Columns.TimelineCategory, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Tick" Binding="{Binding TickKey}" Width="80" Visibility="{Binding DataContext.Columns.TimelineTick, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Related" Binding="{Binding RelatedPersonId}" Width="170" Visibility="{Binding DataContext.Columns.TimelineRelated, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" Visibility="{Binding DataContext.Columns.TimelineMessage, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
@@ -336,22 +365,32 @@
                 <TabItem Header="Sources">
                     <Grid Margin="8">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <DataGrid ItemsSource="{Binding EventDetails.Sources}"
+                        <WrapPanel Grid.Row="0">
+                            <TextBlock Text="Columns:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,0" />
+                            <CheckBox Content="Kind" IsChecked="{Binding Columns.SourcesKind}" Margin="0,4,8,0" />
+                            <CheckBox Content="Person" IsChecked="{Binding Columns.SourcesPerson}" Margin="0,4,8,0" />
+                            <CheckBox Content="Subsystem" IsChecked="{Binding Columns.SourcesSubsystem}" Margin="0,4,8,0" />
+                            <CheckBox Content="Line" IsChecked="{Binding Columns.SourcesLine}" Margin="0,4,8,0" />
+                            <CheckBox Content="File" IsChecked="{Binding Columns.SourcesFile}" Margin="0,4,8,0" />
+                        </WrapPanel>
+                        <DataGrid Grid.Row="1"
+                                  ItemsSource="{Binding EventDetails.Sources}"
                                   SelectedItem="{Binding EventDetails.SelectedSource, Mode=TwoWay}"
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Kind" Binding="{Binding SourceKind}" Width="80" />
-                                <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="180" />
-                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="140" />
-                                <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
-                                <DataGridTextColumn Header="File" Binding="{Binding FilePath}" Width="*" />
+                                <DataGridTextColumn Header="Kind" Binding="{Binding SourceKind}" Width="80" Visibility="{Binding DataContext.Columns.SourcesKind, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="180" Visibility="{Binding DataContext.Columns.SourcesPerson, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="140" Visibility="{Binding DataContext.Columns.SourcesSubsystem, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" Visibility="{Binding DataContext.Columns.SourcesLine, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="File" Binding="{Binding FilePath}" Width="*" Visibility="{Binding DataContext.Columns.SourcesFile, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </DataGrid.Columns>
                         </DataGrid>
-                        <Button Grid.Row="1"
+                        <Button Grid.Row="2"
                                 Content="Open Selected Source Raw"
                                 Command="{Binding EventDetails.OpenRawSourceCommand}"
                                 HorizontalAlignment="Left" />
@@ -377,21 +416,34 @@
 
             <GroupBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Header="Diagnostics" Margin="8,8,0,0">
                 <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" />
                         <ColumnDefinition Width="3*" />
                     </Grid.ColumnDefinitions>
-                    <DataGrid ItemsSource="{Binding Diagnostics.Issues}"
+                    <WrapPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2">
+                        <TextBlock Text="Columns:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,4,8,0" />
+                        <CheckBox Content="Kind" IsChecked="{Binding Columns.DiagnosticsKind}" Margin="0,4,8,0" />
+                        <CheckBox Content="Title" IsChecked="{Binding Columns.DiagnosticsTitle}" Margin="0,4,8,0" />
+                        <CheckBox Content="Line" IsChecked="{Binding Columns.DiagnosticsLine}" Margin="0,4,8,0" />
+                    </WrapPanel>
+                    <DataGrid Grid.Row="1"
+                              Grid.Column="0"
+                              ItemsSource="{Binding Diagnostics.Issues}"
                               SelectedItem="{Binding Diagnostics.SelectedIssue, Mode=TwoWay}"
                               AutoGenerateColumns="False"
                               IsReadOnly="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="180" />
-                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
-                            <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" />
+                            <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="180" Visibility="{Binding DataContext.Columns.DiagnosticsKind, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" Visibility="{Binding DataContext.Columns.DiagnosticsTitle, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" Visibility="{Binding DataContext.Columns.DiagnosticsLine, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
                         </DataGrid.Columns>
                     </DataGrid>
-                    <TextBox Grid.Column="1"
+                    <TextBox Grid.Row="1"
+                             Grid.Column="1"
                              Text="{Binding Diagnostics.SelectedIssue.Description, Mode=OneWay}"
                              IsReadOnly="True"
                              TextWrapping="Wrap"

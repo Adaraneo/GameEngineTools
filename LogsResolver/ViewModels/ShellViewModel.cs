@@ -37,6 +37,7 @@ public sealed class ShellViewModel : ViewModelBase
         Diagnostics = diagnostics;
         RawFile = rawFile;
         CharacterTimeline = characterTimeline;
+        Columns = new GridColumnVisibilityViewModel();
 
         OpenFolderCommand = new AsyncRelayCommand(OpenFolderAsync, () => !IsLoading);
         OpenNpcFolderCommand = new AsyncRelayCommand(OpenNpcFolderAsync, () => !IsLoading);
@@ -62,6 +63,8 @@ public sealed class ShellViewModel : ViewModelBase
     public RawFileViewModel RawFile { get; }
 
     public CharacterTimelineViewModel CharacterTimeline { get; }
+
+    public GridColumnVisibilityViewModel Columns { get; }
 
     public ICommand OpenFolderCommand { get; }
 
