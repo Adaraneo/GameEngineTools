@@ -203,8 +203,12 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
-    DefaultCharacterLod = CognitiveResolutionLevel.Player,
-
+    DefaultCharacterLod = CognitiveResolutionLevel.Background,
+    ResolveCharacterLod = character => ResolveSceneLod(character, playerPerson.Id, locationService, new HashSet<HumanId>
+    {
+        playerPerson.Id,
+        significantOtherPerson.Id
+    }),
     ResolveCharacter = id =>
     {
         var chars = new[] { playerPerson, significantOtherPerson, friendPerson, friendSOPerson };
@@ -273,7 +277,8 @@ if (characters.Count > 0)
         LocationService = locationService,
         TickStep = WTimeSpan.FromHours(5),
         SimulationYears = 5,
-        DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
+        DefaultCharacterLod = CognitiveResolutionLevel.Background,
+        ResolveCharacterLod = character => ResolveSceneLod(character, playerPerson.Id, locationService),
         OnTick = (now, chars) =>
         {
             FireFirstImpressions(now, chars, attractionCalculator, locationService);
@@ -485,6 +490,35 @@ static T PickWeightedRandom<T>(IReadOnlyList<T> candidates, Func<T, double> weig
     // Floating-point safety net — return last element
     return candidates[^1];
 }
+static CognitiveResolutionLevel ResolveSceneLod(
+    IHuman character,
+    HumanId focusCharacterId,
+    ILocationService locationService,
+    IReadOnlySet<HumanId>? alwaysPlayer = null)
+{
+    if (alwaysPlayer is not null && alwaysPlayer.Contains(character.Id))
+    {
+        return CognitiveResolutionLevel.Player;
+    }
+
+    if (character.Id == focusCharacterId)
+    {
+        return CognitiveResolutionLevel.Player;
+    }
+
+    var focusLocation = locationService.GetLocation(focusCharacterId);
+    var characterLocation = locationService.GetLocation(character.Id);
+
+    if (focusLocation is not null
+        && characterLocation is not null
+        && string.Equals(focusLocation, characterLocation, StringComparison.Ordinal))
+    {
+        return CognitiveResolutionLevel.Nearby;
+    }
+
+    return CognitiveResolutionLevel.Background;
+}
+
 
 /// <summary>
 /// Fires <see cref="FirstImpressionFormed"/> for every pair of characters

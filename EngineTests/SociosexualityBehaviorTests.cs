@@ -11,6 +11,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -233,7 +234,8 @@ namespace EngineTests
         {
             var engine = new DefaultRelationshipsEngine(
                 Options.Create(new RelationshipsConfig()),
-                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new FixedSocialFidelityPolicy(SocialFidelityLevel.Full));
             engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = start }));
             var context = BehaviorComponentTestFactory.Context(
                 selfId: self,

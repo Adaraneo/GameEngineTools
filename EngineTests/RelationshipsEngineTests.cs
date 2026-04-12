@@ -440,6 +440,98 @@ namespace EngineTests
             Assert.IsTrue(after < before);
         }
 
+        [TestMethod]
+        public void Tick_ReducedSocialFidelity_DefersDecayUntilCadence()
+        {
+            var engine = BuildEngine(socialFidelity: SocialFidelityLevel.Reduced);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 60, Trust: 60,
+                    Familiarity: 50, AestheticAttraction: 50, PhysicalAttraction: 50, RomanticInterest: 40, SexualInterest: 40,
+                    Closeness: 60, Respect: 60, Comfort: 60,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            var before = engine.State.Edges[other];
+
+            engine.Tick(_now, WTimeSpan.FromHours(6), ctx, _outbox);
+            var afterFirstTick = engine.State.Edges[other];
+
+            Assert.AreEqual(before.Closeness, afterFirstTick.Closeness, 0.0001);
+            Assert.AreEqual(before.Trust, afterFirstTick.Trust, 0.0001);
+            Assert.AreEqual(before.Familiarity, afterFirstTick.Familiarity, 0.0001);
+
+            engine.Tick(_now + WTimeSpan.FromHours(6), WTimeSpan.FromHours(6), ctx, _outbox);
+            var afterSecondTick = engine.State.Edges[other];
+
+            Assert.IsTrue(afterSecondTick.Closeness < before.Closeness || afterSecondTick.Trust < before.Trust);
+        }
+
+        [TestMethod]
+        public void Tick_MinimalSocialFidelity_DefersDecayUntilFullDay()
+        {
+            var engine = BuildEngine(socialFidelity: SocialFidelityLevel.Minimal);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 60, Trust: 60,
+                    Familiarity: 50, AestheticAttraction: 50, PhysicalAttraction: 50, RomanticInterest: 40, SexualInterest: 40,
+                    Closeness: 60, Respect: 60, Comfort: 60,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            var before = engine.State.Edges[other];
+
+            engine.Tick(_now, WTimeSpan.FromHours(12), ctx, _outbox);
+            var afterFirstTick = engine.State.Edges[other];
+
+            Assert.AreEqual(before.Closeness, afterFirstTick.Closeness, 0.0001);
+            Assert.AreEqual(before.Trust, afterFirstTick.Trust, 0.0001);
+            Assert.AreEqual(before.Familiarity, afterFirstTick.Familiarity, 0.0001);
+
+            engine.Tick(_now + WTimeSpan.FromHours(12), WTimeSpan.FromHours(12), ctx, _outbox);
+            var afterSecondTick = engine.State.Edges[other];
+
+            Assert.IsTrue(afterSecondTick.Closeness < before.Closeness || afterSecondTick.Trust < before.Trust);
+        }
+
+        [TestMethod]
+        public void Tick_FullSocialFidelity_AppliesDecayImmediately()
+        {
+            var engine = BuildEngine(socialFidelity: SocialFidelityLevel.Full);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 60, Trust: 60,
+                    Familiarity: 50, AestheticAttraction: 50, PhysicalAttraction: 50, RomanticInterest: 40, SexualInterest: 40,
+                    Closeness: 60, Respect: 60, Comfort: 60,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            var before = engine.State.Edges[other];
+
+            engine.Tick(_now, WTimeSpan.FromHours(6), ctx, _outbox);
+            var after = engine.State.Edges[other];
+
+            Assert.IsTrue(after.Closeness < before.Closeness || after.Trust < before.Trust);
+        }
+
         /// <summary>
         /// Familiarity should decay much more slowly than closeness.
         /// </summary>
@@ -690,9 +782,10 @@ namespace EngineTests
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>
-        private DefaultRelationshipsEngine BuildEngine(RelationshipsConfig? config = null) => new DefaultRelationshipsEngine(
+        private DefaultRelationshipsEngine BuildEngine(RelationshipsConfig? config = null, SocialFidelityLevel socialFidelity = SocialFidelityLevel.Full) => new DefaultRelationshipsEngine(
             Options.Create(config ?? DefaultCfg),
-            LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+            LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+            new FixedSocialFidelityPolicy(socialFidelity));
 
         /// <summary>
         /// Creates a fully wired runtime human with deterministic acceptance for event-flow tests.

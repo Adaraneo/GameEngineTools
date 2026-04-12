@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
 
@@ -216,6 +217,29 @@ namespace GameEngineTools.Characters.Engines.Relationships
             {
                 Upsert(self, other, e => e);
             }
+        }
+
+        /// <summary>
+        /// Returns the minimum accumulated social-decay interval in days for the current runtime fidelity.
+        /// Full = every tick, Reduced = every 12 hours, Minimal = every 24 hours.
+        /// </summary>
+        private static double GetSocialDecayCadenceDays(SocialFidelityLevel fidelity)
+            => fidelity switch
+            {
+                SocialFidelityLevel.Full => 0.0,
+                SocialFidelityLevel.Reduced => 0.5,
+                SocialFidelityLevel.Minimal => 1.0,
+                _ => 0.0
+            };
+
+        /// <summary>
+        /// Determines whether the currently accumulated decay budget is large enough to process
+        /// relationship drift for the current fidelity tier.
+        /// </summary>
+        private static bool ShouldApplySocialDecay(double accumulatedDays, SocialFidelityLevel fidelity)
+        {
+            var cadenceDays = GetSocialDecayCadenceDays(fidelity);
+            return cadenceDays <= 0.0 || accumulatedDays >= cadenceDays;
         }
 
         /// <summary>
