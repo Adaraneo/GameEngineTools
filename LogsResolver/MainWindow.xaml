@@ -3,6 +3,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:helpers="clr-namespace:LogsResolver.Helpers"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Logs Resolver"
@@ -12,6 +13,7 @@
         MinWidth="1100">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <helpers:BindingProxy x:Key="ColumnsProxy" Data="{Binding Columns}" />
         <Style TargetType="TextBlock">
             <Setter Property="Margin" Value="0,2,0,2" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -232,16 +234,16 @@
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="80" Visibility="{Binding DataContext.Columns.EventsSeq, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="160" Visibility="{Binding DataContext.Columns.EventsRealTime, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="140" Visibility="{Binding DataContext.Columns.EventsWorld, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="60" Visibility="{Binding DataContext.Columns.EventsLevel, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="190" Visibility="{Binding DataContext.Columns.EventsPerson, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="160" Visibility="{Binding DataContext.Columns.EventsSubsystem, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Event" Binding="{Binding EventId}" Width="70" Visibility="{Binding DataContext.Columns.EventsEventId, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="220" Visibility="{Binding DataContext.Columns.EventsCategory, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" Visibility="{Binding DataContext.Columns.EventsMessage, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <DataGridTextColumn Header="Sources" Binding="{Binding SourceCount}" Width="70" Visibility="{Binding DataContext.Columns.EventsSources, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="80" Visibility="{Binding Data.EventsSeq, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="160" Visibility="{Binding Data.EventsRealTime, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="140" Visibility="{Binding Data.EventsWorld, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="60" Visibility="{Binding Data.EventsLevel, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="190" Visibility="{Binding Data.EventsPerson, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="160" Visibility="{Binding Data.EventsSubsystem, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Event" Binding="{Binding EventId}" Width="70" Visibility="{Binding Data.EventsEventId, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="220" Visibility="{Binding Data.EventsCategory, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" Visibility="{Binding Data.EventsMessage, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <DataGridTextColumn Header="Sources" Binding="{Binding SourceCount}" Width="70" Visibility="{Binding Data.EventsSources, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
@@ -336,16 +338,16 @@
                                   HorizontalScrollBarVisibility="Auto"
                                   VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="130" Visibility="{Binding DataContext.Columns.TimelineWorld, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="155" Visibility="{Binding DataContext.Columns.TimelineRealTime, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="70" Visibility="{Binding DataContext.Columns.TimelineSeq, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Role" Binding="{Binding Involvement}" Width="70" Visibility="{Binding DataContext.Columns.TimelineRole, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="55" Visibility="{Binding DataContext.Columns.TimelineLevel, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="145" Visibility="{Binding DataContext.Columns.TimelineSubsystem, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="180" Visibility="{Binding DataContext.Columns.TimelineCategory, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Tick" Binding="{Binding TickKey}" Width="80" Visibility="{Binding DataContext.Columns.TimelineTick, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Related" Binding="{Binding RelatedPersonId}" Width="170" Visibility="{Binding DataContext.Columns.TimelineRelated, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" Visibility="{Binding DataContext.Columns.TimelineMessage, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="130" Visibility="{Binding Data.TimelineWorld, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="155" Visibility="{Binding Data.TimelineRealTime, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Seq" Binding="{Binding EventInstanceId}" Width="70" Visibility="{Binding Data.TimelineSeq, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Role" Binding="{Binding Involvement}" Width="70" Visibility="{Binding Data.TimelineRole, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="55" Visibility="{Binding Data.TimelineLevel, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="145" Visibility="{Binding Data.TimelineSubsystem, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="180" Visibility="{Binding Data.TimelineCategory, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Tick" Binding="{Binding TickKey}" Width="80" Visibility="{Binding Data.TimelineTick, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Related" Binding="{Binding RelatedPersonId}" Width="170" Visibility="{Binding Data.TimelineRelated, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" Visibility="{Binding Data.TimelineMessage, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
@@ -383,11 +385,11 @@
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Kind" Binding="{Binding SourceKind}" Width="80" Visibility="{Binding DataContext.Columns.SourcesKind, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="180" Visibility="{Binding DataContext.Columns.SourcesPerson, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="140" Visibility="{Binding DataContext.Columns.SourcesSubsystem, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" Visibility="{Binding DataContext.Columns.SourcesLine, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <DataGridTextColumn Header="File" Binding="{Binding FilePath}" Width="*" Visibility="{Binding DataContext.Columns.SourcesFile, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Kind" Binding="{Binding SourceKind}" Width="80" Visibility="{Binding Data.SourcesKind, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Person" Binding="{Binding PersonId}" Width="180" Visibility="{Binding Data.SourcesPerson, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Subsystem" Binding="{Binding Subsystem}" Width="140" Visibility="{Binding Data.SourcesSubsystem, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" Visibility="{Binding Data.SourcesLine, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <DataGridTextColumn Header="File" Binding="{Binding FilePath}" Width="*" Visibility="{Binding Data.SourcesFile, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </DataGrid.Columns>
                         </DataGrid>
                         <Button Grid.Row="2"
@@ -437,9 +439,9 @@
                               AutoGenerateColumns="False"
                               IsReadOnly="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="180" Visibility="{Binding DataContext.Columns.DiagnosticsKind, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" Visibility="{Binding DataContext.Columns.DiagnosticsTitle, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
-                            <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" Visibility="{Binding DataContext.Columns.DiagnosticsLine, Source={x:Reference Root}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="180" Visibility="{Binding Data.DiagnosticsKind, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" Visibility="{Binding Data.DiagnosticsTitle, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60" Visibility="{Binding Data.DiagnosticsLine, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBox Grid.Row="1"
