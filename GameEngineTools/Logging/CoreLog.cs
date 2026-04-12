@@ -272,6 +272,65 @@ namespace GameEngineTools.Logging
             string Action,
             double Bias);
 
+        [LoggerMessage(
+            EventId = 1011,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} learned {Action} cue={Cue} surface={Surface} time={TimeBand} strength {BeforeStrength:F3}->{AfterStrength:F3} learn={Learning:F3} cueFit={CueFit:F2} relief={ReliefFit:F2} coping={CopingFit:F2} constraint={ConstraintPenalty:F2} tendency={Tendency} reps={RepetitionCount}.")]
+        public static partial void BehaviorHabitLearned(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            string Cue,
+            string Surface,
+            string TimeBand,
+            double BeforeStrength,
+            double AfterStrength,
+            double Learning,
+            double CueFit,
+            double ReliefFit,
+            double CopingFit,
+            double ConstraintPenalty,
+            string Tendency,
+            int RepetitionCount);
+
+        [LoggerMessage(
+            EventId = 1012,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} decay days={Days:F3} retention={Retention:F4} traces {BeforeCount}->{AfterCount} removed={RemovedCount}.")]
+        public static partial void BehaviorHabitDecayed(
+            this ILogger logger,
+            string HumanId,
+            double Days,
+            double Retention,
+            int BeforeCount,
+            int AfterCount,
+            int RemovedCount);
+
+        [LoggerMessage(
+            EventId = 1013,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} pruned traces {BeforeCount}->{AfterCount} max={MaxTraces}.")]
+        public static partial void BehaviorHabitPruned(
+            this ILogger logger,
+            string HumanId,
+            int BeforeCount,
+            int AfterCount,
+            int MaxTraces);
+
+        [LoggerMessage(
+            EventId = 1014,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} bias {Action}: utility {BeforeUtility:F3}->{AfterUtility:F3}, applicability={Applicability:F3}, multiplier={Multiplier:F3}, flat={FlatBias:F3}.")]
+        public static partial void BehaviorHabitBiasApplied(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            double BeforeUtility,
+            double AfterUtility,
+            double Applicability,
+            double Multiplier,
+            double FlatBias);
+
         #endregion Behavior — rozhodování
 
         #region Behavior/Sleep — spánkový subsystém

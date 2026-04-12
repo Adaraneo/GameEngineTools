@@ -33,6 +33,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private readonly IIntentManagementEngine _intentManagementEngine;
         private readonly IActionArbitrationEngine _arbitrationEngine;
         private readonly ICharacterDevelopmentPolicy _developmentPolicy;
+        private readonly IHabitApplicabilityModulator _habitApplicabilityModulator;
 
         #endregion Private fields
 
@@ -50,17 +51,19 @@ namespace GameEngineTools.Characters.Engines.Behavior
             IOptions<BehaviorConfig> cfg,
             IOptions<SleepConfig> sleepCfg,
             ILoggerFactory loggerFactory,
-            ICharacterDevelopmentPolicy? developmentPolicy = null)
+            ICharacterDevelopmentPolicy? developmentPolicy = null,
+            IHabitApplicabilityModulator? habitApplicabilityModulator = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine() };
-            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
+            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
             _developmentPolicy = developmentPolicy ?? new DefaultCharacterDevelopmentPolicy();
+            _habitApplicabilityModulator = habitApplicabilityModulator ?? NoOpHabitApplicabilityModulator.Instance;
         }
 
         #endregion Construction
@@ -71,9 +74,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
         {
             // Build the tick-local behavior context before delegating to sub-engines.
             var updatedCooldowns = BehaviorMath.UpdateCooldowns(State.Cooldowns, Math.Max(0, dt.TotalHours));
-            var stateWithHabits = State with { HabitTraces = BehaviorHabitLearning.Decay(State.HabitTraces, dt, Config) };
+            var stateWithHabits = State with { HabitTraces = BehaviorHabitLearning.Decay(State.HabitTraces, dt, Config, ctx, _log) };
             var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, stateWithHabits) with { Cooldowns = updatedCooldowns };
-            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>());
+            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator);
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.
             var sleep = _sleepCoordinator.Tick(context);
@@ -124,7 +127,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         {
             if (@event is ActionCommitted committed)
             {
-                State = BehaviorHabitLearning.LearnFromCommitment(State, committed, ctx, Config);
+                State = BehaviorHabitLearning.LearnFromCommitment(State, committed, ctx, Config, _log);
             }
 
             State = _sleepCoordinator.Handle(@event, ctx, outbox, State);

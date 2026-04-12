@@ -18,5 +18,6 @@ namespace GameEngineTools.Characters.Engines.Behavior
         BehaviorState State,
         BehaviorConfig Config,
         IReadOnlyDictionary<string, double> Cooldowns,
-        IDictionary<string, DecisionWorkingSet>? DecisionWorkingSets = null);
+        IDictionary<string, DecisionWorkingSet>? DecisionWorkingSets = null,
+        IHabitApplicabilityModulator? HabitApplicabilityModulator = null);
 }

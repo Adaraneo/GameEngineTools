@@ -53,4 +53,49 @@ namespace GameEngineTools.Characters.Engines.Behavior
         int RepetitionCount,
         WDateTime LastUpdatedAt,
         HabitTendency Tendency);
+
+    /// <summary>
+    /// Compact credit-assignment signal used to learn from committed behavior without full reward learning.
+    /// </summary>
+    internal sealed record HabitLearningSignal(
+        string ActionName,
+        SurfaceKind SurfaceKind,
+        HabitTimeBand TimeBand,
+        HabitCueKind CueKind,
+        double CueFit,
+        double ReliefFit,
+        double CopingFit,
+        double ConstraintPenalty,
+        WDateTime OccurredAt);
+
+    /// <summary>
+    /// Optional extension point for future memory or intent layers to adjust habit applicability.
+    /// </summary>
+    internal interface IHabitApplicabilityModulator
+    {
+        double ModulateApplicability(
+            BehaviorContext context,
+            BehaviorCandidate candidate,
+            BehaviorHabitTrace trace,
+            double baseApplicability);
+    }
+
+    /// <summary>
+    /// Default habit applicability modulator. Preserves baseline behavior.
+    /// </summary>
+    internal sealed class NoOpHabitApplicabilityModulator : IHabitApplicabilityModulator
+    {
+        public static NoOpHabitApplicabilityModulator Instance { get; } = new();
+
+        private NoOpHabitApplicabilityModulator()
+        {
+        }
+
+        public double ModulateApplicability(
+            BehaviorContext context,
+            BehaviorCandidate candidate,
+            BehaviorHabitTrace trace,
+            double baseApplicability)
+            => baseApplicability;
+    }
 }

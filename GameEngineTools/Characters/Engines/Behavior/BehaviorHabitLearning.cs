@@ -9,7 +9,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
     using static ActionNames;
 
     /// <summary>
@@ -23,66 +25,81 @@ namespace GameEngineTools.Characters.Engines.Behavior
             BehaviorState state,
             ActionCommitted committed,
             IHumanContext ctx,
-            BehaviorConfig config)
+            BehaviorConfig config,
+            ILogger? logger = null)
         {
             if (committed.Human != ctx.Id || !IsLearnableAction(committed.ActionName))
             {
                 return state;
             }
 
-            var surface = ctx.Snapshot.InteractionSurface.Kind;
-            var timeBand = ResolveTimeBand(committed.OccurredAt);
-            var cue = ResolveCueKind(committed.ActionName, state, ctx);
-            var key = BuildKey(committed.ActionName, surface, timeBand, cue);
+            var signal = BuildLearningSignal(state, committed, ctx);
+            var key = BuildKey(signal.ActionName, signal.SurfaceKind, signal.TimeBand, signal.CueKind);
             var traces = new Dictionary<string, BehaviorHabitTrace>(state.HabitTraces ?? new Dictionary<string, BehaviorHabitTrace>(), StringComparer.Ordinal);
 
             traces.TryGetValue(key, out var previous);
-            var needFit = ComputeNeedFit(committed.ActionName, state, ctx);
-            var coping = ComputeCopingReinforcement(committed.ActionName, state, ctx);
-            var repetitionGain = previous is null ? 0.0 : Math.Min(0.25, previous.RepetitionCount * 0.015);
-            var learning = Math.Clamp(config.HabitLearningRate, 0.0, 0.30) * (0.35 + (needFit * 0.65) + (coping * 0.70) + repetitionGain);
-            var adaptiveReinforcement = Math.Clamp((previous?.AdaptiveReinforcement ?? 0.0) + (needFit * learning), 0.0, 1.0);
-            var copingReinforcement = Math.Clamp((previous?.CopingReinforcement ?? 0.0) + (coping * learning), 0.0, 1.0);
-            var strength = Math.Clamp(((previous?.Strength ?? 0.0) * 0.96) + learning, 0.0, 1.0);
+            var beforeStrength = previous?.Strength ?? 0.0;
+            var repetitionGain = previous is null ? 0.0 : Math.Min(0.18, previous.RepetitionCount * 0.012);
+            var learningQuality = Math.Clamp(
+                0.18
+                + signal.CueFit * 0.34
+                + signal.ReliefFit * 0.36
+                + signal.CopingFit * 0.24
+                + repetitionGain
+                - signal.ConstraintPenalty * 0.42,
+                0.05,
+                1.0);
+            var learning = Math.Clamp(config.HabitLearningRate, 0.0, 0.30) * learningQuality;
+            var adaptiveReinforcement = Math.Clamp((previous?.AdaptiveReinforcement ?? 0.0) + (signal.ReliefFit * signal.CueFit * learning), 0.0, 1.0);
+            var copingReinforcement = Math.Clamp((previous?.CopingReinforcement ?? 0.0) + (signal.CopingFit * learning), 0.0, 1.0);
+            var strength = Math.Clamp(((previous?.Strength ?? 0.0) * 0.985) + learning, 0.0, 1.0);
             var tendency = ResolveTendency(strength, adaptiveReinforcement, copingReinforcement);
 
             traces[key] = new BehaviorHabitTrace(
-                committed.ActionName,
-                surface,
-                timeBand,
-                cue,
+                signal.ActionName,
+                signal.SurfaceKind,
+                signal.TimeBand,
+                signal.CueKind,
                 strength,
                 adaptiveReinforcement,
                 copingReinforcement,
                 (previous?.RepetitionCount ?? 0) + 1,
-                committed.OccurredAt,
+                signal.OccurredAt,
                 tendency);
 
-            return state with { HabitTraces = Trim(traces, config.MaxHabitTraces) };
+            LogHabitLearned(logger, ctx, signal, beforeStrength, strength, learning, tendency, (previous?.RepetitionCount ?? 0) + 1);
+
+            return state with { HabitTraces = Trim(traces, config.MaxHabitTraces, committed.OccurredAt, state, ctx, logger) };
         }
 
         public static IReadOnlyDictionary<string, BehaviorHabitTrace>? Decay(
             IReadOnlyDictionary<string, BehaviorHabitTrace>? traces,
             WTimeSpan dt,
-            BehaviorConfig config)
+            BehaviorConfig config,
+            IHumanContext? ctx = null,
+            ILogger? logger = null)
         {
             if (traces is null || traces.Count == 0)
             {
                 return traces;
             }
 
-            var decay = Math.Max(0.0, config.HabitDecayPerDay) * Math.Max(0.0, dt.TotalDays);
-            if (decay <= 0.0)
+            var elapsedDays = Math.Max(0.0, dt.TotalDays);
+            var decayPerDay = Math.Clamp(config.HabitDecayPerDay, 0.0, 0.95);
+            if (elapsedDays <= 0.0 || decayPerDay <= 0.0)
             {
                 return traces;
             }
 
+            var retention = Math.Pow(1.0 - decayPerDay, elapsedDays);
             var decayed = traces
                 .Select(kv => new KeyValuePair<string, BehaviorHabitTrace>(
                     kv.Key,
-                    kv.Value with { Strength = Math.Max(0.0, kv.Value.Strength - decay) }))
-                .Where(kv => kv.Value.Strength >= 0.02)
+                    kv.Value with { Strength = Math.Clamp(kv.Value.Strength * retention, 0.0, 1.0) }))
+                .Where(kv => kv.Value.Strength >= 0.015 || kv.Value.RepetitionCount >= 3)
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+
+            LogHabitDecay(logger, ctx, elapsedDays, retention, traces.Count, decayed.Count);
 
             return decayed.Count == 0 ? null : decayed;
         }
@@ -101,6 +118,30 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var best = traces.Values
                 .Where(trace => trace.ActionName == candidate.Name)
                 .Select(trace => ComputeApplicability(trace, surface, timeBand, cue))
+                .DefaultIfEmpty(0.0)
+                .Max();
+
+            return Math.Clamp(best, 0.0, 1.0);
+        }
+
+        public static double ComputeCandidateBias(BehaviorContext context, BehaviorCandidate candidate, IHabitApplicabilityModulator modulator)
+        {
+            var traces = context.State.HabitTraces;
+            if (traces is null || traces.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var surface = context.HumanContext.Snapshot.InteractionSurface.Kind;
+            var timeBand = ResolveTimeBand(context.Now);
+            var cue = ResolveCueKind(candidate.Name, context.State, context.HumanContext);
+            var best = traces.Values
+                .Where(trace => trace.ActionName == candidate.Name)
+                .Select(trace =>
+                {
+                    var baseApplicability = ComputeApplicability(trace, surface, timeBand, cue);
+                    return modulator.ModulateApplicability(context, candidate, trace, baseApplicability);
+                })
                 .DefaultIfEmpty(0.0)
                 .Max();
 
@@ -206,7 +247,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         private static HabitTendency ResolveTendency(double strength, double adaptiveReinforcement, double copingReinforcement)
         {
-            if (strength >= 0.18 && copingReinforcement > adaptiveReinforcement + 0.10)
+            if (strength >= 0.12 && copingReinforcement > adaptiveReinforcement + 0.08)
             {
                 return HabitTendency.MaladaptiveCoping;
             }
@@ -221,6 +262,73 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         #endregion Reinforcement
 
+        #region Learning signal
+
+        private static HabitLearningSignal BuildLearningSignal(BehaviorState state, ActionCommitted committed, IHumanContext ctx)
+        {
+            var surface = ctx.Snapshot.InteractionSurface.Kind;
+            var timeBand = ResolveTimeBand(committed.OccurredAt);
+            var cue = ResolveCueKind(committed.ActionName, state, ctx);
+            var reliefFit = ComputeNeedFit(committed.ActionName, state, ctx);
+            var coping = ComputeCopingReinforcement(committed.ActionName, state, ctx);
+            var cueFit = ComputeCueFit(committed.ActionName, cue, reliefFit, coping);
+            var constraintPenalty = ComputeConstraintPenalty(committed, reliefFit, coping);
+
+            return new HabitLearningSignal(
+                committed.ActionName,
+                surface,
+                timeBand,
+                cue,
+                cueFit,
+                reliefFit,
+                coping,
+                constraintPenalty,
+                committed.OccurredAt);
+        }
+
+        private static double ComputeCueFit(string actionName, HabitCueKind cue, double reliefFit, double coping)
+        {
+            var expectedCue = actionName switch
+            {
+                Eat or Drink or SelfCare or MoveToRest => HabitCueKind.BodyNeed,
+                ReachOut or InviteIntimacy or MoveToSocial or MoveToPrivate => HabitCueKind.SocialNeed,
+                Work or Create or MoveToWork => HabitCueKind.CompetenceNeed,
+                Idle => HabitCueKind.StressRelief,
+                _ => HabitCueKind.Neutral
+            };
+
+            if (cue == expectedCue)
+            {
+                return Math.Clamp(0.65 + Math.Max(reliefFit, coping) * 0.35, 0.0, 1.0);
+            }
+
+            if (cue == HabitCueKind.StressRelief && coping > 0.0)
+            {
+                return Math.Clamp(0.45 + coping * 0.45, 0.0, 0.90);
+            }
+
+            if (cue == HabitCueKind.Neutral)
+            {
+                return Math.Clamp(0.20 + reliefFit * 0.35, 0.0, 0.55);
+            }
+
+            return Math.Clamp(0.15 + reliefFit * 0.30, 0.0, 0.50);
+        }
+
+        private static double ComputeConstraintPenalty(ActionCommitted committed, double reliefFit, double coping)
+        {
+            var conflictPenalty = string.IsNullOrWhiteSpace(committed.ConflictReason) ? 0.0 : 0.35;
+            var intentMismatchPenalty = !string.IsNullOrWhiteSpace(committed.IntendedActionName)
+                && !string.Equals(committed.IntendedActionName, committed.ActionName, StringComparison.Ordinal)
+                    ? 0.35
+                    : 0.0;
+            var lowFitPenalty = Math.Max(0.0, 0.35 - Math.Max(reliefFit, coping));
+
+            return Math.Clamp(conflictPenalty + intentMismatchPenalty + lowFitPenalty, 0.0, 1.0);
+        }
+
+        #endregion Learning signal
+
         #region Bias
 
         private static double ComputeApplicability(
@@ -229,13 +337,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
             HabitTimeBand timeBand,
             HabitCueKind cue)
         {
-            var cueMatch = trace.CueKind == cue
-                ? 1.0
-                : trace.CueKind == HabitCueKind.Neutral || cue == HabitCueKind.Neutral ? 0.45 : 0.25;
-            var surfaceMatch = trace.SurfaceKind == surface
-                ? 1.0
-                : trace.SurfaceKind == SurfaceKind.Unknown || surface == SurfaceKind.Unknown ? 0.55 : 0.32;
-            var timeMatch = trace.TimeBand == timeBand ? 1.0 : 0.62;
+            var cueMatch = ComputeCueSimilarity(trace.CueKind, cue);
+            var surfaceMatch = ComputeSurfaceSimilarity(trace.SurfaceKind, surface);
+            var timeMatch = ComputeTimeSimilarity(trace.TimeBand, timeBand);
             var tendencyScale = trace.Tendency switch
             {
                 HabitTendency.MaladaptiveCoping when cue == HabitCueKind.StressRelief => 1.18,
@@ -244,6 +348,70 @@ namespace GameEngineTools.Characters.Engines.Behavior
             };
 
             return Math.Clamp(trace.Strength * cueMatch * surfaceMatch * timeMatch * tendencyScale, 0.0, 1.0);
+        }
+
+        private static double ComputeCueSimilarity(HabitCueKind learned, HabitCueKind current)
+        {
+            if (learned == current)
+            {
+                return 1.0;
+            }
+
+            if (learned == HabitCueKind.Neutral || current == HabitCueKind.Neutral)
+            {
+                return 0.42;
+            }
+
+            if ((learned == HabitCueKind.BodyNeed && current == HabitCueKind.StressRelief)
+                || (learned == HabitCueKind.StressRelief && current == HabitCueKind.BodyNeed))
+            {
+                return 0.34;
+            }
+
+            if ((learned == HabitCueKind.SocialNeed && current == HabitCueKind.StressRelief)
+                || (learned == HabitCueKind.StressRelief && current == HabitCueKind.SocialNeed))
+            {
+                return 0.28;
+            }
+
+            return 0.16;
+        }
+
+        private static double ComputeSurfaceSimilarity(SurfaceKind learned, SurfaceKind current)
+        {
+            if (learned == current)
+            {
+                return 1.0;
+            }
+
+            if (learned == SurfaceKind.Unknown || current == SurfaceKind.Unknown)
+            {
+                return 0.50;
+            }
+
+            if ((learned == SurfaceKind.Private && current == SurfaceKind.Rest)
+                || (learned == SurfaceKind.Rest && current == SurfaceKind.Private)
+                || (learned == SurfaceKind.Social && current == SurfaceKind.Public)
+                || (learned == SurfaceKind.Public && current == SurfaceKind.Social)
+                || (learned == SurfaceKind.Work && current == SurfaceKind.Public)
+                || (learned == SurfaceKind.Public && current == SurfaceKind.Work))
+            {
+                return 0.48;
+            }
+
+            return 0.22;
+        }
+
+        private static double ComputeTimeSimilarity(HabitTimeBand learned, HabitTimeBand current)
+        {
+            if (learned == current)
+            {
+                return 1.0;
+            }
+
+            var distance = Math.Abs((int)learned - (int)current);
+            distance = Math.Min(distance, 4 - distance);
+            return distance == 1 ? 0.72 : 0.38;
         }
 
         #endregion Bias
@@ -256,19 +424,116 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private static bool IsLearnableAction(string actionName)
             => actionName is not (GameEngineTools.Characters.Engines.ActionNames.Sleep or Flee or Fight);
 
-        private static IReadOnlyDictionary<string, BehaviorHabitTrace>? Trim(Dictionary<string, BehaviorHabitTrace> traces, int maxHabitTraces)
+        private static IReadOnlyDictionary<string, BehaviorHabitTrace>? Trim(
+            Dictionary<string, BehaviorHabitTrace> traces,
+            int maxHabitTraces,
+            WDateTime now,
+            BehaviorState state,
+            IHumanContext ctx,
+            ILogger? logger = null)
         {
             var take = Math.Clamp(maxHabitTraces, 8, 512);
             var trimmed = traces
-                .OrderByDescending(kv => kv.Value.Strength)
+                .OrderByDescending(kv => ComputeRetentionScore(kv.Value, now, state, ctx))
+                .ThenByDescending(kv => kv.Value.Strength)
                 .ThenByDescending(kv => kv.Value.RepetitionCount)
+                .ThenBy(kv => kv.Key, StringComparer.Ordinal)
                 .Take(take)
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+
+            if (trimmed.Count < traces.Count)
+            {
+                LogHabitPruned(logger, ctx, traces.Count, trimmed.Count, take);
+            }
 
             return trimmed.Count == 0 ? null : trimmed;
         }
 
+        private static double ComputeRetentionScore(BehaviorHabitTrace trace, WDateTime now, BehaviorState state, IHumanContext ctx)
+        {
+            var ageDays = Math.Max(0.0, (now - trace.LastUpdatedAt).TotalDays);
+            var recency = 1.0 / (1.0 + ageDays / 14.0);
+            var currentCue = ResolveCueKind(trace.ActionName, state, ctx);
+            var applicability = ComputeApplicability(trace, ctx.Snapshot.InteractionSurface.Kind, ResolveTimeBand(now), currentCue);
+            var repetition = Math.Clamp(Math.Log(1.0 + trace.RepetitionCount) / Math.Log(16.0), 0.0, 1.0);
+
+            return trace.Strength * 0.55 + recency * 0.20 + applicability * 0.15 + repetition * 0.10;
+        }
+
         private static double Clamp01(double value) => Math.Clamp(value, 0.0, 1.0);
+
+        private static void LogHabitLearned(
+            ILogger? logger,
+            IHumanContext ctx,
+            HabitLearningSignal signal,
+            double beforeStrength,
+            double afterStrength,
+            double learning,
+            HabitTendency tendency,
+            int repetitionCount)
+        {
+            if (logger is null)
+            {
+                return;
+            }
+
+            using (logger.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(BehaviorHabitLearning))))
+            {
+                logger.BehaviorHabitLearned(
+                    ctx.Id.Value.ToString(),
+                    signal.ActionName,
+                    signal.CueKind.ToString(),
+                    signal.SurfaceKind.ToString(),
+                    signal.TimeBand.ToString(),
+                    beforeStrength,
+                    afterStrength,
+                    learning,
+                    signal.CueFit,
+                    signal.ReliefFit,
+                    signal.CopingFit,
+                    signal.ConstraintPenalty,
+                    tendency.ToString(),
+                    repetitionCount);
+            }
+        }
+
+        private static void LogHabitDecay(
+            ILogger? logger,
+            IHumanContext? ctx,
+            double elapsedDays,
+            double retention,
+            int beforeCount,
+            int afterCount)
+        {
+            if (logger is null || ctx is null)
+            {
+                return;
+            }
+
+            using (logger.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(BehaviorHabitLearning))))
+            {
+                logger.BehaviorHabitDecayed(
+                    ctx.Id.Value.ToString(),
+                    elapsedDays,
+                    retention,
+                    beforeCount,
+                    afterCount,
+                    beforeCount - afterCount);
+            }
+        }
+
+        private static void LogHabitPruned(ILogger? logger, IHumanContext ctx, int beforeCount, int afterCount, int maxTraces)
+        {
+            if (logger is null)
+            {
+                return;
+            }
+
+            using (logger.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(BehaviorHabitLearning))))
+            {
+                logger.BehaviorHabitPruned(ctx.Id.Value.ToString(), beforeCount, afterCount, maxTraces);
+            }
+        }
 
         #endregion Helpers
     }
