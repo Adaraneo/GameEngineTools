@@ -102,14 +102,14 @@ namespace GameEngineTools.Characters.Engines.Sleep
             if (companion.HasValue && sharedType.HasValue)
             {
                 outbox.Add(new SharedSleepBegan(now, ctx.Id, companion.Value, sharedType.Value));
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
                 {
                     _log.SharedSleepStarted(ctx.Id.Value.ToString(), sharedType.Value.ToString(), companion.Value.ToString());
                 }
             }
             else
             {
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
                 {
                     _log.SleepStarted(ctx.Id.Value.ToString(), (plannedWakeUp - now).TotalHours);
                 }
@@ -177,7 +177,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             if (!IsActive) return;
 
             outbox.Add(new SleepInterrupted(now, ctx.Id, cause, CurrentPhase));
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
             {
                 _log.SleepInterrupted(ctx.Id.Value.ToString(), cause.ToString(), CurrentPhase.ToString());
             }
@@ -197,7 +197,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             CurrentPhase = phase;
             _phaseStart = now;
             outbox.Add(new SleepPhaseChanged(now, ctx.Id, phase));
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
             {
                 _log.SleepPhaseEntered(ctx.Id.Value.ToString(), phase.ToString());
             }
@@ -226,7 +226,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
             if (_rng.Chance(chance))
             {
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
                 {
                     _log.SleepAmbush(ctx.Id.Value.ToString(), CurrentPhase.ToString());
                 }
@@ -251,7 +251,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             if (_rng.Chance(nightmareChance))
             {
                 outbox.Add(new NightmareTriggered(now, ctx.Id, _stressAtSleepStart));
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
                 {
                     _log.SleepNightmare(ctx.Id.Value.ToString(), _stressAtSleepStart);
                 }
@@ -263,7 +263,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
                 // Deterministický seed ze seedy postavy + času — aby sny byly konzistentní
                 var dreamSeed = ctx.Random.Next(0, int.MaxValue);
                 outbox.Add(new DreamOccurred(now, ctx.Id, dreamSeed));
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
                 {
                     _log.SleepDream(ctx.Id.Value.ToString(), dreamSeed);
                 }
@@ -286,7 +286,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             var quality = ComputeSleepQuality(wasInterrupted);
 
             outbox.Add(new SleepEnded(now, ctx.Id, HoursSlept, quality, wasInterrupted));
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepSession))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
             {
                 _log.SleepWokeUp(ctx.Id.Value.ToString(), HoursSlept, quality, wasInterrupted);
             }

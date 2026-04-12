@@ -146,7 +146,12 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 accepted = false;
             }
 
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
+            using (_log.BeginCharacterScope(
+                ctx.Id.Value,
+                nameof(DefaultInteractionEngine),
+                relatedPersonId: attempted.From.Value,
+                locationId: State.Location,
+                tickKey: attempted.OccurredAt.WorldTicks.ToString()))
             {
                 _log.TouchOutcomeDecided(ctx.Id.Value.ToString(), attempted.From.Value.ToString(), attempted.To.Value.ToString(), attempted.Level.ToString(), pAcc, accepted ? "PŘIJATO" : "ODMÍTNUTO");
             }
@@ -160,7 +165,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// </summary>
         private void HandleContextChanged(ContextChanged cc, IHumanContext ctx)
         {
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
+            using (_log.BeginCharacterScope(
+                ctx.Id.Value,
+                nameof(DefaultInteractionEngine),
+                locationId: cc.Location,
+                tickKey: cc.OccurredAt.WorldTicks.ToString()))
             {
                 _log.InteractionContextChanged(ctx.Id.Value.ToString(), cc.Location, cc.Noise, cc.Crowding);
             }
@@ -231,7 +240,12 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var pAcc = Math.Clamp(baseP, 0.05, 0.95);
             var accepted = ctx.Random.Chance(pAcc);
 
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultInteractionEngine))))
+            using (_log.BeginCharacterScope(
+                ctx.Id.Value,
+                nameof(DefaultInteractionEngine),
+                relatedPersonId: p.From.Value,
+                locationId: State.Location,
+                tickKey: p.OccurredAt.WorldTicks.ToString()))
             {
                 _log.InteractionOutcomeDecided(
                     ctx.Id.Value.ToString(),

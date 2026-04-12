@@ -46,7 +46,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
             if (emergency is not null)
             {
                 var overrideIntent = NewIntent(context, emergency.Name, emergency.Utility);
-                using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine))))
+                using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine), tickKey: context.Now.WorldTicks.ToString()))
                     _log.BehaviorIntentEmergencyOverride(context.HumanContext.Id.Value.ToString(), overrideIntent.Kind.ToString(), overrideIntent.TargetAction ?? string.Empty, overrideIntent.Strength);
                 return context.State with { ActiveIntent = overrideIntent };
             }
@@ -57,7 +57,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
                 var currentScore = scoredGroups.TryGetValue(current.Kind, out var score) ? score : double.MinValue;
                 if (expired || currentScore == double.MinValue)
                 {
-                    using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine))))
+                    using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine), tickKey: context.Now.WorldTicks.ToString()))
                         _log.BehaviorIntentExpired(context.HumanContext.Id.Value.ToString(), current.Kind.ToString());
                     current = null;
                 }
@@ -72,7 +72,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
 
                 var strongest = HighestCandidateForKind(candidates, winning.Key);
                 var selected = NewIntent(context, strongest.Name, winning.Value);
-                using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine))))
+                using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine), tickKey: context.Now.WorldTicks.ToString()))
                     _log.BehaviorIntentSelected(context.HumanContext.Id.Value.ToString(), selected.Kind.ToString(), selected.TargetAction ?? string.Empty, selected.Strength);
                 return context.State with { ActiveIntent = selected };
             }
@@ -82,7 +82,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
             {
                 var strongest = HighestCandidateForKind(candidates, winning.Key);
                 var switched = NewIntent(context, strongest.Name, winning.Value);
-                using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine))))
+                using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine), tickKey: context.Now.WorldTicks.ToString()))
                     _log.BehaviorIntentSwitched(context.HumanContext.Id.Value.ToString(), switched.Kind.ToString(), switched.TargetAction ?? string.Empty, switched.Strength);
                 return context.State with { ActiveIntent = switched };
             }
@@ -96,7 +96,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
                 Strength = currentIntentScore,
                 ExpiresAt = context.Now + WTimeSpan.FromHours(context.Config.IntentTimeoutHours)
             };
-            using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine))))
+            using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine), tickKey: context.Now.WorldTicks.ToString()))
                 _log.BehaviorIntentRetained(context.HumanContext.Id.Value.ToString(), retained.Kind.ToString(), retained.TargetAction ?? string.Empty, retained.Strength);
             return context.State with { ActiveIntent = retained };
         }
@@ -113,7 +113,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
             {
                 if (!BehaviorIntentMapper.Matches(intent, candidates[i].Name)) continue;
                 candidates[i] = candidates[i] with { Utility = candidates[i].Utility + bias };
-                using (_log.BeginScope(new CharacterLogScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine))))
+                using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine), tickKey: context.Now.WorldTicks.ToString()))
                     _log.BehaviorIntentBiasApplied(context.HumanContext.Id.Value.ToString(), candidates[i].Name, bias);
             }
         }

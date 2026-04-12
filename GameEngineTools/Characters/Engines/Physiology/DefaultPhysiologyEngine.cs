@@ -163,7 +163,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                             Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor)
                         };
 
-                        using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                        using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
                         {
                             _log.PhysiologySleepEnded(ctx.Id.Value.ToString(), h, se.Quality, s.SleepDebtHours);
                         }
@@ -235,7 +235,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 pregnancy = pregnancy with { Discovered = true, DiscoveredOn = now.Date };
                 s = s with { Pregnancy = pregnancy };
                 outbox.Add(new PregnancyDiscovered(now, ctx.Id, pregnancy.OtherParent));
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
                 {
                     _log.PhysiologyPregnancyDiscovered(
                         ctx.Id.Value.ToString(),
@@ -247,7 +247,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (now.Date >= pregnancy.EstimatedDueDate)
             {
                 outbox.Add(new ChildBorn(now, ctx.Id, pregnancy.OtherParent));
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
                 {
                     _log.PhysiologyChildBorn(
                         ctx.Id.Value.ToString(),
@@ -287,7 +287,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var conceptionChance = ConceptionChance(s, encounter);
             var conceived = ctx.Random.Chance(conceptionChance);
 
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
             {
                 _log.PhysiologyConceptionEvaluated(
                     ctx.Id.Value.ToString(),
@@ -310,7 +310,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 encounter.OccurredAt.Date.AddDays(Config.PregnancyTermDays));
 
             outbox.Add(new PregnancyStarted(encounter.OccurredAt, ctx.Id, otherParent, pregnancy.EstimatedDueDate));
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
             {
                 _log.PhysiologyPregnancyStarted(
                     ctx.Id.Value.ToString(),

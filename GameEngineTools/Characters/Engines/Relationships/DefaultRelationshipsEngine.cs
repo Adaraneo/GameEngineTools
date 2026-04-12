@@ -123,7 +123,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         outcome: "formed",
                         detail: $"source={fi.A.Value}, like={fi.Like:F1}, basePhysical={fi.BasePhysical:F1}, preferenceMatch={fi.PreferenceMatch:F1}");
 
-                        using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
+                        using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
                         {
                             _log.RelFirstImpression(
                                 ctx.Id.Value.ToString(),
@@ -478,7 +478,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             State = new RelationshipState(dict);
 
-            using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine))))
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
             {
                 _log.RelDecayApplied(ctx.Id.Value.ToString(), State.Edges.Count, days);
                 // TODO: For debug purpose only

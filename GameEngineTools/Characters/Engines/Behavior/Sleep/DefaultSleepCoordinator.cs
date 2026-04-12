@@ -53,7 +53,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                     var dict = new Dictionary<string, double>(state.Cooldowns ?? new Dictionary<string, double>()) { [Sleep] = _behaviorCfg.SleepCooldownHours };
                     state = state with { CurrentPlan = null, Cooldowns = dict };
                     _activeSession = null;
-                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepCoordinator)))) _log.SleepSessionEnded(ctx.Id.Value.ToString(), _behaviorCfg.SleepCooldownHours);
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepSessionEnded(ctx.Id.Value.ToString(), _behaviorCfg.SleepCooldownHours);
                 }
                 return new SleepDecisionResult(true, state);
             }
@@ -90,7 +90,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                 }
 
                 context.Outbox.Add(new SleepPromptRequested(context.Now, ctx.Id, state.NeedRest));
-                using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepCoordinator)))) if (isEmergency && sleepCooldown > 0) _log.SleepPromptSent(ctx.Id.Value.ToString(), state.NeedRest);
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) if (isEmergency && sleepCooldown > 0) _log.SleepPromptSent(ctx.Id.Value.ToString(), state.NeedRest);
                 return new SleepDecisionResult(true, state with { WaitingForSleepConfirmation = true, SleepGraceExpiresAt = null });
             }
 
@@ -108,12 +108,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                     var plannedWakeUp = sc.PlannedWakeUp != default ? sc.PlannedWakeUp : sc.OccurredAt + WTimeSpan.FromHours(sleepHours);
                     session.Begin(sc.OccurredAt, plannedWakeUp, ctx, outbox, sc.Companion, sc.SharedType);
                     _activeSession = session;
-                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepCoordinator)))) _log.SleepStarted(ctx.Id.Value.ToString(), sleepHours);
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepStarted(ctx.Id.Value.ToString(), sleepHours);
                     return state with { WaitingForSleepConfirmation = false, SleepGraceExpiresAt = null, SleepDeclineCount = 0, CurrentPlan = new PlannedAction(Sleep, sc.OccurredAt, WTimeSpan.FromHours(sleepHours), 100) };
                 case SleepDeclined sd:
                     var newDeclineCount = state.SleepDeclineCount + 1;
                     var graceHours = Math.Max(1.0, _sleepCfg.SleepGraceHours / newDeclineCount);
-                    using (_log.BeginScope(new CharacterLogScope(ctx.Id.Value, nameof(DefaultSleepCoordinator)))) _log.SleepDeclinedByPlayer(ctx.Id.Value.ToString(), newDeclineCount, graceHours);
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepDeclinedByPlayer(ctx.Id.Value.ToString(), newDeclineCount, graceHours);
                     return state with { WaitingForSleepConfirmation = false, SleepDeclineCount = newDeclineCount, SleepGraceExpiresAt = sd.OccurredAt + WTimeSpan.FromHours(graceHours) };
                 case SleepInterrupted si when _activeSession is { IsActive: true }:
                     _activeSession.Interrupt(si.OccurredAt, si.Cause, ctx, outbox);

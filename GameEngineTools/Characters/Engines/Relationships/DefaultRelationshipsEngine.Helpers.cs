@@ -358,7 +358,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             {
                 e = CreateDefaultEdge(self, other);
 
-                using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
+                using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: other.Value))
                 {
                     _log.RelEdgeCreated(self.Value.ToString(), self.Value.ToString(), other.Value.ToString());
                 }
@@ -366,7 +366,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             if (!string.IsNullOrWhiteSpace(eventType))
             {
-                using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
+                using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: other.Value))
                 {
                     _log.RelEventReceived(
                         self.Value.ToString(),
@@ -380,7 +380,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             var updated = mut(e);
 
-            using (_log.BeginScope(new CharacterLogScope(self.Value, nameof(DefaultRelationshipsEngine))))
+            using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: other.Value))
             {
                 if (!string.IsNullOrWhiteSpace(eventType))
                 {
