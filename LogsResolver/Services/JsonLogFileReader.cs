@@ -10,12 +10,11 @@ public sealed class JsonLogFileReader
         PropertyNameCaseInsensitive = true
     };
 
-    public IReadOnlyList<JsonLogReadRecord> Read(JsonLogFileDescriptor file, IList<LogDiagnosticIssue> diagnostics)
+    public IEnumerable<JsonLogReadRecord> Read(JsonLogFileDescriptor file, IList<LogDiagnosticIssue> diagnostics)
     {
-        var records = new List<JsonLogReadRecord>();
         if (!File.Exists(file.FilePath))
         {
-            return records;
+            yield break;
         }
 
         var lineNumber = 0;
@@ -27,24 +26,26 @@ public sealed class JsonLogFileReader
                 continue;
             }
 
+            CharacterLogEntryDto? dto;
             try
             {
-                var dto = JsonSerializer.Deserialize<CharacterLogEntryDto>(line, JsonOptions);
-                if (dto is null)
-                {
-                    AddMalformedDiagnostic(diagnostics, file.FilePath, lineNumber, "The line deserialized to null.");
-                    continue;
-                }
-
-                records.Add(new JsonLogReadRecord(dto, file, lineNumber));
+                dto = JsonSerializer.Deserialize<CharacterLogEntryDto>(line, JsonOptions);
             }
             catch (JsonException ex)
             {
                 AddMalformedDiagnostic(diagnostics, file.FilePath, lineNumber, ex.Message);
+                continue;
             }
+
+            if (dto is null)
+            {
+                AddMalformedDiagnostic(diagnostics, file.FilePath, lineNumber, "The line deserialized to null.");
+                continue;
+            }
+
+            yield return new JsonLogReadRecord(dto, file, lineNumber);
         }
 
-        return records;
     }
 
     private static void AddMalformedDiagnostic(IList<LogDiagnosticIssue> diagnostics, string filePath, int lineNumber, string message)

@@ -33,4 +33,6 @@ public sealed class LogQuery
     public bool GlobalOnly { get; set; }
 
     public bool ScopedOnly { get; set; }
+
+    public int MaxResults { get; set; } = 2_000;
 }

@@ -146,7 +146,8 @@
                         <TextBox Grid.Row="2" Grid.Column="3" Grid.ColumnSpan="2" Text="{Binding EventsExplorer.DecisionId, UpdateSourceTrigger=PropertyChanged}" ToolTip="DecisionId" />
 
                         <TextBox Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding EventsExplorer.FromText, UpdateSourceTrigger=PropertyChanged}" ToolTip="From timestamp" />
-                        <TextBox Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="3" Text="{Binding EventsExplorer.ToText, UpdateSourceTrigger=PropertyChanged}" ToolTip="To timestamp" />
+                        <TextBox Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="2" Text="{Binding EventsExplorer.ToText, UpdateSourceTrigger=PropertyChanged}" ToolTip="To timestamp" />
+                        <TextBox Grid.Row="3" Grid.Column="4" Text="{Binding EventsExplorer.MaxResultsText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Max grid rows; prevents loading millions of rows into WPF" />
 
                         <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal">
                             <CheckBox Content="Exceptions only" IsChecked="{Binding EventsExplorer.ExceptionsOnly}" Margin="0,4,12,0" />

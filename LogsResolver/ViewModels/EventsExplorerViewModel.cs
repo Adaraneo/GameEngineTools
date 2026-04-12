@@ -23,6 +23,7 @@ public sealed class EventsExplorerViewModel : ViewModelBase
     private string? _tickKey;
     private string? _fromText;
     private string? _toText;
+    private string _maxResultsText = "2000";
     private bool _exceptionsOnly;
     private bool _globalOnly;
     private bool _scopedOnly;
@@ -150,6 +151,12 @@ public sealed class EventsExplorerViewModel : ViewModelBase
         set => SetProperty(ref _scopedOnly, value);
     }
 
+    public string MaxResultsText
+    {
+        get => _maxResultsText;
+        set => SetProperty(ref _maxResultsText, value);
+    }
+
     public void Load(IReadOnlyList<ResolvedLogEvent> events)
     {
         _queryEngine.SetEvents(events);
@@ -196,6 +203,7 @@ public sealed class EventsExplorerViewModel : ViewModelBase
         ExceptionsOnly = false;
         GlobalOnly = false;
         ScopedOnly = false;
+        MaxResultsText = "2000";
         ApplyFilters();
     }
 
@@ -206,6 +214,7 @@ public sealed class EventsExplorerViewModel : ViewModelBase
         _ = int.TryParse(EventIdText, out var eventId);
         _ = DateTimeOffset.TryParse(FromText, out var from);
         _ = DateTimeOffset.TryParse(ToText, out var to);
+        _ = int.TryParse(MaxResultsText, out var maxResults);
 
         return new LogQuery
         {
@@ -224,7 +233,10 @@ public sealed class EventsExplorerViewModel : ViewModelBase
             TickKey = TickKey,
             ExceptionsOnly = ExceptionsOnly,
             GlobalOnly = GlobalOnly,
-            ScopedOnly = ScopedOnly
+            ScopedOnly = ScopedOnly,
+            MaxResults = int.TryParse(MaxResultsText, out maxResults)
+                ? Math.Clamp(maxResults, 100, 100_000)
+                : 2_000
         };
     }
 }

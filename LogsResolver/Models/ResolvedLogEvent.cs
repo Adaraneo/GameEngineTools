@@ -1,5 +1,3 @@
-using System.Collections.ObjectModel;
-
 namespace LogsResolver.Models;
 
 public sealed class ResolvedLogEvent
@@ -40,7 +38,7 @@ public sealed class ResolvedLogEvent
 
     public string? TickKey { get; init; }
 
-    public ObservableCollection<ResolvedLogEventSource> Sources { get; } = new();
+    public List<ResolvedLogEventSource> Sources { get; } = new(capacity: 2);
 
     public bool HasException => !string.IsNullOrWhiteSpace(ExceptionType);
 
