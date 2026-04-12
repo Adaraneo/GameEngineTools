@@ -180,5 +180,6 @@ public sealed class LogSessionLoader
            && string.Equals(a.InteractionId, b.InteractionId, StringComparison.Ordinal)
            && string.Equals(a.DecisionId, b.DecisionId, StringComparison.Ordinal)
            && a.RelatedPersonId == b.RelatedPersonId
+           && string.Equals(a.LocationId, b.LocationId, StringComparison.Ordinal)
            && string.Equals(a.TickKey, b.TickKey, StringComparison.Ordinal);
 }
