@@ -66,6 +66,55 @@ clock.SetNow(initTicks == defaultTicks
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
+#region input settings
+
+Console.Write("Would you like to export prompts after simulations is complete? [y\\N] \b");
+bool canGeneratePrompts = false;
+var answerKey = Console.ReadKey().Key;
+if (answerKey == ConsoleKey.Y)
+    canGeneratePrompts = true;
+
+Console.Write("Would you like to export players and significants other's info after simulation? [y\\N] \b");
+bool canExportPlayersAndSOInfos = false;
+answerKey = Console.ReadKey().Key;
+if (answerKey == ConsoleKey.Y)
+    canExportPlayersAndSOInfos = true;
+
+Console.Write("Would you like to export diary after simulation? [y\\N] \b");
+bool canExportDiary = false;
+answerKey = Console.ReadKey().Key;
+if (answerKey == ConsoleKey.Y)
+    canExportDiary = true;
+
+int simulationYears = 2;
+
+SetYearsForSimulation(simulationYears);
+
+static void SetYearsForSimulation(int simulationYears, bool printInfo = true)
+{
+    Console.Write("Set the year(s) for simulation: ");
+    var answer = Console.ReadLine();
+    if (answer.Length == 0 && !int.TryParse(answer, out simulationYears))
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("The simulation years are not set or are in incorrect format.");
+        Console.ResetColor();
+        Console.WriteLine("Would you like to try it again? [y\\N]");
+        if (printInfo)
+        {
+            Console.WriteLine("If you answer no (n), simulation years will be set to 2.");
+        }
+
+        var answerKey = Console.ReadKey().Key;
+        if (answerKey == ConsoleKey.Y)
+        {
+            SetYearsForSimulation(simulationYears, false);
+        }
+    }
+}
+
+#endregion
+
 var currDir = Directory.GetCurrentDirectory();
 
 var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.json").AddJsonFile("appsettings.World.json").Build();
@@ -201,7 +250,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
     LocationService = locationService,
-    SimulationYears = 5,
+    SimulationYears = simulationYears,
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
@@ -322,27 +371,37 @@ foreach (var other in others)
 
 var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-await File.WriteAllTextAsync(
-    Path.Combine(desktopPath, $"player.{playerPerson.Id.Value}.txt"),
-    player.PrintInfo(false));
-
-await File.WriteAllTextAsync(
-    Path.Combine(desktopPath, $"significantOther.{significantOtherPerson.Id.Value}.txt"),
-    significantOther.PrintInfo(false));
-
-var promptDir = Directory.CreateDirectory(Path.Combine(desktopPath, "Prompts")).FullName;
-foreach (var character in manager.Characters)
+if (canExportPlayersAndSOInfos)
 {
-    await File.WriteAllTextAsync(Path.Combine(promptDir, $"{character.Person.Id.Value.ToString()}.txt"), character.PrintPortraitInfo(
-        runtime.Services.GetRequiredService<IPortraitSpecBuilder>(), runtime.Services.GetRequiredService<IPortraitPromptFormatter>()));
+    await File.WriteAllTextAsync(
+        Path.Combine(desktopPath, $"player.{playerPerson.Id.Value}.txt"),
+        player.PrintInfo(false));
+
+    await File.WriteAllTextAsync(
+        Path.Combine(desktopPath, $"significantOther.{significantOtherPerson.Id.Value}.txt"),
+        significantOther.PrintInfo(false));
+}
+
+if (canGeneratePrompts)
+{
+    var promptDir = Directory.CreateDirectory(Path.Combine(desktopPath, "Prompts")).FullName;
+    foreach (var character in manager.Characters)
+    {
+        await File.WriteAllTextAsync(Path.Combine(promptDir, $"{character.Person.Id.Value.ToString()}.txt"), character.PrintPortraitInfo(
+            runtime.Services.GetRequiredService<IPortraitSpecBuilder>(), runtime.Services.GetRequiredService<IPortraitPromptFormatter>()));
+    }
 }
 
 Console.WriteLine("Simulation complete. Game time: {0}", clock.Now);
 
-File.WriteAllText(
-    Path.Combine(desktopPath, $"diary.{clock.Now.Date}.txt"),
-    sbDiary.ToString());
+if (canExportDiary)
+{
+    File.WriteAllText(
+        Path.Combine(desktopPath, $"diary.{clock.Now.Date}.txt"),
+        sbDiary.ToString());
+}
 
+Console.WriteLine("Press any key to exit...");
 Console.ReadKey();
 
 # region Helper Methods
