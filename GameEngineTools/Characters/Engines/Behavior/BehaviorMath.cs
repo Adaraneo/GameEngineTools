@@ -55,18 +55,25 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         internal static double MeanCloseness(RelationshipState rs)
         {
-            if (rs.Edges is null || rs.Edges.Count == 0)
-                return 50;
-
-            double sum = 0;
-            var n = 0;
-            foreach (var e in rs.Edges.Values)
+            if (rs.Edges is null || rs.Edges.Count == 0) return 50;
+        
+            // Nejsilnější vztah má největší váhu (quality over quantity)
+            var sorted = rs.Edges.Values
+                .Select(e => e.Closeness)
+                .OrderByDescending(c => c)
+                .ToList();
+        
+            double weightedSum = 0;
+            double totalWeight = 0;
+            for (int i = 0; i < sorted.Count; i++)
             {
-                sum += e.Closeness;
-                n++;
+                // Exponenciálně klesající váhy: 1.0, 0.5, 0.25, 0.125...
+                var weight = Math.Pow(0.5, i);
+                weightedSum  += sorted[i] * weight;
+                totalWeight  += weight;
             }
-
-            return sum / n;
+            
+            return weightedSum / totalWeight;
         }
 
         internal static double ComputeIntimacyNeed(IHumanContext ctx, PhysiologyState ph, RelationshipState rel, PsychologyState ps)
@@ -75,8 +82,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
             // rather than trusting the legacy aggregate attraction field alone.
             var topAttraction = ComputeTopIntimacyPotential(rel);
 
-            var stressPenalty = Math.Max(0, ps.Stress - 50) * 0.3;
-            return Math.Clamp(35.0 * (0.5 + ctx.Personality.Motivation.Sexuality) + 0.6 * topAttraction + 25 * ((ph.Cycle?.LibidoMod ?? 1.0) - 1.0) - stressPenalty, 0, 100);
+            var stressPenalty = ps.Stress switch
+            {
+                > 80 => 60.0,
+                > 60 => Math.Max(0, ps.Stress - 60) * 1.5,
+                > 50 => Math.Max(0, ps.Stress - 50) * 0.3,
+                _ => 0.0
+            };
+            return Math.Clamp(35.0 * (0.5 + ctx.Personality.Motivation.Sexuality) + 0.6 * topAttraction + 40 * ((ph.Cycle?.LibidoMod ?? 1.0) - 1.0) - stressPenalty, 0, 100);
         }
 
         /// <summary>
