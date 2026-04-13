@@ -74,12 +74,14 @@ var answerKey = Console.ReadKey().Key;
 if (answerKey == ConsoleKey.Y)
     canGeneratePrompts = true;
 
+Console.Clear();
 Console.Write("Would you like to export players and significants other's info after simulation? [y\\N] \b");
 bool canExportPlayersAndSOInfos = false;
 answerKey = Console.ReadKey().Key;
 if (answerKey == ConsoleKey.Y)
     canExportPlayersAndSOInfos = true;
 
+Console.Clear();
 Console.Write("Would you like to export diary after simulation? [y\\N] \b");
 bool canExportDiary = false;
 answerKey = Console.ReadKey().Key;
@@ -92,6 +94,7 @@ SetYearsForSimulation(simulationYears);
 
 static void SetYearsForSimulation(int simulationYears, bool printInfo = true)
 {
+    Console.Clear();
     Console.Write("Set the year(s) for simulation: ");
     var answer = Console.ReadLine();
     if (answer.Length == 0 && !int.TryParse(answer, out simulationYears))
