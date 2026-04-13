@@ -117,18 +117,17 @@ static void SetYearsForSimulation(int simulationYears, bool printInfo = true)
 
 var currDir = Directory.GetCurrentDirectory();
 
-var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.json").AddJsonFile("appsettings.World.json").Build();
-var generatedPeopleLogsFilePath = configProvider.GetValue<string>("GenFilesPath");
+var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.World.json").Build();
 var perceptionOptions = configProvider.GetSection("World:Perception").Get<CharacterPerceptionOptions>() ?? new CharacterPerceptionOptions();
 
-var files = new DirectoryInfo(generatedPeopleLogsFilePath!).GetFiles().ToImmutableList();
+var generatedBlankPeopleLogFiles = new DirectoryInfo(TFSC.gfiles).GetFiles().ToImmutableList();
 
 var ids = new Dictionary<string, Guid>();
 const string so = "significantOther";
 const string fr = "friend";
 const string frso = "friendSignificantOther";
 
-foreach (var file in files)
+foreach (var file in generatedBlankPeopleLogFiles)
 {
     using (var reader = new StreamReader(file.OpenRead()))
     {
