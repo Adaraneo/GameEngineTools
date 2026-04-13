@@ -24,11 +24,11 @@ Cílem je, aby se postavy chovaly věrohodně — ne jako loutky, ale jako lidé
 
 ## Jak postava „funguje" uvnitř
 
-Každá postava prochází při každém herním tiknutí pipeline šesti modulů, které se nazývají **enginy**.
+Každá postava prochází při každém herním tiknutí pipeline sedmi modulů, které se nazývají **enginy**.
 Každý engine má na starosti jeden aspekt existence postavy a předává výsledky dál:
 
 ```
-Physiology → Psychology → Behavior → Interactions → Relationships → Memory
+Physiology → Psychology → Behavior → Interactions → Relationships → Memory → SemanticMemory
 ```
 
 ### 1. Physiology — tělo
@@ -54,7 +54,7 @@ Neuroticism (součást osobnosti Big Five) určuje, jak rychle stres roste a jak
 
 ### 3. Behavior — rozhodování
 
-Postava si nevybírá akci náhodně — vybírá ji přes **utility funkci**.
+Postava si nevybírá akci náhodně — vybírá si ji přes **utility funkci**.
 Každá možná akce dostane skóre na základě aktuálních potřeb postavy:
 
 - Je unavená? → Spánek dostane vysoké skóre.
@@ -72,15 +72,16 @@ V REM fázi může zažít sen nebo noční můru. Noční můra přeruší spá
 Při opakovaném odmítání spánku (hráčem) se zapíná penalizace — stres roste rychleji.
 Po dostatečně vysokém spánkovém dluhu engine bypasse cooldown a postava prostě musí spát.
 
-#### Vliv vzpomínek na rozhodování
+#### Vliv vzpomínek a atraktivity na rozhodování
 
-Toto je jeden z nejzajímavějších systémů. Behavior engine se při výběru akce ptá
-paměťového enginu: *"Pamatuješ si něco relevantního?"*
+Behavior engine se při výběru akce ptá dvou modulů:
 
-- Pokud postava zažila sociální trauma → utilita `ReachOut` klesne.
-- Pokud ji někdo odmítl při intimní iniciativě → `InviteIntimacy` dostane penaltu.
-- Pozitivní vzpomínky na společný čas → sociální aktivity dostávají bonus.
-- Vysoká emocionální zátěž (mnoho silných vzpomínek najednou) → postava více pečuje o sebe.
+**Paměť:** Postava si vzpomíná na relevantní zážitky. Pokud zažila sociální trauma → utilita `ReachOut` klesne.
+Pokud ji někdo odmítl při intimní iniciativě → `InviteIntimacy` dostane penaltu.
+Pozitivní vzpomínky na společný čas → sociální aktivity dostávají bonus.
+
+**Atraktivita:** Přítomnost fyzicky přitažlivé osoby v dohledu zvyšuje motivaci pro `ReachOut` a `InviteIntimacy`.
+Absence sexuálního kontaktu zvyšuje **NeedIntimacy**, která posouvá rozhodování k intimitě-orientovaným akcím.
 
 ### 4. Interactions — sociální kontakt
 
@@ -92,7 +93,7 @@ Typy interakcí (`SpeechAct`): `SmallTalk`, `Question`, `SelfDisclosure`, `Valid
 `Humor`, `Meta`, `Invite`, `Boundary`.
 
 Existuje i fyzický kontakt (`TouchAttempted`): Light, Friendly, Intimate — každá úroveň
-vyžaduje odpovídající hloubku vztahu.
+vyžaduje odpovídající hloubku vztahu a soukromí.
 
 ### 5. Relationships — vztahy
 
@@ -114,6 +115,11 @@ intelekt, humor, estetika, hodnoty, fyzičnost. Každá interakce posouvá konkr
 
 Vztahy časem **decay** — bez kontaktu se pomalu blíží k neutrálním hodnotám.
 
+**První dojem (Attraction engine):** Když se dvě postavy setkají poprvé, spočítá se jejich
+**fyzická přitažlivost** na základě `AttractionProfile` (preference k rysom tváře, postavě, věku, specifickým morfologickým znakům)
+a **vnímané fyzičnosti** v danou chvíli (únava, stav zdraví, emociální stav). Tento první dojem
+ovlivní iniciální hodnoty dimenzí vztahu.
+
 ### 6. Memory — paměť
 
 Paměťový engine modeluje tři kognitivní principy:
@@ -128,6 +134,29 @@ Nedostatečný spánek tak přímo narušuje paměť — přesně jako v reáln�
 **Spacing effect** — opakovaný zážitek stejného druhu nevytváří duplicitní záznam,
 ale posiluje stávající vzpomínku. Postava, která se opakovaně setkává s příjemnou osobou,
 má tuto osobu čím dál hlouběji zakořeněnou v paměti.
+
+### 7. SemanticMemory — sémantické rozhodování
+
+Dodatečný engine pro **sociální targeting a rozhodování** nad hrubými možnostmi.
+Udržuje abstraktní znalosti o jednotlivcích: "Kdo je můj nejbližší?", "Kdo by se mi jist neusmál?",
+"Koho bych měl vyhledat pro zábavu?"
+
+SemanticMemory analyzuje síť vztahů a vzpomínek, aby postavě doporučil, s kým
+a jak být sociálně aktivní, s ohledem na její psychologický stav a historii.
+
+---
+
+## Lokace a vnímání
+
+Svět se skládá z **lokací** (`LocationDescriptor`), které mají atributy:
+- **Hluk** — baseline šum + přispění za osobu
+- **Kapacita** — max osob na místě
+- **Soukromí** — jestli se dá dosáhnout intimní komunikace
+- **Typ** — Social, Work, Rest, Private, Public
+
+Postavy se pohybují mezi lokacemi na základě své potřeby (hledají klid na odpočinek,
+nebo akci v sociální oblasti). **CharacterPerceptionResolver** filtruje, které postavy
+se navzájem vidí — např. hlučná lokace či nízká fidelita snižuje vnímání.
 
 ---
 
@@ -155,11 +184,63 @@ morfologickou knihovnu **Grammar Modular** pro správné skloňování jmen, slo
 Každá narativní věta má prioritu — High, Medium nebo Low — takže si hráč může
 nastavit, co chce vidět: jen klíčové momenty, nebo celý proud vědomí postavy.
 
-### Živá ukázka
+---
 
-`GameSandbox` spouští dvouletou simulaci dvou postav a zapisuje celý jejich narativní
-deník do souboru `diary.txt`. Výstup (~9000 řádků) slouží jako živá produkční ukázka
-Grammar Modular v akci.
+## Nástrojová sada (Tooling)
+
+### CharacterGenerator
+
+Samostatná konzolová aplikace pro interaktivní generování postav:
+
+```csharp
+// Spuštění:
+// CharacterGenerator.exe
+
+// Interaktivní kroky:
+// 1. Pokusy o import existujících postav; pokud neexistují, vytvoří adresářovou strukturu
+// 2. Generuje hráče (PC), jejich SO a přítele + jeho SO
+// 3. Nabídne možnost vygenerovat další NPCs (počet zadá uživatel)
+// 4. Exportuje všechny postavy do JSON
+// 5. Vyexportuje info .txt soubory a portréty pro AI image-gen prompty
+```
+
+### GameSandbox
+
+Plně vybavená sandbox aplikace pro spuštění komplexní simulace:
+
+```csharp
+// Spuštění:
+// GameSandbox.exe
+
+// Interaktivní kroky:
+// 1. Ptá se, jestli exportovat prompty po skončení
+// 2. Ptá se, jestli exportovat info hráče a SO
+// 3. Ptá se, jestli exportovat deník
+// 4. Ptá se, kolik let simulovat
+// 5. Spouští scénu s hlavními postavami (PC, SO, přítel, SO přítele)
+// 6. Spouští druhou scénu s dalšími NPC v pozadí
+// 7. Exportuje výsledky na plochu
+```
+
+Klíčové rysy:
+- **Dvě simulační scény**: hlavní 4-postavy (plná fidelita) + background NPC (5 let v pozadí)
+- **Per-tick hooks**: `FireFirstImpressions`, `RouteMoveTo`, `DynamicReachOutRouting`, `OrganicMicroPositives`
+- **Lokace**: vesnice, hrad, chlévy, kováčna, les — všechny s atributy hluku/kapacity/privacy
+- **Persistence**: čas se ukládá do `gametime.bin` na ploše pro obnovení při příštím spuštění
+- **Exporty**: deník, info, prompty
+
+### LogsResolver
+
+WPF aplikace pro analýzu výstupu engine:
+
+Načítá JSONL logy (`logs/Characters/Characters.jsonl` a scoped soubory):
+- **Session Summary** — přehled osob, subsystémů, souborů
+- **Events Explorer** — filtrování a vyhledávání v rámci 1000+ loggovaných záznamů
+- **Event Details** — detailní pohled na konkrétní návrh, řešení, vztah
+- **Character Timeline** — vizuální časová osa pro NPC: kdy se narodil, kdy se s kým potkal, atd.
+- **Diagnostics** — log integrity checks, race conditions, duplicitní event IDs
+- **Raw File Viewer** — čtení surového JSONL obsahu
+- **NPC Character Loader** — import JSON exportů postavy pro referenci v timelinech
 
 ---
 
@@ -170,14 +251,33 @@ Knihovna je navržena tak, aby šla použít ve dvou scénářích:
 ### Konzolová aplikace / standalone
 
 ```csharp
-await using var runtime = await GameEngineToolsRuntime.StartAsync();
+// Spuštění runtime bez parametru startTime — čas se nastaví později
+await using var runtime = await GameEngineToolsRuntime.StartAsync(
+    consoleLogs: false,
+    logsRoot: "logs",
+    generatedFileOptions: new GeneratedFileOptions
+    {
+        PlayerDirectory = "generated/player",
+        NPCDirectory = "generated/npcs"
+    });
+
+var clock = runtime.Clock;
+var manager = runtime.GameEngineToolsManager;
+
+// Obnovení uloženého času (např. ze souboru)
+if (long.TryParse(File.ReadAllText("gametime.bin"), out var savedTicks))
+{
+    clock.SetNow(new WDateTime(savedTicks));
+}
 
 var scene = new SimulationScene(clock, new SimulationSceneOptions
 {
     Characters      = [playerHuman, npcHuman],
     SimulationYears = 2,
     TickStep        = WTimeSpan.FromHours(0.5),
-
+    LocationService = locationService,
+    DefaultCharacterLod = CognitiveResolutionLevel.Foreground,
+    
     OnNarrative = entry =>
     {
         if (entry.Priority == NarrativePriority.High)
@@ -194,13 +294,38 @@ Pro Unity existuje VContainer adaptér — díky Adapter patternu fungují všec
 registrační metody beze změny. Místo `IHost` (který Unity nepotřebuje) se engine
 bootstrapuje přes `ServiceCollection` přímo.
 
+```csharp
+var services = new ServiceCollection();
+// ... register all GameEngineTools services ...
+var provider = services.BuildServiceProvider();
+WWorld.Configure(spec, clock);
+```
+
 ---
 
 ## Persistence — ukládání postav
 
 Postava se serializuje do JSON a načítá zpátky s plným zachováním stavu —
-vzpomínky, vztahy, fyzický stav, osobnost. Herní čas se ukládá zvlášť,
+vzpomínky, vztahy, fyzický stav, osobnost, atraktivita. Herní čas se ukládá zvlášť,
 takže simulace při příštím spuštění pokračuje přesně tam, kde skončila.
+
+Exporty (`GeneratedFile.Export()` a `GeneratedFile.ExportNPPCs()`) uloží:
+- `Characters/{PersonId}.json` — kompletní stav postavy
+- Doprovodné soubory: portrait prompts, npc info soubory
+
+---
+
+## Struktura řešení
+
+| Projekt | Typ | Účel |
+|---|---|---|
+| `GameEngineTools` | Library (.NET 8) | Jádro enginu — všechna simulační logika |
+| `CharacterGenerator` | Console App | Interaktivní generátor postav |
+| `GameSandbox` | Console App | Sandbox pro spuštění komplexních simulací |
+| `EngineTests` | MSTest | Unit a integrační testy |
+| `LogsResolver` | WPF App | JSONL log viewer a diagnostika |
+| `LogsResolverTests` | MSTest | Testy pro LogsResolver |
+| `RelationshipsGame` | WPF App | Early-stage prototype |
 
 ---
 
@@ -224,9 +349,10 @@ vzít jako hotový základ a zaměřit se na herní obsah místo simulační inf
 | Framework | .NET 8 |
 | DI | Microsoft.Extensions.DependencyInjection |
 | Unity DI | VContainer (adaptér) |
-| Logování | `[LoggerMessage]` source generator (nulové alokace) |
+| Morfologie | 50PSoftware.GrammarModular.Czech (vlastní balíček) |
+| Logování | `[LoggerMessage]` source generator (nulové alokace) + vlastní `CharactersFileLogger` |
 | Testy | MSTest |
-| Jazyková vrstva | Grammar Modular (vlastní projekt) |
+| Nástroje | CharacterGenerator, GameSandbox, LogsResolver (WPF) |
 
 ---
 
