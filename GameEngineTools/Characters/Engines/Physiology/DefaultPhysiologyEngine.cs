@@ -110,7 +110,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Thirst = Clamp01p(s.Thirst + thirstDelta),
                 Pain = Clamp01p(s.Pain + painDelta),
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + immuneDelta),
-                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, feverDelta, 0.1 * h), -1.0, 3.5);
+                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, feverDelta, 0.1 * h), -1.0, 3.5));
             };
 
             if (s.Pregnancy is { } pregnancy)
