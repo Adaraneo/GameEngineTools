@@ -36,7 +36,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     {
         #region Stav a konfigurace
 
-        /// <summary>Aktuální stav paměti — seznam epizod a sémantické fakty.</summary>
+        /// <summary>Aktuální stav paměti — seznam epizod.</summary>
         public MemoryIndex State { get; private set; }
 
         /// <summary>Konfigurace enginu (míra zapomínání, boost, práh prořezání).</summary>
@@ -67,7 +67,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             _log = loggerFactory.CreateLogger<DefaultMemoryEngine>();
             _memoryFidelityPolicy = memoryFidelityPolicy;
 
-            // Inicializuj prázdný stav — žádné vzpomínky, žádná sémantika
+            // Inicializuj prázdný stav — žádné vzpomínky
             State = new MemoryIndex(
                 new List<EpisodicMemory>());
         }
@@ -538,6 +538,24 @@ namespace GameEngineTools.Characters.Engines.Memory
                         break;
                     }
 
+                case MemoryRecalled mr:
+                    {
+                        var episodes = State.Episodes.ToList();
+                        var idx = episodes.FindIndex(e => e.Id == mr.EpisodeId);
+                        if (idx >= 0)
+                        {
+                            var ep = episodes[idx];
+                            episodes[idx] = ep with
+                            {
+                                RecallConfidence = Math.Clamp(
+                                    ep.RecallConfidence + 0.03,  // +3% za recall
+                                    0.0, 1.0)
+                            };
+                            State = new MemoryIndex(episodes);
+                        }
+                        break;
+                    }
+
                 // ── Konsolidace po spánku ─────────────────────────────────────────────────
                 // SleepEnded netriggeruje kódování nové vzpomínky — konsoliduje existující.
                 // Viz ConsolidateMemories() — posílí top-N epizod dle salience.
@@ -631,7 +649,17 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             // Vyber Top 10 epizod podle salience — ty REM fáze upevňuje nejvíc
             var toBoost = episodes
-                .OrderByDescending(e => e.Salience)
+                .OrderByDescending(e =>
+                {
+                    var emotionBoost = e.Emotion switch
+                    {
+                        EmotionalTag.Negative => 0.35,
+                        EmotionalTag.Positive => 0.20,
+                        EmotionalTag.Mixed => 0.15,
+                        _ => 0.0
+                    };
+                    return e.Salience + emotionBoost;
+                })
                 .Take(10)
                 .Select(e => e with
                 {
