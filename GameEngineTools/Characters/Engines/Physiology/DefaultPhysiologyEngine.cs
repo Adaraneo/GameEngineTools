@@ -98,7 +98,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var immuneDelta = action switch
             {
                 SelfCare => -0.5 * h,
-                _ => -0.3
+                _ => -0.3 * h
             };
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;

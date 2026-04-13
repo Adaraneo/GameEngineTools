@@ -237,6 +237,62 @@ namespace EngineTests
         }
 
         // ════════════════════════════════════════════════════════════════════════════
+        // BUG-4: ImmuneLoad recovery not time-scaled
+        // ════════════════════════════════════════════════════════════════════════════
+        //
+        // Scénář: původní kód: _ => -0.3 (konstanta, ne -0.3 * h)
+        // Za 1h: ImmuneLoad -= 0.3
+        // Za 2h: ImmuneLoad -= 0.3 (stejné! — bug)
+        //
+        // Po opravě: _ => -0.3 * h
+        // Za 1h: ImmuneLoad -= 0.3
+        // Za 2h: ImmuneLoad -= 0.6
+
+        [TestMethod]
+        public void Tick_ImmuneRecovery_IsTimeScaled_NotConstant()
+        {
+            // Arrange — dva enginy se stejným počátečním stavem, žádná akce (idle default)
+            var ctx1h = BuildContext(currentAction: null);
+            var ctx2h = BuildContext(currentAction: null);
+
+            var engine1h = BuildEngine(immuneLoad: 50);
+            var engine2h = BuildEngine(immuneLoad: 50);
+
+            // Act — jeden tick 1h vs jeden tick 2h
+            engine1h.Tick(_now, WTimeSpan.FromHours(1.0), ctx1h, _outbox);
+            engine2h.Tick(_now, WTimeSpan.FromHours(2.0), ctx2h, _outbox);
+
+            // Assert — 2h tick musí způsobit větší pokles ImmuneLoad než 1h tick
+            Assert.IsTrue(
+                engine2h.State.ImmuneLoad < engine1h.State.ImmuneLoad,
+                $"BUG-4 REGRESSION: ImmuneLoad recovery musí být škálována časem. " +
+                $"1h engine={engine1h.State.ImmuneLoad:F3}, 2h engine={engine2h.State.ImmuneLoad:F3}. " +
+                $"2h engine musí mít nižší ImmuneLoad.");
+        }
+
+        [TestMethod]
+        public void Tick_ImmuneRecovery_SelfCare_IsTimeScaled()
+        {
+            // Arrange — SelfCare větev (-0.5 * h) jako baseline srovnání
+            // Ověřujeme, že i výchozí větev chová analogicky jako SelfCare
+            var ctxSelfCare1h = BuildContext(currentAction: SelfCare);
+            var ctxSelfCare2h = BuildContext(currentAction: SelfCare);
+
+            var engine1h = BuildEngine(immuneLoad: 50);
+            var engine2h = BuildEngine(immuneLoad: 50);
+
+            // Act
+            engine1h.Tick(_now, WTimeSpan.FromHours(1.0), ctxSelfCare1h, _outbox);
+            engine2h.Tick(_now, WTimeSpan.FromHours(2.0), ctxSelfCare2h, _outbox);
+
+            // Assert — SelfCare větev: po 2h musí být ImmuneLoad nižší než po 1h
+            Assert.IsTrue(
+                engine2h.State.ImmuneLoad < engine1h.State.ImmuneLoad,
+                $"BUG-4 REGRESSION: SelfCare ImmuneLoad recovery musí být škálována časem. " +
+                $"1h engine={engine1h.State.ImmuneLoad:F3}, 2h engine={engine2h.State.ImmuneLoad:F3}.");
+        }
+
+        // ════════════════════════════════════════════════════════════════════════════
         // Pomocné metody
         // ════════════════════════════════════════════════════════════════════════════
 

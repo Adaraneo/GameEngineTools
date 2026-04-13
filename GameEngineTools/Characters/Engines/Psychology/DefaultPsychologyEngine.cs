@@ -36,6 +36,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var h = Math.Max(0, dt.TotalHours);
             var s = State;
             var ph = ctx.Snapshot.Physiology;
+            var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
 
             // Základní drift: stres klesá k baseline, PAD míří k neutrálu
             s = s with
@@ -51,8 +52,34 @@ namespace GameEngineTools.Characters.Engines.Psychology
             {
                 Valence = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * h + 0.0015 * ph.Energy * h),
                 Stress = Clamp01p(s.Stress + 0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * h),
-                Arousal = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h)
+                Arousal = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h),
+                Dominance = Clamp01(s.Dominance - 0.0005 * ph.Pain * h - 0.01 * Math.Max(0, ph.BodyTempDelta - 1.5) * h)
             };
+
+            // CognitiveLoad — odvozuje se z fyziologických stressorů
+            {
+                var feverThreshold = 1.5;
+                var feverDegrees = Math.Max(0, ph.BodyTempDelta - feverThreshold);
+                var targetLoad = Clamp01p(
+                    ph.SleepDebtHours * Config.CognitiveLoadSleepDebtWeight
+                    + ph.Pain          * Config.CognitiveLoadPainWeight
+                    + s.Stress         * Config.CognitiveLoadStressWeight
+                    + feverDegrees     * Config.FeverCognitiveLoadPerDegree);
+
+                var recoveryRate = (action is GameEngineTools.Characters.Engines.ActionNames.Sleep
+                                       or GameEngineTools.Characters.Engines.ActionNames.Idle)
+                    ? Config.CognitiveLoadRecoveryPerHour * 1.5 * h
+                    : Config.CognitiveLoadRecoveryPerHour * h;
+                var buildRate = 8.0 * h;
+                var cogByRate = s.CognitiveLoad < targetLoad ? buildRate : recoveryRate;
+                s = s with { CognitiveLoad = Clamp01p(Approach(s.CognitiveLoad, targetLoad, cogByRate)) };
+
+                if (feverDegrees > 0)
+                    s = s with { Arousal = Clamp01(s.Arousal - feverDegrees * Config.FeverArousalSuppressPerDegree * h) };
+                // Vysoká horečka (> 2.5°C) posouvá náladu k negativní valenci (zmatenost)
+                if (ph.BodyTempDelta > 2.5)
+                    s = s with { Valence = Clampm1p1(s.Valence - 0.02 * h) };
+            }
 
             // Ovulace – jemné zvýšení arousal/valence
             if (ph.Cycle?.OvulationWindow == true)
@@ -132,7 +159,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                     if (io.Accepted)
                     {
-                        s = s with { Valence = Math.Min(1, s.Valence + 0.07) };
+                        s = s with
+                        {
+                            Valence = Math.Min(1, s.Valence + 0.07),
+                            Dominance = Math.Clamp(s.Dominance + 0.03, 0, 1)
+                        };
                     }
                     else if (wasRejected)
                     {
@@ -157,13 +188,18 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         s = s with
                         {
                             Valence = Math.Max(-1, s.Valence - impact),
-                            Stress = Math.Min(100, s.Stress + 3 + 5 * n)
+                            Stress = Math.Min(100, s.Stress + 3 + 5 * n),
+                            Dominance = Math.Clamp(s.Dominance - 0.04 * actSensitivity, 0, 1)
                         };
                     }
                     else if (didReject)
                     {
                         var guilt = 0.02 * ctx.Personality.BigFive.Agreeableness;
-                        s = s with { Valence = Math.Max(-1, s.Valence - guilt) };
+                        s = s with
+                        {
+                            Valence = Math.Max(-1, s.Valence - guilt),
+                            Dominance = Math.Clamp(s.Dominance + 0.02, 0, 1)
+                        };
                     }
                     break;
 
@@ -177,6 +213,42 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                 case Characters.Engines.Physiology.OvulationWindowOpened:
                     s = s with { Arousal = Math.Min(1, s.Arousal + 0.05) };
+                    break;
+
+                case Characters.Engines.Physiology.PregnancyStarted:
+                    // Hormonální nástup (skrytý) — jemná labilita
+                    s = s with
+                    {
+                        Arousal = Math.Clamp(s.Arousal + 0.04, 0, 1),
+                        Valence = Math.Clamp(s.Valence + 0.02, -1, 1)
+                    };
+                    break;
+
+                case Characters.Engines.Physiology.PregnancyDiscovered pd:
+                    {
+                        var n = ctx.Personality.BigFive.Neuroticism;
+                        var openness = ctx.Personality.BigFive.Openness;
+                        var stressSpike = 10.0 + n * 15.0;
+                        var valenceDelta = -0.05 + openness * 0.08 - n * 0.06;
+                        s = s with
+                        {
+                            Stress = Math.Clamp(s.Stress + stressSpike, 0, 100),
+                            Arousal = Math.Clamp(s.Arousal + 0.10 + n * 0.08, 0, 1),
+                            Valence = Math.Clamp(s.Valence + valenceDelta, -1, 1)
+                        };
+                        if (s.Stress > 70 && State.Stress <= 70)
+                            outbox.Add(new StressSpiked(pd.OccurredAt, ctx.Id, s.Stress));
+                        break;
+                    }
+
+                case Characters.Engines.Physiology.ChildBorn:
+                    s = s with
+                    {
+                        Valence   = Math.Clamp(s.Valence + 0.25, -1, 1),
+                        Arousal   = Math.Clamp(s.Arousal + 0.15, 0, 1),
+                        Dominance = Math.Clamp(s.Dominance - 0.10, 0, 1),
+                        Stress    = Math.Clamp(s.Stress - 10, 0, 100)
+                    };
                     break;
 
                 case Characters.Engines.Memory.MemoryRecalled mr:

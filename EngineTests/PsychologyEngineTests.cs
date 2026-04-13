@@ -15,6 +15,7 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
     using System.Collections.Generic;
     using System.Linq;
 
@@ -359,12 +360,458 @@ namespace EngineTests
 
         #endregion SleepQualityAffectWeight — vliv konfigurace
 
+        #region CognitiveLoad — testy
+
+        /// <summary>
+        /// Vysoký spánkový dluh musí zvýšit CognitiveLoad.
+        /// </summary>
+        [TestMethod]
+        public void Tick_CognitiveLoad_IncreasesWithHighSleepDebt()
+        {
+            // Arrange — SleepDebtHours=10, CogLoad začíná nízko
+            var physio = MakePhysio(sleepDebtHours: 10, pain: 0, bodyTempDelta: 0);
+            var ctx = BuildContext(neuroticism: 0.5, physio: physio);
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+
+            var cogBefore = engine.State.CognitiveLoad;
+
+            // Act
+            engine.Tick(_now, WTimeSpan.FromHours(1.0), ctx, _outbox);
+
+            // Assert — CogLoad musí stoupnout (targetLoad = 10*1.8 = 18 > 0)
+            Assert.IsTrue(engine.State.CognitiveLoad > cogBefore,
+                $"SleepDebt=10 musí zvýšit CogLoad. Před: {cogBefore:F2}, po: {engine.State.CognitiveLoad:F2}");
+        }
+
+        /// <summary>
+        /// Vysoká bolest musí zvýšit CognitiveLoad.
+        /// </summary>
+        [TestMethod]
+        public void Tick_CognitiveLoad_IncreasesWithHighPain()
+        {
+            // Arrange — Pain=80, CogLoad začíná nízko
+            var physio = MakePhysio(sleepDebtHours: 0, pain: 80, bodyTempDelta: 0);
+            var ctx = BuildContext(neuroticism: 0.5, physio: physio);
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+
+            var cogBefore = engine.State.CognitiveLoad;
+
+            // Act
+            engine.Tick(_now, WTimeSpan.FromHours(1.0), ctx, _outbox);
+
+            // Assert — CogLoad musí stoupnout (targetLoad = 80*0.4 = 32 > 0)
+            Assert.IsTrue(engine.State.CognitiveLoad > cogBefore,
+                $"Pain=80 musí zvýšit CogLoad. Před: {cogBefore:F2}, po: {engine.State.CognitiveLoad:F2}");
+        }
+
+        /// <summary>
+        /// Čistá fyziologie (SleepDebt=0, Pain=0, Stress≈0) musí snížit elevovaný CogLoad.
+        /// </summary>
+        [TestMethod]
+        public void Tick_CognitiveLoad_DecreasesWhenPhysiologyClean()
+        {
+            // Arrange — fyziologie čistá, CogLoad začíná na 60
+            var physio = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0);
+            var ctx = BuildContext(neuroticism: 0.5, physio: physio);
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 60);
+
+            var cogBefore = engine.State.CognitiveLoad;
+
+            // Act
+            engine.Tick(_now, WTimeSpan.FromHours(1.0), ctx, _outbox);
+
+            // Assert — targetLoad ≈ 0, CogLoad musí klesnout
+            Assert.IsTrue(engine.State.CognitiveLoad < cogBefore,
+                $"Čistá fyziologie musí snižovat CogLoad. Před: {cogBefore:F2}, po: {engine.State.CognitiveLoad:F2}");
+        }
+
+        /// <summary>
+        /// Spánek musí CogLoad snižovat rychleji než jiná akce při stejném CogLoad > target.
+        /// </summary>
+        [TestMethod]
+        public void Tick_CognitiveLoad_RecoversFasterDuringSleep()
+        {
+            // Arrange — fyziologie čistá, CogLoad = 50, target ≈ 0
+            var physio = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0);
+
+            var ctxSleep = BuildContext(neuroticism: 0.5, physio: physio, currentAction: GameEngineTools.Characters.Engines.ActionNames.Sleep);
+            var ctxIdle  = BuildContext(neuroticism: 0.5, physio: physio, currentAction: null);
+
+            var sleepEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 50);
+            var idleEngine  = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 50);
+
+            // Act
+            sleepEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxSleep, new EventCollector());
+            idleEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxIdle, new EventCollector());
+
+            // Assert — spánek = recoveryRate * 1.5, ostatní = recoveryRate * 1.0
+            Assert.IsTrue(
+                sleepEngine.State.CognitiveLoad < idleEngine.State.CognitiveLoad,
+                $"Spánek musí snižovat CogLoad rychleji. Sleep={sleepEngine.State.CognitiveLoad:F2}, Idle={idleEngine.State.CognitiveLoad:F2}");
+        }
+
+        #endregion CognitiveLoad — testy
+
+        #region Fever — testy
+
+        /// <summary>
+        /// Vysoká teplota (BodyTempDelta=2.5) musí zvýšit CognitiveLoad oproti normálnímu stavu.
+        /// </summary>
+        [TestMethod]
+        public void Tick_Fever_HighBodyTemp_IncreasesCognitiveLoad()
+        {
+            // Arrange
+            var physioFever  = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 2.5);
+            var physioNormal = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0.0);
+
+            var ctxFever  = BuildContext(neuroticism: 0.5, physio: physioFever);
+            var ctxNormal = BuildContext(neuroticism: 0.5, physio: physioNormal);
+
+            var feverEngine  = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+            var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+
+            // Act
+            feverEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxFever, new EventCollector());
+            normalEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
+
+            // Assert — horečka (2.5 - 1.5 = 1.0 °C nad prahem) přidá 1.0 * 8 = 8 do targetLoad
+            Assert.IsTrue(
+                feverEngine.State.CognitiveLoad > normalEngine.State.CognitiveLoad,
+                $"Horečka musí zvýšit CogLoad. Fever={feverEngine.State.CognitiveLoad:F2}, Normal={normalEngine.State.CognitiveLoad:F2}");
+        }
+
+        /// <summary>
+        /// Vysoká teplota musí potlačit Arousal.
+        /// </summary>
+        [TestMethod]
+        public void Tick_Fever_HighBodyTemp_SuppressesArousal()
+        {
+            // Arrange
+            var physioFever  = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 2.5);
+            var physioNormal = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0.0);
+
+            var ctxFever  = BuildContext(neuroticism: 0.5, physio: physioFever);
+            var ctxNormal = BuildContext(neuroticism: 0.5, physio: physioNormal);
+
+            var feverEngine  = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+            var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+
+            // Act
+            feverEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxFever, new EventCollector());
+            normalEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
+
+            // Assert — horečka potlačuje arousal
+            Assert.IsTrue(
+                feverEngine.State.Arousal < normalEngine.State.Arousal,
+                $"Horečka musí snižovat Arousal. Fever={feverEngine.State.Arousal:F4}, Normal={normalEngine.State.Arousal:F4}");
+        }
+
+        /// <summary>
+        /// Teplota pod prahem (BodyTempDelta=1.0 &lt; 1.5) nesmí mít žádný kognitívní efekt.
+        /// </summary>
+        [TestMethod]
+        public void Tick_Fever_BelowThreshold_NoCogEffect()
+        {
+            // Arrange — teplota těsně pod prahem
+            var physioSubThreshold = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 1.0);
+            var physioNormal       = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0.0);
+
+            var ctxSub    = BuildContext(neuroticism: 0.5, physio: physioSubThreshold);
+            var ctxNormal = BuildContext(neuroticism: 0.5, physio: physioNormal);
+
+            var subEngine    = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+            var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+
+            // Act
+            subEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxSub, new EventCollector());
+            normalEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
+
+            // Assert — pod prahem není horečkový příspěvek do targetLoad
+            Assert.AreEqual(normalEngine.State.CognitiveLoad, subEngine.State.CognitiveLoad, delta: 0.01,
+                $"Teplota pod prahem nesmí přidat CogLoad. Sub={subEngine.State.CognitiveLoad:F4}, Normal={normalEngine.State.CognitiveLoad:F4}");
+        }
+
+        #endregion Fever — testy
+
+        #region Pregnancy events — testy
+
+        /// <summary>
+        /// Zjištění těhotenství musí způsobit stresový spike.
+        /// </summary>
+        [TestMethod]
+        public void Handle_PregnancyDiscovered_SpikesStress()
+        {
+            // Arrange
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var stressBefore = engine.State.Stress;
+            var evt = new PregnancyDiscovered(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+
+            // Act
+            engine.Handle(evt, ctx, _outbox);
+
+            // Assert — stressSpike = 10 + 0.5*15 = 17.5
+            Assert.IsTrue(engine.State.Stress > stressBefore,
+                $"PregnancyDiscovered musí zvýšit stres. Před: {stressBefore:F1}, po: {engine.State.Stress:F1}");
+        }
+
+        /// <summary>
+        /// Neurotická postava musí reagovat silnějším stresovým spikem při zjištění těhotenství.
+        /// </summary>
+        [TestMethod]
+        public void Handle_PregnancyDiscovered_HighNeuroticism_SpikesMoreStress()
+        {
+            // Arrange
+            var stableEngine  = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var neurotiEngine = BuildEngine(initialValence: 0.0, initialStress: 20);
+
+            var stableCtx  = BuildContext(neuroticism: 0.0);
+            var neurotiCtx = BuildContext(neuroticism: 1.0);
+
+            var stableEvt  = new PregnancyDiscovered(_now, stableCtx.Id, new HumanId(Guid.NewGuid()));
+            var neurotiEvt = new PregnancyDiscovered(_now, neurotiCtx.Id, new HumanId(Guid.NewGuid()));
+
+            // Act
+            stableEngine.Handle(stableEvt, stableCtx, new EventCollector());
+            neurotiEngine.Handle(neurotiEvt, neurotiCtx, new EventCollector());
+
+            // Assert — neuroticism=1: spike=25; neuroticism=0: spike=10
+            Assert.IsTrue(
+                neurotiEngine.State.Stress > stableEngine.State.Stress,
+                $"Neurotická postava musí mít více stresu. Stable={stableEngine.State.Stress:F1}, Neuroti={neurotiEngine.State.Stress:F1}");
+        }
+
+        /// <summary>
+        /// Pokud stres přesáhne 70 díky PregnancyDiscovered, musí být publikován StressSpiked.
+        /// </summary>
+        [TestMethod]
+        public void Handle_PregnancyDiscovered_StressExceedsThreshold_PublishesStressSpiked()
+        {
+            // Arrange — stres těsně pod prahem, neuroticism=1 → spike=25 → stres=90
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 65);
+            var ctx = BuildContext(neuroticism: 1.0);
+            var evt = new PregnancyDiscovered(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+
+            // Act
+            engine.Handle(evt, ctx, _outbox);
+
+            // Assert
+            var events = _outbox.Drain();
+            Assert.IsTrue(
+                events.OfType<StressSpiked>().Any(),
+                "Překročení threshold 70 musí publikovat StressSpiked.");
+        }
+
+        /// <summary>
+        /// Porod musí zvýšit valenci.
+        /// </summary>
+        [TestMethod]
+        public void Handle_ChildBorn_IncreasesValence()
+        {
+            // Arrange
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 30);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var valenceBefore = engine.State.Valence;
+            var evt = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+
+            // Act
+            engine.Handle(evt, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Valence > valenceBefore,
+                $"ChildBorn musí zvýšit valenci. Před: {valenceBefore:F3}, po: {engine.State.Valence:F3}");
+        }
+
+        /// <summary>
+        /// Porod musí zvýšit arousal.
+        /// </summary>
+        [TestMethod]
+        public void Handle_ChildBorn_IncreasesArousal()
+        {
+            // Arrange
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 30);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var arousalBefore = engine.State.Arousal;
+            var evt = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+
+            // Act
+            engine.Handle(evt, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Arousal > arousalBefore,
+                $"ChildBorn musí zvýšit arousal. Před: {arousalBefore:F3}, po: {engine.State.Arousal:F3}");
+        }
+
+        /// <summary>
+        /// Porod musí snížit stres.
+        /// </summary>
+        [TestMethod]
+        public void Handle_ChildBorn_DecreasesStress()
+        {
+            // Arrange
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 50);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var stressBefore = engine.State.Stress;
+            var evt = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+
+            // Act
+            engine.Handle(evt, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Stress < stressBefore,
+                $"ChildBorn musí snížit stres. Před: {stressBefore:F1}, po: {engine.State.Stress:F1}");
+        }
+
+        #endregion Pregnancy events — testy
+
+        #region Dominance — testy
+
+        /// <summary>
+        /// Přijatá interakce (jako iniciátor) musí zvýšit Dominance.
+        /// </summary>
+        [TestMethod]
+        public void Handle_InteractionAccepted_AsInitiator_IncreasesDominance()
+        {
+            // Arrange
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var domBefore = engine.State.Dominance;
+
+            // Accepted: io.From == self
+            var io = new InteractionOutcome(
+                OccurredAt: _now,
+                From: ctx.Id,
+                To: new HumanId(Guid.NewGuid()),
+                Act: SpeechAct.SmallTalk,
+                Accepted: true,
+                Reason: string.Empty);
+
+            // Act
+            engine.Handle(io, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Dominance > domBefore,
+                $"Přijatá interakce jako iniciátor musí zvýšit Dominance. Před: {domBefore:F3}, po: {engine.State.Dominance:F3}");
+        }
+
+        /// <summary>
+        /// Odmítnutá interakce (jako iniciátor) musí snížit Dominance.
+        /// </summary>
+        [TestMethod]
+        public void Handle_InteractionRejected_AsInitiator_DecreasesDominance()
+        {
+            // Arrange
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var domBefore = engine.State.Dominance;
+
+            // wasRejected: io.From == self && !io.Accepted
+            var io = new InteractionOutcome(
+                OccurredAt: _now,
+                From: ctx.Id,
+                To: new HumanId(Guid.NewGuid()),
+                Act: SpeechAct.SmallTalk,
+                Accepted: false,
+                Reason: string.Empty);
+
+            // Act
+            engine.Handle(io, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Dominance < domBefore,
+                $"Odmítnutí jako iniciátor musí snížit Dominance. Před: {domBefore:F3}, po: {engine.State.Dominance:F3}");
+        }
+
+        /// <summary>
+        /// Odmítnutí citlivého aktu (SelfDisclosure) musí způsobit větší pokles Dominance
+        /// než odmítnutí SmallTalk.
+        /// </summary>
+        [TestMethod]
+        public void Handle_InteractionRejected_HighSensitivityAct_LargerDominanceDrop()
+        {
+            // Arrange
+            var engineSmall = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var engineSelf  = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+
+            var toId = new HumanId(Guid.NewGuid());
+            var ioSmall = new InteractionOutcome(_now, ctx.Id, toId, false, string.Empty, SpeechAct.SmallTalk);
+            var ioSelf  = new InteractionOutcome(_now, ctx.Id, toId, false, string.Empty, SpeechAct.SelfDisclosure);
+
+            // Act
+            engineSmall.Handle(ioSmall, ctx, new EventCollector());
+            engineSelf.Handle(ioSelf, ctx, new EventCollector());
+
+            // Assert — SelfDisclosure actSensitivity=1.6 vs SmallTalk=1.0 → větší drop
+            Assert.IsTrue(
+                engineSelf.State.Dominance < engineSmall.State.Dominance,
+                $"SelfDisclosure odmítnutí musí způsobit větší pokles Dominance. " +
+                $"SmallTalk={engineSmall.State.Dominance:F4}, SelfDisclosure={engineSelf.State.Dominance:F4}");
+        }
+
+        /// <summary>
+        /// Odmítnutí jako příjemce (didReject) musí zvýšit Dominance.
+        /// </summary>
+        [TestMethod]
+        public void Handle_InteractionRejected_AsRejecter_IncreasesDominance()
+        {
+            // Arrange
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var domBefore = engine.State.Dominance;
+
+            // didReject: io.To == self && !io.Accepted
+            var io = new InteractionOutcome(
+                OccurredAt: _now,
+                From: new HumanId(Guid.NewGuid()),
+                To: ctx.Id,
+                Act: SpeechAct.SmallTalk,
+                Accepted: false,
+                Reason: string.Empty);
+
+            // Act
+            engine.Handle(io, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Dominance > domBefore,
+                $"Odmítnutí jako příjemce musí zvýšit Dominance. Před: {domBefore:F3}, po: {engine.State.Dominance:F3}");
+        }
+
+        /// <summary>
+        /// Vysoká bolest musí snižovat Dominance v Tick().
+        /// </summary>
+        [TestMethod]
+        public void Tick_HighPain_ReducesDominance()
+        {
+            // Arrange — Pain=50
+            var physioHighPain = MakePhysio(sleepDebtHours: 0, pain: 50, bodyTempDelta: 0);
+            var physioNoPain   = MakePhysio(sleepDebtHours: 0, pain: 0,  bodyTempDelta: 0);
+
+            var ctxHighPain = BuildContext(neuroticism: 0.5, physio: physioHighPain);
+            var ctxNoPain   = BuildContext(neuroticism: 0.5, physio: physioNoPain);
+
+            var engineHighPain = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var engineNoPain   = BuildEngine(initialValence: 0.0, initialStress: 0);
+
+            // Act
+            engineHighPain.Tick(_now, WTimeSpan.FromHours(1.0), ctxHighPain, new EventCollector());
+            engineNoPain.Tick(_now, WTimeSpan.FromHours(1.0), ctxNoPain, new EventCollector());
+
+            // Assert — Pain=50 → -0.0005 * 50 * 1h = -0.025 extra oproti žádné bolesti
+            Assert.IsTrue(
+                engineHighPain.State.Dominance < engineNoPain.State.Dominance,
+                $"Vysoká bolest musí snižovat Dominance. HighPain={engineHighPain.State.Dominance:F4}, NoPain={engineNoPain.State.Dominance:F4}");
+        }
+
+        #endregion Dominance — testy
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine s výchozí nebo vlastní konfigurací.</summary>
         private static DefaultPsychologyEngine BuildEngine(
             double initialValence,
             double initialStress,
+            double initialCogLoad = 10,
             PsychologyConfig? cfg = null)
         {
             var opts = Options.Create(cfg ?? DefaultCfg);
@@ -379,26 +826,36 @@ namespace EngineTests
                 Arousal: 0.4,
                 Dominance: 0.5,
                 Stress: initialStress,
-                CognitiveLoad: 10,
+                CognitiveLoad: initialCogLoad,
                 DominantEmotion: DiscreteEmotion.Neutral));
 
             return engine;
         }
 
-        /// <summary>Sestaví fake kontext s nastaveným Neuroticism.</summary>
+        /// <summary>Sestaví fake kontext s nastaveným Neuroticism a výchozí fyziologií.</summary>
         private static IHumanContext BuildContext(double neuroticism)
-        {
-            var physio = new PhysiologyState(
-                Energy: 70, SleepDebtHours: 0, Hunger: 20, Thirst: 15,
-                Pain: 0, ImmuneLoad: 5, BodyTempDelta: 0, Cycle: null);
+            => BuildContext(neuroticism, MakePhysio(0, 0, 0), currentAction: null);
 
+        /// <summary>
+        /// Sestaví fake kontext s nastaveným Neuroticism a vlastní fyziologií.
+        /// Volitelně nastaví aktuální akci (CurrentPlan.Name).
+        /// </summary>
+        private static IHumanContext BuildContext(
+            double neuroticism,
+            PhysiologyState physio,
+            string? currentAction = null)
+        {
             var psych = new PsychologyState(
                 Valence: 0.1, Arousal: 0.4, Dominance: 0.5,
                 Stress: 20, CognitiveLoad: 10, DominantEmotion: DiscreteEmotion.Neutral);
 
+            var plan = currentAction is not null
+                ? new PlannedAction(currentAction, new WDateTime(0), WTimeSpan.FromHours(1), 50)
+                : null;
+
             var snapshot = new EnginesSnapshot(
                 physio, psych,
-                new BehaviorState(40, 20, 15, 40, 50, 30, null),
+                new BehaviorState(40, 20, 15, 40, 50, 30, plan),
                 new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(
@@ -425,6 +882,21 @@ namespace EngineTests
                 Scheduler = new NullScheduler()
             };
         }
+
+        /// <summary>Sestaví PhysiologyState s danými hodnotami pro Tick() testy.</summary>
+        private static PhysiologyState MakePhysio(
+            double sleepDebtHours,
+            double pain,
+            double bodyTempDelta)
+            => new PhysiologyState(
+                Energy: 70,
+                SleepDebtHours: sleepDebtHours,
+                Hunger: 20,
+                Thirst: 15,
+                Pain: pain,
+                ImmuneLoad: 5,
+                BodyTempDelta: bodyTempDelta,
+                Cycle: null);
 
         /// <summary>Vytvoří <see cref="SleepEnded"/> s danými parametry.</summary>
         private SleepEnded MakeSleepEnded(double quality, double hoursSlept, bool wasInterrupted)

@@ -9,9 +9,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
     public sealed record PsychologyConfig(
         double BaselineAffectVariance = 0.02,
         double StressRecoveryRatePerHour = 1.5,
-        double SleepQualityAffectWeight = 0.5)
+        double SleepQualityAffectWeight = 0.5,
+        double CognitiveLoadSleepDebtWeight = 1.8,
+        double CognitiveLoadPainWeight = 0.4,
+        double CognitiveLoadStressWeight = 0.3,
+        double CognitiveLoadRecoveryPerHour = 5.0,
+        double FeverCognitiveLoadPerDegree = 8.0,
+        double FeverArousalSuppressPerDegree = 0.04)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04) { }
     }
 
     public sealed record PsychologyState(
