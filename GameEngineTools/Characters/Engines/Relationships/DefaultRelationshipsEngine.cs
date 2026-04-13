@@ -481,8 +481,6 @@ namespace GameEngineTools.Characters.Engines.Relationships
             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
             {
                 _log.RelDecayApplied(ctx.Id.Value.ToString(), State.Edges.Count, days);
-                // TODO: For debug purpose only
-                _log.LogDebug("Relationships social decay applied for {HumanId} with fidelity {Fidelity} over {Days:F3} day(s).", ctx.Id.Value, fidelity, days);
             }
         }
 

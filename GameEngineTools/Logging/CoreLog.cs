@@ -562,6 +562,16 @@ namespace GameEngineTools.Logging
             double P,
             string Result);
 
+        [LoggerMessage(EventId = 1203, Level = LogLevel.Information, Message = "[BEHAV/INTERACT] {HumanId} {From} -> {To}: {Intent}, {ReprPotential}, {Contraception}")]
+        public static partial void SexualEncounterProposed(
+            this ILogger logger,
+            string HumanId,
+            string From,
+            string To,
+            string Intent,
+            string ReprPotential,
+            string Contraception);
+
         #endregion Behavior/Interaction — kontext
 
         #region Memory — epizodická paměť
