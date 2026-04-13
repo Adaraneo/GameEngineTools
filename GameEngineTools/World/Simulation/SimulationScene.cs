@@ -148,10 +148,19 @@ namespace GameEngineTools.World.Simulation
             // proto je to správné místo pro detekci ReachOut a routování.
             _options.OnTick?.Invoke(now, chars);
 
-            // ── Krok 2: Tick všech postav + okamžité routování outcomes ────────────
+            // ── Krok 2: Tick všech postav ──────────────────────────────────────────
+            // All characters advance their state before any outcomes are routed.
+            // Ensures outcome delivery is independent of character list order.
             foreach (var character in chars)
             {
                 character.Tick(now, dt);
+            }
+
+            // ── Krok 2b: Routování outcomes ───────────────────────────────────────
+            // Outcomes are enqueued into recipient inboxes and processed at the START
+            // of their next tick (Phase A) — regardless of position in the character list.
+            foreach (var character in chars)
+            {
                 RouteOutcomes(character, chars);
             }
 

@@ -101,7 +101,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 _ => -0.3
             };
 
-            var feverDelta = ph.ImmuneLoad > 30 ? (ph.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
+            var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
 
             s = s with
             {
@@ -110,7 +110,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Thirst = Clamp01p(s.Thirst + thirstDelta),
                 Pain = Clamp01p(s.Pain + painDelta),
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + immuneDelta),
-                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, feverDelta, 0.1 * h), -1.0, 3.5));
+                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, feverDelta, 0.1 * h), -1.0, 3.5)
             };
 
             if (s.Pregnancy is { } pregnancy)
@@ -144,7 +144,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         var h = Math.Max(0, se.TotalHoursSlept);
 
                         var qualityFactor = se.Quality / 100.0;
-                        var remainingDept = s.SleepDeptHours;
+                        var remainingDept = s.SleepDebtHours;
                         var maxRecovery = remainingDept * 0.55; // Max 55 % za jednu noc
                         var actualRecovery = Math.Min(maxRecovery, h * 0.9 * qualityFactor);
 

@@ -263,22 +263,30 @@ namespace GameEngineTools.Characters.Core
 
             // Phase B: advance engines. Physiology / psychology / memory always progress with world time,
             // while behaviour-level reasoning can optionally run on a coarser cadence.
-            var outbox = new EventCollector();
+            // Pipeline order: Physiology → Psychology → Behavior → Interact → Relations → Memory.
+            var outbox    = new EventCollector();
             var behaviorDt = ConsumeBehaviorDelta(dt);
+
+            // Physiology and psychology must advance first — behavior reads their current state.
+            // This enforces the documented pipeline order: Physiology → Psychology → Behavior.
+            _physio.Tick(now, dt, _ctx, outbox);
+            _psych.Tick(now, dt, _ctx, outbox);
+
+            // Mid-tick snapshot: behavior now reads the current tick's physiological and
+            // psychological state rather than the state from the previous tick.
+            RefreshSnapshot();
 
             if (behaviorDt > WTimeSpan.Zero)
             {
                 _behavior.Tick(now, behaviorDt, _ctx, outbox);
             }
 
-            _physio.Tick(now, dt, _ctx, outbox);
-            _psych.Tick(now, dt, _ctx, outbox);
             _interact.Tick(now, dt, _ctx, outbox);
             _relations.Tick(now, dt, _ctx, outbox);
             _memory.Tick(now, dt, _ctx, outbox);
             _semanticMemory.Tick(now, dt, _ctx, outbox);
 
-            // After-tick: build a snapshot from the current engine states before self-delivery.
+            // Final snapshot after all Phase B engines complete.
             RefreshSnapshot();
 
             // Phase C: self-deliver — character reacts to its own Phase B events

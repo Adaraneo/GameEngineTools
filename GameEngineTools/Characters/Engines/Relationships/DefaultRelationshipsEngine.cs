@@ -443,7 +443,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
             foreach (var kv in State.Edges)
             {
                 var e = kv.Value;
-                var d = Config.DecayPerDay * days;
+
+                // Established relationships decay slower: accumulated history provides inertia.
+                // At PositiveInteractionCount = MereExposureSaturation (20), decay is ~60% of base rate.
+                // Minimum decay factor 0.40 — even deep bonds fade with sustained absence.
+                var depthFactor = Math.Clamp(
+                    1.0 - Math.Log(1.0 + e.PositiveInteractionCount)
+                              / Math.Log(1.0 + Config.MereExposureSaturation) * 0.60,
+                    0.40,
+                    1.0);
+
+                var d = Config.DecayPerDay * days * depthFactor;
 
                 // Domain breakdown decays very slowly toward neutral (50) without reinforcement.
                 // Rate is 10× slower than Closeness — domains are more stable impressions than

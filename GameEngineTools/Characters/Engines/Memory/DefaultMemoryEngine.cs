@@ -647,7 +647,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         {
             var episodes = State.Episodes.ToList();
 
-            // Vyber Top 10 epizod podle salience — ty REM fáze upevňuje nejvíc
+            // REM consolidation prioritises by salience weighted by emotional intensity.
+            // Negative memories consolidate most strongly — negativity bias (McGaugh 2000).
             var toBoost = episodes
                 .OrderByDescending(e =>
                 {

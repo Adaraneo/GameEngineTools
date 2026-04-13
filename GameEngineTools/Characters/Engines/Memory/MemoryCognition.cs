@@ -84,14 +84,16 @@ namespace GameEngineTools.Characters.Engines.Memory
             var recencyWeight = ComputeRecencyWeight(age, query.RecencyWindow);
             var targetScore = ComputeTargetScore(episode, query);
             var confidenceScore = Math.Clamp(episode.RecallConfidence, 0.0, 1.0);
+            // Salience is the primary encoding signal (encoding specificity principle, Tulving).
+            // Strength is derived from decay and reinforcement — secondary to initial salience.
             var relevance =
-                (targetScore * 0.30) +
+                (targetScore    * 0.30) +
                 (situationScore * 0.24) +
-                (recencyWeight * 0.18) +
-                (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.08) +
+                (recencyWeight  * 0.18) +
                 (Math.Clamp(episode.Salience, 0.0, 1.0) * 0.16) +
-                (confidenceScore * 0.04) +
-                (emotionScore * 0.08);
+                (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.08) +
+                (emotionScore   * 0.08) +
+                (confidenceScore * 0.04);
 
             if (relevance < MinimumRecallRelevance)
             {
@@ -215,7 +217,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         ReflectionSummaryKind.WarmForCasualContact,
                         query.TargetHuman,
                         strength,
-                        warmthSignals,
+                        (int)Math.Round(warmthSignals),
                         "Repeated low-stakes contact felt warm."));
                     }
                 }
@@ -229,7 +231,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         ReflectionSummaryKind.SafeForReachOut,
                         query.TargetHuman,
                         strength,
-                        safeSignals,
+                        (int)Math.Round(safeSignals),
                         "Recent contact with this person has been safe enough for outreach."));
                     }
                 }
@@ -269,7 +271,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         ReflectionSummaryKind.RejectsIntimacy,
                         query.TargetHuman,
                         strength,
-                        intimacyRejections,
+                        (int)Math.Round(intimacyRejections),
                         "Repeated vulnerable contact was rejected or emotionally costly."));
                     }
                 }
@@ -283,7 +285,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         ReflectionSummaryKind.RecentSocialCost,
                         query.TargetHuman,
                         strength,
-                        recentNegativeSocial,
+                        (int)Math.Round(recentNegativeSocial),
                         "Recent interactions with this person have been emotionally costly."));
                     }
                 }
@@ -294,14 +296,14 @@ namespace GameEngineTools.Characters.Engines.Memory
                     (episode.Emotion == EmotionalTag.Negative || episode.Emotion == EmotionalTag.Mixed) &&
                     IsSocialEpisode(episode), now);
 
-                if (recentNegativeSocial >= 2)
+                if (recentNegativeSocial >= 1.5)
                 {
                     var strength = Math.Clamp(0.10 + (recentNegativeSocial * 0.14), 0.0, 0.62);
                     reflections.Add(new ReflectionSummary(
                         ReflectionSummaryKind.RecentSocialCost,
                         null,
                         strength,
-                        recentNegativeSocial,
+                        (int)Math.Round(recentNegativeSocial),
                         "Recent social contact has been emotionally costly overall."));
                 }
             }

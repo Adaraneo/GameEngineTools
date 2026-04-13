@@ -93,8 +93,10 @@ namespace GameEngineTools.Characters.Engines.Attraction
             var whrOptimum = targetBiology == SexBiology.Female ? WhrOptimumFemale : WhrOptimumMale;
             var whrScore   = TriangularScore(whr, whrOptimum, WhrToleranceHalf) * 18.0;
 
-            // Height within a broad "plausible partner" range (population-level baseline)
-            var heightScore = TriangularScore(target.Body.Proportions.HeightCm, 170.0, HeightWindowHalf) * 12.0;
+            // Height optimum is sex-specific — consistent with sex-specific WHR optimum above.
+            // Population-level baselines (global averages): female ~163 cm, male ~176 cm.
+            var heightOptimum = targetBiology == SexBiology.Female ? 163.0 : 176.0;
+            var heightScore   = TriangularScore(target.Body.Proportions.HeightCm, heightOptimum, HeightWindowHalf) * 12.0;
 
             // Structured morphology provides an explicit subtle-asymmetry signal.
             var symmetryScore = EstimateSymmetry(target) * 10.0;

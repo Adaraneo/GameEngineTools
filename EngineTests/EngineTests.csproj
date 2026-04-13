@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="call prebuild.bat $(OutDir)" />
+    <Exec Command="call &quot;$(MSBuildProjectDirectory)\prebuild.bat&quot; $(OutDir)" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
   <ItemGroup>

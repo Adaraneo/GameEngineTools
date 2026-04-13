@@ -37,7 +37,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 SpeechAct.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
                 SpeechAct.Invite when accepted => bd with { Physical = BumpD(bd.Physical, +0.5) },
                 SpeechAct.Invite => bd,
-                SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.0 * mul) },
+                // Accepted boundary: signals self-respect → raises Values alignment.
+                // Rejected boundary (mul = 0.5): values conflict → stronger penalty.
+                SpeechAct.Boundary when accepted  => bd with { Values = BumpD(bd.Values, +0.8) },
+                SpeechAct.Boundary                => bd with { Values = BumpD(bd.Values, -1.5 * mul) },
                 _ => bd
             };
         }
