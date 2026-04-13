@@ -76,24 +76,35 @@ namespace GameEngineTools.Characters.Engines.Psychology
             double Clampm1p1(double v) => Math.Max(-1, Math.Min(1, v));
             static DiscreteEmotion InferEmotion(PsychologyState ps)
             {
+                // High stress — Dominance rozlišuje strach vs. hněv (PAD model)
                 if (ps.Stress > 70)
-                {
-                    return ps.Valence < 0 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
-                }
-
-                if (ps.Valence > 0.4)
-                {
-                    return DiscreteEmotion.Joy;
-                }
-
-                if (ps.Valence < -0.4)
-                {
-                    return DiscreteEmotion.Sadness;
-                }
-
+                    return ps.Dominance < 0.4 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
+            
+                // Surprise — náhlý arousal spike bez jasné valence
+                if (ps.Arousal > 0.85 && ps.Valence is > -0.2 and < 0.2)
+                    return DiscreteEmotion.Surprise;
+            
+                // Pride — pozitivní + vysoká dominance
+                if (ps.Valence > 0.5 && ps.Dominance > 0.7)
+                    return DiscreteEmotion.Pride;
+            
+                // Shame — negativní + nízká dominance + nízký stres (ne panic)
+                if (ps.Valence < -0.3 && ps.Dominance < 0.3 && ps.Stress < 50)
+                    return DiscreteEmotion.Shame;
+            
+                // Tenderness — pozitivní + klidný + submisivní (péče)
+                if (ps.Valence > 0.3 && ps.Arousal < 0.4 && ps.Dominance < 0.45)
+                    return DiscreteEmotion.Tenderness;
+            
+                // Disgust — negativní + nízký arousal + střední dominance
+                if (ps.Valence < -0.4 && ps.Arousal < 0.4)
+                    return DiscreteEmotion.Disgust;
+            
+                if (ps.Valence > 0.4) return DiscreteEmotion.Joy;
+                if (ps.Valence < -0.4) return DiscreteEmotion.Sadness;
                 return DiscreteEmotion.Neutral;
             }
-            double RandomSym() => (_rng.NextUnit() - 0.5) * 2.0 * 0.05; // ±5% šum
+            double RandomSym() => (_rng.NextUnit() - 0.5) * 2.0;
             double Approach(double val, double target, double by) =>
                 (val < target) ? Math.Min(target, val + by) : Math.Max(target, val - by);
         }
@@ -124,8 +135,23 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     else if (wasRejected)
                     {
                         var n = ctx.Personality.BigFive.Neuroticism;
-                        var att = (int)ctx.Personality.Attachment;
-                        var impact = 0.05 + 0.10 * n + (att == 1 ? 0.05 : 0);
+                        var attachmentModifier = ctx.Personality.Attachment switch
+                        {
+                            AttachmentStyle.Secure => 0.0,
+                            AttachmentStyle.Anxious => 0.08,
+                            AttachmentStyle.Avoidant => -0.02,
+                            AttachmentStyle.Disorganized => 0.12,
+                            _ => 0.0
+                        };
+                        var actSensitivity = io.Act switch
+                        {
+                            SpeechAct.SelfDisclosure => 1.6,
+                            SpeechAct.Invite => 1.4,
+                            SpeechAct.Validation => 1.2,
+                            SpeechAct.Meta => 1.1,
+                            _ => 1.0
+                        };
+                        var impact = (0.05 + 0.10 * n + attachmentModifier) * actSensitivity;
                         s = s with
                         {
                             Valence = Math.Max(-1, s.Valence - impact),
