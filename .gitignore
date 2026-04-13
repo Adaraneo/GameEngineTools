@@ -363,3 +363,8 @@ MigrationBackup/
 FodyWeavers.xsd
 /GameSandbox/appsettings.json
 /.claude/settings.local.json
+/.claude/agents/code-reviewer-impl-planner.md
+/.claude/agents/plan-implementer.md
+/.claude/csharp-conventions.skill
+/.claude/csharp-mstest.skill
+/.claude/human-behavior-npc.skill
