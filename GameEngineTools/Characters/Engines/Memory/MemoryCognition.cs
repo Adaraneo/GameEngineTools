@@ -87,11 +87,11 @@ namespace GameEngineTools.Characters.Engines.Memory
             var relevance =
                 (targetScore * 0.30) +
                 (situationScore * 0.24) +
-                (recencyWeight * 0.20) +
-                (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.12) +
-                (Math.Clamp(episode.Salience, 0.0, 1.0) * 0.08) +
-                (confidenceScore * 0.03) +
-                (emotionScore * 0.10);
+                (recencyWeight * 0.18) +
+                (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.08) +
+                (Math.Clamp(episode.Salience, 0.0, 1.0) * 0.16) +
+                (confidenceScore * 0.04) +
+                (emotionScore * 0.08);
 
             if (relevance < MinimumRecallRelevance)
             {
@@ -196,19 +196,17 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             if (query.TargetHuman is not null)
             {
-                var warmthSignals = targetEpisodes.Count(IsWarmLowStakesEpisode);
-                var safeSignals = targetEpisodes.Count(IsSafeEpisode);
-                var intimacyRejections = targetEpisodes.Count(IsRejectedIntimacyEpisode);
-                var positiveVulnerability = targetEpisodes.Count(IsPositiveVulnerabilityEpisode);
-                var recentNegativeSocial = targetEpisodes.Count(episode =>
+                var warmthSignals = WeightedEpisodeScore(targetEpisodes, IsWarmLowStakesEpisode, now);
+                var safeSignals = WeightedEpisodeScore(targetEpisodes, IsSafeEpisode, now);
+                var intimacyRejections = WeightedEpisodeScore(targetEpisodes, IsRejectedIntimacyEpisode, now);
+                var positiveVulnerability = WeightedEpisodeScore(targetEpisodes, IsPositiveVulnerabilityEpisode, now);
+                var recentNegativeSocial = WeightedEpisodeScore(targetEpisodes, episode =>
                     IsSocialEpisode(episode) &&
-                    (episode.Emotion == EmotionalTag.Negative || episode.Emotion == EmotionalTag.Mixed) &&
-                    now - episode.When <= WTimeSpan.FromDays(5));
-                var recentPositiveSocial = targetEpisodes.Count(episode =>
-                    IsWarmLowStakesEpisode(episode) &&
-                    now - episode.When <= WTimeSpan.FromDays(7));
+                    (episode.Emotion == EmotionalTag.Negative || episode.Emotion == EmotionalTag.Mixed), now);
+                var recentPositiveSocial = WeightedEpisodeScore(targetEpisodes, episode =>
+                    IsWarmLowStakesEpisode(episode), now);
 
-                if (warmthSignals >= 2)
+                if (warmthSignals >= 1.5)
                 {
                     var strength = Math.Clamp(0.10 + (warmthSignals * 0.12) - (recentNegativeSocial * 0.05), 0.0, 0.65);
                     if (strength >= 0.20)
@@ -222,7 +220,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     }
                 }
 
-                if (safeSignals >= 2)
+                if (safeSignals >= 1.5)
                 {
                     var strength = Math.Clamp(0.08 + (safeSignals * 0.14) + (recentPositiveSocial * 0.03) - (recentNegativeSocial * 0.06), 0.0, 0.70);
                     if (strength >= 0.22)
@@ -262,7 +260,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
                 #endregion
 
-                if (intimacyRejections >= 2)
+                if (intimacyRejections >= 1.5)
                 {
                     var strength = Math.Clamp(0.14 + (intimacyRejections * 0.18) - (positiveVulnerability * 0.10), 0.0, 0.78);
                     if (strength >= 0.25)
@@ -276,7 +274,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     }
                 }
 
-                if (recentNegativeSocial >= 2)
+                if (recentNegativeSocial >= 1.5)
                 {
                     var strength = Math.Clamp(0.08 + (recentNegativeSocial * 0.14) - (recentPositiveSocial * 0.05), 0.0, 0.68);
                     if (strength >= 0.20)
@@ -292,10 +290,9 @@ namespace GameEngineTools.Characters.Engines.Memory
             }
             else
             {
-                var recentNegativeSocial = targetEpisodes.Count(episode =>
+                var recentNegativeSocial = WeightedEpisodeScore(targetEpisodes, episode =>
                     (episode.Emotion == EmotionalTag.Negative || episode.Emotion == EmotionalTag.Mixed) &&
-                    IsSocialEpisode(episode) &&
-                    now - episode.When <= WTimeSpan.FromDays(5));
+                    IsSocialEpisode(episode), now);
 
                 if (recentNegativeSocial >= 2)
                 {
@@ -414,6 +411,20 @@ namespace GameEngineTools.Characters.Engines.Memory
             }
 
             return episode.OtherPerson is not null ? 0.55 : 0.15;
+        }
+
+        private static double WeightedEpisodeScore(
+            IReadOnlyList<EpisodicMemory> episodes, 
+            Func<EpisodicMemory, bool> predicate, 
+            WDateTime now)
+        {
+            return episodes
+                .Where(predicate)
+                .Sum(e =>
+                {
+                    var ageDays = (now - e.When).TotalDays;
+                    return 1.0 / (1.0 + ageDays / 7.0); // half-life ~7 dní
+                });
         }
 
         #endregion Episode helpers
