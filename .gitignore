@@ -368,3 +368,9 @@ FodyWeavers.xsd
 /.claude/csharp-conventions.skill
 /.claude/csharp-mstest.skill
 /.claude/human-behavior-npc.skill
+/.claude/agent-memory-local/code-reviewer-impl-planner/MEMORY.md
+/.claude/agent-memory-local/code-reviewer-impl-planner/project_context.md
+/COMPILATION_FIX_SUMMARY.md
+/FINAL_BUILD_AND_TEST_REPORT.md
+/PHASE1_COMPLETION_REPORT.txt
+/PHYSIO_PSYCH_ARCHITECTURE.md
