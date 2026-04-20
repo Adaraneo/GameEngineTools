@@ -12,14 +12,48 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
+    /// <summary>
+    /// Default implementation of the psychology engine.
+    /// Models affective state using the PAD (Pleasure-Arousal-Dominance) model, infers a
+    /// discrete dominant emotion each tick, and reacts to a wide range of domain events
+    /// (sleep, pregnancy, social interactions, memory recall, nightmares).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The engine maintains three continuous PAD dimensions plus a <c>Stress</c> scalar and a
+    /// <c>CognitiveLoad</c> scalar. Each <see cref="Tick"/> applies:
+    /// <list type="number">
+    ///   <item><description>Stress decay toward zero at <c>StressRecoveryRatePerHour</c>.</description></item>
+    ///   <item><description>PAD drift toward a neutral resting state.</description></item>
+    ///   <item><description>Physiology modulation (pain → stress, sleep debt → CogLoad, fever → arousal suppression).</description></item>
+    ///   <item><description>Ovulation arousal/valence boost when the cycle window is open.</description></item>
+    ///   <item><description>Random daily affective noise scaled by <c>BaselineAffectVariance</c>.</description></item>
+    ///   <item><description>Discrete emotion inference via the PAD rule table.</description></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <see cref="Handle"/> applies instantaneous state changes for named domain events and
+    /// may emit <see cref="StressSpiked"/> when stress crosses the 70-point threshold from below.
+    /// </para>
+    /// </remarks>
     internal sealed class DefaultPsychologyEngine : IPsychologyEngine
     {
+        /// <summary>Gets the current psychological state of the character.</summary>
         public PsychologyState State { get; private set; }
+
+        /// <summary>Gets the configuration driving affect drift rates, CognitiveLoad weights, and fever thresholds.</summary>
         public PsychologyConfig Config { get; }
 
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
 
+        /// <summary>
+        /// Initialises the engine with a neutral resting state:
+        /// Valence=0.1, Arousal=0.4, Dominance=0.5, Stress=20, CognitiveLoad=20.
+        /// </summary>
+        /// <param name="cfg">Psychology configuration options.</param>
+        /// <param name="loggerFactory">Logger factory injected by the DI container.</param>
+        /// <param name="rng">Random source for daily affect noise; use <c>ZeroRandom</c> in tests.</param>
         public DefaultPsychologyEngine(IOptions<PsychologyConfig> cfg, ILoggerFactory loggerFactory, IRandomSource rng)
         {
             Config = cfg.Value;
@@ -31,6 +65,22 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 Stress: 20, CognitiveLoad: 20, DominantEmotion: DiscreteEmotion.Neutral);
         }
 
+        /// <summary>
+        /// Advances continuous psychological state drift by one time step.
+        /// Called each game tick to apply gradual changes to PAD dimensions, stress, and
+        /// cognitive load; infers a new dominant emotion and emits <see cref="EmotionShifted"/>
+        /// if the inferred label changes.
+        /// </summary>
+        /// <param name="now">Current in-world date-time (used for event timestamps).</param>
+        /// <param name="dt">
+        /// Elapsed time since the last tick. All drift deltas are scaled by
+        /// <c>dt.TotalHours</c> so the engine is frame-rate independent.
+        /// </param>
+        /// <param name="ctx">
+        /// Character context providing physiology snapshot (for stress/CogLoad modulation)
+        /// and the current action name (Sleep/Idle accelerate CogLoad recovery).
+        /// </param>
+        /// <param name="outbox">Collector for <see cref="EmotionShifted"/> events.</param>
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
             var h = Math.Max(0, dt.TotalHours);
@@ -138,6 +188,26 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 (val < target) ? Math.Min(target, val + by) : Math.Max(target, val - by);
         }
 
+        /// <summary>
+        /// Reacts to discrete domain events by applying instantaneous psychological state mutations.
+        /// Handled event types and their effects:
+        /// <list type="bullet">
+        ///   <item><description><b>MicroPositive / MicroNegative</b> — minor relationship micro-events; nudge Valence.</description></item>
+        ///   <item><description><b>InteractionOutcome</b> — accepted/rejected social interactions; adjust Valence, Stress, Dominance scaled by personality (Neuroticism, Attachment style, act sensitivity).</description></item>
+        ///   <item><description><b>StressSpiked</b> — external stress signal; raises Stress to at least <c>sp.NewStress</c>.</description></item>
+        ///   <item><description><b>MensesStarted</b> — reduces Valence by 0.05 (physical discomfort onset).</description></item>
+        ///   <item><description><b>OvulationWindowOpened</b> — raises Arousal by 0.05 (hormonal activation).</description></item>
+        ///   <item><description><b>PregnancyStarted</b> — subtle hormonal lability: small Arousal and Valence increase.</description></item>
+        ///   <item><description><b>PregnancyDiscovered</b> — stress spike proportional to Neuroticism; may emit <see cref="StressSpiked"/>.</description></item>
+        ///   <item><description><b>ChildBorn</b> — Valence +0.25, Arousal +0.15, Dominance −0.10, Stress −10.</description></item>
+        ///   <item><description><b>MemoryRecalled</b> — nudges Valence ±0.04–0.05 based on episode emotional tag.</description></item>
+        ///   <item><description><b>SleepEnded</b> — sleep quality shifts Valence; poor/interrupted sleep adds stress; good sleep reduces stress; may emit <see cref="StressSpiked"/>.</description></item>
+        ///   <item><description><b>NightmareTriggered</b> — stress spike 8–20 pts, Valence penalty 0.08–0.18, Arousal +0.2; always emits <see cref="StressSpiked"/>.</description></item>
+        /// </list>
+        /// </summary>
+        /// <param name="event">The domain event to handle.</param>
+        /// <param name="ctx">Character context used for personality traits (Neuroticism, Agreeableness, Attachment) and episode memory lookups.</param>
+        /// <param name="outbox">Collector for follow-on events (<see cref="StressSpiked"/>).</param>
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
             var s = State;
@@ -328,6 +398,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
             State = s;
         }
 
+        /// <summary>
+        /// Replaces the current state with the provided snapshot.
+        /// Used by the persistence layer after a save/load cycle and by tests to establish
+        /// specific initial psychological conditions.
+        /// </summary>
+        /// <param name="state">The psychology state to restore.</param>
         public void RestoreState(PsychologyState state) => State = state;
     }
 }

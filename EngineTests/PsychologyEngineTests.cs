@@ -664,6 +664,268 @@ namespace EngineTests
 
         #endregion Pregnancy events — testy
 
+        #region Emotion inference — boundary values
+
+        /// <summary>
+        /// At exactly Stress = 70, the threshold is NOT crossed — no Fear or Anger.
+        /// Emotion falls through to Joy/Sadness/Neutral depending on Valence.
+        /// </summary>
+        [TestMethod]
+        public void InferEmotion_StressExactly70_DoesNotTriggerFearOrAnger()
+        {
+            // Arrange — Stress=70 is at the threshold (rule: Stress > 70, exclusive)
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 70);
+            var physio = MakePhysio(0, 0, 0);
+            var ctx = BuildContext(neuroticism: 0.5, physio: physio);
+
+            // Use a zero-variance config so no noise shifts emotion
+            engine.RestoreState(engine.State with
+            {
+                Stress = 70,
+                Valence = 0.0,
+                Arousal = 0.4,
+                Dominance = 0.3, // low — would trigger Fear if stress > 70
+                DominantEmotion = DiscreteEmotion.Neutral
+            });
+
+            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+
+            // At exactly 70, the > 70 condition is false → no Fear/Anger
+            Assert.AreNotEqual(DiscreteEmotion.Fear, engine.State.DominantEmotion,
+                "Stress=70 (not > 70) must not infer Fear.");
+            Assert.AreNotEqual(DiscreteEmotion.Anger, engine.State.DominantEmotion,
+                "Stress=70 (not > 70) must not infer Anger.");
+        }
+
+        /// <summary>
+        /// At Stress = 71 with Dominance below 0.4, the engine must infer Fear.
+        /// </summary>
+        [TestMethod]
+        public void InferEmotion_StressAbove70_LowDominance_InfersFear()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var physio = MakePhysio(0, 0, 0);
+            var ctx = BuildContext(neuroticism: 0.0, physio: physio); // zero recovery in config
+
+            engine.RestoreState(engine.State with
+            {
+                Stress = 71,
+                Valence = 0.0,
+                Arousal = 0.4,
+                Dominance = 0.2, // < 0.4
+                DominantEmotion = DiscreteEmotion.Neutral
+            });
+
+            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+
+            Assert.AreEqual(DiscreteEmotion.Fear, engine.State.DominantEmotion,
+                "Stress > 70 + Dominance < 0.4 must infer Fear.");
+        }
+
+        /// <summary>
+        /// At Stress = 71 with Dominance above 0.4, the engine must infer Anger.
+        /// </summary>
+        [TestMethod]
+        public void InferEmotion_StressAbove70_HighDominance_InfersAnger()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var physio = MakePhysio(0, 0, 0);
+            var ctx = BuildContext(neuroticism: 0.0, physio: physio);
+
+            engine.RestoreState(engine.State with
+            {
+                Stress = 71,
+                Valence = 0.0,
+                Arousal = 0.4,
+                Dominance = 0.6, // >= 0.4
+                DominantEmotion = DiscreteEmotion.Neutral
+            });
+
+            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+
+            Assert.AreEqual(DiscreteEmotion.Anger, engine.State.DominantEmotion,
+                "Stress > 70 + Dominance >= 0.4 must infer Anger.");
+        }
+
+        /// <summary>
+        /// High Valence (> 0.5) and high Dominance (> 0.7) must infer Pride.
+        /// </summary>
+        [TestMethod]
+        public void InferEmotion_HighValenceHighDominance_InfersPride()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var physio = MakePhysio(0, 0, 0);
+            var ctx = BuildContext(neuroticism: 0.0, physio: physio);
+
+            engine.RestoreState(engine.State with
+            {
+                Stress = 0,
+                Valence = 0.6,
+                Arousal = 0.5,
+                Dominance = 0.8,
+                DominantEmotion = DiscreteEmotion.Neutral
+            });
+
+            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+
+            Assert.AreEqual(DiscreteEmotion.Pride, engine.State.DominantEmotion,
+                "Valence > 0.5 + Dominance > 0.7 must infer Pride.");
+        }
+
+        /// <summary>
+        /// Tender state: positive Valence, low Arousal, low Dominance must infer Tenderness.
+        /// </summary>
+        [TestMethod]
+        public void InferEmotion_TenderState_InfersTenderness()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var physio = MakePhysio(0, 0, 0);
+            var ctx = BuildContext(neuroticism: 0.0, physio: physio);
+
+            engine.RestoreState(engine.State with
+            {
+                Stress = 0,
+                Valence = 0.4,
+                Arousal = 0.3,  // < 0.4
+                Dominance = 0.4, // < 0.45
+                DominantEmotion = DiscreteEmotion.Neutral
+            });
+
+            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+
+            Assert.AreEqual(DiscreteEmotion.Tenderness, engine.State.DominantEmotion,
+                "Valence > 0.3 + Arousal < 0.4 + Dominance < 0.45 must infer Tenderness.");
+        }
+
+        #endregion Emotion inference — boundary values
+
+        #region Ovulation — arousal and valence
+
+        /// <summary>
+        /// When the ovulation window is open, each Tick must raise Arousal above baseline.
+        /// </summary>
+        [TestMethod]
+        public void Tick_OvulationWindow_IncreasesArousalAndValence()
+        {
+            // Arrange: two physio states — one with ovulation window, one without
+            var physioOvul = MakePhysioWithCycle(ovulationWindowOpen: true);
+            var physioNone = MakePhysioWithCycle(ovulationWindowOpen: false);
+
+            var ctxOvul = BuildContext(neuroticism: 0.0, physio: physioOvul);
+            var ctxNone = BuildContext(neuroticism: 0.0, physio: physioNone);
+
+            var ovulEngine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var noneEngine = BuildEngine(initialValence: 0.0, initialStress: 0);
+
+            // Set identical starting PAD
+            ovulEngine.RestoreState(ovulEngine.State with { Arousal = 0.4, Valence = 0.0 });
+            noneEngine.RestoreState(noneEngine.State with { Arousal = 0.4, Valence = 0.0 });
+
+            // Act — single tick; ovulation adds +0.03 arousal, +0.02 valence
+            ovulEngine.Tick(_now, WTimeSpan.FromHours(0.001), ctxOvul, new EventCollector());
+            noneEngine.Tick(_now, WTimeSpan.FromHours(0.001), ctxNone, new EventCollector());
+
+            // Assert
+            Assert.IsTrue(ovulEngine.State.Arousal > noneEngine.State.Arousal,
+                $"Ovulation window must increase Arousal. Ovul={ovulEngine.State.Arousal:F4}, None={noneEngine.State.Arousal:F4}");
+            Assert.IsTrue(ovulEngine.State.Valence > noneEngine.State.Valence,
+                $"Ovulation window must increase Valence. Ovul={ovulEngine.State.Valence:F4}, None={noneEngine.State.Valence:F4}");
+        }
+
+        /// <summary>
+        /// Handle(OvulationWindowOpened) must add +0.05 to Arousal.
+        /// </summary>
+        [TestMethod]
+        public void Handle_OvulationWindowOpened_IncreasesArousal()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var arousalBefore = engine.State.Arousal;
+
+            engine.Handle(new OvulationWindowOpened(_now, ctx.Id), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Arousal > arousalBefore,
+                $"OvulationWindowOpened must raise Arousal. Before={arousalBefore:F3}, After={engine.State.Arousal:F3}");
+        }
+
+        /// <summary>
+        /// Handle(MensesStarted) must reduce Valence by 0.05 (discomfort onset).
+        /// </summary>
+        [TestMethod]
+        public void Handle_MensesStarted_DecreasesValence()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var valenceBefore = engine.State.Valence;
+
+            engine.Handle(new MensesStarted(_now, ctx.Id), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Valence < valenceBefore,
+                $"MensesStarted must reduce Valence. Before={valenceBefore:F3}, After={engine.State.Valence:F3}");
+        }
+
+        #endregion Ovulation — arousal and valence
+
+        #region Memory recall — emotional impact
+
+        /// <summary>
+        /// Recalling a positive episode must nudge Valence upward.
+        /// </summary>
+        [TestMethod]
+        public void Handle_MemoryRecalled_PositiveEpisode_IncreasesValence()
+        {
+            var episodeId = Guid.NewGuid();
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContextWithMemory(
+                episodeId,
+                EmotionalTag.Positive,
+                initialValence: 0.0);
+            var valenceBefore = engine.State.Valence;
+
+            engine.Handle(new MemoryRecalled(_now, ctx.Id, episodeId), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Valence > valenceBefore,
+                $"Recalling a positive memory must increase Valence. Before={valenceBefore:F3}, After={engine.State.Valence:F3}");
+        }
+
+        /// <summary>
+        /// Recalling a negative episode must nudge Valence downward.
+        /// </summary>
+        [TestMethod]
+        public void Handle_MemoryRecalled_NegativeEpisode_DecreasesValence()
+        {
+            var episodeId = Guid.NewGuid();
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContextWithMemory(
+                episodeId,
+                EmotionalTag.Negative,
+                initialValence: 0.0);
+            var valenceBefore = engine.State.Valence;
+
+            engine.Handle(new MemoryRecalled(_now, ctx.Id, episodeId), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Valence < valenceBefore,
+                $"Recalling a negative memory must decrease Valence. Before={valenceBefore:F3}, After={engine.State.Valence:F3}");
+        }
+
+        /// <summary>
+        /// Recalling an episode with a non-existent ID must not change Valence.
+        /// </summary>
+        [TestMethod]
+        public void Handle_MemoryRecalled_UnknownEpisode_DoesNotChangeValence()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var valenceBefore = engine.State.Valence;
+
+            engine.Handle(new MemoryRecalled(_now, ctx.Id, Guid.NewGuid()), ctx, _outbox);
+
+            Assert.AreEqual(valenceBefore, engine.State.Valence, delta: 0.001,
+                "Recalling an unknown episode ID must not change Valence.");
+        }
+
+        #endregion Memory recall — emotional impact
+
         #region Dominance — testy
 
         /// <summary>
@@ -897,6 +1159,76 @@ namespace EngineTests
                 ImmuneLoad: 5,
                 BodyTempDelta: bodyTempDelta,
                 Cycle: null);
+
+        /// <summary>
+        /// Builds a <see cref="PhysiologyState"/> with a menstrual cycle state for ovulation tests.
+        /// </summary>
+        private static PhysiologyState MakePhysioWithCycle(bool ovulationWindowOpen)
+        {
+            var cycle = new MenstrualCycleState(
+                Phase: ovulationWindowOpen ? CyclePhase.Ovulation : CyclePhase.Follicular,
+                DayInCycle: ovulationWindowOpen ? 14 : 7,
+                OvulationWindow: ovulationWindowOpen,
+                SymptomPain: 0, SymptomBreastTender: 0, SymptomBloat: 0,
+                LibidoMod: 1.0,
+                LastMensesStart: WDateOnly.New(116, 1, 1));
+
+            return new PhysiologyState(
+                Energy: 70,
+                SleepDebtHours: 0,
+                Hunger: 20,
+                Thirst: 15,
+                Pain: 0,
+                ImmuneLoad: 5,
+                BodyTempDelta: 0,
+                Cycle: cycle);
+        }
+
+        /// <summary>
+        /// Builds a context that contains a single episodic memory with the given emotional tag,
+        /// used to test memory-recall emotional impacts.
+        /// </summary>
+        private static IHumanContext BuildContextWithMemory(
+            Guid episodeId,
+            EmotionalTag emotionalTag,
+            double initialValence)
+        {
+            var episode = new EpisodicMemory(
+                Id: episodeId,
+                When: new WDateTime(0),
+                What: "test memory",
+                Salience: 0.8,
+                Emotion: emotionalTag,
+                Strength: 0.9);
+
+            var physio = new PhysiologyState(70, 0, 20, 15, 0, 5, 0, null);
+            var psych = new PsychologyState(initialValence, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                physio, psych,
+                new BehaviorState(40, 20, 15, 40, 50, 30, null),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory> { episode }));
+
+            return new HumanContext
+            {
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = new Personality(
+                    BigFive: new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                    Attachment: AttachmentStyle.Secure,
+                    Communication: CommunicationStyle.Direct,
+                    Motivation: new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                    Sociosexuality: Sociosexuality.Intermediate,
+                    Chronotype: Chronotype.Neutral),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
 
         /// <summary>Vytvoří <see cref="SleepEnded"/> s danými parametry.</summary>
         private SleepEnded MakeSleepEnded(double quality, double hoursSlept, bool wasInterrupted)

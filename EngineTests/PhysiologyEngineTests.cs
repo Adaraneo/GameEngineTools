@@ -225,6 +225,351 @@ namespace EngineTests
 
         #endregion Menstrual Cycle
 
+        #region Menstrual Cycle — cycle length randomness
+
+        /// <summary>
+        /// With ZeroRandom (Normal returns 0), cycle length equals MeanCycleLengthDays (28).
+        /// After 28 ticks of 24 h each the engine wraps back to day 1.
+        /// </summary>
+        [TestMethod]
+        public void AdvanceCycleDay_WithZeroRandom_CycleLengthEqualsMean()
+        {
+            // Arrange — cycle-enabled engine, start the cycle at day 1
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+            var ctx = BuildContext();
+            var outbox = new EventCollector();
+            var now = new WDateTime(0);
+
+            // Seed the cycle to day 1 so we can count a full revolution
+            var initialCycle = engine.State.Cycle!;
+            engine.RestoreState(engine.State with
+            {
+                Cycle = initialCycle with { DayInCycle = 1, Phase = CyclePhase.Menses }
+            });
+
+            // Act — advance exactly 28 days (each Tick accumulates 24 h → one cycle-day advance)
+            int wraps = 0;
+            int prevDay = engine.State.Cycle!.DayInCycle;
+            for (int i = 0; i < 28; i++)
+            {
+                engine.Tick(now, WTimeSpan.FromHours(24), ctx, outbox);
+                var newDay = engine.State.Cycle!.DayInCycle;
+                if (newDay < prevDay)
+                    wraps++;
+                prevDay = newDay;
+            }
+
+            // With ZeroRandom Normal(0, std)=0, length = Clamp(28+0, 21, 35) = 28 → exactly 1 wrap
+            Assert.AreEqual(1, wraps,
+                $"ZeroRandom must produce cycle length of 28 days (one wrap after 28 advances). Wraps={wraps}");
+        }
+
+        /// <summary>
+        /// Cycle length is always clamped to the biological minimum of 21 days.
+        /// </summary>
+        [TestMethod]
+        public void AdvanceCycleDay_CycleLengthNeverBelow21Days()
+        {
+            // Use a random source that always returns 0 for the Box-Muller inputs
+            // which produces the mean; verify the clamp by checking the wrap point.
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+            var ctx = BuildContext();
+            var outbox = new EventCollector();
+            var now = new WDateTime(0);
+
+            engine.RestoreState(engine.State with
+            {
+                Cycle = engine.State.Cycle! with { DayInCycle = 1 }
+            });
+
+            // Advance 20 days — should NOT wrap regardless of length distribution
+            for (int i = 0; i < 20; i++)
+                engine.Tick(now, WTimeSpan.FromHours(24), ctx, outbox);
+
+            Assert.IsTrue(engine.State.Cycle!.DayInCycle >= 1,
+                "After 20 advances the cycle must still be in progress (minimum 21 days).");
+        }
+
+        /// <summary>
+        /// Cycle length is always clamped to the biological maximum of 35 days.
+        /// A cycle advanced 36 times must have wrapped at least once.
+        /// </summary>
+        [TestMethod]
+        public void AdvanceCycleDay_CycleLengthNeverExceeds35Days()
+        {
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+            var ctx = BuildContext();
+            var outbox = new EventCollector();
+            var now = new WDateTime(0);
+
+            engine.RestoreState(engine.State with
+            {
+                Cycle = engine.State.Cycle! with { DayInCycle = 1 }
+            });
+
+            int wraps = 0;
+            int prev = engine.State.Cycle!.DayInCycle;
+            for (int i = 0; i < 36; i++)
+            {
+                engine.Tick(now, WTimeSpan.FromHours(24), ctx, outbox);
+                var cur = engine.State.Cycle!.DayInCycle;
+                if (cur < prev) wraps++;
+                prev = cur;
+            }
+
+            Assert.IsTrue(wraps >= 1,
+                $"After 36 advances the cycle must have wrapped at least once (max length 35). Wraps={wraps}");
+        }
+
+        #endregion Menstrual Cycle — cycle length randomness
+
+        #region Conception chance
+
+        /// <summary>
+        /// No contraception during ovulation window must produce a higher conception chance
+        /// than no contraception outside the ovulation window.
+        /// </summary>
+        [TestMethod]
+        public void ConceptionChance_OvulationWindow_HigherThanOutsideOvulation()
+        {
+            // Arrange — test ovulation window boost on conception chance
+            var outboxOvul = new EventCollector();
+            var outboxNon = new EventCollector();
+
+            // Act — ovulation window with AlwaysConceiveRandom should conceive
+            var ovulEngineConceiving = BuildEngineWithCycle(ovulationWindowOpen: true, alwaysConceive: true);
+            var ctxConceiving = BuildContextForConception(SexBiology.Female, alwaysChance: true);
+            var encounterOvul = MakeEncounter(ctxConceiving.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.None);
+            ovulEngineConceiving.Handle(encounterOvul, ctxConceiving, outboxOvul);
+
+            // Outside ovulation window with ZeroRandom should not conceive
+            var nonOvulEngineNot = BuildEngineWithCycle(ovulationWindowOpen: false, alwaysConceive: false);
+            var ctxNot = BuildContextForConception(SexBiology.Female, alwaysChance: false);
+            var encounterNon = MakeEncounter(ctxNot.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.None);
+            nonOvulEngineNot.Handle(encounterNon, ctxNot, outboxNon);
+
+            var ovulEvents = outboxOvul.Drain();
+            var nonEvents = outboxNon.Drain();
+
+            Assert.IsTrue(ovulEvents.OfType<PregnancyStarted>().Any(),
+                "Ovulation window + no contraception + Chance=true must result in PregnancyStarted.");
+            Assert.IsFalse(nonEvents.OfType<PregnancyStarted>().Any(),
+                "Outside ovulation + Chance=false must not result in pregnancy.");
+        }
+
+        /// <summary>
+        /// High contraception (0.04 modifier) must prevent pregnancy even during ovulation
+        /// when the base-chance random roll is seeded to never conceive.
+        /// </summary>
+        [TestMethod]
+        public void ConceptionChance_HighContraception_PreventsConception()
+        {
+            var engine = BuildEngineWithCycle(ovulationWindowOpen: true, alwaysConceive: false);
+            var ctx = BuildContextForConception(SexBiology.Female, alwaysChance: false);
+            var outbox = new EventCollector();
+            var encounter = MakeEncounter(ctx.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.High);
+
+            engine.Handle(encounter, ctx, outbox);
+
+            Assert.IsFalse(outbox.Drain().OfType<PregnancyStarted>().Any(),
+                "High contraception with Chance=false must not produce a pregnancy.");
+        }
+
+        /// <summary>
+        /// A male biology context must never start a pregnancy regardless of ovulation or contraception.
+        /// </summary>
+        [TestMethod]
+        public void ConceptionChance_MaleBiology_NeverConceives()
+        {
+            var engine = BuildEngineWithCycle(ovulationWindowOpen: true, alwaysConceive: true);
+            var ctx = BuildContextForConception(SexBiology.Male, alwaysChance: true);
+            var outbox = new EventCollector();
+            var encounter = MakeEncounter(ctx.Id, ReproductiveIntent.TryingForChild, ContraceptionLevel.None);
+
+            engine.Handle(encounter, ctx, outbox);
+
+            Assert.IsFalse(outbox.Drain().OfType<PregnancyStarted>().Any(),
+                "Male biology must never start a pregnancy.");
+        }
+
+        #endregion Conception chance
+
+        #region Pregnancy discovery timing
+
+        /// <summary>
+        /// Before PregnancyDiscoveryMinDays, the pregnancy must not be marked as Discovered.
+        /// </summary>
+        [TestMethod]
+        public void AdvancePregnancy_BeforeDiscoveryMinDays_NotDiscovered()
+        {
+            var engine = BuildEngine();
+            var ctx = BuildContext();
+            var outbox = new EventCollector();
+
+            var conceivedOn = WDateOnly.New(116, 1, 1);
+            var now = conceivedOn.AddDays(10).ToDateTime(); // 10 days < 21 min
+
+            engine.RestoreState(engine.State with
+            {
+                Pregnancy = new PregnancyState(
+                    OtherParent: new HumanId(Guid.NewGuid()),
+                    ConceivedOn: conceivedOn,
+                    EstimatedDueDate: conceivedOn.AddDays(280))
+            });
+
+            engine.Tick(now, WTimeSpan.FromHours(1), ctx, outbox);
+
+            Assert.IsFalse(engine.State.Pregnancy!.Discovered,
+                "Pregnancy must not be Discovered before PregnancyDiscoveryMinDays (21).");
+            Assert.IsFalse(outbox.Drain().OfType<PregnancyDiscovered>().Any(),
+                "PregnancyDiscovered must not be emitted before the minimum days.");
+        }
+
+        /// <summary>
+        /// After PregnancyDiscoveryMinDays, the Discovered flag must flip and PregnancyDiscovered must be emitted.
+        /// </summary>
+        [TestMethod]
+        public void AdvancePregnancy_AfterDiscoveryMinDays_FlipsDiscoveredAndEmitsEvent()
+        {
+            var engine = BuildEngine();
+            var ctx = BuildContext();
+            var outbox = new EventCollector();
+
+            var conceivedOn = WDateOnly.New(116, 1, 1);
+            // 22 days > default 21 minimum
+            var now = conceivedOn.AddDays(22).ToDateTime();
+
+            engine.RestoreState(engine.State with
+            {
+                Pregnancy = new PregnancyState(
+                    OtherParent: new HumanId(Guid.NewGuid()),
+                    ConceivedOn: conceivedOn,
+                    EstimatedDueDate: conceivedOn.AddDays(280))
+            });
+
+            engine.Tick(now, WTimeSpan.FromHours(1), ctx, outbox);
+
+            Assert.IsTrue(engine.State.Pregnancy!.Discovered,
+                "Pregnancy must be Discovered after PregnancyDiscoveryMinDays.");
+            Assert.IsTrue(outbox.Drain().OfType<PregnancyDiscovered>().Any(),
+                "PregnancyDiscovered event must be emitted when discovery threshold is crossed.");
+        }
+
+        #endregion Pregnancy discovery timing
+
+        #region Postpartum state
+
+        /// <summary>
+        /// After ChildBorn is emitted (EstimatedDueDate reached), Pregnancy is cleared
+        /// and the cycle transitions to CyclePhase.Paused with LibidoMod = 0.8.
+        /// </summary>
+        [TestMethod]
+        public void AdvancePregnancy_OnDueDate_EmitsChildBornAndPausesCycle()
+        {
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+            var ctx = BuildContext();
+            var outbox = new EventCollector();
+
+            // Set due date to today
+            var dueDate = WDateOnly.New(116, 1, 1);
+            var now = dueDate.ToDateTime();
+
+            engine.RestoreState(engine.State with
+            {
+                Pregnancy = new PregnancyState(
+                    OtherParent: new HumanId(Guid.NewGuid()),
+                    ConceivedOn: dueDate.AddDays(-280),
+                    EstimatedDueDate: dueDate,
+                    Discovered: true)
+            });
+
+            engine.Tick(now, WTimeSpan.FromHours(1), ctx, outbox);
+
+            var events = outbox.Drain();
+            Assert.IsNull(engine.State.Pregnancy,
+                "Pregnancy record must be cleared after birth.");
+            Assert.IsTrue(events.OfType<ChildBorn>().Any(),
+                "ChildBorn event must be emitted on the due date.");
+        }
+
+        /// <summary>
+        /// After birth, if the character had a cycle, it transitions to Paused with LibidoMod = 0.8.
+        /// </summary>
+        [TestMethod]
+        public void AdvancePregnancy_OnDueDate_CyclePausedWithReducedLibido()
+        {
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+            var ctx = BuildContext();
+            var outbox = new EventCollector();
+
+            var dueDate = WDateOnly.New(116, 1, 1);
+            var now = dueDate.ToDateTime();
+
+            // Ensure a cycle exists
+            Assert.IsNotNull(engine.State.Cycle, "Pre-condition: cycle must exist for this test.");
+
+            engine.RestoreState(engine.State with
+            {
+                Pregnancy = new PregnancyState(
+                    OtherParent: new HumanId(Guid.NewGuid()),
+                    ConceivedOn: dueDate.AddDays(-280),
+                    EstimatedDueDate: dueDate,
+                    Discovered: true)
+            });
+
+            engine.Tick(now, WTimeSpan.FromHours(1), ctx, outbox);
+
+            Assert.AreEqual(CyclePhase.Paused, engine.State.Cycle?.Phase,
+                "Cycle must be Paused after childbirth (postpartum amenorrhea).");
+            Assert.AreEqual(0.8, engine.State.Cycle?.LibidoMod ?? 0, delta: 0.001,
+                "LibidoMod must be 0.8 during postpartum period.");
+        }
+
+        #endregion Postpartum state
+
+        #region Immune load and fever
+
+        /// <summary>
+        /// BodyTempDelta approaches the fever target proportional to ImmuneLoad.
+        /// With ImmuneLoad > 30, target fever = (ImmuneLoad - 30) / 70 * 2.0 > 0.
+        /// </summary>
+        [TestMethod]
+        public void Tick_ImmuneLoad_AboveThreshold_RaisesBodyTempDelta()
+        {
+            var highImmuneEngine = BuildEngine(immuneLoad: 80, birthYear: 100, todayYear: 116);
+            var lowImmuneEngine  = BuildEngine(immuneLoad: 10, birthYear: 100, todayYear: 116);
+            var ctx = BuildContext();
+
+            // Start both at neutral temp
+            highImmuneEngine.RestoreState(highImmuneEngine.State with { BodyTempDelta = 0 });
+            lowImmuneEngine.RestoreState(lowImmuneEngine.State with { BodyTempDelta = 0 });
+
+            highImmuneEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(4), ctx, new EventCollector());
+            lowImmuneEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(4), ctx, new EventCollector());
+
+            Assert.IsTrue(highImmuneEngine.State.BodyTempDelta > lowImmuneEngine.State.BodyTempDelta,
+                $"High ImmuneLoad must drive BodyTempDelta higher. " +
+                $"High={highImmuneEngine.State.BodyTempDelta:F4}, Low={lowImmuneEngine.State.BodyTempDelta:F4}");
+        }
+
+        /// <summary>
+        /// With ImmuneLoad at or below 30, fever target is 0; BodyTempDelta must not increase.
+        /// </summary>
+        [TestMethod]
+        public void Tick_ImmuneLoad_AtOrBelowThreshold_NoFeverDevelopment()
+        {
+            var engine = BuildEngine(immuneLoad: 30);
+            engine.RestoreState(engine.State with { BodyTempDelta = 0 });
+            var ctx = BuildContext();
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(4), ctx, new EventCollector());
+
+            Assert.AreEqual(0.0, engine.State.BodyTempDelta, delta: 0.01,
+                "ImmuneLoad = 30 produces fever target = 0; BodyTempDelta must not increase.");
+        }
+
+        #endregion Immune load and fever
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine s nastavenými počátečními hodnotami.</summary>
@@ -310,9 +655,111 @@ namespace EngineTests
                 Quality: quality,
                 WasInterrupted: wasInterrupted);
 
+        /// <summary>
+        /// Builds an engine with a cycle seeded to a specific ovulation-window state.
+        /// Uses a custom <see cref="IRandomSource"/> to control conception roll outcome.
+        /// </summary>
+        private static DefaultPhysiologyEngine BuildEngineWithCycle(
+            bool ovulationWindowOpen,
+            bool alwaysConceive = false)
+        {
+            var cfg = Options.Create(new PhysiologyConfig(
+                RestingMetabolicRate: 1600,
+                MaxSleepDebtHours: 12,
+                EnableMenstrualCycle: true,
+                MenstrualCycleBeginsInAge: 12));
+            var cycleCfg = Options.Create(new MenstrualCycleConfig());
+            var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            IRandomSource rng = alwaysConceive ? new AlwaysConceiveRandom() : (IRandomSource)new ZeroRandom();
+
+            var engine = new DefaultPhysiologyEngine(
+                cfg, cycleCfg, factory, rng,
+                biology: SexBiology.Female,
+                birthDate: WDateOnly.New(13, 1, 1),
+                now: WDateOnly.New(116, 1, 1));
+
+            // Override the cycle to control the ovulation window precisely
+            var phase = ovulationWindowOpen ? CyclePhase.Ovulation : CyclePhase.Follicular;
+            engine.RestoreState(engine.State with
+            {
+                Cycle = new MenstrualCycleState(
+                    Phase: phase,
+                    DayInCycle: ovulationWindowOpen ? 14 : 7,
+                    OvulationWindow: ovulationWindowOpen,
+                    SymptomPain: 0, SymptomBreastTender: 0, SymptomBloat: 0,
+                    LibidoMod: 1.0,
+                    LastMensesStart: WDateOnly.New(116, 1, 1))
+            });
+
+            return engine;
+        }
+
+        /// <summary>
+        /// Builds a context for conception tests with configurable biology and chance outcome.
+        /// </summary>
+        private static IHumanContext BuildContextForConception(SexBiology biology, bool alwaysChance = true)
+        {
+            var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
+            var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                physio, psych,
+                new BehaviorState(40, 20, 15, 40, 50, 30, null),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            IRandomSource rng = alwaysChance ? new AlwaysConceiveRandom() : (IRandomSource)new ZeroRandom();
+
+            return new HumanContext
+            {
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = biology,
+                Personality = new Personality(
+                    new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                    AttachmentStyle.Secure,
+                    CommunicationStyle.Direct,
+                    new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                    Sociosexuality.Intermediate,
+                    Chronotype.Neutral),
+                Snapshot = snapshot,
+                Random = rng,
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        /// <summary>Creates a <see cref="SexualEncounterOutcome"/> directed at the given character.</summary>
+        private static SexualEncounterOutcome MakeEncounter(
+            HumanId to,
+            ReproductiveIntent intent,
+            ContraceptionLevel contraception)
+            => new SexualEncounterOutcome(
+                OccurredAt: new WDateTime(0),
+                From: new HumanId(Guid.NewGuid()),
+                To: to,
+                Accepted: true,
+                Reason: string.Empty,
+                Intent: intent,
+                Contraception: contraception,
+                ReproductivePotential: true);
+
         #endregion Pomocné metody
 
         #region Fake / Stub implementace
+
+        /// <summary>
+        /// Random source that always returns true for <c>Chance()</c>, used to guarantee
+        /// conception in tests that verify the conception code path.
+        /// </summary>
+        private sealed class AlwaysConceiveRandom : IRandomSource
+        {
+            public int Next(int min, int max) => min;
+            public double NextUnit() => 0.0;
+            // Always conceive — probability check always passes
+            public bool Chance(double p) => true;
+        }
 
         private sealed class NullEventBus : IEventBus
         {

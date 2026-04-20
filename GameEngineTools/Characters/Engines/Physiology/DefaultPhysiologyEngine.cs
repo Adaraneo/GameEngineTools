@@ -13,11 +13,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using static ActionNames;
 
     /// <summary>
-    /// Homeostázy + základní menstruační cyklus. Bez „spánku“ či jídla z eventů – jen drift a symptomy.
+    /// Default implementation of the physiology engine.
+    /// Models homeostasis (energy, hunger, thirst, pain, immune system, fever) and, for female
+    /// characters of sufficient age, the menstrual cycle including ovulation, conception, pregnancy
+    /// discovery, and birth.
     /// </summary>
+    /// <remarks>
+    /// Continuous drift is applied in <see cref=”Tick”/> proportional to elapsed game hours.
+    /// Discrete one-time effects (sleep recovery, sexual encounters) are applied in <see cref=”Handle”/>.
+    /// All state mutations produce a new <see cref=”PhysiologyState”/> record; the engine is
+    /// functionally pure once the random source is fixed.
+    /// </remarks>
     internal sealed class DefaultPhysiologyEngine : IPhysiologyEngine
     {
+        /// <summary>Gets the current physiological state of the character.</summary>
         public PhysiologyState State { get; private set; }
+
+        /// <summary>Gets the configuration used to drive physiological drift and cycle behaviour.</summary>
         public PhysiologyConfig Config { get; }
 
         private readonly ILogger _log;
@@ -27,6 +39,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private double _accHours;
         private bool _mensesOn;
 
+        /// <summary>
+        /// Initialises the engine, computing an initial <see cref="PhysiologyState"/> including
+        /// a seeded menstrual cycle when <paramref name="biology"/> is
+        /// <see cref="SexBiology.Female"/>, the cycle is enabled in config, and
+        /// <paramref name="now"/> minus <paramref name="birthDate"/> meets the minimum age.
+        /// </summary>
+        /// <param name="cfg">Physiology configuration (energy recovery, pain recovery, conception rates, etc.).</param>
+        /// <param name="cycleCfg">Menstrual cycle configuration (mean length, variability, menses days).</param>
+        /// <param name="loggerFactory">Logger factory injected by the DI container.</param>
+        /// <param name="rng">Random source; use <c>ZeroRandom</c> in tests for determinism.</param>
+        /// <param name="biology">Biological sex of the character — cycle only initialises for Female.</param>
+        /// <param name="birthDate">Character birth date, used to check minimum cycle age.</param>
+        /// <param name="now">Current in-world date at engine construction.</param>
         public DefaultPhysiologyEngine(
             IOptions<PhysiologyConfig> cfg,
             IOptions<MenstrualCycleConfig> cycleCfg,
@@ -59,6 +84,20 @@ namespace GameEngineTools.Characters.Engines.Physiology
             _mensesOn = initialCycle?.Phase == CyclePhase.Menses;
         }
 
+        /// <summary>
+        /// Advances continuous physiological drift by one time step.
+        /// Called each game tick to apply gradual changes to energy, hunger, thirst, pain,
+        /// immune load, and body temperature, modulated by the character's current action.
+        /// Also advances the menstrual cycle day counter (once per accumulated 24 game hours)
+        /// or pregnancy progression if the character is pregnant.
+        /// </summary>
+        /// <param name="now">Current in-world date-time, used for pregnancy/cycle date calculations.</param>
+        /// <param name="dt">Elapsed time since the last tick; drift is scaled by <c>dt.TotalHours</c>.</param>
+        /// <param name="ctx">
+        /// Character context providing <c>ctx.Snapshot.Behavior.CurrentPlan?.Name</c> to select
+        /// action-specific drift branches (Sleep, Eat, Drink, SelfCare, or default awake rate).
+        /// </param>
+        /// <param name="outbox">Collector for cycle and pregnancy domain events.</param>
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
             var h = SafeHours(dt);
@@ -117,7 +156,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 s = AdvancePregnancy(s, now, ctx, outbox, pregnancy);
             }
-            else if (s.Cycle is not null)
+            else if (s.Cycle is not null && s.Cycle.Phase != CyclePhase.Paused)
             {
                 _accHours += h;
                 while (_accHours >= 24.0)
@@ -130,6 +169,24 @@ namespace GameEngineTools.Characters.Engines.Physiology
             State = s;
         }
 
+        /// <summary>
+        /// Reacts to discrete domain events by applying instantaneous state mutations.
+        /// Handled events:
+        /// <list type="bullet">
+        ///   <item><description>
+        ///     <see cref="Sleep.SleepEnded"/> — applies sleep-quality-weighted recovery to
+        ///     <c>SleepDebtHours</c>, <c>ImmuneLoad</c>, <c>Pain</c>, and <c>Energy</c>.
+        ///   </description></item>
+        ///   <item><description>
+        ///     <see cref="SexualEncounterOutcome"/> with <c>ReproductivePotential = true</c> —
+        ///     rolls for conception via <see cref="ConceptionChance"/> and, on success, emits
+        ///     <see cref="PregnancyStarted"/> and transitions the cycle to <c>Paused</c>.
+        ///   </description></item>
+        /// </list>
+        /// </summary>
+        /// <param name="event">The domain event to react to.</param>
+        /// <param name="ctx">Character context, used to check biology and roll random chance.</param>
+        /// <param name="outbox">Collector for follow-on events (PregnancyStarted).</param>
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
             var s = State;
@@ -335,6 +392,24 @@ namespace GameEngineTools.Characters.Engines.Physiology
             };
         }
 
+        /// <summary>
+        /// Calculates the probability of conception for a given encounter, clamped to [0.0, 0.65].
+        /// </summary>
+        /// <remarks>
+        /// Calculation pipeline:
+        /// <code>
+        /// chance = BaseConceptionChancePerEncounter
+        ///   × (OvulationConceptionMultiplier if OvulationWindow is open, else 1.0)
+        ///   × intent factor  (AvoidPregnancy=0.35, Indifferent=1.0, Open=1.10, TryingForChild=1.35)
+        ///   × contraception factor (None=1.0, Low=0.55, Moderate=0.25, High=0.04)
+        /// </code>
+        /// The intent factor models behavioral differences (e.g., timing intercourse); the
+        /// contraception factor models method efficacy. The hard cap of 0.65 prevents edge-case
+        /// probabilities from becoming near-certain.
+        /// </remarks>
+        /// <param name="s">Current physiology state, checked for an open ovulation window.</param>
+        /// <param name="encounter">Sexual encounter carrying intent and contraception metadata.</param>
+        /// <returns>Conception probability in [0.0, 0.65].</returns>
         private double ConceptionChance(PhysiologyState s, SexualEncounterOutcome encounter)
         {
             var chance = Config.BaseConceptionChancePerEncounter;
@@ -364,6 +439,36 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return Math.Clamp(chance, 0.0, 0.65);
         }
 
+        /// <summary>
+        /// Returns per-day physiological symptom deltas for the current cycle phase.
+        /// Values represent increments applied once per 24 accumulated game hours.
+        /// </summary>
+        /// <param name="c">Current menstrual cycle state from which <c>Phase</c> is read.</param>
+        /// <returns>
+        /// A tuple of (pain delta, bloat delta, breast-tenderness delta, libido multiplier):
+        /// <list type="bullet">
+        ///   <item><description>
+        ///     <b>Menses</b>: Pain +3, Bloat +2, Tenderness +2, LibidoMod 0.90.
+        ///     Elevated prostaglandin levels cause cramping and bloating;
+        ///     reduced libido is driven by discomfort and low estrogen.
+        ///   </description></item>
+        ///   <item><description>
+        ///     <b>Follicular</b>: Pain −2, Bloat −1, Tenderness −1, LibidoMod 1.05.
+        ///     Rising estrogen reduces inflammation; energy and libido recover.
+        ///   </description></item>
+        ///   <item><description>
+        ///     <b>Ovulation</b>: Pain 0, Bloat 0, Tenderness 0, LibidoMod 1.15.
+        ///     Peak estrogen and LH surge; libido is highest; symptoms minimal.
+        ///   </description></item>
+        ///   <item><description>
+        ///     <b>Luteal</b>: Pain +1, Bloat +1, Tenderness +1, LibidoMod 0.95.
+        ///     Progesterone dominance; mild PMS precursors, slightly reduced libido.
+        ///   </description></item>
+        ///   <item><description>
+        ///     <b>Paused</b> (pregnancy/other): neutral zero deltas, LibidoMod 1.0.
+        ///   </description></item>
+        /// </list>
+        /// </returns>
         private static (double pain, double bloat, double tender, double libidoMod) SymptomsFor(MenstrualCycleState c)
         {
             // Jednoduché mapování (přírůstky za den; následně se vyhladí normalizací v Ticku)
@@ -431,6 +536,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private static double Clamp01p(double v) => Math.Max(0, Math.Min(100, v));
 
+        /// <summary>
+        /// Replaces the current state with the provided snapshot.
+        /// Used by the persistence layer to reload serialized state after a save/load cycle,
+        /// and by tests to set up specific initial conditions.
+        /// </summary>
+        /// <param name="state">The state to restore.</param>
         public void RestoreState(PhysiologyState state) => State = state;
     }
 }
