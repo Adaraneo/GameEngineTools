@@ -37,6 +37,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private readonly MenstrualCycleConfig _cycleCfg;
 
         private double _accHours;
+        private double _injuryAccHours;
+        private double _postpartumAccHours;
         private bool _mensesOn;
 
         /// <summary>
@@ -79,7 +81,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Pain: 5,
                 ImmuneLoad: 10,
                 BodyTempDelta: 0,
-                Cycle: initialCycle);
+                Cycle: initialCycle,
+                Nutrition: Config.EnableNutrition ? new NutritionState() : null);
 
             _mensesOn = initialCycle?.Phase == CyclePhase.Menses;
         }
@@ -151,6 +154,72 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + immuneDelta),
                 BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, feverDelta, 0.1 * h), -1.0, 3.5)
             };
+
+            // Nutriční drift — Calories/Protein klesají, jsou doplňovány jídlem;
+            // Iron se obnovuje spánkem; VitaminD pomalu klesá
+            if (s.Nutrition is { } nut)
+            {
+                var caloriesDelta = action == Eat  ?  Config.CaloriesEatingGainPerHour * h : -Config.NutritionDecayPerHour * h;
+                var proteinDelta  = action == Eat  ?  Config.ProteinEatingGainPerHour  * h : -Config.NutritionDecayPerHour * h;
+                var ironDelta     = action == Sleep ?  Config.IronSleepRecoveryPerHour  * h : -Config.NutritionDecayPerHour * h * 0.3;
+                s = s with
+                {
+                    Nutrition = nut with
+                    {
+                        Calories = Clamp01p(nut.Calories + caloriesDelta),
+                        VitaminD = Clamp01p(nut.VitaminD - Config.NutritionDecayPerHour * h * 0.5),
+                        Iron     = Clamp01p(nut.Iron     + ironDelta),
+                        Protein  = Clamp01p(nut.Protein  + proteinDelta)
+                    }
+                };
+            }
+
+            // Zranění — přidání bolesti a postupné hojení (1× za 24h)
+            if (s.Injury is { } inj)
+            {
+                s = s with { Pain = Clamp01p(s.Pain + inj.Severity * 0.05 * h) };
+                if (inj.Type == InjuryType.Infection)
+                    s = s with { ImmuneLoad = Clamp01p(s.ImmuneLoad + Config.InjuryInfectionImmuneLoadPerDay / 24.0 * h) };
+
+                _injuryAccHours += h;
+                while (_injuryAccHours >= 24.0)
+                {
+                    _injuryAccHours -= 24.0;
+                    var recoveryPerDay = action is Sleep or SelfCare
+                        ? Config.InjuryRestRecoveryPerDay
+                        : Config.InjuryActiveRecoveryPerDay;
+                    inj = inj with { Severity = Math.Max(0, inj.Severity - recoveryPerDay), DaysSinceOnset = inj.DaysSinceOnset + 1 };
+                    if (inj.Severity <= 0)
+                    {
+                        s = s with { Injury = null };
+                        outbox.Add(new InjuryHealed(now, ctx.Id));
+                        _injuryAccHours = 0;
+                        break;
+                    }
+                    s = s with { Injury = inj };
+                }
+            }
+
+            // Šestinedělí — minimální bolest a maximální energie podle fáze
+            if (s.Postpartum is not null)
+            {
+                var (painFloor, energyCap) = s.Postpartum.Phase switch
+                {
+                    PostpartumPhase.Immediate => (70.0, 30.0),
+                    PostpartumPhase.FirstWeek => (40.0, 45.0),
+                    PostpartumPhase.SixWeeks  => (15.0, 65.0),
+                    _                         => ( 0.0, 100.0)
+                };
+                if (s.Postpartum.Phase != PostpartumPhase.FullRecovery)
+                    s = s with { Pain = Math.Max(s.Pain, painFloor), Energy = Math.Min(s.Energy, energyCap) };
+
+                _postpartumAccHours += h;
+                while (_postpartumAccHours >= 24.0 && s.Postpartum is not null)
+                {
+                    _postpartumAccHours -= 24.0;
+                    s = AdvancePostpartum(s, now, ctx, outbox);
+                }
+            }
 
             if (s.Pregnancy is { } pregnancy)
             {
@@ -234,6 +303,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 case SexualEncounterOutcome se when se.Accepted && se.ReproductivePotential:
                     s = TryStartPregnancy(s, se, ctx, outbox);
                     break;
+
+                case InjuryReceived ir:
+                    s = s with { Injury = new InjuryState(Math.Clamp(ir.Severity, 0, 100), 0, ir.Type) };
+                    break;
             }
 
             State = s;
@@ -241,38 +314,53 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private PhysiologyState AdvanceCycleDay(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box)
         {
-            var c = s.Cycle!;
-            var length = Math.Max(21, Math.Min(35, _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
-            var day = c.DayInCycle + 1;
-            if (day > length)
+            var (day, phase) = CalculateCycleProgression(s.Cycle!);
+            s = EmitCycleProgressionEvents(s, now, ctx, box, day, phase);
+            s = ApplyCycleSymptoms(s);
+
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
             {
-                day = 1;
+                _log.PhysiologyCycle(ctx.Id.Value.ToString(), s.Cycle!.Phase.ToString(), s.Cycle.DayInCycle);
             }
 
-            var phase = PhaseFor(day, length, _cycleCfg.MensesMeanDays);
+            return s;
+        }
 
-            // Event: CycleDayAdvanced
+        private (int day, CyclePhase phase) CalculateCycleProgression(MenstrualCycleState c)
+        {
+            var length = Math.Max(_cycleCfg.MinCycleLengthDays, Math.Min(_cycleCfg.MaxCycleLengthDays,
+                _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
+            var day = c.DayInCycle + 1;
+            if (day > length) day = 1;
+            var phase = PhaseFor(day, length, _cycleCfg.MensesMeanDays, _cycleCfg.OvulationDayOfCycle);
+            return (day, phase);
+        }
+
+        private PhysiologyState EmitCycleProgressionEvents(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box, int day, CyclePhase phase)
+        {
+            var c = s.Cycle!;
             box.Add(new CycleDayAdvanced(now, ctx.Id, day, phase));
 
-            // Menses start/end
-            var wasMenses = _mensesOn;
             var isMenses = phase == CyclePhase.Menses;
-            if (!wasMenses && isMenses) { box.Add(new MensesStarted(now, ctx.Id)); _mensesOn = true; }
-            if (wasMenses && !isMenses) { box.Add(new MensesEnded(now, ctx.Id)); _mensesOn = false; }
+            if (!_mensesOn && isMenses) { box.Add(new MensesStarted(now, ctx.Id)); _mensesOn = true; }
+            if (_mensesOn && !isMenses) { box.Add(new MensesEnded(now, ctx.Id)); _mensesOn = false; }
 
-            // Ovulation window (jednoduše den 13–15)
             var ovulWindow = phase == CyclePhase.Ovulation;
-            if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && c.OvulationWindow == false)
-            {
+            if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && !c.OvulationWindow)
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
-            }
 
-            var next = c with { DayInCycle = day, Phase = phase, OvulationWindow = ovulWindow, LastMensesStart = (day == 1) ? now.Date : c.LastMensesStart };
-            s = s with { Cycle = next };
+            var next = c with
+            {
+                DayInCycle = day, Phase = phase, OvulationWindow = ovulWindow,
+                LastMensesStart = (day == 1) ? now.Date : c.LastMensesStart
+            };
+            return s with { Cycle = next };
+        }
 
-            // Symptomy jednou za den
-            var (pain, bloat, tender, libido) = SymptomsFor(next);
-            s = s with
+        private PhysiologyState ApplyCycleSymptoms(PhysiologyState s)
+        {
+            var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle!);
+            return s with
             {
                 Pain = Clamp01p(s.Pain + pain),
                 Cycle = s.Cycle with
@@ -282,13 +370,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     LibidoMod = libido
                 }
             };
-
-            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
-            {
-                _log.PhysiologyCycle(ctx.Id.Value.ToString(), s.Cycle.Phase.ToString(), s.Cycle.DayInCycle);
-            }
-
-            return s;
         }
 
         private PhysiologyState AdvancePregnancy(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector outbox, PregnancyState pregnancy)
@@ -323,10 +404,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                 return s with
                 {
-                    Pregnancy = null,
+                    Pregnancy  = null,
+                    Pain       = 90,  // porod je akutně bolestivý
+                    Energy     = 20,  // vyčerpaná po porodu
                     Cycle = s.Cycle is null
                         ? null
-                        : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 }
+                        : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 },
+                    Postpartum = new PostpartumState(0, PostpartumPhase.Immediate)
                 };
             }
 
@@ -337,6 +421,33 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     ? null
                     : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 }
             };
+        }
+
+        private PhysiologyState AdvancePostpartum(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector outbox)
+        {
+            var pp = s.Postpartum!;
+            var days = pp.DaysSinceBirth + 1;
+            var newPhase = days switch
+            {
+                <= 3  => PostpartumPhase.Immediate,
+                <= 7  => PostpartumPhase.FirstWeek,
+                <= 42 => PostpartumPhase.SixWeeks,
+                _     => PostpartumPhase.FullRecovery
+            };
+
+            if (newPhase != pp.Phase)
+                outbox.Add(new PostpartumPhaseChanged(now, ctx.Id, newPhase));
+
+            if (newPhase == PostpartumPhase.FullRecovery)
+            {
+                return s with
+                {
+                    Postpartum = null,
+                    Cycle = s.Cycle is null ? null : s.Cycle with { Phase = CyclePhase.Follicular, LibidoMod = 1.0 }
+                };
+            }
+
+            return s with { Postpartum = pp with { DaysSinceBirth = days, Phase = newPhase } };
         }
 
         private PhysiologyState TryStartPregnancy(PhysiologyState s, SexualEncounterOutcome encounter, IHumanContext ctx, IEventCollector outbox)
@@ -469,33 +580,35 @@ namespace GameEngineTools.Characters.Engines.Physiology
         ///   </description></item>
         /// </list>
         /// </returns>
-        private static (double pain, double bloat, double tender, double libidoMod) SymptomsFor(MenstrualCycleState c)
+        private (double pain, double bloat, double tender, double libidoMod) SymptomsFor(MenstrualCycleState c)
         {
-            // Jednoduché mapování (přírůstky za den; následně se vyhladí normalizací v Ticku)
-            return c.Phase switch
+            var (rawPain, rawBloat, rawTender, libido) = c.Phase switch
             {
-                CyclePhase.Menses => (+3, +2, +2, 0.90),
-                CyclePhase.Follicular => (-2, -1, -1, 1.05),
-                CyclePhase.Ovulation => (+0, +0, +0, 1.15),
-                CyclePhase.Luteal => (+1, +1, +1, 0.95),
-                _ => (0, 0, 0, 1.00)
+                CyclePhase.Menses     => (+3.0, +2.0, +2.0, 0.90),
+                CyclePhase.Follicular => (-2.0, -1.0, -1.0, 1.05),
+                CyclePhase.Ovulation  => (+0.0, +0.0, +0.0, 1.15),
+                CyclePhase.Luteal     => (+1.0, +1.0, +1.0, 0.95),
+                _                     => ( 0.0,  0.0,  0.0, 1.00)
             };
+            return (rawPain  * _cycleCfg.PainBaseMultiplier,
+                    rawBloat * _cycleCfg.BloatBaseMultiplier,
+                    rawTender * _cycleCfg.BreastTenderMultiplier,
+                    libido);
         }
 
-        private static CyclePhase PhaseFor(int day, int length, int mensesDays)
+        private static CyclePhase PhaseFor(int day, int length, int mensesDays, int ovulationDay)
         {
-            var ovulDay = 14;
             if (day <= mensesDays)
             {
                 return CyclePhase.Menses;
             }
 
-            if (day < ovulDay)
+            if (day < ovulationDay)
             {
                 return CyclePhase.Follicular;
             }
 
-            if (day >= ovulDay && day <= ovulDay + 1)
+            if (day >= ovulationDay && day <= ovulationDay + 1)
             {
                 return CyclePhase.Ovulation;
             }
@@ -507,7 +620,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             var day = rng.Next(1, Math.Max(2, cfg.MeanCycleLengthDays));
             day = Math.Clamp(day, 1, 35);
-            var phase = PhaseFor(day, cfg.MeanCycleLengthDays, cfg.MensesMeanDays);
+            var phase = PhaseFor(day, cfg.MeanCycleLengthDays, cfg.MensesMeanDays, cfg.OvulationDayOfCycle);
 
             // Zpětný odhad, kdy začala menstruace
             var lastMensesStart = now.AddDays(-(day - 1));

@@ -39,7 +39,8 @@ namespace EngineTests
         private static readonly PsychologyConfig DefaultCfg = new PsychologyConfig(
             BaselineAffectVariance: 0.0,   // vypnuto — deterministické testy
             StressRecoveryRatePerHour: 0.0,   // vypnuto — nechceme drift v testech
-            SleepQualityAffectWeight: 0.5);
+            SleepQualityAffectWeight: 0.5,
+            EnableCircadianRhythm: false);  // vypnuto — testy nesmí záviset na denní hodině
 
         #endregion Soukromá pole
 

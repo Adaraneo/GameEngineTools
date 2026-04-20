@@ -46,6 +46,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
+        private WDateTime? _stressAbove70Since;
 
         /// <summary>
         /// Initialises the engine with a neutral resting state:
@@ -62,7 +63,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
             State = new PsychologyState(
                 Valence: 0.1, Arousal: 0.4, Dominance: 0.5,
-                Stress: 20, CognitiveLoad: 20, DominantEmotion: DiscreteEmotion.Neutral);
+                Stress: 20, CognitiveLoad: 20, DominantEmotion: DiscreteEmotion.Neutral,
+                MoodBaseline: 50, Motivations: new MotivationState());
         }
 
         /// <summary>
@@ -106,6 +108,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 Dominance = Clamp01(s.Dominance - 0.0005 * ph.Pain * h - 0.01 * Math.Max(0, ph.BodyTempDelta - 1.5) * h)
             };
 
+            // Nutriční dopady — nízké železo snižuje valenci; nízký vitamín D tlumí náladu
+            if (ph.Nutrition is { } nutrition)
+            {
+                if (nutrition.Iron < 30)
+                    s = s with { Valence = Clampm1p1(s.Valence - (30 - nutrition.Iron) * Config.LowIronValencePenaltyPerUnit * h) };
+                if (nutrition.VitaminD < 20)
+                    s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - (20 - nutrition.VitaminD) * Config.LowVitaminDMoodPenaltyPerHour / 20.0 * h, 0, 100) };
+            }
+
             // CognitiveLoad — odvozuje se z fyziologických stressorů
             {
                 var feverThreshold = 1.5;
@@ -129,6 +140,39 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 // Vysoká horečka (> 2.5°C) posouvá náladu k negativní valenci (zmatenost)
                 if (ph.BodyTempDelta > 2.5)
                     s = s with { Valence = Clampm1p1(s.Valence - 0.02 * h) };
+            }
+
+            // MoodBaseline — pomalý drift směrem k neutrálu (50), potlačený vysokým stresem
+            {
+                var moodRecovery = Config.MoodBaselineRecoveryPerHour;
+                if (s.Stress > Config.MoodBaselineHighStressThreshold) moodRecovery *= 0.1;
+                moodRecovery *= 1.0 + ctx.Personality.BigFive.Agreeableness * Config.MoodBaselineAgreeablenessBonus;
+                s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * h), 0, 100) };
+            }
+
+            // Cirkadiánní rytmus — sinusoidální modulace arousal podle denní hodiny
+            if (Config.EnableCircadianRhythm)
+            {
+                var hourOfDay = (double)(now.Hour % 24);
+                var phase = (hourOfDay - Config.CircadianArousalPeakHour) * (Math.PI / 12.0);
+                var circadianDelta = Math.Cos(phase) * Config.CircadianInfluence;
+                s = s with { Arousal = Clamp01(s.Arousal + circadianDelta * h) };
+            }
+
+            // Stresová manifestace — sleduj jak dlouho je stres povýšen nad threshold
+            if (s.Stress > Config.StressManifestationThreshold)
+            {
+                _stressAbove70Since ??= now;
+                var hoursElevated = (now - _stressAbove70Since.Value).TotalHours;
+                if (hoursElevated >= Config.StressManifestationHours)
+                {
+                    outbox.Add(new StressManifested(now, ctx.Id, ChooseManifestation(ctx.Personality)));
+                    _stressAbove70Since = now; // reset — nezahlcovat výstupní frontu
+                }
+            }
+            else
+            {
+                _stressAbove70Since = null;
             }
 
             // Ovulace – jemné zvýšení arousal/valence
@@ -229,11 +273,19 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                     if (io.Accepted)
                     {
+                        var prevMotivAcc = s.Motivations ?? new MotivationState();
                         s = s with
                         {
                             Valence = Math.Min(1, s.Valence + 0.07),
-                            Dominance = Math.Clamp(s.Dominance + 0.03, 0, 1)
+                            Dominance = Math.Clamp(s.Dominance + 0.03, 0, 1),
+                            MoodBaseline = Math.Clamp(s.MoodBaseline + 5.0, 0, 100),
+                            Motivations = prevMotivAcc with
+                            {
+                                NeedSocial = Math.Clamp(prevMotivAcc.NeedSocial + 3.0, 0, 100)
+                            }
                         };
+                        if (s.Motivations != prevMotivAcc)
+                            outbox.Add(new MotivationChanged(io.OccurredAt, ctx.Id, prevMotivAcc, s.Motivations!));
                     }
                     else if (wasRejected)
                     {
@@ -255,12 +307,21 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             _ => 1.0
                         };
                         var impact = (0.05 + 0.10 * n + attachmentModifier) * actSensitivity;
+                        var prevMotivRej = s.Motivations ?? new MotivationState();
                         s = s with
                         {
                             Valence = Math.Max(-1, s.Valence - impact),
                             Stress = Math.Min(100, s.Stress + 3 + 5 * n),
-                            Dominance = Math.Clamp(s.Dominance - 0.04 * actSensitivity, 0, 1)
+                            Dominance = Math.Clamp(s.Dominance - 0.04 * actSensitivity, 0, 1),
+                            MoodBaseline = Math.Clamp(s.MoodBaseline - 8.0, 0, 100),
+                            Motivations = prevMotivRej with
+                            {
+                                NeedSocial = Math.Clamp(prevMotivRej.NeedSocial - 5.0, 0, 100),
+                                NeedSafety = Math.Clamp(prevMotivRej.NeedSafety + 5.0, 0, 100)
+                            }
                         };
+                        if (s.Motivations != prevMotivRej)
+                            outbox.Add(new MotivationChanged(io.OccurredAt, ctx.Id, prevMotivRej, s.Motivations!));
                     }
                     else if (didReject)
                     {
@@ -308,17 +369,36 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         };
                         if (s.Stress > 70 && State.Stress <= 70)
                             outbox.Add(new StressSpiked(pd.OccurredAt, ctx.Id, s.Stress));
+                        var prevMotivPd = State.Motivations ?? new MotivationState();
+                        s = s with
+                        {
+                            Motivations = prevMotivPd with
+                            {
+                                NeedCare     = Math.Clamp(prevMotivPd.NeedCare     + 15.0, 0, 100),
+                                NeedIntimacy = Math.Clamp(prevMotivPd.NeedIntimacy -  5.0, 0, 100)
+                            }
+                        };
+                        if (s.Motivations != prevMotivPd)
+                            outbox.Add(new MotivationChanged(pd.OccurredAt, ctx.Id, prevMotivPd, s.Motivations!));
                         break;
                     }
 
-                case Characters.Engines.Physiology.ChildBorn:
+                case Characters.Engines.Physiology.ChildBorn cb:
+                    var prevMotivCb = s.Motivations ?? new MotivationState();
                     s = s with
                     {
                         Valence   = Math.Clamp(s.Valence + 0.25, -1, 1),
                         Arousal   = Math.Clamp(s.Arousal + 0.15, 0, 1),
                         Dominance = Math.Clamp(s.Dominance - 0.10, 0, 1),
-                        Stress    = Math.Clamp(s.Stress - 10, 0, 100)
+                        Stress    = Math.Clamp(s.Stress - 10, 0, 100),
+                        Motivations = prevMotivCb with
+                        {
+                            NeedCare     = Math.Clamp(prevMotivCb.NeedCare     + 20.0, 0, 100),
+                            NeedIntimacy = Math.Clamp(prevMotivCb.NeedIntimacy - 10.0, 0, 100)
+                        }
                     };
+                    if (s.Motivations != prevMotivCb)
+                        outbox.Add(new MotivationChanged(cb.OccurredAt, ctx.Id, prevMotivCb, s.Motivations!));
                     break;
 
                 case Characters.Engines.Memory.MemoryRecalled mr:
@@ -350,7 +430,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         if (se.WasInterrupted || se.Quality < 40)
                         {
                             var stressDelta = (1.0 - se.Quality / 100.0) * 10.0 * sensitivityMod;
-                            s = s with { Stress = Math.Clamp(s.Stress + stressDelta, 0, 100) };
+                            s = s with
+                            {
+                                Stress = Math.Clamp(s.Stress + stressDelta, 0, 100),
+                                MoodBaseline = Math.Clamp(s.MoodBaseline - 2.0, 0, 100)
+                            };
                             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
                             {
                         _log.PsychSleepInterrupted(se.Quality, stressDelta);
@@ -360,7 +444,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         {
                             // Dobrý spánek snižuje stres navíc k průběžnému driftu v Tick()
                             var stressRelief = (se.Quality / 100.0) * 5.0;
-                            s = s with { Stress = Math.Clamp(s.Stress - stressRelief, 0, 100) };
+                            var moodGain = se.Quality > 70 ? 2.0 : 0.0;
+                            s = s with
+                            {
+                                Stress = Math.Clamp(s.Stress - stressRelief, 0, 100),
+                                MoodBaseline = Math.Clamp(s.MoodBaseline + moodGain, 0, 100)
+                            };
                         }
 
                         // Publikuj StressSpiked pokud stres přesáhl threshold (ostatní enginy mohou reagovat)
@@ -396,6 +485,17 @@ namespace GameEngineTools.Characters.Engines.Psychology
             }
 
             State = s;
+        }
+
+        private static string ChooseManifestation(Traits.Personality p)
+        {
+            if (p.BigFive.Neuroticism > 0.6)
+                return p.BigFive.Extraversion < 0.4 ? "withdrawal" : "anxiety";
+            if (p.BigFive.Agreeableness < 0.35)
+                return "aggression";
+            if (p.BigFive.Openness > 0.6)
+                return p.BigFive.Conscientiousness > 0.5 ? "creativity" : "rumination";
+            return "anxiety";
         }
 
         /// <summary>
