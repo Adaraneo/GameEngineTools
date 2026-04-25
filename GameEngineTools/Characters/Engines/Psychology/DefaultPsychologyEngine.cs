@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -177,10 +178,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Cirkadiánní rytmus — dvě Gaussovy křivky (ráno + večer) s poobědovým poklesem
             if (Config.EnableCircadianRhythm)
             {
-                var h24 = (double)(now.Hour % 24);
-                var morningPeak = 0.35 * Math.Exp(-Math.Pow(h24 - 10.0, 2) / 16.0);  // σ²=8, peak 10h
-                var eveningPeak = 0.25 * Math.Exp(-Math.Pow(h24 - 19.0, 2) / 12.0);  // σ²=6, peak 19h
-                var lunchDip    = 0.20 * Math.Exp(-Math.Pow(h24 - 15.0, 2) / 3.0);   // σ²=1.5, dip 15h
+                var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+                var morningPeak = 0.35 * Math.Exp(-Math.Pow(hoursOfDay - 10.0, 2) / 16.0);  // σ²=8, peak 10h
+                var eveningPeak = 0.25 * Math.Exp(-Math.Pow(hoursOfDay - 19.0, 2) / 12.0);  // σ²=6, peak 19h
+                var lunchDip    = 0.20 * Math.Exp(-Math.Pow(hoursOfDay - 15.0, 2) / 3.0);   // σ²=1.5, dip 15h
                 var baseArousal = Math.Clamp(0.60 + morningPeak + eveningPeak - lunchDip, 0.40, 0.95);
                 var delta = (baseArousal - s.Arousal) * Config.CircadianInfluence * h;
                 s = s with { Arousal = Clamp01(s.Arousal + delta) };
