@@ -122,6 +122,8 @@ namespace GameEngineTools
         public static async Task<GameEngineToolsRuntimeHandle> StartAsync(
             bool consoleLogs = false,
             string? logsRoot = null,
+            bool writeJsonLines = true,
+            bool writeTextLogs = true,
             GeneratedFileOptions? generatedFileOptions = null)
         {
             var services = new ServiceCollection();
@@ -139,8 +141,8 @@ namespace GameEngineTools
                     opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                     opt.WorldTimeTextAccessor = () => WDateTime.Now.ToString();
-                    opt.WriteTextLogs = true;
-                    opt.WriteJsonLines = false;
+                    opt.WriteTextLogs = writeTextLogs;
+                    opt.WriteJsonLines = writeJsonLines;
                 });
             });
 
