@@ -963,6 +963,139 @@ namespace EngineTests
 
         #endregion Testosteron (mužský cyklus)
 
+        #region Sleep Inertia
+
+        /// <summary>
+        /// Po SleepEnded musí být SleepInertiaHours nenulová; přes Tick() musí klesat.
+        /// </summary>
+        [TestMethod]
+        public void SleepInertia_SetAfterSleepEnded_DecaysOverTime()
+        {
+            var engine = BuildEngine();
+            var ended = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
+            engine.Handle(ended, _ctx, _outbox);
+
+            Assert.IsTrue(engine.State.SleepInertiaHours > 0,
+                $"SleepInertiaHours musí být > 0 po SleepEnded. Aktuálně: {engine.State.SleepInertiaHours:F4}");
+
+            var beforeDecay = engine.State.SleepInertiaHours;
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(null), new EventCollector());
+
+            Assert.IsTrue(engine.State.SleepInertiaHours < beforeDecay,
+                $"SleepInertiaHours musí klesat v Tick(). Před: {beforeDecay:F4}, po: {engine.State.SleepInertiaHours:F4}");
+        }
+
+        /// <summary>
+        /// Špatný spánek musí nastavit delší inertii než spánek perfektní kvality.
+        /// </summary>
+        [TestMethod]
+        public void SleepInertia_PoorQuality_LongerThanGoodQuality()
+        {
+            var poorEngine = BuildEngine();
+            var goodEngine = BuildEngine();
+            poorEngine.Handle(MakeSleepEnded(quality: 0,   hoursSlept: 8, wasInterrupted: true),  _ctx, new EventCollector());
+            goodEngine.Handle(MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false), _ctx, new EventCollector());
+
+            Assert.IsTrue(poorEngine.State.SleepInertiaHours > goodEngine.State.SleepInertiaHours,
+                $"Špatný spánek musí mít delší inertii. Špatný={poorEngine.State.SleepInertiaHours:F4}, " +
+                $"Dobrý={goodEngine.State.SleepInertiaHours:F4}");
+        }
+
+        #endregion Sleep Inertia
+
+        #region Sociální bolest — kortizol
+
+        /// <summary>
+        /// Odmítnutá interakce (wasRejected) musí elevovat CortisolLevel v PhysiologyEngine.
+        /// Vědecký základ: Eisenberger et al. (2003) — sociální odmítnutí = HPA aktivace.
+        /// </summary>
+        [TestMethod]
+        public void SocialPain_RejectedInteraction_SpikesCortisolInPhysiology()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { CortisolLevel = 50 });
+            var ctx = BuildContext();
+
+            var io = new GameEngineTools.Characters.Engines.Interactions.InteractionOutcome(
+                OccurredAt: _now,
+                From: ctx.Id,
+                To: new HumanId(Guid.NewGuid()),
+                Act: GameEngineTools.Characters.Engines.Interactions.SpeechAct.SmallTalk,
+                Accepted: false,
+                Reason: string.Empty);
+
+            engine.Handle(io, ctx, _outbox);
+
+            Assert.IsTrue(engine.State.CortisolLevel > 50,
+                $"Odmítnutá interakce musí elevovat kortizol. Před: 50, po: {engine.State.CortisolLevel:F2}");
+        }
+
+        #endregion Sociální bolest — kortizol
+
+        #region Menstruační cyklus — sinusoidální drift
+
+        /// <summary>
+        /// LibidoMod v ovulačním dni musí být vyšší než v menstruačním dni.
+        /// </summary>
+        [TestMethod]
+        public void MenstrualCycle_LibidoPeak_AtOvulation_Higher_ThanAtMenses()
+        {
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            // Ovulační den (den 14)
+            engine.RestoreState(engine.State with
+            {
+                Cycle = engine.State.Cycle! with { DayInCycle = 14, Phase = CyclePhase.Ovulation }
+            });
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            var libidoAtOvulation = engine.State.Cycle!.LibidoMod;
+
+            // Menstruační den (den 2)
+            engine.RestoreState(engine.State with
+            {
+                Cycle = engine.State.Cycle with { DayInCycle = 2, Phase = CyclePhase.Menses }
+            });
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            var libidoAtMenses = engine.State.Cycle!.LibidoMod;
+
+            Assert.IsTrue(libidoAtOvulation > libidoAtMenses,
+                $"LibidoMod v ovulaci ({libidoAtOvulation:F4}) musí být > LibidoMod v menstruaci ({libidoAtMenses:F4}).");
+        }
+
+        /// <summary>
+        /// Přechod mezi fázemi nesmí způsobit nespojitý skok v bolesti (sinusoida ≈ plynulá).
+        /// Bolest ve Follicular (den 8) musí být nižší než v Menses (den 2) a nižší než v Luteal (den 26).
+        /// </summary>
+        [TestMethod]
+        public void MenstrualCycle_PainSymptom_Smooth_AtPhaseTransitions()
+        {
+            var engine = BuildEngine(birthYear: 13, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            double GetPainAfterTick(int day, CyclePhase phase)
+            {
+                engine.RestoreState(engine.State with
+                {
+                    Pain = 0,
+                    Cycle = engine.State.Cycle! with { DayInCycle = day, Phase = phase }
+                });
+                engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+                return engine.State.Pain;
+            }
+
+            var painMenses      = GetPainAfterTick(2,  CyclePhase.Menses);
+            var painFollicular  = GetPainAfterTick(8,  CyclePhase.Follicular);
+            var painLuteal      = GetPainAfterTick(26, CyclePhase.Luteal);
+
+            Assert.IsTrue(painFollicular < painMenses,
+                $"Follicular ({painFollicular:F4}) musí mít nižší bolest než Menses ({painMenses:F4}).");
+            Assert.IsTrue(painFollicular < painLuteal,
+                $"Follicular ({painFollicular:F4}) musí mít nižší bolest než pozdní Luteal ({painLuteal:F4}).");
+        }
+
+        #endregion Menstruační cyklus — sinusoidální drift
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine pro konkrétní biologii (Male/Female) — pro testy pohlavně specifických metrik.</summary>

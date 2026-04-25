@@ -253,6 +253,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { AllostaticLoad = Math.Clamp(s.AllostaticLoad + alloAccum - alloDecay, 0, 100) };
             }
 
+            // Sleep Inertia — lineární decay po probuzení
+            if (s.SleepInertiaHours > 0)
+                s = s with { SleepInertiaHours = Math.Max(0, s.SleepInertiaHours - h) };
+
             // Kortizol — diurnální křivka (HPA osa) + chronický stres + imunitní elevace
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
@@ -351,6 +355,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                         // Recovery Debt zpomaluje obnovu energie (min. 30 % účinnosti)
                         var recoveryFactor = Math.Max(0.3, 1.0 - s.RecoveryDebtHours / 48.0);
+                        // Sleep Inertia: horší kvalita = delší inertia (quality=100 → 0.75h; quality=0 → 1.5h)
+                        var inertiaHours = Config.SleepInertiaMaxHours * (1.0 - se.Quality / 100.0 * 0.5);
 
                         s = s with
                         {
@@ -367,7 +373,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
                             // Energie se obnoví spánkem; při recovery debt je obnova snížena
                             // 8h kvalitního spánku (quality=100, debt=0) → +80 energie
                             // Stejný spánek s RecoveryDebt=48h → +24 energie (30 % min.)
-                            Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor * recoveryFactor)
+                            Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor * recoveryFactor),
+
+                            // Sleep inertia — kognitivní setrvačnost po probuzení
+                            SleepInertiaHours = inertiaHours
                         };
 
                         using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
@@ -385,6 +394,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 case InjuryReceived ir:
                     s = s with { Injury = new InjuryState(Math.Clamp(ir.Severity, 0, 100), 0, ir.Type) };
                     break;
+
+                // Sociální bolest = fyzická bolest (Eisenberger et al., 2003) — odmítnutí aktivuje HPA osu
+                case InteractionOutcome io when io.From == ctx.Id && !io.Accepted:
+                {
+                    var n = ctx.Personality.BigFive.Neuroticism;
+                    var spike = Config.SocialPainCortisolSpike * (1.0 + n * 0.5);
+                    s = s with { CortisolLevel = Math.Clamp(s.CortisolLevel + spike, 0, 100) };
+                    break;
+                }
             }
 
             State = s;
@@ -658,20 +676,42 @@ namespace GameEngineTools.Characters.Engines.Physiology
         ///   </description></item>
         /// </list>
         /// </returns>
+        /// <summary>
+        /// Sinusoidální model symptomů menstruačního cyklu (náhrada phase-step konstanty).
+        /// Výpočet je kontinuální funkcí dne v cyklu — Gaussovy křivky pro menzes a luteální fázi.
+        /// Vědecký základ: estrogen/progesteron drift je plynulý, nikoli binární přepínač
+        /// (reference: physiology-psychology.md).
+        /// </summary>
         private (double pain, double bloat, double tender, double libidoMod) SymptomsFor(MenstrualCycleState c)
         {
-            var (rawPain, rawBloat, rawTender, libido) = c.Phase switch
-            {
-                CyclePhase.Menses     => (+3.0, +2.0, +2.0, 0.90),
-                CyclePhase.Follicular => (-2.0, -1.0, -1.0, 1.05),
-                CyclePhase.Ovulation  => (+0.0, +0.0, +0.0, 1.15),
-                CyclePhase.Luteal     => (+1.0, +1.0, +1.0, 0.95),
-                _                     => ( 0.0,  0.0,  0.0, 1.00)
-            };
-            return (rawPain  * _cycleCfg.PainBaseMultiplier,
-                    rawBloat * _cycleCfg.BloatBaseMultiplier,
-                    rawTender * _cycleCfg.BreastTenderMultiplier,
-                    libido);
+            if (c.Phase == CyclePhase.Paused)
+                return (0.0, 0.0, 0.0, 1.0);
+
+            var day      = (double)c.DayInCycle;
+            var ovulDay  = (double)_cycleCfg.OvulationDayOfCycle;
+            var mensesMid = _cycleCfg.MensesMeanDays / 2.0;
+
+            // Bolest: Gaussový spike v menstruaci + luteální eskalace
+            var mensesPain = 4.0 * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
+            var lutealPain = 1.5 * Math.Max(0, (day - (ovulDay + 7)) / 7.0);
+            var rawPain    = (mensesPain + lutealPain) * _cycleCfg.PainBaseMultiplier;
+
+            // Bloat: peak v menstruaci, mírně v luteálu
+            var mensesBloat = 2.5 * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
+            var lutealBloat = 0.8 * Math.Max(0, (day - (ovulDay + 7)) / 7.0);
+            var rawBloat    = (mensesBloat + lutealBloat) * _cycleCfg.BloatBaseMultiplier;
+
+            // Breast tenderness: dominantní v pozdní luteální fázi, mírně v menstruaci
+            var mensesTender = 2.0 * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
+            var lutealTender = 1.5 * Math.Max(0, (day - (ovulDay + 5)) / 7.0);
+            var rawTender    = (mensesTender + lutealTender) * _cycleCfg.BreastTenderMultiplier;
+
+            // LibidoMod: Gaussový vrchol v ovulaci, mírný propad v menstruaci, baseline 0.95
+            var libidoBoost = 0.25 * Math.Exp(-Math.Pow(day - ovulDay, 2) / 8.0);
+            var mensesDip   = -0.10 * Math.Exp(-Math.Pow(day - mensesMid, 2) / 4.0);
+            var libidoMod   = Math.Clamp(0.95 + libidoBoost + mensesDip, 0.80, 1.20);
+
+            return (rawPain, rawBloat, rawTender, libidoMod);
         }
 
         private static CyclePhase PhaseFor(int day, int length, int mensesDays, int ovulationDay)

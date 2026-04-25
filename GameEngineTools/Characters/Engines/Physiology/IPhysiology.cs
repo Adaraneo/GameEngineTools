@@ -51,9 +51,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         bool EnableTestosteroneCycle = true,
         double TestosteronePeakHour = 8.0,
         double TestosteroneAlloSuppression = 0.20,
-        double TestosteroneSleepDebtPenaltyPerHour = 0.8)
+        double TestosteroneSleepDebtPenaltyPerHour = 0.8,
+        // Sleep Inertia
+        double SleepInertiaMaxHours = 1.5,
+        // Sociální bolest (HPA aktivace při odmítnutí)
+        double SocialPainCortisolSpike = 8.0)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0) { }
     }
 
     public sealed record PhysiologyState(
@@ -101,7 +105,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Modeluje diurnální rytmus (vrchol ráno) a potlačení HPA-HPG cross-talkem
         /// při chronickém stresu a spánkovém dluhu.
         /// </summary>
-        TestosteroneState? Testosterone = null);
+        TestosteroneState? Testosterone = null,
+        /// <summary>
+        /// Zbývající hodiny sleep inertia po probuzení. Adenosin není ihned vyčistěn —
+        /// prvních 1–2 h po SleepEnded je kognitivní výkon a arousal snížen (Borbély model).
+        /// Klesá lineárně v Tick(); nastaveno po každém SleepEnded. 0..2.
+        /// </summary>
+        double SleepInertiaHours = 0);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }

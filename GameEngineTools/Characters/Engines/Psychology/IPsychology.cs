@@ -33,9 +33,20 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double CortisolArousalWeight = 0.008,
         // Testosteron → psychika
         double TestosteroneIntimacyWeight = 0.3,
-        double TestosteroneStressResilienceWeight = 0.008)
+        double TestosteroneStressResilienceWeight = 0.008,
+        // Sleep Inertia (musí souhlasit s PhysiologyConfig.SleepInertiaMaxHours pro správné normování)
+        double SleepInertiaMaxHours = 1.5,
+        // Hangry neutrální bias (MacCormack 2019)
+        double HangryNeutralBiasThreshold = 70.0,
+        double HangryNeutralBiasStrength = 0.015,
+        double HangryNeutralContextWindow = 0.25,
+        // Sickness behavior — anhedonie (Dantzer 2007)
+        double SicknessAnhedoniaImmuneThreshold = 50.0,
+        double SicknessAnhedoniaRewardBlunting = 0.5,
+        double SicknessLethargyArousalPenalty = 0.008,
+        double SicknessBrainFogCogLoadBonus = 3.0)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0) { }
     }
 
     public sealed record PsychologyState(

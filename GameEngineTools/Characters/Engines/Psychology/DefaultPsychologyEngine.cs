@@ -118,7 +118,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - (20 - nutrition.VitaminD) * Config.LowVitaminDMoodPenaltyPerHour / 20.0 * h, 0, 100) };
             }
 
-            // Sickness behavior — imunitní zátěž → sociální stažení
+            // Sickness behavior — imunitní zátěž → sociální stažení + anhedonie + letargie (Dantzer 2007)
             if (s.Motivations is { } sicknessMotiv)
             {
                 var shouldWithdraw = ph.ImmuneLoad > 50;
@@ -127,6 +127,17 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     var next = sicknessMotiv with { SicknessWithdraw = shouldWithdraw };
                     s = s with { Motivations = next };
                     outbox.Add(new MotivationChanged(now, ctx.Id, sicknessMotiv, next));
+                }
+
+                // Anhedonie (Dantzer): IL-1β inhibuje nucleus accumbens →
+                // letargie (Arousal↓) a brain fog (CogLoad↑) při aktivní nemoci
+                if (shouldWithdraw)
+                {
+                    s = s with
+                    {
+                        Arousal       = Clamp01(s.Arousal - Config.SicknessLethargyArousalPenalty * h),
+                        CognitiveLoad = Clamp01p(s.CognitiveLoad + Config.SicknessBrainFogCogLoadBonus * h)
+                    };
                 }
             }
 
@@ -170,6 +181,26 @@ namespace GameEngineTools.Characters.Engines.Psychology
             if (ph.CortisolLevel > 70)
                 s = s with { Stress = Clamp01p(s.Stress + (ph.CortisolLevel - 70) * Config.CortisolStressWeight * h) };
             s = s with { Arousal = Clamp01(s.Arousal + (ph.CortisolLevel - 50) * Config.CortisolArousalWeight * h) };
+
+            // Sleep Inertia — kognitivní zpomalení a tlumení arousalu po probuzení (Borbély)
+            if (ph.SleepInertiaHours > 0)
+            {
+                var inertiaSeverity = ph.SleepInertiaHours / Config.SleepInertiaMaxHours; // 0..1
+                s = s with
+                {
+                    Arousal       = Clamp01(s.Arousal - inertiaSeverity * 0.15 * h),
+                    CognitiveLoad = Clamp01p(s.CognitiveLoad + inertiaSeverity * 5.0 * h)
+                };
+            }
+
+            // Hangry neutrální bias — hlad misattribuovaný k negativitě v neutrálním kontextu
+            // (MacCormack & Lindquist, 2019: interoceptivní signál hladu → hostile attribution bias)
+            if (ph.Hunger > Config.HangryNeutralBiasThreshold
+                && Math.Abs(s.Valence) < Config.HangryNeutralContextWindow)
+            {
+                var hungerExcess = (ph.Hunger - Config.HangryNeutralBiasThreshold) / 30.0; // 0..1
+                s = s with { Valence = Clampm1p1(s.Valence - hungerExcess * Config.HangryNeutralBiasStrength * h) };
+            }
 
             // Testosteron → NeedIntimacy a stresová resilience (jen muži)
             if (ph.Testosterone is { } testo && s.Motivations is { } motiv)
@@ -336,6 +367,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                     if (io.Accepted)
                     {
+                        // Anhedonie při sickness: pozitivní interakce méně uspokojuje (Dantzer 2007)
+                        var anhedoniaMult = (ph.ImmuneLoad > Config.SicknessAnhedoniaImmuneThreshold)
+                            ? Config.SicknessAnhedoniaRewardBlunting : 1.0;
                         var prevMotivAcc = s.Motivations ?? new MotivationState();
                         s = s with
                         {
@@ -344,7 +378,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             MoodBaseline = Math.Clamp(s.MoodBaseline + 5.0, 0, 100),
                             Motivations = prevMotivAcc with
                             {
-                                NeedSocial = Math.Clamp(prevMotivAcc.NeedSocial + 3.0, 0, 100)
+                                NeedSocial = Math.Clamp(prevMotivAcc.NeedSocial + 3.0 * anhedoniaMult, 0, 100)
                             }
                         };
                         if (s.Motivations != prevMotivAcc)

@@ -438,6 +438,208 @@ namespace EngineTests
 
         #endregion Scenario 5
 
+        #region Scenario 6 — Sleep Inertia → Psychology
+
+        /// <summary>
+        /// Aktivní SleepInertiaHours musí tlumit Arousal v Psychology Tick().
+        /// </summary>
+        [TestMethod]
+        public void SleepInertia_ReducesArousal_InPsychologyTick()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                SleepInertiaMaxHours: 1.5));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var withInertia    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var withoutInertia = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            withInertia.RestoreState(withInertia.State with { Arousal = 0.6 });
+            withoutInertia.RestoreState(withoutInertia.State with { Arousal = 0.6 });
+
+            var physioWithInertia    = MakePhysio(0, 0, 0) with { SleepInertiaHours = 1.2 };
+            var physioWithoutInertia = MakePhysio(0, 0, 0) with { SleepInertiaHours = 0.0 };
+
+            var ctxWith    = BuildRawContext(neuroticism: 0.5, physio: physioWithInertia);
+            var ctxWithout = BuildRawContext(neuroticism: 0.5, physio: physioWithoutInertia);
+            var now = new WDateTime(0);
+
+            withInertia.Tick(now, WTimeSpan.FromHours(1), ctxWith, new EventCollector());
+            withoutInertia.Tick(now, WTimeSpan.FromHours(1), ctxWithout, new EventCollector());
+
+            Assert.IsTrue(withInertia.State.Arousal < withoutInertia.State.Arousal,
+                $"Sleep inertia musí tlumit Arousal. " +
+                $"S inertií={withInertia.State.Arousal:F4}, Bez={withoutInertia.State.Arousal:F4}");
+        }
+
+        #endregion Scenario 6
+
+        #region Scenario 7 — Hangry neutrální bias
+
+        /// <summary>
+        /// Při vysokém hladu a neutrální Valence musí Valence klesat (hangry bias).
+        /// </summary>
+        [TestMethod]
+        public void HangryNeutralBias_NeutralValence_BecomesNegativeWhenHungry()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                HangryNeutralBiasThreshold: 70.0,
+                HangryNeutralBiasStrength: 0.015,
+                HangryNeutralContextWindow: 0.25));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var hungryPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var normalPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            hungryPsych.RestoreState(hungryPsych.State with { Valence = 0.0 });
+            normalPsych.RestoreState(normalPsych.State with { Valence = 0.0 });
+
+            var hungryPhysio = new PhysiologyState(70, 2, 85, 15, 0, 5, 0, null);  // Hunger=85 > threshold 70
+            var normalPhysio = new PhysiologyState(70, 2, 20, 15, 0, 5, 0, null);  // Hunger=20
+
+            var ctxHungry = BuildRawContext(neuroticism: 0.5, physio: hungryPhysio);
+            var ctxNormal = BuildRawContext(neuroticism: 0.5, physio: normalPhysio);
+            var now = new WDateTime(0);
+
+            hungryPsych.Tick(now, WTimeSpan.FromHours(4), ctxHungry, new EventCollector());
+            normalPsych.Tick(now, WTimeSpan.FromHours(4), ctxNormal, new EventCollector());
+
+            Assert.IsTrue(hungryPsych.State.Valence < normalPsych.State.Valence,
+                $"Hladové NPC musí mít nižší Valenci při neutrálním kontextu. " +
+                $"Hladový={hungryPsych.State.Valence:F4}, Normální={normalPsych.State.Valence:F4}");
+        }
+
+        /// <summary>
+        /// Hangry bias nesmí fungovat při negativní Valence (kontext není neutrální).
+        /// </summary>
+        [TestMethod]
+        public void HangryNeutralBias_NegativeValence_NotAffected_ByHangryBias()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                HangryNeutralBiasThreshold: 70.0,
+                HangryNeutralBiasStrength: 0.015,
+                HangryNeutralContextWindow: 0.25));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            // Obě instance s negativní valencí (kontext není neutrální → bias se nespouští)
+            var hungryNeg = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var normalNeg = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            hungryNeg.RestoreState(hungryNeg.State with { Valence = -0.5 });
+            normalNeg.RestoreState(normalNeg.State with { Valence = -0.5 });
+
+            var hungryPhysio = new PhysiologyState(70, 2, 85, 15, 0, 5, 0, null);
+            var normalPhysio = new PhysiologyState(70, 2, 20, 15, 0, 5, 0, null);
+
+            var ctxHungry = BuildRawContext(neuroticism: 0.5, physio: hungryPhysio);
+            var ctxNormal = BuildRawContext(neuroticism: 0.5, physio: normalPhysio);
+            var now = new WDateTime(0);
+
+            hungryNeg.Tick(now, WTimeSpan.FromHours(1), ctxHungry, new EventCollector());
+            normalNeg.Tick(now, WTimeSpan.FromHours(1), ctxNormal, new EventCollector());
+
+            // Rozdíl je způsoben pouze stávajícím fyzio driftem (0.001*Hunger*h) — ne hangry bias.
+            // Při Hunger=85 vs 20 je fyzio drift rozdíl: 0.001*(85-20)*1h = 0.065.
+            // Hangry bias by přidal dalších ~0.05 — proto je tolerance 0.09 (fyziodrift < thresh < fyziodrift+bias).
+            var valenceDiff = Math.Abs(hungryNeg.State.Valence - normalNeg.State.Valence);
+            Assert.IsTrue(valenceDiff < 0.09,
+                $"Hangry bias se nesmí spouštět při negativní Valenci (rozdíl musí být jen fyzio drift). Rozdíl={valenceDiff:F4}");
+        }
+
+        #endregion Scenario 7
+
+        #region Scenario 8 — Sickness anhedonie a letargie
+
+        /// <summary>
+        /// Nemocné NPC (ImmuneLoad > threshold) musí mít nižší Arousal (letargie).
+        /// </summary>
+        [TestMethod]
+        public void SicknessBehavior_Lethargy_ReducesArousal()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                SicknessLethargyArousalPenalty: 0.008,
+                SicknessBrainFogCogLoadBonus: 3.0));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            sickPsych.RestoreState(sickPsych.State with
+                { Arousal = 0.6, Motivations = new MotivationState(SicknessWithdraw: false) });
+            healthyPsych.RestoreState(healthyPsych.State with
+                { Arousal = 0.6, Motivations = new MotivationState(SicknessWithdraw: false) });
+
+            var sickPhysio    = MakePhysio(0, 0, 0) with { ImmuneLoad = 70 };  // > threshold 50
+            var healthyPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 10 };
+
+            var ctxSick    = BuildRawContext(neuroticism: 0.5, physio: sickPhysio);
+            var ctxHealthy = BuildRawContext(neuroticism: 0.5, physio: healthyPhysio);
+            var now = new WDateTime(0);
+
+            sickPsych.Tick(now, WTimeSpan.FromHours(4), ctxSick, new EventCollector());
+            healthyPsych.Tick(now, WTimeSpan.FromHours(4), ctxHealthy, new EventCollector());
+
+            Assert.IsTrue(sickPsych.State.Arousal < healthyPsych.State.Arousal,
+                $"Nemocné NPC musí mít nižší Arousal (letargie). " +
+                $"Nemocný={sickPsych.State.Arousal:F4}, Zdravý={healthyPsych.State.Arousal:F4}");
+        }
+
+        /// <summary>
+        /// Pozitivní interakce musí méně zvyšovat NeedSocial u nemocného NPC (anhedonie).
+        /// </summary>
+        [TestMethod]
+        public void SicknessBehavior_Anhedonia_ReducesNeedSocialGainOnAccepted()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                SicknessAnhedoniaImmuneThreshold: 50.0,
+                SicknessAnhedoniaRewardBlunting: 0.5));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var initMotiv = new MotivationState(NeedSocial: 50);
+            sickPsych.RestoreState(sickPsych.State with { Motivations = initMotiv });
+            healthyPsych.RestoreState(healthyPsych.State with { Motivations = initMotiv });
+
+            var sickPhysio    = MakePhysio(0, 0, 0) with { ImmuneLoad = 70 };
+            var healthyPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 10 };
+
+            var sickCtx    = BuildRawContext(neuroticism: 0.5, physio: sickPhysio);
+            var healthyCtx = BuildRawContext(neuroticism: 0.5, physio: healthyPhysio);
+
+            var io = new GameEngineTools.Characters.Engines.Interactions.InteractionOutcome(
+                OccurredAt: new WDateTime(0),
+                From: new HumanId(Guid.NewGuid()),
+                To: sickCtx.Id,
+                Act: GameEngineTools.Characters.Engines.Interactions.SpeechAct.SmallTalk,
+                Accepted: true,
+                Reason: string.Empty);
+
+            sickPsych.Handle(io, sickCtx, new EventCollector());
+            healthyPsych.Handle(io, healthyCtx, new EventCollector());
+
+            Assert.IsTrue(
+                healthyPsych.State.Motivations!.NeedSocial > sickPsych.State.Motivations!.NeedSocial,
+                $"Zdravé NPC musí získat více NeedSocial než nemocné. " +
+                $"Zdravý={healthyPsych.State.Motivations.NeedSocial:F4}, " +
+                $"Nemocný={sickPsych.State.Motivations.NeedSocial:F4}");
+        }
+
+        #endregion Scenario 8
+
         #region Helpers
 
         /// <summary>
