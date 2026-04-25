@@ -1068,6 +1068,306 @@ namespace EngineTests
 
         #endregion Dominance — testy
 
+        #region MoodBaseline — Phase 4
+
+        [TestMethod]
+        public void Tick_MoodBaseline_DriftsToward50InNeutralConditions()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            engine.RestoreState(engine.State with { MoodBaseline = 80 });
+            var ctx = BuildContext(neuroticism: 0.5);
+
+            engine.Tick(_now, WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.MoodBaseline < 80,
+                $"MoodBaseline=80 must drift down toward 50 in neutral conditions. Got {engine.State.MoodBaseline:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_MoodBaseline_RecoveryIsSuppressedWhenStressAbove80()
+        {
+            var engineHighStress = BuildEngine(initialValence: 0.0, initialStress: 90,
+                cfg: new PsychologyConfig(BaselineAffectVariance: 0.0, StressRecoveryRatePerHour: 0.0,
+                    EnableCircadianRhythm: false));
+            engineHighStress.RestoreState(engineHighStress.State with { MoodBaseline = 30 });
+
+            var engineLowStress = BuildEngine(initialValence: 0.0, initialStress: 10,
+                cfg: new PsychologyConfig(BaselineAffectVariance: 0.0, StressRecoveryRatePerHour: 0.0,
+                    EnableCircadianRhythm: false));
+            engineLowStress.RestoreState(engineLowStress.State with { MoodBaseline = 30 });
+
+            var ctxHigh = BuildContext(neuroticism: 0.5);
+            var ctxLow  = BuildContext(neuroticism: 0.5);
+
+            engineHighStress.Tick(_now, WTimeSpan.FromHours(1), ctxHigh, new EventCollector());
+            engineLowStress.Tick(_now, WTimeSpan.FromHours(1), ctxLow, new EventCollector());
+
+            Assert.IsTrue(engineHighStress.State.MoodBaseline <= engineLowStress.State.MoodBaseline,
+                $"High stress must suppress MoodBaseline recovery. HighStress={engineHighStress.State.MoodBaseline:F4}, LowStress={engineLowStress.State.MoodBaseline:F4}");
+        }
+
+        [TestMethod]
+        public void Handle_SleepEnded_GoodSleep_IncreasesMoodBaseline()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var before = engine.State.MoodBaseline;
+            var ctx = BuildContext(neuroticism: 0.5);
+
+            engine.Handle(new SleepEnded(_now, ctx.Id, TotalHoursSlept: 8, Quality: 90, WasInterrupted: false), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.MoodBaseline > before,
+                $"Good sleep (quality=90) must increase MoodBaseline. Before={before:F4}, After={engine.State.MoodBaseline:F4}");
+        }
+
+        [TestMethod]
+        public void Handle_SleepEnded_BadSleep_DecreasesMoodBaseline()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var before = engine.State.MoodBaseline;
+            var ctx = BuildContext(neuroticism: 0.5);
+
+            engine.Handle(new SleepEnded(_now, ctx.Id, TotalHoursSlept: 4, Quality: 20, WasInterrupted: true), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.MoodBaseline < before,
+                $"Bad sleep (quality=20, interrupted) must decrease MoodBaseline. Before={before:F4}, After={engine.State.MoodBaseline:F4}");
+        }
+
+        [TestMethod]
+        public void Handle_InteractionAccepted_IncreasesMoodBaseline()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var before = engine.State.MoodBaseline;
+            var ctx = BuildContext(neuroticism: 0.5);
+            var outcome = new InteractionOutcome(
+                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                Accepted: true, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+
+            engine.Handle(outcome, ctx, _outbox);
+
+            Assert.IsTrue(engine.State.MoodBaseline > before,
+                $"Accepted interaction must increase MoodBaseline. Before={before:F4}, After={engine.State.MoodBaseline:F4}");
+        }
+
+        [TestMethod]
+        public void Handle_InteractionRejected_DecreasesMoodBaseline()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var before = engine.State.MoodBaseline;
+            var ctx = BuildContext(neuroticism: 0.5);
+            var outcome = new InteractionOutcome(
+                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                Accepted: false, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+
+            engine.Handle(outcome, ctx, _outbox);
+
+            Assert.IsTrue(engine.State.MoodBaseline < before,
+                $"Rejected interaction must decrease MoodBaseline. Before={before:F4}, After={engine.State.MoodBaseline:F4}");
+        }
+
+        #endregion MoodBaseline — Phase 4
+
+        #region MotivationState — Phase 4
+
+        [TestMethod]
+        public void Handle_InteractionAccepted_IncreasesNeedSocial()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            engine.RestoreState(engine.State with { Motivations = new MotivationState() });
+            var before = engine.State.Motivations!.NeedSocial;
+            var ctx = BuildContext(neuroticism: 0.5);
+            var outcome = new InteractionOutcome(
+                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                Accepted: true, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+
+            engine.Handle(outcome, ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Motivations!.NeedSocial > before,
+                $"Accepted interaction must increase NeedSocial. Before={before:F4}, After={engine.State.Motivations.NeedSocial:F4}");
+        }
+
+        [TestMethod]
+        public void Handle_InteractionRejected_DecreasesNeedSocial()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            engine.RestoreState(engine.State with { Motivations = new MotivationState() });
+            var beforeSocial = engine.State.Motivations!.NeedSocial;
+            var beforeSafety = engine.State.Motivations!.NeedSafety;
+            var ctx = BuildContext(neuroticism: 0.5);
+            var outcome = new InteractionOutcome(
+                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                Accepted: false, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+
+            engine.Handle(outcome, ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Motivations!.NeedSocial < beforeSocial,
+                $"Rejected interaction must decrease NeedSocial. Before={beforeSocial:F4}, After={engine.State.Motivations.NeedSocial:F4}");
+            Assert.IsTrue(engine.State.Motivations!.NeedSafety > beforeSafety,
+                $"Rejected interaction must increase NeedSafety. Before={beforeSafety:F4}, After={engine.State.Motivations.NeedSafety:F4}");
+        }
+
+        [TestMethod]
+        public void Handle_PregnancyDiscovered_IncreasesNeedCare()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            engine.RestoreState(engine.State with { Motivations = new MotivationState() });
+            var before = engine.State.Motivations!.NeedCare;
+            var ctx = BuildContext(neuroticism: 0.5);
+            var ev = new PregnancyDiscovered(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+
+            engine.Handle(ev, ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Motivations!.NeedCare > before,
+                $"PregnancyDiscovered must increase NeedCare. Before={before:F4}, After={engine.State.Motivations.NeedCare:F4}");
+        }
+
+        [TestMethod]
+        public void Handle_ChildBorn_IncreasesNeedCare()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            engine.RestoreState(engine.State with { Motivations = new MotivationState() });
+            var before = engine.State.Motivations!.NeedCare;
+            var ctx = BuildContext(neuroticism: 0.5);
+            var ev = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+
+            engine.Handle(ev, ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Motivations!.NeedCare > before,
+                $"ChildBorn must increase NeedCare. Before={before:F4}, After={engine.State.Motivations.NeedCare:F4}");
+        }
+
+        #endregion MotivationState — Phase 4
+
+        #region StressManifested — Phase 4
+
+        [TestMethod]
+        public void Tick_StressManifested_EmittedAfterConfiguredHours()
+        {
+            var cfg = new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                StressManifestationThreshold: 70.0,
+                StressManifestationHours: 4.0);
+
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 80, cfg: cfg);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var outbox = new EventCollector();
+
+            // First tick at t=0 — initializes the stress-above-threshold timer
+            engine.Tick(_now, WTimeSpan.FromHours(0.1), ctx, outbox);
+            outbox.Drain();
+
+            // Second tick at t=4.1h — elapsed time from timer start exceeds 4h threshold
+            var laterNow = _now + WTimeSpan.FromHours(4.1);
+            engine.Tick(laterNow, WTimeSpan.FromHours(4.1), ctx, outbox);
+            var events = outbox.Drain();
+
+            Assert.IsTrue(events.OfType<StressManifested>().Any(),
+                "StressManifested must be emitted after stress exceeds threshold for configured hours.");
+        }
+
+        [TestMethod]
+        public void Tick_StressManifested_NotEmittedBeforeThreshold()
+        {
+            var cfg = new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                StressManifestationThreshold: 70.0,
+                StressManifestationHours: 4.0);
+
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 80, cfg: cfg);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var outbox = new EventCollector();
+
+            // First tick at t=0 — initializes the timer
+            engine.Tick(_now, WTimeSpan.FromHours(0.1), ctx, outbox);
+            outbox.Drain();
+
+            // Second tick at t=3.9h — not yet at the 4h threshold
+            var laterNow = _now + WTimeSpan.FromHours(3.9);
+            engine.Tick(laterNow, WTimeSpan.FromHours(3.9), ctx, outbox);
+            var events = outbox.Drain();
+
+            Assert.IsFalse(events.OfType<StressManifested>().Any(),
+                "StressManifested must NOT be emitted before the configured hours threshold.");
+        }
+
+        #endregion StressManifested — Phase 4
+
+        #region CircadianRhythm — Phase 4
+
+        [TestMethod]
+        public void Tick_CircadianRhythm_ArousalHigherAtMorningPeakThanNightTrough()
+        {
+            var cfg = new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: true,
+                CircadianInfluence: 0.15);
+
+            var enginePeak  = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
+            var engineTrough = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
+
+            // Two-Gaussian model: morning peak at 10h, night trough at ~3h
+            var nowPeak  = new WDateTime(0) + WTimeSpan.FromHours(10);
+            var nowTrough = new WDateTime(0) + WTimeSpan.FromHours(3);
+
+            var ctxPeak  = BuildContext(neuroticism: 0.5);
+            var ctxTrough = BuildContext(neuroticism: 0.5);
+
+            enginePeak.Tick(nowPeak,  WTimeSpan.FromHours(0.1), ctxPeak,  new EventCollector());
+            engineTrough.Tick(nowTrough, WTimeSpan.FromHours(0.1), ctxTrough, new EventCollector());
+
+            Assert.IsTrue(enginePeak.State.Arousal > engineTrough.State.Arousal,
+                $"Morning peak (10h) must have higher arousal than night trough (3h). Peak={enginePeak.State.Arousal:F4}, Trough={engineTrough.State.Arousal:F4}");
+        }
+
+        #endregion CircadianRhythm — Phase 4
+
+        #region NutritionEffectsOnPsychology — Phase 4
+
+        [TestMethod]
+        public void Tick_LowIron_SuppressesValence()
+        {
+            var engine1 = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var engine2 = BuildEngine(initialValence: 0.0, initialStress: 0);
+
+            var ctxLowIron  = BuildContext(0.5, MakePhysioWithNutrition(iron: 10, vitaminD: 80));
+            var ctxHighIron = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 80));
+
+            engine1.Tick(_now, WTimeSpan.FromHours(1), ctxLowIron,  new EventCollector());
+            engine2.Tick(_now, WTimeSpan.FromHours(1), ctxHighIron, new EventCollector());
+
+            Assert.IsTrue(engine1.State.Valence < engine2.State.Valence,
+                $"Low iron must suppress Valence. LowIron={engine1.State.Valence:F4}, HighIron={engine2.State.Valence:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_LowVitaminD_SuppressesMoodBaseline()
+        {
+            // Use zero mood recovery so the drift doesn't cancel the VitaminD penalty
+            var cfg = new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                MoodBaselineRecoveryPerHour: 0.0);
+
+            var engine1 = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
+            var engine2 = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
+
+            var ctxLowVitD  = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 5));
+            var ctxHighVitD = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 80));
+
+            engine1.Tick(_now, WTimeSpan.FromHours(1), ctxLowVitD,  new EventCollector());
+            engine2.Tick(_now, WTimeSpan.FromHours(1), ctxHighVitD, new EventCollector());
+
+            Assert.IsTrue(engine1.State.MoodBaseline < engine2.State.MoodBaseline,
+                $"Low VitaminD must suppress MoodBaseline. LowVitD={engine1.State.MoodBaseline:F4}, HighVitD={engine2.State.MoodBaseline:F4}");
+        }
+
+        #endregion NutritionEffectsOnPsychology — Phase 4
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine s výchozí nebo vlastní konfigurací.</summary>
@@ -1184,6 +1484,19 @@ namespace EngineTests
                 BodyTempDelta: 0,
                 Cycle: cycle);
         }
+
+        /// <summary>Sestaví PhysiologyState s výživovými hodnotami pro testy výživy.</summary>
+        private static PhysiologyState MakePhysioWithNutrition(double iron, double vitaminD)
+            => new PhysiologyState(
+                Energy: 70,
+                SleepDebtHours: 0,
+                Hunger: 20,
+                Thirst: 15,
+                Pain: 0,
+                ImmuneLoad: 5,
+                BodyTempDelta: 0,
+                Cycle: null,
+                Nutrition: new NutritionState(Iron: iron, VitaminD: vitaminD));
 
         /// <summary>
         /// Builds a context that contains a single episodic memory with the given emotional tag,

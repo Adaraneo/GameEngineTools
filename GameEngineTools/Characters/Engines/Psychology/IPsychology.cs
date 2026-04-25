@@ -26,9 +26,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double StressManifestationThreshold = 70.0,
         double StressManifestationHours = 4.0,
         double LowIronValencePenaltyPerUnit = 0.0003,
-        double LowVitaminDMoodPenaltyPerHour = 0.2)
+        double LowVitaminDMoodPenaltyPerHour = 0.2,
+        double AllostaticLoadCognitiveWeight = 0.4)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4) { }
     }
 
     public sealed record PsychologyState(
@@ -49,7 +50,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double NeedIntimacy = 50,      // 0..100; sexual/romantic driver
         double NeedAchievement = 50,   // 0..100; accomplishment driver
         double NeedCare = 50,          // 0..100; nurturing driver (peaks postpartum)
-        double NeedSafety = 50);       // 0..100; security/predictability driver
+        double NeedSafety = 50,        // 0..100; security/predictability driver
+        bool SicknessWithdraw = false); // sickness behavior: immune-driven social withdrawal
 
     public interface IPsychologyEngine : IEngine<PsychologyState, PsychologyConfig>
     { }

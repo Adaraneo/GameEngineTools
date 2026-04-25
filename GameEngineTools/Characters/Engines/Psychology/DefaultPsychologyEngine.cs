@@ -117,6 +117,18 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - (20 - nutrition.VitaminD) * Config.LowVitaminDMoodPenaltyPerHour / 20.0 * h, 0, 100) };
             }
 
+            // Sickness behavior — imunitní zátěž → sociální stažení
+            if (s.Motivations is { } sicknessMotiv)
+            {
+                var shouldWithdraw = ph.ImmuneLoad > 50;
+                if (shouldWithdraw != sicknessMotiv.SicknessWithdraw)
+                {
+                    var next = sicknessMotiv with { SicknessWithdraw = shouldWithdraw };
+                    s = s with { Motivations = next };
+                    outbox.Add(new MotivationChanged(now, ctx.Id, sicknessMotiv, next));
+                }
+            }
+
             // CognitiveLoad — odvozuje se z fyziologických stressorů
             {
                 var feverThreshold = 1.5;
@@ -142,21 +154,36 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = s with { Valence = Clampm1p1(s.Valence - 0.02 * h) };
             }
 
+            // Allostatická zátěž — zvyšuje CogLoad a snižuje valenci
+            var alloLoad = ph.AllostaticLoad;
+            if (alloLoad > 0)
+            {
+                s = s with
+                {
+                    CognitiveLoad = Clamp01p(s.CognitiveLoad + alloLoad * Config.AllostaticLoadCognitiveWeight * h),
+                    Valence       = Clampm1p1(s.Valence - alloLoad * 0.001 * h)
+                };
+            }
+
             // MoodBaseline — pomalý drift směrem k neutrálu (50), potlačený vysokým stresem
             {
                 var moodRecovery = Config.MoodBaselineRecoveryPerHour;
                 if (s.Stress > Config.MoodBaselineHighStressThreshold) moodRecovery *= 0.1;
                 moodRecovery *= 1.0 + ctx.Personality.BigFive.Agreeableness * Config.MoodBaselineAgreeablenessBonus;
-                s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * h), 0, 100) };
+                var alloMoodDampFactor = 1.0 - alloLoad / 200.0;
+                s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * alloMoodDampFactor * h), 0, 100) };
             }
 
-            // Cirkadiánní rytmus — sinusoidální modulace arousal podle denní hodiny
+            // Cirkadiánní rytmus — dvě Gaussovy křivky (ráno + večer) s poobědovým poklesem
             if (Config.EnableCircadianRhythm)
             {
-                var hourOfDay = (double)(now.Hour % 24);
-                var phase = (hourOfDay - Config.CircadianArousalPeakHour) * (Math.PI / 12.0);
-                var circadianDelta = Math.Cos(phase) * Config.CircadianInfluence;
-                s = s with { Arousal = Clamp01(s.Arousal + circadianDelta * h) };
+                var h24 = (double)(now.Hour % 24);
+                var morningPeak = 0.35 * Math.Exp(-Math.Pow(h24 - 10.0, 2) / 16.0);  // σ²=8, peak 10h
+                var eveningPeak = 0.25 * Math.Exp(-Math.Pow(h24 - 19.0, 2) / 12.0);  // σ²=6, peak 19h
+                var lunchDip    = 0.20 * Math.Exp(-Math.Pow(h24 - 15.0, 2) / 3.0);   // σ²=1.5, dip 15h
+                var baseArousal = Math.Clamp(0.60 + morningPeak + eveningPeak - lunchDip, 0.40, 0.95);
+                var delta = (baseArousal - s.Arousal) * Config.CircadianInfluence * h;
+                s = s with { Arousal = Clamp01(s.Arousal + delta) };
             }
 
             // Stresová manifestace — sleduj jak dlouho je stres povýšen nad threshold
@@ -255,6 +282,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
             var s = State;
+            var ph = ctx.Snapshot.Physiology;
 
             switch (@event)
             {
@@ -264,6 +292,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                 case Characters.Engines.Relationships.MicroNegative:
                     s = s with { Valence = Math.Max(-1, s.Valence - 0.06), Stress = Math.Min(100, s.Stress + 2) };
+                    if (ph.Hunger > 40)
+                    {
+                        var hungerNorm = (ph.Hunger - 40.0) / 60.0;
+                        s = s with
+                        {
+                            Arousal = Math.Clamp(s.Arousal + 0.05 * hungerNorm, 0, 1),
+                            Valence = Math.Clamp(s.Valence  - 0.08 * hungerNorm, -1, 1)
+                        };
+                    }
                     break;
 
                 case Characters.Engines.Interactions.InteractionOutcome io:
@@ -322,6 +359,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         };
                         if (s.Motivations != prevMotivRej)
                             outbox.Add(new MotivationChanged(io.OccurredAt, ctx.Id, prevMotivRej, s.Motivations!));
+                        if (ph.Hunger > 40)
+                        {
+                            var hungerNorm = (ph.Hunger - 40.0) / 60.0;
+                            s = s with
+                            {
+                                Arousal = Math.Clamp(s.Arousal + 0.05 * hungerNorm, 0, 1),
+                                Valence = Math.Clamp(s.Valence  - 0.08 * hungerNorm, -1, 1)
+                            };
+                        }
                     }
                     else if (didReject)
                     {

@@ -235,6 +235,18 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             }
 
+            // Allostatická zátěž — kumuluje se při chronickém neglektu potřeb
+            {
+                var alloAccum = 0.0;
+                if (s.Hunger > Config.AllostaticLoadThresholdHunger)       alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
+                if (s.Thirst > Config.AllostaticLoadThresholdThirst)       alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
+                if (s.SleepDebtHours > Config.AllostaticLoadThresholdSleepDebt) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
+                if (s.Pain > Config.AllostaticLoadThresholdPain)           alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
+                if (s.ImmuneLoad > Config.AllostaticLoadThresholdImmune)   alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
+                var alloDecay = action is Sleep or SelfCare ? Config.AllostaticLoadDecayRatePerHour * h : 0.0;
+                s = s with { AllostaticLoad = Math.Clamp(s.AllostaticLoad + alloAccum - alloDecay, 0, 100) };
+            }
+
             State = s;
         }
 

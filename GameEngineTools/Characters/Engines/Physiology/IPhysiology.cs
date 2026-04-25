@@ -25,9 +25,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double IronSleepRecoveryPerHour = 0.5,
         double InjuryRestRecoveryPerDay = 2.0,
         double InjuryActiveRecoveryPerDay = 0.5,
-        double InjuryInfectionImmuneLoadPerDay = 5.0)
+        double InjuryInfectionImmuneLoadPerDay = 5.0,
+        double AllostaticLoadThresholdHunger = 70,
+        double AllostaticLoadThresholdThirst = 70,
+        double AllostaticLoadThresholdSleepDebt = 5,
+        double AllostaticLoadThresholdPain = 50,
+        double AllostaticLoadThresholdImmune = 60,
+        double AllostaticLoadAccumRatePerHour = 0.5,
+        double AllostaticLoadDecayRatePerHour = 0.1)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1) { }
     }
 
     public sealed record PhysiologyState(
@@ -42,7 +49,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         PregnancyState? Pregnancy = null,
         NutritionState? Nutrition = null,
         InjuryState? Injury = null,
-        PostpartumState? Postpartum = null);
+        PostpartumState? Postpartum = null,
+        double AllostaticLoad = 0);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }

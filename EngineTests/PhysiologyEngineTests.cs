@@ -15,8 +15,10 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
     using System.Collections.Generic;
     using System.Linq;
+    using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
     /// Unit testy pro <see cref="DefaultPhysiologyEngine"/>.
@@ -570,6 +572,202 @@ namespace EngineTests
 
         #endregion Immune load and fever
 
+        #region Nutrition — Phase 4
+
+        [TestMethod]
+        public void Tick_Nutrition_CaloriesAndProteinDecayWhenNotEating()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with
+            {
+                Nutrition = new NutritionState(Calories: 80, Protein: 80)
+            });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Nutrition!.Calories < 80,
+                $"Calories must decay when not eating. Got {engine.State.Nutrition.Calories:F4}");
+            Assert.IsTrue(engine.State.Nutrition!.Protein < 80,
+                $"Protein must decay when not eating. Got {engine.State.Nutrition.Protein:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Nutrition_CaloriesAndProteinRestoredWhileEating()
+        {
+            var eatingEngine = BuildEngine(hunger: 60);
+            eatingEngine.RestoreState(eatingEngine.State with
+            {
+                Nutrition = new NutritionState(Calories: 40, Protein: 40)
+            });
+
+            var idleEngine = BuildEngine(hunger: 60);
+            idleEngine.RestoreState(idleEngine.State with
+            {
+                Nutrition = new NutritionState(Calories: 40, Protein: 40)
+            });
+
+            eatingEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(Eat), new EventCollector());
+            idleEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(null), new EventCollector());
+
+            Assert.IsTrue(eatingEngine.State.Nutrition!.Calories > idleEngine.State.Nutrition!.Calories,
+                $"Eating must restore Calories faster. Eating={eatingEngine.State.Nutrition.Calories:F4}, Idle={idleEngine.State.Nutrition.Calories:F4}");
+            Assert.IsTrue(eatingEngine.State.Nutrition!.Protein > idleEngine.State.Nutrition!.Protein,
+                $"Eating must restore Protein faster. Eating={eatingEngine.State.Nutrition.Protein:F4}, Idle={idleEngine.State.Nutrition.Protein:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Nutrition_IronRestoredDuringSleep()
+        {
+            var sleepEngine = BuildEngine();
+            sleepEngine.RestoreState(sleepEngine.State with
+            {
+                Nutrition = new NutritionState(Iron: 50)
+            });
+
+            var idleEngine = BuildEngine();
+            idleEngine.RestoreState(idleEngine.State with
+            {
+                Nutrition = new NutritionState(Iron: 50)
+            });
+
+            sleepEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(Sleep), new EventCollector());
+            idleEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(null), new EventCollector());
+
+            Assert.IsTrue(sleepEngine.State.Nutrition!.Iron > idleEngine.State.Nutrition!.Iron,
+                $"Sleep must restore Iron faster than idle. Sleep={sleepEngine.State.Nutrition.Iron:F4}, Idle={idleEngine.State.Nutrition.Iron:F4}");
+        }
+
+        #endregion Nutrition — Phase 4
+
+        #region Injury — Phase 4
+
+        [TestMethod]
+        public void Tick_Injury_AddsPainProportionalToSeverity()
+        {
+            var engine = BuildEngine(pain: 0);
+            engine.RestoreState(engine.State with
+            {
+                Pain = 0,
+                Injury = new InjuryState(Severity: 50, DaysSinceOnset: 0, Type: InjuryType.Wound)
+            });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Pain > 0,
+                $"Injury with Severity=50 must add pain. Got Pain={engine.State.Pain:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Injury_HealsOverDaysDuringRest()
+        {
+            var engine = BuildEngine(pain: 0);
+            engine.RestoreState(engine.State with
+            {
+                Injury = new InjuryState(Severity: 10, DaysSinceOnset: 0, Type: InjuryType.Wound)
+            });
+            var ctx = BuildContextWithAction(Sleep);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Injury == null || engine.State.Injury.Severity < 10,
+                $"Injury must heal during rest. Severity={engine.State.Injury?.Severity:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Injury_EmitsInjuryHealedWhenSeverityReachesZero()
+        {
+            var engine = BuildEngine(pain: 0);
+            engine.RestoreState(engine.State with
+            {
+                Injury = new InjuryState(Severity: 2, DaysSinceOnset: 0, Type: InjuryType.Wound)
+            });
+            var ctx = BuildContextWithAction(Sleep);
+            var outbox = new EventCollector();
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, outbox);
+
+            var events = outbox.Drain();
+            Assert.IsNull(engine.State.Injury, "Injury must be cleared when severity reaches 0.");
+            Assert.IsTrue(events.OfType<InjuryHealed>().Any(), "InjuryHealed event must be emitted.");
+        }
+
+        #endregion Injury — Phase 4
+
+        #region Postpartum — Phase 4
+
+        [TestMethod]
+        public void Tick_Postpartum_Immediate_EnforcesPainFloorAt70()
+        {
+            var engine = BuildEngine(pain: 0);
+            engine.RestoreState(engine.State with
+            {
+                Pain = 0,
+                Postpartum = new PostpartumState(DaysSinceBirth: 1, Phase: PostpartumPhase.Immediate)
+            });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Pain >= 70,
+                $"Postpartum Immediate must enforce Pain floor of 70. Got {engine.State.Pain:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Postpartum_Immediate_EnforcesEnergyCap30()
+        {
+            var engine = BuildEngine(energy: 100);
+            engine.RestoreState(engine.State with
+            {
+                Energy = 100,
+                Postpartum = new PostpartumState(DaysSinceBirth: 1, Phase: PostpartumPhase.Immediate)
+            });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Energy <= 30,
+                $"Postpartum Immediate must enforce Energy cap of 30. Got {engine.State.Energy:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Postpartum_FirstWeek_EnforcesPainFloorAt40()
+        {
+            var engine = BuildEngine(pain: 0);
+            engine.RestoreState(engine.State with
+            {
+                Pain = 0,
+                Postpartum = new PostpartumState(DaysSinceBirth: 5, Phase: PostpartumPhase.FirstWeek)
+            });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Pain >= 40,
+                $"Postpartum FirstWeek must enforce Pain floor of 40. Got {engine.State.Pain:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Postpartum_PhaseChangedEventEmittedAtTransition()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with
+            {
+                Postpartum = new PostpartumState(DaysSinceBirth: 3, Phase: PostpartumPhase.Immediate)
+            });
+            var ctx = BuildContextWithAction(null);
+            var outbox = new EventCollector();
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, outbox);
+
+            var events = outbox.Drain();
+            Assert.IsTrue(events.OfType<PostpartumPhaseChanged>().Any(e => e.Phase == PostpartumPhase.FirstWeek),
+                "PostpartumPhaseChanged(FirstWeek) must be emitted after day 3 → day 4 transition.");
+        }
+
+        #endregion Postpartum — Phase 4
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine s nastavenými počátečními hodnotami.</summary>
@@ -641,6 +839,42 @@ namespace EngineTests
                 Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
                                            .CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        /// <summary>Sestaví kontext s nastavitelnou aktuální akcí (Sleep, Eat, …).</summary>
+        private static IHumanContext BuildContextWithAction(string? currentAction)
+        {
+            var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
+            var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
+
+            var plan = currentAction is not null
+                ? new PlannedAction(currentAction, new WDateTime(0), WTimeSpan.FromHours(1), 50)
+                : null;
+
+            var snapshot = new EnginesSnapshot(
+                physio, psych,
+                new BehaviorState(40, 20, 15, 40, 50, 30, plan),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = new Personality(
+                    new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                    AttachmentStyle.Secure,
+                    CommunicationStyle.Direct,
+                    new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                    Sociosexuality.Intermediate,
+                    Chronotype.Neutral),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
                 EventBus = new NullEventBus(),
                 Scheduler = new NullScheduler()
             };
