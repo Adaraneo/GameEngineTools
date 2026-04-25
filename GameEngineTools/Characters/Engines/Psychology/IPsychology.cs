@@ -27,9 +27,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double StressManifestationHours = 4.0,
         double LowIronValencePenaltyPerUnit = 0.0003,
         double LowVitaminDMoodPenaltyPerHour = 0.2,
-        double AllostaticLoadCognitiveWeight = 0.4)
+        double AllostaticLoadCognitiveWeight = 0.4,
+        // Kortizol → psychika
+        double CortisolStressWeight = 0.15,
+        double CortisolArousalWeight = 0.008,
+        // Testosteron → psychika
+        double TestosteroneIntimacyWeight = 0.3,
+        double TestosteroneStressResilienceWeight = 0.008)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008) { }
     }
 
     public sealed record PsychologyState(

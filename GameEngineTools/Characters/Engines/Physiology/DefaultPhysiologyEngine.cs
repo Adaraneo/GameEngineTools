@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -73,6 +74,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 
+            var initialTestosterone = (Config.EnableTestosteroneCycle && biology == SexBiology.Male)
+                ? new TestosteroneState()
+                : null;
+
             State = new PhysiologyState(
                 Energy: 70,
                 SleepDebtHours: 2,
@@ -82,7 +87,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 ImmuneLoad: 10,
                 BodyTempDelta: 0,
                 Cycle: initialCycle,
-                Nutrition: Config.EnableNutrition ? new NutritionState() : null);
+                Nutrition: Config.EnableNutrition ? new NutritionState() : null,
+                Testosterone: initialTestosterone);
 
             _mensesOn = initialCycle?.Phase == CyclePhase.Menses;
         }
@@ -247,6 +253,63 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { AllostaticLoad = Math.Clamp(s.AllostaticLoad + alloAccum - alloDecay, 0, 100) };
             }
 
+            // Kortizol — diurnální křivka (HPA osa) + chronický stres + imunitní elevace
+            {
+                var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+                var diurnal = Config.CortisolDiurnalAmplitude
+                              * Math.Exp(-Math.Pow(hoursOfDay - Config.CortisolDiurnalPeakHour, 2) / 8.0);
+                var alloComponent   = s.AllostaticLoad * Config.CortisolAlloWeight;
+                var immuneComponent = Math.Max(0, s.ImmuneLoad - 40) * Config.CortisolImmuneWeight;
+                var targetCortisol  = Math.Clamp(50 + diurnal + alloComponent + immuneComponent, 0, 100);
+                // Rychleji nahoru (CAR), pomaleji dolů — biologicky věrné
+                var cortRate = targetCortisol > s.CortisolLevel ? 20.0 * h : 8.0 * h;
+                s = s with { CortisolLevel = Math.Clamp(Approach(s.CortisolLevel, targetCortisol, cortRate), 0, 100) };
+            }
+
+            // Cirkadiánní fázový posun — social jet-lag model
+            {
+                var hoursPerDay  = (double)WWorld.Spec.HoursPerDay;
+                var hoursOfDay   = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+                var naturalSleep = (Config.NaturalSleepStartHour - Config.ChronotypeOffsetHours + hoursPerDay) % hoursPerDay;
+                if (action == Sleep)
+                {
+                    var mismatch = Math.Abs(hoursOfDay - naturalSleep);
+                    if (mismatch > hoursPerDay / 2) mismatch = hoursPerDay - mismatch;
+                    if (mismatch > 2.0)
+                        s = s with { CircadianPhaseShiftHours = Math.Clamp(
+                            s.CircadianPhaseShiftHours + (mismatch - 2.0) * 0.05 * h, -6, 6) };
+                }
+                // Pomalé zotavení k chronotypu (tělo se resynchronizuje ~1 h/den)
+                s = s with { CircadianPhaseShiftHours = Approach(
+                    s.CircadianPhaseShiftHours, Config.ChronotypeOffsetHours, Config.CircadianPhaseRecoveryPerHour * h) };
+            }
+
+            // Recovery Debt — fyzický deficit regenerace nad rámec spánkového dluhu
+            {
+                if (s.AllostaticLoad > Config.RecoveryDebtAccumAlloThreshold)
+                    s = s with { RecoveryDebtHours = Math.Min(72,
+                        s.RecoveryDebtHours + Config.RecoveryDebtAccumRatePerHour * h) };
+                var debtDecay = action switch
+                {
+                    Sleep    => Config.RecoveryDebtDecayPerSleepHour * h,
+                    SelfCare => Config.RecoveryDebtDecayPerSelfCareHour * h,
+                    _        => 0.0
+                };
+                s = s with { RecoveryDebtHours = Math.Max(0, s.RecoveryDebtHours - debtDecay) };
+            }
+
+            // Testosteron — diurnální rytmus + HPA-HPG cross-talk + spánkový dluh (jen muži)
+            if (s.Testosterone is { } testo)
+            {
+                var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+                var diurnal = 20.0 * Math.Exp(-Math.Pow(hoursOfDay - Config.TestosteronePeakHour, 2) / 10.0);
+                var alloSuppression = Math.Max(0, s.AllostaticLoad - 50) / 10.0 * Config.TestosteroneAlloSuppression;
+                var sleepPenalty    = Math.Max(0, s.SleepDebtHours - 2) * Config.TestosteroneSleepDebtPenaltyPerHour;
+                var targetLevel     = Math.Clamp(50 + diurnal - alloSuppression - sleepPenalty, 0, 100);
+                s = s with { Testosterone = testo with
+                    { Level = Math.Clamp(Approach(testo.Level, targetLevel, 10.0 * h), 0, 100) } };
+            }
+
             State = s;
         }
 
@@ -286,6 +349,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         var maxRecovery = remainingDept * 0.55; // Max 55 % za jednu noc
                         var actualRecovery = Math.Min(maxRecovery, h * 0.9 * qualityFactor);
 
+                        // Recovery Debt zpomaluje obnovu energie (min. 30 % účinnosti)
+                        var recoveryFactor = Math.Max(0.3, 1.0 - s.RecoveryDebtHours / 48.0);
+
                         s = s with
                         {
                             // Spánkový dluh: maximální splacení závisí na kvalitě
@@ -298,10 +364,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
                                 ? Clamp01p(s.Pain - 5.0 * qualityFactor)
                                 : s.Pain,
 
-                            // Energie se obnoví spánkem
-                            // 8h kvalitního spánku (quality=100) → +80 energie
-                            // Špatný spánek (quality=40) → +32 energie
-                            Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor)
+                            // Energie se obnoví spánkem; při recovery debt je obnova snížena
+                            // 8h kvalitního spánku (quality=100, debt=0) → +80 energie
+                            // Stejný spánek s RecoveryDebt=48h → +24 energie (30 % min.)
+                            Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor * recoveryFactor)
                         };
 
                         using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))

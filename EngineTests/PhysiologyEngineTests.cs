@@ -768,7 +768,219 @@ namespace EngineTests
 
         #endregion Postpartum — Phase 4
 
+        #region Kortizol (HPA osa)
+
+        /// <summary>
+        /// Vysoká allostatická zátěž musí elevovat kortizol nad klidový normál (50).
+        /// </summary>
+        [TestMethod]
+        public void Tick_Cortisol_HighAllostaticLoad_ElevatesAboveBaseline()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { AllostaticLoad = 80, CortisolLevel = 50 });
+            // Hodina 8 = diurnální vrchol; přidáme ještě AlloWeight × 80 = +20
+            var hour8 = new WDateTime(WTimeSpan.FromHours(8).Ticks);
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(hour8, WTimeSpan.FromHours(4), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.CortisolLevel > 70,
+                $"CortisolLevel s AlloLoad=80 musí překročit 70. Aktuálně: {engine.State.CortisolLevel:F2}");
+        }
+
+        /// <summary>
+        /// Kortizol v hodinu diurnálního vrcholu (8h) musí být vyšší než v troughu (22h).
+        /// </summary>
+        [TestMethod]
+        public void Tick_Cortisol_DayTimePeak_HigherThanNightTrough()
+        {
+            var enginePeak  = BuildEngine();
+            var engineTrough = BuildEngine();
+            // Obě instance se stejnou allostatickou zátěží 0 — čistě diurnální efekt
+            enginePeak.RestoreState(enginePeak.State with { AllostaticLoad = 0, CortisolLevel = 50 });
+            engineTrough.RestoreState(engineTrough.State with { AllostaticLoad = 0, CortisolLevel = 50 });
+            var ctx = BuildContextWithAction(null);
+
+            var hour8  = new WDateTime(WTimeSpan.FromHours(8).Ticks);
+            var hour22 = new WDateTime(WTimeSpan.FromHours(22).Ticks);
+
+            enginePeak.Tick(hour8, WTimeSpan.FromHours(2), ctx, new EventCollector());
+            engineTrough.Tick(hour22, WTimeSpan.FromHours(2), ctx, new EventCollector());
+
+            Assert.IsTrue(enginePeak.State.CortisolLevel > engineTrough.State.CortisolLevel,
+                $"Kortizol v 8h ({enginePeak.State.CortisolLevel:F2}) musí být vyšší než ve 22h ({engineTrough.State.CortisolLevel:F2}).");
+        }
+
+        #endregion Kortizol (HPA osa)
+
+        #region Cirkadiánní fázový posun (chronotyp + jet-lag)
+
+        /// <summary>
+        /// Spánek v hodinu vzdálenou od přirozeného spánku (22h) musí akumulovat fázový posun.
+        /// </summary>
+        [TestMethod]
+        public void Tick_CircadianPhaseShift_SleepAtWrongTime_AccumulatesShift()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { CircadianPhaseShiftHours = 0 });
+            // Spí ve 4h ráno — přirozený spánek je v 22h; mismatch = 18h, protože cyklicky = min(18, 26-18)=8h
+            var hour4 = new WDateTime(WTimeSpan.FromHours(4).Ticks);
+            var ctx = BuildContextWithAction(Sleep);
+
+            engine.Tick(hour4, WTimeSpan.FromHours(4), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.CircadianPhaseShiftHours > 0,
+                $"Spánek mimo přirozené okno musí akumulovat CircadianPhaseShiftHours > 0. Aktuálně: {engine.State.CircadianPhaseShiftHours:F4}");
+        }
+
+        /// <summary>
+        /// Fázový posun se musí pomalu vracet k ChronotypeOffsetHours (=0) při konzistentním rytmu.
+        /// </summary>
+        [TestMethod]
+        public void Tick_CircadianPhaseShift_Recovery_ConvergesBackToChronotype()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { CircadianPhaseShiftHours = 3.0 });
+            var hour22 = new WDateTime(WTimeSpan.FromHours(22).Ticks);
+            var ctx = BuildContextWithAction(null);
+
+            // 48h bdění v konzistentní hodinu → posun by měl klesat
+            engine.Tick(hour22, WTimeSpan.FromHours(48), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.CircadianPhaseShiftHours < 3.0,
+                $"CircadianPhaseShiftHours musí klesat při resynchronizaci. Před: 3.0, po: {engine.State.CircadianPhaseShiftHours:F4}");
+        }
+
+        #endregion Cirkadiánní fázový posun (chronotyp + jet-lag)
+
+        #region Recovery Debt
+
+        /// <summary>
+        /// Vysoká allostatická zátěž (nad prahem 60) musí akumulovat recovery debt.
+        /// </summary>
+        [TestMethod]
+        public void Tick_RecoveryDebt_HighAlloLoad_Accumulates()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { AllostaticLoad = 80, RecoveryDebtHours = 0 });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(10), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.RecoveryDebtHours > 0,
+                $"AlloLoad=80 musí akumulovat RecoveryDebtHours > 0. Aktuálně: {engine.State.RecoveryDebtHours:F4}");
+        }
+
+        /// <summary>
+        /// Spánek musí snižovat recovery debt.
+        /// </summary>
+        [TestMethod]
+        public void Tick_RecoveryDebt_SleepAction_Decays()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { AllostaticLoad = 0, RecoveryDebtHours = 10.0 });
+            var ctx = BuildContextWithAction(Sleep);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(8), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.RecoveryDebtHours < 10.0,
+                $"Spánek musí snižovat RecoveryDebtHours. Před: 10.0, po: {engine.State.RecoveryDebtHours:F4}");
+        }
+
+        /// <summary>
+        /// Vysoký recovery debt musí snižovat efektivitu obnovy energie při SleepEnded.
+        /// </summary>
+        [TestMethod]
+        public void Handle_SleepEnded_HighRecoveryDebt_ReducesEnergyRecovery()
+        {
+            var freshEngine  = BuildEngine(energy: 0);
+            var debtedEngine = BuildEngine(energy: 0);
+            freshEngine.RestoreState(freshEngine.State with { RecoveryDebtHours = 0 });
+            debtedEngine.RestoreState(debtedEngine.State with { RecoveryDebtHours = 40 });
+
+            var ended = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
+            freshEngine.Handle(ended, _ctx, new EventCollector());
+            debtedEngine.Handle(ended, _ctx, new EventCollector());
+
+            Assert.IsTrue(
+                freshEngine.State.Energy > debtedEngine.State.Energy,
+                $"Bez recovery debt musí obnova energie být vyšší. " +
+                $"Bez dluhu={freshEngine.State.Energy:F2}, S dluhem={debtedEngine.State.Energy:F2}");
+        }
+
+        #endregion Recovery Debt
+
+        #region Testosteron (mužský cyklus)
+
+        /// <summary>
+        /// Mužská postava musí mít inicializovaný TestosteroneState; ženská ne.
+        /// </summary>
+        [TestMethod]
+        public void Constructor_Testosterone_InitializedForMale_NullForFemale()
+        {
+            var maleEngine   = BuildEngineForBiology(SexBiology.Male);
+            var femaleEngine = BuildEngineForBiology(SexBiology.Female);
+
+            Assert.IsNotNull(maleEngine.State.Testosterone,
+                "Male biology musí mít inicializovaný TestosteroneState.");
+            Assert.IsNull(femaleEngine.State.Testosterone,
+                "Female biology nesmí mít TestosteroneState.");
+        }
+
+        /// <summary>
+        /// Vysoký spánkový dluh musí snižovat hladinu testosteronu (penalizace za sleep debt).
+        /// </summary>
+        [TestMethod]
+        public void Tick_Testosterone_HighSleepDebt_SuppressesLevel()
+        {
+            var maleEngine = BuildEngineForBiology(SexBiology.Male);
+            // Nastavit vysoký dluh; testosteron by měl být potlačen pod klidovou úroveň ~70
+            maleEngine.RestoreState(maleEngine.State with
+            {
+                SleepDebtHours = 10,
+                Testosterone = new TestosteroneState(Level: 70)
+            });
+            var ctx = BuildContextWithAction(null);
+            // Hodina 8 = diurnální vrchol, ale velký sleepPenalty = 8h × 0.8 = 6.4 bodů
+            var hour8 = new WDateTime(WTimeSpan.FromHours(8).Ticks);
+
+            engine_tick_n(maleEngine, hour8, ctx, iterations: 48);
+
+            Assert.IsTrue(maleEngine.State.Testosterone!.Level < 70,
+                $"Vysoký SleepDebt musí potlačit Testosterone.Level pod 70. " +
+                $"Aktuálně: {maleEngine.State.Testosterone.Level:F2}");
+        }
+
+        private static void engine_tick_n(DefaultPhysiologyEngine engine, WDateTime start, IHumanContext ctx, int iterations)
+        {
+            var t = start;
+            for (var i = 0; i < iterations; i++)
+            {
+                engine.Tick(t, WTimeSpan.FromHours(1), ctx, new EventCollector());
+                t += WTimeSpan.FromHours(1);
+            }
+        }
+
+        #endregion Testosteron (mužský cyklus)
+
         #region Pomocné metody
+
+        /// <summary>Sestaví engine pro konkrétní biologii (Male/Female) — pro testy pohlavně specifických metrik.</summary>
+        private static DefaultPhysiologyEngine BuildEngineForBiology(SexBiology biology)
+        {
+            var cfg = Options.Create(new PhysiologyConfig(
+                RestingMetabolicRate: 1600,
+                MaxSleepDebtHours: 12,
+                EnableMenstrualCycle: biology == SexBiology.Female,
+                EnableTestosteroneCycle: biology == SexBiology.Male));
+            var cycleCfg = Options.Create(new MenstrualCycleConfig());
+            var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            return new DefaultPhysiologyEngine(
+                cfg, cycleCfg, factory, new ZeroRandom(),
+                biology: biology,
+                birthDate: WDateOnly.New(100, 1, 1),
+                now: WDateOnly.New(116, 1, 1));
+        }
 
         /// <summary>Sestaví engine s nastavenými počátečními hodnotami.</summary>
         private static DefaultPhysiologyEngine BuildEngine(

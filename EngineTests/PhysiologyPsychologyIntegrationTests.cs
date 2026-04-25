@@ -392,6 +392,52 @@ namespace EngineTests
 
         #endregion Scenario 4
 
+        #region Scenario 5 — Testosteron → NeedIntimacy
+
+        /// <summary>
+        /// Postava s vysokou hladinou testosteronu musí vykazovat vyšší NeedIntimacy
+        /// po Psychology Tick než postava s nízkou hladinou.
+        /// Testuje integraci PhysiologyState.Testosterone → DefaultPsychologyEngine.
+        /// </summary>
+        [TestMethod]
+        public void Testosterone_HighLevel_BoostsNeedIntimacy_InPsychologyTick()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                TestosteroneIntimacyWeight: 0.3));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var highTestoPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var lowTestoPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+
+            // Obě instance začínají se stejným NeedIntimacy=50
+            highTestoPsych.RestoreState(highTestoPsych.State with
+                { Motivations = new MotivationState(NeedIntimacy: 50) });
+            lowTestoPsych.RestoreState(lowTestoPsych.State with
+                { Motivations = new MotivationState(NeedIntimacy: 50) });
+
+            var highTestoPhysio = MakePhysioWithTestosterone(testosteroneLevel: 85);
+            var lowTestoPhysio  = MakePhysioWithTestosterone(testosteroneLevel: 30);
+
+            var highCtx = BuildRawContext(neuroticism: 0.5, physio: highTestoPhysio);
+            var lowCtx  = BuildRawContext(neuroticism: 0.5, physio: lowTestoPhysio);
+
+            var now = new WDateTime(0);
+            highTestoPsych.Tick(now, WTimeSpan.FromHours(4), highCtx, new EventCollector());
+            lowTestoPsych.Tick(now, WTimeSpan.FromHours(4), lowCtx, new EventCollector());
+
+            Assert.IsTrue(
+                highTestoPsych.State.Motivations!.NeedIntimacy > lowTestoPsych.State.Motivations!.NeedIntimacy,
+                $"Vysoký testosteron musí zvýšit NeedIntimacy více než nízký. " +
+                $"Vysoký={highTestoPsych.State.Motivations.NeedIntimacy:F4}, " +
+                $"Nízký={lowTestoPsych.State.Motivations.NeedIntimacy:F4}");
+        }
+
+        #endregion Scenario 5
+
         #region Helpers
 
         /// <summary>
@@ -516,6 +562,21 @@ namespace EngineTests
                 ImmuneLoad: 5,
                 BodyTempDelta: bodyTempDelta,
                 Cycle: null);
+
+        /// <summary>
+        /// Vytvoří PhysiologyState s daným TestosteroneState.
+        /// </summary>
+        private static PhysiologyState MakePhysioWithTestosterone(double testosteroneLevel)
+            => new PhysiologyState(
+                Energy: 70,
+                SleepDebtHours: 2,
+                Hunger: 20,
+                Thirst: 15,
+                Pain: 0,
+                ImmuneLoad: 5,
+                BodyTempDelta: 0,
+                Cycle: null,
+                Testosterone: new TestosteroneState(Level: testosteroneLevel));
 
         #endregion Helpers
     }

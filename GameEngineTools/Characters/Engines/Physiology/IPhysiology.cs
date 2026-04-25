@@ -32,9 +32,28 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double AllostaticLoadThresholdPain = 50,
         double AllostaticLoadThresholdImmune = 60,
         double AllostaticLoadAccumRatePerHour = 0.5,
-        double AllostaticLoadDecayRatePerHour = 0.1)
+        double AllostaticLoadDecayRatePerHour = 0.1,
+        // Kortizol (HPA osa)
+        double CortisolDiurnalPeakHour = 8.0,
+        double CortisolDiurnalAmplitude = 30.0,
+        double CortisolAlloWeight = 0.25,
+        double CortisolImmuneWeight = 0.15,
+        // Chronotyp + cirkadiánní fázový posun
+        double ChronotypeOffsetHours = 0.0,
+        double NaturalSleepStartHour = 22.0,
+        double CircadianPhaseRecoveryPerHour = 0.08,
+        // Recovery Debt
+        double RecoveryDebtAccumAlloThreshold = 60.0,
+        double RecoveryDebtAccumRatePerHour = 0.2,
+        double RecoveryDebtDecayPerSleepHour = 0.15,
+        double RecoveryDebtDecayPerSelfCareHour = 0.05,
+        // Testosteron (mužský cyklus)
+        bool EnableTestosteroneCycle = true,
+        double TestosteronePeakHour = 8.0,
+        double TestosteroneAlloSuppression = 0.20,
+        double TestosteroneSleepDebtPenaltyPerHour = 0.8)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8) { }
     }
 
     public sealed record PhysiologyState(
@@ -50,7 +69,39 @@ namespace GameEngineTools.Characters.Engines.Physiology
         NutritionState? Nutrition = null,
         InjuryState? Injury = null,
         PostpartumState? Postpartum = null,
-        double AllostaticLoad = 0);
+        /// <summary>
+        /// Kumulativní allostatická zátěž — proxy HPA osy. Roste při chronickém neglektu
+        /// potřeb (hlad, žízeň, spánkový dluh, bolest, imunitní aktivace). Klesá pouze při
+        /// spánku nebo self-care. Chronicky elevovaná hodnota odráží hyperaktivaci HPA osy
+        /// a predikuje zdravotní rizika (McEwen, 2000). 0..100.
+        /// </summary>
+        double AllostaticLoad = 0,
+        /// <summary>
+        /// Kortizolová hladina — explicitní výstup HPA osy. Sleduje diurnální křivku
+        /// s vrcholem ~1 h po probuzení (Cortisol Awakening Response). Chronicky elevován
+        /// allostatickou zátěží a imunitní aktivací. Zpětně zvyšuje stres a arousal
+        /// v Psychology. 0..100; klidový normál ≈ 50.
+        /// </summary>
+        double CortisolLevel = 50,
+        /// <summary>
+        /// Celkový efektivní posun cirkadiánního rytmu od průměru (hodiny). Kombinuje
+        /// stabilní chronotyp (<see cref="PhysiologyConfig.ChronotypeOffsetHours"/>) a
+        /// aktuální jet-lag narušení. Kladné = ranní ptáče, záporné = noční sova.
+        /// Psychology čte tuto hodnotu a posouvá Gaussovy arousal vrcholy. Rozsah −6..+6.
+        /// </summary>
+        double CircadianPhaseShiftHours = 0,
+        /// <summary>
+        /// Fyzický deficit regenerace nad rámec prostého spánkového dluhu. Roste při
+        /// allostatické přetíženosti (AllostaticLoad &gt; threshold), klesá spánkem a
+        /// self-care. Snižuje efektivitu obnovy energie při SleepEnded. 0..72 h.
+        /// </summary>
+        double RecoveryDebtHours = 0,
+        /// <summary>
+        /// Stav mužského testosteronového cyklu; <c>null</c> pro ženské postavy.
+        /// Modeluje diurnální rytmus (vrchol ráno) a potlačení HPA-HPG cross-talkem
+        /// při chronickém stresu a spánkovém dluhu.
+        /// </summary>
+        TestosteroneState? Testosterone = null);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }
@@ -112,6 +163,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
     public sealed record PostpartumState(
         int DaysSinceBirth,
         PostpartumPhase Phase);
+
+    /// <summary>
+    /// Stav mužského testosteronového cyklu. Modeluje diurnální rytmus (vrchol v ranních
+    /// hodinách) a potlačení při chronickém stresu (HPA-HPG osa cross-talk) a spánkovém
+    /// dluhu. Inicializován pouze pro <see cref="SexBiology.Male"/>.
+    /// </summary>
+    public sealed record TestosteroneState(
+        double Level = 60);  // 0..100; 60 = průměrný dospělý muž
 
     // Události
     public sealed record MensesStarted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;

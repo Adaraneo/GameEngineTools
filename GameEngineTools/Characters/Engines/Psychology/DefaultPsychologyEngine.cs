@@ -166,6 +166,29 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
+            // Kortizol → stres a arousal (HPA over-activation)
+            if (ph.CortisolLevel > 70)
+                s = s with { Stress = Clamp01p(s.Stress + (ph.CortisolLevel - 70) * Config.CortisolStressWeight * h) };
+            s = s with { Arousal = Clamp01(s.Arousal + (ph.CortisolLevel - 50) * Config.CortisolArousalWeight * h) };
+
+            // Testosteron → NeedIntimacy a stresová resilience (jen muži)
+            if (ph.Testosterone is { } testo && s.Motivations is { } motiv)
+            {
+                if (testo.Level > 65)
+                {
+                    var intimacyBoost = (testo.Level - 65) * Config.TestosteroneIntimacyWeight * h;
+                    var next = motiv with { NeedIntimacy = Math.Min(100, motiv.NeedIntimacy + intimacyBoost) };
+                    if (next != motiv)
+                    {
+                        s = s with { Motivations = next };
+                        outbox.Add(new MotivationChanged(now, ctx.Id, motiv, next));
+                    }
+                }
+                // Stress resilience: vyšší testosteron zpomaluje akumulaci stresu
+                if (testo.Level > 50)
+                    s = s with { Stress = Math.Max(0, s.Stress - (testo.Level - 50) * Config.TestosteroneStressResilienceWeight * h) };
+            }
+
             // MoodBaseline — pomalý drift směrem k neutrálu (50), potlačený vysokým stresem
             {
                 var moodRecovery = Config.MoodBaselineRecoveryPerHour;
@@ -175,13 +198,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * alloMoodDampFactor * h), 0, 100) };
             }
 
-            // Cirkadiánní rytmus — dvě Gaussovy křivky (ráno + večer) s poobědovým poklesem
+            // Cirkadiánní rytmus — dvě Gaussovy křivky (ráno + večer) s poobědovým poklesem.
+            // Vrcholy jsou posunuty o CircadianPhaseShiftHours (chronotyp + jet-lag) z Physiology.
             if (Config.EnableCircadianRhythm)
             {
-                var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-                var morningPeak = 0.35 * Math.Exp(-Math.Pow(hoursOfDay - 10.0, 2) / 16.0);  // σ²=8, peak 10h
-                var eveningPeak = 0.25 * Math.Exp(-Math.Pow(hoursOfDay - 19.0, 2) / 12.0);  // σ²=6, peak 19h
-                var lunchDip    = 0.20 * Math.Exp(-Math.Pow(hoursOfDay - 15.0, 2) / 3.0);   // σ²=1.5, dip 15h
+                var hoursOfDay  = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+                var phaseShift  = ph.CircadianPhaseShiftHours;
+                var morningPeak = 0.35 * Math.Exp(-Math.Pow(hoursOfDay - 10.0 - phaseShift, 2) / 16.0);  // σ²=8, peak 10h ± posun
+                var eveningPeak = 0.25 * Math.Exp(-Math.Pow(hoursOfDay - 19.0 - phaseShift, 2) / 12.0);  // σ²=6, peak 19h ± posun
+                var lunchDip    = 0.20 * Math.Exp(-Math.Pow(hoursOfDay - 15.0 - phaseShift, 2) / 3.0);   // σ²=1.5, dip 15h ± posun
                 var baseArousal = Math.Clamp(0.60 + morningPeak + eveningPeak - lunchDip, 0.40, 0.95);
                 var delta = (baseArousal - s.Arousal) * Config.CircadianInfluence * h;
                 s = s with { Arousal = Clamp01(s.Arousal + delta) };
