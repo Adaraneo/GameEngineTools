@@ -335,8 +335,9 @@
                                   CanUserSortColumns="True"
                                   EnableRowVirtualization="True"
                                   EnableColumnVirtualization="True"
-                                  HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Auto">
+                                  ScrollViewer.CanContentScroll="True"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Visible">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="World" Binding="{Binding WorldTimeText}" Width="130" Visibility="{Binding Data.TimelineWorld, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
                                 <DataGridTextColumn Header="Real Time" Binding="{Binding RealTimestamp}" Width="155" Visibility="{Binding Data.TimelineRealTime, Source={StaticResource ColumnsProxy}, Converter={StaticResource BoolToVisibilityConverter}}" />
