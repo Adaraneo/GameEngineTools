@@ -640,6 +640,140 @@ namespace EngineTests
 
         #endregion Scenario 8
 
+        #region Scenario 9 — SAM → Psychology Arousal
+
+        [TestMethod]
+        public void SAM_AcuteArousal_ElevatesArousalInPsychology()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                AcuteArousalPsychWeight: 0.6));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var highSAMPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var noSAMPsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            highSAMPsych.RestoreState(highSAMPsych.State with { Arousal = 0.4 });
+            noSAMPsych.RestoreState(noSAMPsych.State with { Arousal = 0.4 });
+
+            var highSAMPhysio = MakePhysio(0, 0, 0) with { AcuteArousalLevel = 80 };
+            var noSAMPhysio   = MakePhysio(0, 0, 0) with { AcuteArousalLevel = 0 };
+
+            var ctxHigh = BuildRawContext(0.5, highSAMPhysio);
+            var ctxNone = BuildRawContext(0.5, noSAMPhysio);
+            var now = new WDateTime(0);
+
+            highSAMPsych.Tick(now, WTimeSpan.FromHours(1), ctxHigh, new EventCollector());
+            noSAMPsych.Tick(now, WTimeSpan.FromHours(1), ctxNone, new EventCollector());
+
+            Assert.IsTrue(highSAMPsych.State.Arousal > noSAMPsych.State.Arousal,
+                $"SAM aktivace musí zvyšovat PAD Arousal. High={highSAMPsych.State.Arousal:F4}, None={noSAMPsych.State.Arousal:F4}");
+        }
+
+        #endregion Scenario 9
+
+        #region Scenario 10 — Yerkes-Dodson kortizol optimum
+
+        [TestMethod]
+        public void YerkesDodson_OptimalCortisol_ReducesCogLoad()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                CortisolOptimalLow: 55.0,
+                CortisolOptimalHigh: 75.0,
+                CortisolOptimalCogBonus: 5.0));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var optimalPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var suboptPsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            optimalPsych.RestoreState(optimalPsych.State with { CognitiveLoad = 50 });
+            suboptPsych.RestoreState(suboptPsych.State with { CognitiveLoad = 50 });
+
+            var optimalPhysio = MakePhysio(0, 0, 0) with { CortisolLevel = 65 };  // v optimu
+            var suboptPhysio  = MakePhysio(0, 0, 0) with { CortisolLevel = 30 };  // mimo optimum
+
+            var ctxOpt  = BuildRawContext(0.5, optimalPhysio);
+            var ctxSub  = BuildRawContext(0.5, suboptPhysio);
+            var now = new WDateTime(0);
+
+            optimalPsych.Tick(now, WTimeSpan.FromHours(2), ctxOpt, new EventCollector());
+            suboptPsych.Tick(now, WTimeSpan.FromHours(2), ctxSub, new EventCollector());
+
+            Assert.IsTrue(optimalPsych.State.CognitiveLoad < suboptPsych.State.CognitiveLoad,
+                $"Optimální kortizol musí snižovat CogLoad více. Optimal={optimalPsych.State.CognitiveLoad:F4}, Subopt={suboptPsych.State.CognitiveLoad:F4}");
+        }
+
+        #endregion Scenario 10
+
+        #region Scenario 11 — Vagální tonus (přes Neuroticism)
+
+        [TestMethod]
+        public void VagalTone_HighNeuroticism_SlowerStressRecovery()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 2.0,
+                EnableCircadianRhythm: false));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var highNPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var lowNPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            highNPsych.RestoreState(highNPsych.State with { Stress = 80 });
+            lowNPsych.RestoreState(lowNPsych.State with { Stress = 80 });
+
+            var physio = MakePhysio(0, 0, 0);
+            var highNCtx = BuildRawContext(neuroticism: 0.9, physio: physio);
+            var lowNCtx  = BuildRawContext(neuroticism: 0.1, physio: physio);
+            var now = new WDateTime(0);
+
+            highNPsych.Tick(now, WTimeSpan.FromHours(4), highNCtx, new EventCollector());
+            lowNPsych.Tick(now, WTimeSpan.FromHours(4), lowNCtx, new EventCollector());
+
+            Assert.IsTrue(highNPsych.State.Stress > lowNPsych.State.Stress,
+                $"High Neuroticism musí mít pomalejší stress recovery (vagal tone). High N={highNPsych.State.Stress:F2}, Low N={lowNPsych.State.Stress:F2}");
+        }
+
+        #endregion Scenario 11
+
+        #region Scenario 12 — Ambientní teplota
+
+        [TestMethod]
+        public void AmbientTemp_HeatAboveThreshold_ReducesValence()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                AmbientTempHeatThreshold: 27.0,
+                AmbientTempHeatValencePenalty: 0.02));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var hotPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var normalPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            hotPsych.RestoreState(hotPsych.State with { Valence = 0.0 });
+            normalPsych.RestoreState(normalPsych.State with { Valence = 0.0 });
+
+            var physio = MakePhysio(0, 0, 0);
+            var hotCtx    = BuildRawContext(neuroticism: 0.5, physio: physio, ambientTemperature: 35.0);
+            var normalCtx = BuildRawContext(neuroticism: 0.5, physio: physio, ambientTemperature: 20.0);
+
+            var now = new WDateTime(0);
+            hotPsych.Tick(now, WTimeSpan.FromHours(2), hotCtx, new EventCollector());
+            normalPsych.Tick(now, WTimeSpan.FromHours(2), normalCtx, new EventCollector());
+
+            Assert.IsTrue(hotPsych.State.Valence < normalPsych.State.Valence,
+                $"Horko musí snižovat Valenci více než neutrální teplota. Hot={hotPsych.State.Valence:F4}, Normal={normalPsych.State.Valence:F4}");
+        }
+
+        #endregion Scenario 12
+
         #region Helpers
 
         /// <summary>
@@ -718,7 +852,7 @@ namespace EngineTests
         /// <summary>
         /// Builds a raw <see cref="IHumanContext"/> with configurable neuroticism and physiology.
         /// </summary>
-        private static IHumanContext BuildRawContext(double neuroticism, PhysiologyState? physio = null, string? currentAction = null)
+        private static IHumanContext BuildRawContext(double neuroticism, PhysiologyState? physio = null, string? currentAction = null, double ambientTemperature = 20.0)
         {
             var ph = physio ?? new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
             var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
@@ -732,7 +866,8 @@ namespace EngineTests
                 new BehaviorState(40, 20, 15, 40, 50, 30, plan),
                 new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
-                new MemoryIndex(new List<EpisodicMemory>()));
+                new MemoryIndex(new List<EpisodicMemory>()),
+                AmbientTemperature: ambientTemperature);
 
             return new HumanContext
             {

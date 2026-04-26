@@ -91,10 +91,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var ph = ctx.Snapshot.Physiology;
             var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
 
-            // Základní drift: stres klesá k baseline, PAD míří k neutrálu
+            // Vagální tonus (přes Neuroticism): High N = nižší HRV = pomalejší stress recovery
+            // Empiricky: Neuroticism negativně koreluje s vagálním tónem
+            var vagalTone = 1.0 - ctx.Personality.BigFive.Neuroticism * 0.5;  // 0.5..1.0
+
+            // Základní drift: stres klesá k baseline (modulován vagálním tónem), PAD míří k neutrálu
             s = s with
             {
-                Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * h),
+                Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * vagalTone * h),
                 Valence = Approach(s.Valence, 0, 0.15 * h),
                 Arousal = Approach(s.Arousal, 0.5, 0.05 * h),
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)
@@ -218,6 +222,95 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 // Stress resilience: vyšší testosteron zpomaluje akumulaci stresu
                 if (testo.Level > 50)
                     s = s with { Stress = Math.Max(0, s.Stress - (testo.Level - 50) * Config.TestosteroneStressResilienceWeight * h) };
+            }
+
+            // SAM systém → PAD (Sympatho-Adrenomedullary: okamžitá sympatická aktivace)
+            if (ph.AcuteArousalLevel > 0)
+            {
+                var samContrib = ph.AcuteArousalLevel / 100.0 * Config.AcuteArousalPsychWeight;
+                s = s with
+                {
+                    Arousal   = Clamp01(s.Arousal + samContrib * h * 2.0),
+                    Dominance = Clamp01(s.Dominance + samContrib * 0.1 * h)
+                };
+            }
+
+            // Fyzická únava → PAD: přetížení = Valence↓; mírná exerce = stress buffer (Stubbs 2017)
+            if (ph.PhysicalFatigueLevel > Config.PhysicalFatigueHighThreshold)
+            {
+                var excess = (ph.PhysicalFatigueLevel - Config.PhysicalFatigueHighThreshold) / 30.0;
+                s = s with
+                {
+                    Valence = Clampm1p1(s.Valence - excess * Config.PhysicalFatigueValencePenalty * h),
+                    Arousal = Clamp01(s.Arousal   - excess * Config.PhysicalFatigueArousalPenalty * h)
+                };
+            }
+            else if (ph.PhysicalFatigueLevel > Config.PhysicalFatigueMildThreshold)
+            {
+                // Mírná fyzická aktivita = endorfiny → snižuje stres
+                s = s with { Stress = Math.Max(0, s.Stress - Config.PhysicalFatigueStressReliefWeight * h) };
+            }
+
+            // Glykemický stav: hypoglykémie → iritabilita + CogLoad↑
+            if (ph.Nutrition is { } glycemicNut && glycemicNut.BloodGlucoseLevel < Config.HypoglycemiaThreshold)
+            {
+                var hypSeverity = (Config.HypoglycemiaThreshold - glycemicNut.BloodGlucoseLevel) / Config.HypoglycemiaThreshold;
+                s = s with
+                {
+                    Valence       = Clampm1p1(s.Valence - hypSeverity * Config.HypoglycemiaValencePenalty * h),
+                    CognitiveLoad = Clamp01p(s.CognitiveLoad + hypSeverity * Config.HypoglycemiaCogLoadBonus * h)
+                };
+            }
+
+            // Yerkes-Dodson: optimální kortizolové pásmo mírně zlepšuje kognici (Lupien 2007)
+            if (ph.CortisolLevel >= Config.CortisolOptimalLow && ph.CortisolLevel <= Config.CortisolOptimalHigh)
+                s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad - Config.CortisolOptimalCogBonus * h) };
+
+            // PMDD: závažnější psychologické efekty v luteální fázi u postav s vysokým PmsRisk
+            if (ph.Cycle?.PmddActive == true)
+            {
+                s = s with
+                {
+                    Valence = Clampm1p1(s.Valence - Config.PmddValencePenaltyPerHour * h),
+                    Stress  = Clamp01p(s.Stress + Config.PmddStressBonus * h)
+                };
+            }
+
+            // Postpartum hormonální crash: estrogen/progesteron propad → emocionální labilita
+            if (ph.Postpartum?.HormonalCrashActive == true)
+            {
+                var labilityNoise = RandomSym() * Config.PostpartumCrashValenceLability;
+                s = s with
+                {
+                    Valence      = Clampm1p1(s.Valence + labilityNoise * h),
+                    MoodBaseline = Math.Clamp(s.MoodBaseline - Config.PostpartumCrashMoodBaselinePenalty * h, 0, 100)
+                };
+            }
+
+            // Ambientní teplota → PAD (Anderson 2002, General Aggression Model)
+            {
+                var ambientTemp = ctx.Snapshot.AmbientTemperature;
+                if (ambientTemp > Config.AmbientTempHeatThreshold)
+                {
+                    var heatExcess = ambientTemp - Config.AmbientTempHeatThreshold;
+                    s = s with
+                    {
+                        Valence = Clampm1p1(s.Valence - heatExcess * Config.AmbientTempHeatValencePenalty * h),
+                        Arousal = Clamp01(s.Arousal + heatExcess * Config.AmbientTempHeatArousalBonus * h)
+                    };
+                }
+                else if (ambientTemp < Config.AmbientTempColdThreshold && s.Motivations is { } coldMotiv)
+                {
+                    // Mírný chlad → affiliativní hledání tepla/blízkosti (Fay & Maner 2012)
+                    var coldFactor = (Config.AmbientTempColdThreshold - ambientTemp) / 10.0;
+                    var next = coldMotiv with
+                        { NeedSocial = Math.Min(100, coldMotiv.NeedSocial + coldFactor * Config.AmbientTempColdSocialBonus * h) };
+                    if (next != coldMotiv)
+                    {
+                        s = s with { Motivations = next };
+                        outbox.Add(new MotivationChanged(now, ctx.Id, coldMotiv, next));
+                    }
+                }
             }
 
             // MoodBaseline — pomalý drift směrem k neutrálu (50), potlačený vysokým stresem
@@ -505,6 +598,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     };
                     if (s.Motivations != prevMotivCb)
                         outbox.Add(new MotivationChanged(cb.OccurredAt, ctx.Id, prevMotivCb, s.Motivations!));
+                    // Postpartum hormonální crash: radost z porodu + hormonální labilita koexistují
+                    if (ph.Postpartum?.HormonalCrashActive == true)
+                        s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - 5.0, 0, 100) };
                     break;
 
                 case Characters.Engines.Memory.MemoryRecalled mr:

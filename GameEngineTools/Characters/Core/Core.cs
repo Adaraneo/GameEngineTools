@@ -159,5 +159,11 @@ namespace GameEngineTools.Characters.Core
         InteractionSurface InteractionSurface,
         RelationshipState Relationships,
         MemoryIndex Memory,
-        SemanticMemoryState? SemanticMemory = null);
+        SemanticMemoryState? SemanticMemory = null,
+        /// <summary>
+        /// Teplota prostředí v místě postavy (°C). Nastaveno simulační vrstvou per-tick
+        /// z <c>LocationDescriptor</c>. Výchozí 20 °C = neutrální interiér.
+        /// Čteno Psychology enginem (vedro → agrese, mírný chlad → afiliace).
+        /// </summary>
+        double AmbientTemperature = 20.0);
 }

@@ -44,9 +44,37 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double SicknessAnhedoniaImmuneThreshold = 50.0,
         double SicknessAnhedoniaRewardBlunting = 0.5,
         double SicknessLethargyArousalPenalty = 0.008,
-        double SicknessBrainFogCogLoadBonus = 3.0)
+        double SicknessBrainFogCogLoadBonus = 3.0,
+        // SAM systém → PAD
+        double AcuteArousalPsychWeight = 0.6,
+        // Fyzická únava → PAD
+        double PhysicalFatigueHighThreshold = 70.0,
+        double PhysicalFatigueMildThreshold = 20.0,
+        double PhysicalFatigueValencePenalty = 0.0008,
+        double PhysicalFatigueArousalPenalty = 0.005,
+        double PhysicalFatigueStressReliefWeight = 0.5,
+        // Glykemický stav — hypoglykémie
+        double HypoglycemiaThreshold = 35.0,
+        double HypoglycemiaValencePenalty = 0.003,
+        double HypoglycemiaCogLoadBonus = 4.0,
+        // Yerkes-Dodson kortizol optimum (Lupien 2007)
+        double CortisolOptimalLow = 55.0,
+        double CortisolOptimalHigh = 75.0,
+        double CortisolOptimalCogBonus = 1.0,
+        // PMDD (PmsRisk amplifikátor)
+        double PmddValencePenaltyPerHour = 0.002,
+        double PmddStressBonus = 0.5,
+        // Postpartum hormonal crash
+        double PostpartumCrashValenceLability = 0.05,
+        double PostpartumCrashMoodBaselinePenalty = 0.3,
+        // Ambientní teplota → PAD (Anderson 2002)
+        double AmbientTempHeatThreshold = 27.0,
+        double AmbientTempColdThreshold = 15.0,
+        double AmbientTempHeatValencePenalty = 0.008,
+        double AmbientTempHeatArousalBonus = 0.005,
+        double AmbientTempColdSocialBonus = 1.0)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0) { }
     }
 
     public sealed record PsychologyState(

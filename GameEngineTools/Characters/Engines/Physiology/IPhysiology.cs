@@ -55,9 +55,31 @@ namespace GameEngineTools.Characters.Engines.Physiology
         // Sleep Inertia
         double SleepInertiaMaxHours = 1.5,
         // Sociální bolest (HPA aktivace při odmítnutí)
-        double SocialPainCortisolSpike = 8.0)
+        double SocialPainCortisolSpike = 8.0,
+        // SAM systém (Sympatho-Adrenomedullary — okamžitá sympatická odpověď)
+        double AcuteArousalDecayPerHour = 200.0,
+        double InjuryAcuteArousalSpike = 40.0,
+        double NightmareAcuteArousalSpike = 25.0,
+        double StressSpikedAcuteArousalWeight = 0.3,
+        // Fyzická únava (svalová — odlišná od kognitivní SleepDebt)
+        double PhysicalFatigueAccumPerWorkHour = 5.0,
+        double PhysicalFatigueDecayPerSleepHour = 25.0,
+        double PhysicalFatigueDecayPerIdleHour = 5.0,
+        double PhysicalFatigueSelfCareDecayBonus = 8.0,
+        // Glykemický stav
+        double BloodGlucoseEatingGain = 50.0,
+        double BloodGlucoseBaseDecayPerHour = 3.0,
+        double BloodGlucoseDipDecayBonus = 8.0,
+        double BloodGlucoseDipStartHours = 1.0,
+        double BloodGlucoseDipEndHours = 2.0,
+        // Hypocortisolismus paradox (HPA downregulace při extrémním AlloLoad)
+        double HypocortisolismAlloThreshold = 75.0,
+        double HypocortisolismDeclineRate = 0.1,
+        // Sociální podpora jako kortizol buffer (Eisenberger 2007)
+        double SocialSupportCortisolBuffer = 6.0,
+        double SocialSupportClosenessThreshold = 50.0)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0) { }
     }
 
     public sealed record PhysiologyState(
@@ -111,7 +133,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// prvních 1–2 h po SleepEnded je kognitivní výkon a arousal snížen (Borbély model).
         /// Klesá lineárně v Tick(); nastaveno po každém SleepEnded. 0..2.
         /// </summary>
-        double SleepInertiaHours = 0);
+        double SleepInertiaHours = 0,
+        /// <summary>
+        /// Akutní SAM aktivace — Sympatho-Adrenomedullary odpověď (adrenalin/noradrenalin).
+        /// Trvá 5–15 minut (decay ~200/hod). Spikuje při fyzickém ohrožení, šoku, noční můře.
+        /// Odlišné od HPA/kortizolu (minuty vs. hodiny). 0..100.
+        /// </summary>
+        double AcuteArousalLevel = 0,
+        /// <summary>
+        /// Fyzická svalová únava — odlišná od kognitivní únavy (SleepDebt) a celkové energie.
+        /// Akumuluje se při fyzické práci (Work), klesá spánkem a odpočinkem.
+        /// Při mírné úrovni (20–70) = stres buffer (endorfiny). Při >70 = Valence↓. 0..100.
+        /// </summary>
+        double PhysicalFatigueLevel = 0);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }
@@ -145,7 +179,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double SymptomBreastTender, // 0..100
         double SymptomBloat,        // 0..100
         double LibidoMod,           // multiplikátor 0.5..1.5
-        WDateOnly LastMensesStart);
+        WDateOnly LastMensesStart,
+        /// <summary>
+        /// Aktivní PMDD epizoda — nastává v pozdní luteální fázi u postav s PmsRisk &gt; 0.3.
+        /// Způsobuje závažnější emocionální labilitu a vyšší Stress v Psychology.
+        /// </summary>
+        bool PmddActive = false);
 
     /// <summary>Stav probíhajícího těhotenství postavy.</summary>
     public sealed record PregnancyState(
@@ -156,10 +195,17 @@ namespace GameEngineTools.Characters.Engines.Physiology
         WDateOnly? DiscoveredOn = null);
 
     public sealed record NutritionState(
-        double Calories = 80,   // 0..100; energy availability from food
-        double VitaminD = 80,   // 0..100; sun/diet exposure
-        double Iron = 80,       // 0..100; critical for female recovery post-menses
-        double Protein = 80);   // 0..100; muscle and tissue recovery
+        double Calories = 80,           // 0..100; energy availability from food
+        double VitaminD = 80,           // 0..100; sun/diet exposure
+        double Iron = 80,               // 0..100; critical for female recovery post-menses
+        double Protein = 80,            // 0..100; muscle and tissue recovery
+        /// <summary>
+        /// Hladina krevního cukru. Stoupá při jídle, klesá rebound dip 1–2 h po jídle.
+        /// Pod 35 = hypoglykémie: iritabilita, špatná koncentrace, CogLoad↑. 0..100.
+        /// </summary>
+        double BloodGlucoseLevel = 80,
+        /// <summary>Hodiny od posledního jídla; reset při Eat; řídí glycemický dip okno.</summary>
+        double PostMealHours = 0);
 
     public enum InjuryType { Sprain, Infection, Wound }
 
@@ -172,7 +218,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
     public sealed record PostpartumState(
         int DaysSinceBirth,
-        PostpartumPhase Phase);
+        PostpartumPhase Phase,
+        /// <summary>
+        /// Aktivní hormonální crash po porodu (propad estrogenu/progesteronu v 24–48 h).
+        /// Způsobuje emocionální labilitu a zpomalené MoodBaseline recovery v Psychology.
+        /// Automaticky deaktivován po 7 dnech.
+        /// </summary>
+        bool HormonalCrashActive = true);
 
     /// <summary>
     /// Stav mužského testosteronového cyklu. Modeluje diurnální rytmus (vrchol v ranních

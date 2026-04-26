@@ -1096,6 +1096,143 @@ namespace EngineTests
 
         #endregion Menstruační cyklus — sinusoidální drift
 
+        #region SAM systém (AcuteArousalLevel)
+
+        [TestMethod]
+        public void SAM_InjuryReceived_SpikesAcuteArousal()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { AcuteArousalLevel = 0 });
+            var ir = new InjuryReceived(_now, new HumanId(Guid.NewGuid()), 50, InjuryType.Wound);
+
+            engine.Handle(ir, _ctx, _outbox);
+
+            Assert.IsTrue(engine.State.AcuteArousalLevel > 0,
+                $"InjuryReceived musí spikovat AcuteArousalLevel. Aktuálně: {engine.State.AcuteArousalLevel:F2}");
+        }
+
+        [TestMethod]
+        public void SAM_AcuteArousal_DecaysRapidly()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { AcuteArousalLevel = 80 });
+            var ctx = BuildContextWithAction(null);
+
+            // 1 hodina s decay 200/hod → mělo by klesnout na 0
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.AreEqual(0.0, engine.State.AcuteArousalLevel, delta: 0.001,
+                "AcuteArousalLevel musí po 1h s decay=200 klesnout na 0.");
+        }
+
+        #endregion SAM systém (AcuteArousalLevel)
+
+        #region Fyzická únava (PhysicalFatigueLevel)
+
+        [TestMethod]
+        public void PhysicalFatigue_WorkAccumulates_SleepDecays()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { PhysicalFatigueLevel = 0 });
+
+            // Work → akumulace
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(4), BuildContextWithAction(Work), new EventCollector());
+            var afterWork = engine.State.PhysicalFatigueLevel;
+            Assert.IsTrue(afterWork > 0,
+                $"Work musí akumulovat PhysicalFatigueLevel. Po 4h: {afterWork:F2}");
+
+            // Sleep → decay
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(8), BuildContextWithAction(Sleep), new EventCollector());
+            Assert.IsTrue(engine.State.PhysicalFatigueLevel < afterWork,
+                $"Sleep musí snižovat PhysicalFatigueLevel. Před: {afterWork:F2}, po: {engine.State.PhysicalFatigueLevel:F2}");
+        }
+
+        #endregion Fyzická únava (PhysicalFatigueLevel)
+
+        #region Glykemický stav (BloodGlucoseLevel)
+
+        [TestMethod]
+        public void Glycemic_PostMealDip_ReducesBloodGlucose()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with
+            {
+                Nutrition = new NutritionState(BloodGlucoseLevel: 90, PostMealHours: 1.5) // v dip okně
+            });
+            var ctx = BuildContextWithAction(null); // nejedí
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Nutrition!.BloodGlucoseLevel < 90,
+                $"Post-meal dip musí snižovat BloodGlucoseLevel. Před: 90, po: {engine.State.Nutrition.BloodGlucoseLevel:F2}");
+        }
+
+        #endregion Glykemický stav (BloodGlucoseLevel)
+
+        #region Hypocortisolismus (HPA blunting)
+
+        [TestMethod]
+        public void Hypocortisolism_ExtremeAlloLoad_BluntsCortisolRise()
+        {
+            var normalEngine  = BuildEngine();
+            var extremeEngine = BuildEngine();
+
+            // Vysoké (70, těsně pod threshold 75) vs. extrémní (100, přes threshold) AlloLoad.
+            // Při threshold=75 a declineRate=0.1:
+            //   AlloLoad=70  → alloComponent = 70 × 0.25 = 17.5
+            //   AlloLoad=100 → alloComponent = 75×0.25 − (100−75)×0.1 = 18.75 − 2.5 = 16.25
+            // Extrémní proto produkuje NIŽŠÍ allo-kortizol než sub-threshold (blunting).
+            normalEngine.RestoreState(normalEngine.State with { AllostaticLoad = 70, CortisolLevel = 50 });
+            extremeEngine.RestoreState(extremeEngine.State with { AllostaticLoad = 100, CortisolLevel = 50 });
+
+            var hour8 = new WDateTime(WTimeSpan.FromHours(8).Ticks);
+            var ctx = BuildContextWithAction(null);
+            normalEngine.Tick(hour8, WTimeSpan.FromHours(4), ctx, new EventCollector());
+            extremeEngine.Tick(hour8, WTimeSpan.FromHours(4), ctx, new EventCollector());
+
+            // Extrémní AlloLoad → kortizol nesmí stoupnout výše než sub-threshold (blunting)
+            Assert.IsTrue(extremeEngine.State.CortisolLevel <= normalEngine.State.CortisolLevel,
+                $"Extrémní AlloLoad (100) musí bluntnout kortizol pod sub-threshold (70). " +
+                $"Sub-threshold={normalEngine.State.CortisolLevel:F2}, Extrémní={extremeEngine.State.CortisolLevel:F2}");
+        }
+
+        #endregion Hypocortisolismus (HPA blunting)
+
+        #region Postpartum hormonal crash
+
+        [TestMethod]
+        public void Postpartum_HormonalCrash_ActiveFirst7Days()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with
+            {
+                Postpartum = new PostpartumState(0, PostpartumPhase.Immediate, HormonalCrashActive: true)
+            });
+
+            Assert.IsTrue(engine.State.Postpartum!.HormonalCrashActive,
+                "HormonalCrashActive musí být true ihned po porodu.");
+        }
+
+        [TestMethod]
+        public void Postpartum_HormonalCrash_DeactivatesAfter7Days()
+        {
+            var engine = BuildEngine();
+            // Den 7 → FirstWeek, HormonalCrash by měl být deaktivován při přechodu na den 8+
+            engine.RestoreState(engine.State with
+            {
+                Postpartum = new PostpartumState(7, PostpartumPhase.FirstWeek, HormonalCrashActive: true)
+            });
+            var ctx = BuildContextWithAction(null);
+
+            // 24h tick → přejde na den 8, crash se deaktivuje
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+
+            Assert.IsFalse(engine.State.Postpartum?.HormonalCrashActive ?? false,
+                "HormonalCrashActive musí být false po 7 dnech.");
+        }
+
+        #endregion Postpartum hormonal crash
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine pro konkrétní biologii (Male/Female) — pro testy pohlavně specifických metrik.</summary>

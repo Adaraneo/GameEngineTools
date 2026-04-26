@@ -168,14 +168,24 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var caloriesDelta = action == Eat  ?  Config.CaloriesEatingGainPerHour * h : -Config.NutritionDecayPerHour * h;
                 var proteinDelta  = action == Eat  ?  Config.ProteinEatingGainPerHour  * h : -Config.NutritionDecayPerHour * h;
                 var ironDelta     = action == Sleep ?  Config.IronSleepRecoveryPerHour  * h : -Config.NutritionDecayPerHour * h * 0.3;
+                // Glykemický stav: spike při jídle, rebound dip 1–2h po jídle
+                var glucoseDelta  = action == Eat ? Config.BloodGlucoseEatingGain * h : 0.0;
+                var postMealHours = action == Eat ? 0.0 : nut.PostMealHours + h;
+                var inDipWindow   = postMealHours > Config.BloodGlucoseDipStartHours
+                                 && postMealHours < Config.BloodGlucoseDipEndHours;
+                var glucoseDecay  = Config.BloodGlucoseBaseDecayPerHour + (inDipWindow ? Config.BloodGlucoseDipDecayBonus : 0);
+                if (action != Eat) glucoseDelta -= glucoseDecay * h;
+
                 s = s with
                 {
                     Nutrition = nut with
                     {
-                        Calories = Clamp01p(nut.Calories + caloriesDelta),
-                        VitaminD = Clamp01p(nut.VitaminD - Config.NutritionDecayPerHour * h * 0.5),
-                        Iron     = Clamp01p(nut.Iron     + ironDelta),
-                        Protein  = Clamp01p(nut.Protein  + proteinDelta)
+                        Calories         = Clamp01p(nut.Calories + caloriesDelta),
+                        VitaminD         = Clamp01p(nut.VitaminD - Config.NutritionDecayPerHour * h * 0.5),
+                        Iron             = Clamp01p(nut.Iron     + ironDelta),
+                        Protein          = Clamp01p(nut.Protein  + proteinDelta),
+                        BloodGlucoseLevel = Math.Clamp(nut.BloodGlucoseLevel + glucoseDelta, 0, 100),
+                        PostMealHours    = postMealHours
                     }
                 };
             }
@@ -257,12 +267,33 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (s.SleepInertiaHours > 0)
                 s = s with { SleepInertiaHours = Math.Max(0, s.SleepInertiaHours - h) };
 
+            // SAM systém — velmi rychlý decay (Sympatho-Adrenomedullary, adrenalin/noradrenalin)
+            if (s.AcuteArousalLevel > 0)
+                s = s with { AcuteArousalLevel = Math.Max(0, s.AcuteArousalLevel - Config.AcuteArousalDecayPerHour * h) };
+
+            // Fyzická únava — akumulace při Work, decay při odpočinku/spánku
+            {
+                var fatigueDelta = action switch
+                {
+                    Work     => Config.PhysicalFatigueAccumPerWorkHour * h,
+                    Sleep    => -Config.PhysicalFatigueDecayPerSleepHour * h,
+                    Idle     => -Config.PhysicalFatigueDecayPerIdleHour * h,
+                    SelfCare => -(Config.PhysicalFatigueDecayPerIdleHour + Config.PhysicalFatigueSelfCareDecayBonus) * h,
+                    _        => -Config.PhysicalFatigueDecayPerIdleHour * 0.5 * h
+                };
+                s = s with { PhysicalFatigueLevel = Math.Clamp(s.PhysicalFatigueLevel + fatigueDelta, 0, 100) };
+            }
+
             // Kortizol — diurnální křivka (HPA osa) + chronický stres + imunitní elevace
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
                 var diurnal = Config.CortisolDiurnalAmplitude
                               * Math.Exp(-Math.Pow(hoursOfDay - Config.CortisolDiurnalPeakHour, 2) / 8.0);
-                var alloComponent   = s.AllostaticLoad * Config.CortisolAlloWeight;
+                // Hypocortisolismus paradox (Fries 2005): při extrémním AlloLoad HPA downreguluje
+                var alloComponent = s.AllostaticLoad < Config.HypocortisolismAlloThreshold
+                    ? s.AllostaticLoad * Config.CortisolAlloWeight
+                    : Math.Max(0, Config.HypocortisolismAlloThreshold * Config.CortisolAlloWeight
+                               - (s.AllostaticLoad - Config.HypocortisolismAlloThreshold) * Config.HypocortisolismDeclineRate);
                 var immuneComponent = Math.Max(0, s.ImmuneLoad - 40) * Config.CortisolImmuneWeight;
                 var targetCortisol  = Math.Clamp(50 + diurnal + alloComponent + immuneComponent, 0, 100);
                 // Rychleji nahoru (CAR), pomaleji dolů — biologicky věrné
@@ -392,7 +423,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     break;
 
                 case InjuryReceived ir:
-                    s = s with { Injury = new InjuryState(Math.Clamp(ir.Severity, 0, 100), 0, ir.Type) };
+                    s = s with
+                    {
+                        Injury = new InjuryState(Math.Clamp(ir.Severity, 0, 100), 0, ir.Type),
+                        // SAM spike: fyzické ohrožení = okamžitá sympatická aktivace
+                        AcuteArousalLevel = Math.Min(100, s.AcuteArousalLevel + Config.InjuryAcuteArousalSpike)
+                    };
                     break;
 
                 // Sociální bolest = fyzická bolest (Eisenberger et al., 2003) — odmítnutí aktivuje HPA osu
@@ -403,6 +439,30 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     s = s with { CortisolLevel = Math.Clamp(s.CortisolLevel + spike, 0, 100) };
                     break;
                 }
+
+                // Sociální podpora jako kortizol buffer (Eisenberger 2007):
+                // přijatá interakce od blízkého člověka tlumí HPA aktivitu
+                case InteractionOutcome io when io.To == ctx.Id && io.Accepted:
+                {
+                    ctx.Snapshot.Relationships.Edges.TryGetValue(io.From, out var edge);
+                    var closeness = edge?.Closeness ?? 0;
+                    if (closeness >= Config.SocialSupportClosenessThreshold)
+                    {
+                        var bufferStrength = (closeness - Config.SocialSupportClosenessThreshold) / 50.0;
+                        s = s with { CortisolLevel = Math.Max(0, s.CortisolLevel - Config.SocialSupportCortisolBuffer * bufferStrength) };
+                    }
+                    break;
+                }
+
+            }
+
+            // SAM spiky mimo switch — NightmareTriggered a StressSpiked
+            if (@event is Sleep.NightmareTriggered)
+                s = s with { AcuteArousalLevel = Math.Min(100, s.AcuteArousalLevel + Config.NightmareAcuteArousalSpike) };
+            if (@event is Psychology.StressSpiked sp2 && sp2.NewStress > 70)
+            {
+                var samSpike = (sp2.NewStress - 70) * Config.StressSpikedAcuteArousalWeight;
+                s = s with { AcuteArousalLevel = Math.Min(100, s.AcuteArousalLevel + samSpike) };
             }
 
             State = s;
@@ -456,14 +516,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private PhysiologyState ApplyCycleSymptoms(PhysiologyState s)
         {
             var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle!);
+            var day       = (double)s.Cycle!.DayInCycle;
+            var ovulDay   = (double)_cycleCfg.OvulationDayOfCycle;
+            var lutealFactor = Math.Max(0, (day - (ovulDay + 7)) / 7.0);
+            var isPmddActive = _cycleCfg.PmsRisk > 0.3 && lutealFactor > 0.5;
             return s with
             {
                 Pain = Clamp01p(s.Pain + pain),
                 Cycle = s.Cycle with
                 {
-                    SymptomBloat = Clamp01p(s.Cycle.SymptomBloat + bloat),
+                    SymptomBloat        = Clamp01p(s.Cycle.SymptomBloat + bloat),
                     SymptomBreastTender = Clamp01p(s.Cycle.SymptomBreastTender + tender),
-                    LibidoMod = libido
+                    LibidoMod           = libido,
+                    PmddActive          = isPmddActive
                 }
             };
         }
@@ -506,7 +571,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     Cycle = s.Cycle is null
                         ? null
                         : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 },
-                    Postpartum = new PostpartumState(0, PostpartumPhase.Immediate)
+                    Postpartum = new PostpartumState(0, PostpartumPhase.Immediate, HormonalCrashActive: true)
                 };
             }
 
@@ -543,7 +608,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 };
             }
 
-            return s with { Postpartum = pp with { DaysSinceBirth = days, Phase = newPhase } };
+            // Hormonal crash deaktivovat po 7 dnech (progesteron/estrogen crash fáze končí)
+            var hormonalCrash = days <= 7;
+            return s with { Postpartum = pp with { DaysSinceBirth = days, Phase = newPhase, HormonalCrashActive = hormonalCrash } };
         }
 
         private PhysiologyState TryStartPregnancy(PhysiologyState s, SexualEncounterOutcome encounter, IHumanContext ctx, IEventCollector outbox)
@@ -710,6 +777,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var libidoBoost = 0.25 * Math.Exp(-Math.Pow(day - ovulDay, 2) / 8.0);
             var mensesDip   = -0.10 * Math.Exp(-Math.Pow(day - mensesMid, 2) / 4.0);
             var libidoMod   = Math.Clamp(0.95 + libidoBoost + mensesDip, 0.80, 1.20);
+
+            // PMDD amplifikátor — luteální symptomy závažnější u postav s PmsRisk > 0.3
+            var lutealFactor   = Math.Max(0, (day - (ovulDay + 7)) / 7.0);   // 0..1 v luteálu
+            var pmddMultiplier = 1.0 + _cycleCfg.PmsRisk * lutealFactor * 1.5;
+            rawPain   *= pmddMultiplier;
+            rawBloat  *= pmddMultiplier;
+            rawTender *= pmddMultiplier;
 
             return (rawPain, rawBloat, rawTender, libidoMod);
         }
