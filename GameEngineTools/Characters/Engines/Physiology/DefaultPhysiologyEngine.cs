@@ -284,6 +284,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { PhysicalFatigueLevel = Math.Clamp(s.PhysicalFatigueLevel + fatigueDelta, 0, 100) };
             }
 
+            // Chronická bolest — kumulativní counter (Dantzer 2008)
+            if (s.Pain > Config.ChronicPainAccumThreshold)
+                s = s with { ChronicPainDays = s.ChronicPainDays + h / 24.0 };
+            else
+                s = s with { ChronicPainDays = Math.Max(0, s.ChronicPainDays - h / (24.0 * Config.ChronicPainDecayFactor * 2)) };
+
             // Kortizol — diurnální křivka (HPA osa) + chronický stres + imunitní elevace
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
@@ -331,6 +337,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     _        => 0.0
                 };
                 s = s with { RecoveryDebtHours = Math.Max(0, s.RecoveryDebtHours - debtDecay) };
+            }
+
+            // Chronická sociální izolace → kortizol (Cacioppo 2015)
+            {
+                var needSocial = ctx.Snapshot.Psychology?.Motivations?.NeedSocial ?? 50;
+                if (needSocial > Config.SocialIsolationCortisolThreshold)
+                {
+                    var isolSeverity = Math.Min((needSocial - Config.SocialIsolationCortisolThreshold) / 20.0, 1.0);
+                    s = s with { CortisolLevel = Math.Clamp(s.CortisolLevel + isolSeverity * Config.SocialIsolationCortisolRatePerHour * h, 0, 100) };
+                }
             }
 
             // Testosteron — diurnální rytmus + HPA-HPG cross-talk + spánkový dluh (jen muži)

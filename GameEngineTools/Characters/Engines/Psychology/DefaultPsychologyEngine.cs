@@ -104,13 +104,18 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)
             };
 
-            // Fyzio modulace
+            // Hyperalgezie: imunitní zátěž zesiluje bolestivý signál (Dantzer 2007)
+            var painAmp = ph.ImmuneLoad > Config.HyperalgesiaImmuneThreshold
+                ? 1.0 + (ph.ImmuneLoad - Config.HyperalgesiaImmuneThreshold) / 60.0 * Config.HyperalgesiaMaxMultiplier
+                : 1.0;
+
+            // Fyzio modulace (Pain efekty škálovány hyperalgezií)
             s = s with
             {
-                Valence = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * h + 0.0015 * ph.Energy * h),
-                Stress = Clamp01p(s.Stress + 0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * h),
-                Arousal = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h),
-                Dominance = Clamp01(s.Dominance - 0.0005 * ph.Pain * h - 0.01 * Math.Max(0, ph.BodyTempDelta - 1.5) * h)
+                Valence   = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * painAmp * h + 0.0015 * ph.Energy * h),
+                Stress    = Clamp01p(s.Stress + 0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * painAmp * h),
+                Arousal   = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h),
+                Dominance = Clamp01(s.Dominance - 0.0005 * ph.Pain * painAmp * h - 0.01 * Math.Max(0, ph.BodyTempDelta - 1.5) * h)
             };
 
             // Nutriční dopady — nízké železo snižuje valenci; nízký vitamín D tlumí náladu
@@ -259,6 +264,24 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 {
                     Valence       = Clampm1p1(s.Valence - hypSeverity * Config.HypoglycemiaValencePenalty * h),
                     CognitiveLoad = Clamp01p(s.CognitiveLoad + hypSeverity * Config.HypoglycemiaCogLoadBonus * h)
+                };
+            }
+
+            // Dehydratace → kognitivní deficit (Masento 2014): 2% ztráta tělesné vody = zhoršená pracovní paměť
+            if (ph.Thirst > Config.DehydrationCogLoadThreshold)
+            {
+                var dehydSeverity = (ph.Thirst - Config.DehydrationCogLoadThreshold) / 50.0;
+                s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + dehydSeverity * Config.DehydrationCogLoadBonus * h) };
+            }
+
+            // Chronická bolest → depresivní profil (Dantzer 2008): po 7+ dnech s bolestí → Valence↓, MoodBaseline erose
+            if (ph.ChronicPainDays > Config.ChronicPainOnsetDays)
+            {
+                var chronicity = Math.Min(ph.ChronicPainDays / 30.0, 1.0); // nasycení za 30 dní
+                s = s with
+                {
+                    Valence      = Clampm1p1(s.Valence - chronicity * Config.ChronicPainValencePenaltyPerDay * h),
+                    MoodBaseline = Math.Clamp(s.MoodBaseline - chronicity * Config.ChronicPainMoodBaselinePenaltyPerDay * h, 0, 100)
                 };
             }
 

@@ -774,6 +774,119 @@ namespace EngineTests
 
         #endregion Scenario 12
 
+        #region Scenario 13 — Dehydratace → CogLoad
+
+        [TestMethod]
+        public void Dehydration_HighThirst_IncreaseCogLoad()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                DehydrationCogLoadThreshold: 50.0,
+                DehydrationCogLoadBonus: 5.0));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var thirstyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var hydratedPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            thirstyPsych.RestoreState(thirstyPsych.State with { CognitiveLoad = 20 });
+            hydratedPsych.RestoreState(hydratedPsych.State with { CognitiveLoad = 20 });
+
+            var thirstyPhysio  = new PhysiologyState(70, 2, 25, 80, 0, 5, 0, null);  // Thirst=80 > 50
+            var hydratedPhysio = new PhysiologyState(70, 2, 25, 10, 0, 5, 0, null);  // Thirst=10
+
+            var ctxThirsty  = BuildRawContext(0.5, thirstyPhysio);
+            var ctxHydrated = BuildRawContext(0.5, hydratedPhysio);
+            var now = new WDateTime(0);
+
+            thirstyPsych.Tick(now, WTimeSpan.FromHours(2), ctxThirsty, new EventCollector());
+            hydratedPsych.Tick(now, WTimeSpan.FromHours(2), ctxHydrated, new EventCollector());
+
+            Assert.IsTrue(thirstyPsych.State.CognitiveLoad > hydratedPsych.State.CognitiveLoad,
+                $"Dehydratace musí zvyšovat CogLoad. Thirsty={thirstyPsych.State.CognitiveLoad:F4}, Hydrated={hydratedPsych.State.CognitiveLoad:F4}");
+        }
+
+        #endregion Scenario 13
+
+        #region Scenario 14 — Hyperalgezie (sickness pain amplification)
+
+        [TestMethod]
+        public void Hyperalgesia_HighImmuneLoad_AmplifiesPainValencePenalty()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                HyperalgesiaImmuneThreshold: 40.0,
+                HyperalgesiaMaxMultiplier: 0.5));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            sickPsych.RestoreState(sickPsych.State with { Valence = 0.0 });
+            healthyPsych.RestoreState(healthyPsych.State with { Valence = 0.0 });
+
+            // Obě postavy mají stejnou bolest (40), ale liší se imunitní zátěží
+            var sickPhysio    = new PhysiologyState(70, 2, 25, 20, 40, 80, 0, null); // ImmuneLoad=80 > 40
+            var healthyPhysio = new PhysiologyState(70, 2, 25, 20, 40, 5,  0, null); // ImmuneLoad=5
+
+            var ctxSick    = BuildRawContext(0.5, sickPhysio);
+            var ctxHealthy = BuildRawContext(0.5, healthyPhysio);
+            var now = new WDateTime(0);
+
+            sickPsych.Tick(now, WTimeSpan.FromHours(1), ctxSick, new EventCollector());
+            healthyPsych.Tick(now, WTimeSpan.FromHours(1), ctxHealthy, new EventCollector());
+
+            Assert.IsTrue(sickPsych.State.Valence < healthyPsych.State.Valence,
+                $"Nemoc musí amplifikovat bolestivý signál (nižší Valence). " +
+                $"Sick={sickPsych.State.Valence:F4}, Healthy={healthyPsych.State.Valence:F4}");
+        }
+
+        #endregion Scenario 14
+
+        #region Scenario 15 — Chronická bolest → MoodBaseline
+
+        [TestMethod]
+        public void ChronicPain_ReducesMoodBaseline_InPsychology()
+        {
+            // Vysoká penalta (2.0/den) + dlouhý tick (24h) = jasně měřitelný efekt
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                MoodBaselineRecoveryPerHour: 0.0,   // vypnout recovery aby nerušilo
+                EnableCircadianRhythm: false,
+                ChronicPainOnsetDays: 7.0,
+                ChronicPainValencePenaltyPerDay: 0.0,
+                ChronicPainMoodBaselinePenaltyPerDay: 2.0));  // 2 body/den → 2*0.667*24h = ~32 bodů
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var chronicPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var acutePsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            chronicPsych.RestoreState(chronicPsych.State with { MoodBaseline = 50 });
+            acutePsych.RestoreState(acutePsych.State with { MoodBaseline = 50 });
+
+            // Chronická bolest: ChronicPainDays=20 (přes onset 7); chronicity = min(20/30, 1) = 0.667
+            var chronicPhysio = new PhysiologyState(70, 2, 25, 20, 40, 5, 0, null) with { ChronicPainDays = 20 };
+            // Akutní bolest: stejná Pain, ale ChronicPainDays=0 (pod onset) → žádná penalta
+            var acutePhysio   = new PhysiologyState(70, 2, 25, 20, 40, 5, 0, null) with { ChronicPainDays = 0 };
+
+            var ctxChronic = BuildRawContext(0.5, chronicPhysio);
+            var ctxAcute   = BuildRawContext(0.5, acutePhysio);
+            var now = new WDateTime(0);
+
+            chronicPsych.Tick(now, WTimeSpan.FromHours(24), ctxChronic, new EventCollector());
+            acutePsych.Tick(now, WTimeSpan.FromHours(24), ctxAcute, new EventCollector());
+
+            Assert.IsTrue(chronicPsych.State.MoodBaseline < acutePsych.State.MoodBaseline,
+                $"Chronická bolest (20 dní) musí snižovat MoodBaseline více než akutní (0 dní). " +
+                $"Chronic={chronicPsych.State.MoodBaseline:F4}, Acute={acutePsych.State.MoodBaseline:F4}");
+        }
+
+        #endregion Scenario 15
+
         #region Helpers
 
         /// <summary>

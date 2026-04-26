@@ -1233,6 +1233,76 @@ namespace EngineTests
 
         #endregion Postpartum hormonal crash
 
+        #region Chronická bolest (ChronicPainDays)
+
+        [TestMethod]
+        public void ChronicPain_AccumulatesWhenPainAboveThreshold()
+        {
+            var engine = BuildEngine(pain: 50); // Pain=50 > threshold 30
+            engine.RestoreState(engine.State with { ChronicPainDays = 0 });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.ChronicPainDays > 0,
+                $"Pain=50 > threshold=30 musí akumulovat ChronicPainDays. Aktuálně: {engine.State.ChronicPainDays:F4}");
+        }
+
+        [TestMethod]
+        public void ChronicPain_DecreasesWhenPainDropsBelowThreshold()
+        {
+            var engine = BuildEngine(pain: 5); // Pain=5 < threshold 30
+            engine.RestoreState(engine.State with { ChronicPainDays = 5.0 });
+            var ctx = BuildContextWithAction(null);
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.ChronicPainDays < 5.0,
+                $"Pain pod prahem musí snižovat ChronicPainDays. Před: 5.0, po: {engine.State.ChronicPainDays:F4}");
+        }
+
+        #endregion Chronická bolest (ChronicPainDays)
+
+        #region Sociální izolace → kortizol
+
+        [TestMethod]
+        public void SocialIsolation_HighNeedSocial_ElevatesCortisol()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with { CortisolLevel = 50 });
+
+            // Vytvoříme kontext s vysokým NeedSocial (simulace izolace přes minulý snapshot)
+            var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
+            var psych  = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral,
+                Motivations: new MotivationState(NeedSocial: 90)); // vysoko nad 80
+            var snapshot = new EnginesSnapshot(
+                physio, psych,
+                new BehaviorState(40, 20, 15, 40, 50, 30, null),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
+                new RelationshipState(new System.Collections.Generic.Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new System.Collections.Generic.List<EpisodicMemory>()));
+            var ctx = new HumanContext
+            {
+                Id = new HumanId(System.Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentStyle.Secure,
+                    CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                    Sociosexuality.Intermediate, Chronotype.Neutral),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(4), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.CortisolLevel > 50,
+                $"NeedSocial=90 (izolace) musí elevovat kortizol. Před: 50, po: {engine.State.CortisolLevel:F2}");
+        }
+
+        #endregion Sociální izolace → kortizol
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine pro konkrétní biologii (Male/Female) — pro testy pohlavně specifických metrik.</summary>

@@ -77,9 +77,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double HypocortisolismDeclineRate = 0.1,
         // Sociální podpora jako kortizol buffer (Eisenberger 2007)
         double SocialSupportCortisolBuffer = 6.0,
-        double SocialSupportClosenessThreshold = 50.0)
+        double SocialSupportClosenessThreshold = 50.0,
+        // Chronická sociální izolace → kortizol (Cacioppo 2015)
+        double SocialIsolationCortisolThreshold = 80.0,
+        double SocialIsolationCortisolRatePerHour = 0.8,
+        // Chronická bolest (Dantzer 2008)
+        double ChronicPainAccumThreshold = 30.0,
+        double ChronicPainDecayFactor = 0.5)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5) { }
     }
 
     public sealed record PhysiologyState(
@@ -145,7 +151,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Akumuluje se při fyzické práci (Work), klesá spánkem a odpočinkem.
         /// Při mírné úrovni (20–70) = stres buffer (endorfiny). Při >70 = Valence↓. 0..100.
         /// </summary>
-        double PhysicalFatigueLevel = 0);
+        double PhysicalFatigueLevel = 0,
+        /// <summary>
+        /// Kumulativní počet dní s bolestí nad prahem (<see cref="PhysiologyConfig.ChronicPainAccumThreshold"/>).
+        /// Chronická bolest (&gt;7 dní) mění psychologický profil: depresivní symptomy,
+        /// trvalý Valence↓, erose MoodBaseline (Dantzer 2008; Eisenberger 2012).
+        /// </summary>
+        double ChronicPainDays = 0);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }
