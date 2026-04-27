@@ -3,9 +3,12 @@
 
 namespace GameEngineTools.Characters.Engines.SemanticMemory
 {
+    using System;
+    using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Options;
     using static GameEngineTools.Characters.Engines.Memory.MemoryWhatParser;
@@ -40,13 +43,36 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 return;
             }
 
+            var edges = ctx.Snapshot.Relationships.Edges;
+
             var decayedPeople = new Dictionary<HumanId, PersonBeliefSet>();
             foreach (var (other, set) in State.People)
             {
+                // ── Navarro 8× gap rule (Navarro et al. 2017) ──────────────────────────
+                // Pokud uplynulo déle než 8× průměrný meziinterakční interval,
+                // decay se znásobí NavarroDecayAccelerator (default 3×).
+                var closeness = edges.TryGetValue(other, out var edge) ? edge.Closeness : 30.0;
+                var expectedIntervalDays = closeness > 70.0 ? 3.0
+                    : closeness > 40.0 ? 7.0
+                    : 21.0;
+                var navarroThreshold = expectedIntervalDays * Config.NavarroCriticalMultiple;
+
+                var oldestBelief = set.Beliefs.Values
+                    .OrderBy(b => b.LastUpdatedAt.WorldTicks)
+                    .FirstOrDefault();
+                var daysSinceContact = oldestBelief is not null
+                    ? Math.Max(0.0, (now - oldestBelief.LastUpdatedAt).TotalDays)
+                    : 0.0;
+
+                var gapMultiplier = daysSinceContact > navarroThreshold
+                    ? Config.NavarroDecayAccelerator
+                    : 1.0;
+                // ──────────────────────────────────────────────────────────────────────
+
                 var beliefs = new Dictionary<PersonBeliefKind, PersonBelief>();
                 foreach (var belief in set.Beliefs)
                 {
-                    var decay = Config.DecayPerDay * days * (1.0 - belief.Value.Stability * 0.8);
+                    var decay = Config.DecayPerDay * days * (1.0 - belief.Value.Stability * 0.8) * gapMultiplier;
                     var strength = Math.Max(0.0, belief.Value.Strength - decay);
                     beliefs[belief.Key] = belief.Value with { Strength = strength };
                 }
@@ -70,7 +96,12 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 return;
             }
 
-            var interpretations = BuildInterpretations(ctx, encoded, other.Value).ToList();
+            // ── Attachment style modulation (Bartholomew-Horowitz 2D model) ──────────
+            var (learningMult, contradictionMult, safeDiscount) =
+                ComputeAttachmentMultipliers(ctx.Personality.Attachment);
+            // ─────────────────────────────────────────────────────────────────────────
+
+            var interpretations = BuildInterpretations(ctx, encoded, other.Value, safeDiscount).ToList();
             if (interpretations.Count == 0)
             {
                 return;
@@ -95,7 +126,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                     : new PersonBelief(other.Value, interpretation.Kind, 0.0, 0.0, 0, encoded.OccurredAt);
 
                 var resistance = 1.0 - current.Stability * 0.6;
-                var delta = interpretation.Weight * Config.LearningRate * resistance;
+                var delta = interpretation.Weight * Config.LearningRate * learningMult * resistance;
                 var updated = current with
                 {
                     Strength = Math.Clamp(current.Strength + (1.0 - current.Strength) * delta, 0.0, 1.0),
@@ -106,7 +137,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 };
 
                 beliefs[interpretation.Kind] = updated;
-                ApplyContradiction(encoded.OccurredAt, beliefs, interpretation.Kind, interpretation.Weight, interpretation.SupportCount);
+                ApplyContradiction(encoded.OccurredAt, beliefs, interpretation.Kind, interpretation.Weight, interpretation.SupportCount, contradictionMult);
                 outbox.Add(new SemanticBeliefUpdated(encoded.OccurredAt, ctx.Id, other.Value, interpretation.Kind, updated.Strength, updated.EvidenceCount));
             }
 
@@ -118,9 +149,35 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         #endregion
 
+        #region Diagnostics & management
+
+        /// <inheritdoc/>
+        public IReadOnlyList<PersonBelief> GetBeliefsSorted(HumanId other)
+        {
+            var set = State.GetBeliefs(other);
+            if (set is null) return Array.Empty<PersonBelief>();
+            return set.Beliefs.Values
+                .OrderByDescending(b => b.Strength)
+                .ThenBy(b => b.Kind.ToString())
+                .ToList();
+        }
+
+        /// <inheritdoc/>
+        public void ForgetPerson(HumanId other)
+        {
+            if (!State.People.ContainsKey(other)) return;
+            var updated = State.People
+                .Where(kv => kv.Key != other)
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+            State = new SemanticMemoryState(updated);
+        }
+
+        #endregion
+
         #region Private helpers
 
-        private IEnumerable<BeliefInterpretation> BuildInterpretations(IHumanContext ctx, MemoryEncoded encoded, HumanId other)
+        private IEnumerable<BeliefInterpretation> BuildInterpretations(
+            IHumanContext ctx, MemoryEncoded encoded, HumanId other, double safeDiscount)
         {
             var recentEpisodes = ctx.Snapshot.Memory.Episodes
                 .Where(e => e.OtherPerson == other)
@@ -143,6 +200,12 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 aggregateWeight += directSupport * 0.35;
                 aggregateWeight = Math.Clamp(aggregateWeight, 0.0, 1.0);
 
+                // Avoidant attachment potlačuje EmotionallySafe belief
+                if (group.Key == PersonBeliefKind.EmotionallySafe)
+                {
+                    aggregateWeight *= safeDiscount;
+                }
+
                 if (aggregateWeight < 0.08)
                 {
                     continue;
@@ -157,7 +220,8 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             IDictionary<PersonBeliefKind, PersonBelief> beliefs,
             PersonBeliefKind kind,
             double weight,
-            int supportCount)
+            int supportCount,
+            double contradictionMult = 1.0)
         {
             foreach (var opposing in OpposingBeliefs(kind))
             {
@@ -166,7 +230,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                     continue;
                 }
 
-                var disconfirmation = weight * Config.ContradictionRate * (0.35 + current.Stability) * (1.0 + (supportCount - 1) * 0.25);
+                var disconfirmation = weight * Config.ContradictionRate * contradictionMult
+                    * (0.35 + current.Stability)
+                    * (1.0 + (supportCount - 1) * 0.25);
                 beliefs[opposing] = current with
                 {
                     Strength = Math.Max(0.0, current.Strength - disconfirmation),
@@ -176,6 +242,31 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 };
             }
         }
+
+        /// <summary>
+        /// Mapuje AttachmentStyle na learning/contradiction/safeDiscount multiplikátory.
+        /// Anxious  → hyperaktivace (rychlejší učení, vyšší contradikce)
+        /// Avoidant → deaktivace (pomalejší učení, potlačení EmotionallySafe)
+        /// Disorganized → nestabilní (střední učení, vysoká contradikce)
+        /// </summary>
+        private (double learningMult, double contradictionMult, double safeDiscount)
+            ComputeAttachmentMultipliers(AttachmentStyle style)
+            => style switch
+            {
+                AttachmentStyle.Anxious => (
+                    Config.AttachmentLearningBoostAnxious,
+                    Config.AttachmentContradictionBoostAnxious,
+                    1.0),
+                AttachmentStyle.Avoidant => (
+                    Config.AttachmentLearningDiscountAvoidant,
+                    1.0,
+                    Config.AttachmentSafeDiscountAvoidant),
+                AttachmentStyle.Disorganized => (
+                    Config.AttachmentLearningBoostDisorganized,
+                    Config.AttachmentContradictionBoostDisorganized,
+                    0.70),
+                _ => (1.0, 1.0, 1.0)  // Secure: baseline
+            };
 
         private static IEnumerable<InterpretedBeliefSignal> InterpretEpisode(SemanticEpisodeSample episode)
         {

@@ -35,7 +35,17 @@ namespace GameEngineTools.Characters.Engines.Memory
             return new MemoryRecallResult(query, items);
         }
 
-        public static DecisionWorkingSet BuildWorkingSet(MemoryIndex memory, MemoryRecallQuery query, WDateTime now)
+        public static DecisionWorkingSet BuildWorkingSet(
+            MemoryIndex memory, MemoryRecallQuery query, WDateTime now, double threshold = 0.65)
+        {
+            if (query.CognitiveBurden.HasValue && query.CognitiveBurden.Value > threshold)
+                return BuildSystem1WorkingSet(memory, query, now);
+
+            return BuildSystem2WorkingSet(memory, query, now);
+        }
+
+        private static DecisionWorkingSet BuildSystem2WorkingSet(
+            MemoryIndex memory, MemoryRecallQuery query, WDateTime now)
         {
             var recall = Recall(memory, query, now);
             var reflectionEpisodes = CollectReflectionEpisodes(memory, query, now);
@@ -45,7 +55,24 @@ namespace GameEngineTools.Characters.Engines.Memory
                 query.ActionName,
                 query.InteractionAct,
                 recall.Items,
-                reflections);
+                reflections,
+                IsSystem1: false);
+        }
+
+        // System 1: kognitivní zátěž překračuje threshold — přeskočí episodický recall,
+        // zachová pouze reflection summaries odvozené ze semantic beliefs.
+        private static DecisionWorkingSet BuildSystem1WorkingSet(
+            MemoryIndex memory, MemoryRecallQuery query, WDateTime now)
+        {
+            var reflectionEpisodes = CollectReflectionEpisodes(memory, query, now);
+            var reflections = BuildReflections(query, reflectionEpisodes, now);
+            return new DecisionWorkingSet(
+                query.TargetHuman,
+                query.ActionName,
+                query.InteractionAct,
+                RecalledEpisodes: Array.Empty<MemoryRecallItem>(),
+                Reflections: reflections,
+                IsSystem1: true);
         }
 
         #endregion Public API
@@ -86,14 +113,18 @@ namespace GameEngineTools.Characters.Engines.Memory
             var confidenceScore = Math.Clamp(episode.RecallConfidence, 0.0, 1.0);
             // Salience is the primary encoding signal (encoding specificity principle, Tulving).
             // Strength is derived from decay and reinforcement — secondary to initial salience.
-            var relevance =
+            var neuroticismBias = ComputeNeuroticismMoodBias(
+                episode.Emotion, query.CurrentValence, query.NeuroticismScore);
+            var relevance = Math.Clamp(
                 (targetScore    * 0.30) +
                 (situationScore * 0.24) +
                 (recencyWeight  * 0.18) +
                 (Math.Clamp(episode.Salience, 0.0, 1.0) * 0.16) +
                 (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.08) +
                 (emotionScore   * 0.08) +
-                (confidenceScore * 0.04);
+                (confidenceScore * 0.04) +
+                neuroticismBias,
+                0.0, 1.0);
 
             if (relevance < MinimumRecallRelevance)
             {
@@ -384,6 +415,25 @@ namespace GameEngineTools.Characters.Engines.Memory
                     || header.StartsWith("Interaction:SelfDisclosure:Accepted", StringComparison.Ordinal)
                     || header.StartsWith("Interaction:Validation:Accepted", StringComparison.Ordinal)
                     || header.StartsWith("Interaction:Meta:Accepted", StringComparison.Ordinal));
+        }
+
+        // Mood repair (low N) vs. negativní spirála (high N) — Bower 1981.
+        // Při dobré náladě není žádný bias bez ohledu na N.
+        private static double ComputeNeuroticismMoodBias(
+            EmotionalTag episodeEmotion, double currentValence, double neuroticism)
+        {
+            if (currentValence >= 0.0) return 0.0;
+
+            var isPositive = episodeEmotion == EmotionalTag.Positive;
+            var isNegative = episodeEmotion is EmotionalTag.Negative or EmotionalTag.Mixed;
+
+            if (neuroticism < 0.4)
+                return isPositive ? +0.10 : 0.0;
+
+            if (neuroticism > 0.6)
+                return isPositive ? -0.08 : isNegative ? +0.06 : 0.0;
+
+            return 0.0;
         }
 
         private static bool IsEmotionCompatible(EmotionalTag episodeEmotion, EmotionalTag queryEmotion, string? actionName)

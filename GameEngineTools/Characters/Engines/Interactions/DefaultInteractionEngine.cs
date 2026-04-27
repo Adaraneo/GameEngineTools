@@ -256,6 +256,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             }
 
             // Přenášíme p.Act — RelationshipsEngine ho potřebuje pro DomainBreakdown
+            var (peakVal, endVal) = ComputePeakEndValence(p.Act, accepted, misattrib);
             var outcome = new InteractionOutcome(
                 OccurredAt: p.OccurredAt,
                 From: p.From,
@@ -264,7 +265,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 Reason: accepted ? "accepted" : "declined",
                 Act: p.Act,
                 FromBiology: p.FromBiology,
-                ToBiology: ctx.Biology);
+                ToBiology: ctx.Biology,
+                PeakValence: peakVal,
+                EndValence: endVal);
 
             outbox.Add(outcome);
 
@@ -390,6 +393,27 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var privacyRelief = hasPrivacy && safety >= 0.65 ? 0.78 : 1.0;
 
             return Config.MisattributionRateBase * stressFactor * unsafeMultiplier * actMultiplier * privacyRelief;
+        }
+
+        private static (double peak, double end) ComputePeakEndValence(
+            SpeechAct act, bool accepted, double misattribPenalty)
+        {
+            if (accepted)
+            {
+                var end = act switch
+                {
+                    SpeechAct.SelfDisclosure or SpeechAct.Validation or SpeechAct.Invite or SpeechAct.Meta => 0.85,
+                    SpeechAct.SmallTalk or SpeechAct.Humor or SpeechAct.Question => 0.50,
+                    _ => 0.40
+                };
+                return (1.0, end);
+            }
+            else
+            {
+                var end = misattribPenalty > 0.12 ? -0.80 : -0.45;
+                end = Math.Clamp(end - misattribPenalty * 0.15, -1.0, 0.0);
+                return (-1.0, end);
+            }
         }
 
         private static bool HasReproductivePotential(SexBiology? initiatorBiology, SexBiology recipientBiology)

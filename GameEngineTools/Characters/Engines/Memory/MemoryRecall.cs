@@ -16,7 +16,10 @@ namespace GameEngineTools.Characters.Engines.Memory
         SpeechAct? InteractionAct = null,
         EmotionalTag? EmotionalValence = null,
         WTimeSpan? RecencyWindow = null,
-        int Take = 4);
+        int Take = 4,
+        double CurrentValence = 0.0,
+        double NeuroticismScore = 0.5,
+        double? CognitiveBurden = null);
 
     /// <summary>
     /// Ranked episodic recall item with compact scoring diagnostics.
@@ -65,5 +68,6 @@ namespace GameEngineTools.Characters.Engines.Memory
         string? ActionName,
         SpeechAct? InteractionAct,
         IReadOnlyList<MemoryRecallItem> RecalledEpisodes,
-        IReadOnlyList<ReflectionSummary> Reflections);
+        IReadOnlyList<ReflectionSummary> Reflections,
+        bool IsSystem1 = false);
 }

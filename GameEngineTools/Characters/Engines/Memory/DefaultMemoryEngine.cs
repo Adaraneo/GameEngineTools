@@ -178,6 +178,20 @@ namespace GameEngineTools.Characters.Engines.Memory
         public DecisionWorkingSet BuildWorkingSet(MemoryRecallQuery query, WDateTime now)
             => MemoryCognition.BuildWorkingSet(State, query, now);
 
+        public DecisionWorkingSet BuildWorkingSet(MemoryRecallQuery query, WDateTime now, IHumanContext ctx)
+        {
+            var burden = ComputeCognitiveBurden(ctx);
+            var conscientiousness = ctx.Personality.BigFive.Conscientiousness;
+            var threshold = Config.CognitiveBurdenThreshold + (conscientiousness - 0.5) * 0.10;
+            var enriched = query with
+            {
+                CognitiveBurden  = burden,
+                CurrentValence   = ctx.Snapshot.Psychology.Valence,
+                NeuroticismScore = ctx.Personality.BigFive.Neuroticism
+            };
+            return MemoryCognition.BuildWorkingSet(State, enriched, now, threshold);
+        }
+
         #endregion Veřejné API
 
         #region Handle — zpracování doménových událostí
@@ -396,9 +410,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                 case InteractionOutcome io:
                     {
                         // Schema zachytí: typ aktu, výsledek, oba aktéři
-                        // Odmítnutí má vyšší salience — sociální bolest se pamatuje lépe
+                        // Salience se počítá peak-end vzorcem (Fredrickson & Kahneman 1993)
                         var what = MemoryWhatParser.Interaction(io.Act.ToString(), io.Accepted, io.From.Value, io.To.Value);
-                        var salience = io.Accepted ? 0.7 : 0.9;
+                        var salience = ComputePeakEndSalience(io);
                         var emotion = io.Accepted ? EmotionalTag.Positive : EmotionalTag.Negative;
 
                         Encode(new EpisodicMemory(
@@ -409,7 +423,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                             emotion,
                             Strength: Config.BaseEncoding + 0.2,
                             OtherPerson: ResolveOtherPerson(ctx.Id, io.From, io.To),
-                            BeliefEvidence: CreateInteractionBeliefEvidence(ctx.Id, io)),
+                            BeliefEvidence: CreateInteractionBeliefEvidence(ctx.Id, io),
+                            PeakEmotion: ValenceToEmotionalTag(io.PeakValence),
+                            EndEmotion: ValenceToEmotionalTag(io.EndValence)),
                             ctx, outbox);
                         break;
                     }
@@ -545,11 +561,33 @@ namespace GameEngineTools.Characters.Engines.Memory
                         if (idx >= 0)
                         {
                             var ep = episodes[idx];
+
+                            // Memory reconsolidation (Nader et al. 2000): každý recall
+                            // driftuje emoci vzpomínky směrem k aktuální náladě.
+                            // Negativní vzpomínky driftují 1.3× rychleji.
+                            var currentValence = ctx.Snapshot.Psychology.Valence;
+                            var driftRate = Config.ReconsolidationDriftRate
+                                            * (ep.Emotion == EmotionalTag.Negative ? 1.3 : 1.0);
+                            var numericEmotion = ep.Emotion switch
+                            {
+                                EmotionalTag.Positive =>  1.0,
+                                EmotionalTag.Negative => -1.0,
+                                EmotionalTag.Mixed    => -0.3,
+                                _                     =>  0.0
+                            };
+                            var drifted = numericEmotion + (currentValence - numericEmotion) * driftRate;
+                            var newEmotion = drifted switch
+                            {
+                                > 0.35  => EmotionalTag.Positive,
+                                < -0.35 => EmotionalTag.Negative,
+                                < 0.0   => EmotionalTag.Mixed,
+                                _       => EmotionalTag.Neutral
+                            };
+
                             episodes[idx] = ep with
                             {
-                                RecallConfidence = Math.Clamp(
-                                    ep.RecallConfidence + 0.03,  // +3% za recall
-                                    0.0, 1.0)
+                                RecallConfidence = Math.Clamp(ep.RecallConfidence + 0.03, 0.0, 1.0),
+                                Emotion = newEmotion
                             };
                             State = new MemoryIndex(episodes);
                         }
@@ -692,6 +730,29 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <param name="actionName">Název akce z <see cref="ActionNames"/>.</param>
         /// <param name="ctx">Kontext postavy (pro budoucí rozšíření).</param>
         /// <returns>Hodnota salience v rozsahu 0.0–1.0.</returns>
+        private static double ComputePeakEndSalience(InteractionOutcome io)
+        {
+            if (io.PeakValence is null || io.EndValence is null)
+                return io.Accepted ? 0.7 : 0.9;
+
+            // Fredrickson & Kahneman 1993: salience = (|peak|×1.5 + |end|) / 2.5
+            var raw = (Math.Abs(io.PeakValence.Value) * 1.5 + Math.Abs(io.EndValence.Value)) / 2.5;
+            var negativityBoost = io.PeakValence.Value < 0 ? 0.08 : 0.0;
+            return Math.Clamp(raw + negativityBoost, 0.3, 1.0);
+        }
+
+        private static EmotionalTag ValenceToEmotionalTag(double? v)
+            => v switch { null => EmotionalTag.Neutral, > 0.2 => EmotionalTag.Positive,
+                          < -0.2 => EmotionalTag.Negative, _ => EmotionalTag.Mixed };
+
+        private static double ComputeCognitiveBurden(IHumanContext ctx)
+        {
+            var stress   = Math.Clamp(ctx.Snapshot.Psychology.Stress / 100.0, 0.0, 1.0);
+            var fatigue  = Math.Clamp(1.0 - ctx.Snapshot.Physiology.Energy / 100.0, 0.0, 1.0);
+            var crowding = Math.Clamp(ctx.Snapshot.InteractionSurface.Crowding, 0.0, 1.0);
+            return stress * 0.40 + fatigue * 0.35 + crowding * 0.25;
+        }
+
         private static double SalienceForAction(string actionName, IHumanContext ctx)
             => actionName switch
             {

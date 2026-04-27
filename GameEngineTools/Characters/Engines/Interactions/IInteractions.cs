@@ -134,7 +134,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
         string Reason,
         SpeechAct Act = SpeechAct.SmallTalk,
         SexBiology? FromBiology = null,
-        SexBiology? ToBiology = null) : IDomainEvent;
+        SexBiology? ToBiology = null,
+        double? PeakValence = null,
+        double? EndValence = null) : IDomainEvent;
 
     /// <summary>Záměr vůči případnému těhotenství u abstraktního sexuálního setkání.</summary>
     public enum ReproductiveIntent

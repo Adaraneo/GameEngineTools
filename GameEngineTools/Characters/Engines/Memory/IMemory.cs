@@ -14,9 +14,11 @@ namespace GameEngineTools.Characters.Engines.Memory
         double PruneThreshold = 0.01,
         double ReinforcementBoost = 0.15,
         double EmotionDecayMod = 0.5,
-        double StressDistortionWeight = 0.35)
+        double StressDistortionWeight = 0.35,
+        double ReconsolidationDriftRate = 0.04,
+        double CognitiveBurdenThreshold = 0.65)
     {
-        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35) { }
+        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35, 0.04, 0.65) { }
     }
 
     public sealed record MemoryIndex(
@@ -25,7 +27,9 @@ namespace GameEngineTools.Characters.Engines.Memory
     public sealed record EpisodicMemory(
         Guid Id, WDateTime When, string What, double Salience, EmotionalTag Emotion, double Strength,
         string? PerceivedWhat = null, double RecallConfidence = 1.0, double Distortion = 0.0,
-        HumanId? OtherPerson = null, PersonBeliefEvidence? BeliefEvidence = null);
+        HumanId? OtherPerson = null, PersonBeliefEvidence? BeliefEvidence = null,
+        EmotionalTag? PeakEmotion = null,
+        EmotionalTag? EndEmotion = null);
 
     public enum EmotionalTag
     { Neutral, Positive, Negative, Mixed }
@@ -39,6 +43,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         MemoryRecallResult Recall(MemoryRecallQuery query, WDateTime now);
 
         DecisionWorkingSet BuildWorkingSet(MemoryRecallQuery query, WDateTime now);
+
+        DecisionWorkingSet BuildWorkingSet(MemoryRecallQuery query, WDateTime now, IHumanContext ctx);
     }
 
     // Události
