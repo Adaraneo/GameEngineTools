@@ -256,7 +256,7 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
-    DefaultCharacterLod = CognitiveResolutionLevel.Background,
+    DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
     ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService, new HashSet<HumanId>
     {
         playerPerson.Id,
@@ -323,15 +323,15 @@ var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id &&
 
 if (characters.Count > 0)
 {
-    clock.SetNow(clock.Now.AddYears(-mainTrioSceneOpts.SimulationYears));
+    clock.SetNow(clock.Now.AddYears(-simulationYears));
     var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
         Characters = characters,
         LocationService = locationService,
-        TickStep = WTimeSpan.FromHours(5),
-        SimulationYears = 5,
-        DefaultCharacterLod = CognitiveResolutionLevel.Background,
-        ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService),
+        TickStep = WTimeSpan.FromHours(0.5),
+        SimulationYears = simulationYears,
+        DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
+        ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService),
         OnTick = (now, chars) =>
         {
             FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy, perceptionOptions);
