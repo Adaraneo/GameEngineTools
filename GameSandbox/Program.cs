@@ -328,9 +328,10 @@ if (characters.Count > 0)
     {
         Characters = characters,
         LocationService = locationService,
-        TickStep = WTimeSpan.FromHours(0.5),
+        TickStep = WTimeSpan.FromHours(5),
         SimulationYears = simulationYears,
-        DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
+        DefaultCharacterLod = CognitiveResolutionLevel.Background,
+        InternalSubstep = WTimeSpan.FromMinutes(30),
         ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService),
         OnTick = (now, chars) =>
         {
