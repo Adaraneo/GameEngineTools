@@ -248,7 +248,7 @@ foreach (var npc in manager.Characters.Where(npc => ids.ContainsKey(npc.Person.I
     }
 }
 
-var mainTrioSceneOpts = new SimulationSceneOptions
+var mainCharactersSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
     LocationService = locationService,
@@ -256,8 +256,8 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
-    DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
-    ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService, new HashSet<HumanId>
+    DefaultCharacterLod = CognitiveResolutionLevel.Player,
+    ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService, new HashSet<HumanId>
     {
         playerPerson.Id,
         significantOtherPerson.Id
@@ -316,10 +316,10 @@ var mainTrioSceneOpts = new SimulationSceneOptions
     }
 };
 
-var mainTrioScene = new SimulationScene(clock, mainTrioSceneOpts, lodRuntime);
-await mainTrioScene.RunAsync();
+var mainCharactersScene = new SimulationScene(clock, mainCharactersSceneOpts, lodRuntime);
+await mainCharactersScene.RunAsync();
 
-var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id).Select(c => c.Person).ToList();
+var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id && c.Person.Id != friendSOPerson.Id).Select(c => c.Person).ToList();
 
 if (characters.Count > 0)
 {
