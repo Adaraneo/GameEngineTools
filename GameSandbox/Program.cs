@@ -257,11 +257,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
     DefaultCharacterLod = CognitiveResolutionLevel.Player,
-    ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService, new HashSet<HumanId>
-    {
-        playerPerson.Id,
-        significantOtherPerson.Id
-    }),
+    ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService),
     ResolveCharacter = id =>
     {
         var chars = new[] { playerPerson, significantOtherPerson, friendPerson, friendSOPerson };
@@ -441,7 +437,7 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
         var act = selection.Act;
 
         Console.WriteLine(
-            "[ReachOut] {0} -> {1}: action={2}, familiarity={3:F1}, trust={4:F1}, comfort={5:F1}, closeness={6:F1}, romantic={7:F1}, privacy={8}.",
+            "[ReachOut] {0} -> {1}: action={2}, familiarity={3:F1}, trust={4:F1}, comfort={5:F1}, closeness={6:F1}, romantic={7:F1}, privacy={8}, character's gender={9}, target's gender={10}.",
             character.Id.Value,
             target.Id.Value,
             act,
@@ -450,7 +446,9 @@ static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, IL
             selection.Comfort,
             selection.Closeness,
             selection.RomanticInterest,
-            selection.HasPrivacy ? "yes" : "no");
+            selection.HasPrivacy ? "yes" : "no",
+            character.Biology.ToString(),
+            target.Biology.ToString());
 
         target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null, character.Biology));
         TryTouch(now, character, target, rng);
