@@ -256,7 +256,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
-    DefaultCharacterLod = CognitiveResolutionLevel.Player,
+    DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
     ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService),
     ResolveCharacter = id =>
     {
