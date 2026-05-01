@@ -257,7 +257,11 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
     DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
-    ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService),
+    ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService, new HashSet<HumanId>
+    {
+        playerPerson.Id,
+        significantOtherPerson.Id
+    }),
     ResolveCharacter = id =>
     {
         var chars = new[] { playerPerson, significantOtherPerson, friendPerson, friendSOPerson };
