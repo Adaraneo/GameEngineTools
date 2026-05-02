@@ -47,6 +47,12 @@ namespace GameEngineTools.Characters.Traits
         double SkinOiliness,       // 0..100
         double AcneLevel,          // 0..100
         BloatingLevel Bloating,    // None/Light/Medium/High
+        /// <summary>Podíl šedivých vlasů (0..1); z PhysicalAgingState.GreyFraction.</summary>
+        double GreyFraction = 0.0,
+        /// <summary>Hustota/plnost vlasů (0..1); z PhysicalAgingState.HairDensity.</summary>
+        double HairDensity = 1.0,
+        /// <summary>Skóre vrásek (0..100); z PhysicalAgingState.WrinkleScore.</summary>
+        double WrinkleScore = 0.0,
         string? ClothingStyle = null,
         string? MakeupStyle = null);
 
@@ -60,7 +66,11 @@ namespace GameEngineTools.Characters.Traits
         /// Vypočti aktuální vzhled z traitu a snapshotu fyziologie.
         /// Neprovádí side-effecty; můžeš ukládat výsledný <see cref="AppearanceView"/>.
         /// </summary>
-        public static AppearanceView Compute(PhysicalAppearance trait, PhysiologyState physio, SexBiology biology)
+        public static AppearanceView Compute(
+            PhysicalAppearance trait,
+            PhysiologyState physio,
+            SexBiology biology,
+            PhysicalAgingState? aging = null)
         {
             // Hmotnost je mimo sim – očekává se, že si ji buď držíš extra, nebo aproximujeme ze 2 indexů:
             // Energy (dlouhodobě) a ImmuneLoad (krátkodobě zhorší vzhled pleti).
@@ -111,7 +121,11 @@ namespace GameEngineTools.Characters.Traits
                 0,
                 100);
 
-            var hairLen = Math.Clamp(trait.HairLengthCm, 0.0, 120.0);
+            // Vlasy: runtime aging state přepíše statický trait
+            var hairLen   = Math.Clamp(aging?.HairLengthCm ?? trait.HairLengthCm, 0.0, 120.0);
+            var greyFrac  = Math.Clamp(aging?.GreyFraction ?? 0.0, 0, 1);
+            var hairDens  = Math.Clamp(aging?.HairDensity ?? 1.0, 0, 1);
+            var wrinkles  = Math.Clamp(aging?.WrinkleScore ?? 0.0, 0, 100);
 
             return new AppearanceView(
                 WeightKg: Round1(weight),
@@ -121,7 +135,10 @@ namespace GameEngineTools.Characters.Traits
                 PostureScore: Math.Round(posture, 1),
                 SkinOiliness: Math.Round(oil, 1),
                 AcneLevel: Math.Round(acne, 1),
-                Bloating: bloat
+                Bloating: bloat,
+                GreyFraction: Math.Round(greyFrac, 3),
+                HairDensity: Math.Round(hairDens, 3),
+                WrinkleScore: Math.Round(wrinkles, 1)
             );
         }
 

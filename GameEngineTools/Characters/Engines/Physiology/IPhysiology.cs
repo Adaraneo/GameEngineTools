@@ -101,9 +101,26 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double AltitudeHypoxiaThreshold = 2000.0,
         double AltitudeAMSThreshold = 4000.0,
         double AltitudeEnergyDecayBonusPerKm = 0.3,
-        double AltitudeAMSPainPerHour = 2.0)
+        double AltitudeAMSPainPerHour = 2.0,
+        // Fyzické stárnutí — vlasy, vrásky, svalová hmota
+        double HairGrowthCmPerHour = 0.00175,
+        double HairGreyingAgeStart = 30.0,
+        double HairGreyingRatePerYear = 0.02,
+        double HairGreyingCortisolBoost = 0.0001,
+        double HairLossAgeStartMale = 25.0,
+        double HairLossRatePerYearMale = 0.005,
+        double HairLossStressThreshold = 70.0,
+        double HairLossStressRate = 0.0005,
+        double HairLossPostpartumAmount = 0.15,
+        double HairDensityRecoveryPerHour = 0.00002,
+        double WrinklingAgeStart = 25.0,
+        double WrinklingRatePerYear = 0.5,
+        double WrinklingCortisolBoost = 0.001,
+        double SarcopeniaAgeStart = 30.0,
+        double SarcopeniaRatePerYear = 0.005,
+        double SarcopeniaMuscleMin = 0.3)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0, 0.00175, 30.0, 0.02, 0.0001, 25.0, 0.005, 70.0, 0.0005, 0.15, 0.00002, 25.0, 0.5, 0.001, 30.0, 0.005, 0.3) { }
     }
 
     public sealed record PhysiologyState(
@@ -180,7 +197,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Aktuální antikoncepční ochrana. Nastavena eventem <see cref="ContraceptionChanged"/>.
         /// Při &gt;= Moderate: potlačena ovulace a snížena závažnost PMDD.
         /// </summary>
-        ContraceptionLevel CurrentContraception = ContraceptionLevel.Unspecified);
+        ContraceptionLevel CurrentContraception = ContraceptionLevel.Unspecified,
+        /// <summary>
+        /// Dynamický stav fyzického stárnutí (vlasy, vrásky, svalová hmota).
+        /// <c>null</c> = aging systém ještě nebyl inicializován; inicializace proběhne při prvním Tick().
+        /// </summary>
+        PhysicalAgingState? Aging = null);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }
@@ -269,6 +291,24 @@ namespace GameEngineTools.Characters.Engines.Physiology
     public sealed record TestosteroneState(
         double Level = 60);  // 0..100; 60 = průměrný dospělý muž
 
+    /// <summary>
+    /// Dynamický stav fyzického stárnutí — ukládá runtime fyzické změny postavy.
+    /// Součást <see cref="Characters.Core.EnginesSnapshot"/>; aktualizován v každém Tick().
+    /// Na rozdíl od statického traitu <see cref="Characters.Traits.PhysicalAppearance"/> (genetika),
+    /// tento record sleduje změny způsobené věkem, hormony, stresem a vnějšími událostmi.
+    /// </summary>
+    public sealed record PhysicalAgingState(
+        /// <summary>Aktuální délka vlasů (cm). Roste ~0,00175 cm/hod. HairCut eventem se nastavuje na novou hodnotu.</summary>
+        double HairLengthCm = 5.0,
+        /// <summary>Podíl šedivých vlasů (0..1). Roste s věkem (od ~30 let) a chronickým kortizolem.</summary>
+        double GreyFraction = 0.0,
+        /// <summary>Hustota/plnost vlasů (0..1). Klesá androgenní alopécií, stresovým telogen effluviem, postpartum.</summary>
+        double HairDensity = 1.0,
+        /// <summary>Skóre vrásek (0..100). Roste s věkem po 25 letech a akceleruje chronickým kortizolem.</summary>
+        double WrinkleScore = 0.0,
+        /// <summary>Podíl svalové hmoty (0..1). Klesá sarkopénií po 30. roce; min = SarcopeniaMuscleMin.</summary>
+        double MuscleMassFraction = 1.0);
+
     // Události
     public sealed record MensesStarted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     public sealed record MensesEnded(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
@@ -288,6 +328,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
     public sealed record PostpartumPhaseChanged(WDateTime OccurredAt, HumanId Human, PostpartumPhase Phase) : IDomainEvent;
     /// <summary>Událost — postava změnila antikoncepci.</summary>
     public sealed record ContraceptionChanged(WDateTime OccurredAt, HumanId Human, ContraceptionLevel Level) : IDomainEvent;
+    /// <summary>Událost — postava si ostříhala vlasy na zadanou délku.</summary>
+    public sealed record HairCut(WDateTime OccurredAt, HumanId Human, double NewLengthCm) : IDomainEvent;
+    /// <summary>Událost — postava si obarvila vlasy (narrativní; resetuje šedivost pro zobrazení).</summary>
+    public sealed record HairDyed(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
 
     /// <summary>
     /// Odvozené fyziologické vitální parametry — čisté funkce stávajících stavů.

@@ -90,7 +90,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 BodyTempDelta: 0,
                 Cycle: initialCycle,
                 Nutrition: Config.EnableNutrition ? new NutritionState() : null,
-                Testosterone: initialTestosterone);
+                Testosterone: initialTestosterone,
+                Aging: new PhysicalAgingState());
 
             _mensesOn = initialCycle?.Phase == CyclePhase.Menses;
         }
@@ -280,10 +281,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { AcuteArousalLevel = Math.Max(0, s.AcuteArousalLevel - Config.AcuteArousalDecayPerHour * h) };
 
             // Fyzická únava — akumulace při Work, decay při odpočinku/spánku
+            // Sarkopenie: méně svalové hmoty = Work fatigue se akumuluje rychleji
             {
+                var muscleFactor = s.Aging?.MuscleMassFraction ?? 1.0;
                 var fatigueDelta = action switch
                 {
-                    Work     => Config.PhysicalFatigueAccumPerWorkHour * h,
+                    Work     => (Config.PhysicalFatigueAccumPerWorkHour / Math.Max(0.1, muscleFactor)) * h,
                     Sleep    => -Config.PhysicalFatigueDecayPerSleepHour * h,
                     Idle     => -Config.PhysicalFatigueDecayPerIdleHour * h,
                     SelfCare => -(Config.PhysicalFatigueDecayPerIdleHour + Config.PhysicalFatigueSelfCareDecayBonus) * h,
@@ -368,6 +371,58 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     var ageImmuneBonus = (ageYears - Config.AgingImmuneBaselineStart) * Config.AgingImmuneBaselinePerYear;
                     s = s with { ImmuneLoad = Math.Min(100, s.ImmuneLoad + ageImmuneBonus * h / (365.25 * 24)) };
                 }
+            }
+
+            // Fyzické stárnutí — vlasy, vrásky, svalová hmota
+            if (s.Aging is { } aging)
+            {
+                var ageYears = (double)(now.Date.Year - _birthDate.Year);
+
+                // Růst vlasů (~1,25 cm/měsíc reálně, ~0,00175 cm/hod v herním světě)
+                var newHairLen = Math.Min(120.0, aging.HairLengthCm + Config.HairGrowthCmPerHour * h);
+
+                // Šedivění: věk + kortizol akcelerátor
+                var greying = 0.0;
+                if (ageYears > Config.HairGreyingAgeStart)
+                {
+                    greying += (ageYears - Config.HairGreyingAgeStart) * Config.HairGreyingRatePerYear * h / (365.25 * 24);
+                    greying += s.CortisolLevel * Config.HairGreyingCortisolBoost * h;
+                }
+
+                // Hustota vlasů: androgenní alopécie (muži) + stres
+                var densityChange = 0.0;
+                if (s.Testosterone is { } _ && ageYears > Config.HairLossAgeStartMale)
+                    densityChange -= (ageYears - Config.HairLossAgeStartMale) * Config.HairLossRatePerYearMale * h / (365.25 * 24);
+                if (s.AllostaticLoad > Config.HairLossStressThreshold)
+                    densityChange -= Config.HairLossStressRate * h;
+                else
+                    densityChange += Config.HairDensityRecoveryPerHour * h;
+
+                // Vrásky: věk + kortizol
+                var wrinkles = 0.0;
+                if (ageYears > Config.WrinklingAgeStart)
+                {
+                    wrinkles += (ageYears - Config.WrinklingAgeStart) * Config.WrinklingRatePerYear * h / (365.25 * 24);
+                    wrinkles += s.CortisolLevel * Config.WrinklingCortisolBoost * h;
+                }
+
+                // Sarkopenie: pokles svalové hmoty po 30. roce
+                var muscleChange = ageYears > Config.SarcopeniaAgeStart
+                    ? -(ageYears - Config.SarcopeniaAgeStart) * Config.SarcopeniaRatePerYear * h / (365.25 * 24)
+                    : 0.0;
+
+                s = s with
+                {
+                    Aging = aging with
+                    {
+                        HairLengthCm       = newHairLen,
+                        GreyFraction       = Math.Clamp(aging.GreyFraction + greying, 0, 1),
+                        HairDensity        = Math.Clamp(aging.HairDensity + densityChange, 0.1, 1),
+                        WrinkleScore       = Math.Clamp(aging.WrinkleScore + wrinkles, 0, 100),
+                        MuscleMassFraction = Math.Clamp(aging.MuscleMassFraction + muscleChange,
+                                                        Config.SarcopeniaMuscleMin, 1.0)
+                    }
+                };
             }
 
             // Altitude — hypoxie a AMS
@@ -519,6 +574,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 case ContraceptionChanged cc:
                     s = s with { CurrentContraception = cc.Level };
                     break;
+
+                case HairCut hc:
+                    if (s.Aging is { } hairAging)
+                        s = s with { Aging = hairAging with { HairLengthCm = Math.Clamp(hc.NewLengthCm, 0, 120) } };
+                    break;
             }
 
             // SAM spiky mimo switch — NightmareTriggered a StressSpiked
@@ -638,7 +698,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     Cycle = s.Cycle is null
                         ? null
                         : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 },
-                    Postpartum = new PostpartumState(0, PostpartumPhase.Immediate, HormonalCrashActive: true)
+                    Postpartum = new PostpartumState(0, PostpartumPhase.Immediate, HormonalCrashActive: true),
+                    // Postpartum HairLoss: estrogen propad → telogen effluvium
+                    Aging = s.Aging is { } birthAging
+                        ? birthAging with { HairDensity = Math.Max(0.1, birthAging.HairDensity - Config.HairLossPostpartumAmount) }
+                        : s.Aging
                 };
             }
 
