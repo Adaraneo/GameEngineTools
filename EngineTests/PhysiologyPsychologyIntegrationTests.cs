@@ -887,6 +887,160 @@ namespace EngineTests
 
         #endregion Scenario 15
 
+        #region Scenario 16 — Stresová vulnerabilita v noci (kortizol)
+
+        [TestMethod]
+        public void StressVulnerability_LowCortisol_SlowsStressRecovery()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 5.0,
+                EnableCircadianRhythm: false,
+                CircadianVulnerabilityMin: 0.3,
+                CircadianVulnerabilityScale: 50.0));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var lowCortPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var highCortPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            lowCortPsych.RestoreState(lowCortPsych.State with { Stress = 80 });
+            highCortPsych.RestoreState(highCortPsych.State with { Stress = 80 });
+
+            // Nízký kortizol (noc) vs vysoký kortizol (ráno)
+            var lowCortPhysio  = MakePhysio(0, 0, 0) with { CortisolLevel = 10 };  // noc → faktor 0.3
+            var highCortPhysio = MakePhysio(0, 0, 0) with { CortisolLevel = 90 };  // ráno → faktor 1.8
+
+            var ctxLow  = BuildRawContext(0.5, lowCortPhysio);
+            var ctxHigh = BuildRawContext(0.5, highCortPhysio);
+            var now = new WDateTime(0);
+
+            lowCortPsych.Tick(now, WTimeSpan.FromHours(2), ctxLow, new EventCollector());
+            highCortPsych.Tick(now, WTimeSpan.FromHours(2), ctxHigh, new EventCollector());
+
+            Assert.IsTrue(lowCortPsych.State.Stress > highCortPsych.State.Stress,
+                $"Nízký kortizol (noc) musí zpomalit stresovou recovery. " +
+                $"LowCort={lowCortPsych.State.Stress:F2}, HighCort={highCortPsych.State.Stress:F2}");
+        }
+
+        #endregion Scenario 16
+
+        #region Scenario 17 — Serotonin IDO pathway
+
+        [TestMethod]
+        public void Serotonin_HighImmuneLoad_DampensMoodBaselineRecovery()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                MoodBaselineRecoveryPerHour: 2.0,
+                MoodBaselineAgreeablenessBonus: 0.0,
+                SerotoninSuppressionImmuneThreshold: 60.0,
+                SerotoninMoodRecoveryDampening: 0.1));  // 90% dampening
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            // Obě instance startují s nízkou MoodBaseline (30), cílí na 50
+            sickPsych.RestoreState(sickPsych.State with { MoodBaseline = 30 });
+            healthyPsych.RestoreState(healthyPsych.State with { MoodBaseline = 30 });
+
+            var sickPhysio    = MakePhysio(0, 0, 0) with { ImmuneLoad = 80 };  // > threshold 60
+            var healthyPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 10 };
+
+            var ctxSick    = BuildRawContext(0.5, sickPhysio);
+            var ctxHealthy = BuildRawContext(0.5, healthyPhysio);
+            var now = new WDateTime(0);
+
+            sickPsych.Tick(now, WTimeSpan.FromHours(4), ctxSick, new EventCollector());
+            healthyPsych.Tick(now, WTimeSpan.FromHours(4), ctxHealthy, new EventCollector());
+
+            Assert.IsTrue(sickPsych.State.MoodBaseline < healthyPsych.State.MoodBaseline,
+                $"Serotonin IDO: nemoc musí zpomalit MoodBaseline recovery. " +
+                $"Sick={sickPsych.State.MoodBaseline:F4}, Healthy={healthyPsych.State.MoodBaseline:F4}");
+        }
+
+        #endregion Scenario 17
+
+        #region Scenario 18 — Wanting amplification pod stresem
+
+        [TestMethod]
+        public void Wanting_HighStress_BoostsNeedIntimacy()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                WantingStressThreshold: 60.0,
+                WantingNeedIntimacyBoostPerHour: 1.0));  // vysoká hodnota pro jasný signál
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var highStressPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var lowStressPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            highStressPsych.RestoreState(highStressPsych.State with
+                { Stress = 80, Motivations = new MotivationState(NeedIntimacy: 50) });
+            lowStressPsych.RestoreState(lowStressPsych.State with
+                { Stress = 20, Motivations = new MotivationState(NeedIntimacy: 50) });
+
+            var physio = MakePhysio(0, 0, 0);
+            var ctxHigh = BuildRawContext(0.5, physio);
+            var ctxLow  = BuildRawContext(0.5, physio);
+            var now = new WDateTime(0);
+
+            highStressPsych.Tick(now, WTimeSpan.FromHours(2), ctxHigh, new EventCollector());
+            lowStressPsych.Tick(now, WTimeSpan.FromHours(2), ctxLow, new EventCollector());
+
+            Assert.IsTrue(
+                highStressPsych.State.Motivations!.NeedIntimacy > lowStressPsych.State.Motivations!.NeedIntimacy,
+                $"Vysoký stres musí amplifikovat wanting (NeedIntimacy). " +
+                $"High={highStressPsych.State.Motivations.NeedIntimacy:F4}, Low={lowStressPsych.State.Motivations.NeedIntimacy:F4}");
+        }
+
+        #endregion Scenario 18
+
+        #region Scenario 19 — Cirkadiánní tělesná teplota
+
+        [TestMethod]
+        public void CircadianTemp_EveningHour_RaisesBodyTempDelta()
+        {
+            var nightEngine   = BuildPhysioEngine();
+            var eveningEngine = BuildPhysioEngine();
+
+            // Obě instance startují na 0 BodyTempDelta, nulová imunita (žádná horečka)
+            nightEngine.RestoreState(nightEngine.State with { BodyTempDelta = 0, ImmuneLoad = 0 });
+            eveningEngine.RestoreState(eveningEngine.State with { BodyTempDelta = 0, ImmuneLoad = 0 });
+
+            var ctx = BuildRawContext(0.5);
+
+            // Noční hodina (4h) = teplota minimální; večerní (17h) = maximální
+            var nightHour   = new WDateTime(WTimeSpan.FromHours(4).Ticks);
+            var eveningHour = new WDateTime(WTimeSpan.FromHours(17).Ticks);
+
+            nightEngine.Tick(nightHour, WTimeSpan.FromHours(4), ctx, new EventCollector());
+            eveningEngine.Tick(eveningHour, WTimeSpan.FromHours(4), ctx, new EventCollector());
+
+            Assert.IsTrue(eveningEngine.State.BodyTempDelta > nightEngine.State.BodyTempDelta,
+                $"Večerní hodina (17h) musí mít vyšší tělesnou teplotu než noční (4h). " +
+                $"Evening={eveningEngine.State.BodyTempDelta:F4}, Night={nightEngine.State.BodyTempDelta:F4}");
+        }
+
+        private static DefaultPhysiologyEngine BuildPhysioEngine()
+        {
+            var cfg = Options.Create(new PhysiologyConfig(
+                EnableMenstrualCycle: false,
+                EnableNutrition: false,
+                CircadianTempAmplitude: 0.3,
+                CircadianTempPeakHour: 17.0));
+            var cycleCfg = Options.Create(new MenstrualCycleConfig());
+            var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            return new DefaultPhysiologyEngine(cfg, cycleCfg, factory, new ZeroRandom(),
+                SexBiology.Female, WDateOnly.New(100, 1, 1), WDateOnly.New(116, 1, 1));
+        }
+
+        #endregion Scenario 19
+
         #region Helpers
 
         /// <summary>

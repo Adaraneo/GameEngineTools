@@ -185,9 +185,10 @@ namespace GameEngineTools.Characters.Engines.Memory
             var threshold = Config.CognitiveBurdenThreshold + (conscientiousness - 0.5) * 0.10;
             var enriched = query with
             {
-                CognitiveBurden  = burden,
-                CurrentValence   = ctx.Snapshot.Psychology.Valence,
-                NeuroticismScore = ctx.Personality.BigFive.Neuroticism
+                CognitiveBurden      = burden,
+                CurrentValence       = ctx.Snapshot.Psychology.Valence,
+                NeuroticismScore     = ctx.Personality.BigFive.Neuroticism,
+                DaysInNegativeMood   = ComputeDaysInNegativeMood(ctx.Snapshot.Memory.Episodes, now)
             };
             return MemoryCognition.BuildWorkingSet(State, enriched, now, threshold);
         }
@@ -393,14 +394,16 @@ namespace GameEngineTools.Characters.Engines.Memory
                         // Vlastní akce — nejjednodušší schema, žádní aktéři
                         var what = MemoryWhatParser.Action(ac.ActionName);
                         var other = ac.TargetHuman == ctx.Id ? null : ac.TargetHuman;
+                        var acSalience = SalienceForAction(ac.ActionName, ctx);
+                        var acEmotion  = EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
                             ac.OccurredAt,
                             what,
-                            SalienceForAction(ac.ActionName, ctx),
-                            EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence),
-                            Strength: Config.BaseEncoding,
+                            acSalience,
+                            acEmotion,
+                            Strength: ComputeInitialStrength(acSalience, acEmotion),
                             OtherPerson: other),
                             ctx, outbox);
                         break;
@@ -421,7 +424,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             salience,
                             emotion,
-                            Strength: Config.BaseEncoding + 0.2,
+                            Strength: ComputeInitialStrength(salience, emotion),
                             OtherPerson: ResolveOtherPerson(ctx.Id, io.From, io.To),
                             BeliefEvidence: CreateInteractionBeliefEvidence(ctx.Id, io),
                             PeakEmotion: ValenceToEmotionalTag(io.PeakValence),
@@ -447,7 +450,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.85,   // první dojem je velmi salinetní — evolučně důležitý
                             emotion,
-                            Strength: Config.BaseEncoding + 0.3,
+                            Strength: ComputeInitialStrength(0.85, emotion),
                             OtherPerson: other,
                             BeliefEvidence: CreateFirstImpressionBeliefEvidence(ctx.Id, fi)),
                             ctx, outbox);
@@ -466,7 +469,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.6,
                             EmotionalTag.Positive,
-                            Strength: Config.BaseEncoding,
+                            Strength: ComputeInitialStrength(0.6, EmotionalTag.Positive),
                             OtherPerson: ResolveOtherPerson(ctx.Id, mp.A, mp.B),
                             BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mp.A, mp.B, positive: true, mp.Kind)),
                             ctx, outbox);
@@ -486,7 +489,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.65,
                             EmotionalTag.Negative,
-                            Strength: Config.BaseEncoding + 0.1,
+                            Strength: ComputeInitialStrength(0.65, EmotionalTag.Negative),
                             OtherPerson: ResolveOtherPerson(ctx.Id, mn.A, mn.B),
                             BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mn.A, mn.B, positive: false, mn.Kind)),
                             ctx, outbox);
@@ -506,7 +509,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.8,   // smíření/odmítnutí smíru je výrazná událost
                             emotion,
-                            Strength: Config.BaseEncoding + 0.2,
+                            Strength: ComputeInitialStrength(0.8, emotion),
                             OtherPerson: ResolveOtherPerson(ctx.Id, ra.A, ra.B),
                             BeliefEvidence: CreateRepairBeliefEvidence(ctx.Id, ra)),
                             ctx, outbox);
@@ -525,7 +528,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.95,
                             se.Accepted ? EmotionalTag.Positive : EmotionalTag.Mixed,
-                            Strength: Config.BaseEncoding + 0.3,
+                            Strength: ComputeInitialStrength(0.95, se.Accepted ? EmotionalTag.Positive : EmotionalTag.Mixed),
                             OtherPerson: other,
                             BeliefEvidence: other.HasValue
                                 ? se.Accepted
@@ -549,7 +552,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                             what,
                             Salience: 0.9,
                             EmotionalTag.Negative,
-                            Strength: Config.BaseEncoding + 0.3),
+                            Strength: ComputeInitialStrength(0.9, EmotionalTag.Negative)),
                             ctx, outbox);
                         break;
                     }
@@ -730,6 +733,34 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <param name="actionName">Název akce z <see cref="ActionNames"/>.</param>
         /// <param name="ctx">Kontext postavy (pro budoucí rozšíření).</param>
         /// <returns>Hodnota salience v rozsahu 0.0–1.0.</returns>
+        // Proxy pro chronickou negativní náladu: počet dní od nejnovější negativní/mixed epizody.
+        // Clamped na 30 dní — delší periody mají konstantní spirálové riziko.
+        private static double ComputeDaysInNegativeMood(
+            IReadOnlyList<EpisodicMemory> episodes, WDateTime now)
+        {
+            var recentNegative = episodes
+                .Where(e => e.Emotion is EmotionalTag.Negative or EmotionalTag.Mixed)
+                .OrderByDescending(e => e.When.WorldTicks)
+                .FirstOrDefault();
+
+            if (recentNegative is null) return 0.0;
+            return Math.Min(30.0, (now - recentNegative.When).TotalDays);
+        }
+
+        // Počáteční Strength závisí na emocionální intenzitě epizody.
+        // Negativní vzpomínky se kódují silněji (negativity bias — Baumeister et al. 2001).
+        private static double ComputeInitialStrength(double salience, EmotionalTag emotion)
+        {
+            var intensity = emotion switch
+            {
+                EmotionalTag.Negative => 1.00,
+                EmotionalTag.Positive => 0.85,
+                EmotionalTag.Mixed    => 0.65,
+                _                     => 0.45
+            };
+            return Math.Clamp(salience * intensity * 0.7 + 0.3, 0.3, 1.0);
+        }
+
         private static double ComputePeakEndSalience(InteractionOutcome io)
         {
             if (io.PeakValence is null || io.EndValence is null)

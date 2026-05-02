@@ -95,10 +95,16 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Empiricky: Neuroticism negativně koreluje s vagálním tónem
             var vagalTone = 1.0 - ctx.Personality.BigFive.Neuroticism * 0.5;  // 0.5..1.0
 
-            // Základní drift: stres klesá k baseline (modulován vagálním tónem), PAD míří k neutrálu
+            // Stresová vulnerabilita v noci (McEwen 1998): kortizol moduluje HPA resilience
+            // Nízký kortizol (noc) → stres klesá pomaleji; Vysoký (ráno) → rychleji
+            var circadianVulnerability = Math.Clamp(
+                ph.CortisolLevel / Config.CircadianVulnerabilityScale,
+                Config.CircadianVulnerabilityMin, 2.0);
+
+            // Základní drift: stres klesá k baseline (modulován vagálním tónem + cirkadiánní vulnerabilitou)
             s = s with
             {
-                Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * vagalTone * h),
+                Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * vagalTone * circadianVulnerability * h),
                 Valence = Approach(s.Valence, 0, 0.15 * h),
                 Arousal = Approach(s.Arousal, 0.5, 0.05 * h),
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)
@@ -229,6 +235,23 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = s with { Stress = Math.Max(0, s.Stress - (testo.Level - 50) * Config.TestosteroneStressResilienceWeight * h) };
             }
 
+            // Wanting vs. Liking: stres amplifikuje wanting/craving (Berridge 2025)
+            // Liking suppression již pokryta anhedonií; chybějící část: dopaminergní wanting pod stresem
+            if (s.Stress > Config.WantingStressThreshold && s.Motivations is { } wantingMotiv)
+            {
+                var stressExcess = (s.Stress - Config.WantingStressThreshold) / 40.0;
+                var nextWanting = wantingMotiv with
+                {
+                    NeedIntimacy = Math.Min(100, wantingMotiv.NeedIntimacy + stressExcess * Config.WantingNeedIntimacyBoostPerHour * h),
+                    NeedSocial   = Math.Min(100, wantingMotiv.NeedSocial   + stressExcess * Config.WantingNeedSocialBoostPerHour   * h)
+                };
+                if (nextWanting != wantingMotiv)
+                {
+                    s = s with { Motivations = nextWanting };
+                    outbox.Add(new MotivationChanged(now, ctx.Id, wantingMotiv, nextWanting));
+                }
+            }
+
             // SAM systém → PAD (Sympatho-Adrenomedullary: okamžitá sympatická aktivace)
             if (ph.AcuteArousalLevel > 0)
             {
@@ -342,6 +365,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 if (s.Stress > Config.MoodBaselineHighStressThreshold) moodRecovery *= 0.1;
                 moodRecovery *= 1.0 + ctx.Personality.BigFive.Agreeableness * Config.MoodBaselineAgreeablenessBonus;
                 var alloMoodDampFactor = 1.0 - alloLoad / 200.0;
+                // Serotonin IDO pathway (Dantzer 2007): chronická imunita tlumí MoodBaseline recovery
+                var serotoninFactor = ph.ImmuneLoad > Config.SerotoninSuppressionImmuneThreshold
+                    ? Config.SerotoninMoodRecoveryDampening
+                    : 1.0;
+                moodRecovery *= serotoninFactor;
                 s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * alloMoodDampFactor * h), 0, 100) };
             }
 

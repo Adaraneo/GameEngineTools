@@ -19,7 +19,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         int Take = 4,
         double CurrentValence = 0.0,
         double NeuroticismScore = 0.5,
-        double? CognitiveBurden = null);
+        double? CognitiveBurden = null,
+        double DaysInNegativeMood = 0.0);
 
     /// <summary>
     /// Ranked episodic recall item with compact scoring diagnostics.

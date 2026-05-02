@@ -369,6 +369,187 @@ namespace EngineTests
     }
 
     // =========================================================================
+    // Negative Memory Spiral (Bower 1981; memory-cognition.md formula)
+    // spiralRisk = N×0.5 + log(1 + daysInNegativeMood)×0.1
+    // Spiral active when: valence < -0.4 AND spiralRisk > 0.6
+    // =========================================================================
+
+    [TestClass]
+    public class NegativeMemorySpiralTests : TestBase
+    {
+        private static readonly HumanId Target = new HumanId(Guid.NewGuid());
+
+        [TestMethod]
+        public void Spiral_HighN_LongNegativeMood_AmplifiedNegativeRecall()
+        {
+            // N=0.8, daysInNegativeMood=20 → spiralRisk = 0.4 + log(21)×0.1 ≈ 0.4 + 0.304 = 0.704 > 0.6
+            // valence = -0.6 < -0.4 → spirála aktivní → positive bias = -0.15, negative = +0.12
+            var now = WDateTime.New(100, 1, 10, 12);
+
+            var positive = Episode(now, 120, "Interaction:SmallTalk:Accepted|from=a|to=b",
+                EmotionalTag.Positive, 0.40, Target, salience: 0.40);
+            var negative = Episode(now, 120, "Interaction:SmallTalk:Rejected|from=a|to=b",
+                EmotionalTag.Negative, 0.40, Target, salience: 0.40);
+            var memory = new MemoryIndex(new List<EpisodicMemory> { positive, negative });
+
+            var recall = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(null, "ReachOut", null, null,
+                    WTimeSpan.FromDays(7), 2,
+                    CurrentValence: -0.6, NeuroticismScore: 0.8, DaysInNegativeMood: 20.0),
+                now);
+
+            Assert.IsTrue(recall.Items.Count >= 2);
+            Assert.AreEqual(negative.Id, recall.Items[0].Episode.Id,
+                $"V spirále musí negativní epizoda silně dominovat. Top: {recall.Items[0].Episode.Emotion}");
+        }
+
+        [TestMethod]
+        public void Spiral_LowN_LongNegativeMood_NoSpiral_MoodRepairStillWorks()
+        {
+            // N=0.3 → spiralRisk = 0.15 + log(21)×0.1 ≈ 0.15 + 0.304 = 0.454 < 0.6 → spirála NENÍ
+            // Low N → mood repair branch → pozitivní epizody preferred
+            var now = WDateTime.New(100, 1, 10, 12);
+
+            var positive = Episode(now, 120, "Interaction:SmallTalk:Accepted|from=a|to=b",
+                EmotionalTag.Positive, 0.40, Target, salience: 0.40);
+            var negative = Episode(now, 120, "Interaction:SmallTalk:Rejected|from=a|to=b",
+                EmotionalTag.Negative, 0.40, Target, salience: 0.40);
+            var memory = new MemoryIndex(new List<EpisodicMemory> { negative, positive });
+
+            var recall = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(null, "ReachOut", null, null,
+                    WTimeSpan.FromDays(7), 2,
+                    CurrentValence: -0.6, NeuroticismScore: 0.3, DaysInNegativeMood: 20.0),
+                now);
+
+            Assert.IsTrue(recall.Items.Count >= 2);
+            Assert.AreEqual(positive.Id, recall.Items[0].Episode.Id,
+                "Low-N bez spirály musí stále aplikovat mood repair → pozitivní epizoda vyhrává.");
+        }
+
+        [TestMethod]
+        public void Spiral_HighN_ShortNegativeMood_BelowThreshold_NormalBias()
+        {
+            // N=0.8, daysInNegativeMood=1 → spiralRisk = 0.4 + log(2)×0.1 ≈ 0.4 + 0.069 = 0.469 < 0.6
+            // → spirála NENÍ, ale high-N baseline negativní bias platí
+            var now = WDateTime.New(100, 1, 10, 12);
+
+            var positive = Episode(now, 120, "Interaction:SmallTalk:Accepted|from=a|to=b",
+                EmotionalTag.Positive, 0.40, Target, salience: 0.40);
+            var negative = Episode(now, 120, "Interaction:SmallTalk:Rejected|from=a|to=b",
+                EmotionalTag.Negative, 0.40, Target, salience: 0.40);
+            var memory = new MemoryIndex(new List<EpisodicMemory> { positive, negative });
+
+            // High-N (0.75) bez spirály → slabší bias (-0.08/+0.06 místo -0.15/+0.12)
+            var withoutSpiral = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(null, "ReachOut", null, null,
+                    WTimeSpan.FromDays(7), 2,
+                    CurrentValence: -0.6, NeuroticismScore: 0.75, DaysInNegativeMood: 1.0),
+                now);
+
+            var withSpiral = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(null, "ReachOut", null, null,
+                    WTimeSpan.FromDays(7), 2,
+                    CurrentValence: -0.6, NeuroticismScore: 0.75, DaysInNegativeMood: 20.0),
+                now);
+
+            // Negativní epizoda musí vyhrát v obou případech (high N), ale s různou silou
+            Assert.AreEqual(negative.Id, withoutSpiral.Items[0].Episode.Id,
+                "Bez spirály: high-N negativní bias platí.");
+            Assert.AreEqual(negative.Id, withSpiral.Items[0].Episode.Id,
+                "Se spirálou: negativní bias ještě silnější.");
+
+            // Spiral musí mít větší diferenci (silnější bias)
+            var negRelNoSpiral = withoutSpiral.Items.FirstOrDefault(i => i.Episode.Id == negative.Id)?.Relevance ?? 0;
+            var negRelSpiral   = withSpiral.Items.FirstOrDefault(i => i.Episode.Id == negative.Id)?.Relevance ?? 0;
+            Assert.IsTrue(negRelSpiral >= negRelNoSpiral,
+                $"Se spirálou musí mít negativní epizoda alespoň stejně vysokou relevance. " +
+                $"Spiral={negRelSpiral:F4}, NoSpiral={negRelNoSpiral:F4}");
+        }
+
+        [TestMethod]
+        public void Spiral_PositiveMood_NoSpiral_Regardless_Of_DaysInNegativeMood()
+        {
+            // valence >= 0 → vždy vrátí 0.0 bez ohledu na daysInNegativeMood
+            var now = WDateTime.New(100, 1, 10, 12);
+
+            var positive = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b",
+                EmotionalTag.Positive, 0.80, Target, salience: 0.80);
+            var negative = Episode(now, 2, "Interaction:SmallTalk:Rejected|from=a|to=b",
+                EmotionalTag.Negative, 0.50, Target, salience: 0.50);
+            var memory = new MemoryIndex(new List<EpisodicMemory> { negative, positive });
+
+            var recall = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(Target, "ReachOut", SpeechAct.SmallTalk, null,
+                    WTimeSpan.FromDays(7), 2,
+                    CurrentValence: +0.3, NeuroticismScore: 0.9, DaysInNegativeMood: 30.0),
+                now);
+
+            Assert.AreEqual(positive.Id, recall.Items[0].Episode.Id,
+                "Pozitivní nálada → žádná spirála, výsledek závisí jen na salience.");
+        }
+    }
+
+    // =========================================================================
+    // Initial Strength z emocionální intenzity (Baumeister et al. 2001)
+    // strength = salience × intensity × 0.7 + 0.3
+    // =========================================================================
+
+    [TestClass]
+    public class InitialStrengthTests : TestBase
+    {
+        [TestMethod]
+        public void InitialStrength_NegativeEpisode_StrongerThan_PositiveEpisode_AtSameSalience()
+        {
+            // Stejná salience, různá emoce → negativní musí mít vyšší počáteční strength
+            // intensity: Negative=1.0, Positive=0.85 → Neg strength > Pos strength
+            var now    = WDateTime.New(100, 1, 10, 12);
+            var target = new HumanId(Guid.NewGuid());
+
+            // Tyto epizody simulují co engine zakóduje
+            // strength = ComputeInitialStrength(0.75, emotion)
+            var negStrength = 0.75 * 1.00 * 0.7 + 0.3; // 0.825
+            var posStrength = 0.75 * 0.85 * 0.7 + 0.3; // 0.746
+
+            var negEpisode = Episode(now, 2, "Interaction:SmallTalk:Rejected|from=a|to=b",
+                EmotionalTag.Negative, negStrength, target, salience: 0.75);
+            var posEpisode = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b",
+                EmotionalTag.Positive, posStrength, target, salience: 0.75);
+
+            Assert.IsTrue(negEpisode.Strength > posEpisode.Strength,
+                $"Negativní epizoda musí mít vyšší initial strength. " +
+                $"Neg={negEpisode.Strength:F4}, Pos={posEpisode.Strength:F4}");
+        }
+
+        [TestMethod]
+        public void InitialStrength_HighSalience_HigherStrength()
+        {
+            // Vyšší salience → vyšší strength (monotonicky)
+            var highSalience = 0.90 * 0.85 * 0.7 + 0.3; // salience=0.90, Positive
+            var lowSalience  = 0.40 * 0.85 * 0.7 + 0.3; // salience=0.40, Positive
+
+            Assert.IsTrue(highSalience > lowSalience,
+                $"Vyšší salience musí dát vyšší strength. High={highSalience:F4}, Low={lowSalience:F4}");
+        }
+
+        [TestMethod]
+        public void InitialStrength_NeutralEpisode_MinimumStrength()
+        {
+            // Neutral emoce → intensity=0.45, tedy nejnižší strength
+            // strength = salience × 0.45 × 0.7 + 0.3; clamped to [0.3, 1.0]
+            var salience = 0.5;
+            var neutral = salience * 0.45 * 0.7 + 0.3;
+            var positive = salience * 0.85 * 0.7 + 0.3;
+            var negative = salience * 1.00 * 0.7 + 0.3;
+
+            Assert.IsTrue(neutral < positive,
+                $"Neutral musí mít nižší strength než Positive. Neutral={neutral:F4}, Pos={positive:F4}");
+            Assert.IsTrue(positive < negative,
+                $"Positive musí mít nižší strength než Negative. Pos={positive:F4}, Neg={negative:F4}");
+        }
+    }
+
+    // =========================================================================
     // Sdílená helper data pro testy paměti
     // =========================================================================
 

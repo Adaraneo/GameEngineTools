@@ -150,6 +150,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
             };
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
+            // Cirkadiánní tělesná teplota: sinusoidální vlna ±CircadianTempAmplitude (Waterhouse 2005)
+            var hoursOfDayT = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+            // cos: maximum na PeakHour (17h), minimum na PeakHour±HalfDay (4h)
+            var circadianTempComponent = Config.CircadianTempAmplitude
+                * Math.Cos((hoursOfDayT - Config.CircadianTempPeakHour) * 2 * Math.PI / WWorld.Spec.HoursPerDay);
+            var targetBodyTemp = feverDelta + circadianTempComponent;
 
             s = s with
             {
@@ -158,7 +164,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Thirst = Clamp01p(s.Thirst + thirstDelta),
                 Pain = Clamp01p(s.Pain + painDelta),
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + immuneDelta),
-                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, feverDelta, 0.1 * h), -1.0, 3.5)
+                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, targetBodyTemp, 0.1 * h), -1.0, 3.5)
             };
 
             // Nutriční drift — Calories/Protein klesají, jsou doplňovány jídlem;

@@ -114,7 +114,8 @@ namespace GameEngineTools.Characters.Engines.Memory
             // Salience is the primary encoding signal (encoding specificity principle, Tulving).
             // Strength is derived from decay and reinforcement — secondary to initial salience.
             var neuroticismBias = ComputeNeuroticismMoodBias(
-                episode.Emotion, query.CurrentValence, query.NeuroticismScore);
+                episode.Emotion, query.CurrentValence, query.NeuroticismScore,
+                query.DaysInNegativeMood);
             var relevance = Math.Clamp(
                 (targetScore    * 0.30) +
                 (situationScore * 0.24) +
@@ -418,14 +419,25 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         // Mood repair (low N) vs. negativní spirála (high N) — Bower 1981.
+        // Spiral detection: high N + chronicky negativní nálada → silnější negativní bias.
+        // Spiral risk formula (memory-cognition.md): N×0.5 + log(1 + daysInNegativeMood)×0.1
         // Při dobré náladě není žádný bias bez ohledu na N.
         private static double ComputeNeuroticismMoodBias(
-            EmotionalTag episodeEmotion, double currentValence, double neuroticism)
+            EmotionalTag episodeEmotion, double currentValence, double neuroticism,
+            double daysInNegativeMood = 0.0)
         {
             if (currentValence >= 0.0) return 0.0;
 
             var isPositive = episodeEmotion == EmotionalTag.Positive;
             var isNegative = episodeEmotion is EmotionalTag.Negative or EmotionalTag.Mixed;
+
+            // Negative Memory Spiral (Bower 1981; memory-cognition.md formula)
+            var spiralRisk = neuroticism * 0.5 + Math.Log(1.0 + daysInNegativeMood) * 0.1;
+            if (currentValence < -0.4 && spiralRisk > 0.6)
+            {
+                // Spirála aktivní — výrazně silnější negativní bias, mood repair téměř nefunguje
+                return isPositive ? -0.15 : isNegative ? +0.12 : 0.0;
+            }
 
             if (neuroticism < 0.4)
                 return isPositive ? +0.10 : 0.0;
