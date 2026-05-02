@@ -165,5 +165,11 @@ namespace GameEngineTools.Characters.Core
         /// z <c>LocationDescriptor</c>. Výchozí 20 °C = neutrální interiér.
         /// Čteno Psychology enginem (vedro → agrese, mírný chlad → afiliace).
         /// </summary>
-        double AmbientTemperature = 20.0);
+        double AmbientTemperature = 20.0,
+        /// <summary>
+        /// Nadmořská výška v místě postavy (m). Nastaveno simulační vrstvou per-tick.
+        /// &gt;2000 m → hypoxie (Energy↓, CogLoad↑). &gt;4000 m → AMS (Pain↑).
+        /// Výchozí 0 = hladina moře.
+        /// </summary>
+        double AltitudeMeters = 0.0);
 }

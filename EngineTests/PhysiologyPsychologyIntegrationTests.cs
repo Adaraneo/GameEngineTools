@@ -1041,6 +1041,39 @@ namespace EngineTests
 
         #endregion Scenario 19
 
+        #region Scenario 20 — Altitude → CogLoad
+
+        [TestMethod]
+        public void Altitude_AboveCogLoadThreshold_IncreaseCogLoad()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                AltitudeCogLoadThreshold: 2500.0,
+                AltitudeCogLoadBonusPerKm: 5.0));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var highAltPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var seaPsych     = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            highAltPsych.RestoreState(highAltPsych.State with { CognitiveLoad = 20 });
+            seaPsych.RestoreState(seaPsych.State with { CognitiveLoad = 20 });
+
+            var physio = MakePhysio(0, 0, 0);
+            var ctxHighAlt = BuildRawContext(0.5, physio, altitudeMeters: 4000.0);  // > threshold 2500
+            var ctxSea     = BuildRawContext(0.5, physio, altitudeMeters: 0.0);
+
+            var now = new WDateTime(0);
+            highAltPsych.Tick(now, WTimeSpan.FromHours(2), ctxHighAlt, new EventCollector());
+            seaPsych.Tick(now, WTimeSpan.FromHours(2), ctxSea, new EventCollector());
+
+            Assert.IsTrue(highAltPsych.State.CognitiveLoad > seaPsych.State.CognitiveLoad,
+                $"Vysoká nadmořská výška musí zvyšovat CogLoad. HighAlt={highAltPsych.State.CognitiveLoad:F4}, Sea={seaPsych.State.CognitiveLoad:F4}");
+        }
+
+        #endregion Scenario 20
+
         #region Helpers
 
         /// <summary>
@@ -1066,7 +1099,7 @@ namespace EngineTests
             var physioEngine = new DefaultPhysiologyEngine(
                 physioCfg, cycleCfg, logFactory, rng,
                 biology: SexBiology.Female,
-                birthDate: WDateOnly.New(13, 1, 1),
+                birthDate: WDateOnly.New(101, 1, 1),
                 now: WDateOnly.New(116, 1, 1));
 
             // Override cycle to exact starting state
@@ -1119,7 +1152,7 @@ namespace EngineTests
         /// <summary>
         /// Builds a raw <see cref="IHumanContext"/> with configurable neuroticism and physiology.
         /// </summary>
-        private static IHumanContext BuildRawContext(double neuroticism, PhysiologyState? physio = null, string? currentAction = null, double ambientTemperature = 20.0)
+        private static IHumanContext BuildRawContext(double neuroticism, PhysiologyState? physio = null, string? currentAction = null, double ambientTemperature = 20.0, double altitudeMeters = 0.0)
         {
             var ph = physio ?? new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
             var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
@@ -1134,7 +1167,8 @@ namespace EngineTests
                 new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(new List<EpisodicMemory>()),
-                AmbientTemperature: ambientTemperature);
+                AmbientTemperature: ambientTemperature,
+                AltitudeMeters: altitudeMeters);
 
             return new HumanContext
             {

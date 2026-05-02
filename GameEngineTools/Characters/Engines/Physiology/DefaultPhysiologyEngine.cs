@@ -41,6 +41,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private double _injuryAccHours;
         private double _postpartumAccHours;
         private bool _mensesOn;
+        private readonly WDateOnly _birthDate;
 
         /// <summary>
         /// Initialises the engine, computing an initial <see cref="PhysiologyState"/> including
@@ -66,6 +67,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             Config = cfg.Value;
             _cycleCfg = cycleCfg.Value;
+            _birthDate = birthDate;
 
             _log = loggerFactory.CreateLogger<DefaultPhysiologyEngine>();
             _rng = rng;
@@ -345,6 +347,41 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { RecoveryDebtHours = Math.Max(0, s.RecoveryDebtHours - debtDecay) };
             }
 
+            // Věkové efekty
+            {
+                var ageYears = now.Date.Year - _birthDate.Year;
+
+                // Menopauza: ženy ≥ MenopauseAge → cyklus trvale Paused
+                if (s.Cycle is { Phase: not CyclePhase.Paused } && ageYears >= Config.MenopauseAge)
+                    s = s with { Cycle = s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 1.0 } };
+
+                // Stárnutí testosteronu u mužů (~1 %/rok po 25)
+                if (s.Testosterone is { } ageTesto && ageYears > Config.AgingTestosteronePenaltyStart)
+                {
+                    var agePenalty = (ageYears - Config.AgingTestosteronePenaltyStart) * Config.AgingTestosteronePenaltyPerYear;
+                    s = s with { Testosterone = ageTesto with { Level = Math.Max(0, ageTesto.Level - agePenalty * h / (365.25 * 24)) } };
+                }
+
+                // Inflammaging: nad 60 → baseline ImmuneLoad pomalu roste
+                if (ageYears > Config.AgingImmuneBaselineStart)
+                {
+                    var ageImmuneBonus = (ageYears - Config.AgingImmuneBaselineStart) * Config.AgingImmuneBaselinePerYear;
+                    s = s with { ImmuneLoad = Math.Min(100, s.ImmuneLoad + ageImmuneBonus * h / (365.25 * 24)) };
+                }
+            }
+
+            // Altitude — hypoxie a AMS
+            {
+                var alt = ctx.Snapshot.AltitudeMeters;
+                if (alt > Config.AltitudeHypoxiaThreshold)
+                {
+                    var kmAbove = (alt - Config.AltitudeHypoxiaThreshold) / 1000.0;
+                    s = s with { Energy = Clamp01p(s.Energy - Config.AltitudeEnergyDecayBonusPerKm * kmAbove * h) };
+                    if (alt > Config.AltitudeAMSThreshold)
+                        s = s with { Pain = Clamp01p(s.Pain + Config.AltitudeAMSPainPerHour * h) };
+                }
+            }
+
             // Chronická sociální izolace → kortizol (Cacioppo 2015)
             {
                 var needSocial = ctx.Snapshot.Psychology?.Motivations?.NeedSocial ?? 50;
@@ -408,6 +445,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                         // Recovery Debt zpomaluje obnovu energie (min. 30 % účinnosti)
                         var recoveryFactor = Math.Max(0.3, 1.0 - s.RecoveryDebtHours / 48.0);
+                        // Věkový faktor: energie se obnovuje pomaleji po 40. roce
+                        var sleepAgeYears = se.OccurredAt.Date.Year - _birthDate.Year;
+                        var ageFactor = sleepAgeYears > Config.AgingEnergyRecoveryPenaltyStart
+                            ? Math.Max(0.3, 1.0 - (sleepAgeYears - Config.AgingEnergyRecoveryPenaltyStart) * Config.AgingEnergyRecoveryPenaltyPerYear)
+                            : 1.0;
                         // Sleep Inertia: horší kvalita = delší inertia (quality=100 → 0.75h; quality=0 → 1.5h)
                         var inertiaHours = Config.SleepInertiaMaxHours * (1.0 - se.Quality / 100.0 * 0.5);
 
@@ -423,10 +465,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                                 ? Clamp01p(s.Pain - 5.0 * qualityFactor)
                                 : s.Pain,
 
-                            // Energie se obnoví spánkem; při recovery debt je obnova snížena
-                            // 8h kvalitního spánku (quality=100, debt=0) → +80 energie
-                            // Stejný spánek s RecoveryDebt=48h → +24 energie (30 % min.)
-                            Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor * recoveryFactor),
+                            // Energie se obnoví spánkem; při recovery debt a věku je obnova snížena
+                            Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor * recoveryFactor * ageFactor),
 
                             // Sleep inertia — kognitivní setrvačnost po probuzení
                             SleepInertiaHours = inertiaHours
@@ -476,6 +516,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     break;
                 }
 
+                case ContraceptionChanged cc:
+                    s = s with { CurrentContraception = cc.Level };
+                    break;
             }
 
             // SAM spiky mimo switch — NightmareTriggered a StressSpiked
@@ -523,7 +566,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (!_mensesOn && isMenses) { box.Add(new MensesStarted(now, ctx.Id)); _mensesOn = true; }
             if (_mensesOn && !isMenses) { box.Add(new MensesEnded(now, ctx.Id)); _mensesOn = false; }
 
-            var ovulWindow = phase == CyclePhase.Ovulation;
+            // Antikoncepce High/Moderate potlačuje ovulaci
+            var contraceptionSuppressesOvul = s.CurrentContraception is ContraceptionLevel.High or ContraceptionLevel.Moderate;
+            var ovulWindow = phase == CyclePhase.Ovulation && !contraceptionSuppressesOvul;
             if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && !c.OvulationWindow)
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
 
@@ -537,7 +582,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private PhysiologyState ApplyCycleSymptoms(PhysiologyState s)
         {
-            var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle!);
+            var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle!, s.CurrentContraception);
             var day       = (double)s.Cycle!.DayInCycle;
             var ovulDay   = (double)_cycleCfg.OvulationDayOfCycle;
             var lutealFactor = Math.Max(0, (day - (ovulDay + 7)) / 7.0);
@@ -771,7 +816,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Vědecký základ: estrogen/progesteron drift je plynulý, nikoli binární přepínač
         /// (reference: physiology-psychology.md).
         /// </summary>
-        private (double pain, double bloat, double tender, double libidoMod) SymptomsFor(MenstrualCycleState c)
+        private (double pain, double bloat, double tender, double libidoMod) SymptomsFor(
+            MenstrualCycleState c,
+            ContraceptionLevel contraception = ContraceptionLevel.Unspecified)
         {
             if (c.Phase == CyclePhase.Paused)
                 return (0.0, 0.0, 0.0, 1.0);
@@ -801,8 +848,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var libidoMod   = Math.Clamp(0.95 + libidoBoost + mensesDip, 0.80, 1.20);
 
             // PMDD amplifikátor — luteální symptomy závažnější u postav s PmsRisk > 0.3
+            // Antikoncepce (High/Moderate) snižuje závažnost PMS/PMDD
+            var contraFactor = contraception switch
+            {
+                ContraceptionLevel.High     => 0.2,
+                ContraceptionLevel.Moderate => 0.5,
+                ContraceptionLevel.Low      => 0.8,
+                _                           => 1.0
+            };
             var lutealFactor   = Math.Max(0, (day - (ovulDay + 7)) / 7.0);   // 0..1 v luteálu
-            var pmddMultiplier = 1.0 + _cycleCfg.PmsRisk * lutealFactor * 1.5;
+            var pmddMultiplier = 1.0 + _cycleCfg.PmsRisk * lutealFactor * 1.5 * contraFactor;
             rawPain   *= pmddMultiplier;
             rawBloat  *= pmddMultiplier;
             rawTender *= pmddMultiplier;

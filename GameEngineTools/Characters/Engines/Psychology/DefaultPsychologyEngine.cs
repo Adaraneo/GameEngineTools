@@ -359,6 +359,16 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
+            // Altitude → kognitivní deficit (hypoxie mozku)
+            {
+                var alt = ctx.Snapshot.AltitudeMeters;
+                if (alt > Config.AltitudeCogLoadThreshold)
+                {
+                    var kmAbove = (alt - Config.AltitudeCogLoadThreshold) / 1000.0;
+                    s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + Config.AltitudeCogLoadBonusPerKm * kmAbove * h) };
+                }
+            }
+
             // MoodBaseline — pomalý drift směrem k neutrálu (50), potlačený vysokým stresem
             {
                 var moodRecovery = Config.MoodBaselineRecoveryPerHour;

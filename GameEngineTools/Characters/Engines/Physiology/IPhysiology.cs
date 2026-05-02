@@ -4,6 +4,8 @@
 namespace GameEngineTools.Characters.Engines.Physiology
 {
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.World.Utils.Time;
 
     public sealed record PhysiologyConfig(
@@ -86,9 +88,22 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double ChronicPainDecayFactor = 0.5,
         // Cirkadiánní tělesná teplota (Waterhouse et al. 2005)
         double CircadianTempAmplitude = 0.3,
-        double CircadianTempPeakHour = 17.0)
+        double CircadianTempPeakHour = 17.0,
+        // Věkové efekty
+        int MenopauseAge = 50,
+        double AgingEnergyRecoveryPenaltyStart = 40,
+        double AgingEnergyRecoveryPenaltyPerYear = 0.005,
+        double AgingImmuneBaselineStart = 60,
+        double AgingImmuneBaselinePerYear = 0.2,
+        double AgingTestosteronePenaltyStart = 25,
+        double AgingTestosteronePenaltyPerYear = 0.8,
+        // Altitude — hypoxie a AMS
+        double AltitudeHypoxiaThreshold = 2000.0,
+        double AltitudeAMSThreshold = 4000.0,
+        double AltitudeEnergyDecayBonusPerKm = 0.3,
+        double AltitudeAMSPainPerHour = 2.0)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0) { }
     }
 
     public sealed record PhysiologyState(
@@ -160,7 +175,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Chronická bolest (&gt;7 dní) mění psychologický profil: depresivní symptomy,
         /// trvalý Valence↓, erose MoodBaseline (Dantzer 2008; Eisenberger 2012).
         /// </summary>
-        double ChronicPainDays = 0);
+        double ChronicPainDays = 0,
+        /// <summary>
+        /// Aktuální antikoncepční ochrana. Nastavena eventem <see cref="ContraceptionChanged"/>.
+        /// Při &gt;= Moderate: potlačena ovulace a snížena závažnost PMDD.
+        /// </summary>
+        ContraceptionLevel CurrentContraception = ContraceptionLevel.Unspecified);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }
@@ -266,4 +286,44 @@ namespace GameEngineTools.Characters.Engines.Physiology
     public sealed record InjuryHealed(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     /// <summary>Událost — postava přešla do nové fáze šestinedělí.</summary>
     public sealed record PostpartumPhaseChanged(WDateTime OccurredAt, HumanId Human, PostpartumPhase Phase) : IDomainEvent;
+    /// <summary>Událost — postava změnila antikoncepci.</summary>
+    public sealed record ContraceptionChanged(WDateTime OccurredAt, HumanId Human, ContraceptionLevel Level) : IDomainEvent;
+
+    /// <summary>
+    /// Odvozené fyziologické vitální parametry — čisté funkce stávajících stavů.
+    /// Nejsou součástí simulačního loop; počítají se on-demand pro narrativu a UI.
+    /// </summary>
+    public sealed record PhysiologicalVitals(
+        int HeartRateBpm,           // 40..200 bpm
+        int SystolicBP,             // 90..200 mmHg
+        int DiastolicBP,            // 60..120 mmHg
+        double RespiratoryRate)     // 10..30 dechů/min
+    {
+        /// <summary>Vypočítá vitální parametry z existujícího fyzio+psycho stavu.</summary>
+        public static PhysiologicalVitals Compute(PhysiologyState ph, PsychologyState ps)
+        {
+            var arousal     = ps.Arousal;
+            var stress      = ps.Stress / 100.0;
+            var cortisol    = ph.CortisolLevel / 100.0;
+            var acuteSAM    = ph.AcuteArousalLevel / 100.0;
+            var physFatigue = ph.PhysicalFatigueLevel / 100.0;
+
+            // Srdeční tep: klidový 60 bpm + modulace arousal/SAM/fyzická zátěž/horečka
+            var hr = 60 + arousal * 50 + acuteSAM * 60 + physFatigue * 30 + stress * 15;
+            if (ph.BodyTempDelta > 1.0) hr += ph.BodyTempDelta * 10;
+
+            // Krevní tlak: klidový 120/80 + stres/kortizol/SAM
+            var systolic  = 120 + stress * 30 + cortisol * 15 + acuteSAM * 25;
+            var diastolic = 80  + stress * 15 + cortisol * 8  + acuteSAM * 12;
+
+            // Dechová frekvence: klidová 14 + arousal/SAM/stres
+            var rr = 14 + arousal * 8 + acuteSAM * 10 + stress * 4;
+
+            return new PhysiologicalVitals(
+                HeartRateBpm:    (int)System.Math.Clamp(hr,       40,  200),
+                SystolicBP:      (int)System.Math.Clamp(systolic,  90, 200),
+                DiastolicBP:     (int)System.Math.Clamp(diastolic, 60, 120),
+                RespiratoryRate: System.Math.Clamp(rr, 10, 30));
+        }
+    }
 }
