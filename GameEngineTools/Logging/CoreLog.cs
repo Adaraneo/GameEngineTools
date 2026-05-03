@@ -607,7 +607,7 @@ namespace GameEngineTools.Logging
 
         #region Relationships — vztahy
 
-        /// <summary>Nová relationship hrana vytvořena — první kontakt mezi dvěma postavami.</summary>
+        /// <summary>Relationship event recieved</summary>
         [LoggerMessage(
             EventId = 2001,
             Level = LogLevel.Information,
@@ -650,7 +650,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 2005,
             Level = LogLevel.Debug,
-            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}.")]
+            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}, Familiarity={Familiarity:F1}, RomatnicInterest={Romantic:F1}, SexualInterest={Sexual:F1}, AestheticAttraction={Aesthetic:F1}, PhysicalAttraction={Physical:F1}.")]
         public static partial void RelEdgeUpdated(
             this ILogger logger,
             string HumanId,
@@ -660,7 +660,12 @@ namespace GameEngineTools.Logging
             double Trust,
             double Closeness,
             double Comfort,
-            double Respect);
+            double Respect,
+            double Familiarity,
+            double Romantic,
+            double Sexual,
+            double Aesthetic,
+            double Physical);
 
         [LoggerMessage(
             EventId = 2006,

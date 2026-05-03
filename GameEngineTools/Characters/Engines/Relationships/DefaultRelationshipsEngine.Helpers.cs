@@ -425,7 +425,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 _log.RelEdgeUpdated(
                     self.Value.ToString(), self.Value.ToString(), other.Value.ToString(),
                     updated.Like, updated.Trust, updated.Closeness,
-                    updated.Comfort, updated.Respect);
+                    updated.Comfort, updated.Respect, updated.Familiarity, updated.RomanticInterest, updated.SexualInterest, updated.AestheticAttraction, updated.PhysicalAttraction);
             }
 
             dict[other] = updated;
