@@ -102,9 +102,24 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// <summary>NeedIntimacy inhibition per unit SIS1 per unit stress/100 per hour.</summary>
         double SIS1StressInhibitionWeight = 0.8,
         /// <summary>NeedIntimacy inhibition per unit SIS2 per unit crowding per hour.</summary>
-        double SIS2CrowdingInhibitionWeight = 1.0)
+        double SIS2CrowdingInhibitionWeight = 1.0,
+        // ── Proxemics zone violation (Altman 1975) ─────────────────────────────
+        /// <summary>
+        /// Stress added per hour when in Intimate zone (&lt;0.45 m) without privacy.
+        /// Applied after stressGrowthMult (Neuroticism modulation, E4).
+        /// </summary>
+        double ProxemicsIntimateZoneStressPerHour = 4.0,
+        /// <summary>Stress added per hour when in Personal zone in a public/work context.</summary>
+        double ProxemicsPersonalZoneStressPerHour = 1.5,
+        // ── Privacy non-monotonicity (Altman 1975) ─────────────────────────────
+        /// <summary>
+        /// Stress per unit of privacy mismatch per hour.
+        /// Both too little privacy (introvert in public) and too much (extravert in isolation)
+        /// generate stress proportional to the mismatch magnitude.
+        /// </summary>
+        double PrivacyMismatchStressWeight = 6.0)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0) { }
     }
 
     public sealed record PsychologyState(

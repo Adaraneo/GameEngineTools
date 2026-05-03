@@ -291,6 +291,44 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
+            // ── E1 + E4: Proxemics zone violation → stress (Altman 1975) ────────────────
+            // Intimate zone (<0.45m) without privacy is acutely stressful.
+            // stressGrowthMult (Neuroticism) is applied — high-N characters are more sensitive.
+            {
+                var dist = ctx.Snapshot.InteractionSurface.ProxemicDistanceMeters;
+                if (dist.HasValue && !double.IsNaN(dist.Value))
+                {
+                    var zone = Interactions.ProxemicsHelper.GetZone(dist.Value);
+                    if (Interactions.ProxemicsHelper.IsZoneViolation(zone, ctx.Snapshot.InteractionSurface.HasPrivacy, ctx.Snapshot.InteractionSurface.Kind))
+                    {
+                        var zoneStress = zone == Interactions.ProxemicsZone.Intimate
+                            ? Config.ProxemicsIntimateZoneStressPerHour
+                            : Config.ProxemicsPersonalZoneStressPerHour;
+                        s = s with { Stress = Clamp01p(s.Stress + zoneStress * stressGrowthMult * h) };
+                    }
+                }
+            }
+
+            // ── E3 + E4: Privacy non-monotonicity → stress ───────────────────────────────
+            // Altman (1975): desired privacy is a function of personality.
+            // Both under-privacy (introvert in public) and over-privacy (extravert in isolation)
+            // generate stress proportional to the mismatch magnitude.
+            // Only applies when location is known (not Unknown/null) — prevents spurious stress
+            // in test/offline contexts where the interaction surface is not set.
+            // stressGrowthMult (Neuroticism) amplifies sensitivity to privacy violations.
+            {
+                var surface = ctx.Snapshot.InteractionSurface;
+                if (surface.Kind != Interactions.SurfaceKind.Unknown && surface.Location != null)
+                {
+                    // desiredPrivacy ∈ [0.2, 0.8]: E=0.1→0.74, E=0.5→0.50, E=0.9→0.26
+                    var desiredPrivacy = 0.5 - (ctx.Personality.BigFive.Extraversion - 0.5) * 0.60;
+                    var actualPrivacy  = surface.HasPrivacy ? 0.8 : 0.2;
+                    var mismatch       = Math.Abs(desiredPrivacy - actualPrivacy);
+                    var privacyStress  = mismatch * Config.PrivacyMismatchStressWeight * stressGrowthMult * h;
+                    s = s with { Stress = Clamp01p(s.Stress + privacyStress) };
+                }
+            }
+
             // SAM systém → PAD (Sympatho-Adrenomedullary: okamžitá sympatická aktivace)
             if (ph.AcuteArousalLevel > 0)
             {

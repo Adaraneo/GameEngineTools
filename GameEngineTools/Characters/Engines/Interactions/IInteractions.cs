@@ -14,10 +14,17 @@ namespace GameEngineTools.Characters.Engines.Interactions
     /// Škáluje se stresem postavy: čím větší stres, tím více chybné čtení záměrů druhých.
     /// Výchozí: 0.15.
     /// </param>
-    public sealed record InteractionConfig(double MisattributionRateBase = 0.15)
+    public sealed record InteractionConfig(
+        double MisattributionRateBase = 0.15,
+        /// <summary>
+        /// How much ambient noise amplifies misattribution of social intent.
+        /// At noise=1.0, the misattribution rate is multiplied by (1 + NoiseAttributionAmplifier).
+        /// Default 0.4 → up to 40% extra misattribution at maximum noise.
+        /// </summary>
+        double NoiseAttributionAmplifier = 0.40)
     {
         /// <summary>Bezparametrický konstruktor vyžadovaný Options patternem.</summary>
-        public InteractionConfig() : this(0.15) { }
+        public InteractionConfig() : this(0.15, 0.40) { }
     }
 
     /// <summary>Událost — postava vstoupila do nového kontextu (lokace, soukromí, hluk, dav).</summary>
@@ -46,7 +53,14 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// <see cref="GameEngineTools.Characters.Engines.Relationships.ThirdPartyActionObserved"/>
         /// events for each observer after processing MicroPositive / MicroNegative.
         /// </summary>
-        System.Collections.Generic.IReadOnlyList<HumanId>? Observers = null);
+        System.Collections.Generic.IReadOnlyList<HumanId>? Observers = null,
+
+        /// <summary>
+        /// Distance to the nearest person at this location, in metres.
+        /// Used for Altman (1975) proxemics zone calculation.
+        /// <c>null</c> = distance not measured / not relevant.
+        /// </summary>
+        double? ProxemicDistanceMeters = null);
 
     public enum SurfaceKind
     {

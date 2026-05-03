@@ -243,8 +243,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     baseP += edge.ResponsiveDesireLevel / 500.0;  // max +0.16 at ResponsiveDesireLevel=80
             }
 
-            // Misattribution: vyšší stres → větší šance na špatné čtení záměru
-            var misattrib = ComputeMisattributionPenalty(p.Act, psych.Stress, trust, comfort, State.HasPrivacy);
+            // Misattribution: vyšší stres + hluk → větší šance na špatné čtení záměru
+            // E2: noise degrades social signal quality (harder to read intent correctly).
+            var noise = double.IsNaN(State.Noise) ? 0.0 : State.Noise;
+            var misattrib = ComputeMisattributionPenalty(p.Act, psych.Stress, trust, comfort, State.HasPrivacy, noise);
             baseP -= misattrib;
 
             var pAcc = Math.Clamp(baseP, 0.05, 0.95);
@@ -387,7 +389,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 && relationalReadiness >= 72.0;
         }
 
-        private double ComputeMisattributionPenalty(SpeechAct act, double stress, double trust, double comfort, bool hasPrivacy)
+        private double ComputeMisattributionPenalty(
+            SpeechAct act, double stress, double trust, double comfort, bool hasPrivacy,
+            double noise = 0.0)
         {
             var stressFactor = Math.Clamp(stress / 100.0, 0.0, 1.0);
             var safety = Math.Clamp(((trust + comfort) * 0.5) / 100.0, 0.0, 1.0);
@@ -402,7 +406,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
             };
             var privacyRelief = hasPrivacy && safety >= 0.65 ? 0.78 : 1.0;
 
-            return Config.MisattributionRateBase * stressFactor * unsafeMultiplier * actMultiplier * privacyRelief;
+            // E2 — noise degrades social signal quality.
+            // At noise=0.0: amplifier=1.0 (no change); at noise=1.0: amplifier=1+NoiseAttributionAmplifier.
+            var noiseAmplifier = 1.0 + Math.Clamp(noise, 0.0, 1.0) * Config.NoiseAttributionAmplifier;
+
+            return Config.MisattributionRateBase * stressFactor * unsafeMultiplier * actMultiplier * privacyRelief * noiseAmplifier;
         }
 
         private static (double peak, double end) ComputePeakEndValence(
