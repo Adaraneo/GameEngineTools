@@ -70,7 +70,22 @@ namespace GameEngineTools.Characters.Engines.Attraction
             PhysicalAppearance targetAppearance,
             AppearanceView targetView,
             SexBiology targetBiology,
-            double observerValence = 0.0);
+            double observerValence = 0.0,
+            /// <summary>
+            /// Observer's current physiological arousal level [0–100] from
+            /// <c>PhysiologyState.AcuteArousalLevel</c>.
+            /// Used for excitatory transfer (Zillmann 1983): arousal from any source boosts
+            /// perceived attraction when base attraction is already above 50.
+            /// Defaults to 0 (no arousal) — backward compatible.
+            /// </summary>
+            double observerArousal = 0.0,
+            /// <summary>
+            /// Observer's age in years. Combined with <paramref name="targetAgeYears"/> for
+            /// age-match scoring (A3). Pass <c>null</c> to skip age-match.
+            /// </summary>
+            int? observerAgeYears = null,
+            /// <summary>Target's age in years. Pass <c>null</c> to skip age-match.</summary>
+            int? targetAgeYears = null);
     }
 
     /// <summary>

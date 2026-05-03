@@ -91,33 +91,44 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             break;
                         }
 
-                        Upsert(self, other, e => e with
+                        Upsert(self, other, e =>
                         {
-                        // Lerp 70% toward the first impression — does not fully override
-                        // if the character already knows the person slightly.
-                        Like = Lerp(e.Like, fi.Like, 0.7),
-                        Familiarity = Math.Max(e.Familiarity, 2),
-                        Trust = e.Trust <= 0 ? 50 : e.Trust,
-                        Closeness = Math.Max(e.Closeness, 0),
-                        AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.8),
-                        PhysicalAttraction = Lerp(e.PhysicalAttraction, fi.BasePhysical / 40.0 * 100.0, 0.8),
-                        RomanticInterest = e.RomanticInterest,
-                        SexualInterest = e.SexualInterest,
-                        Breakdown = e.Breakdown with
-                        {
-                            // BasePhysical (max 40) → normalised to [0, 100] for the Physical domain.
-                            // Models the immediate "this person is physically striking" impression
-                            // from evolutionary signals: WHR, height range, facial symmetry.
-                            Physical = Lerp(e.Breakdown.Physical,
-                                             fi.BasePhysical / 40.0 * 100.0, 0.8),
+                            // A2 — Halo effect seeds Trust, Comfort, and Respect at first impression.
+                            // Physically attractive people are perceived as more trustworthy, comfortable,
+                            // and respectable on first contact (Eagly et al. 1991 meta-analysis).
+                            // Weights applied above the neutral default only when attraction exceeds 50.
+                            // Below 50: no halo bonus (unattractive target does not exceed neutral default).
+                            var attraction = fi.Attraction;  // [0, 100]
+                            var haloBonus  = Math.Clamp(attraction - 50.0, 0.0, 50.0); // 0..50
 
-                            // PreferenceMatch (max 35) → normalised to [0, 100] for the Aesthetics domain.
-                            // Models personal taste — how closely the target matches the observer's
-                            // own physical ideal (height preference, frame, WHR preference).
-                            Aesthetics = Lerp(e.Breakdown.Aesthetics,
-                                             fi.PreferenceMatch / 35.0 * 100.0, 0.8)
-                        },
-                        TargetBiology = otherBiology ?? e.TargetBiology
+                            // Trust: small halo boost (easily overwritten by actual interaction)
+                            var haloTrust   = e.Trust <= 0 ? 50.0 + haloBonus * 0.10 : e.Trust;
+                            // Comfort: moderate boost above default (45) — attractive stranger feels safer
+                            var haloComfort = Math.Max(e.Comfort, 45.0 + haloBonus * 0.40);
+                            // Respect: above neutral (50) — attractive people are assumed more capable
+                            var haloRespect = Math.Max(e.Respect, 50.0 + haloBonus * 0.35);
+
+                            return e with
+                            {
+                                // Lerp 70% toward the first impression — does not fully override
+                                // if the character already knows the person slightly.
+                                Like   = Lerp(e.Like, fi.Like, 0.7),
+                                Familiarity = Math.Max(e.Familiarity, 2),
+                                Trust  = Clamp(haloTrust),
+                                Comfort = Clamp(haloComfort),
+                                Respect = Clamp(haloRespect),
+                                Closeness = Math.Max(e.Closeness, 0),
+                                AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.8),
+                                PhysicalAttraction  = Lerp(e.PhysicalAttraction,  fi.BasePhysical    / 40.0 * 100.0, 0.8),
+                                RomanticInterest = e.RomanticInterest,
+                                SexualInterest   = e.SexualInterest,
+                                Breakdown = e.Breakdown with
+                                {
+                                    Physical  = Lerp(e.Breakdown.Physical,   fi.BasePhysical    / 40.0 * 100.0, 0.8),
+                                    Aesthetics = Lerp(e.Breakdown.Aesthetics, fi.PreferenceMatch / 35.0 * 100.0, 0.8)
+                                },
+                                TargetBiology = otherBiology ?? e.TargetBiology
+                            };
                         },
                         eventType: nameof(FirstImpressionFormed),
                         outcome: "formed",

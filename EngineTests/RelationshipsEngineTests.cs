@@ -1341,6 +1341,41 @@ namespace EngineTests
 
         #endregion S2 — ResponsiveDesireLevel testy
 
+        #region A2 — Halo efekt seeding testy
+
+        [TestMethod]
+        public void Halo_HighAttraction_SeedsHigherComfortAndRespect_ThanLowAttraction()
+        {
+            // High-attraction first impression should seed higher Comfort and Respect than low.
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            var engineLow  = BuildEngine();
+            var engineHigh = BuildEngine();
+
+            // Low attraction: Attraction=10
+            engineLow.Handle(new FirstImpressionFormed(_now, self, other,
+                Like: 45, Attraction: 10, BasePhysical: 5, PreferenceMatch: 5), ctx, _outbox);
+
+            // High attraction: Attraction=90
+            engineHigh.Handle(new FirstImpressionFormed(_now, self, other,
+                Like: 70, Attraction: 90, BasePhysical: 38, PreferenceMatch: 32), ctx, _outbox);
+
+            var lowEdge  = engineLow.State.Edges[other];
+            var highEdge = engineHigh.State.Edges[other];
+
+            Assert.IsTrue(highEdge.Comfort > lowEdge.Comfort,
+                $"High attraction should seed higher Comfort (high={highEdge.Comfort:F1}, low={lowEdge.Comfort:F1})");
+            Assert.IsTrue(highEdge.Respect > lowEdge.Respect,
+                $"High attraction should seed higher Respect (high={highEdge.Respect:F1}, low={lowEdge.Respect:F1})");
+            Assert.IsTrue(highEdge.Trust >= lowEdge.Trust,
+                $"High attraction should seed at least equal Trust (high={highEdge.Trust:F1}, low={lowEdge.Trust:F1})");
+        }
+
+        #endregion A2 — Halo efekt seeding testy
+
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>

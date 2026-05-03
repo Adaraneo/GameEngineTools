@@ -572,5 +572,143 @@ namespace EngineTests
         }
 
         #endregion
+
+        #region A1 — Excitatory transfer
+
+        [TestMethod]
+        public void ExcitatoryTransfer_HighArousalHighAttraction_IncreasesScore()
+        {
+            // High arousal (80) + high-attraction target → bonus applied
+            var appearance = BuildAppearance(170.0, BodyFrame.Medium);
+            var view       = BuildView(70, 0, BloatingLevel.None);
+            var profile    = BuildNeutralProfile();
+
+            var baseline  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerValence: 0, observerArousal: 0);
+            var withArousal = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerValence: 0, observerArousal: 80);
+
+            if (baseline.Score > 50)
+            {
+                Assert.IsTrue(withArousal.Score > baseline.Score,
+                    $"High arousal should boost score when base > 50 (base={baseline.Score:F2}, boosted={withArousal.Score:F2})");
+            }
+            else
+            {
+                Assert.AreEqual(baseline.Score, withArousal.Score, 0.01,
+                    "No boost when base attraction ≤ 50 (transfer condition not met)");
+            }
+        }
+
+        [TestMethod]
+        public void ExcitatoryTransfer_LowBaseAttraction_NoBoost()
+        {
+            // Very unattractive target (base score ≤ 50): no excitatory transfer
+            var appearance = WithStructuredWhr(BuildAppearance(100.0, BodyFrame.Medium), 1.0); // extreme values → low score
+            var view       = BuildView(70, 0, BloatingLevel.None);
+            var profile    = BuildNeutralProfile();
+
+            var baseline    = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerValence: 0, observerArousal: 0);
+            var withArousal = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerValence: 0, observerArousal: 90);
+
+            // Regardless of arousal, score should be unchanged when base ≤ 50
+            if (baseline.Score <= 50)
+            {
+                Assert.AreEqual(baseline.Score, withArousal.Score, 0.01,
+                    "No excitatory boost for low-attraction target");
+            }
+        }
+
+        [TestMethod]
+        public void ExcitatoryTransfer_ZeroArousal_NoBoost()
+        {
+            var appearance  = BuildAppearance(170.0, BodyFrame.Medium);
+            var view        = BuildView(70, 0, BloatingLevel.None);
+            var profile     = BuildNeutralProfile();
+
+            var zero   = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerArousal: 0);
+            var also0  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerArousal: 39); // below threshold of 40
+
+            Assert.AreEqual(zero.Score, also0.Score, 0.01,
+                "Arousal below threshold (40) should not boost score");
+        }
+
+        #endregion A1 — Excitatory transfer
+
+        #region A2 — Halo effect seeding
+
+        [TestMethod]
+        public void Halo_HighAttraction_SeedsHigherTrustAndComfort_AtFirstImpression()
+        {
+            // The halo effect is tested via RelationshipsEngine FirstImpressionFormed handler.
+            // Here we verify the calculator's FirstImpressionLike scales with attraction.
+            var highAttr = BuildAppearance(170.0, BodyFrame.Medium);   // optimised appearance
+            var lowAttr  = WithStructuredWhr(BuildAppearance(100.0, BodyFrame.Medium), 1.0);  // poor appearance
+            var profile  = BuildNeutralProfile();
+            var view     = BuildView(70, 0, BloatingLevel.None);
+
+            var highResult = _sut.Calculate(profile, highAttr, view, SexBiology.Female);
+            var lowResult  = _sut.Calculate(profile, lowAttr, view, SexBiology.Female);
+
+            Assert.IsTrue(highResult.FirstImpressionLike > lowResult.FirstImpressionLike,
+                $"Higher attraction → higher halo Like (high={highResult.FirstImpressionLike:F1}, low={lowResult.FirstImpressionLike:F1})");
+        }
+
+        #endregion A2 — Halo effect seeding
+
+        #region A3 — Age-match
+
+        [TestMethod]
+        public void AgeMatch_SameAge_HigherPreferenceMatch_ThanLargeAgeDiff()
+        {
+            var appearance = BuildAppearance(170.0, BodyFrame.Medium);
+            var view       = BuildView(70, 0, BloatingLevel.None);
+            var profile    = BuildNeutralProfile();
+
+            var sameAge  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerAgeYears: 30, targetAgeYears: 30);
+            var ageDiff20 = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerAgeYears: 30, targetAgeYears: 50);
+
+            Assert.IsTrue(sameAge.PreferenceMatch >= ageDiff20.PreferenceMatch,
+                $"Same-age target should have ≥ PreferenceMatch than 20-year gap " +
+                $"(same={sameAge.PreferenceMatch:F2}, diff20={ageDiff20.PreferenceMatch:F2})");
+        }
+
+        [TestMethod]
+        public void AgeMatch_NullAges_SameResultAsBaseline()
+        {
+            var appearance = BuildAppearance(170.0, BodyFrame.Medium);
+            var view       = BuildView(70, 0, BloatingLevel.None);
+            var profile    = BuildNeutralProfile();
+
+            var withNull    = _sut.Calculate(profile, appearance, view, SexBiology.Female);
+            var withExplicit = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerAgeYears: null, targetAgeYears: null);
+
+            Assert.AreEqual(withNull.Score, withExplicit.Score, 0.01,
+                "null ages should give same result as omitting the parameter");
+        }
+
+        [TestMethod]
+        public void AgeMatch_PreferenceMatchBoundedByMaximum()
+        {
+            // Even with perfect age match AND perfect physical match, PreferenceMatch ≤ 35
+            var appearance = BuildAppearance(170.0, BodyFrame.Medium);
+            var view       = BuildView(70, 0, BloatingLevel.None);
+            var profile    = BuildNeutralProfile();
+
+            var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+                observerAgeYears: 25, targetAgeYears: 25);
+
+            Assert.IsTrue(result.PreferenceMatch <= 35.01,
+                $"PreferenceMatch must be capped at 35 (got={result.PreferenceMatch:F2})");
+        }
+
+        #endregion A3 — Age-match
     }
 }

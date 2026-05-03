@@ -50,21 +50,45 @@ namespace GameEngineTools.Characters.Engines.Attraction
         private const double HaloAttractionScale = 0.40;
         private const double ValenceLikeScale    = 8.0;
 
+        // ── A1: Excitatory transfer (Zillmann 1983) ──────────────────────────────
+        // Arousal from ANY source boosts perceived attraction when base score > 50.
+        // Max bonus at AcuteArousalLevel=100, baseScore=100: +ExcitatoryTransferMax
+        private const double ExcitatoryTransferArousalThreshold = 40.0;
+        private const double ExcitatoryTransferScoreThreshold   = 50.0;
+        private const double ExcitatoryTransferMax              = 8.0;
+
+        // ── A3: Age-match preference ─────────────────────────────────────────────
+        // Similar-age attraction penalty/bonus, Gaussian with tolerance 10 years.
+        private const double AgeMatchTolerance = 10.0;   // σ in years (half-tolerance)
+        private const double AgeMatchWeight    = 7.0;    // contribution to PreferenceMatch
+
         /// <inheritdoc/>
         public AttractionResult Calculate(
             AttractionProfile observerProfile,
             PhysicalAppearance targetAppearance,
             AppearanceView targetView,
             SexBiology targetBiology,
-            double observerValence = 0.0)
+            double observerValence = 0.0,
+            double observerArousal = 0.0,
+            int? observerAgeYears  = null,
+            int? targetAgeYears    = null)
         {
             var orientationWeight = SexualOrientationBehaviorMath.TargetAttractionWeight(observerProfile, targetBiology);
             var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology) * orientationWeight;
-            var preferenceMatch = ComputePreferenceMatch(observerProfile, targetAppearance, targetBiology) * orientationWeight;
+            var preferenceMatch = ComputePreferenceMatch(
+                observerProfile, targetAppearance, targetBiology,
+                observerAgeYears, targetAgeYears) * orientationWeight;
             var stateModifier   = ComputeStateModifier(targetView);
 
             var raw   = basePhysical + preferenceMatch + stateModifier;
             var score = Math.Clamp(raw, 0.0, 100.0);
+
+            // A1 — Excitatory transfer (Zillmann 1983; replaces Dutton & Aron misattribution model).
+            // Physiological arousal from any source enhances perceived attraction,
+            // but ONLY when base attraction is already above threshold (condition: score > 50).
+            // "Transfer" requires a salient potential target — low-attraction targets don't benefit.
+            var excitatoryBonus = ComputeExcitatoryTransfer(score, observerArousal);
+            score = Math.Clamp(score + excitatoryBonus, 0.0, 100.0);
 
             var firstImpressionLike = ComputeFirstImpressionLike(score, observerValence);
 
@@ -110,11 +134,14 @@ namespace GameEngineTools.Characters.Engines.Attraction
 
         /// <summary>
         /// How closely the target matches the observer's personal <see cref="AttractionProfile"/>.
+        /// Includes optional age-match scoring (A3) when both ages are provided.
         /// </summary>
         private static double ComputePreferenceMatch(
             AttractionProfile profile,
             PhysicalAppearance target,
-            SexBiology targetBiology)
+            SexBiology targetBiology,
+            int? observerAgeYears = null,
+            int? targetAgeYears   = null)
         {
             // Height preference match
             var heightMatch = TriangularScore(
@@ -134,7 +161,19 @@ namespace GameEngineTools.Characters.Engines.Attraction
             var whrMatch = TriangularScore(whr, profile.PreferredWhr, WhrToleranceHalf) * 9.0;
             var symmetryMatch = EstimateSymmetry(target) * Math.Clamp(profile.SymmetryWeight, 0.0, 1.0) * 5.0;
 
-            return Math.Clamp(heightMatch + frameMatch + whrMatch + symmetryMatch, 0.0, MaxPreferenceMatch);
+            // A3 — Age-match preference.
+            // Similar-age partners are preferred on average (Kenrick & Keefe 1992);
+            // modelled as a Gaussian decay with tolerance ≈ 10 years.
+            // Contributes up to 7 points; existing components reduced proportionally by
+            // Math.Clamp to keep total ≤ MaxPreferenceMatch.
+            var ageMatch = 0.0;
+            if (observerAgeYears.HasValue && targetAgeYears.HasValue)
+            {
+                var ageDiff = Math.Abs(observerAgeYears.Value - targetAgeYears.Value);
+                ageMatch = Math.Exp(-Math.Pow(ageDiff / AgeMatchTolerance, 2)) * AgeMatchWeight;
+            }
+
+            return Math.Clamp(heightMatch + frameMatch + whrMatch + symmetryMatch + ageMatch, 0.0, MaxPreferenceMatch);
         }
 
         #endregion PreferenceMatch
@@ -175,6 +214,26 @@ namespace GameEngineTools.Characters.Engines.Attraction
         {
             var asymmetry = target.Face.Asymmetry.FacialAsymmetry;
             return Math.Clamp(1.0 - asymmetry / 0.16, 0.0, 1.0);
+        }
+
+        /// <summary>
+        /// A1 — Excitatory transfer (Zillmann 1983).
+        /// Physiological arousal from a non-sexual source (exercise, fear, excitement)
+        /// can be misattributed to a salient attractive target, boosting perceived attraction.
+        /// Condition: arousal above threshold AND base score above threshold.
+        /// Both factors must be non-trivial for the effect to register.
+        /// </summary>
+        private static double ComputeExcitatoryTransfer(double baseScore, double observerArousal)
+        {
+            if (observerArousal <= ExcitatoryTransferArousalThreshold) return 0.0;
+            if (baseScore <= ExcitatoryTransferScoreThreshold)         return 0.0;
+
+            var arousalFactor = (observerArousal - ExcitatoryTransferArousalThreshold)
+                                / (100.0 - ExcitatoryTransferArousalThreshold);  // 0..1
+            var scoreFactor   = (baseScore - ExcitatoryTransferScoreThreshold)
+                                / (100.0 - ExcitatoryTransferScoreThreshold);    // 0..1
+
+            return arousalFactor * scoreFactor * ExcitatoryTransferMax;
         }
 
         /// <summary>
