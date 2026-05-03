@@ -9,7 +9,12 @@ namespace GameEngineTools.Characters.Traits
         CommunicationStyle Communication,
         MotivationWeights Motivation,
         Sociosexuality Sociosexuality,
-        Chronotype Chronotype);
+        Chronotype Chronotype,
+        /// <summary>
+        /// Dual Control Model profile (Bancroft &amp; Janssen 2000).
+        /// <c>null</c> = population average (SES=0.5, SIS1=0.5, SIS2=0.5) — backward compatible.
+        /// </summary>
+        SexualResponsiveness? DualControl = null);
 
     public sealed record BigFive(
         double Openness, double Conscientiousness, double Extraversion, double Agreeableness, double Neuroticism);

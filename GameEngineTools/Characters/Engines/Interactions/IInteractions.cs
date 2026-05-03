@@ -35,11 +35,18 @@ namespace GameEngineTools.Characters.Engines.Interactions
     /// Ovlivňuje pravděpodobnost přijetí interakce.
     /// </summary>
     public sealed record InteractionSurface(
-        string Location,
+        string? Location,
         bool HasPrivacy,
         double Noise,
         double Crowding,
-        SurfaceKind Kind);
+        SurfaceKind Kind,
+        /// <summary>
+        /// Characters present at this location who can witness interactions.
+        /// When non-null and non-empty, the RelationshipsEngine emits
+        /// <see cref="GameEngineTools.Characters.Engines.Relationships.ThirdPartyActionObserved"/>
+        /// events for each observer after processing MicroPositive / MicroNegative.
+        /// </summary>
+        System.Collections.Generic.IReadOnlyList<HumanId>? Observers = null);
 
     public enum SurfaceKind
     {

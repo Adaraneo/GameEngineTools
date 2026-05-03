@@ -213,6 +213,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 .ExpectedAcceptance(p.From, p.Act, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
 
             // Základní pravděpodobnost přijetí — lineární kombinace vztahů a psychiky
+            // B4: Agreeableness moduluje ochotu přijmout — high-A postavy jsou přijímavější
+            // (+0.10 u plné Agreeableness, −0.10 u nulové); rozsah ±0.10 je konzervativní.
+            var agreeablenessBias = (ctx.Personality.BigFive.Agreeableness - 0.5) * 0.20;
             var baseP = 0.30
                         + 0.0025 * closeness
                         + 0.0020 * comfort
@@ -221,7 +224,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                         + (State.HasPrivacy ? 0.05 : 0)
                         - 0.05 * State.Crowding
                         - 0.0015 * psych.Stress
-                        + (expectedAcceptance - 0.5) * 0.25;
+                        + (expectedAcceptance - 0.5) * 0.25
+                        + agreeablenessBias;
 
             if (p.Act == SpeechAct.Invite)
             {
@@ -231,6 +235,12 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     expectedAcceptance,
                     State.HasPrivacy);
                 baseP += SexualOrientationBehaviorMath.InviteAcceptanceBias(ctx.AttractionProfile, p.FromBiology);
+
+                // S2 — Basson responsive desire: long-term partners respond to advances
+                // even when they wouldn't spontaneously initiate (Basson 2001).
+                // ResponsiveDesireLevel [0–80] → up to +0.16 acceptance bias at max.
+                if (edge is not null)
+                    baseP += edge.ResponsiveDesireLevel / 500.0;  // max +0.16 at ResponsiveDesireLevel=80
             }
 
             // Misattribution: vyšší stres → větší šance na špatné čtení záměru

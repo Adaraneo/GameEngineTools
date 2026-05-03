@@ -16,7 +16,10 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
         {
-            var novelty = 10 * context.HumanContext.Personality.Motivation.Curiosity;
+            var p = context.HumanContext.Personality;
+            // Openness amplifies the base curiosity drive by up to 50%.
+            // Curiosity (Motivation) is the short-term drive; Openness (BigFive) is the stable trait.
+            var novelty = 10 * p.Motivation.Curiosity * (0.5 + 0.5 * p.BigFive.Openness);
             return new BehaviorNeedOutput(
                 new[] { new BehaviorDrive("NeedNovelty", novelty, BehaviorDomain.Exploration) },
                 new List<BehaviorCandidate>

@@ -249,7 +249,7 @@ namespace EngineTests
             // Arrange
             var engine = BuildEngine(initialValence: 0.3, initialStress: 20);
             var ctx = BuildContext(neuroticism: 0.5);
-            var nightmare = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 40);
+            var nightmare = new NightmareTriggered(WDateTime.New(100, 1, 1), ctx.Id, StressAtSleepStart: 40);
             var stressBefore = engine.State.Stress;
             var valenceBefore = engine.State.Valence;
 
@@ -272,7 +272,7 @@ namespace EngineTests
             // Arrange
             var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
             var ctx = BuildContext(neuroticism: 0.5);
-            var nightmare = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 30);
+            var nightmare = new NightmareTriggered(WDateTime.New(100, 1, 1), ctx.Id, StressAtSleepStart: 30);
             var arousalBefore = engine.State.Arousal;
 
             // Act
@@ -290,7 +290,7 @@ namespace EngineTests
         public void Handle_NightmareTriggered_HighNeuroticism_CausesLargerStressSpike()
         {
             // Arrange
-            var nightmare = new NightmareTriggered(_now, new HumanId(Guid.NewGuid()), StressAtSleepStart: 50);
+            var nightmare = new NightmareTriggered(WDateTime.New(100, 1, 1), new HumanId(Guid.NewGuid()), StressAtSleepStart: 50);
 
             var stableEngine = BuildEngine(initialValence: 0.0, initialStress: 20);
             var neurotiEngine = BuildEngine(initialValence: 0.0, initialStress: 20);
@@ -315,7 +315,7 @@ namespace EngineTests
             // Arrange
             var engine = BuildEngine(initialValence: 0.0, initialStress: 10);
             var ctx = BuildContext(neuroticism: 0.5);
-            var nightmare = new NightmareTriggered(_now, ctx.Id, StressAtSleepStart: 20);
+            var nightmare = new NightmareTriggered(WDateTime.New(100, 1, 1), ctx.Id, StressAtSleepStart: 20);
 
             // Act
             engine.Handle(nightmare, ctx, _outbox);
@@ -377,7 +377,7 @@ namespace EngineTests
             var cogBefore = engine.State.CognitiveLoad;
 
             // Act
-            engine.Tick(_now, WTimeSpan.FromHours(1.0), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctx, _outbox);
 
             // Assert — CogLoad musí stoupnout (targetLoad = 10*1.8 = 18 > 0)
             Assert.IsTrue(engine.State.CognitiveLoad > cogBefore,
@@ -398,7 +398,7 @@ namespace EngineTests
             var cogBefore = engine.State.CognitiveLoad;
 
             // Act
-            engine.Tick(_now, WTimeSpan.FromHours(1.0), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctx, _outbox);
 
             // Assert — CogLoad musí stoupnout (targetLoad = 80*0.4 = 32 > 0)
             Assert.IsTrue(engine.State.CognitiveLoad > cogBefore,
@@ -419,7 +419,7 @@ namespace EngineTests
             var cogBefore = engine.State.CognitiveLoad;
 
             // Act
-            engine.Tick(_now, WTimeSpan.FromHours(1.0), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctx, _outbox);
 
             // Assert — targetLoad ≈ 0, CogLoad musí klesnout
             Assert.IsTrue(engine.State.CognitiveLoad < cogBefore,
@@ -442,8 +442,8 @@ namespace EngineTests
             var idleEngine  = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 50);
 
             // Act
-            sleepEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxSleep, new EventCollector());
-            idleEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxIdle, new EventCollector());
+            sleepEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxSleep, new EventCollector());
+            idleEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxIdle, new EventCollector());
 
             // Assert — spánek = recoveryRate * 1.5, ostatní = recoveryRate * 1.0
             Assert.IsTrue(
@@ -472,8 +472,8 @@ namespace EngineTests
             var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
 
             // Act
-            feverEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxFever, new EventCollector());
-            normalEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
+            feverEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxFever, new EventCollector());
+            normalEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
 
             // Assert — horečka (2.5 - 1.5 = 1.0 °C nad prahem) přidá 1.0 * 8 = 8 do targetLoad
             Assert.IsTrue(
@@ -498,8 +498,8 @@ namespace EngineTests
             var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
 
             // Act
-            feverEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxFever, new EventCollector());
-            normalEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
+            feverEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxFever, new EventCollector());
+            normalEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
 
             // Assert — horečka potlačuje arousal
             Assert.IsTrue(
@@ -524,8 +524,8 @@ namespace EngineTests
             var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
 
             // Act
-            subEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxSub, new EventCollector());
-            normalEngine.Tick(_now, WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
+            subEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxSub, new EventCollector());
+            normalEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxNormal, new EventCollector());
 
             // Assert — pod prahem není horečkový příspěvek do targetLoad
             Assert.AreEqual(normalEngine.State.CognitiveLoad, subEngine.State.CognitiveLoad, delta: 0.01,
@@ -546,7 +546,7 @@ namespace EngineTests
             var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
             var ctx = BuildContext(neuroticism: 0.5);
             var stressBefore = engine.State.Stress;
-            var evt = new PregnancyDiscovered(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+            var evt = new PregnancyDiscovered(WDateTime.New(100, 1, 1), ctx.Id, new HumanId(Guid.NewGuid()));
 
             // Act
             engine.Handle(evt, ctx, _outbox);
@@ -569,8 +569,8 @@ namespace EngineTests
             var stableCtx  = BuildContext(neuroticism: 0.0);
             var neurotiCtx = BuildContext(neuroticism: 1.0);
 
-            var stableEvt  = new PregnancyDiscovered(_now, stableCtx.Id, new HumanId(Guid.NewGuid()));
-            var neurotiEvt = new PregnancyDiscovered(_now, neurotiCtx.Id, new HumanId(Guid.NewGuid()));
+            var stableEvt  = new PregnancyDiscovered(WDateTime.New(100, 1, 1), stableCtx.Id, new HumanId(Guid.NewGuid()));
+            var neurotiEvt = new PregnancyDiscovered(WDateTime.New(100, 1, 1), neurotiCtx.Id, new HumanId(Guid.NewGuid()));
 
             // Act
             stableEngine.Handle(stableEvt, stableCtx, new EventCollector());
@@ -591,7 +591,7 @@ namespace EngineTests
             // Arrange — stres těsně pod prahem, neuroticism=1 → spike=25 → stres=90
             var engine = BuildEngine(initialValence: 0.0, initialStress: 65);
             var ctx = BuildContext(neuroticism: 1.0);
-            var evt = new PregnancyDiscovered(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+            var evt = new PregnancyDiscovered(WDateTime.New(100, 1, 1), ctx.Id, new HumanId(Guid.NewGuid()));
 
             // Act
             engine.Handle(evt, ctx, _outbox);
@@ -613,7 +613,7 @@ namespace EngineTests
             var engine = BuildEngine(initialValence: 0.0, initialStress: 30);
             var ctx = BuildContext(neuroticism: 0.5);
             var valenceBefore = engine.State.Valence;
-            var evt = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+            var evt = new ChildBorn(WDateTime.New(100, 1, 1), ctx.Id, new HumanId(Guid.NewGuid()));
 
             // Act
             engine.Handle(evt, ctx, _outbox);
@@ -633,7 +633,7 @@ namespace EngineTests
             var engine = BuildEngine(initialValence: 0.0, initialStress: 30);
             var ctx = BuildContext(neuroticism: 0.5);
             var arousalBefore = engine.State.Arousal;
-            var evt = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+            var evt = new ChildBorn(WDateTime.New(100, 1, 1), ctx.Id, new HumanId(Guid.NewGuid()));
 
             // Act
             engine.Handle(evt, ctx, _outbox);
@@ -653,7 +653,7 @@ namespace EngineTests
             var engine = BuildEngine(initialValence: 0.0, initialStress: 50);
             var ctx = BuildContext(neuroticism: 0.5);
             var stressBefore = engine.State.Stress;
-            var evt = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+            var evt = new ChildBorn(WDateTime.New(100, 1, 1), ctx.Id, new HumanId(Guid.NewGuid()));
 
             // Act
             engine.Handle(evt, ctx, _outbox);
@@ -689,7 +689,7 @@ namespace EngineTests
                 DominantEmotion = DiscreteEmotion.Neutral
             });
 
-            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctx, _outbox);
 
             // At exactly 70, the > 70 condition is false → no Fear/Anger
             Assert.AreNotEqual(DiscreteEmotion.Fear, engine.State.DominantEmotion,
@@ -717,7 +717,7 @@ namespace EngineTests
                 DominantEmotion = DiscreteEmotion.Neutral
             });
 
-            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctx, _outbox);
 
             Assert.AreEqual(DiscreteEmotion.Fear, engine.State.DominantEmotion,
                 "Stress > 70 + Dominance < 0.4 must infer Fear.");
@@ -742,7 +742,7 @@ namespace EngineTests
                 DominantEmotion = DiscreteEmotion.Neutral
             });
 
-            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctx, _outbox);
 
             Assert.AreEqual(DiscreteEmotion.Anger, engine.State.DominantEmotion,
                 "Stress > 70 + Dominance >= 0.4 must infer Anger.");
@@ -767,7 +767,7 @@ namespace EngineTests
                 DominantEmotion = DiscreteEmotion.Neutral
             });
 
-            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctx, _outbox);
 
             Assert.AreEqual(DiscreteEmotion.Pride, engine.State.DominantEmotion,
                 "Valence > 0.5 + Dominance > 0.7 must infer Pride.");
@@ -792,7 +792,7 @@ namespace EngineTests
                 DominantEmotion = DiscreteEmotion.Neutral
             });
 
-            engine.Tick(_now, WTimeSpan.FromHours(0.001), ctx, _outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctx, _outbox);
 
             Assert.AreEqual(DiscreteEmotion.Tenderness, engine.State.DominantEmotion,
                 "Valence > 0.3 + Arousal < 0.4 + Dominance < 0.45 must infer Tenderness.");
@@ -823,8 +823,8 @@ namespace EngineTests
             noneEngine.RestoreState(noneEngine.State with { Arousal = 0.4, Valence = 0.0 });
 
             // Act — single tick; ovulation adds +0.03 arousal, +0.02 valence
-            ovulEngine.Tick(_now, WTimeSpan.FromHours(0.001), ctxOvul, new EventCollector());
-            noneEngine.Tick(_now, WTimeSpan.FromHours(0.001), ctxNone, new EventCollector());
+            ovulEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctxOvul, new EventCollector());
+            noneEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctxNone, new EventCollector());
 
             // Assert
             Assert.IsTrue(ovulEngine.State.Arousal > noneEngine.State.Arousal,
@@ -843,7 +843,7 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
             var arousalBefore = engine.State.Arousal;
 
-            engine.Handle(new OvulationWindowOpened(_now, ctx.Id), ctx, _outbox);
+            engine.Handle(new OvulationWindowOpened(WDateTime.New(100, 1, 1), ctx.Id), ctx, _outbox);
 
             Assert.IsTrue(engine.State.Arousal > arousalBefore,
                 $"OvulationWindowOpened must raise Arousal. Before={arousalBefore:F3}, After={engine.State.Arousal:F3}");
@@ -859,7 +859,7 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
             var valenceBefore = engine.State.Valence;
 
-            engine.Handle(new MensesStarted(_now, ctx.Id), ctx, _outbox);
+            engine.Handle(new MensesStarted(WDateTime.New(100, 1, 1), ctx.Id), ctx, _outbox);
 
             Assert.IsTrue(engine.State.Valence < valenceBefore,
                 $"MensesStarted must reduce Valence. Before={valenceBefore:F3}, After={engine.State.Valence:F3}");
@@ -883,7 +883,7 @@ namespace EngineTests
                 initialValence: 0.0);
             var valenceBefore = engine.State.Valence;
 
-            engine.Handle(new MemoryRecalled(_now, ctx.Id, episodeId), ctx, _outbox);
+            engine.Handle(new MemoryRecalled(WDateTime.New(100, 1, 1), ctx.Id, episodeId), ctx, _outbox);
 
             Assert.IsTrue(engine.State.Valence > valenceBefore,
                 $"Recalling a positive memory must increase Valence. Before={valenceBefore:F3}, After={engine.State.Valence:F3}");
@@ -903,7 +903,7 @@ namespace EngineTests
                 initialValence: 0.0);
             var valenceBefore = engine.State.Valence;
 
-            engine.Handle(new MemoryRecalled(_now, ctx.Id, episodeId), ctx, _outbox);
+            engine.Handle(new MemoryRecalled(WDateTime.New(100, 1, 1), ctx.Id, episodeId), ctx, _outbox);
 
             Assert.IsTrue(engine.State.Valence < valenceBefore,
                 $"Recalling a negative memory must decrease Valence. Before={valenceBefore:F3}, After={engine.State.Valence:F3}");
@@ -919,7 +919,7 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
             var valenceBefore = engine.State.Valence;
 
-            engine.Handle(new MemoryRecalled(_now, ctx.Id, Guid.NewGuid()), ctx, _outbox);
+            engine.Handle(new MemoryRecalled(WDateTime.New(100, 1, 1), ctx.Id, Guid.NewGuid()), ctx, _outbox);
 
             Assert.AreEqual(valenceBefore, engine.State.Valence, delta: 0.001,
                 "Recalling an unknown episode ID must not change Valence.");
@@ -942,7 +942,7 @@ namespace EngineTests
 
             // Accepted: io.From == self
             var io = new InteractionOutcome(
-                OccurredAt: _now,
+                OccurredAt: WDateTime.New(100, 1, 1),
                 From: ctx.Id,
                 To: new HumanId(Guid.NewGuid()),
                 Act: SpeechAct.SmallTalk,
@@ -970,7 +970,7 @@ namespace EngineTests
 
             // wasRejected: io.From == self && !io.Accepted
             var io = new InteractionOutcome(
-                OccurredAt: _now,
+                OccurredAt: WDateTime.New(100, 1, 1),
                 From: ctx.Id,
                 To: new HumanId(Guid.NewGuid()),
                 Act: SpeechAct.SmallTalk,
@@ -998,8 +998,8 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
 
             var toId = new HumanId(Guid.NewGuid());
-            var ioSmall = new InteractionOutcome(_now, ctx.Id, toId, false, string.Empty, SpeechAct.SmallTalk);
-            var ioSelf  = new InteractionOutcome(_now, ctx.Id, toId, false, string.Empty, SpeechAct.SelfDisclosure);
+            var ioSmall = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, SpeechAct.SmallTalk);
+            var ioSelf  = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, SpeechAct.SelfDisclosure);
 
             // Act
             engineSmall.Handle(ioSmall, ctx, new EventCollector());
@@ -1025,7 +1025,7 @@ namespace EngineTests
 
             // didReject: io.To == self && !io.Accepted
             var io = new InteractionOutcome(
-                OccurredAt: _now,
+                OccurredAt: WDateTime.New(100, 1, 1),
                 From: new HumanId(Guid.NewGuid()),
                 To: ctx.Id,
                 Act: SpeechAct.SmallTalk,
@@ -1057,8 +1057,8 @@ namespace EngineTests
             var engineNoPain   = BuildEngine(initialValence: 0.0, initialStress: 0);
 
             // Act
-            engineHighPain.Tick(_now, WTimeSpan.FromHours(1.0), ctxHighPain, new EventCollector());
-            engineNoPain.Tick(_now, WTimeSpan.FromHours(1.0), ctxNoPain, new EventCollector());
+            engineHighPain.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxHighPain, new EventCollector());
+            engineNoPain.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxNoPain, new EventCollector());
 
             // Assert — Pain=50 → -0.0005 * 50 * 1h = -0.025 extra oproti žádné bolesti
             Assert.IsTrue(
@@ -1077,7 +1077,7 @@ namespace EngineTests
             engine.RestoreState(engine.State with { MoodBaseline = 80 });
             var ctx = BuildContext(neuroticism: 0.5);
 
-            engine.Tick(_now, WTimeSpan.FromHours(1), ctx, new EventCollector());
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctx, new EventCollector());
 
             Assert.IsTrue(engine.State.MoodBaseline < 80,
                 $"MoodBaseline=80 must drift down toward 50 in neutral conditions. Got {engine.State.MoodBaseline:F4}");
@@ -1099,8 +1099,8 @@ namespace EngineTests
             var ctxHigh = BuildContext(neuroticism: 0.5);
             var ctxLow  = BuildContext(neuroticism: 0.5);
 
-            engineHighStress.Tick(_now, WTimeSpan.FromHours(1), ctxHigh, new EventCollector());
-            engineLowStress.Tick(_now, WTimeSpan.FromHours(1), ctxLow, new EventCollector());
+            engineHighStress.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxHigh, new EventCollector());
+            engineLowStress.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLow, new EventCollector());
 
             Assert.IsTrue(engineHighStress.State.MoodBaseline <= engineLowStress.State.MoodBaseline,
                 $"High stress must suppress MoodBaseline recovery. HighStress={engineHighStress.State.MoodBaseline:F4}, LowStress={engineLowStress.State.MoodBaseline:F4}");
@@ -1113,7 +1113,7 @@ namespace EngineTests
             var before = engine.State.MoodBaseline;
             var ctx = BuildContext(neuroticism: 0.5);
 
-            engine.Handle(new SleepEnded(_now, ctx.Id, TotalHoursSlept: 8, Quality: 90, WasInterrupted: false), ctx, _outbox);
+            engine.Handle(new SleepEnded(WDateTime.New(100, 1, 1), ctx.Id, TotalHoursSlept: 8, Quality: 90, WasInterrupted: false), ctx, _outbox);
 
             Assert.IsTrue(engine.State.MoodBaseline > before,
                 $"Good sleep (quality=90) must increase MoodBaseline. Before={before:F4}, After={engine.State.MoodBaseline:F4}");
@@ -1126,7 +1126,7 @@ namespace EngineTests
             var before = engine.State.MoodBaseline;
             var ctx = BuildContext(neuroticism: 0.5);
 
-            engine.Handle(new SleepEnded(_now, ctx.Id, TotalHoursSlept: 4, Quality: 20, WasInterrupted: true), ctx, _outbox);
+            engine.Handle(new SleepEnded(WDateTime.New(100, 1, 1), ctx.Id, TotalHoursSlept: 4, Quality: 20, WasInterrupted: true), ctx, _outbox);
 
             Assert.IsTrue(engine.State.MoodBaseline < before,
                 $"Bad sleep (quality=20, interrupted) must decrease MoodBaseline. Before={before:F4}, After={engine.State.MoodBaseline:F4}");
@@ -1139,7 +1139,7 @@ namespace EngineTests
             var before = engine.State.MoodBaseline;
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
-                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
                 Accepted: true, Reason: string.Empty, Act: SpeechAct.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
@@ -1155,7 +1155,7 @@ namespace EngineTests
             var before = engine.State.MoodBaseline;
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
-                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
                 Accepted: false, Reason: string.Empty, Act: SpeechAct.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
@@ -1176,7 +1176,7 @@ namespace EngineTests
             var before = engine.State.Motivations!.NeedSocial;
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
-                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
                 Accepted: true, Reason: string.Empty, Act: SpeechAct.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
@@ -1194,7 +1194,7 @@ namespace EngineTests
             var beforeSafety = engine.State.Motivations!.NeedSafety;
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
-                OccurredAt: _now, From: ctx.Id, To: new HumanId(Guid.NewGuid()),
+                OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
                 Accepted: false, Reason: string.Empty, Act: SpeechAct.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
@@ -1212,7 +1212,7 @@ namespace EngineTests
             engine.RestoreState(engine.State with { Motivations = new MotivationState() });
             var before = engine.State.Motivations!.NeedCare;
             var ctx = BuildContext(neuroticism: 0.5);
-            var ev = new PregnancyDiscovered(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+            var ev = new PregnancyDiscovered(WDateTime.New(100, 1, 1), ctx.Id, new HumanId(Guid.NewGuid()));
 
             engine.Handle(ev, ctx, _outbox);
 
@@ -1227,7 +1227,7 @@ namespace EngineTests
             engine.RestoreState(engine.State with { Motivations = new MotivationState() });
             var before = engine.State.Motivations!.NeedCare;
             var ctx = BuildContext(neuroticism: 0.5);
-            var ev = new ChildBorn(_now, ctx.Id, new HumanId(Guid.NewGuid()));
+            var ev = new ChildBorn(WDateTime.New(100, 1, 1), ctx.Id, new HumanId(Guid.NewGuid()));
 
             engine.Handle(ev, ctx, _outbox);
 
@@ -1254,11 +1254,11 @@ namespace EngineTests
             var outbox = new EventCollector();
 
             // First tick at t=0 — initializes the stress-above-threshold timer
-            engine.Tick(_now, WTimeSpan.FromHours(0.1), ctx, outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.1), ctx, outbox);
             outbox.Drain();
 
             // Second tick at t=4.1h — elapsed time from timer start exceeds 4h threshold
-            var laterNow = _now + WTimeSpan.FromHours(4.1);
+            var laterNow = WDateTime.New(100, 1, 1) + WTimeSpan.FromHours(4.1);
             engine.Tick(laterNow, WTimeSpan.FromHours(4.1), ctx, outbox);
             var events = outbox.Drain();
 
@@ -1281,11 +1281,11 @@ namespace EngineTests
             var outbox = new EventCollector();
 
             // First tick at t=0 — initializes the timer
-            engine.Tick(_now, WTimeSpan.FromHours(0.1), ctx, outbox);
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.1), ctx, outbox);
             outbox.Drain();
 
             // Second tick at t=3.9h — not yet at the 4h threshold
-            var laterNow = _now + WTimeSpan.FromHours(3.9);
+            var laterNow = WDateTime.New(100, 1, 1) + WTimeSpan.FromHours(3.9);
             engine.Tick(laterNow, WTimeSpan.FromHours(3.9), ctx, outbox);
             var events = outbox.Drain();
 
@@ -1336,8 +1336,8 @@ namespace EngineTests
             var ctxLowIron  = BuildContext(0.5, MakePhysioWithNutrition(iron: 10, vitaminD: 80));
             var ctxHighIron = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 80));
 
-            engine1.Tick(_now, WTimeSpan.FromHours(1), ctxLowIron,  new EventCollector());
-            engine2.Tick(_now, WTimeSpan.FromHours(1), ctxHighIron, new EventCollector());
+            engine1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLowIron,  new EventCollector());
+            engine2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxHighIron, new EventCollector());
 
             Assert.IsTrue(engine1.State.Valence < engine2.State.Valence,
                 $"Low iron must suppress Valence. LowIron={engine1.State.Valence:F4}, HighIron={engine2.State.Valence:F4}");
@@ -1359,8 +1359,8 @@ namespace EngineTests
             var ctxLowVitD  = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 5));
             var ctxHighVitD = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 80));
 
-            engine1.Tick(_now, WTimeSpan.FromHours(1), ctxLowVitD,  new EventCollector());
-            engine2.Tick(_now, WTimeSpan.FromHours(1), ctxHighVitD, new EventCollector());
+            engine1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLowVitD,  new EventCollector());
+            engine2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxHighVitD, new EventCollector());
 
             Assert.IsTrue(engine1.State.MoodBaseline < engine2.State.MoodBaseline,
                 $"Low VitaminD must suppress MoodBaseline. LowVitD={engine1.State.MoodBaseline:F4}, HighVitD={engine2.State.MoodBaseline:F4}");
@@ -1547,12 +1547,142 @@ namespace EngineTests
         /// <summary>Vytvoří <see cref="SleepEnded"/> s danými parametry.</summary>
         private SleepEnded MakeSleepEnded(double quality, double hoursSlept, bool wasInterrupted)
             => new SleepEnded(
-                OccurredAt: _now,
+                OccurredAt: WDateTime.New(100, 1, 1),
                 Human: new HumanId(Guid.NewGuid()),
                 TotalHoursSlept: hoursSlept,
                 Quality: quality,
                 WasInterrupted: wasInterrupted);
 
         #endregion Pomocné metody
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // S1 — Dual Control Model tests
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [TestClass]
+    public sealed class DualControlModelTests : TestBase
+    {
+        private static readonly PsychologyConfig NoiselessCfg = new PsychologyConfig(
+            BaselineAffectVariance: 0.0);
+
+        [TestMethod]
+        public void HighSES_IncreasesNeedIntimacy_OverBaseline()
+        {
+            // DualControl with SES=0.9 should produce higher NeedIntimacy than baseline (SES=0.5)
+            var engineBaseline = Build(SexualResponsiveness.Default);
+            var engineHighSES  = Build(new SexualResponsiveness(SES: 0.9, SIS1: 0.5, SIS2: 0.5));
+
+            var ctx = BuildCtx(engineBaseline, ses: 0.9, stress: 0, crowding: 0);
+            var outbox = new EventCollector();
+
+            engineBaseline.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(SexualResponsiveness.Default, stress: 0, crowding: 0), outbox);
+            engineHighSES.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.9, 0.5, 0.5), stress: 0, crowding: 0), outbox);
+
+            var baseIntimacy = engineBaseline.State.Motivations?.NeedIntimacy ?? 50;
+            var highIntimacy = engineHighSES.State.Motivations?.NeedIntimacy ?? 50;
+
+            Assert.IsTrue(highIntimacy > baseIntimacy,
+                $"High SES should raise NeedIntimacy (baseline={baseIntimacy:F2}, highSES={highIntimacy:F2})");
+        }
+
+        [TestMethod]
+        public void HighSIS1_UnderStress_ReducesNeedIntimacy()
+        {
+            // SIS1=0.9 under high stress should suppress NeedIntimacy more than SIS1=0.1
+            var engineLowSIS1  = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.1, SIS2: 0.5));
+            var engineHighSIS1 = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.9, SIS2: 0.5));
+
+            var outbox = new EventCollector();
+            engineLowSIS1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.1, 0.5), stress: 80, crowding: 0), outbox);
+            engineHighSIS1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.9, 0.5), stress: 80, crowding: 0), outbox);
+
+            var lowSIS1Intimacy  = engineLowSIS1.State.Motivations?.NeedIntimacy ?? 50;
+            var highSIS1Intimacy = engineHighSIS1.State.Motivations?.NeedIntimacy ?? 50;
+
+            Assert.IsTrue(highSIS1Intimacy < lowSIS1Intimacy,
+                $"High SIS1 under stress should suppress NeedIntimacy more (low={lowSIS1Intimacy:F2}, high={highSIS1Intimacy:F2})");
+        }
+
+        [TestMethod]
+        public void HighSIS2_InHighCrowding_ReducesNeedIntimacy()
+        {
+            // SIS2=0.9 in crowded environment should suppress NeedIntimacy more than SIS2=0.1
+            var engineLowSIS2  = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.5, SIS2: 0.1));
+            var engineHighSIS2 = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.5, SIS2: 0.9));
+
+            var outbox = new EventCollector();
+            engineLowSIS2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.5, 0.1), stress: 0, crowding: 0.9), outbox);
+            engineHighSIS2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.5, 0.9), stress: 0, crowding: 0.9), outbox);
+
+            var lowSIS2Intimacy  = engineLowSIS2.State.Motivations?.NeedIntimacy ?? 50;
+            var highSIS2Intimacy = engineHighSIS2.State.Motivations?.NeedIntimacy ?? 50;
+
+            Assert.IsTrue(highSIS2Intimacy < lowSIS2Intimacy,
+                $"High SIS2 in crowded env should suppress NeedIntimacy more (low={lowSIS2Intimacy:F2}, high={highSIS2Intimacy:F2})");
+        }
+
+        [TestMethod]
+        public void NullDualControl_NoChangeToBaseline()
+        {
+            // null DualControl (no DCM profile) should behave identically to population average
+            var engineNull    = Build(null);
+            var engineDefault = Build(SexualResponsiveness.Default);
+
+            var outbox = new EventCollector();
+            engineNull.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(null, stress: 0, crowding: 0), outbox);
+            engineDefault.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(SexualResponsiveness.Default, stress: 0, crowding: 0), outbox);
+
+            var nullIntimacy    = engineNull.State.Motivations?.NeedIntimacy ?? 50;
+            var defaultIntimacy = engineDefault.State.Motivations?.NeedIntimacy ?? 50;
+
+            // SES=0.5 → sesBoost=0; SIS at 0.5 but stress=0, crowding=0 → inhibition=0 → no change
+            Assert.AreEqual(nullIntimacy, defaultIntimacy, 0.1,
+                $"Null vs Default DCM should give same NeedIntimacy (null={nullIntimacy:F2}, default={defaultIntimacy:F2})");
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+
+        private static DefaultPsychologyEngine Build(SexualResponsiveness? dcm)
+        {
+            var engine = new DefaultPsychologyEngine(
+                Microsoft.Extensions.Options.Options.Create(NoiselessCfg),
+                Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Warning)),
+                new ZeroRandom());
+            engine.RestoreState(engine.State with { Motivations = new MotivationState() });
+            return engine;
+        }
+
+        private IHumanContext BuildCtxWithDCM(SexualResponsiveness? dcm, double stress, double crowding)
+        {
+            var physio = new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null);
+            var psych  = new PsychologyState(0.0, 0.4, 0.5, stress, 20, DiscreteEmotion.Neutral,
+                Motivations: new MotivationState());
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.3),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral,
+                DualControl: dcm);
+            var crowdingVal = double.IsNaN(crowding) ? 0.5 : crowding;
+            var snapshot = new EnginesSnapshot(physio, psych,
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new InteractionSurface(null, false, 0.2, crowdingVal, SurfaceKind.Unknown),
+                new RelationshipState(new System.Collections.Generic.Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new System.Collections.Generic.List<EpisodicMemory>()));
+            return new HumanContext
+            {
+                Id = new HumanId(System.Guid.NewGuid()), Biology = SexBiology.Female,
+                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot, Random = new ZeroRandom(),
+                Logger = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+            };
+        }
+
+        private IHumanContext BuildCtx(DefaultPsychologyEngine engine, double ses, double stress, double crowding)
+            => BuildCtxWithDCM(new SexualResponsiveness(ses, 0.5, 0.5), stress, crowding);
     }
 }

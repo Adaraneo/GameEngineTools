@@ -148,6 +148,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     outcome: "positive",
                     detail: mp.Kind ?? "n/a",
                     now: mp.OccurredAt);
+                    // R1 — Third-party gossip: observers update their edge toward the actor (mp.B)
+                    EmitThirdPartyEvents(mp.OccurredAt, self, mp.B, mp.A,
+                        ThirdPartyObservationType.PositiveAct, valence: +1.0,
+                        ctx.Snapshot.InteractionSurface.Observers, outbox);
                     break;
 
                 // ── Micro-negative (criticism, ignoring, cold response…) ─────────────────
@@ -163,6 +167,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     outcome: "negative",
                     detail: mn.Kind ?? "n/a",
                     now: mn.OccurredAt);
+                    // R1 — Third-party gossip: observers update their edge toward the actor (mn.B)
+                    EmitThirdPartyEvents(mn.OccurredAt, self, mn.B, mn.A,
+                        ThirdPartyObservationType.NegativeAct, valence: -1.0,
+                        ctx.Snapshot.InteractionSurface.Observers, outbox);
                     break;
 
                 // ── Repair attempt ───────────────────────────────────────────────────────
@@ -174,19 +182,38 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         var avoidance = ctx.Personality.Attachment.Avoidance;
                         var repairGainModifier = 1.0 - avoidance * 0.6;
 
-                        Upsert(self, ra.B, e => e with
+                        Upsert(self, ra.B, e =>
                         {
-                            Trust = Bump(e.Trust, ra.Accepted
+                            // R2 — Contempt ceiling: RepairAttempt cannot rebuild above 30/20 once
+                            // IsContemptuouslyDestroyed is set (Gottman 1994: contempt is irreversible).
+                            const double ContemptTrustCeiling    = 30.0;
+                            const double ContemptClosenessCeiling = 20.0;
+
+                            var trustGain = ra.Accepted
                                 ? +Config.RepairGain * repairGainModifier
-                                : -Config.RupturePenalty),
-                            Closeness = Bump(e.Closeness, ra.Accepted
+                                : -Config.RupturePenalty;
+
+                            var closenessGain = ra.Accepted
                                 ? +Config.RepairGain * 0.5 * repairGainModifier
-                                : -Config.RupturePenalty * 0.4),
-                            // Repair reduces TransgressionResidue (Lewicki et al. 2016:
-                            // "acceptance" = highest-weight apology component — responsibility acknowledged).
-                            TransgressionResidue = ra.Accepted
-                                ? Math.Max(0, e.TransgressionResidue - Config.RepairGain)
-                                : Math.Min(100, e.TransgressionResidue + Config.RupturePenalty * 0.5)
+                                : -Config.RupturePenalty * 0.4;
+
+                            var newTrust = Bump(e.Trust, trustGain);
+                            var newCloseness = Bump(e.Closeness, closenessGain);
+
+                            if (e.IsContemptuouslyDestroyed && ra.Accepted)
+                            {
+                                newTrust    = Math.Min(newTrust,    ContemptTrustCeiling);
+                                newCloseness = Math.Min(newCloseness, ContemptClosenessCeiling);
+                            }
+
+                            return e with
+                            {
+                                Trust     = newTrust,
+                                Closeness = newCloseness,
+                                TransgressionResidue = ra.Accepted
+                                    ? Math.Max(0, e.TransgressionResidue - Config.RepairGain)
+                                    : Math.Min(100, e.TransgressionResidue + Config.RupturePenalty * 0.5)
+                            };
                         },
                         eventType: nameof(RepairAttempt),
                         outcome: ra.Accepted ? "accepted" : "rejected",
@@ -239,6 +266,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             var closenessGain = +1.5 + stabilization * 0.35;
                             var closenessMax = 100.0 - ctx.Personality.Attachment.Avoidance * Config.ClosenessAvoidanceCap;
 
+                            // R3 — ExchangeStrength: Meta SpeechAct = explicit negotiation about
+                            // the relationship's terms → builds transactional equity norm.
+                            var exchangeGain = io.Act == SpeechAct.Meta ? 0.5 : 0.0;
+
                             return e with
                             {
                                 Closeness = Math.Min(closenessMax, Bump(e.Closeness, closenessGain)),
@@ -253,6 +284,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 PhysicalAttraction = Bump(e.PhysicalAttraction, attractionPlasticity * 0.65),
                                 PositiveInteractionCount = newCount,
                                 TargetBiology = otherBiology ?? e.TargetBiology,
+                                ExchangeStrength = exchangeGain > 0
+                                    ? Math.Min(100, e.ExchangeStrength + exchangeGain)
+                                    : e.ExchangeStrength,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                             };
                         },
@@ -408,6 +442,62 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         break;
                     }
 
+                // ── Third-party observation — R1 gossip handler ──────────────────────────
+                case ThirdPartyActionObserved tpa when tpa.Observer == self:
+                    {
+                        // Observer updates their edge toward the Actor.
+                        // Indirect evidence is weaker than direct interaction (~30–50%).
+                        // Feinberg et al. 2014: gossip deters selfishness and shapes reputation.
+                        var gossipScale = tpa.Type == ThirdPartyObservationType.Betrayal ? 0.5 : 0.3;
+                        Upsert(self, tpa.Actor, e => tpa.Type switch
+                        {
+                            ThirdPartyObservationType.PositiveAct => e with
+                            {
+                                Like  = Bump(e.Like,  +2.0 * gossipScale),
+                                Trust = Bump(e.Trust, +1.5 * gossipScale)
+                            },
+                            ThirdPartyObservationType.NegativeAct => e with
+                            {
+                                Like  = Bump(e.Like,  -2.5 * gossipScale),
+                                Trust = Bump(e.Trust, -2.0 * gossipScale)
+                            },
+                            // Betrayal: step-drop (Slovic 1993; skill ref: 30–70 % of Trust)
+                            ThirdPartyObservationType.Betrayal => e with
+                            {
+                                Like  = Bump(e.Like,  -20.0 * gossipScale),
+                                Trust = Bump(e.Trust, -30.0 * gossipScale)
+                            },
+                            _ => e
+                        },
+                        eventType: nameof(ThirdPartyActionObserved),
+                        outcome: tpa.Type.ToString().ToLowerInvariant(),
+                        detail: $"actor={tpa.Actor.Value}, target={tpa.Target.Value}, valence={tpa.Valence:F1}",
+                        now: tpa.OccurredAt);
+                        break;
+                    }
+
+                // ── Contempt — terminal relationship marker (Gottman 1994) ────────────────
+                case ContemptuousActPerformed ca when (ca.From == self || ca.To == self):
+                    {
+                        // Contempt directed FROM self toward someone: self's edge to that person.
+                        // Contempt received BY self from someone: self's edge to that person.
+                        var contemptTarget = ca.From == self ? ca.To : ca.From;
+                        Upsert(self, contemptTarget, e => e with
+                        {
+                            // Irreversible step-drop in Trust and Like
+                            Trust = Bump(e.Trust, -35.0),
+                            Like  = Bump(e.Like,  -30.0),
+                            Comfort = Bump(e.Comfort, -20.0),
+                            // Flag is permanent — cannot be cleared by repair
+                            IsContemptuouslyDestroyed = true
+                        },
+                        eventType: nameof(ContemptuousActPerformed),
+                        outcome: ca.From == self ? "expressed" : "received",
+                        detail: $"from={ca.From.Value}, to={ca.To.Value}",
+                        now: ca.OccurredAt);
+                        break;
+                    }
+
                 case SexualEncounterOutcome se:
                     {
                         var otherId = se.From == self ? se.To : se.From;
@@ -557,6 +647,18 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     }
                 }
 
+                // S2 — Basson 2001: ResponsiveDesireLevel grows slowly in long-term communal
+                // relationships. Once CommunalStrength > 60 AND PositiveInteractionCount > 30,
+                // the NPC gradually shifts from spontaneous initiator to responsive acceptor.
+                var responsiveTarget = 0.0;
+                if (e.CommunalStrength > 60 && e.PositiveInteractionCount > 30)
+                {
+                    // Target scales with CommunalStrength beyond threshold; saturates at 80.
+                    responsiveTarget = Math.Min(80.0, (e.CommunalStrength - 60.0) / 40.0 * 80.0);
+                }
+                // Drift rate: ~1 pt/day toward target (slow shift over months/years)
+                var newResponsive = Clamp(Approach(e.ResponsiveDesireLevel, responsiveTarget, 1.0 * days));
+
                 dict[kv.Key] = e with
                 {
                     Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect - familiarityLikePenalty),
@@ -570,6 +672,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Respect = Clamp(Approach(e.Respect, 55, d * 0.3)),
                     Comfort = Clamp(Approach(e.Comfort, 45, d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
                     TransgressionResidue = newResidue,
+                    ResponsiveDesireLevel = newResponsive,
                     Breakdown = new DomainBreakdown(
                         Intellect: Clamp(Approach(e.Breakdown.Intellect, 50, dd)),
                         Humor: Clamp(Approach(e.Breakdown.Humor, 50, dd)),

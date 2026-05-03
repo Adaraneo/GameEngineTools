@@ -45,7 +45,15 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 NeedRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2),
                 NeedFood = Clamp01p(ph.Hunger),
                 NeedWater = Clamp01p(ph.Thirst),
-                NeedBelonging = Clamp01p(70 - MeanCloseness(rel) + Math.Max(0, -ps.Valence * 15) - CooldownFor(cooldowns, ReachOut) * 15),
+                // B2: Extraversion modulates social belonging pressure.
+                // Introverts have lower baseline social-need, extraverts higher.
+                // Additive bias centred on E=0.5: ±20 points at extremes.
+                // E=0.5 → no change (backward compatible with all existing tests).
+                NeedBelonging = Clamp01p(
+                    70 - MeanCloseness(rel)
+                    + Math.Max(0, -ps.Valence * 15)
+                    - CooldownFor(cooldowns, ReachOut) * 15
+                    + (ctx.Personality.BigFive.Extraversion - 0.5) * 20.0),
                 NeedCompetence = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2),
                 NeedIntimacy = ComputeIntimacyNeed(ctx, ph, rel, ps) - CooldownFor(cooldowns, InviteIntimacy) * 20
             };

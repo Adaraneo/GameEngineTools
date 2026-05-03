@@ -81,5 +81,22 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Used for Navarro's 8× gap rule: if the gap since last contact exceeds
         /// 8× the expected contact interval, decay rate is multiplied.
         /// </summary>
-        WDateTime? LastContactTime = null);
+        WDateTime? LastContactTime = null,
+
+        /// <summary>
+        /// Set to <c>true</c> when a <see cref="ContemptuousActPerformed"/> event has been processed.
+        /// Contempt is a terminal relationship marker (Gottman 1994): once set, RepairAttempts
+        /// can never rebuild Trust or Like above the post-contempt ceiling.
+        /// The flag itself does not decay and cannot be cleared.
+        /// </summary>
+        bool IsContemptuouslyDestroyed = false,
+
+        /// <summary>
+        /// How much this character's desire toward B has shifted from spontaneous to responsive.
+        /// In long-term communal relationships, spontaneous initiation declines and the person
+        /// instead responds to partner's advances (Basson 2001 responsive desire model).
+        /// Range [0–100]: 0 = fully spontaneous, 100 = fully responsive.
+        /// Grows with CommunalStrength and accumulated interaction history.
+        /// </summary>
+        double ResponsiveDesireLevel = 0);
 }

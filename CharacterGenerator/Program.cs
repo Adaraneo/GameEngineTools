@@ -112,6 +112,8 @@
             catch
             {
                 Console.WriteLine("File system was not originally created, so it was created right now.");
+                ClearDirectoryForRegeneration(pcFolderPath, npcFolderPath);
+                manager.Characters.Clear();
             }
 
             PC player = null;

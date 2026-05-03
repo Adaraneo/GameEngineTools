@@ -95,6 +95,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Empiricky: Neuroticism negativně koreluje s vagálním tónem
             var vagalTone = 1.0 - ctx.Personality.BigFive.Neuroticism * 0.5;  // 0.5..1.0
 
+            // Neuroticism moduluje rychlost AKUMULACE stresu (HPA osa vulnerabilita).
+            // Empiricky: max ~1.7× rozdíl mezi nízkým a vysokým N (Sutin et al. 2013;
+            // Bibbey et al. 2015 — HPA reactivity); nikoli 3×.
+            var stressGrowthMult = 0.65 + ctx.Personality.BigFive.Neuroticism * 1.05;  // [0.65, 1.70]
+
             // Stresová vulnerabilita v noci (McEwen 1998): kortizol moduluje HPA resilience
             // Nízký kortizol (noc) → stres klesá pomaleji; Vysoký (ráno) → rychleji
             var circadianVulnerability = Math.Clamp(
@@ -119,7 +124,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
             s = s with
             {
                 Valence   = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * painAmp * h + 0.0015 * ph.Energy * h),
-                Stress    = Clamp01p(s.Stress + 0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * painAmp * h),
+                // stressGrowthMult: High Neuroticism → HPA osa reaguje silněji na stejné stresory
+                Stress    = Clamp01p(s.Stress + (0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * painAmp * h) * stressGrowthMult),
                 Arousal   = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h),
                 Dominance = Clamp01(s.Dominance - 0.0005 * ph.Pain * painAmp * h - 0.01 * Math.Max(0, ph.BodyTempDelta - 1.5) * h)
             };
@@ -192,9 +198,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Kortizol → stres a arousal (HPA over-activation)
+            // Kortizol → stres a arousal (HPA over-activation); modulován Neuroticism growth mult
             if (ph.CortisolLevel > 70)
-                s = s with { Stress = Clamp01p(s.Stress + (ph.CortisolLevel - 70) * Config.CortisolStressWeight * h) };
+                s = s with { Stress = Clamp01p(s.Stress + (ph.CortisolLevel - 70) * Config.CortisolStressWeight * h * stressGrowthMult) };
             s = s with { Arousal = Clamp01(s.Arousal + (ph.CortisolLevel - 50) * Config.CortisolArousalWeight * h) };
 
             // Sleep Inertia — kognitivní zpomalení a tlumení arousalu po probuzení (Borbély)
@@ -249,6 +255,39 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 {
                     s = s with { Motivations = nextWanting };
                     outbox.Add(new MotivationChanged(now, ctx.Id, wantingMotiv, nextWanting));
+                }
+            }
+
+            // ── Dual Control Model (Bancroft & Janssen 2000) ─────────────────────────
+            // SES/SIS1/SIS2 modulate NeedIntimacy independently of testosterone and stress-wanting.
+            // null DualControl = population average (SES=0.5, SIS1=0.5, SIS2=0.5) → no net change.
+            if (s.Motivations is { } dcmMotiv && ctx.Personality.DualControl is { } dcm)
+            {
+                var crowding = double.IsNaN(ctx.Snapshot.InteractionSurface.Crowding)
+                    ? 0.5 : ctx.Snapshot.InteractionSurface.Crowding;
+
+                // All three dimensions are centred at 0.5 (population average → zero net change).
+                // This ensures null DualControl == SexualResponsiveness.Default in behaviour.
+
+                // SES: excitation — above 0.5 raises NeedIntimacy, below 0.5 suppresses it
+                var sesBoost = (dcm.SES - 0.5) * Config.SESNeedIntimacyBoostPerHour * h;
+
+                // SIS1: performance/failure inhibition — only above population average (>0.5) inhibits.
+                // × 2.0 so that SIS1=1.0 produces the same magnitude as SIS1=0.5 in the old formula.
+                var sis1Penalty = Math.Max(0, (dcm.SIS1 - 0.5)) * 2.0 * (s.Stress / 100.0) * Config.SIS1StressInhibitionWeight * h;
+
+                // SIS2: threat/context inhibition — only above population average (>0.5) inhibits.
+                var sis2Penalty = Math.Max(0, (dcm.SIS2 - 0.5)) * 2.0 * crowding * Config.SIS2CrowdingInhibitionWeight * h;
+
+                var dcmDelta = sesBoost - sis1Penalty - sis2Penalty;
+                if (Math.Abs(dcmDelta) > 0.001)
+                {
+                    var dcmNext = dcmMotiv with
+                    {
+                        NeedIntimacy = Math.Clamp(dcmMotiv.NeedIntimacy + dcmDelta, 0, 100)
+                    };
+                    s = s with { Motivations = dcmNext };
+                    outbox.Add(new MotivationChanged(now, ctx.Id, dcmMotiv, dcmNext));
                 }
             }
 

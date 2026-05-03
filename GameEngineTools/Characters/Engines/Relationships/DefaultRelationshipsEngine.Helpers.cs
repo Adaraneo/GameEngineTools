@@ -458,5 +458,42 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 : Math.Max(target, cur - amount);
 
         #endregion Private methods — helpers
+
+        #region Private methods — third-party gossip
+
+        /// <summary>
+        /// Emits <see cref="ThirdPartyActionObserved"/> events for each observer present
+        /// at the scene of a MicroPositive or MicroNegative.
+        /// Observers are sourced from <see cref="Interactions.InteractionSurface.Observers"/>;
+        /// skips the direct participants (self / actor / target).
+        /// </summary>
+        private static void EmitThirdPartyEvents(
+            WDateTime occurredAt,
+            HumanId self,
+            HumanId actor,
+            HumanId target,
+            ThirdPartyObservationType type,
+            double valence,
+            System.Collections.Generic.IReadOnlyList<HumanId>? observers,
+            IEventCollector outbox)
+        {
+            if (observers is not { Count: > 0 }) return;
+
+            foreach (var observer in observers)
+            {
+                // Skip direct participants — they process the original event themselves
+                if (observer == self || observer == actor || observer == target) continue;
+
+                outbox.Add(new ThirdPartyActionObserved(
+                    occurredAt,
+                    Observer: observer,
+                    Actor: actor,
+                    Target: target,
+                    Valence: valence,
+                    Type: type));
+            }
+        }
+
+        #endregion Private methods — third-party gossip
     }
 }

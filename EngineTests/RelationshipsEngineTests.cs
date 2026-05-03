@@ -1109,6 +1109,238 @@ namespace EngineTests
 
         #endregion RejectionNeedsThreat testy
 
+        #region R1 — Third-party gossip testy
+
+        [TestMethod]
+        public void ThirdPartyGossip_PositiveAct_IncreasesObserverTrustOfActor()
+        {
+            // Observer B watches actor A do a MicroPositive to target C.
+            // B's relationship engine receives ThirdPartyActionObserved → Trust/Like of A should rise.
+            var engine = BuildEngine();
+            var observer = new HumanId(Guid.NewGuid());
+            var actor    = new HumanId(Guid.NewGuid());
+            var target   = new HumanId(Guid.NewGuid());
+
+            // Observer context (observer's engine processes the event)
+            var ctx = BuildContext(observer);
+
+            // Seed a neutral edge from observer → actor
+            engine.Handle(new FirstImpressionFormed(_now, observer, actor, Like: 50, Attraction: 30), ctx, _outbox);
+            var trustBefore = engine.State.Edges[actor].Trust;
+
+            engine.Handle(new ThirdPartyActionObserved(
+                _now, Observer: observer, Actor: actor, Target: target,
+                Valence: +1.0, Type: ThirdPartyObservationType.PositiveAct), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[actor].Trust > trustBefore,
+                $"Trust of actor should rise after positive gossip (before={trustBefore:F1}, after={engine.State.Edges[actor].Trust:F1})");
+        }
+
+        [TestMethod]
+        public void ThirdPartyGossip_NegativeAct_DecreasesObserverTrustOfActor()
+        {
+            var engine   = BuildEngine();
+            var observer = new HumanId(Guid.NewGuid());
+            var actor    = new HumanId(Guid.NewGuid());
+            var target   = new HumanId(Guid.NewGuid());
+            var ctx      = BuildContext(observer);
+
+            engine.Handle(new FirstImpressionFormed(_now, observer, actor, Like: 60, Attraction: 30), ctx, _outbox);
+            var trustBefore = engine.State.Edges[actor].Trust;
+
+            engine.Handle(new ThirdPartyActionObserved(
+                _now, Observer: observer, Actor: actor, Target: target,
+                Valence: -1.0, Type: ThirdPartyObservationType.NegativeAct), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[actor].Trust < trustBefore,
+                $"Trust should fall after negative gossip (before={trustBefore:F1}, after={engine.State.Edges[actor].Trust:F1})");
+        }
+
+        [TestMethod]
+        public void MicroPositive_WithObservers_EmitsThirdPartyEvents()
+        {
+            // When MicroPositive is processed and Observers are in InteractionSurface,
+            // ThirdPartyActionObserved events should appear in the outbox for each observer.
+            var engine   = BuildEngine();
+            var self     = new HumanId(Guid.NewGuid());
+            var actor    = new HumanId(Guid.NewGuid());   // mn.B = perpetrator
+            var observer = new HumanId(Guid.NewGuid());
+            var outbox   = new EventCollector();
+
+            // Context with an observer in InteractionSurface
+            var ctx = BuildContextWithObservers(self, new[] { observer });
+            engine.Handle(new FirstImpressionFormed(_now, self, actor, Like: 50, Attraction: 30), ctx, outbox);
+
+            engine.Handle(new MicroPositive(_now, self, actor, "smile"), ctx, outbox);
+
+            var events = outbox.Drain();
+            var gossip = events.OfType<ThirdPartyActionObserved>().ToList();
+
+            Assert.AreEqual(1, gossip.Count, "One ThirdPartyActionObserved should be emitted per observer");
+            Assert.AreEqual(observer, gossip[0].Observer);
+            Assert.AreEqual(actor, gossip[0].Actor);
+            Assert.AreEqual(ThirdPartyObservationType.PositiveAct, gossip[0].Type);
+        }
+
+        #endregion R1 — Third-party gossip testy
+
+        #region R2 — Contempt terminal marker testy
+
+        [TestMethod]
+        public void Contempt_SetsIsContemptuouslyDestroyed_Flag()
+        {
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 70, Attraction: 40), ctx, _outbox);
+            Assert.IsFalse(engine.State.Edges[other].IsContemptuouslyDestroyed,
+                "Flag should be false before contempt");
+
+            engine.Handle(new ContemptuousActPerformed(_now, From: self, To: other), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].IsContemptuouslyDestroyed,
+                "Flag should be true after contempt");
+        }
+
+        [TestMethod]
+        public void Contempt_CausesMajorTrustAndLikeDrop()
+        {
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 70, Attraction: 40), ctx, _outbox);
+            var trustBefore = engine.State.Edges[other].Trust;
+            var likeBefore  = engine.State.Edges[other].Like;
+
+            engine.Handle(new ContemptuousActPerformed(_now, From: self, To: other), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].Trust < trustBefore - 20,
+                $"Trust should drop by >20 after contempt (before={trustBefore:F1}, after={engine.State.Edges[other].Trust:F1})");
+            Assert.IsTrue(engine.State.Edges[other].Like < likeBefore - 15,
+                $"Like should drop by >15 after contempt (before={likeBefore:F1}, after={engine.State.Edges[other].Like:F1})");
+        }
+
+        [TestMethod]
+        public void Contempt_RepairAttempt_CannotExceedCeiling()
+        {
+            // After contempt, RepairAttempt.Accepted cannot rebuild Trust above 30 or Closeness above 20.
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 70, Attraction: 40), ctx, _outbox);
+            engine.Handle(new ContemptuousActPerformed(_now, From: self, To: other), ctx, _outbox);
+
+            // Apply many successful repairs
+            for (var i = 0; i < 20; i++)
+                engine.Handle(new RepairAttempt(_now, self, other, Accepted: true), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].Trust <= 30.0 + 0.01,
+                $"Trust should not exceed ceiling of 30 after contempt (got={engine.State.Edges[other].Trust:F1})");
+            Assert.IsTrue(engine.State.Edges[other].Closeness <= 20.0 + 0.01,
+                $"Closeness should not exceed ceiling of 20 after contempt (got={engine.State.Edges[other].Closeness:F1})");
+        }
+
+        #endregion R2 — Contempt terminal marker testy
+
+        #region R3 — ExchangeStrength testy
+
+        [TestMethod]
+        public void ExchangeStrength_GrowsFromMetaInteraction()
+        {
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
+            var exchangeBefore = engine.State.Edges[other].ExchangeStrength;
+
+            // Accepted Meta interaction → ExchangeStrength should increase
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok",
+                Act: SpeechAct.Meta), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].ExchangeStrength > exchangeBefore,
+                $"ExchangeStrength should grow from Meta interaction (before={exchangeBefore:F1}, " +
+                $"after={engine.State.Edges[other].ExchangeStrength:F1})");
+        }
+
+        [TestMethod]
+        public void ExchangeStrength_DoesNotGrow_FromSmallTalk()
+        {
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
+            var exchangeBefore = engine.State.Edges[other].ExchangeStrength;
+
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok",
+                Act: SpeechAct.SmallTalk), ctx, _outbox);
+
+            Assert.AreEqual(exchangeBefore, engine.State.Edges[other].ExchangeStrength,
+                "ExchangeStrength should NOT change from SmallTalk");
+        }
+
+        #endregion R3 — ExchangeStrength testy
+
+        #region S2 — ResponsiveDesireLevel testy
+
+        [TestMethod]
+        public void ResponsiveDesireLevel_GrowsInLongTermCommunalRelationship()
+        {
+            // Edge with high CommunalStrength + high PositiveInteractionCount should
+            // drift ResponsiveDesireLevel toward its target over many days.
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 75, Trust: 80, Familiarity: 60,
+                    AestheticAttraction: 65, PhysicalAttraction: 65,
+                    RomanticInterest: 55, SexualInterest: 45,
+                    Closeness: 70, Respect: 65, Comfort: 75,
+                    Breakdown: new DomainBreakdown(50, 60, 65, 65, 60),
+                    PositiveInteractionCount: 50,  // > 30 threshold
+                    CommunalStrength: 75)           // > 60 threshold
+            }));
+
+            var before = engine.State.Edges[other].ResponsiveDesireLevel;
+            engine.Tick(_now, WTimeSpan.FromDays(90), ctx, _outbox);
+            var after = engine.State.Edges[other].ResponsiveDesireLevel;
+
+            Assert.IsTrue(after > before,
+                $"ResponsiveDesireLevel should grow in communal long-term relationship (before={before:F1}, after={after:F1})");
+        }
+
+        [TestMethod]
+        public void ResponsiveDesireLevel_StaysZero_InNewRelationship()
+        {
+            // Low CommunalStrength + low PositiveInteractionCount → ResponsiveDesireLevel stays at 0
+            var engine = BuildEngine();
+            var self   = new HumanId(Guid.NewGuid());
+            var other  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
+
+            engine.Tick(_now, WTimeSpan.FromDays(60), ctx, _outbox);
+
+            Assert.AreEqual(0, engine.State.Edges[other].ResponsiveDesireLevel, 0.01,
+                "New relationship with low CommunalStrength should have ResponsiveDesireLevel = 0");
+        }
+
+        #endregion S2 — ResponsiveDesireLevel testy
+
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>
@@ -1232,6 +1464,12 @@ namespace EngineTests
         /// kromě ctx.Id a ctx.Snapshot.Psychology (pro Tick).
         /// </summary>
         private IHumanContext BuildContext(HumanId id, Personality? personality = null)
+            => BuildContextWithObservers(id, null, personality);
+
+        private IHumanContext BuildContextWithObservers(
+            HumanId id,
+            IReadOnlyList<HumanId>? observers,
+            Personality? personality = null)
         {
             personality ??= new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
@@ -1249,7 +1487,7 @@ namespace EngineTests
                 new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
                 psych,
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
-                new InteractionSurface(null, false, 0.5, 0.5, SurfaceKind.Unknown),
+                new InteractionSurface(null, false, 0.5, 0.5, SurfaceKind.Unknown, observers),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(new List<EpisodicMemory>()));
 
