@@ -29,8 +29,8 @@ namespace GameEngineTools.Characters.Traits
         public static PsychologicalProfile FromPersonality(Personality personality)
         {
             var coping =
-                personality.Attachment == AttachmentStyle.Avoidant ? CopingStyle.Avoidant :
-                personality.Attachment == AttachmentStyle.Anxious ? CopingStyle.PeoplePleasing :
+                personality.Attachment.Avoidance >= 0.6 ? CopingStyle.Avoidant :
+                personality.Attachment.Anxiety >= 0.6 ? CopingStyle.PeoplePleasing :
                 personality.BigFive.Agreeableness >= 0.75 ? CopingStyle.PeoplePleasing :
                 personality.BigFive.Extraversion >= 0.75 && personality.BigFive.Openness >= 0.6 ? CopingStyle.Humor :
                 personality.BigFive.Conscientiousness >= 0.75 ? CopingStyle.Rationalizing :

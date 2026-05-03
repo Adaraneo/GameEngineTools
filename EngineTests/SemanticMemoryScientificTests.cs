@@ -40,8 +40,8 @@ namespace EngineTests
 
             var engineSecure  = BuildEngine();
             var engineAnxious = BuildEngine();
-            var ctxSecure     = BuildCtxWith(self, AttachmentStyle.Secure);
-            var ctxAnxious    = BuildCtxWith(self, AttachmentStyle.Anxious);
+            var ctxSecure     = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxAnxious    = BuildCtxWith(self, AttachmentProfile.Preoccupied);
             var outbox = new EventCollector();
 
             for (var i = 0; i < 3; i++)
@@ -67,8 +67,8 @@ namespace EngineTests
 
             var engineSecure  = BuildEngine();
             var engineAvoidant = BuildEngine();
-            var ctxSecure   = BuildCtxWith(self, AttachmentStyle.Secure);
-            var ctxAvoidant = BuildCtxWith(self, AttachmentStyle.Avoidant);
+            var ctxSecure   = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxAvoidant = BuildCtxWith(self, AttachmentProfile.Dismissing);
             var outbox = new EventCollector();
 
             // Validation:Accepted → generuje Warm (0.20) + EmotionallySafe (0.24)
@@ -98,8 +98,8 @@ namespace EngineTests
 
             var engineSecure   = BuildEngine();
             var engineAvoidant = BuildEngine();
-            var ctxSecure   = BuildCtxWith(self, AttachmentStyle.Secure);
-            var ctxAvoidant = BuildCtxWith(self, AttachmentStyle.Avoidant);
+            var ctxSecure   = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxAvoidant = BuildCtxWith(self, AttachmentProfile.Dismissing);
             var outbox = new EventCollector();
 
             for (var i = 0; i < 4; i++)
@@ -127,8 +127,8 @@ namespace EngineTests
 
             var engineSecure       = BuildEngine();
             var engineDisorganized = BuildEngine();
-            var ctxSecure       = BuildCtxWith(self, AttachmentStyle.Secure);
-            var ctxDisorganized = BuildCtxWith(self, AttachmentStyle.Disorganized);
+            var ctxSecure       = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxDisorganized = BuildCtxWith(self, AttachmentProfile.Fearful);
             var outbox = new EventCollector();
 
             // Stejný počáteční stav pro oba enginy (Rejecting strength = 0.50)
@@ -162,8 +162,8 @@ namespace EngineTests
 
             var engineDefault = BuildEngine();
             var engineSecure  = BuildEngine();
-            var ctxDefault = BuildCtxWith(self, AttachmentStyle.Secure);
-            var ctxSecure  = BuildCtxWith(self, AttachmentStyle.Secure);
+            var ctxDefault = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxSecure  = BuildCtxWith(self, AttachmentProfile.Secure);
             var outbox = new EventCollector();
 
             for (var i = 0; i < 3; i++)
@@ -201,7 +201,7 @@ namespace EngineTests
 
             var engineGap    = BuildEngine();
             var engineNormal = BuildEngine();
-            var ctx = BuildCtxWith(self, AttachmentStyle.Secure);
+            var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
 
             // Stav s velmi starým LastUpdatedAt (200 dní před now)
             var oldTime    = now - WTimeSpan.FromDays(200);
@@ -239,7 +239,7 @@ namespace EngineTests
             var dt = WTimeSpan.FromDays(1);
 
             var engine = BuildEngine();
-            var ctx = BuildCtxWith(self, AttachmentStyle.Secure);
+            var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
 
             var recentTime = now - WTimeSpan.FromDays(5);
             engine.RestoreState(BeliefState(other, PersonBeliefKind.Warm, 0.80, 0.10, recentTime));
@@ -269,7 +269,7 @@ namespace EngineTests
         {
             var self  = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx = BuildCtxWith(self, AttachmentStyle.Secure);
+            var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
             var engine = BuildEngine();
             var outbox = new EventCollector();
 
@@ -306,7 +306,7 @@ namespace EngineTests
             var self   = new HumanId(Guid.NewGuid());
             var alpha  = new HumanId(Guid.NewGuid());
             var beta   = new HumanId(Guid.NewGuid());
-            var ctx    = BuildCtxWith(self, AttachmentStyle.Secure);
+            var ctx    = BuildCtxWith(self, AttachmentProfile.Secure);
             var engine = BuildEngine();
             var outbox = new EventCollector();
 
@@ -324,7 +324,7 @@ namespace EngineTests
         {
             var self  = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx   = BuildCtxWith(self, AttachmentStyle.Secure);
+            var ctx   = BuildCtxWith(self, AttachmentProfile.Secure);
             var engine = BuildEngine();
             var outbox = new EventCollector();
 
@@ -391,7 +391,7 @@ namespace EngineTests
                 => Array.Empty<(ScheduledId, ScheduledAction)>();
         }
 
-        internal static IHumanContext BuildCtxWith(HumanId self, AttachmentStyle attachment)
+        internal static IHumanContext BuildCtxWith(HumanId self, AttachmentProfile attachment)
         {
             var personality = new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),

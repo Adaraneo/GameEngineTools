@@ -5,7 +5,7 @@ namespace GameEngineTools.Characters.Traits
 {
     public sealed record Personality(
         BigFive BigFive,
-        AttachmentStyle Attachment,
+        AttachmentProfile Attachment,
         CommunicationStyle Communication,
         MotivationWeights Motivation,
         Sociosexuality Sociosexuality,
@@ -13,9 +13,6 @@ namespace GameEngineTools.Characters.Traits
 
     public sealed record BigFive(
         double Openness, double Conscientiousness, double Extraversion, double Agreeableness, double Neuroticism);
-
-    public enum AttachmentStyle
-    { Secure, Anxious, Avoidant, Disorganized }
 
     public enum CommunicationStyle
     { Direct, Indirect, HighContext, LowContext }

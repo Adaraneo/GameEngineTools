@@ -541,14 +541,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     else if (wasRejected)
                     {
                         var n = ctx.Personality.BigFive.Neuroticism;
-                        var attachmentModifier = ctx.Personality.Attachment switch
-                        {
-                            AttachmentStyle.Secure => 0.0,
-                            AttachmentStyle.Anxious => 0.08,
-                            AttachmentStyle.Avoidant => -0.02,
-                            AttachmentStyle.Disorganized => 0.12,
-                            _ => 0.0
-                        };
+                        // Continuous ECR-R model (Brennan et al. 1998):
+                        // Anxiety amplifies rejection impact (hyperactivation);
+                        // Avoidance suppresses it (deactivation strategy).
+                        var attachmentModifier = ctx.Personality.Attachment.Anxiety * 0.12
+                                               - ctx.Personality.Attachment.Avoidance * 0.02;
                         var actSensitivity = io.Act switch
                         {
                             SpeechAct.SelfDisclosure => 1.6,
@@ -718,6 +715,50 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         // Publikuj StressSpiked pokud stres přesáhl threshold (ostatní enginy mohou reagovat)
                         if (s.Stress > 70 && State.Stress <= 70)
                             outbox.Add(new StressSpiked(se.OccurredAt, ctx.Id, s.Stress));
+
+                        break;
+                    }
+
+                // ── RejectionNeedsThreat — Williams' 4-need threat model ────────────────
+                // Hartgerink et al. 2015 (k=120 Cyberball studies, d > |1.4|):
+                // Intimate rejection simultaneously threatens Belonging, Self-esteem,
+                // Control, and Meaningful Existence — even brief exclusion is deeply aversive.
+                case Characters.Engines.Relationships.RejectionNeedsThreat rnt
+                    when rnt.Rejected == ctx.Id:
+                    {
+                        var intensity = Math.Clamp(rnt.Intensity, 0.72, 1.6);
+                        var intimacyScale = rnt.IsIntimateAdvance ? 1.0 : 0.6;
+
+                        // Need 2: Self-esteem — Valence drop + MoodBaseline erosion
+                        var valenceDrop = 0.07 * intensity * intimacyScale;
+                        var moodDrop    = 6.0  * intensity * intimacyScale;
+
+                        // Need 4: Meaningful existence — Stress spike (HPA activation)
+                        var stressGain  = 5.0  * intensity * intimacyScale;
+
+                        // Need 3: Control — Dominance penalty
+                        var dominanceDrop = 0.05 * intensity * intimacyScale;
+
+                        var prevMotivRnt = s.Motivations ?? new MotivationState();
+                        s = s with
+                        {
+                            Valence      = Math.Clamp(s.Valence - valenceDrop, -1, 1),
+                            MoodBaseline = Math.Clamp(s.MoodBaseline - moodDrop, 0, 100),
+                            Stress       = Math.Clamp(s.Stress + stressGain, 0, 100),
+                            Dominance    = Math.Clamp(s.Dominance - dominanceDrop, 0, 1),
+                            // Need 1: Belonging — NeedSocial urgency increases (desire to reconnect)
+                            Motivations  = prevMotivRnt with
+                            {
+                                NeedSocial = Math.Clamp(prevMotivRnt.NeedSocial + 8.0 * intensity * intimacyScale, 0, 100),
+                                NeedSafety = Math.Clamp(prevMotivRnt.NeedSafety + 4.0 * intensity * intimacyScale, 0, 100)
+                            }
+                        };
+
+                        if (s.Motivations != prevMotivRnt)
+                            outbox.Add(new MotivationChanged(rnt.OccurredAt, ctx.Id, prevMotivRnt, s.Motivations!));
+
+                        if (s.Stress > 70 && State.Stress <= 70)
+                            outbox.Add(new StressSpiked(rnt.OccurredAt, ctx.Id, s.Stress));
 
                         break;
                     }

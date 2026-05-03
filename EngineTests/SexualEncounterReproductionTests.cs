@@ -256,7 +256,7 @@ namespace EngineTests
         {
             var personality = new Personality(
                 new BigFive(0.55, 0.55, 0.55, 0.6, 0.2),
-                AttachmentStyle.Secure,
+                AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
                 new MotivationWeights(0.7, 0.5, 0.3, 0.4, 0.5, 0.5, 0.4, 0.6, 0.85),
                 Sociosexuality.Unrestricted,

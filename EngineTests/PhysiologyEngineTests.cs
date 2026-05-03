@@ -1287,7 +1287,7 @@ namespace EngineTests
             {
                 Id = new HumanId(System.Guid.NewGuid()),
                 Biology = SexBiology.Female,
-                Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentStyle.Secure,
+                Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure,
                     CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate, Chronotype.Neutral),
                 Snapshot = snapshot,
@@ -1466,7 +1466,7 @@ namespace EngineTests
             var ctxHighAlt = new HumanContext
             {
                 Id = new HumanId(System.Guid.NewGuid()), Biology = SexBiology.Female,
-                Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentStyle.Secure,
+                Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure,
                     CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate, Chronotype.Neutral),
                 Snapshot = highAltSnapshot, Random = new ZeroRandom(),
@@ -1504,7 +1504,7 @@ namespace EngineTests
             var ctx = new HumanContext
             {
                 Id = new HumanId(System.Guid.NewGuid()), Biology = SexBiology.Female,
-                Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentStyle.Secure,
+                Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure,
                     CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate, Chronotype.Neutral),
                 Snapshot = amsSnapshot, Random = new ZeroRandom(),
@@ -1745,7 +1745,7 @@ namespace EngineTests
                 Biology = SexBiology.Female,
                 Personality = new Personality(
                     new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                    AttachmentStyle.Secure,
+                    AttachmentProfile.Secure,
                     CommunicationStyle.Direct,
                     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate,
@@ -1782,7 +1782,7 @@ namespace EngineTests
                 Biology = SexBiology.Female,
                 Personality = new Personality(
                     new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                    AttachmentStyle.Secure,
+                    AttachmentProfile.Secure,
                     CommunicationStyle.Direct,
                     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate,
@@ -1866,7 +1866,7 @@ namespace EngineTests
                 Biology = biology,
                 Personality = new Personality(
                     new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                    AttachmentStyle.Secure,
+                    AttachmentProfile.Secure,
                     CommunicationStyle.Direct,
                     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate,

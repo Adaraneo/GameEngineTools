@@ -21,7 +21,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             var productiveBias = Centered(personality.BigFive.Conscientiousness) * 6.0 + Centered(profile.Narrative.DiligenceIdentity) * 4.0;
             var socialBias = Centered(personality.Motivation.Affiliation) * 6.0 + Centered(personality.BigFive.Extraversion) * 5.0 + Centered(profile.Narrative.BelongingIdentity) * 3.0;
             var curiosityBias = Centered(personality.Motivation.Curiosity) * 6.0 + Centered(personality.BigFive.Openness) * 4.0;
-            var privacyBias = Centered(personality.BigFive.Neuroticism) * 4.0 + (personality.Attachment == AttachmentStyle.Avoidant ? 2.5 : 0.0);
+            var privacyBias = Centered(personality.BigFive.Neuroticism) * 4.0 + personality.Attachment.Avoidance * 2.5;
             var intimacyBias = SociosexualityBehaviorMath.InviteIntimacyTraitBias(personality.Sociosexuality);
 
             BehaviorCandidateEditor.Add(candidates, Work, productiveBias);

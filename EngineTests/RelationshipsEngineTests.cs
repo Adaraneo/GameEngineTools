@@ -330,7 +330,7 @@ namespace EngineTests
             var other = new HumanId(Guid.NewGuid());
             var personality = new Personality(
                 new BigFive(0.5, 0.25, 0.45, 0.65, 0.9),
-                AttachmentStyle.Anxious,
+                AttachmentProfile.Preoccupied,
                 CommunicationStyle.Indirect,
                 new MotivationWeights(0.8, 0.4, 0.2, 0.5, 0.4, 0.4, 0.5, 0.5, 0.3),
                 Sociosexuality.Intermediate,
@@ -779,6 +779,336 @@ namespace EngineTests
 
         #endregion Runtime wiring
 
+        #region AttachmentProfile testy
+
+        [TestMethod]
+        public void AttachmentProfile_HighAvoidance_CapsCloseness()
+        {
+            // Dismissing (high Avoidance = 0.8): closeness cap = 100 - 0.8 * 40 = 68
+            var engine = BuildEngine();
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var avoidance = 0.8;
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.3),
+                new AttachmentProfile(Anxiety: 0.2, Avoidance: avoidance),
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate, Chronotype.Neutral);
+            var ctx = BuildContext(self, personality);
+
+            // Seed high closeness so ceiling is actually tested
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 80, Trust: 85, Familiarity: 50,
+                    AestheticAttraction: 60, PhysicalAttraction: 60,
+                    RomanticInterest: 50, SexualInterest: 40,
+                    Closeness: 60, Respect: 60, Comfort: 70,
+                    Breakdown: new DomainBreakdown(50, 50, 60, 55, 60))
+            }));
+
+            // Several accepted interactions should not push Closeness above the cap
+            for (var i = 0; i < 10; i++)
+            {
+                engine.Handle(new InteractionOutcome(_now, self, other, Accepted: true, Reason: "ok",
+                    Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+            }
+
+            var expectedCap = 100.0 - avoidance * DefaultCfg.ClosenessAvoidanceCap;
+            Assert.IsTrue(engine.State.Edges[other].Closeness <= expectedCap + 0.01,
+                $"Closeness {engine.State.Edges[other].Closeness:F1} should not exceed cap {expectedCap:F1}");
+        }
+
+        [TestMethod]
+        public void AttachmentProfile_HighAnxiety_AmplifiesRejectionSting()
+        {
+            // Preoccupied (high Anxiety): rejection sting should be larger than for Secure
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+
+            var engineSecure   = BuildEngine();
+            var engineAnxious  = BuildEngine();
+
+            var ctxSecure = BuildContext(self, new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.3),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate, Chronotype.Neutral));
+
+            var ctxAnxious = BuildContext(self, new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.3),
+                AttachmentProfile.Preoccupied,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate, Chronotype.Neutral));
+
+            // Seed identical edge in both
+            var edge = new RelationshipEdge(self, other, Like: 70, Trust: 65, Familiarity: 30,
+                AestheticAttraction: 60, PhysicalAttraction: 60,
+                RomanticInterest: 45, SexualInterest: 35,
+                Closeness: 50, Respect: 60, Comfort: 60,
+                Breakdown: new DomainBreakdown(50, 50, 60, 55, 60));
+            engineSecure.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = edge }));
+            engineAnxious.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = edge }));
+
+            var rejection = new InteractionOutcome(_now, self, other, Accepted: false, Reason: "no",
+                Act: SpeechAct.Invite);
+
+            engineSecure.Handle(rejection, ctxSecure, _outbox);
+            engineAnxious.Handle(rejection, ctxAnxious, _outbox);
+
+            var likeDeltaSecure  = edge.Like - engineSecure.State.Edges[other].Like;
+            var likeDeltaAnxious = edge.Like - engineAnxious.State.Edges[other].Like;
+
+            Assert.IsTrue(likeDeltaAnxious > likeDeltaSecure,
+                $"Anxious sting ({likeDeltaAnxious:F2}) should exceed Secure sting ({likeDeltaSecure:F2})");
+        }
+
+        [TestMethod]
+        public void AttachmentProfile_HighAvoidance_ReducesRepairGain()
+        {
+            // Dismissing (high Avoidance): RepairAttempt.Accepted gives less Trust
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+
+            var engineSecure    = BuildEngine();
+            var engineDismissing = BuildEngine();
+
+            var ctxSecure = BuildContext(self, new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.3), AttachmentProfile.Secure,
+                CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate, Chronotype.Neutral));
+
+            var ctxDismissing = BuildContext(self, new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.3), AttachmentProfile.Dismissing,
+                CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate, Chronotype.Neutral));
+
+            var edge = new RelationshipEdge(self, other, Like: 60, Trust: 50, Familiarity: 30,
+                AestheticAttraction: 60, PhysicalAttraction: 60,
+                RomanticInterest: 30, SexualInterest: 20,
+                Closeness: 40, Respect: 55, Comfort: 50,
+                Breakdown: new DomainBreakdown(50, 50, 60, 55, 60));
+            engineSecure.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = edge }));
+            engineDismissing.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = edge }));
+
+            var repair = new RepairAttempt(_now, self, other, Accepted: true);
+            engineSecure.Handle(repair, ctxSecure, _outbox);
+            engineDismissing.Handle(repair, ctxDismissing, _outbox);
+
+            var trustGainSecure    = engineSecure.State.Edges[other].Trust - edge.Trust;
+            var trustGainDismissing = engineDismissing.State.Edges[other].Trust - edge.Trust;
+
+            Assert.IsTrue(trustGainDismissing < trustGainSecure,
+                $"Dismissing repair gain ({trustGainDismissing:F2}) should be less than Secure ({trustGainSecure:F2})");
+        }
+
+        #endregion AttachmentProfile testy
+
+        #region TransgressionResidue testy
+
+        [TestMethod]
+        public void TransgressionResidue_MicroNegativeAccumulates()
+        {
+            var engine = BuildEngine();
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx   = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 55, Attraction: 40), ctx, _outbox);
+            Assert.AreEqual(0, engine.State.Edges[other].TransgressionResidue, "Initial residue should be 0");
+
+            // MicroNegative(A=victim=self, B=perpetrator=other): self's edge to other gains residue
+            engine.Handle(new MicroNegative(_now, self, other, "snub"), ctx, _outbox);
+            engine.Handle(new MicroNegative(_now, self, other, "snub"), ctx, _outbox);
+            engine.Handle(new MicroNegative(_now, self, other, "snub"), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].TransgressionResidue > 0,
+                "After 3 MicroNegatives, TransgressionResidue should be positive");
+        }
+
+        [TestMethod]
+        public void TransgressionResidue_PowerLawDecay()
+        {
+            var engine = BuildEngine();
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx   = BuildContext(self);
+
+            // Seed edge with known TransgressionResidue
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 30,
+                    AestheticAttraction: 60, PhysicalAttraction: 60,
+                    RomanticInterest: 30, SexualInterest: 20,
+                    Closeness: 40, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 60, 55, 60),
+                    TransgressionResidue: 30)
+            }));
+
+            // Tick 20 days
+            engine.Tick(_now, WTimeSpan.FromDays(20), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].TransgressionResidue < 30,
+                "TransgressionResidue should decay over 20 days");
+        }
+
+        [TestMethod]
+        public void TransgressionResidue_RepairAccepted_Reduces()
+        {
+            var engine = BuildEngine();
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx   = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 30,
+                    AestheticAttraction: 60, PhysicalAttraction: 60,
+                    RomanticInterest: 30, SexualInterest: 20,
+                    Closeness: 40, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 60, 55, 60),
+                    TransgressionResidue: 20)
+            }));
+
+            engine.Handle(new RepairAttempt(_now, self, other, Accepted: true), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].TransgressionResidue < 20,
+                "Accepted RepairAttempt should reduce TransgressionResidue");
+        }
+
+        #endregion TransgressionResidue testy
+
+        #region Navarro gap rule testy
+
+        [TestMethod]
+        public void NavarrGap_TriggersAcceleratedDecay()
+        {
+            // Two identical edges: one with recent contact, one with contact 150 days ago.
+            // The stale one (150 > 8 × 14 = 112 days) should decay faster.
+            var self   = new HumanId(Guid.NewGuid());
+            var recent = new HumanId(Guid.NewGuid());
+            var stale  = new HumanId(Guid.NewGuid());
+            var ctx    = BuildContext(self);
+            var engine = BuildEngine();
+
+            var now = _now;
+            var recentContact = now - WTimeSpan.FromDays(5);
+            var staleContact  = now - WTimeSpan.FromDays(150);
+
+            var baseEdge = new RelationshipEdge(self, recent,
+                Like: 70, Trust: 70, Familiarity: 50,
+                AestheticAttraction: 60, PhysicalAttraction: 60,
+                RomanticInterest: 40, SexualInterest: 30,
+                Closeness: 60, Respect: 60, Comfort: 65,
+                Breakdown: new DomainBreakdown(50, 50, 60, 55, 60));
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [recent] = baseEdge with { A = self, B = recent, LastContactTime = recentContact },
+                [stale]  = baseEdge with { A = self, B = stale,  LastContactTime = staleContact }
+            }));
+
+            engine.Tick(now, WTimeSpan.FromDays(7), ctx, _outbox);
+
+            var recentCloseness = engine.State.Edges[recent].Closeness;
+            var staleCloseness  = engine.State.Edges[stale].Closeness;
+
+            Assert.IsTrue(staleCloseness < recentCloseness,
+                $"Stale edge Closeness ({staleCloseness:F1}) should be lower than recent ({recentCloseness:F1}) due to Navarro gap");
+        }
+
+        #endregion Navarro gap rule testy
+
+        #region CommunalStrength testy
+
+        [TestMethod]
+        public void CommunalStrength_GrowsFromIntimateTouch()
+        {
+            var engine = BuildEngine();
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx   = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, _outbox);
+            var before = engine.State.Edges[other].CommunalStrength;
+
+            // Intimate touch (self = recipient)
+            engine.Handle(new TouchOutcome(_now, other, self, TouchLevel.Intimate, Accepted: true, Reason: "ok"), ctx, _outbox);
+
+            var after = engine.State.Edges[other].CommunalStrength;
+            Assert.IsTrue(after > before,
+                $"CommunalStrength should increase after accepted intimate touch (before={before:F1}, after={after:F1})");
+        }
+
+        #endregion CommunalStrength testy
+
+        #region Familiarity non-monotonicity testy
+
+        [TestMethod]
+        public void FamiliarityDissonance_HighFamiliarityWithoutContact_ReducesLike()
+        {
+            var engine = BuildEngine();
+            var self  = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx   = BuildContext(self);
+
+            var now          = _now;
+            var lastContact  = now - WTimeSpan.FromDays(40);  // 40 days since last contact
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 65, Trust: 60, Familiarity: 70,  // Familiarity > 55 ✓
+                    AestheticAttraction: 60, PhysicalAttraction: 60,
+                    RomanticInterest: 30, SexualInterest: 20,
+                    Closeness: 50, Respect: 55, Comfort: 55,
+                    Breakdown: new DomainBreakdown(50, 50, 60, 55, 60),
+                    LastContactTime: lastContact)
+            }));
+
+            var likeBefore = engine.State.Edges[other].Like;
+            engine.Tick(now, WTimeSpan.FromDays(10), ctx, _outbox);
+            var likeAfter = engine.State.Edges[other].Like;
+
+            // Normal decay + familiarity dissonance penalty → Like should drop
+            Assert.IsTrue(likeAfter < likeBefore,
+                $"Like should decrease with Familiarity>55 and 40-day absence (before={likeBefore:F1}, after={likeAfter:F1})");
+        }
+
+        #endregion Familiarity non-monotonicity testy
+
+        #region RejectionNeedsThreat testy
+
+        [TestMethod]
+        public void RejectionNeedsThreat_PublishedOnInviteRejected()
+        {
+            var engine  = BuildEngine();
+            var self    = new HumanId(Guid.NewGuid());
+            var other   = new HumanId(Guid.NewGuid());
+            var ctx     = BuildContext(self);
+            var outbox  = new EventCollector();
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, outbox);
+
+            // Self = initiator, other = recipient who rejects
+            engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "no",
+                Act: SpeechAct.Invite), ctx, outbox);
+
+            var events = outbox.Drain();
+            var threat = events.OfType<RejectionNeedsThreat>().FirstOrDefault();
+            Assert.IsNotNull(threat, "RejectionNeedsThreat should be published when InviteIntimacy is rejected");
+            Assert.AreEqual(self, threat.Rejected, "Rejected should be the initiator");
+            Assert.IsTrue(threat.IsIntimateAdvance, "IsIntimateAdvance should be true for Invite");
+            Assert.IsTrue(threat.Intensity >= 0.72, "Intensity should be >= baseline 0.72");
+        }
+
+        #endregion RejectionNeedsThreat testy
+
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>
@@ -805,7 +1135,7 @@ namespace EngineTests
 
             var personality = new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                AttachmentStyle.Secure,
+                AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
                 new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                 Sociosexuality.Intermediate,
@@ -905,7 +1235,7 @@ namespace EngineTests
         {
             personality ??= new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                AttachmentStyle.Secure,
+                AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
                 new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                 Sociosexuality.Intermediate,

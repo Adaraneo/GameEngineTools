@@ -276,7 +276,7 @@ namespace EngineTests
         private static Personality Personality(Sociosexuality sociosexuality, double sexuality)
             => new(
                 new BigFive(0.5, 0.5, 0.6, 0.6, 0.3),
-                AttachmentStyle.Secure,
+                AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
                 new MotivationWeights(0.6, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.5, sexuality),
                 sociosexuality,

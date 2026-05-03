@@ -66,7 +66,7 @@ namespace EngineTests
 
         private static readonly Personality DefaultPersonality = new(
             new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-            AttachmentStyle.Secure,
+            AttachmentProfile.Secure,
             CommunicationStyle.Direct,
             new MotivationWeights(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
             Sociosexuality.Intermediate,

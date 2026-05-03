@@ -365,7 +365,7 @@ namespace EngineTests
                 Biology = SexBiology.Female,
                 Personality = new Personality(
                     new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                    AttachmentStyle.Secure,
+                    AttachmentProfile.Secure,
                     CommunicationStyle.Direct,
                     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate,

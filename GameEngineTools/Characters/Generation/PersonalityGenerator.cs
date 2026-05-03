@@ -27,7 +27,7 @@ public sealed record PersonalityHints(
     double? Extraversion = null,
     double? Agreeableness = null,
     double? Neuroticism = null,
-    AttachmentStyle? Attachment = null,
+    AttachmentProfile? Attachment = null,
     CommunicationStyle? Communication = null,
     Chronotype? Chronotype = null,
     Sociosexuality? Sociosexuality = null
@@ -340,10 +340,10 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
 
         // 3) ostatní volby – losování z vah nebo hint fix
         var attach = hints.Attachment ?? PickWeighted(
-            (AttachmentStyle.Secure, spec.AttachmentWeights.Secure),
-            (AttachmentStyle.Anxious, spec.AttachmentWeights.Anxious),
-            (AttachmentStyle.Avoidant, spec.AttachmentWeights.Avoidant),
-            (AttachmentStyle.Disorganized, spec.AttachmentWeights.Disorganized), rng);
+            (AttachmentProfile.Secure, spec.AttachmentWeights.Secure),
+            (AttachmentProfile.Preoccupied, spec.AttachmentWeights.Anxious),
+            (AttachmentProfile.Dismissing, spec.AttachmentWeights.Avoidant),
+            (AttachmentProfile.Fearful, spec.AttachmentWeights.Disorganized), rng);
 
         var comm = hints.Communication ?? PickWeighted(
             (CommunicationStyle.Indirect, spec.CommunicationWeights.Indirect),

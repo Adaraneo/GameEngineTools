@@ -58,7 +58,7 @@ namespace EngineTests
 
         internal static IHumanContext Human(MemoryIndex? memory, SemanticMemoryState? semanticMemory, RelationshipState? relationships, SurfaceKind surfaceKind, double noise, double crowding, double stress, double valence, double hunger, double thirst, double energy, double competence, double curiosity, double affiliation, Chronotype chronotype, Personality? personality = null, IRandomSource? random = null, HumanId? selfId = null, SexBiology biology = SexBiology.Female, AttractionProfile? attractionProfile = null)
         {
-            var effectivePersonality = personality ?? new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentStyle.Secure, CommunicationStyle.Direct,
+            var effectivePersonality = personality ?? new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure, CommunicationStyle.Direct,
                 new MotivationWeights(affiliation, 0.5, 0.3, 0.4, competence, 0.5, curiosity, 0.6, 0.3), Sociosexuality.Intermediate, chronotype);
             var snapshot = new EnginesSnapshot(
                 new PhysiologyState(energy, 0, hunger, thirst, 0, 0, 0, null),
@@ -126,7 +126,7 @@ namespace EngineTests
         [TestMethod]
         public void Modify_HighConscientiousness_BoostsWork()
         {
-            var personality = new Personality(new BigFive(0.5, 0.95, 0.4, 0.5, 0.2), AttachmentStyle.Secure, CommunicationStyle.Direct, new MotivationWeights(0.3, 0.8, 0.3, 0.4, 0.9, 0.5, 0.4, 0.4, 0.3), Sociosexuality.Intermediate, Chronotype.Neutral);
+            var personality = new Personality(new BigFive(0.5, 0.95, 0.4, 0.5, 0.2), AttachmentProfile.Secure, CommunicationStyle.Direct, new MotivationWeights(0.3, 0.8, 0.3, 0.4, 0.9, 0.5, 0.4, 0.4, 0.3), Sociosexuality.Intermediate, Chronotype.Neutral);
             var candidates = new List<BehaviorCandidate> { new(Work, 10, WTimeSpan.FromHours(1), BehaviorDomain.Competence) };
             new TraitBiasEngine().Modify(BehaviorComponentTestFactory.Context(personality: personality), candidates);
             Assert.IsTrue(candidates[0].Utility > 10);
@@ -135,7 +135,7 @@ namespace EngineTests
         [TestMethod]
         public void Modify_HighAffiliationAndExtraversion_BoostsReachOut()
         {
-            var personality = new Personality(new BigFive(0.6, 0.4, 0.95, 0.8, 0.2), AttachmentStyle.Secure, CommunicationStyle.Direct, new MotivationWeights(1.0, 0.4, 0.2, 0.4, 0.5, 0.5, 0.4, 0.4, 0.3), Sociosexuality.Intermediate, Chronotype.Neutral);
+            var personality = new Personality(new BigFive(0.6, 0.4, 0.95, 0.8, 0.2), AttachmentProfile.Secure, CommunicationStyle.Direct, new MotivationWeights(1.0, 0.4, 0.2, 0.4, 0.5, 0.5, 0.4, 0.4, 0.3), Sociosexuality.Intermediate, Chronotype.Neutral);
             var candidates = new List<BehaviorCandidate> { new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social) };
             new TraitBiasEngine().Modify(BehaviorComponentTestFactory.Context(personality: personality), candidates);
             Assert.IsTrue(candidates[0].Utility > 10);
@@ -147,7 +147,7 @@ namespace EngineTests
     [TestClass] public class MemoryInfluenceEngineTests : TestBase { [TestMethod] public void Modify_NegativeInteraction_EmitsMemoryRecallAndPenalizesReachOut() { var memory = new MemoryIndex(new List<EpisodicMemory> { new(Guid.NewGuid(), new WDateTime(0), "Interaction:A", 0.5, EmotionalTag.Negative, 0.7) }); var context = BehaviorComponentTestFactory.Context(memory: memory); var candidates = new List<BehaviorCandidate> { new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social) }; new MemoryInfluenceEngine().Modify(context, candidates); Assert.IsTrue(candidates[0].Utility < 10); Assert.IsTrue(context.Outbox.Drain().OfType<MemoryRecalled>().Any()); } }
     [TestClass] public class EnvironmentalAffordanceEngineTests : TestBase { [TestMethod] public void Modify_SocialSurface_PenalizesWorkHereAndBoostsMoveToWork() { var candidates = new List<BehaviorCandidate> { new(Work, 100, WTimeSpan.FromHours(1), BehaviorDomain.Competence), new(MoveToWork, 0, WTimeSpan.FromHours(1), BehaviorDomain.Competence) }; new EnvironmentalAffordanceEngine().Modify(BehaviorComponentTestFactory.Context(surfaceKind: SurfaceKind.Social, competence: 1), candidates); Assert.IsTrue(candidates.Single(c => c.Name == Work).Utility < 100); Assert.IsTrue(candidates.Single(c => c.Name == MoveToWork).Utility > 0); } }
     [TestClass] public class ActionArbitrationEngineTests : TestBase { [TestMethod] public void Arbitrate_SelectsHighestUtilityCandidate() { var result = new DefaultActionArbitrationEngine(LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger<DefaultActionArbitrationEngine>()).Arbitrate(BehaviorComponentTestFactory.Context(), new List<BehaviorCandidate> { new(Idle, 1, WTimeSpan.FromHours(1), BehaviorDomain.Physiological), new(Work, 10, WTimeSpan.FromHours(1), BehaviorDomain.Competence) }); Assert.AreEqual(Work, result.SelectedCandidate?.Name); } }
-    [TestClass] public class HumanInconsistencyArbitrationTests : TestBase { [TestMethod] public void Arbitrate_WhenIdentityAndCopingConflict_CanPickNonUtilityLeader() { var personality = new Personality(new BigFive(0.4, 1.0, 0.2, 0.3, 0.95), AttachmentStyle.Avoidant, CommunicationStyle.Direct, new MotivationWeights(0.2, 0.8, 0.6, 0.2, 0.9, 0.3, 0.2, 0.4, 0.2), Sociosexuality.Intermediate, Chronotype.Neutral); var snapshot = new EnginesSnapshot(new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null), new PsychologyState(0, 0.5, 0.5, 95, 0, DiscreteEmotion.Neutral), new BehaviorState(10, 5, 5, 20, 50, 30, null), new InteractionSurface("test", false, 0.3, 0.3, SurfaceKind.Unknown), new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()), new MemoryIndex(new List<EpisodicMemory>())); var context = new BehaviorContext(new WDateTime(0), WTimeSpan.FromHours(1), new HumanContext { Id = new HumanId(Guid.NewGuid()), Biology = SexBiology.Female, Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality), Snapshot = snapshot, Random = new LocalConflictRandom(), Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"), EventBus = new LocalNullEventBus(), Scheduler = new LocalNullScheduler() }, new EventCollector(), new BehaviorState(10, 5, 5, 20, 50, 30, null), new BehaviorConfig(), new Dictionary<string, double>()); var result = new DefaultActionArbitrationEngine(LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger<DefaultActionArbitrationEngine>()).Arbitrate(context, new List<BehaviorCandidate> { new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social), new(Work, 9, WTimeSpan.FromHours(1), BehaviorDomain.Competence) }); Assert.AreEqual(ReachOut, result.IntendedCandidate?.Name); Assert.AreEqual(Work, result.SelectedCandidate?.Name); Assert.IsFalse(string.IsNullOrWhiteSpace(result.ConflictReason)); } }
+    [TestClass] public class HumanInconsistencyArbitrationTests : TestBase { [TestMethod] public void Arbitrate_WhenIdentityAndCopingConflict_CanPickNonUtilityLeader() { var personality = new Personality(new BigFive(0.4, 1.0, 0.2, 0.3, 0.95), AttachmentProfile.Dismissing, CommunicationStyle.Direct, new MotivationWeights(0.2, 0.8, 0.6, 0.2, 0.9, 0.3, 0.2, 0.4, 0.2), Sociosexuality.Intermediate, Chronotype.Neutral); var snapshot = new EnginesSnapshot(new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null), new PsychologyState(0, 0.5, 0.5, 95, 0, DiscreteEmotion.Neutral), new BehaviorState(10, 5, 5, 20, 50, 30, null), new InteractionSurface("test", false, 0.3, 0.3, SurfaceKind.Unknown), new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()), new MemoryIndex(new List<EpisodicMemory>())); var context = new BehaviorContext(new WDateTime(0), WTimeSpan.FromHours(1), new HumanContext { Id = new HumanId(Guid.NewGuid()), Biology = SexBiology.Female, Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality), Snapshot = snapshot, Random = new LocalConflictRandom(), Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"), EventBus = new LocalNullEventBus(), Scheduler = new LocalNullScheduler() }, new EventCollector(), new BehaviorState(10, 5, 5, 20, 50, 30, null), new BehaviorConfig(), new Dictionary<string, double>()); var result = new DefaultActionArbitrationEngine(LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger<DefaultActionArbitrationEngine>()).Arbitrate(context, new List<BehaviorCandidate> { new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social), new(Work, 9, WTimeSpan.FromHours(1), BehaviorDomain.Competence) }); Assert.AreEqual(ReachOut, result.IntendedCandidate?.Name); Assert.AreEqual(Work, result.SelectedCandidate?.Name); Assert.IsFalse(string.IsNullOrWhiteSpace(result.ConflictReason)); } }
 
     [TestClass]
     public class IntentManagementEngineTests : TestBase
@@ -326,7 +326,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_WorkFocusedCharacter_RetainsWorkIntentAcrossTicks()
         {
-            var personality = new Personality(new BigFive(0.5, 0.95, 0.3, 0.4, 0.2), AttachmentStyle.Secure, CommunicationStyle.Direct, new MotivationWeights(0.2, 0.8, 0.3, 0.4, 1.0, 0.5, 0.3, 0.3, 0.2), Sociosexuality.Intermediate, Chronotype.Neutral);
+            var personality = new Personality(new BigFive(0.5, 0.95, 0.3, 0.4, 0.2), AttachmentProfile.Secure, CommunicationStyle.Direct, new MotivationWeights(0.2, 0.8, 0.3, 0.4, 1.0, 0.5, 0.3, 0.3, 0.2), Sociosexuality.Intermediate, Chronotype.Neutral);
             var engine = BuildBehaviorEngine();
             var human = BehaviorComponentTestFactory.Human(null, null, null, SurfaceKind.Work, 0.2, 0.2, 10, 0, 5, 5, 95, 1.0, 0.3, 0.2, Chronotype.Neutral, personality);
             var outbox = new EventCollector();
@@ -359,7 +359,7 @@ namespace EngineTests
             var memory = new MemoryIndex(new List<EpisodicMemory> { new(Guid.NewGuid(), new WDateTime(0), "Interaction:Friendly", 0.5, EmotionalTag.Positive, 0.8, OtherPerson: other) });
             var semantic = new SemanticMemoryState(new Dictionary<HumanId, PersonBeliefSet> { [other] = Beliefs(other, warm: 0.8, safe: 0.7) });
             var relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = Relationship(self, other, 68, 60, 55, 62) });
-            var personality = new Personality(new BigFive(0.5, 0.4, 0.8, 0.8, 0.2), AttachmentStyle.Secure, CommunicationStyle.Direct, new MotivationWeights(1.0, 0.4, 0.2, 0.4, 0.4, 0.5, 0.3, 0.3, 0.2), Sociosexuality.Intermediate, Chronotype.Neutral);
+            var personality = new Personality(new BigFive(0.5, 0.4, 0.8, 0.8, 0.2), AttachmentProfile.Secure, CommunicationStyle.Direct, new MotivationWeights(1.0, 0.4, 0.2, 0.4, 0.4, 0.5, 0.3, 0.3, 0.2), Sociosexuality.Intermediate, Chronotype.Neutral);
             var human = BehaviorComponentTestFactory.Human(memory, semantic, relationships, SurfaceKind.Social, 0.2, 0.2, 10, 0.2, 5, 5, 95, 0.4, 0.3, 1.0, Chronotype.Neutral, personality, selfId: self);
             var outbox = new EventCollector();
 
@@ -399,7 +399,7 @@ namespace EngineTests
                 [personB] = Relationship(self, personB, 55, 65, 62, 50)
             });
             var engine = BuildBehaviorEngine();
-            var personality = new Personality(new BigFive(0.6, 0.5, 0.8, 0.8, 0.2), AttachmentStyle.Secure, CommunicationStyle.Direct, new MotivationWeights(1.0, 0.4, 0.2, 0.4, 0.4, 0.5, 0.3, 0.3, 0.3), Sociosexuality.Intermediate, Chronotype.Neutral);
+            var personality = new Personality(new BigFive(0.6, 0.5, 0.8, 0.8, 0.2), AttachmentProfile.Secure, CommunicationStyle.Direct, new MotivationWeights(1.0, 0.4, 0.2, 0.4, 0.4, 0.5, 0.3, 0.3, 0.3), Sociosexuality.Intermediate, Chronotype.Neutral);
             var human = BehaviorComponentTestFactory.Human(new MemoryIndex(new List<EpisodicMemory>()), semantic, relationships, SurfaceKind.Social, 0.2, 0.2, 10, 0.1, 5, 5, 95, 0.4, 0.3, 1.0, Chronotype.Neutral, personality, new LocalZeroRandom(), self);
             var outbox = new EventCollector();
 
@@ -429,7 +429,7 @@ namespace EngineTests
                 [safeTarget] = Relationship(self, safeTarget, 80, 70, 70, 75),
                 [unsafeTarget] = Relationship(self, unsafeTarget, 30, 45, 20, 25)
             });
-            var personality = new Personality(new BigFive(0.5, 0.4, 0.7, 0.5, 0.6), AttachmentStyle.Avoidant, CommunicationStyle.Direct, new MotivationWeights(0.7, 0.4, 0.2, 0.4, 0.4, 0.5, 0.3, 0.3, 1.0), Sociosexuality.Intermediate, Chronotype.Neutral);
+            var personality = new Personality(new BigFive(0.5, 0.4, 0.7, 0.5, 0.6), AttachmentProfile.Dismissing, CommunicationStyle.Direct, new MotivationWeights(0.7, 0.4, 0.2, 0.4, 0.4, 0.5, 0.3, 0.3, 1.0), Sociosexuality.Intermediate, Chronotype.Neutral);
             var output = new SocialNeedsEngine().Evaluate(BehaviorComponentTestFactory.Context(selfId: self, semanticMemory: semantic, relationships: relationships, personality: personality));
 
             var intimacyTargets = output.Candidates.Where(c => c.Name == InviteIntimacy).Select(c => c.SocialTargeting?.TargetHuman).ToList();

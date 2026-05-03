@@ -107,7 +107,7 @@ namespace EngineTests
             var target = new HumanId(Guid.NewGuid());
             var personality = new Personality(
                 new BigFive(0.7, 0.1, 0.5, 0.6, 0.8),
-                AttachmentStyle.Secure,
+                AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
                 new MotivationWeights(1.0, 1.0, 0.2, 0.4, 1.0, 0.5, 1.0, 1.0, 1.0),
                 Sociosexuality.Restricted,
@@ -160,7 +160,7 @@ namespace EngineTests
             var id = new HumanId(Guid.NewGuid());
             var personality = new Personality(
                 new BigFive(0.55, 0.60, 0.45, 0.65, 0.35),
-                AttachmentStyle.Secure,
+                AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
                 new MotivationWeights(0.6, 0.5, 0.3, 0.4, 0.5, 0.5, 0.4, 0.6, 0.5),
                 Sociosexuality.Intermediate,

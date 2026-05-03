@@ -4,13 +4,14 @@
 namespace GameEngineTools.Characters.Engines.Relationships
 {
     using Characters.Core;
+    using GameEngineTools.World.Utils.Time;
 
     /// <summary>
     /// A directed edge in the relationship graph — how character A perceives character B.
     /// </summary>
     /// <remarks>
     /// The graph is asymmetric: A may like B more than B likes A.
-    /// All numeric dimensions are in [0, 100].
+    /// All numeric dimensions are in [0, 100] unless noted otherwise.
     /// </remarks>
     public sealed record RelationshipEdge(
         HumanId A,
@@ -20,6 +21,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// <summary>
         /// Accumulated familiarity from repeated exposure and accepted contact.
         /// Higher values mean A feels more acquainted with B.
+        /// Non-monotonic with Like: very high Familiarity without continued positive contact
+        /// slowly erodes Like (Norton, Frost &amp; Ariely 2007).
         /// </summary>
         double Familiarity,
         /// <summary>
@@ -47,11 +50,36 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// <summary>
         /// Running count of positive (accepted) interactions between A and B.
         /// Used to compute the familiarity bonus in <see cref="DefaultRelationshipsEngine"/>.
+        /// Never decays — cumulative historical counter.
         /// </summary>
         int PositiveInteractionCount = 0,
         /// <summary>
         /// Last known biological sex category of B, when the interaction source provided it.
         /// Kept on the edge so later target scoring can use orientation without requiring a world lookup.
         /// </summary>
-        SexBiology? TargetBiology = null);
+        SexBiology? TargetBiology = null,
+        /// <summary>
+        /// How much the relationship operates on communal norms (responding to needs, not tracking reciprocity).
+        /// High CommunalStrength: tracking and recording favors actively hurts the bond (Clark &amp; Mills 2012).
+        /// Grows from intimate touch and sexual encounters; decays very slowly.
+        /// </summary>
+        double CommunalStrength = 0,
+        /// <summary>
+        /// How much the relationship operates on exchange norms (equity, explicit reciprocity).
+        /// Independent of CommunalStrength — both can be non-zero.
+        /// </summary>
+        double ExchangeStrength = 0,
+        /// <summary>
+        /// Accumulated unresolved transgression weight [0–100].
+        /// Power-law decay over time; increased by micro-negatives and rejected advances;
+        /// reduced by repair attempts (weighted by Lewicki apology components — responsibility &gt; repair offer &gt; regret).
+        /// While non-zero reduces effective Trust and Closeness perceived by the actor.
+        /// </summary>
+        double TransgressionResidue = 0,
+        /// <summary>
+        /// World-time of the most recent interaction that updated this edge.
+        /// Used for Navarro's 8× gap rule: if the gap since last contact exceeds
+        /// 8× the expected contact interval, decay rate is multiplied.
+        /// </summary>
+        WDateTime? LastContactTime = null);
 }

@@ -244,29 +244,35 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         }
 
         /// <summary>
-        /// Mapuje AttachmentStyle na learning/contradiction/safeDiscount multiplikátory.
-        /// Anxious  → hyperaktivace (rychlejší učení, vyšší contradikce)
-        /// Avoidant → deaktivace (pomalejší učení, potlačení EmotionallySafe)
-        /// Disorganized → nestabilní (střední učení, vysoká contradikce)
+        /// Mapuje AttachmentProfile (2D kontinuální model) na learning/contradiction/safeDiscount multiplikátory.
+        /// Anxiety  → hyperaktivace (rychlejší učení, vyšší contradikce)
+        /// Avoidance → deaktivace (pomalejší učení, potlačení EmotionallySafe)
+        /// Kombinace obou (Fearful) → nestabilní profil
         /// </summary>
         private (double learningMult, double contradictionMult, double safeDiscount)
-            ComputeAttachmentMultipliers(AttachmentStyle style)
-            => style switch
-            {
-                AttachmentStyle.Anxious => (
-                    Config.AttachmentLearningBoostAnxious,
-                    Config.AttachmentContradictionBoostAnxious,
-                    1.0),
-                AttachmentStyle.Avoidant => (
-                    Config.AttachmentLearningDiscountAvoidant,
-                    1.0,
-                    Config.AttachmentSafeDiscountAvoidant),
-                AttachmentStyle.Disorganized => (
-                    Config.AttachmentLearningBoostDisorganized,
-                    Config.AttachmentContradictionBoostDisorganized,
-                    0.70),
-                _ => (1.0, 1.0, 1.0)  // Secure: baseline
-            };
+            ComputeAttachmentMultipliers(AttachmentProfile profile)
+        {
+            // Anxiety drives hyperactivation of learning and contradiction sensitivity
+            var learningMult = 1.0
+                + profile.Anxiety * (Config.AttachmentLearningBoostAnxious - 1.0)
+                - profile.Avoidance * (1.0 - Config.AttachmentLearningDiscountAvoidant);
+
+            // The Fearful (high Anxiety × high Avoidance) interaction term uses
+            // (BoostDisorganized - 1.0) rather than the delta from Anxious, so that
+            // the combined Fearful profile (where EmotionallySafe is suppressed by avoidance)
+            // still produces higher total contradiction impact than Secure.
+            var contradictionMult = 1.0
+                + profile.Anxiety * (Config.AttachmentContradictionBoostAnxious - 1.0)
+                + profile.Anxiety * profile.Avoidance * (Config.AttachmentContradictionBoostDisorganized - 1.0);
+
+            // Avoidance suppresses EmotionallySafe encoding (deactivation strategy)
+            var safeDiscount = 1.0 - profile.Avoidance * (1.0 - Config.AttachmentSafeDiscountAvoidant);
+
+            return (
+                Math.Clamp(learningMult, 0.5, 2.0),
+                Math.Clamp(contradictionMult, 0.5, 2.5),
+                Math.Clamp(safeDiscount, 0.5, 1.0));
+        }
 
         private static IEnumerable<InterpretedBeliefSignal> InterpretEpisode(SemanticEpisodeSample episode)
         {

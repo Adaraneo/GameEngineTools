@@ -11,6 +11,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Utils.Time;
 
     internal sealed partial class DefaultRelationshipsEngine
     {
@@ -185,9 +186,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
         /// <summary>
         /// Lets established safe contact soften, but not erase, the sting of a later rejection.
-        /// Ambivalent characters retain more immediate sensitivity.
+        /// Ambivalent characters and high-anxiety (preoccupied) attachment retain more sensitivity.
         /// </summary>
-        private double ComputeRejectionStingMultiplier(RelationshipEdge edge, PsychologicalProfile? profile)
+        /// <param name="attachment">
+        /// Continuous ECR-R attachment profile; Anxiety amplifies the sting
+        /// (hyperactivation strategy — Mikulincer &amp; Shaver 2016).
+        /// </param>
+        private double ComputeRejectionStingMultiplier(
+            RelationshipEdge edge,
+            PsychologicalProfile? profile,
+            AttachmentProfile? attachment = null)
         {
             var exposure = Math.Clamp(
                 Math.Log(1.0 + edge.PositiveInteractionCount) / Math.Log(1.0 + Config.MereExposureSaturation),
@@ -203,7 +211,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
             var followThrough = Math.Clamp(profile?.FollowThrough ?? PsychologicalProfile.Default.FollowThrough, 0.0, 1.0);
             var protection = exposure * safety * (0.30 + followThrough * 0.35) * (1.0 - sensitivity * 0.45);
 
-            return Math.Clamp(1.0 - protection, 0.72, 1.0);
+            var baseMultiplier = Math.Clamp(1.0 - protection, 0.72, 1.0);
+
+            // Attachment anxiety amplifies rejection impact (hyperactivation strategy).
+            // At Anxiety = 1.0, sting is multiplied by (1 + RejectionAnxietyAmplifier).
+            var anxietyBoost = 1.0 + (attachment?.Anxiety ?? 0.0) * Config.RejectionAnxietyAmplifier;
+
+            return Math.Clamp(baseMultiplier * anxietyBoost, 0.72, 1.0 + Config.RejectionAnxietyAmplifier);
         }
 
         #endregion Private methods — signal deltas
@@ -342,13 +356,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Inserts or updates an edge in the relationship graph.
         /// If the edge does not exist, initialises it with neutral default values.
         /// </summary>
+        /// <param name="now">
+        /// World-time of the triggering event; stored as <see cref="RelationshipEdge.LastContactTime"/>
+        /// for the Navarro 8× gap rule. Pass <c>null</c> only for read-only probes that should not
+        /// reset the contact clock.
+        /// </param>
         private void Upsert(
             HumanId self,
             HumanId other,
             Func<RelationshipEdge, RelationshipEdge> mut,
             string? eventType = null,
             string? outcome = null,
-            string? detail = null)
+            string? detail = null,
+            WDateTime? now = null)
         {
             if (self == other)
             {
@@ -382,6 +402,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
             }
 
             var updated = mut(e);
+
+            // Update LastContactTime for Navarro gap rule tracking.
+            if (now.HasValue)
+            {
+                updated = updated with { LastContactTime = now.Value };
+            }
 
             using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: other.Value))
             {

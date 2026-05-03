@@ -121,7 +121,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         },
                         eventType: nameof(FirstImpressionFormed),
                         outcome: "formed",
-                        detail: $"source={fi.A.Value}, like={fi.Like:F1}, basePhysical={fi.BasePhysical:F1}, preferenceMatch={fi.PreferenceMatch:F1}");
+                        detail: $"source={fi.A.Value}, like={fi.Like:F1}, basePhysical={fi.BasePhysical:F1}, preferenceMatch={fi.PreferenceMatch:F1}",
+                        now: fi.OccurredAt);
 
                         using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
                         {
@@ -145,7 +146,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     },
                     eventType: nameof(MicroPositive),
                     outcome: "positive",
-                    detail: mp.Kind ?? "n/a");
+                    detail: mp.Kind ?? "n/a",
+                    now: mp.OccurredAt);
                     break;
 
                 // ── Micro-negative (criticism, ignoring, cold response…) ─────────────────
@@ -154,24 +156,44 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     {
                         Like = Bump(e.Like, -2.5),
                         Trust = Bump(e.Trust, -2.0),
-                        Comfort = Bump(e.Comfort, -2.0)
+                        Comfort = Bump(e.Comfort, -2.0),
+                        TransgressionResidue = Math.Min(100, e.TransgressionResidue + Config.TransgressionMicroNegativeGain)
                     },
                     eventType: nameof(MicroNegative),
                     outcome: "negative",
-                    detail: mn.Kind ?? "n/a");
+                    detail: mn.Kind ?? "n/a",
+                    now: mn.OccurredAt);
                     break;
 
                 // ── Repair attempt ───────────────────────────────────────────────────────
                 case RepairAttempt ra:
-                    Upsert(self, ra.B, e => e with
                     {
-                        Trust = Bump(e.Trust, ra.Accepted ? +Config.RepairGain : -Config.RupturePenalty),
-                        Closeness = Bump(e.Closeness, ra.Accepted ? +Config.RepairGain * 0.5 : -Config.RupturePenalty * 0.4)
-                    },
-                    eventType: nameof(RepairAttempt),
-                    outcome: ra.Accepted ? "accepted" : "rejected",
-                    detail: $"source={ra.A.Value}->{ra.B.Value}");
-                    break;
+                        // Attachment.Avoidance modulates repair effectiveness.
+                        // Dismissing characters (high Avoidance) treat repair attempts as intrusion
+                        // → only 40% of RepairGain applied at full Avoidance.
+                        var avoidance = ctx.Personality.Attachment.Avoidance;
+                        var repairGainModifier = 1.0 - avoidance * 0.6;
+
+                        Upsert(self, ra.B, e => e with
+                        {
+                            Trust = Bump(e.Trust, ra.Accepted
+                                ? +Config.RepairGain * repairGainModifier
+                                : -Config.RupturePenalty),
+                            Closeness = Bump(e.Closeness, ra.Accepted
+                                ? +Config.RepairGain * 0.5 * repairGainModifier
+                                : -Config.RupturePenalty * 0.4),
+                            // Repair reduces TransgressionResidue (Lewicki et al. 2016:
+                            // "acceptance" = highest-weight apology component — responsibility acknowledged).
+                            TransgressionResidue = ra.Accepted
+                                ? Math.Max(0, e.TransgressionResidue - Config.RepairGain)
+                                : Math.Min(100, e.TransgressionResidue + Config.RupturePenalty * 0.5)
+                        },
+                        eventType: nameof(RepairAttempt),
+                        outcome: ra.Accepted ? "accepted" : "rejected",
+                        detail: $"source={ra.A.Value}->{ra.B.Value}",
+                        now: ra.OccurredAt);
+                        break;
+                    }
 
                 // ── Interaction outcome — ACCEPTED ───────────────────────────────────────
                 case InteractionOutcome io when io.Accepted:
@@ -212,9 +234,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 : stabilization * 0.10;
                             var attractionPlasticity = ComputeAttractionPlasticity(e, positive: true, act: io.Act);
 
+                            // Attachment.Avoidance caps how close A can get to B.
+                            // Dismissing characters (high Avoidance) resist deep closeness.
+                            var closenessGain = +1.5 + stabilization * 0.35;
+                            var closenessMax = 100.0 - ctx.Personality.Attachment.Avoidance * Config.ClosenessAvoidanceCap;
+
                             return e with
                             {
-                                Closeness = Bump(e.Closeness, +1.5 + stabilization * 0.35),
+                                Closeness = Math.Min(closenessMax, Bump(e.Closeness, closenessGain)),
                                 Like = Bump(e.Like, +0.5 + stabilization * 0.20),
                                 Comfort = Bump(e.Comfort, +0.8 + stabilization * 0.45 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
                                 RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
@@ -231,7 +258,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         },
                         eventType: nameof(InteractionOutcome),
                         outcome: "accepted",
-                        detail: $"act={io.Act}, self={(io.From == self ? "initiator" : "recipient")}, from={io.From.Value}, to={io.To.Value}");
+                        detail: $"act={io.Act}, self={(io.From == self ? "initiator" : "recipient")}, from={io.From.Value}, to={io.To.Value}",
+                        now: io.OccurredAt);
                         break;
                     }
 
@@ -263,13 +291,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             },
                             eventType: nameof(InteractionOutcome),
                             outcome: "rejected",
-                            detail: $"act={io.Act}, self=recipient, from={io.From.Value}, to={io.To.Value}");
+                            detail: $"act={io.Act}, self=recipient, from={io.From.Value}, to={io.To.Value}",
+                            now: io.OccurredAt);
                         }
                         else // I was rejected
                         {
                             Upsert(self, otherId, e =>
                             {
-                                var stingMultiplier = ComputeRejectionStingMultiplier(e, ctx.PsychologyProfile);
+                                var stingMultiplier = ComputeRejectionStingMultiplier(e, ctx.PsychologyProfile, ctx.Personality.Attachment);
+
+                                // TransgressionResidue for intimate rejection (InviteIntimacy).
+                                var residueDelta = io.Act == SpeechAct.Invite
+                                    ? Config.TransgressionRejectionGain
+                                    : 0.0;
 
                                 return e with
                                 {
@@ -280,12 +314,25 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act)),
                                     PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.65),
                                     TargetBiology = otherBiology ?? e.TargetBiology,
+                                    TransgressionResidue = Math.Min(100, e.TransgressionResidue + residueDelta),
                                     Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: false)
                                 };
                             },
                             eventType: nameof(InteractionOutcome),
                             outcome: "rejected",
-                            detail: $"act={io.Act}, self=initiator, from={io.From.Value}, to={io.To.Value}");
+                            detail: $"act={io.Act}, self=initiator, from={io.From.Value}, to={io.To.Value}",
+                            now: io.OccurredAt);
+
+                            // Williams' Temporal Need-Threat Model (Hartgerink et al. 2015, k=120, d > |1.4|):
+                            // Intimate rejection threatens 4 needs simultaneously. Publish cross-engine event.
+                            if (io.Act == SpeechAct.Invite)
+                            {
+                                if (State.Edges.TryGetValue(otherId, out var rejEdge))
+                                {
+                                    var sting = ComputeRejectionStingMultiplier(rejEdge, ctx.PsychologyProfile, ctx.Personality.Attachment);
+                                    outbox.Add(new RejectionNeedsThreat(io.OccurredAt, self, sting, IsIntimateAdvance: true));
+                                }
+                            }
                         }
 
                         break;
@@ -308,6 +355,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     RomanticInterest = to.Level == TouchLevel.Intimate && e.Trust >= 60 && e.Comfort >= 60
                                         ? Bump(e.RomanticInterest, +1.5)
                                         : e.RomanticInterest,
+                                    // Intimate touch builds communal relationship norms (Clark & Mills 2012)
+                                    CommunalStrength = to.Level == TouchLevel.Intimate
+                                        ? Math.Min(100, e.CommunalStrength + Config.CommunalGrowthPerIntimateInteraction)
+                                        : e.CommunalStrength,
                                     Breakdown = e.Breakdown with
                                     {
                                         Physical = BumpD(e.Breakdown.Physical, TouchBoost(to.Level)),
@@ -321,7 +372,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 },
                                 eventType: nameof(TouchOutcome),
                                 outcome: "accepted",
-                                detail: $"level={to.Level}, self=recipient, from={to.From.Value}, to={to.To.Value}");
+                                detail: $"level={to.Level}, self=recipient, from={to.From.Value}, to={to.To.Value}",
+                                now: to.OccurredAt);
                             }
                             else
                             {
@@ -333,7 +385,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 },
                                 eventType: nameof(TouchOutcome),
                                 outcome: "rejected",
-                                detail: $"level={to.Level}, self=recipient, from={to.From.Value}, to={to.To.Value}");
+                                detail: $"level={to.Level}, self=recipient, from={to.From.Value}, to={to.To.Value}",
+                                now: to.OccurredAt);
                             }
                         }
                         else // I was rejected
@@ -348,7 +401,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             },
                             eventType: nameof(TouchOutcome),
                             outcome: to.Accepted ? "accepted" : "rejected",
-                            detail: $"level={to.Level}, self=initiator, from={to.From.Value}, to={to.To.Value}");
+                            detail: $"level={to.Level}, self=initiator, from={to.From.Value}, to={to.To.Value}",
+                            now: to.OccurredAt);
                         }
 
                         break;
@@ -368,6 +422,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 RomanticInterest = Bump(e.RomanticInterest, 0.8 * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(ctx.Personality.Sociosexuality) * SexualOrientationBehaviorMath.RomanticInterestMultiplier(ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 SexualInterest = Bump(e.SexualInterest, 2.4 * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(ctx.Personality.Sociosexuality) * SexualOrientationBehaviorMath.SexualInterestMultiplier(ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 TargetBiology = otherBiology ?? e.TargetBiology,
+                                // Sexual encounter deepens communal norms (Clark & Mills 2012)
+                                CommunalStrength = Math.Min(100, e.CommunalStrength + Config.CommunalGrowthPerIntimateInteraction),
                                 Breakdown = e.Breakdown with
                                 {
                                     Physical = BumpD(e.Breakdown.Physical, +3.0)
@@ -375,7 +431,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             },
                             eventType: nameof(SexualEncounterOutcome),
                             outcome: "accepted",
-                            detail: $"self={(se.From == self ? "initiator" : "recipient")}, reproductive={se.ReproductivePotential}");
+                            detail: $"self={(se.From == self ? "initiator" : "recipient")}, reproductive={se.ReproductivePotential}",
+                            now: se.OccurredAt);
                         }
                         else
                         {
@@ -389,7 +446,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             },
                             eventType: nameof(SexualEncounterOutcome),
                             outcome: "declined",
-                            detail: $"self={(se.From == self ? "initiator" : "recipient")}");
+                            detail: $"self={(se.From == self ? "initiator" : "recipient")}",
+                            now: se.OccurredAt);
                         }
 
                         break;
@@ -453,7 +511,20 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     0.40,
                     1.0);
 
-                var d = Config.DecayPerDay * days * depthFactor;
+                // ── Navarro 8× gap rule (Navarro et al. 2017) ────────────────────────────
+                // If the gap since last contact exceeds 8× the expected contact interval,
+                // tie-death hazard spikes. Apply an accelerated decay multiplier.
+                var navarrMultiplier = 1.0;
+                if (e.LastContactTime.HasValue)
+                {
+                    var gapDays = WDateTime.Difference(now, e.LastContactTime.Value).TotalDays;
+                    if (gapDays > 8.0 * Config.ExpectedContactIntervalDays)
+                    {
+                        navarrMultiplier = Config.NavarrGapMultiplier;
+                    }
+                }
+
+                var d = Config.DecayPerDay * days * depthFactor * navarrMultiplier;
 
                 // Domain breakdown decays very slowly toward neutral (50) without reinforcement.
                 // Rate is 10× slower than Closeness — domains are more stable impressions than
@@ -461,9 +532,34 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 // PositiveInteractionCount does not decay — it is a cumulative historical counter.
                 var dd = d * 0.1;
 
+                // ── TransgressionResidue power-law decay ─────────────────────────────────
+                // residue *= (1 - rate)^days; prune to 0 below 0.5.
+                var newResidue = e.TransgressionResidue;
+                if (newResidue > 0)
+                {
+                    newResidue *= Math.Pow(1.0 - Config.TransgressionDecayRatePerDay, days);
+                    if (newResidue < 0.5)
+                    {
+                        newResidue = 0;
+                    }
+                }
+
+                // ── Familiarity–Like dissonance (non-monotonicity) ───────────────────────
+                // Norton, Frost & Ariely 2007: high Familiarity without ongoing contact
+                // erodes Like (overexposure without renewal breeds indifference).
+                var familiarityLikePenalty = 0.0;
+                if (e.Familiarity > 55 && e.LastContactTime.HasValue)
+                {
+                    var daysSinceContact = WDateTime.Difference(now, e.LastContactTime.Value).TotalDays;
+                    if (daysSinceContact > 30)
+                    {
+                        familiarityLikePenalty = Config.FamiliarityLikeDissonancePenalty * days;
+                    }
+                }
+
                 dict[kv.Key] = e with
                 {
-                    Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect),
+                    Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect - familiarityLikePenalty),
                     Trust = Clamp(Approach(e.Trust, 50, d * 0.5)),
                     Familiarity = Clamp(Approach(e.Familiarity, Config.FamiliarityDecayFloor, d * 0.08)),
                     AestheticAttraction = e.AestheticAttraction,
@@ -473,6 +569,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Closeness = Clamp(Approach(e.Closeness, 5, d * 1.2)),
                     Respect = Clamp(Approach(e.Respect, 55, d * 0.3)),
                     Comfort = Clamp(Approach(e.Comfort, 45, d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
+                    TransgressionResidue = newResidue,
                     Breakdown = new DomainBreakdown(
                         Intellect: Clamp(Approach(e.Breakdown.Intellect, 50, dd)),
                         Humor: Clamp(Approach(e.Breakdown.Humor, 50, dd)),
