@@ -1074,6 +1074,81 @@ namespace EngineTests
 
         #endregion Scenario 20
 
+        #region Scenario 21 — Kognitivní stárnutí + percepce
+
+        [TestMethod]
+        public void CognitiveAging_After60_IncreasesBaselineCogLoad()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                CognitivAgingThreshold: 60.0,
+                CognitiveAgingCogLoadPerYear: 5.0));  // vyšší pro jasný signál
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var oldPsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var youngPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            oldPsych.RestoreState(oldPsych.State with { CognitiveLoad = 10 });
+            youngPsych.RestoreState(youngPsych.State with { CognitiveLoad = 10 });
+
+            var oldPhysio   = MakePhysio(0, 0, 0) with { Aging = new PhysicalAgingState(AgeYears: 70) };
+            var youngPhysio = MakePhysio(0, 0, 0) with { Aging = new PhysicalAgingState(AgeYears: 30) };
+
+            var ctxOld   = BuildRawContext(0.5, oldPhysio);
+            var ctxYoung = BuildRawContext(0.5, youngPhysio);
+            var now = new WDateTime(0);
+
+            oldPsych.Tick(now, WTimeSpan.FromHours(365 * 24), ctxOld, new EventCollector());
+            youngPsych.Tick(now, WTimeSpan.FromHours(365 * 24), ctxYoung, new EventCollector());
+
+            Assert.IsTrue(oldPsych.State.CognitiveLoad > youngPsych.State.CognitiveLoad,
+                $"70letá postava musí mít vyšší CogLoad než 30letá. " +
+                $"Old={oldPsych.State.CognitiveLoad:F4}, Young={youngPsych.State.CognitiveLoad:F4}");
+        }
+
+        [TestMethod]
+        public void PostMenopause_MoodBaseline_DeclinesFaster()
+        {
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false,
+                MoodBaselineRecoveryPerHour: 0.0,    // vypnout recovery
+                PostMenopauseMoodBaselinePenaltyPerHour: 0.1));  // velká penalta pro jasný signál
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+            var rng = new ZeroRandom();
+
+            var postMenoPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var normalPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            postMenoPsych.RestoreState(postMenoPsych.State with { MoodBaseline = 50 });
+            normalPsych.RestoreState(normalPsych.State with { MoodBaseline = 50 });
+
+            // Post-menopauza: Cycle.Phase=Paused, AgeYears>=45, žádné těhotenství
+            var postMenoPhysio = MakePhysio(0, 0, 0) with
+            {
+                Aging = new PhysicalAgingState(AgeYears: 55),
+                Cycle = new MenstrualCycleState(
+                    CyclePhase.Paused, 1, false, 0, 0, 0, 1.0, WDateOnly.New(61, 1, 1))
+            };
+            var normalPhysio = MakePhysio(0, 0, 0) with
+                { Aging = new PhysicalAgingState(AgeYears: 55) }; // bez Cycle.Paused
+
+            var ctxPostMeno = BuildRawContext(0.5, postMenoPhysio);
+            var ctxNormal   = BuildRawContext(0.5, normalPhysio);
+            var now = new WDateTime(0);
+
+            postMenoPsych.Tick(now, WTimeSpan.FromHours(8), ctxPostMeno, new EventCollector());
+            normalPsych.Tick(now, WTimeSpan.FromHours(8), ctxNormal, new EventCollector());
+
+            Assert.IsTrue(postMenoPsych.State.MoodBaseline < normalPsych.State.MoodBaseline,
+                $"Post-menopauzální MoodBaseline musí klesat rychleji. " +
+                $"PostMeno={postMenoPsych.State.MoodBaseline:F4}, Normal={normalPsych.State.MoodBaseline:F4}");
+        }
+
+        #endregion Scenario 21
+
         #region Helpers
 
         /// <summary>

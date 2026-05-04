@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using System;
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Time;
@@ -434,6 +435,30 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         outbox.Add(new MotivationChanged(now, ctx.Id, coldMotiv, next));
                     }
                 }
+            }
+
+            // Kognitivní stárnutí + percepce (Salthouse 2009; Gates & Cooper 1991)
+            if (ph.Aging is { AgeYears: > 0 } ageState)
+            {
+                // Kognitivní stárnutí: pracovní paměť a rychlost zpracování klesají po 60
+                if (ageState.AgeYears > Config.CognitivAgingThreshold)
+                {
+                    var cogDecline = (ageState.AgeYears - Config.CognitivAgingThreshold)
+                                    * Config.CognitiveAgingCogLoadPerYear * h / (365.25 * 24);
+                    s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + cogDecline) };
+                }
+                // Presbyopie/presbyakusis: percepční obtíže zvyšují kognitivní zátěž po 50
+                if (ageState.AgeYears > Config.PerceptualAgingThreshold)
+                    s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + Config.PerceptualAgingCogLoadPerHour * h) };
+            }
+
+            // Post-menopauza: estrogen deficience → MoodBaseline erose (serotonin↓, vliv na náladu)
+            {
+                var isPostMenopausal = ph.Cycle?.Phase == CyclePhase.Paused
+                                    && ph.Pregnancy is null
+                                    && (ph.Aging?.AgeYears ?? 0) >= 45;
+                if (isPostMenopausal)
+                    s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - Config.PostMenopauseMoodBaselinePenaltyPerHour * h, 0, 100) };
             }
 
             // Altitude → kognitivní deficit (hypoxie mozku)

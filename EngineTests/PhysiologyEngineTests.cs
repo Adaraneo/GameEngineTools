@@ -1665,6 +1665,92 @@ namespace EngineTests
 
         #endregion PhysicalAgingState — vlasy, šedivost, hustota, vrásky, sarkopenie
 
+        #region Batch 8 — kompletní aging
+
+        [TestMethod]
+        public void Aging_AgeYears_UpdatedInPhysicalAgingState()
+        {
+            // Postava 40 let — AgeYears musí být nastaveno v Aging při ticku s rokem 116
+            var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 40);
+            engine.RestoreState(engine.State with
+                { Aging = engine.State.Aging! with { AgeYears = 0 } });
+            var ctx = BuildContextWithAction(null);
+            var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
+
+            engine.Tick(year116, WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.AreEqual(40, engine.State.Aging!.AgeYears,
+                $"AgeYears musí být 40 pro postavu věku 40 let. Aktuálně: {engine.State.Aging.AgeYears}");
+        }
+
+        [TestMethod]
+        public void HairDyed_ResetsGreyFraction()
+        {
+            var engine = BuildEngine();
+            engine.RestoreState(engine.State with
+                { Aging = engine.State.Aging! with { GreyFraction = 0.4 } });
+
+            var hairDyed = new HairDyed(_now, new HumanId(System.Guid.NewGuid()));
+            engine.Handle(hairDyed, _ctx, _outbox);
+
+            Assert.AreEqual(0.0, engine.State.Aging!.GreyFraction, delta: 0.001,
+                "HairDyed event musí resetovat GreyFraction na 0.");
+        }
+
+        [TestMethod]
+        public void BoneDensity_DecreasesWithAge()
+        {
+            // Postava 50 let (věk > BoneDensityDeclineAgeStart=30)
+            var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 50);
+            engine.RestoreState(engine.State with
+                { Aging = engine.State.Aging! with { BoneDensity = 1.0 } });
+            var ctx = BuildContextWithAction(null);
+            var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
+
+            engine.Tick(year116, WTimeSpan.FromHours(365 * 24), ctx, new EventCollector()); // 1 rok
+
+            Assert.IsTrue(engine.State.Aging!.BoneDensity < 1.0,
+                $"Kostní hustota musí klesat u 50leté postavy. BoneDensity={engine.State.Aging.BoneDensity:F4}");
+        }
+
+        [TestMethod]
+        public void BoneDensity_LowerDensity_AmplifiiesInjurySeverity()
+        {
+            var healthyEngine    = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25);
+            var osteoEngine      = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25);
+            healthyEngine.RestoreState(healthyEngine.State with
+                { Aging = healthyEngine.State.Aging! with { BoneDensity = 1.0 } });
+            osteoEngine.RestoreState(osteoEngine.State with
+                { Aging = osteoEngine.State.Aging! with { BoneDensity = 0.5 } }); // výrazná osteoporóza
+
+            var injury = new InjuryReceived(_now, new HumanId(System.Guid.NewGuid()), 40, InjuryType.Sprain);
+            healthyEngine.Handle(injury, _ctx, new EventCollector());
+            osteoEngine.Handle(injury, _ctx, new EventCollector());
+
+            Assert.IsTrue(osteoEngine.State.Injury!.Severity > healthyEngine.State.Injury!.Severity,
+                $"Osteoporóza musí amplifikovat závažnost zranění. " +
+                $"Healthy={healthyEngine.State.Injury.Severity:F2}, Osteo={osteoEngine.State.Injury.Severity:F2}");
+        }
+
+        [TestMethod]
+        public void Vitals_OlderAge_HigherSystolicBP()
+        {
+            var youngPhysio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null) with
+                { Aging = new PhysicalAgingState(AgeYears: 25) };
+            var oldPhysio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null) with
+                { Aging = new PhysicalAgingState(AgeYears: 65) };
+
+            var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
+            var youngVitals = PhysiologicalVitals.Compute(youngPhysio, psych);
+            var oldVitals   = PhysiologicalVitals.Compute(oldPhysio, psych);
+
+            Assert.IsTrue(oldVitals.SystolicBP > youngVitals.SystolicBP,
+                $"Starší postava musí mít vyšší systolický TK. " +
+                $"Young={youngVitals.SystolicBP}, Old={oldVitals.SystolicBP}");
+        }
+
+        #endregion Batch 8 — kompletní aging
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine pro konkrétní biologii (Male/Female) — pro testy pohlavně specifických metrik.</summary>

@@ -146,10 +146,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 _ => -Config.PainPassiveRecoveryPerHour * h
             };
 
+            // Post-menopauza: estrogen ztracen → imunitní recovery pomalejší (30 % zpomalení)
+            var isPostMenopauseImmune = s.Cycle?.Phase == CyclePhase.Paused
+                && s.Pregnancy is null && (s.Aging?.AgeYears ?? 0) >= 45;
+            var immuneDecayFactor = isPostMenopauseImmune ? 0.7 : 1.0;
             var immuneDelta = action switch
             {
-                SelfCare => -0.5 * h,
-                _ => -0.3 * h
+                SelfCare => -0.5 * h * immuneDecayFactor,
+                _ => -0.3 * h * immuneDecayFactor
             };
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
@@ -373,10 +377,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             }
 
-            // Fyzické stárnutí — vlasy, vrásky, svalová hmota
+            // Fyzické stárnutí — vlasy, vrásky, svalová hmota, kostní hustota
             if (s.Aging is { } aging)
             {
                 var ageYears = (double)(now.Date.Year - _birthDate.Year);
+                var ageYearsInt = Math.Max(0, now.Date.Year - _birthDate.Year);
 
                 // Růst vlasů (~1,25 cm/měsíc reálně, ~0,00175 cm/hod v herním světě)
                 var newHairLen = Math.Min(120.0, aging.HairLengthCm + Config.HairGrowthCmPerHour * h);
@@ -411,16 +416,26 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     ? -(ageYears - Config.SarcopeniaAgeStart) * Config.SarcopeniaRatePerYear * h / (365.25 * 24)
                     : 0.0;
 
+                // Kostní hustota: stárnutí + post-menopauza
+                var isPostMenoForBone = s.Cycle?.Phase == CyclePhase.Paused
+                    && s.Pregnancy is null && ageYears >= Config.MenopauseAge;
+                var boneDeclineRate = ageYears > Config.BoneDensityDeclineAgeStart
+                    ? Config.BoneDensityDeclinePerYear * (isPostMenoForBone ? Config.BoneDensityMenopauseMultiplier : 1.0)
+                    : 0.0;
+                var newBoneDensity = Math.Max(0.2, aging.BoneDensity - boneDeclineRate * h / (365.25 * 24));
+
                 s = s with
                 {
                     Aging = aging with
                     {
+                        AgeYears           = ageYearsInt,
                         HairLengthCm       = newHairLen,
                         GreyFraction       = Math.Clamp(aging.GreyFraction + greying, 0, 1),
                         HairDensity        = Math.Clamp(aging.HairDensity + densityChange, 0.1, 1),
                         WrinkleScore       = Math.Clamp(aging.WrinkleScore + wrinkles, 0, 100),
                         MuscleMassFraction = Math.Clamp(aging.MuscleMassFraction + muscleChange,
-                                                        Config.SarcopeniaMuscleMin, 1.0)
+                                                        Config.SarcopeniaMuscleMin, 1.0),
+                        BoneDensity        = newBoneDensity
                     }
                 };
             }
@@ -492,8 +507,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 case Sleep.SleepEnded se:
                     {
                         var h = Math.Max(0, se.TotalHoursSlept);
+                        var rawQuality = se.Quality / 100.0;
 
-                        var qualityFactor = se.Quality / 100.0;
+                        // Věkový faktor na kvalitu spánku: méně deep sleep po 50 → horší efektivní kvalita
+                        var sleepAgeYears = se.OccurredAt.Date.Year - _birthDate.Year;
+                        var ageQualityFactor = sleepAgeYears > Config.AgeSleepQualityThreshold
+                            ? Math.Max(0.5, 1.0 - (sleepAgeYears - Config.AgeSleepQualityThreshold) * Config.AgeSleepQualityPenaltyPerYear)
+                            : 1.0;
+                        var qualityFactor = rawQuality * ageQualityFactor;
+
                         var remainingDept = s.SleepDebtHours;
                         var maxRecovery = remainingDept * 0.55; // Max 55 % za jednu noc
                         var actualRecovery = Math.Min(maxRecovery, h * 0.9 * qualityFactor);
@@ -501,7 +523,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         // Recovery Debt zpomaluje obnovu energie (min. 30 % účinnosti)
                         var recoveryFactor = Math.Max(0.3, 1.0 - s.RecoveryDebtHours / 48.0);
                         // Věkový faktor: energie se obnovuje pomaleji po 40. roce
-                        var sleepAgeYears = se.OccurredAt.Date.Year - _birthDate.Year;
                         var ageFactor = sleepAgeYears > Config.AgingEnergyRecoveryPenaltyStart
                             ? Math.Max(0.3, 1.0 - (sleepAgeYears - Config.AgingEnergyRecoveryPenaltyStart) * Config.AgingEnergyRecoveryPenaltyPerYear)
                             : 1.0;
@@ -516,7 +537,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                             // Imunitní systém: regenerace hlubokého spánku
                             ImmuneLoad = Clamp01p(s.ImmuneLoad - 3.0 * qualityFactor),
 
-                            Pain = se.Quality >= 40
+                            Pain = rawQuality >= 0.40
                                 ? Clamp01p(s.Pain - 5.0 * qualityFactor)
                                 : s.Pain,
 
@@ -540,13 +561,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     break;
 
                 case InjuryReceived ir:
+                {
+                    // Bone fragility: nízká hustota kostí → vyšší efektivní závažnost zranění
+                    var boneFactor = s.Aging is { BoneDensity: < 1.0 } bone
+                        ? 1.0 + (1.0 - bone.BoneDensity) * Config.BoneFragilityInjuryMultiplier
+                        : 1.0;
+                    var effectiveSeverity = Math.Clamp(ir.Severity * boneFactor, 0, 100);
                     s = s with
                     {
-                        Injury = new InjuryState(Math.Clamp(ir.Severity, 0, 100), 0, ir.Type),
-                        // SAM spike: fyzické ohrožení = okamžitá sympatická aktivace
+                        Injury            = new InjuryState(effectiveSeverity, 0, ir.Type),
                         AcuteArousalLevel = Math.Min(100, s.AcuteArousalLevel + Config.InjuryAcuteArousalSpike)
                     };
                     break;
+                }
 
                 // Sociální bolest = fyzická bolest (Eisenberger et al., 2003) — odmítnutí aktivuje HPA osu
                 case InteractionOutcome io when io.From == ctx.Id && !io.Accepted:
@@ -578,6 +605,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 case HairCut hc:
                     if (s.Aging is { } hairAging)
                         s = s with { Aging = hairAging with { HairLengthCm = Math.Clamp(hc.NewLengthCm, 0, 120) } };
+                    break;
+
+                case HairDyed:
+                    if (s.Aging is { } dyedAging)
+                        s = s with { Aging = dyedAging with { GreyFraction = 0.0 } };
                     break;
             }
 

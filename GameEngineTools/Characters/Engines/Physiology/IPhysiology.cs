@@ -118,9 +118,17 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double WrinklingCortisolBoost = 0.001,
         double SarcopeniaAgeStart = 30.0,
         double SarcopeniaRatePerYear = 0.005,
-        double SarcopeniaMuscleMin = 0.3)
+        double SarcopeniaMuscleMin = 0.3,
+        // Kostní hustota + osteoporóza
+        double BoneDensityDeclineAgeStart = 30.0,
+        double BoneDensityDeclinePerYear = 0.005,
+        double BoneDensityMenopauseMultiplier = 2.5,
+        double BoneFragilityInjuryMultiplier = 0.5,
+        // Spánek a věk
+        double AgeSleepQualityThreshold = 50.0,
+        double AgeSleepQualityPenaltyPerYear = 0.008)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0, 0.00175, 30.0, 0.02, 0.0001, 25.0, 0.005, 70.0, 0.0005, 0.15, 0.00002, 25.0, 0.5, 0.001, 30.0, 0.005, 0.3) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0, 0.00175, 30.0, 0.02, 0.0001, 25.0, 0.005, 70.0, 0.0005, 0.15, 0.00002, 25.0, 0.5, 0.001, 30.0, 0.005, 0.3, 30.0, 0.005, 2.5, 0.5, 50.0, 0.008) { }
     }
 
     public sealed record PhysiologyState(
@@ -298,6 +306,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// tento record sleduje změny způsobené věkem, hormony, stresem a vnějšími událostmi.
     /// </summary>
     public sealed record PhysicalAgingState(
+        /// <summary>Věk postavy v herních letech. Aktualizován DefaultPhysiologyEngine.Tick() z _birthDate.</summary>
+        int AgeYears = 0,
         /// <summary>Aktuální délka vlasů (cm). Roste ~0,00175 cm/hod. HairCut eventem se nastavuje na novou hodnotu.</summary>
         double HairLengthCm = 5.0,
         /// <summary>Podíl šedivých vlasů (0..1). Roste s věkem (od ~30 let) a chronickým kortizolem.</summary>
@@ -307,7 +317,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Skóre vrásek (0..100). Roste s věkem po 25 letech a akceleruje chronickým kortizolem.</summary>
         double WrinkleScore = 0.0,
         /// <summary>Podíl svalové hmoty (0..1). Klesá sarkopénií po 30. roce; min = SarcopeniaMuscleMin.</summary>
-        double MuscleMassFraction = 1.0);
+        double MuscleMassFraction = 1.0,
+        /// <summary>
+        /// Hustota kostní tkáně (0..1). Klesá postupně od 30 let; dramaticky po menopauze (bez estrogenu).
+        /// Nízká hustota → amplifikuje závažnost zranění (osteoporóza → fraktury).
+        /// </summary>
+        double BoneDensity = 1.0);
 
     // Události
     public sealed record MensesStarted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
@@ -353,12 +368,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var physFatigue = ph.PhysicalFatigueLevel / 100.0;
 
             // Srdeční tep: klidový 60 bpm + modulace arousal/SAM/fyzická zátěž/horečka
+            // Kardiovaskulární stárnutí: arteriální tuhost → BP ↑ ~0,5 mmHg/rok po 30
+            var ageBPBonus = ph.Aging is { AgeYears: > 30 } agingBP ? (agingBP.AgeYears - 30) * 0.5 : 0.0;
+
             var hr = 60 + arousal * 50 + acuteSAM * 60 + physFatigue * 30 + stress * 15;
             if (ph.BodyTempDelta > 1.0) hr += ph.BodyTempDelta * 10;
 
-            // Krevní tlak: klidový 120/80 + stres/kortizol/SAM
-            var systolic  = 120 + stress * 30 + cortisol * 15 + acuteSAM * 25;
-            var diastolic = 80  + stress * 15 + cortisol * 8  + acuteSAM * 12;
+            // Krevní tlak: klidový 120/80 + stres/kortizol/SAM + věk
+            var systolic  = 120 + stress * 30 + cortisol * 15 + acuteSAM * 25 + ageBPBonus;
+            var diastolic = 80  + stress * 15 + cortisol * 8  + acuteSAM * 12 + ageBPBonus * 0.4;
 
             // Dechová frekvence: klidová 14 + arousal/SAM/stres
             var rr = 14 + arousal * 8 + acuteSAM * 10 + stress * 4;
