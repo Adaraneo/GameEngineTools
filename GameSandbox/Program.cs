@@ -313,6 +313,8 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
         DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
         OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
+
+        Console.Title = now.Date.ToString();
     }
 };
 
@@ -342,6 +344,8 @@ if (characters.Count > 0)
             DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
             OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
+
+            Console.Title = now.Date.ToString();
         }
     }, lodRuntime);
 
