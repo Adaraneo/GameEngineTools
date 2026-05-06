@@ -111,11 +111,11 @@ namespace GameEngineTools.Characters.Hosting
             services.AddSingleton<IChildBlueprintGenerator, ChildBlueprintGenerator>();
             services.AddSingleton<IIdentityGenerator>(_ =>
             {
-                var femaleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.femaleNames,
+                var femaleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.FemaleNames,
                     v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
-                var maleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.maleNames,
+                var maleNames = CsvLoader.Load(FileSystemConstant.SourceFilePath.MaleNames,
                     v => new Name { Original = v[0], Familiar = v[1].Split(' ') });
-                var surnames = CsvLoader.Load(FileSystemConstant.SourceFilePath.surnames,
+                var surnames = CsvLoader.Load(FileSystemConstant.SourceFilePath.Surnames,
                     v => new Surname { Male = v[0], Female = v[1] });
 
                 return new SimpleIdentityGenerator(

@@ -1,75 +1,130 @@
-﻿// FileSystemConstant.cs
+// FileSystemConstant.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Constants
 {
     /// <summary>
-    /// FileSystem Constants containts Direcotries and Filenames
+    /// Central registry of all file system paths used by the engine.
+    /// All source-file paths are relative to the working directory
+    /// (resolved at runtime by <c>prebuild.bat</c>).
     /// </summary>
     internal static class FileSystemConstant
     {
+        #region Source directories
+
         /// <summary>
-        /// Directories for source files
+        /// Root directories for source CSV and JSON data files.
         /// </summary>
         private static class SourceDirectory
         {
-            private const string root = @"SourceFiles\";
-            public const string armory = root + @"Armory\";
-            public const string names = root + @"Names\";
+            internal const string Root        = @"SourceFiles\";
+            internal const string Armory      = Root + @"Armory\";
+            internal const string Names       = Root + @"Names\";
+
+            /// <summary>World layout: locations, connections, and per-location objects.</summary>
+            internal const string World        = Root + @"World\";
+
+            /// <summary>
+            /// Per-location object files. Each file is named {locationId}.csv
+            /// and loaded lazily on first access to that location.
+            /// </summary>
+            internal const string WorldObjects = World + @"Objects\";
         }
 
+        #endregion
+
+        #region Source filenames (without extension)
+
         /// <summary>
-        /// Filenames of source files
+        /// Base filenames of source files, without path or extension.
         /// </summary>
         private static class SourceFilename
         {
-            public const string armorPartsFilename = "ArmorParts";
-            public const string femaleNamesFilename = "Female";
-            public const string maleNamesFilename = "Male";
-            public const string surnamesFilename = "Surnames";
-            public const string weaponsFilename = "Weapons";
+            internal const string ArmorParts  = "ArmorParts";
+            internal const string FemaleNames = "Female";
+            internal const string MaleNames   = "Male";
+            internal const string Surnames    = "Surnames";
+            internal const string Weapons     = "Weapons";
+
+            /// <summary>All location descriptors (Id, DisplayName, Type, Region, noise params…).</summary>
+            internal const string Locations   = "Locations";
+
+            /// <summary>Adjacency graph between locations (FromId, ToId, TravelMinutes).</summary>
+            internal const string Connections = "Connections";
         }
 
+        #endregion
+
+        #region Source file paths
+
         /// <summary>
-        /// Files in source directory
+        /// Full relative paths to source files consumed at startup.
         /// </summary>
         internal static class SourceFilePath
         {
-            public const string armorParts = SourceDirectory.armory + SourceFilename.armorPartsFilename + Extension.sourceCSV;
-            public const string femaleNames = SourceDirectory.names + SourceFilename.femaleNamesFilename + Extension.sourceCSV;
-            public const string maleNames = SourceDirectory.names + SourceFilename.maleNamesFilename + Extension.sourceCSV;
-            public const string surnames = SourceDirectory.names + SourceFilename.surnamesFilename + Extension.sourceCSV;
-            public const string weapons = SourceDirectory.armory + SourceFilename.weaponsFilename + Extension.sourceCSV;
+            // ── Existing ──────────────────────────────────────────────────────
+            public const string ArmorParts  = SourceDirectory.Armory + SourceFilename.ArmorParts  + Extension.SourceCsv;
+            public const string FemaleNames = SourceDirectory.Names  + SourceFilename.FemaleNames + Extension.SourceCsv;
+            public const string MaleNames   = SourceDirectory.Names  + SourceFilename.MaleNames   + Extension.SourceCsv;
+            public const string Surnames    = SourceDirectory.Names  + SourceFilename.Surnames    + Extension.SourceCsv;
+            public const string Weapons     = SourceDirectory.Armory + SourceFilename.Weapons     + Extension.SourceCsv;
+
+            // ── World ─────────────────────────────────────────────────────────
+
+            /// <summary>
+            /// Path to Locations.csv.
+            /// Loaded once at startup; defines all <see cref="LocationDescriptor"/> records.
+            /// </summary>
+            public const string Locations   = SourceDirectory.World + SourceFilename.Locations   + Extension.SourceCsv;
+
+            /// <summary>
+            /// Path to Connections.csv.
+            /// Loaded once at startup; defines the adjacency graph used by <see cref="WorldMap"/>.
+            /// </summary>
+            public const string Connections = SourceDirectory.World + SourceFilename.Connections + Extension.SourceCsv;
+
+            /// <summary>
+            /// Directory containing per-location object files.
+            /// Each file is named <c>{locationId}.csv</c> and loaded lazily.
+            /// </summary>
+            public const string WorldObjectsDirectory = SourceDirectory.WorldObjects;
         }
 
-        /// <summary>
-        /// Extensions
-        /// </summary>
+        #endregion
+
+        #region Extensions
+
+        /// <summary>File extensions used across source and generated files.</summary>
         public static class Extension
         {
-            public const string generatedJSON = ".json";
-            public const string sourceCSV = ".csv";
+            public const string GeneratedJson = ".json";
+            public const string SourceCsv     = ".csv";
         }
 
+        #endregion
+
+        #region Generated directories
+
         /// <summary>
-        /// Directories for generated files
+        /// Directories for runtime-generated character files.
         /// </summary>
         public static class GeneratedDirectory
         {
-            public const string npcs = root + @"NPCs\";
-            public const string player = root + @"Player\";
-            public const string root = @"Generated\";
+            private const string root = @"Generated\";
+            public const string Npcs   = root + @"NPCs\";
+            public const string Player = root + @"Player\";
+            public const string Root   = root;
         }
+
+        #endregion
     }
 
-    /// <summary>
-    /// For test purposes only!
-    /// </summary>
+    /// <summary>For test purposes only!</summary>
     public static class FileSystemConstantsForTest
     {
-        public const string npc = FileSystemConstant.GeneratedDirectory.npcs;
-        public const string pc = FileSystemConstant.GeneratedDirectory.player;
-        public const string root = FileSystemConstant.GeneratedDirectory.root;
+        public const string Npc  = FileSystemConstant.GeneratedDirectory.Npcs;
+        public const string Pc   = FileSystemConstant.GeneratedDirectory.Player;
+        public const string Root = FileSystemConstant.GeneratedDirectory.Root;
     }
 
     /// <summary>

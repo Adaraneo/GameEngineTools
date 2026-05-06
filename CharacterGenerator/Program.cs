@@ -85,13 +85,13 @@
 
         private static async Task Main(string[] args)
         {
-            var pcFolderPath = GFC.pc;
-            var npcFolderPath = GFC.npc;
+            var pcFolderPath = GFC.Pc;
+            var npcFolderPath = GFC.Npc;
 
             await using var runtime = await GameEngineToolsRuntime.StartAsync(consoleLogs: true, writeJsonLines: false, writeTextLogs: false, generatedFileOptions: new GeneratedFileOptions
             {
-                NPCDirectory = GFC.npc,
-                PlayerDirectory = GFC.pc
+                NPCDirectory = GFC.Npc,
+                PlayerDirectory = GFC.Pc
             });
 
             var clock = (SystemClock)runtime.Clock;

@@ -16,6 +16,7 @@ using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
 using GameEngineTools.Narrative;
 using GameEngineTools.World.Location;
+using GameEngineTools.World.Objects;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;

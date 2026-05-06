@@ -1,0 +1,211 @@
+// CsvWorldObjectProvider.cs
+// Copyright (c) 50PSoftware
+
+namespace GameEngineTools.World.Objects
+{
+    using System;
+    using System.Collections.Concurrent;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Globalization;
+    using System.IO;
+    using System.Linq;
+    using GameEngineTools.Constants;
+    using GameEngineTools.FileSystem;
+
+    /// <summary>
+    /// CSV-backed implementation of <see cref="IWorldObjectProvider"/> with lazy per-location loading.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Each location has its own file: <c>SourceFiles\World\Objects\{locationId}.csv</c>.
+    /// The file is read from disk only on the first call to <see cref="GetObjectsAt"/>
+    /// for that location. Subsequent calls return the cached result.
+    /// </para>
+    /// <para>
+    /// <b>This is the Phase 1 implementation.</b> In Phase 2 (Unity integration),
+    /// replace this with <c>UnityWorldObjectProvider : IWorldObjectProvider</c>
+    /// without touching any simulation engine code.
+    /// </para>
+    /// <para>
+    /// <b>Object file column order:</b><br/>
+    /// <c>Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances</c>
+    /// </para>
+    /// <para>
+    /// Affordances are pipe-separated key:value pairs, e.g.:<br/>
+    /// <c>Warmth:0.7|Social:0.3|MoodBoost:0.2</c>
+    /// </para>
+    /// </remarks>
+    public sealed class CsvWorldObjectProvider : IWorldObjectProvider
+    {
+        #region Private state
+
+        /// <summary>
+        /// Directory that contains per-location CSV files (one file per location ID).
+        /// </summary>
+        private readonly string _objectsDirectory;
+
+        /// <summary>
+        /// Per-location object cache. Populated lazily on first access.
+        /// Uses <see cref="ConcurrentDictionary{TKey,TValue}"/> to be safe
+        /// if multiple threads ever access the provider simultaneously.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, IReadOnlyList<WorldObject>> _cache = new();
+
+        #endregion
+
+        #region Construction
+
+        /// <summary>
+        /// Initialises the provider pointing at the default objects directory
+        /// from <see cref="FileSystemConstant.SourceFilePath.WorldObjectsDirectory"/>.
+        /// </summary>
+        public CsvWorldObjectProvider()
+            : this(FileSystemConstant.SourceFilePath.WorldObjectsDirectory) { }
+
+        /// <summary>
+        /// Initialises the provider with an explicit directory path.
+        /// Intended for tests and alternative configurations.
+        /// </summary>
+        /// <param name="objectsDirectory">
+        /// Path to the directory containing per-location CSV files.
+        /// </param>
+        public CsvWorldObjectProvider(string objectsDirectory)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(objectsDirectory);
+            _objectsDirectory = objectsDirectory;
+        }
+
+        #endregion
+
+        #region IWorldObjectProvider
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Loads <c>{objectsDirectory}\{locationId}.csv</c> on first call;
+        /// returns cached result on all subsequent calls.
+        /// Returns an empty list if the file does not exist (location has no objects).
+        /// </remarks>
+        public IEnumerable<WorldObject> GetObjectsAt(string locationId)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
+
+            // GetOrAdd is atomic — the factory will only run once per locationId.
+            return _cache.GetOrAdd(locationId, LoadForLocation);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Loads ALL per-location CSV files from the objects directory.
+        /// Results are cached, so subsequent calls to <see cref="GetObjectsAt"/>
+        /// for already-loaded locations are free.
+        /// </remarks>
+        public IEnumerable<WorldObject> GetAllObjects()
+        {
+            if (!Directory.Exists(_objectsDirectory))
+                return Enumerable.Empty<WorldObject>();
+
+            // Load every CSV file found in the directory, then flatten.
+            return Directory
+                .GetFiles(_objectsDirectory, $"*{FileSystemConstant.Extension.SourceCsv}")
+                .SelectMany(filePath =>
+                {
+                    // Derive locationId from filename (e.g. "castle_hall.csv" → "castle_hall").
+                    var locationId = Path.GetFileNameWithoutExtension(filePath);
+                    return _cache.GetOrAdd(locationId, _ => LoadFromPath(filePath, locationId));
+                });
+        }
+
+        #endregion
+
+        #region Private loading
+
+        /// <summary>
+        /// Lazy-load factory for <see cref="_cache"/>.
+        /// Constructs the expected file path from <paramref name="locationId"/> and loads it.
+        /// </summary>
+        /// <param name="locationId">Location ID (used as filename without extension).</param>
+        private IReadOnlyList<WorldObject> LoadForLocation(string locationId)
+        {
+            var path = Path.Combine(_objectsDirectory, locationId + FileSystemConstant.Extension.SourceCsv);
+            return LoadFromPath(path, locationId);
+        }
+
+        /// <summary>
+        /// Reads and parses a single per-location CSV file.
+        /// Returns an empty list if the file does not exist.
+        /// </summary>
+        /// <param name="filePath">Full path to the CSV file.</param>
+        /// <param name="locationId">Location ID injected into every parsed object.</param>
+        private static IReadOnlyList<WorldObject> LoadFromPath(string filePath, string locationId)
+        {
+            if (!File.Exists(filePath))
+                return Array.Empty<WorldObject>();
+
+            return CsvLoader.Load(filePath, v => ParseObjectRow(v, locationId));
+        }
+
+        #endregion
+
+        #region CSV parsing
+
+        /// <summary>
+        /// Parses a single row from a per-location objects CSV file.
+        /// </summary>
+        /// <remarks>
+        /// Expected column order:
+        /// 0=Id, 1=DisplayName, 2=Category, 3=HeatSignature,
+        /// 4=AmbientNoise, 5=BlocksLineOfSight, 6=IsAvailable, 7=Affordances
+        /// </remarks>
+        /// <param name="v">Column values split by the CSV delimiter.</param>
+        /// <param name="locationId">Location ID injected from the file name.</param>
+        private static WorldObject ParseObjectRow(string[] v, string locationId)
+            => new()
+            {
+                Id               = v[0].Trim(),
+                DisplayName      = v[1].Trim(),
+                Category         = Enum.Parse<WorldObjectCategory>(v[2].Trim(), ignoreCase: true),
+                LocationId       = locationId,
+                HeatSignature    = double.Parse(v[3].Trim(), CultureInfo.InvariantCulture),
+                AmbientNoise     = double.Parse(v[4].Trim(), CultureInfo.InvariantCulture),
+                BlocksLineOfSight = bool.Parse(v[5].Trim()),
+                IsAvailable      = bool.Parse(v[6].Trim()),
+                Affordances      = ParseAffordances(v[7].Trim())
+            };
+
+        /// <summary>
+        /// Parses the pipe-separated affordance string into an immutable array.
+        /// </summary>
+        /// <example>
+        /// Input: <c>"Warmth:0.7|Social:0.3|MoodBoost:0.2"</c><br/>
+        /// Output: three <see cref="WorldObjectAffordance"/> records.
+        /// </example>
+        /// <param name="raw">Raw affordance string from the CSV cell.</param>
+        private static ImmutableArray<WorldObjectAffordance> ParseAffordances(string raw)
+        {
+            // An empty cell means the object has no affordances.
+            if (string.IsNullOrWhiteSpace(raw))
+                return ImmutableArray<WorldObjectAffordance>.Empty;
+
+            var builder = ImmutableArray.CreateBuilder<WorldObjectAffordance>();
+
+            foreach (var token in raw.Split('|', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = token.Split(':');
+
+                if (parts.Length != 2)
+                    throw new FormatException(
+                        $"Affordance token '{token}' is malformed. Expected format: 'Type:Value'.");
+
+                var type         = Enum.Parse<AffordanceType>(parts[0].Trim(), ignoreCase: true);
+                var satisfaction = double.Parse(parts[1].Trim(), CultureInfo.InvariantCulture);
+
+                builder.Add(new WorldObjectAffordance(type, satisfaction));
+            }
+
+            return builder.ToImmutable();
+        }
+
+        #endregion
+    }
+}

@@ -191,11 +191,11 @@ namespace GameEngineTools
         /// </summary>
         private void LoadResources()
         {
-            _weapons = CsvLoader.Load(FileSystemConstant.SourceFilePath.weapons,
+            _weapons = CsvLoader.Load(FileSystemConstant.SourceFilePath.Weapons,
                 v => new Weapon(v[0], Enum.Parse<Weapon.WeaponType>(v[1]),
                     double.Parse(v[2], CultureInfo.InvariantCulture)));
 
-            _armorParts = CsvLoader.Load(FileSystemConstant.SourceFilePath.armorParts,
+            _armorParts = CsvLoader.Load(FileSystemConstant.SourceFilePath.ArmorParts,
                 v => new ArmorPart(v[0], Enum.Parse<ArmorPart.PartType>(v[1]),
                     double.Parse(v[2], CultureInfo.InvariantCulture)));
         }
