@@ -1186,8 +1186,10 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void Handle_InteractionRejected_DecreasesNeedSocial()
+        public void Handle_InteractionRejected_IncreasesNeedSocial()
         {
+            // Williams (2007) 4-need threat model: rejection threatens Belonging, making the need
+            // MORE urgent (hyperactivation), not less. NeedSafety also rises from the threat.
             var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
             engine.RestoreState(engine.State with { Motivations = new MotivationState() });
             var beforeSocial = engine.State.Motivations!.NeedSocial;
@@ -1199,8 +1201,8 @@ namespace EngineTests
 
             engine.Handle(outcome, ctx, _outbox);
 
-            Assert.IsTrue(engine.State.Motivations!.NeedSocial < beforeSocial,
-                $"Rejected interaction must decrease NeedSocial. Before={beforeSocial:F4}, After={engine.State.Motivations.NeedSocial:F4}");
+            Assert.IsTrue(engine.State.Motivations!.NeedSocial > beforeSocial,
+                $"Rejected interaction must increase NeedSocial (belonging threat — Williams 2007). Before={beforeSocial:F4}, After={engine.State.Motivations.NeedSocial:F4}");
             Assert.IsTrue(engine.State.Motivations!.NeedSafety > beforeSafety,
                 $"Rejected interaction must increase NeedSafety. Before={beforeSafety:F4}, After={engine.State.Motivations.NeedSafety:F4}");
         }

@@ -30,7 +30,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         double HabitDecayPerDay = 0.015,
         double HabitMaxUtilityMultiplier = 0.18,
         double HabitMaxFlatBias = 4.0,
-        int MaxHabitTraces = 64)
+        int MaxHabitTraces = 64,
+        /// <summary>
+        /// Maximum utility reduction applied to Work/Create when Noise=1.0 (Glass &amp; Singer 1972).
+        /// At Noise=0.55 penalty is 0; at Noise=1.0 penalty equals this value.
+        /// </summary>
+        double NoiseCognitivePenaltyMax = 0.45)
     {
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
     }

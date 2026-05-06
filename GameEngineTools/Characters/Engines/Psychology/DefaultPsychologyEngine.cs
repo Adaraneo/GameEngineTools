@@ -107,11 +107,23 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 ph.CortisolLevel / Config.CircadianVulnerabilityScale,
                 Config.CircadianVulnerabilityMin, 2.0);
 
+            // Per-emotion valence decay multiplier (Verduyn & Lavrijsen 2015):
+            // different emotions have empirically different durations — sadness lingers, fear fades fast.
+            var emotionDecayMult = GetEmotionDecayMultiplier(s.DominantEmotion, Config);
+
+            // Rumination: high stress blocks decay of ruminative negative emotions (Nolen-Hoeksema 2000)
+            if (s.Stress > Config.RuminationStressThreshold &&
+                s.DominantEmotion is DiscreteEmotion.Sadness or DiscreteEmotion.Shame or DiscreteEmotion.Anger)
+            {
+                var ruminationBlock = 1.0 - s.Stress / 100.0 * Config.RuminationDecayBlock;
+                emotionDecayMult *= Math.Max(0.01, ruminationBlock);
+            }
+
             // Základní drift: stres klesá k baseline (modulován vagálním tónem + cirkadiánní vulnerabilitou)
             s = s with
             {
                 Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * vagalTone * circadianVulnerability * h),
-                Valence = Approach(s.Valence, 0, 0.15 * h),
+                Valence = Approach(s.Valence, 0, 0.15 * emotionDecayMult * h),
                 Arousal = Approach(s.Arousal, 0.5, 0.05 * h),
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)
             };
@@ -657,6 +669,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             _ => 1.0
                         };
                         var impact = (0.05 + 0.10 * n + attachmentModifier) * actSensitivity;
+                        // Williams (2007) 4-need threat model: rejection threatens Belonging →
+                        // need becomes more urgent, not less (hyperactivation for anxious attachment;
+                        // deactivation for avoidant — Mikulincer & Shaver 2016).
+                        // RejectionSensitivity proxy: Attachment.Anxiety (Downey & Feldman 1996).
+                        var belongingBoost = (4.0 + ctx.Personality.Attachment.Anxiety * 6.0)
+                                           * (1.0 - ctx.Personality.Attachment.Avoidance * 0.70);
                         var prevMotivRej = s.Motivations ?? new MotivationState();
                         s = s with
                         {
@@ -666,7 +684,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             MoodBaseline = Math.Clamp(s.MoodBaseline - 8.0, 0, 100),
                             Motivations = prevMotivRej with
                             {
-                                NeedSocial = Math.Clamp(prevMotivRej.NeedSocial - 5.0, 0, 100),
+                                NeedSocial = Math.Clamp(prevMotivRej.NeedSocial + belongingBoost, 0, 100),
                                 NeedSafety = Math.Clamp(prevMotivRej.NeedSafety + 5.0, 0, 100)
                             }
                         };
@@ -692,6 +710,29 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         };
                     }
                     break;
+
+                case Characters.Engines.Interactions.SexualEncounterOutcome se when se.Accepted && (se.From == ctx.Id || se.To == ctx.Id):
+                {
+                    // Post-coital reward: liking (opioid system) — valence boost, tension release,
+                    // NeedIntimacy satisfied. Wanting (dopamine) recovers via normal physiology tick.
+                    // Reference: Dual Control Model (Bancroft & Janssen 2009); Basson 2001.
+                    var prevMotivSex = s.Motivations ?? new MotivationState();
+                    var liking = 0.07 + (ctx.Personality.DualControl?.SES ?? 0.5) * 0.06;
+                    s = s with
+                    {
+                        Valence  = Math.Clamp(s.Valence  + liking, -1, 1),
+                        Arousal  = Math.Clamp(s.Arousal  - 0.12,   0, 1),   // post-coital relaxation
+                        Stress   = Math.Max(0, s.Stress  - 5.0),              // tension release
+                        Motivations = prevMotivSex with
+                        {
+                            // NeedIntimacy satisfied — recovers at normal SES-driven rate in Behavior
+                            NeedIntimacy = Math.Max(0, prevMotivSex.NeedIntimacy - 30.0)
+                        }
+                    };
+                    if (s.Motivations != prevMotivSex)
+                        outbox.Add(new MotivationChanged(se.OccurredAt, ctx.Id, prevMotivSex, s.Motivations!));
+                    break;
+                }
 
                 case Characters.Engines.Psychology.StressSpiked sp:
                     s = s with { Stress = Math.Max(s.Stress, sp.NewStress) };
@@ -903,6 +944,25 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 return p.BigFive.Conscientiousness > 0.5 ? "creativity" : "rumination";
             return "anxiety";
         }
+
+        /// <summary>
+        /// Returns the per-emotion valence decay rate multiplier (Verduyn &amp; Lavrijsen 2015).
+        /// Values below 1.0 slow decay (emotion lingers); values above 1.0 accelerate it (emotion fades fast).
+        /// </summary>
+        private static double GetEmotionDecayMultiplier(DiscreteEmotion emotion, PsychologyConfig cfg)
+            => emotion switch
+            {
+                DiscreteEmotion.Fear       => cfg.EmotionDecayFear,
+                DiscreteEmotion.Surprise   => cfg.EmotionDecaySurprise,
+                DiscreteEmotion.Disgust    => cfg.EmotionDecayDisgust,
+                DiscreteEmotion.Joy        => cfg.EmotionDecayJoy,
+                DiscreteEmotion.Pride      => cfg.EmotionDecayPride,
+                DiscreteEmotion.Tenderness => cfg.EmotionDecayTenderness,
+                DiscreteEmotion.Anger      => cfg.EmotionDecayAnger,
+                DiscreteEmotion.Shame      => cfg.EmotionDecayShame,
+                DiscreteEmotion.Sadness    => cfg.EmotionDecaySadness,
+                _                          => 1.0
+            };
 
         /// <summary>
         /// Replaces the current state with the provided snapshot.

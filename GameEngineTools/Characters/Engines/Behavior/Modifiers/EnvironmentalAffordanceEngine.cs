@@ -36,6 +36,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             var productiveLoss = Math.Max(0.0, Math.Max(rawWork - workHere, rawCreate - createHere));
             BehaviorCandidateEditor.Add(candidates, MoveToWork, kind != SurfaceKind.Work ? productiveLoss * 0.80 : 0.0);
 
+            // Noise cognitive penalty: working memory degradation (Glass & Singer 1972).
+            // Noise > 0.55 starts degrading complex cognitive tasks (WHO threshold mapping).
+            var noiseCognitivePenalty = noise > 0.55
+                ? (noise - 0.55) / (1.0 - 0.55) * context.Config.NoiseCognitivePenaltyMax
+                : 0.0;
+
+            if (noiseCognitivePenalty > 0.0)
+            {
+                BehaviorCandidateEditor.Multiply(candidates, Work,   1.0 - noiseCognitivePenalty);
+                BehaviorCandidateEditor.Multiply(candidates, Create, 1.0 - noiseCognitivePenalty);
+            }
+
             // Noise and crowding create low-stakes displacement pressure toward more suitable spaces.
             var noiseStress = Math.Max(0, noise - 0.5) * 2.0 * (context.HumanContext.Snapshot.Psychology.Stress / 100.0) * 20.0;
             var socialPull = context.State.NeedBelonging * context.HumanContext.Personality.Motivation.Affiliation * BehaviorMath.SocialSurfaceMultiplier(kind) * (1.0 - crowding) * 0.5;

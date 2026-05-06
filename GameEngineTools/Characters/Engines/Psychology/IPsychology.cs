@@ -124,9 +124,53 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double PerceptualAgingThreshold = 50.0,
         double PerceptualAgingCogLoadPerHour = 0.005,
         // Post-menopauza — estrogen deficience → nálada
-        double PostMenopauseMoodBaselinePenaltyPerHour = 0.002)
+        double PostMenopauseMoodBaselinePenaltyPerHour = 0.002,
+        // --- Per-emotion PAD valence decay multipliers (Verduyn & Lavrijsen 2015) ---
+        // Multiplier < 1 = emotion lingers longer; multiplier > 1 = fades quickly.
+        // Calibrated for ValenceDecayRate = 0.15/h:
+        //   Fear/Surprise ~30 min  → mult 3.0  (very fast fade)
+        //   Joy           ~2–4 h   → mult 1.0  (default)
+        //   Anger         ~4–8 h   → mult 0.6
+        //   Shame         ~3–6 h   → mult 0.4
+        //   Sadness       ~120 h   → mult 0.06 (very slow fade)
+
+        /// <summary>Valence decay multiplier when dominant emotion is Fear (Verduyn &amp; Lavrijsen 2015). Default 3.0 ≈ ~30 min duration.</summary>
+        double EmotionDecayFear = 3.0,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Surprise. Default 3.0.</summary>
+        double EmotionDecaySurprise = 3.0,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Disgust. Default 2.5.</summary>
+        double EmotionDecayDisgust = 2.5,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Joy. Default 1.0.</summary>
+        double EmotionDecayJoy = 1.0,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Pride. Default 0.8.</summary>
+        double EmotionDecayPride = 0.8,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Tenderness. Default 0.7.</summary>
+        double EmotionDecayTenderness = 0.7,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Anger. Default 0.6 ≈ ~4–8 h duration.</summary>
+        double EmotionDecayAnger = 0.6,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Shame. Default 0.4.</summary>
+        double EmotionDecayShame = 0.4,
+
+        /// <summary>Valence decay multiplier when dominant emotion is Sadness. Default 0.06 ≈ ~120 h duration.</summary>
+        double EmotionDecaySadness = 0.06,
+
+        /// <summary>
+        /// When stress exceeds this threshold and DominantEmotion is Sadness/Shame/Anger,
+        /// rumination blocks emotional decay. Factor: 1 - (stress/100 × RuminationDecayBlock).
+        /// </summary>
+        double RuminationStressThreshold = 60.0,
+
+        /// <summary>Strength of rumination's blocking effect on valence decay. Default 0.7.</summary>
+        double RuminationDecayBlock = 0.7)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7) { }
     }
 
     public sealed record PsychologyState(

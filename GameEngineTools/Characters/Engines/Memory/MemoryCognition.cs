@@ -439,6 +439,16 @@ namespace GameEngineTools.Characters.Engines.Memory
                 return isPositive ? -0.15 : isNegative ? +0.12 : 0.0;
             }
 
+            // Mood repair: stable NPC (low N) in negative mood upweights positive memories.
+            // Active mood regulation via memory — Josephson et al. 1996; Joormann & Siemer 2004.
+            // Agreeableness not available in this method; (1-N) serves as the repair tendency proxy.
+            // Mutually exclusive with spiral: spiral takes priority when risk > 0.6 && valence < -0.4.
+            if (currentValence < -0.2 && isPositive)
+            {
+                var repairTendency = (1.0 - neuroticism) * (1.0 - neuroticism) * 0.30;
+                return repairTendency;
+            }
+
             if (neuroticism < 0.4)
                 return isPositive ? +0.10 : 0.0;
 
