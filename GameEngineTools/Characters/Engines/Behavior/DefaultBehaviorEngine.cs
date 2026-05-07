@@ -14,6 +14,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -35,6 +36,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         private readonly ICharacterDevelopmentPolicy _developmentPolicy;
         private readonly IHabitApplicabilityModulator _habitApplicabilityModulator;
 
+        /// <summary>
+        /// Optional provider of world objects at the character's current location.
+        /// Populated at construction time; <c>null</c> means no object-affordance modulation.
+        /// </summary>
+        private readonly IWorldObjectProvider? _objectProvider;
+
         #endregion Private fields
 
         #region Public properties
@@ -52,18 +59,26 @@ namespace GameEngineTools.Characters.Engines.Behavior
             IOptions<SleepConfig> sleepCfg,
             ILoggerFactory loggerFactory,
             ICharacterDevelopmentPolicy? developmentPolicy = null,
-            IHabitApplicabilityModulator? habitApplicabilityModulator = null)
+            IHabitApplicabilityModulator? habitApplicabilityModulator = null,
+            /// <summary>
+            /// Optional world object provider.
+            /// When supplied, <see cref="WorldObjectAffordanceEngine"/> is added to the
+            /// modifier pipeline and nudges candidate utility based on objects in the
+            /// character's current location.
+            /// </summary>
+            IWorldObjectProvider? objectProvider = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine() };
-            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine() };
+            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine() };
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
             _developmentPolicy = developmentPolicy ?? new DefaultCharacterDevelopmentPolicy();
             _habitApplicabilityModulator = habitApplicabilityModulator ?? NoOpHabitApplicabilityModulator.Instance;
+            _objectProvider = objectProvider;
         }
 
         #endregion Construction
@@ -77,7 +92,21 @@ namespace GameEngineTools.Characters.Engines.Behavior
             var stateWithHabits = State with { HabitTraces = BehaviorHabitLearning.Decay(State.HabitTraces, dt, Config, ctx, _log) };
             var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, stateWithHabits) with { Cooldowns = updatedCooldowns };
             State = stateWithNeeds;
-            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator);
+
+            IReadOnlyList<WorldObject>? availableObjects = null;
+            if (_objectProvider is not null)
+            {
+                var locationId = ctx.Snapshot.InteractionSurface.Location;
+                if (!string.IsNullOrEmpty(locationId))
+                {
+                    availableObjects = _objectProvider
+                        .GetObjectsAt(locationId)
+                        .Where(o => o.IsAvailable)
+                        .ToList();
+                }
+            }
+
+            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator, availableObjects);
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.
             var sleep = _sleepCoordinator.Tick(context);

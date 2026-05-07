@@ -157,96 +157,24 @@ var diary = new List<NarrativeEntry>();
 
 var rng = new Random();
 
+var worldMap = WorldMapLoader.Load();
 var locationService = new DefaultLocationService();
+worldMap.RegisterAllLocations(locationService);
+var objectProvider = new CsvWorldObjectProvider();
 
-locationService.RegisterLocation(new LocationDescriptor(
-    Id: "village_square",
-    DisplayName: "Village Square",
-    BaseNoise: 0.3,
-    NoisePerPerson: 0.1,
-    Capacity: 20,
-    AllowsPrivacy: false,
-    LocationType.Social));
+var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
-locationService.RegisterLocation(new LocationDescriptor(
-    Id: "castle_hall",
-    DisplayName: "Castle Hall",
-    BaseNoise: 0.1,
-    NoisePerPerson: 0.05,
-    Capacity: 10,
-    AllowsPrivacy: true,
-    LocationType.Private));
+var mainCharactersQuery = from mainCharacters in manager.Characters
+                          where mainCharacters.Person.Id.Value.Equals(playerPerson.Id.Value) && mainCharacters.Person.Id.Value.Equals(soid) && mainCharacters.Person.Id.Value.Equals(friendId) && mainCharacters.Person.Id.Value.Equals(friendSOId)
+                          select mainCharacters.Person;
 
-locationService.RegisterLocation(new LocationDescriptor(
-    Id: "castle_sleep_room",
-    DisplayName: "Castle Sleep Room",
-    BaseNoise: 0.1,
-    NoisePerPerson: 0.01,
-    Capacity: 10,
-    AllowsPrivacy: true,
-    LocationType.Rest));
+var locationQuery = from locations in mainCharactersQuery
+        where locations.Snapshot.InteractionSurface.Location == "Unknown"
+        select locations;
 
-for (int villageHouseIndex = 0; villageHouseIndex < (manager.Characters.Count - 3) / 5; villageHouseIndex++)
+foreach (var personToMove in locationQuery)
 {
-    locationService.RegisterLocation(new LocationDescriptor(
-        $"village_house{villageHouseIndex}",
-        $"Village House {villageHouseIndex + 1}",
-        BaseNoise: 0.2,
-        NoisePerPerson: 0.2,
-        Capacity: 5,
-        false,
-        LocationType.Private));
-    locationService.RegisterLocation(new LocationDescriptor(
-        Id: $"village_house{villageHouseIndex}_sleep_room",
-        DisplayName: $"Village House {villageHouseIndex + 1}: Sleep Room",
-        BaseNoise: 0.2,
-        NoisePerPerson: 0.2,
-        Capacity: 2,
-        AllowsPrivacy: true,
-        LocationType.Rest));
-}
-
-locationService.RegisterLocation(new LocationDescriptor(
-    Id: "castle_horse_stables",
-    DisplayName: "Castle Horse Stables",
-    BaseNoise: 0.3,
-    NoisePerPerson: 0.2,
-    Capacity: 10,
-    AllowsPrivacy: false,
-    LocationType.Work));
-
-locationService.RegisterLocation(new LocationDescriptor(
-    Id: "castle_forge",
-    DisplayName: "Castle Forge",
-    BaseNoise: 0.7,
-    NoisePerPerson: 0.2,
-    Capacity: 10,
-    AllowsPrivacy: false,
-    LocationType.Work));
-
-locationService.RegisterLocation(new LocationDescriptor(
-    Id: "forest_behinf_village",
-    DisplayName: "Forest Behing the vilage",
-    BaseNoise: 0.3,
-    NoisePerPerson: 0.1,
-    Capacity: 100,
-    AllowsPrivacy: true,
-    LocationType.Public));
-
-if (locationService.GetLocation(playerPerson.Id) is null && locationService.GetLocation(significantOtherPerson.Id) is null && locationService.GetLocation(friendPerson.Id) is null && locationService.GetLocation(friendSOPerson.Id) is null)
-{
-    locationService.MoveCharacter(playerPerson.Id, "village_square");
-    locationService.MoveCharacter(significantOtherPerson.Id, "village_square");
-    locationService.MoveCharacter(friendPerson.Id, "village_square");
-    locationService.MoveCharacter(friendSOPerson.Id, "village_square");
-}
-
-foreach (var npc in manager.Characters.Where(npc => ids.ContainsKey(npc.Person.Id.Value.ToString()) == false))
-{
-    if (locationService.GetLocation(npc.Person.Id) is null)
-    {
-        locationService.MoveCharacter(npc.Person.Id, "village_square");
-    }
+    locationService.MoveCharacter(personToMove.Id, mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count + 1)]);
 }
 
 var mainCharactersSceneOpts = new SimulationSceneOptions
@@ -298,19 +226,6 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
         // ── NPC movement — route MoveTo:* actions from previous tick ─────────
         RouteMoveTo(now, chars, locationService, rng);
 
-        // ── Location context — move both to Castle on day 16, evening ─────────
-        if (now.Day is 16 && now.Hour is 20
-        && !locationService.GetLocation(significantOtherPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
-        && !locationService.GetLocation(playerPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
-        && !locationService.GetLocation(friendPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase)
-        && !locationService.GetLocation(friendSOPerson.Id)!.Equals("castle_hall", StringComparison.InvariantCultureIgnoreCase))
-        {
-            locationService.MoveCharacter(playerPerson.Id, "castle_hall");
-            locationService.MoveCharacter(significantOtherPerson.Id, "castle_hall");
-            locationService.MoveCharacter(friendPerson.Id, "castle_hall");
-            locationService.MoveCharacter(friendSOPerson.Id, "castle_hall");
-        }
-
         DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
         OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
@@ -322,10 +237,17 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
 var mainCharactersScene = new SimulationScene(clock, mainCharactersSceneOpts, lodRuntime);
 await mainCharactersScene.RunAsync();
 
-var characters = manager.Characters.Where(c => c.Person.Id != playerPerson.Id && c.Person.Id != significantOtherPerson.Id && c.Person.Id != friendPerson.Id && c.Person.Id != friendSOPerson.Id).Select(c => c.Person).ToList();
+var characters = manager.Characters.Where(c => !mainCharactersQuery.Contains(c.Person)).Select(c => c.Person).ToList();
 
 if (characters.Count > 0)
 {
+    var ocLocations = worldMap.GetLocationsInRegion("Village");
+
+    foreach(var character in characters)
+    {
+        locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count + 1)]);
+    }
+
     clock.SetNow(clock.Now.AddYears(-simulationYears));
     var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
