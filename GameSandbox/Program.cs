@@ -174,7 +174,7 @@ var locationQuery = from locations in mainCharactersQuery
 
 foreach (var personToMove in locationQuery)
 {
-    locationService.MoveCharacter(personToMove.Id, mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count + 1)]);
+    locationService.MoveCharacter(personToMove.Id, mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count)]);
 }
 
 var mainCharactersSceneOpts = new SimulationSceneOptions
@@ -245,7 +245,7 @@ if (characters.Count > 0)
 
     foreach(var character in characters)
     {
-        locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count + 1)]);
+        locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
     }
 
     clock.SetNow(clock.Now.AddYears(-simulationYears));
