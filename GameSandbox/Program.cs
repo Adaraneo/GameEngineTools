@@ -9,6 +9,7 @@ using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.SemanticMemory;
+using GameEngineTools.Characters.GameObjects;
 using GameEngineTools.Characters.Generation.Portraits;
 using GameEngineTools.Characters.Hosting;
 using GameEngineTools.Characters.Traits;
@@ -244,7 +245,17 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
 var mainCharactersScene = new SimulationScene(clock, mainCharactersSceneOpts, lodRuntime);
 await mainCharactersScene.RunAsync();
 
-var characters = manager.Characters.Where(c => mainCharactersQuery.Contains(c.Person)).Select(c => c.Person).ToList();
+var characters = new List<IHuman>();
+foreach (var character in manager.Characters.Select(c => c.Person).ToList())
+{
+    var mainCharacters = mainCharactersQuery.ToList();
+    if (mainCharacters.Contains(character))
+    {
+        continue;
+    }
+
+    characters.Add(character);
+}
 
 if (characters.Count > 0)
 {
