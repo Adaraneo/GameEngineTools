@@ -113,11 +113,20 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double ProxemicsPersonalZoneStressPerHour = 1.5,
         // ── Privacy non-monotonicity (Altman 1975) ─────────────────────────────
         /// <summary>
-        /// Stress per unit of privacy mismatch per hour.
-        /// Both too little privacy (introvert in public) and too much (extravert in isolation)
-        /// generate stress proportional to the mismatch magnitude.
+        /// Stress per unit of crowding mismatch per hour (actual privacy &lt; desired).
+        /// Introverts in public spaces accumulate stress proportional to the deficit.
         /// </summary>
         double PrivacyMismatchStressWeight = 6.0,
+        /// <summary>
+        /// Stress per unit of isolation excess per hour, applied only when Extraversion &gt; 0.6
+        /// and actual privacy exceeds desired. Models Altman (1975) non-monotonic privacy optimum.
+        /// </summary>
+        double IsolationStressWeight = 3.0,
+        /// <summary>
+        /// Stress recovery bonus per hour when in a quiet private space (HasPrivacy + Noise &lt; 0.3).
+        /// Reduces accumulated stress — models restorative environment effect (Kaplan 1995).
+        /// </summary>
+        double PrivacyRecoveryBonusPerHour = 0.8,
         // Kognitivní stárnutí + percepce (Salthouse 2009; Gates & Cooper 1991)
         double CognitivAgingThreshold = 60.0,
         double CognitiveAgingCogLoadPerYear = 0.3,

@@ -58,10 +58,9 @@ namespace GameEngineTools.World.Simulation
         #region Časování simulace
 
         /// <summary>
-        /// Počet herních let, po které simulace poběží.
-        /// Výchozí hodnota: <c>2</c>.
+        /// Výchoží hodnota pro simulační dny.
         /// </summary>
-        public int SimulationYears { get; init; } = 2;
+        public long SimulationDays { get; init; } = 20;
 
         /// <summary>
         /// Délka jednoho vnějšího simulačního kroku — jak daleko se má svět ideálně posunout

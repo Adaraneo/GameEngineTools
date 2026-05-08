@@ -113,7 +113,7 @@ namespace GameEngineTools.World.Simulation
         private Task SimulateAsync()
         {
             var startTime = _clock.Now;
-            var endTime = _clock.Now.AddYears(_options.SimulationYears);
+            var endTime = _clock.Now.AddDays(_options.SimulationDays);
             var chars = _options.Characters;
             var macroStep = _options.TickStep;
             var internalSubstep = ResolveInternalSubstep(macroStep);

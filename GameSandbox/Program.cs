@@ -60,9 +60,9 @@ var perceptionPolicy = runtime.Services.GetRequiredService<IPerceptionFidelityPo
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
 manager.Characters.Add(player);
 
-clock.SetNow(initTicks == defaultTicks
-    ? WDateTime.New(player.Person.Identity.BirthDate.AddYears(16))
-    : new WDateTime(initTicks));
+var startNow = initTicks == defaultTicks ? WDateTime.New(player.Person.Identity.BirthDate.AddYears(16)) : new WDateTime(initTicks);
+
+clock.SetNow(startNow);
 
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
@@ -89,24 +89,24 @@ answerKey = Console.ReadKey().Key;
 if (answerKey == ConsoleKey.Y)
     canExportDiary = true;
 
-int simulationYears = 2;
+int simulationDays = 20;
 
-SetYearsForSimulation(simulationYears);
+SetYearsForSimulation(simulationDays);
 
 static void SetYearsForSimulation(int simulationYears, bool printInfo = true)
 {
     Console.Clear();
-    Console.Write("Set the year(s) for simulation: ");
+    Console.Write("Set days for simulation: ");
     var answer = Console.ReadLine();
     if (answer.Length == 0 && !int.TryParse(answer, out simulationYears))
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("The simulation years are not set or are in incorrect format.");
+        Console.WriteLine("The simulation days are not set or are in incorrect format.");
         Console.ResetColor();
         Console.WriteLine("Would you like to try it again? [y\\N]");
         if (printInfo)
         {
-            Console.WriteLine("If you answer no (n), simulation years will be set to 2.");
+            Console.WriteLine("If you answer no (n), simulation days will be set to 20.");
         }
 
         var answerKey = Console.ReadKey().Key;
@@ -181,7 +181,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
     LocationService = locationService,
-    SimulationYears = simulationYears,
+    SimulationDays = simulationDays,
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
@@ -248,13 +248,13 @@ if (characters.Count > 0)
         locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
     }
 
-    clock.SetNow(clock.Now.AddYears(-simulationYears));
+    clock.SetNow(clock.Now.AddDays(-simulationDays));
     var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
         Characters = characters,
         LocationService = locationService,
         TickStep = WTimeSpan.FromHours(5),
-        SimulationYears = simulationYears,
+        SimulationDays = simulationDays,
         DefaultCharacterLod = CognitiveResolutionLevel.Background,
         InternalSubstep = WTimeSpan.FromMinutes(30),
         ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, character.Id, locationService),
@@ -327,7 +327,7 @@ Console.WriteLine("Simulation complete. Game time: {0}", clock.Now);
 if (canExportDiary)
 {
     File.WriteAllText(
-        Path.Combine(desktopPath, $"diary.{clock.Now.Date}.txt"),
+        Path.Combine(desktopPath, $"diary.{startNow.Date.ToString()} - {clock.Now.Date.ToString()}.txt"),
         sbDiary.ToString());
 }
 
