@@ -672,16 +672,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 dict[kv.Key] = e with
                 {
-                    Like = Clamp(Approach(e.Like, 50, d) + valenceEffect - stressEffect - familiarityLikePenalty),
-                    Trust = Clamp(Approach(e.Trust, 50, d * 0.5)),
-                    Familiarity = Clamp(Approach(e.Familiarity, Config.FamiliarityDecayFloor, d * 0.08)),
+                    Like = Clamp(Approach(e.Like, 50, d * Config.DecayMultiplierLike) + valenceEffect - stressEffect - familiarityLikePenalty),
+                    Trust = Clamp(Approach(e.Trust, 50, d * Config.DecayMultiplierTrust)),
+                    Familiarity = Clamp(Approach(e.Familiarity, Config.FamiliarityDecayFloor, d * Config.DecayMultiplierFamiliarity)),
                     AestheticAttraction = e.AestheticAttraction,
                     PhysicalAttraction = e.PhysicalAttraction,
-                    RomanticInterest = Clamp(Approach(e.RomanticInterest, 5, d * 0.45)),
-                    SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * 0.70)),
-                    Closeness = Clamp(Approach(e.Closeness, 5, d * 1.2)),
-                    Respect = Clamp(Approach(e.Respect, 55, d * 0.3)),
-                    Comfort = Clamp(Approach(e.Comfort, 45, d * 0.6) + valenceEffect * 0.5 - stressEffect * 0.5),
+                    RomanticInterest = Clamp(Approach(e.RomanticInterest, 5, d * Config.DecayMultiplierRomanticInterest)),
+                    SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * Config.DecayMultiplierSexualInterest)),
+                    Closeness = Clamp(Approach(e.Closeness, 5, d * Config.DecayMultiplierCloseness)),
+                    Respect = Clamp(Approach(e.Respect, 55, d * Config.DecayMultiplierRespect)),
+                    Comfort = Clamp(Approach(e.Comfort, 45, d * Config.DecayMultiplierComfort) + valenceEffect * 0.5 - stressEffect * 0.5),
                     TransgressionResidue = newResidue,
                     ResponsiveDesireLevel = newResponsive,
                     Breakdown = new DomainBreakdown(

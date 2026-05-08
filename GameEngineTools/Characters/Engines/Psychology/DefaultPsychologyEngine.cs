@@ -324,21 +324,37 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
             // ── E3 + E4: Privacy non-monotonicity → stress ───────────────────────────────
             // Altman (1975): desired privacy is a function of personality.
-            // Both under-privacy (introvert in public) and over-privacy (extravert in isolation)
-            // generate stress proportional to the mismatch magnitude.
-            // Only applies when location is known (not Unknown/null) — prevents spurious stress
-            // in test/offline contexts where the interaction surface is not set.
-            // stressGrowthMult (Neuroticism) amplifies sensitivity to privacy violations.
+            // Two asymmetric mechanisms:
+            //   • Crowding stress: actual < desired → stress for introverts in public (always).
+            //   • Isolation stress: actual > desired → stress only for E > 0.6 (Altman non-monotonic).
+            // Recovery bonus: quiet private space accelerates stress recovery (Kaplan 1995).
+            // Only applies when location is known — prevents spurious stress in test contexts.
+            // stressGrowthMult (Neuroticism) amplifies crowding sensitivity.
             {
                 var surface = ctx.Snapshot.InteractionSurface;
                 if (surface.Kind != Interactions.SurfaceKind.Unknown && surface.Location != null)
                 {
+                    var e = ctx.Personality.BigFive.Extraversion;
                     // desiredPrivacy ∈ [0.2, 0.8]: E=0.1→0.74, E=0.5→0.50, E=0.9→0.26
-                    var desiredPrivacy = 0.5 - (ctx.Personality.BigFive.Extraversion - 0.5) * 0.60;
+                    var desiredPrivacy = 0.5 - (e - 0.5) * 0.60;
                     var actualPrivacy  = surface.HasPrivacy ? 0.8 : 0.2;
-                    var mismatch       = Math.Abs(desiredPrivacy - actualPrivacy);
-                    var privacyStress  = mismatch * Config.PrivacyMismatchStressWeight * stressGrowthMult * h;
-                    s = s with { Stress = Clamp01p(s.Stress + privacyStress) };
+
+                    // Crowding: actual < desired (too little privacy)
+                    var crowdingDeficit = Math.Max(0.0, desiredPrivacy - actualPrivacy);
+                    var crowdingStress  = crowdingDeficit * Config.PrivacyMismatchStressWeight * stressGrowthMult * h;
+
+                    // Isolation: actual > desired, only when E > 0.6 (extraverts feel lonely alone)
+                    var privacyExcess    = Math.Max(0.0, actualPrivacy - desiredPrivacy);
+                    var isolationStress  = e > 0.6
+                        ? privacyExcess * e * Config.IsolationStressWeight * h
+                        : 0.0;
+
+                    // Recovery bonus: quiet private space → stress decays faster
+                    var recoveryBonus = surface.HasPrivacy && surface.Noise < 0.3
+                        ? Config.PrivacyRecoveryBonusPerHour * h
+                        : 0.0;
+
+                    s = s with { Stress = Clamp01p(s.Stress + crowdingStress + isolationStress - recoveryBonus) };
                 }
             }
 
