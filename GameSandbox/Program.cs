@@ -91,15 +91,17 @@ if (answerKey == ConsoleKey.Y)
 
 long simulationDays = 20;
 
-SetDaysForSimulation(simulationDays);
+SetDaysForSimulation(ref simulationDays);
 
-static void SetDaysForSimulation(long simulationDays, bool printInfo = true)
+static void SetDaysForSimulation(ref long simulationDays, bool printInfo = true)
 {
     Console.Clear();
     Console.Write("Set days for simulation: ");
     var answer = Console.ReadLine();
-    if (answer.Length == 0 && !long.TryParse(answer, out simulationDays))
+    var parsed = long.TryParse(answer, out simulationDays);
+    if (answer.Length == 0 && !parsed)
     {
+        simulationDays = 20;
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine("The simulation days are not set or are in incorrect format.");
         Console.ResetColor();
@@ -112,9 +114,14 @@ static void SetDaysForSimulation(long simulationDays, bool printInfo = true)
         var answerKey = Console.ReadKey().Key;
         if (answerKey == ConsoleKey.Y)
         {
-            SetDaysForSimulation(simulationDays, false);
+            SetDaysForSimulation(ref simulationDays, false);
         }
     }
+
+    Console.ForegroundColor = ConsoleColor.DarkCyan;
+    Console.Write("Info: ");
+    Console.ResetColor();
+    Console.WriteLine("Simulation days: {0}", simulationDays);
 }
 
 #endregion
@@ -323,9 +330,10 @@ if (canGeneratePrompts)
 }
 
 Console.WriteLine("Simulation complete. Game time: {0}", clock.Now);
-Console.ForegroundColor = ConsoleColor.Gray;
+Console.ForegroundColor = ConsoleColor.DarkGray;
 Console.WriteLine("Simulation start time was: {0}. Simulation end time: {1}. Simulation days: {2}", startNow.ToString(), clock.Now.ToString(), simulationDays.ToString());
-Console.WriteLine("Simulations starts at {0} and should end at {1}", startNow.ToString(), startNow.AddDays(simulationDays).ToString());
+Console.WriteLine("Simulation starts at {0} and should end at {1}", startNow.ToString(), startNow.AddDays(simulationDays).ToString());
+Console.ResetColor();
 
 if (canExportDiary)
 {
