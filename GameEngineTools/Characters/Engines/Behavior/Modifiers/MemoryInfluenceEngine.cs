@@ -39,6 +39,41 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 multiplier *= ComputeSemanticFallbackMultiplier(context, candidate);
                 candidates[i] = candidate with { Utility = Math.Max(0.0, candidate.Utility * multiplier) };
             }
+
+            // ToM knowledge modifier: known betrayals/negative acts reduce social utility;
+            // known positive acts and self-disclosures give a slight boost.
+            ApplyKnowledgeModifiers(context, candidates);
+        }
+
+        private static void ApplyKnowledgeModifiers(BehaviorContext context, List<BehaviorCandidate> candidates)
+        {
+            var knowledge = context.HumanContext.Snapshot.Memory.Knowledge;
+            if (knowledge.Count == 0) return;
+
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var candidate = candidates[i];
+                if (candidate.Name != ReachOut) continue;
+                if (candidate.SocialTargeting is not { } targeting) continue;
+
+                var targetId = targeting.TargetHuman;
+                var betrayalConf = knowledge
+                    .Where(f => f.Subject == targetId && f.ActionKind == "Betrayal")
+                    .Select(f => f.Confidence)
+                    .DefaultIfEmpty(0.0).Max();
+                var negativeConf = knowledge
+                    .Where(f => f.Subject == targetId && f.ActionKind == "NegativeAct")
+                    .Select(f => f.Confidence)
+                    .DefaultIfEmpty(0.0).Max();
+                var positiveConf = knowledge
+                    .Where(f => f.Subject == targetId && (f.ActionKind == "PositiveAct" || f.ActionKind == "SelfDisclosure"))
+                    .Select(f => f.Confidence)
+                    .DefaultIfEmpty(0.0).Max();
+
+                var knowledgeBias = positiveConf * 3.0 - betrayalConf * 8.0 - negativeConf * 4.0;
+                if (Math.Abs(knowledgeBias) > 0.01)
+                    candidates[i] = candidate with { Utility = Math.Max(0.0, candidate.Utility + knowledgeBias) };
+            }
         }
 
         #endregion

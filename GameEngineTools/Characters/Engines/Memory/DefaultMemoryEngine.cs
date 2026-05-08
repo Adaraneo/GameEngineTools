@@ -129,7 +129,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     };
 
                     episodes[existingIndex] = reinforced;
-                    State = new MemoryIndex(episodes);
+                    State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
 
                     _log.MemoryEncoded(
                         ctx.Id.Value.ToString(),
@@ -151,7 +151,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 };
 
                 episodes.Add(encoded);
-                State = new MemoryIndex(episodes);
+                State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
 
                 _log.MemoryEncoded(
                     ctx.Id.Value.ToString(),
@@ -191,6 +191,24 @@ namespace GameEngineTools.Characters.Engines.Memory
                 DaysInNegativeMood   = ComputeDaysInNegativeMood(ctx.Snapshot.Memory.Episodes, now)
             };
             return MemoryCognition.BuildWorkingSet(State, enriched, now, threshold);
+        }
+
+        /// <inheritdoc/>
+        public bool KnowsAbout(HumanId subject, string actionKind, HumanId? objectId = null)
+            => ConfidenceAbout(subject, actionKind, objectId) >= Config.KnowledgePruneThreshold;
+
+        /// <inheritdoc/>
+        public double ConfidenceAbout(HumanId subject, string actionKind, HumanId? objectId = null)
+        {
+            var best = 0.0;
+            foreach (var f in State.Knowledge)
+            {
+                if (f.Subject != subject) continue;
+                if (f.ActionKind != actionKind) continue;
+                if (objectId.HasValue && f.Object.HasValue && f.Object.Value != objectId.Value) continue;
+                if (f.Confidence > best) best = f.Confidence;
+            }
+            return best;
         }
 
         #endregion Veřejné API
@@ -430,6 +448,13 @@ namespace GameEngineTools.Characters.Engines.Memory
                             PeakEmotion: ValenceToEmotionalTag(io.PeakValence),
                             EndEmotion: ValenceToEmotionalTag(io.EndValence)),
                             ctx, outbox);
+
+                        // ToM: record knowledge that the other party performed a SelfDisclosure
+                        if (io.Act == SpeechAct.SelfDisclosure && io.Accepted)
+                        {
+                            var otherId = io.From == ctx.Id ? io.To : io.From;
+                            RecordKnowledge(otherId, ctx.Id, "SelfDisclosure", FactSource.DirectWitness, io.OccurredAt);
+                        }
                         break;
                     }
 
@@ -493,6 +518,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                             OtherPerson: ResolveOtherPerson(ctx.Id, mn.A, mn.B),
                             BeliefEvidence: CreateMicroBeliefEvidence(ctx.Id, mn.A, mn.B, positive: false, mn.Kind)),
                             ctx, outbox);
+
+                        // ToM: if I witnessed someone else act negatively toward another, record it
+                        if (mn.A != ctx.Id)
+                            RecordKnowledge(mn.A, mn.B, "NegativeAct", FactSource.DirectWitness, mn.OccurredAt);
                         break;
                     }
 
@@ -537,6 +566,24 @@ namespace GameEngineTools.Characters.Engines.Memory
                                 : null),
                             ctx,
                             outbox);
+
+                        // ToM: record mutual knowledge of sexual encounter
+                        if (se.Accepted)
+                            RecordKnowledge(se.From, se.To, nameof(SexualEncounterOutcome), FactSource.DirectWitness, se.OccurredAt);
+                        break;
+                    }
+
+                // ── Gossip / third-party observation (Theory of Mind) ─────────────────────
+                case ThirdPartyActionObserved tpa when tpa.Observer == ctx.Id:
+                    {
+                        var actionKind = tpa.Type switch
+                        {
+                            ThirdPartyObservationType.Betrayal    => "Betrayal",
+                            ThirdPartyObservationType.NegativeAct => "NegativeAct",
+                            ThirdPartyObservationType.PositiveAct => "PositiveAct",
+                            _                                     => "Unknown"
+                        };
+                        RecordKnowledge(tpa.Actor, tpa.Target, actionKind, FactSource.Gossip, tpa.OccurredAt);
                         break;
                     }
 
@@ -592,7 +639,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                                 RecallConfidence = Math.Clamp(ep.RecallConfidence + 0.03, 0.0, 1.0),
                                 Emotion = newEmotion
                             };
-                            State = new MemoryIndex(episodes);
+                            State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
                         }
                         break;
                     }
@@ -654,7 +701,23 @@ namespace GameEngineTools.Characters.Engines.Memory
                 .Where(e => e.Strength >= Config.PruneThreshold)
                 .ToList();
 
-            State = new MemoryIndex(episodes);
+            // Preserve existing Knowledge facts when rebuilding episodic state
+            State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
+
+            // Knowledge fact confidence decay (Theory of Mind: facts fade slowly over time)
+            if (State.Knowledge.Count > 0)
+            {
+                var decayedKnowledge = State.Knowledge
+                    .Select(f =>
+                    {
+                        var newConf = f.Confidence - Config.KnowledgeConfidenceDecayPerDay * (hours / 24.0);
+                        return f with { Confidence = newConf };
+                    })
+                    .Where(f => f.Confidence >= Config.KnowledgePruneThreshold)
+                    .ToList();
+
+                State = State with { Knowledge = decayedKnowledge };
+            }
         }
 
         #endregion Tick — zapomínání (Ebbinghausova křivka)
@@ -673,6 +736,51 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         private bool ShouldStoreEvent(IDomainEvent @event, IHumanContext ctx)
             => _memoryFidelityPolicy?.ShouldStoreEvent(ctx, @event) ?? true;
+
+        /// <summary>
+        /// Records or reinforces a knowledge fact (Theory of Mind).
+        /// If a fact with the same (subject, object, actionKind) already exists, confidence is boosted
+        /// and the timestamp refreshed. Otherwise a new fact is created.
+        /// </summary>
+        private void RecordKnowledge(
+            HumanId subject, HumanId? objectId, string actionKind,
+            FactSource source, WDateTime now)
+        {
+            var confidence = source == FactSource.DirectWitness
+                ? Config.DirectWitnessConfidence
+                : Config.GossipConfidence;
+
+            // Merge with existing fact if same (subject, object, actionKind) — boost confidence
+            var existing = State.Knowledge
+                .FirstOrDefault(f => f.Subject == subject
+                                  && f.ActionKind == actionKind
+                                  && f.Object == objectId);
+
+            List<KnowledgeFact> updated;
+            if (existing != null)
+            {
+                updated = State.Knowledge.ToList();
+                var idx = updated.IndexOf(existing);
+                updated[idx] = existing with
+                {
+                    Confidence = Math.Min(1.0, Math.Max(existing.Confidence, confidence)),
+                    LearnedAt  = now   // refresh timestamp
+                };
+            }
+            else
+            {
+                updated = State.Knowledge.ToList();
+                updated.Add(new KnowledgeFact(
+                    Id: Guid.NewGuid(),
+                    LearnedAt: now,
+                    Subject: subject,
+                    Object: objectId,
+                    ActionKind: actionKind,
+                    Source: source,
+                    Confidence: confidence));
+            }
+            State = State with { Knowledge = updated };
+        }
 
         /// <summary>
         /// Konsoliduje paměti po skončení spánku.
@@ -716,7 +824,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 lookup[boosted.Id] = boosted;
             }
 
-            State = new MemoryIndex(lookup.Values.ToList());
+            State = new MemoryIndex(lookup.Values.ToList()) { Knowledge = State.Knowledge };
 
             outbox.Add(new MemoryConsolidated(at, ctx.Id, toBoost.Count));
 
