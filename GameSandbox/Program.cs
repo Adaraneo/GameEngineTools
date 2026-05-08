@@ -89,16 +89,16 @@ answerKey = Console.ReadKey().Key;
 if (answerKey == ConsoleKey.Y)
     canExportDiary = true;
 
-int simulationDays = 20;
+long simulationDays = 20;
 
-SetYearsForSimulation(simulationDays);
+SetDaysForSimulation(simulationDays);
 
-static void SetYearsForSimulation(int simulationYears, bool printInfo = true)
+static void SetDaysForSimulation(long simulationDays, bool printInfo = true)
 {
     Console.Clear();
     Console.Write("Set days for simulation: ");
     var answer = Console.ReadLine();
-    if (answer.Length == 0 && !int.TryParse(answer, out simulationYears))
+    if (answer.Length == 0 && !long.TryParse(answer, out simulationDays))
     {
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine("The simulation days are not set or are in incorrect format.");
@@ -112,7 +112,7 @@ static void SetYearsForSimulation(int simulationYears, bool printInfo = true)
         var answerKey = Console.ReadKey().Key;
         if (answerKey == ConsoleKey.Y)
         {
-            SetYearsForSimulation(simulationYears, false);
+            SetDaysForSimulation(simulationDays, false);
         }
     }
 }
@@ -241,6 +241,7 @@ var characters = manager.Characters.Where(c => !mainCharactersQuery.Contains(c.P
 
 if (characters.Count > 0)
 {
+    Console.ReadKey();
     var ocLocations = worldMap.GetLocationsInRegion("Village");
 
     foreach(var character in characters)

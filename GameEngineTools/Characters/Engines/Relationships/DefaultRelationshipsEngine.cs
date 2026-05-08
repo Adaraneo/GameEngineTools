@@ -599,6 +599,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
             var valenceEffect = psych.Valence * 0.3 * days;
             var stressEffect = psych.Stress * 0.02 * days;
 
+            // ── Dunbar finite attention budget (Saramaki et al. 2014, PNAS) ──────────────
+            // Total social-maintenance effort is roughly fixed. When the number of intimate
+            // (Tier-1) or close-friend (Tier-2) ties exceeds the soft capacity, remaining
+            // bandwidth per lower-tier edge shrinks → decay rate increases proportionally.
+            var tier1Count = State.Edges.Values.Count(e => e.Closeness >= Config.DunbarTier1Threshold);
+            var tier2Count = State.Edges.Values.Count(e => e.Closeness >= Config.DunbarTier2Threshold
+                                                         && e.Closeness <  Config.DunbarTier1Threshold);
+            var tier1Excess = Math.Max(0, tier1Count - Config.DunbarTier1Capacity);
+            var tier2Excess = Math.Max(0, tier2Count - Config.DunbarTier2Capacity);
+
             foreach (var kv in State.Edges)
             {
                 var e = kv.Value;
@@ -626,6 +636,18 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 }
 
                 var d = Config.DecayPerDay * days * depthFactor * navarrMultiplier;
+
+                // Dunbar attention pressure: each excess Tier-1 tie steals maintenance bandwidth
+                // from lower-tier edges (Tier-2 and below). Each excess Tier-2 additionally
+                // pressures Tier-3/4. Tier-1 edges themselves are never penalised — they are
+                // the ones consuming the budget. (Miritello et al. 2013: finite attention budget.)
+                if (e.Closeness < Config.DunbarTier1Threshold && (tier1Excess > 0 || tier2Excess > 0))
+                {
+                    var pressure = tier1Excess * Config.AttentionBudgetPressurePerExcessTier1;
+                    if (e.Closeness < Config.DunbarTier2Threshold)
+                        pressure += tier2Excess * Config.AttentionBudgetPressurePerExcessTier2;
+                    d *= 1.0 + pressure;
+                }
 
                 // Domain breakdown decays very slowly toward neutral (50) without reinforcement.
                 // Rate is 10× slower than Closeness — domains are more stable impressions than

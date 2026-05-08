@@ -108,7 +108,35 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Decay multiplier for Familiarity. Default 0.08 → very slow decay
         /// (knowledge of the person persists long after felt familiarity fades).
         /// </summary>
-        double DecayMultiplierFamiliarity = 0.08)
+        double DecayMultiplierFamiliarity = 0.08,
+
+        // ── Dunbar finite attention budget ────────────────────────────────────
+        // Saramaki et al. 2014 (PNAS): total communication effort is roughly fixed.
+        // When Tier-1 relationships exceed their soft capacity, lower-tier ties
+        // receive less maintenance → decay rate increases proportionally.
+        /// <summary>
+        /// Closeness threshold for Tier-1 (intimate support clique, ~5 people).
+        /// Edges at or above this value are counted as intimate ties.
+        /// </summary>
+        double DunbarTier1Threshold = 70.0,
+        /// <summary>
+        /// Closeness threshold for Tier-2 (close friends, ~15 people).
+        /// Edges between this and <see cref="DunbarTier1Threshold"/> are Tier-2.
+        /// </summary>
+        double DunbarTier2Threshold = 40.0,
+        /// <summary>Soft capacity for Tier-1 intimate relationships (Dunbar ~5).</summary>
+        int DunbarTier1Capacity = 5,
+        /// <summary>Soft capacity for Tier-2 close-friend relationships (Dunbar ~15).</summary>
+        int DunbarTier2Capacity = 15,
+        /// <summary>
+        /// Additional decay multiplier applied to lower-tier edges per excess Tier-1 relationship.
+        /// E.g. 0.15 means each extra intimate tie raises Tier-2/3 decay by 15 %.
+        /// </summary>
+        double AttentionBudgetPressurePerExcessTier1 = 0.15,
+        /// <summary>
+        /// Additional decay multiplier applied to Tier-3/4 edges per excess Tier-2 relationship.
+        /// </summary>
+        double AttentionBudgetPressurePerExcessTier2 = 0.05)
     {
         /// <summary>Parameterless constructor required by DI options binding.</summary>
         public RelationshipsConfig() : this(
@@ -135,6 +163,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
             DecayMultiplierComfort: 0.80,
             DecayMultiplierRomanticInterest: 1.00,
             DecayMultiplierSexualInterest: 1.50,
-            DecayMultiplierFamiliarity: 0.08) { }
+            DecayMultiplierFamiliarity: 0.08,
+            DunbarTier1Threshold: 70.0,
+            DunbarTier2Threshold: 40.0,
+            DunbarTier1Capacity: 5,
+            DunbarTier2Capacity: 15,
+            AttentionBudgetPressurePerExcessTier1: 0.15,
+            AttentionBudgetPressurePerExcessTier2: 0.05) { }
     }
 }
