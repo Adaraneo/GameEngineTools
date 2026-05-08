@@ -127,6 +127,24 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// Reduces accumulated stress — models restorative environment effect (Kaplan 1995).
         /// </summary>
         double PrivacyRecoveryBonusPerHour = 0.8,
+        /// <summary>
+        /// Noise level above which ambient sound begins contributing to stress accumulation.
+        /// Mapped from WHO threshold ~55 dB. Below this value effect is negligible.
+        /// </summary>
+        double NoiseStressThreshold = 0.55,
+        /// <summary>
+        /// Stress added per unit of noise above <see cref="NoiseStressThreshold"/> per hour.
+        /// Neuroticism (via stressGrowthMult) further amplifies sensitivity.
+        /// Reference: Glass &amp; Singer 1972; WHO community noise guidelines.
+        /// </summary>
+        double NoiseStressWeightPerHour = 0.08,
+        /// <summary>
+        /// Multiplier applied to noise-induced stress when the character is in their home territory
+        /// (Identity.HomeLocationId == InteractionSurface.Location). Controllable noise has
+        /// dramatically lower cortisol response than uncontrollable noise of equal intensity
+        /// (Glass &amp; Singer 1972). Default 0.4 → 60 % reduction at home.
+        /// </summary>
+        double HomeNoiseStressMultiplier = 0.4,
         // Kognitivní stárnutí + percepce (Salthouse 2009; Gates & Cooper 1991)
         double CognitivAgingThreshold = 60.0,
         double CognitiveAgingCogLoadPerYear = 0.3,

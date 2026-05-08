@@ -65,7 +65,17 @@ namespace GameEngineTools.Characters.Core
     }
 
     public readonly record struct HumanId(Guid Value);
-    public sealed record Identity(Name FirstName, Surname LastName, WDateOnly BirthDate);
+    public sealed record Identity(Name FirstName, Surname LastName, WDateOnly BirthDate)
+    {
+        /// <summary>
+        /// Location ID that this character considers "home territory".
+        /// When <c>InteractionSurface.Location</c> matches this value, ambient noise is treated
+        /// as controllable → noise-induced stress is reduced by <c>HomeNoiseStressMultiplier</c>
+        /// (Glass &amp; Singer 1972: controllable noise has dramatically lower cortisol response).
+        /// <c>null</c> means no home is assigned (e.g. travellers, characters without fixed residence).
+        /// </summary>
+        public string? HomeLocationId { get; init; }
+    }
 
     public enum SexBiology
     { Female, Male, Intersex, Unknown }

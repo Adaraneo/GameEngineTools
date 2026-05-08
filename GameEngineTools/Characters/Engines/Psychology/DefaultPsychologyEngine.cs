@@ -358,6 +358,30 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
+            // ── E5: Noise → stress (HPA activation via auditory startle cascade) ──────────
+            // Glass & Singer 1972; WHO community noise guidelines (55/70/80 dB thresholds).
+            // Uncontrollable noise (unknown/public space) → full stress contribution.
+            // Home territory (Identity.HomeLocationId matches surface.Location) → 0.4× reduction:
+            // the character has agency over the noise source, dramatically lowering cortisol response.
+            // Neuroticism (stressGrowthMult) amplifies individual noise sensitivity.
+            {
+                var surface = ctx.Snapshot.InteractionSurface;
+                if (surface.Noise > Config.NoiseStressThreshold
+                    && surface.Kind != Interactions.SurfaceKind.Unknown
+                    && surface.Location != null)
+                {
+                    var noiseExcess  = surface.Noise - Config.NoiseStressThreshold;
+                    var noiseStress  = noiseExcess * Config.NoiseStressWeightPerHour * stressGrowthMult * h;
+
+                    // Home territory: controllable noise → 60 % stress reduction
+                    var isHome = ctx.Identity.HomeLocationId is { } homeId
+                                 && homeId == surface.Location;
+                    if (isHome) noiseStress *= Config.HomeNoiseStressMultiplier;
+
+                    s = s with { Stress = Clamp01p(s.Stress + noiseStress) };
+                }
+            }
+
             // SAM systém → PAD (Sympatho-Adrenomedullary: okamžitá sympatická aktivace)
             if (ph.AcuteArousalLevel > 0)
             {
