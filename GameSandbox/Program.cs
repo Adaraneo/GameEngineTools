@@ -239,9 +239,6 @@ await mainCharactersScene.RunAsync();
 
 var characters = manager.Characters.Where(c => mainCharactersQuery.Contains(c.Person)).Select(c => c.Person).ToList();
 
-Console.WriteLine(characters.Count.ToString());
-Console.ReadKey();
-
 if (characters.Count > 0)
 {
     var ocLocations = worldMap.GetLocationsInRegion("Village");
