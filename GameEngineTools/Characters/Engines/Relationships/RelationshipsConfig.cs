@@ -136,7 +136,48 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// <summary>
         /// Additional decay multiplier applied to Tier-3/4 edges per excess Tier-2 relationship.
         /// </summary>
-        double AttentionBudgetPressurePerExcessTier2 = 0.05)
+        double AttentionBudgetPressurePerExcessTier2 = 0.05,
+
+        // ── Dominance / Prestige status perception ────────────────────────────
+        // Cheng et al. 2013 (JPSP); Redhead et al. 2019 (R. Soc. Open Sci.):
+        // Two independent status axes with different behavioural consequences.
+        /// <summary>
+        /// Decay multiplier for PerceivedDominance toward neutral (50).
+        /// Status impressions fade slowly — default 0.08 → half-life ~years.
+        /// </summary>
+        double DecayMultiplierDominance = 0.08,
+        /// <summary>
+        /// Decay multiplier for PerceivedPrestige toward neutral (50).
+        /// </summary>
+        double DecayMultiplierPrestige = 0.08,
+        /// <summary>
+        /// Delta added to PerceivedPrestige when a PositiveAct is witnessed via ThirdPartyActionObserved.
+        /// </summary>
+        double PrestigeGainPerPositiveAct = 2.0,
+        /// <summary>
+        /// Delta added to PerceivedDominance when a NegativeAct/Betrayal is witnessed.
+        /// </summary>
+        double DominanceGainPerNegativeAct = 3.0,
+        /// <summary>
+        /// Delta added to PerceivedPrestige when target's accepted SelfDisclosure is witnessed.
+        /// Models intellectual/emotional admiration.
+        /// </summary>
+        double PrestigeGainPerSelfDisclosure = 1.0,
+        /// <summary>
+        /// Delta added to PerceivedDominance when ContemptuousAct is received from target.
+        /// Contempt signals aggression and coercive intent — strongly signals dominance.
+        /// </summary>
+        double DominanceGainPerContempt = 10.0,
+        /// <summary>
+        /// Utility bonus per point of PerceivedPrestige above 50 added to ReachOut candidate.
+        /// High-prestige targets attract social approach.
+        /// </summary>
+        double PrestigeReachOutBonusPerPoint = 0.06,
+        /// <summary>
+        /// Utility penalty per point of PerceivedDominance above 70 when Closeness &lt; 30.
+        /// Dominant strangers trigger avoidance; close dominant figures do not.
+        /// </summary>
+        double DominanceAvoidancePenaltyPerPoint = 0.08)
     {
         /// <summary>Parameterless constructor required by DI options binding.</summary>
         public RelationshipsConfig() : this(
@@ -169,6 +210,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
             DunbarTier1Capacity: 5,
             DunbarTier2Capacity: 15,
             AttentionBudgetPressurePerExcessTier1: 0.15,
-            AttentionBudgetPressurePerExcessTier2: 0.05) { }
+            AttentionBudgetPressurePerExcessTier2: 0.05,
+            DecayMultiplierDominance: 0.08,
+            DecayMultiplierPrestige: 0.08,
+            PrestigeGainPerPositiveAct: 2.0,
+            DominanceGainPerNegativeAct: 3.0,
+            PrestigeGainPerSelfDisclosure: 1.0,
+            DominanceGainPerContempt: 10.0,
+            PrestigeReachOutBonusPerPoint: 0.06,
+            DominanceAvoidancePenaltyPerPoint: 0.08) { }
     }
 }

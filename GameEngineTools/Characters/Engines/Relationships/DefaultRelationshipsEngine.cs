@@ -298,6 +298,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 ExchangeStrength = exchangeGain > 0
                                     ? Math.Min(100, e.ExchangeStrength + exchangeGain)
                                     : e.ExchangeStrength,
+                                // SelfDisclosure grants prestige to the discloser in the recipient's eyes
+                                // (emotional/intellectual courage is admirable — Cheng et al. 2013)
+                                PerceivedPrestige = io.Act == SpeechAct.SelfDisclosure && io.To == self
+                                    ? Clamp(e.PerceivedPrestige + Config.PrestigeGainPerSelfDisclosure)
+                                    : e.PerceivedPrestige,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
                             };
                         },
@@ -454,6 +459,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     }
 
                 // ── Third-party observation — R1 gossip handler ──────────────────────────
+                // Also updates perceived Dominance/Prestige (Cheng et al. 2013):
+                //   PositiveAct → Prestige ↑ (admirable, copy-worthy behavior)
+                //   NegativeAct/Betrayal → Dominance ↑ (coercive, threatening)
                 case ThirdPartyActionObserved tpa when tpa.Observer == self:
                     {
                         // Observer updates their edge toward the Actor.
@@ -465,18 +473,21 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             ThirdPartyObservationType.PositiveAct => e with
                             {
                                 Like  = Bump(e.Like,  +2.0 * gossipScale),
-                                Trust = Bump(e.Trust, +1.5 * gossipScale)
+                                Trust = Bump(e.Trust, +1.5 * gossipScale),
+                                PerceivedPrestige = Clamp(e.PerceivedPrestige + Config.PrestigeGainPerPositiveAct)
                             },
                             ThirdPartyObservationType.NegativeAct => e with
                             {
                                 Like  = Bump(e.Like,  -2.5 * gossipScale),
-                                Trust = Bump(e.Trust, -2.0 * gossipScale)
+                                Trust = Bump(e.Trust, -2.0 * gossipScale),
+                                PerceivedDominance = Clamp(e.PerceivedDominance + Config.DominanceGainPerNegativeAct)
                             },
                             // Betrayal: step-drop (Slovic 1993; skill ref: 30–70 % of Trust)
                             ThirdPartyObservationType.Betrayal => e with
                             {
                                 Like  = Bump(e.Like,  -20.0 * gossipScale),
-                                Trust = Bump(e.Trust, -30.0 * gossipScale)
+                                Trust = Bump(e.Trust, -30.0 * gossipScale),
+                                PerceivedDominance = Clamp(e.PerceivedDominance + Config.DominanceGainPerNegativeAct * 2.0)
                             },
                             _ => e
                         },
@@ -500,7 +511,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             Like  = Bump(e.Like,  -30.0),
                             Comfort = Bump(e.Comfort, -20.0),
                             // Flag is permanent — cannot be cleared by repair
-                            IsContemptuouslyDestroyed = true
+                            IsContemptuouslyDestroyed = true,
+                            // Contempt signals coercive intent — raises perceived dominance of the expresser
+                            PerceivedDominance = Clamp(e.PerceivedDominance + Config.DominanceGainPerContempt)
                         },
                         eventType: nameof(ContemptuousActPerformed),
                         outcome: ca.From == self ? "expressed" : "received",
@@ -703,6 +716,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * Config.DecayMultiplierSexualInterest)),
                     Closeness = Clamp(Approach(e.Closeness, 5, d * Config.DecayMultiplierCloseness)),
                     Respect = Clamp(Approach(e.Respect, 55, d * Config.DecayMultiplierRespect)),
+                    PerceivedDominance = Clamp(Approach(e.PerceivedDominance, 50, d * Config.DecayMultiplierDominance)),
+                    PerceivedPrestige  = Clamp(Approach(e.PerceivedPrestige,  50, d * Config.DecayMultiplierPrestige)),
                     Comfort = Clamp(Approach(e.Comfort, 45, d * Config.DecayMultiplierComfort) + valenceEffect * 0.5 - stressEffect * 0.5),
                     TransgressionResidue = newResidue,
                     ResponsiveDesireLevel = newResponsive,

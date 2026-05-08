@@ -3,6 +3,7 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Needs
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
@@ -43,6 +44,24 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             var utility = BehaviorMath.Util(context.State.NeedBelonging, affiliation)
                 * (0.45 + target.Score * 0.55)
                 + target.ExpectedAcceptance * 12.0;
+
+            // Prestige: high-prestige targets attract voluntary social approach (Redhead et al. 2019)
+            // Dominance: very dominant strangers trigger avoidance (fear-based compliance)
+            // TODO: RelationshipsConfig is not accessible from BehaviorContext; using default config values
+            //       (PrestigeReachOutBonusPerPoint = 0.06, DominanceAvoidancePenaltyPerPoint = 0.08).
+            //       If these are tuned in appsettings, wire RelationshipsConfig into BehaviorContext.
+            const double PrestigeReachOutBonusPerPoint = 0.06;
+            const double DominanceAvoidancePenaltyPerPoint = 0.08;
+            var edge = context.HumanContext.Snapshot.Relationships?.Edges.GetValueOrDefault(target.Target);
+            if (edge != null)
+            {
+                var prestigeBonus = Math.Max(0.0, edge.PerceivedPrestige - 50.0)
+                                  * PrestigeReachOutBonusPerPoint;
+                var dominancePenalty = edge.PerceivedDominance > 70.0 && edge.Closeness < 30.0
+                    ? (edge.PerceivedDominance - 70.0) * DominanceAvoidancePenaltyPerPoint
+                    : 0.0;
+                utility += prestigeBonus - dominancePenalty;
+            }
 
             return new BehaviorCandidate(
                 ReachOut,

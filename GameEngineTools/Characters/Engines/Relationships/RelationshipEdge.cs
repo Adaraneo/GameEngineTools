@@ -98,5 +98,21 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Range [0–100]: 0 = fully spontaneous, 100 = fully responsive.
         /// Grows with CommunalStrength and accumulated interaction history.
         /// </summary>
-        double ResponsiveDesireLevel = 0);
+        double ResponsiveDesireLevel = 0,
+
+        /// <summary>
+        /// How dominant (coercion-based status) the observer perceives the target to be.
+        /// Range [0–100], neutral 50. Rises when target performs threatening or coercive acts
+        /// (ContemptuousAct, witnessed NegativeAct/Betrayal). Drives compliance and avoidance
+        /// rather than approach. Cheng et al. (2013, JPSP); Redhead et al. (2019, R. Soc. Open Sci.)
+        /// </summary>
+        double PerceivedDominance = 50,
+
+        /// <summary>
+        /// How prestigious (freely-conferred admiration) the observer perceives the target to be.
+        /// Range [0–100], neutral 50. Rises when target performs skilled, generous, or admirable
+        /// acts (PositiveAct observed, meaningful SelfDisclosure). Drives voluntary approach and
+        /// social copying. Cheng et al. (2013, JPSP); Redhead et al. (2019, R. Soc. Open Sci.)
+        /// </summary>
+        double PerceivedPrestige = 50);
 }
