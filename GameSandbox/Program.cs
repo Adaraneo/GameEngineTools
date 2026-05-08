@@ -323,6 +323,9 @@ if (canGeneratePrompts)
 }
 
 Console.WriteLine("Simulation complete. Game time: {0}", clock.Now);
+Console.ForegroundColor = ConsoleColor.Gray;
+Console.WriteLine("Simulation start time was: {0}. Simulation end time: {1}. Simulation days: {2}", startNow.ToString(), clock.Now.ToString(), simulationDays.ToString());
+Console.WriteLine("Simulations starts at {0} and should end at {1}", startNow.ToString(), startNow.AddDays(simulationDays).ToString());
 
 if (canExportDiary)
 {

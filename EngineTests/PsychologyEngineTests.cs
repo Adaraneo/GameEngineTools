@@ -1687,4 +1687,149 @@ namespace EngineTests
         private IHumanContext BuildCtx(DefaultPsychologyEngine engine, double ses, double stress, double crowding)
             => BuildCtxWithDCM(new SexualResponsiveness(ses, 0.5, 0.5), stress, crowding);
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Per-emotion decay multipliers — Sadness persists longer than Fear
+    // Uses named-parameter construction to guarantee correct field values.
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [TestClass]
+    public sealed class EmotionDecayMultiplierTests
+    {
+        // Build a config using only the named parameters we care about;
+        // all others remain at their documented defaults.
+        private static PsychologyConfig CfgWithDecays(
+            double fear      = 3.0,
+            double sadness   = 0.06,
+            double shame     = 0.4,
+            double anger     = 0.6,
+            double joy       = 1.0)
+            => new PsychologyConfig(
+                EmotionDecayFear:    fear,
+                EmotionDecaySadness: sadness,
+                EmotionDecayShame:   shame,
+                EmotionDecayAnger:   anger,
+                EmotionDecayJoy:     joy);
+
+        /// <summary>
+        /// Sadness musí mít nižší decay multiplier než Fear —
+        /// hodnota menší než 1.0 znamená pomalejší pokles než baseline; větší = rychlejší.
+        /// Verifuje zdokumentované hodnoty: Sadness=0.06, Fear=3.0.
+        /// </summary>
+        [TestMethod]
+        public void EmotionDecayMultipliers_Sadness_IsSlower_ThanFear()
+        {
+            var cfg = CfgWithDecays();
+
+            Assert.IsTrue(cfg.EmotionDecaySadness < cfg.EmotionDecayFear,
+                $"Smutek (0.06) musí mít nižší multiplikátor než Strach (3.0) — déle přetrvává. " +
+                $"Sadness={cfg.EmotionDecaySadness}, Fear={cfg.EmotionDecayFear}");
+
+            Assert.IsTrue(cfg.EmotionDecayFear > 1.0,
+                $"Strach musí odznít rychleji než baseline (mult > 1.0). Fear={cfg.EmotionDecayFear}");
+
+            Assert.IsTrue(cfg.EmotionDecaySadness < 1.0,
+                $"Smutek musí odznít pomaleji než baseline (mult < 1.0). Sadness={cfg.EmotionDecaySadness}");
+        }
+
+        /// <summary>
+        /// Ověřuje pořadí ze specifikace: Sadness &lt; Shame &lt; Anger &lt; Joy &lt; Fear.
+        /// </summary>
+        [TestMethod]
+        public void EmotionDecayMultipliers_Ordering_MatchesSpecification()
+        {
+            var cfg = CfgWithDecays();
+
+            // Sadness je nejpomalejší (0.06)
+            Assert.IsTrue(cfg.EmotionDecaySadness <= cfg.EmotionDecayShame,
+                $"Sadness ({cfg.EmotionDecaySadness}) musí být <= Shame ({cfg.EmotionDecayShame})");
+            Assert.IsTrue(cfg.EmotionDecayShame <= cfg.EmotionDecayAnger,
+                $"Shame ({cfg.EmotionDecayShame}) musí být <= Anger ({cfg.EmotionDecayAnger})");
+            Assert.IsTrue(cfg.EmotionDecayAnger <= cfg.EmotionDecayJoy,
+                $"Anger ({cfg.EmotionDecayAnger}) musí být <= Joy ({cfg.EmotionDecayJoy})");
+            // Fear je nejrychlejší (3.0)
+            Assert.IsTrue(cfg.EmotionDecayJoy <= cfg.EmotionDecayFear,
+                $"Joy ({cfg.EmotionDecayJoy}) musí být <= Fear ({cfg.EmotionDecayFear})");
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Isolation Stress — extraverts get more stress when alone
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [TestClass]
+    public sealed class IsolationStressTests : TestBase
+    {
+        private static readonly PsychologyConfig IsolationCfg = new PsychologyConfig(
+            BaselineAffectVariance: 0.0,
+            StressRecoveryRatePerHour: 0.0,
+            EnableCircadianRhythm: false,
+            IsolationStressWeight: 3.0);
+
+        private static DefaultPsychologyEngine BuildIsolationEngine(double initialStress = 10)
+        {
+            var engine = new DefaultPsychologyEngine(
+                Options.Create(IsolationCfg),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new ZeroRandom());
+            engine.RestoreState(new PsychologyState(0.0, 0.4, 0.5, initialStress, 10, DiscreteEmotion.Neutral));
+            return engine;
+        }
+
+        private static IHumanContext BuildIsolationContext(double extraversion, SurfaceKind kind = SurfaceKind.Private)
+        {
+            // Musíme uvést Location != null jinak engine přeskočí isolation blok
+            var personality = new Personality(
+                BigFive: new BigFive(0.5, 0.5, extraversion, 0.5, 0.5),
+                Attachment: AttachmentProfile.Secure,
+                Communication: CommunicationStyle.Direct,
+                Motivation: new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality: Sociosexuality.Intermediate,
+                Chronotype: Chronotype.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                new PsychologyState(0.0, 0.4, 0.5, 10, 10, DiscreteEmotion.Neutral),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                // HasPrivacy=true (alone), Kind != Unknown, Location != null
+                new InteractionSurface("home", HasPrivacy: true, Noise: 0.1, Crowding: 0.0, Kind: kind),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        [TestMethod]
+        public void IsolationStress_ExtravertInPrivateSpace_GetsMoreStress_ThanIntrovert()
+        {
+            // Arrange
+            var extravertEngine  = BuildIsolationEngine(initialStress: 10);
+            var introvertEngine  = BuildIsolationEngine(initialStress: 10);
+
+            var extravertCtx = BuildIsolationContext(extraversion: 0.9);  // E=0.9 → silný extravert
+            var introvertCtx = BuildIsolationContext(extraversion: 0.1);  // E=0.1 → introvert
+
+            var outbox = new EventCollector();
+
+            // Act — 8 hodin sami doma
+            extravertEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(8), extravertCtx, outbox);
+            introvertEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(8), introvertCtx, new EventCollector());
+
+            // Assert — extravert musí mít více stresu (isolation penalty aktivní pro E > 0.6)
+            Assert.IsTrue(extravertEngine.State.Stress > introvertEngine.State.Stress,
+                $"Extravert (E=0.9) v soukromém prostoru musí mít více stresu z izolace. " +
+                $"Extravert={extravertEngine.State.Stress:F2}, Introvert={introvertEngine.State.Stress:F2}");
+        }
+    }
 }

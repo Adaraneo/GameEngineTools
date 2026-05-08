@@ -1555,4 +1555,361 @@ namespace EngineTests
 
         #endregion Factory metody
     }
+
+    // =========================================================================
+    // Dominance / Prestige — Cheng et al. 2013; Redhead et al. 2019
+    // ThirdPartyActionObserved updates PerceivedDominance / PerceivedPrestige on
+    // the observer's edge toward the actor.
+    // =========================================================================
+
+    [TestClass]
+    public class DominancePrestigeTests : TestBase
+    {
+        private IEventCollector _outbox = default!;
+        private WDateTime _now;
+
+        private static readonly RelationshipsConfig Cfg = new RelationshipsConfig(
+            DecayPerDay: 0.0);  // disable decay so only the event effect is visible
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _now = new WDateTime(0);
+            _outbox = new EventCollector();
+        }
+
+        private DefaultRelationshipsEngine BuildEngine(RelationshipsConfig? cfg = null)
+            => new DefaultRelationshipsEngine(
+                Options.Create(cfg ?? Cfg),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new FixedSocialFidelityPolicy(SocialFidelityLevel.Full));
+
+        private IHumanContext BuildCtx(HumanId self)
+        {
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new InteractionSurface(null, false, 0.3, 0.3, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = self,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        // ------------------------------------------------------------------
+        // Test 1: PositiveAct → PerceivedPrestige roste
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void ThirdPartyPositiveAct_IncreasesPerceivedPrestige()
+        {
+            // Arrange
+            var self    = new HumanId(Guid.NewGuid());
+            var actor   = new HumanId(Guid.NewGuid());
+            var target  = new HumanId(Guid.NewGuid());
+            var engine  = BuildEngine();
+            var ctx     = BuildCtx(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, actor, Like: 50, Attraction: 40), ctx, _outbox);
+            var prestigeBefore = engine.State.Edges[actor].PerceivedPrestige;
+
+            // Act
+            engine.Handle(new ThirdPartyActionObserved(
+                OccurredAt: _now,
+                Observer: self,
+                Actor: actor,
+                Target: target,
+                Valence: 1.0,
+                Type: ThirdPartyObservationType.PositiveAct), ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Edges[actor].PerceivedPrestige > prestigeBefore,
+                $"PositiveAct musí zvýšit PerceivedPrestige. Před: {prestigeBefore:F1}, po: {engine.State.Edges[actor].PerceivedPrestige:F1}");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 2: NegativeAct → PerceivedDominance roste
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void ThirdPartyNegativeAct_IncreasesPerceivedDominance()
+        {
+            // Arrange
+            var self    = new HumanId(Guid.NewGuid());
+            var actor   = new HumanId(Guid.NewGuid());
+            var target  = new HumanId(Guid.NewGuid());
+            var engine  = BuildEngine();
+            var ctx     = BuildCtx(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, actor, Like: 50, Attraction: 40), ctx, _outbox);
+            var dominanceBefore = engine.State.Edges[actor].PerceivedDominance;
+
+            // Act
+            engine.Handle(new ThirdPartyActionObserved(
+                OccurredAt: _now,
+                Observer: self,
+                Actor: actor,
+                Target: target,
+                Valence: -1.0,
+                Type: ThirdPartyObservationType.NegativeAct), ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Edges[actor].PerceivedDominance > dominanceBefore,
+                $"NegativeAct musí zvýšit PerceivedDominance. Před: {dominanceBefore:F1}, po: {engine.State.Edges[actor].PerceivedDominance:F1}");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 3: Betrayal dává 2× větší nárůst PerceivedDominance než NegativeAct
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void ThirdPartyBetrayal_IncreasesPerceivedDominance_MoreThanNegativeAct()
+        {
+            // Arrange
+            var self          = new HumanId(Guid.NewGuid());
+            var actorNeg      = new HumanId(Guid.NewGuid());
+            var actorBetrayal = new HumanId(Guid.NewGuid());
+            var target        = new HumanId(Guid.NewGuid());
+            var ctx           = BuildCtx(self);
+
+            var engineNeg      = BuildEngine();
+            var engineBetrayal = BuildEngine();
+
+            engineNeg.Handle(new FirstImpressionFormed(_now, self, actorNeg, Like: 50, Attraction: 40), ctx, _outbox);
+            engineBetrayal.Handle(new FirstImpressionFormed(_now, self, actorBetrayal, Like: 50, Attraction: 40), ctx, _outbox);
+
+            var negBefore      = engineNeg.State.Edges[actorNeg].PerceivedDominance;
+            var betrayalBefore = engineBetrayal.State.Edges[actorBetrayal].PerceivedDominance;
+
+            // Act
+            engineNeg.Handle(new ThirdPartyActionObserved(_now, self, actorNeg, target, -1.0, ThirdPartyObservationType.NegativeAct), ctx, _outbox);
+            engineBetrayal.Handle(new ThirdPartyActionObserved(_now, self, actorBetrayal, target, -1.0, ThirdPartyObservationType.Betrayal), ctx, _outbox);
+
+            // Assert — Betrayal dává DominanceGainPerNegativeAct × 2
+            var negGain      = engineNeg.State.Edges[actorNeg].PerceivedDominance - negBefore;
+            var betrayalGain = engineBetrayal.State.Edges[actorBetrayal].PerceivedDominance - betrayalBefore;
+
+            Assert.IsTrue(betrayalGain > negGain,
+                $"Betrayal musí dávat 2× větší nárůst PerceivedDominance než NegativeAct. " +
+                $"NegGain={negGain:F2}, BetrayalGain={betrayalGain:F2}");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 4: ContemptuousActPerformed → PerceivedDominance roste
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void ContemptuousActReceived_IncreasesPerceivedDominance()
+        {
+            // Arrange
+            var self   = new HumanId(Guid.NewGuid());
+            var actor  = new HumanId(Guid.NewGuid());
+            var engine = BuildEngine();
+            var ctx    = BuildCtx(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, actor, Like: 50, Attraction: 40), ctx, _outbox);
+            var dominanceBefore = engine.State.Edges[actor].PerceivedDominance;
+
+            // Act — ContemptuousActPerformed: actor is contemptuous toward self
+            engine.Handle(new ContemptuousActPerformed(_now, From: actor, To: self), ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.State.Edges[actor].PerceivedDominance > dominanceBefore,
+                $"ContemptuousActPerformed musí zvýšit PerceivedDominance. Před: {dominanceBefore:F1}, po: {engine.State.Edges[actor].PerceivedDominance:F1}");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 5: PerceivedDominance/Prestige decays toward neutral (50) over time
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void PerceivedDominancePrestige_DecayTowardNeutral_OverTime()
+        {
+            // Arrange — engine se zapnutým decayem
+            var decayCfg = new RelationshipsConfig(DecayPerDay: 0.5);
+            var self     = new HumanId(Guid.NewGuid());
+            var other    = new HumanId(Guid.NewGuid());
+            var engine   = BuildEngine(decayCfg);
+            var ctx      = BuildCtx(self);
+
+            // Restore edge s extrémními hodnotami dominance/prestige
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(
+                    self, other,
+                    Like: 60, Trust: 60,
+                    Familiarity: 50, AestheticAttraction: 50, PhysicalAttraction: 50,
+                    RomanticInterest: 40, SexualInterest: 40,
+                    Closeness: 60, Respect: 60, Comfort: 60,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PerceivedDominance: 80,
+                    PerceivedPrestige: 20)
+            }));
+
+            // Act — 365 dní
+            engine.Tick(_now, WTimeSpan.FromDays(365), ctx, _outbox);
+
+            var edgeAfter = engine.State.Edges[other];
+
+            // Assert — dominance klesá od 80 k 50, prestige roste od 20 k 50
+            Assert.IsTrue(edgeAfter.PerceivedDominance < 80 && edgeAfter.PerceivedDominance > 50,
+                $"PerceivedDominance (80) musí klesat k 50. Hodnota: {edgeAfter.PerceivedDominance:F1}");
+            Assert.IsTrue(edgeAfter.PerceivedPrestige > 20 && edgeAfter.PerceivedPrestige < 50,
+                $"PerceivedPrestige (20) musí růst k 50. Hodnota: {edgeAfter.PerceivedPrestige:F1}");
+        }
+    }
+
+    // =========================================================================
+    // Dunbar Finite Attention Budget — Saramaki et al. 2014, PNAS
+    // Exceeding Tier-1 capacity accelerates decay of lower-tier edges.
+    // =========================================================================
+
+    [TestClass]
+    public class DunbarAttentionBudgetTests : TestBase
+    {
+        private IEventCollector _outbox = default!;
+        private WDateTime _now;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _now = new WDateTime(0);
+            _outbox = new EventCollector();
+        }
+
+        private DefaultRelationshipsEngine BuildEngine(RelationshipsConfig cfg)
+            => new DefaultRelationshipsEngine(
+                Options.Create(cfg),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new FixedSocialFidelityPolicy(SocialFidelityLevel.Full));
+
+        private IHumanContext BuildCtx(HumanId self)
+        {
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new InteractionSurface(null, false, 0.3, 0.3, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = self,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        private static RelationshipEdge MakeEdge(HumanId self, HumanId other, double closeness, double like = 60)
+            => new RelationshipEdge(
+                self, other,
+                Like: like, Trust: 60, Familiarity: 40,
+                AestheticAttraction: 50, PhysicalAttraction: 50,
+                RomanticInterest: 40, SexualInterest: 40,
+                Closeness: closeness, Respect: 55, Comfort: 55,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
+
+        // ------------------------------------------------------------------
+        // Test: 3 Tier-1 hrany (kapacita = 2) → Tier-2 hrana rozpadá rychleji
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void DunbarTier1Excess_AcceleratesDecayOfLowerTierEdges()
+        {
+            // Config: DunbarTier1Capacity = 2 (nízký práh pro test),
+            //         DunbarTier1Threshold = 70 (closeness >= 70 = Tier-1)
+            //         DunbarTier2Threshold = 40 (closeness 40–69 = Tier-2)
+            // DecayPerDay záměrně nízké (0.1), aby Like nekleslo přímo na floor 50
+            // za krátký testovací interval; AttentionBudgetPressure je velká (5.0)
+            // aby efekt byl viditelný i za 1 den.
+            var cfg = new RelationshipsConfig(
+                DecayPerDay: 0.1,
+                DunbarTier1Capacity: 2,
+                DunbarTier2Capacity: 15,
+                DunbarTier1Threshold: 70.0,
+                DunbarTier2Threshold: 40.0,
+                AttentionBudgetPressurePerExcessTier1: 10.0);  // obří tlak → zcela jiná rychlost
+
+            var self = new HumanId(Guid.NewGuid());
+            var ctx  = BuildCtx(self);
+
+            // 3 Tier-1 přátele (closeness=80, nad prahem 70) → 1 přebytek
+            var tier1a = new HumanId(Guid.NewGuid());
+            var tier1b = new HumanId(Guid.NewGuid());
+            var tier1c = new HumanId(Guid.NewGuid());
+            // 1 Tier-2 přítel (closeness=50, mezi 40 a 70)
+            var tier2  = new HumanId(Guid.NewGuid());
+
+            // Engine s tlakem (3 tier-1, kapacita=2 → 1 přebytek)
+            var engineWithPressure = BuildEngine(cfg);
+            engineWithPressure.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [tier1a] = MakeEdge(self, tier1a, closeness: 80),
+                [tier1b] = MakeEdge(self, tier1b, closeness: 80),
+                [tier1c] = MakeEdge(self, tier1c, closeness: 80),
+                [tier2]  = MakeEdge(self, tier2,  closeness: 50, like: 70)
+            }));
+
+            // Engine bez tlaku (jen 1 tier-1, pod kapacitou)
+            var engineNoPressure = BuildEngine(cfg);
+            engineNoPressure.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [tier1a] = MakeEdge(self, tier1a, closeness: 80),
+                [tier2]  = MakeEdge(self, tier2,  closeness: 50, like: 70)
+            }));
+
+            // Act — 1 den (krátce, aby Like nesáhlo na floor 50)
+            engineWithPressure.Tick(_now, WTimeSpan.FromDays(1), ctx, _outbox);
+            engineNoPressure.Tick(_now, WTimeSpan.FromDays(1), ctx, _outbox);
+
+            // Tier-2 Like po 1 dni
+            var tier2LikeWithPressure = engineWithPressure.State.Edges.TryGetValue(tier2, out var edgeP)
+                ? edgeP.Like
+                : 0.0;
+
+            var tier2LikeNoPressure = engineNoPressure.State.Edges.TryGetValue(tier2, out var edgeNP)
+                ? edgeNP.Like
+                : 0.0;
+
+            // Assert — s tlakem musí klesat více (nebo být nižší)
+            Assert.IsTrue(tier2LikeWithPressure < tier2LikeNoPressure,
+                $"Tier-2 hrana musí rozpadat rychleji při přebytku Tier-1 přítelů. " +
+                $"S tlakem: {tier2LikeWithPressure:F2}, bez tlaku: {tier2LikeNoPressure:F2}");
+        }
+    }
 }

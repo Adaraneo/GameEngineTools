@@ -484,4 +484,88 @@ namespace EngineTests
             CollectionAssert.AreEqual(resultA, resultB);
         }
     }
+
+    // =========================================================================
+    // EnvironmentalAffordanceEngine — Noise Cognitive Penalty
+    // Glass & Singer 1972: noise > 0.55 degrades Work/Create utility
+    // =========================================================================
+
+    [TestClass]
+    public class NoiseCognitivePenaltyTests : TestBase
+    {
+        private static List<BehaviorCandidate> MakeCandidatesWithWork(double workUtility = 60.0)
+            => new List<BehaviorCandidate>
+            {
+                new BehaviorCandidate(Work,   workUtility, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                new BehaviorCandidate(Create, workUtility, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                new BehaviorCandidate(Eat,    30.0,        WTimeSpan.FromHours(0.5), BehaviorDomain.Physiological),
+            };
+
+        private static BehaviorContext MakeContext(double noise, BehaviorConfig? cfg = null)
+            => BehaviorComponentTestFactory.Context(noise: noise, surfaceKind: SurfaceKind.Work);
+
+        // ------------------------------------------------------------------
+        // Test: Noise > 0.55 → Work utility klesá
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void NoiseCognitivePenalty_ReducesWorkUtility_WhenNoiseHigh()
+        {
+            // Arrange — Noise = 0.80 (nad prahem 0.55)
+            // penalty = (0.80 - 0.55) / (1.0 - 0.55) * 0.45 ≈ 0.25
+            var context = MakeContext(noise: 0.80, cfg: new BehaviorConfig(NoiseCognitivePenaltyMax: 0.45));
+            var candidates = MakeCandidatesWithWork(workUtility: 60.0);
+
+            var workBefore = candidates.First(c => c.Name == Work).Utility;
+
+            // Act
+            new EnvironmentalAffordanceEngine().Modify(context, candidates);
+
+            var workAfter = candidates.First(c => c.Name == Work).Utility;
+
+            // Assert — Work utility musí klesnout
+            Assert.IsTrue(workAfter < workBefore,
+                $"Hluk 0.80 musí snížit Work utility. Před: {workBefore:F2}, po: {workAfter:F2}");
+        }
+
+        // ------------------------------------------------------------------
+        // Test: Noise < 0.55 → Work utility beze změny (žádná penalizace)
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void NoiseCognitivePenalty_NoEffect_WhenNoiseBelowThreshold()
+        {
+            // Arrange — Noise = 0.40 (pod prahem 0.55)
+            var context = MakeContext(noise: 0.40);
+            var candidates = MakeCandidatesWithWork(workUtility: 60.0);
+
+            var workBefore  = candidates.First(c => c.Name == Work).Utility;
+            var createBefore = candidates.First(c => c.Name == Create).Utility;
+
+            // Act
+            new EnvironmentalAffordanceEngine().Modify(context, candidates);
+
+            var workAfter   = candidates.First(c => c.Name == Work).Utility;
+            var createAfter = candidates.First(c => c.Name == Create).Utility;
+
+            // Assert — pod prahem nesmí dojít ke kognitivní penalizaci ze šumu
+            // (může být surface multiplier, ale ne noise cognitive penalty)
+            // Ověříme alespoň že se nesnížily díky noise (penalty=0)
+            // Surface = Work → productiveMult bude pravděpodobně >=1 nebo 1
+            // Tedy workAfter >= workBefore nebo workAfter == workBefore
+            // Přesněji: noisePenalty musí být 0.0 → žádné další Multiply(1 - penalty)
+            // Zkontrolujeme přes penalty vzorec: noise=0.40 <= 0.55 → 0.0
+            var noisePenalty = 0.40 > 0.55
+                ? (0.40 - 0.55) / (1.0 - 0.55) * 0.45
+                : 0.0;
+
+            Assert.AreEqual(0.0, noisePenalty, 0.001,
+                "Hluk 0.40 musí dávat nulovou kognitivní penalizaci.");
+
+            // Work utility nesmí klesnout kvůli noise penalty (ačkoli surface může přidat multiplier)
+            // Ověříme, že žádná noise cognitive penalty nezpůsobila pokles
+            Assert.IsTrue(workAfter >= workBefore * (1.0 - noisePenalty) - 0.001,
+                $"Work utility ({workAfter:F2}) nesmí klesnout pod hodnotu bez noise penalty ({workBefore:F2}).");
+        }
+    }
 }

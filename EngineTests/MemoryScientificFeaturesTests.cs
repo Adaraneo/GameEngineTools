@@ -7,9 +7,18 @@ namespace EngineTests
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Physiology;
+    using GameEngineTools.Characters.Engines.Psychology;
+    using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using static EngineTests.MemoryScientificTestData;
 
@@ -571,5 +580,217 @@ namespace EngineTests
                 emotion,
                 strength,
                 OtherPerson: otherPerson);
+    }
+
+    // =========================================================================
+    // Knowledge Tracking (Theory of Mind) — Baker, Jara-Ettinger et al. 2017
+    // KnowsAbout / ConfidenceAbout — direct witness vs. gossip confidence levels
+    // =========================================================================
+
+    [TestClass]
+    public class KnowledgeTrackingTests : TestBase
+    {
+        private IEventCollector _outbox = default!;
+        private WDateTime _now;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _now = new WDateTime(0);
+            _outbox = new EventCollector();
+        }
+
+        /// <summary>Sestaví DefaultMemoryEngine bez fidelity policy.</summary>
+        private static DefaultMemoryEngine BuildMemoryEngine(MemoryConfig? cfg = null)
+        {
+            cfg ??= new MemoryConfig();
+            var services = new ServiceCollection()
+                .AddLogging(b => b.SetMinimumLevel(LogLevel.Warning))
+                .AddSingleton(Options.Create(cfg));
+            var sp = services.BuildServiceProvider();
+            return new DefaultMemoryEngine(
+                sp.GetRequiredService<IOptions<MemoryConfig>>(),
+                sp.GetRequiredService<ILoggerFactory>());
+        }
+
+        /// <summary>Sestaví minimální IHumanContext pro Memory engine Handle() testy.</summary>
+        private IHumanContext BuildMemoryContext(HumanId selfId)
+        {
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                new PsychologyState(0.1, 0.4, 0.5, 10, 10, DiscreteEmotion.Neutral),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new InteractionSurface(null, false, 0.2, 0.2, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = selfId,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        // ------------------------------------------------------------------
+        // Test 1: přímý svědek SelfDisclosure → KnowsAbout vrátí true
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void KnowsAbout_ReturnsTrue_AfterDirectWitnessEvent()
+        {
+            // Arrange
+            var self  = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var engine = BuildMemoryEngine();
+            var ctx = BuildMemoryContext(self);
+
+            // SelfDisclosure: actor → self (self witnesses actor disclosing to self)
+            // RecordKnowledge fires when io.Act==SelfDisclosure && io.Accepted && io.To==self
+            var @event = new InteractionOutcome(
+                OccurredAt: _now,
+                From: actor,
+                To: self,
+                Accepted: true,
+                Reason: "ok",
+                Act: SpeechAct.SelfDisclosure);
+
+            // Act
+            engine.Handle(@event, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.KnowsAbout(actor, "SelfDisclosure"),
+                "Po přímém svědectví SelfDisclosure musí KnowsAbout vrátit true.");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 2: bez událostí → KnowsAbout vrátí false
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void KnowsAbout_ReturnsFalse_WhenNoKnowledge()
+        {
+            // Arrange
+            var engine  = BuildMemoryEngine();
+            var someId  = new HumanId(Guid.NewGuid());
+
+            // Assert — prázdný engine, žádná znalost
+            Assert.IsFalse(engine.KnowsAbout(someId, "SelfDisclosure"),
+                "Bez záznamů musí KnowsAbout vrátit false.");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 3: přímý svědek má vyšší confidence než gossip
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void ConfidenceAbout_DirectWitness_IsHigherThanGossip()
+        {
+            // DirectWitnessConfidence = 0.90; GossipConfidence = 0.35
+            var cfg = new MemoryConfig();
+            Assert.IsTrue(cfg.DirectWitnessConfidence > cfg.GossipConfidence,
+                $"DirectWitnessConfidence ({cfg.DirectWitnessConfidence}) musí být větší než GossipConfidence ({cfg.GossipConfidence}).");
+            Assert.AreEqual(0.90, cfg.DirectWitnessConfidence, 0.001);
+            Assert.AreEqual(0.35, cfg.GossipConfidence, 0.001);
+        }
+
+        // ------------------------------------------------------------------
+        // Test 4: confidence na znalosti klesá po Tick() s dlouhým dt
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void Knowledge_DecaysOver_Time()
+        {
+            // Arrange
+            var self  = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var engine = BuildMemoryEngine();
+            var ctx = BuildMemoryContext(self);
+
+            engine.Handle(new InteractionOutcome(_now, actor, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+
+            var initialConfidence = engine.ConfidenceAbout(actor, "SelfDisclosure");
+
+            // Act — 180 dní ≈ stačí na výrazný pokles (0.005/den × 180 = 0.9 pokles)
+            engine.Tick(_now, WTimeSpan.FromDays(90), ctx, _outbox);
+
+            var decayedConfidence = engine.ConfidenceAbout(actor, "SelfDisclosure");
+
+            // Assert
+            Assert.IsTrue(decayedConfidence < initialConfidence,
+                $"Confidence musí klesat s časem. Počáteční: {initialConfidence:F4}, po 90 dnech: {decayedConfidence:F4}");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 5: stejný fakt dvakrát → sloučení (jen 1 záznam)
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void Knowledge_MergesWhenSameFact_RecordedTwice()
+        {
+            // Arrange
+            var self  = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var engine = BuildMemoryEngine();
+            var ctx = BuildMemoryContext(self);
+
+            var @event = new InteractionOutcome(_now, actor, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure);
+
+            // Act — stejná událost dvakrát
+            engine.Handle(@event, ctx, _outbox);
+            engine.Handle(@event, ctx, _outbox);
+
+            // Assert — sloučení: jen 1 záznam
+            Assert.AreEqual(1, engine.State.Knowledge.Count,
+                "Stejný fakt zaznamenaný dvakrát musí být sloučen do jednoho záznamu.");
+        }
+
+        // ------------------------------------------------------------------
+        // Test 6: ThirdPartyActionObserved Betrayal → gossip znalost
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void ThirdPartyActionObserved_Betrayal_CreatesGossipKnowledge()
+        {
+            // Arrange
+            var self    = new HumanId(Guid.NewGuid());
+            var actor   = new HumanId(Guid.NewGuid());
+            var target  = new HumanId(Guid.NewGuid());
+            var engine  = BuildMemoryEngine();
+            var ctx     = BuildMemoryContext(self);
+
+            var @event = new ThirdPartyActionObserved(
+                OccurredAt: _now,
+                Observer: self,
+                Actor: actor,
+                Target: target,
+                Valence: -1.0,
+                Type: ThirdPartyObservationType.Betrayal);
+
+            // Act
+            engine.Handle(@event, ctx, _outbox);
+
+            // Assert
+            Assert.IsTrue(engine.KnowsAbout(actor, "Betrayal"),
+                "Po ThirdPartyActionObserved Betrayal musí KnowsAbout(actor, 'Betrayal') vrátit true.");
+
+            var conf = engine.ConfidenceAbout(actor, "Betrayal");
+            Assert.AreEqual(engine.Config.GossipConfidence, conf, 0.001,
+                $"Gossip fakt musí mít confidence = GossipConfidence ({engine.Config.GossipConfidence:F2}). Actual: {conf:F4}");
+        }
     }
 }
