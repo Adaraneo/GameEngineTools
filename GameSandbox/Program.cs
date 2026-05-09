@@ -551,19 +551,19 @@ static void FireFirstImpressions(
                 if (a.Snapshot.Relationships.Edges.ContainsKey(b.Id))
                     continue;
 
-                var viewA = AppearanceProjector.Compute(a.PhysicalAppearance, a.Snapshot.Physiology, a.Biology);
-                var viewB = AppearanceProjector.Compute(b.PhysicalAppearance, b.Snapshot.Physiology, b.Biology);
+                var viewA = AppearanceProjector.Compute(a.PhysicalAppearance, a.Snapshot.Physiology, a.Biology, a.Snapshot.Physiology.Aging);
+                var viewB = AppearanceProjector.Compute(b.PhysicalAppearance, b.Snapshot.Physiology, b.Biology, b.Snapshot.Physiology.Aging);
 
                 // A sees B
                 var aResult = a.AttractionProfile is not null
                     ? calculator.Calculate(a.AttractionProfile, b.PhysicalAppearance, viewB, b.Biology,
-                                           observerValence: a.Snapshot.Psychology.Valence)
+                                           observerValence: a.Snapshot.Psychology.Valence, observerArousal: a.Snapshot.Psychology.Arousal, observerAgeYears: a.Age, targetAgeYears: b.Age)
                     : AttractionResult.Neutral;
 
                 // B sees A
                 var bResult = b.AttractionProfile is not null
                     ? calculator.Calculate(b.AttractionProfile, a.PhysicalAppearance, viewA, a.Biology,
-                                           observerValence: b.Snapshot.Psychology.Valence)
+                                           observerValence: b.Snapshot.Psychology.Valence, observerArousal: b.Snapshot.Psychology.Arousal, observerAgeYears: b.Age, targetAgeYears: a.Age)
                     : AttractionResult.Neutral;
 
                 a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,

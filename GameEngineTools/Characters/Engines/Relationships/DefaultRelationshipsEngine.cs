@@ -108,6 +108,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             // Respect: above neutral (50) — attractive people are assumed more capable
                             var haloRespect = Math.Max(e.Respect, 50.0 + haloBonus * 0.35);
 
+                            // A3 — Sexual interest seed from physical attractiveness (Regan & Berscheid 1999).
+                            // Physical attractiveness triggers an immediate, involuntary lust component
+                            // that is distinct from romantic interest and does not require prior interaction.
+                            // The seed is orientation-weighted: a cross-orientation pair receives a
+                            // proportionally smaller seed (SexualInterestMultiplier ≈ 0.05–1.0).
+                            // Clamped to [0, 45]: first impression seeds only the tonic baseline zone;
+                            // phasic passion (> TonicSexualInterestThreshold = 40) requires repeated
+                            // intimate interaction and cannot be established on first sight alone.
+                            var physicalAttractionNorm = fi.BasePhysical / 40.0 * 100.0;
+                            var sexualInterestSeed = Math.Clamp(physicalAttractionNorm * Config.SexualInterestSeedFactor * SexualOrientationBehaviorMath.SexualInterestMultiplier(ctx.AttractionProfile, otherBiology), 0.0, 45.0);
+
                             return e with
                             {
                                 // Lerp 70% toward the first impression — does not fully override
@@ -121,7 +132,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.8),
                                 PhysicalAttraction  = Lerp(e.PhysicalAttraction,  fi.BasePhysical    / 40.0 * 100.0, 0.8),
                                 RomanticInterest = e.RomanticInterest,
-                                SexualInterest   = e.SexualInterest,
+                                SexualInterest   = Math.Max(e.SexualInterest, sexualInterestSeed),
                                 Breakdown = e.Breakdown with
                                 {
                                     Physical  = Lerp(e.Breakdown.Physical,   fi.BasePhysical    / 40.0 * 100.0, 0.8),
@@ -705,6 +716,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 // Drift rate: ~1 pt/day toward target (slow shift over months/years)
                 var newResponsive = Clamp(Approach(e.ResponsiveDesireLevel, responsiveTarget, 1.0 * days));
 
+                // ── Tonic / phasic sexual interest decay (Baumeister et al. 2001) ────────────
+                // When SexualInterest is below the tonic threshold it represents stable physical
+                // desire rooted in attractiveness — it should persist for months without contact.
+                // When it is above the threshold it represents active phasic passion, which fades
+                // quickly due to habituation (Coolidge effect). Full 1.50× rate applies there.
+                var effectiveSexualInterestDecayMult = e.SexualInterest < Config.TonicSexualInterestThreshold
+                    ? Config.DecayMultiplierSexualInterest * Config.TonicSexualInterestDecayFactor
+                    : Config.DecayMultiplierSexualInterest;
+
                 dict[kv.Key] = e with
                 {
                     Like = Clamp(Approach(e.Like, 50, d * Config.DecayMultiplierLike) + valenceEffect - stressEffect - familiarityLikePenalty),
@@ -713,7 +733,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     AestheticAttraction = e.AestheticAttraction,
                     PhysicalAttraction = e.PhysicalAttraction,
                     RomanticInterest = Clamp(Approach(e.RomanticInterest, 5, d * Config.DecayMultiplierRomanticInterest)),
-                    SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * Config.DecayMultiplierSexualInterest)),
+                    SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * effectiveSexualInterestDecayMult)),
                     Closeness = Clamp(Approach(e.Closeness, 5, d * Config.DecayMultiplierCloseness)),
                     Respect = Clamp(Approach(e.Respect, 55, d * Config.DecayMultiplierRespect)),
                     PerceivedDominance = Clamp(Approach(e.PerceivedDominance, 50, d * Config.DecayMultiplierDominance)),

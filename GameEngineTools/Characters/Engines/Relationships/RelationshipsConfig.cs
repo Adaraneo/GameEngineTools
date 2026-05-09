@@ -102,8 +102,38 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// <summary>
         /// Decay multiplier for SexualInterest. Default 1.50 → half-life ~2 months
         /// (fastest-decaying dimension; Coolidge / habituation effects; boosted by novelty).
+        /// Applies only when SexualInterest is at or above <see cref="TonicSexualInterestThreshold"/>
+        /// (phasic passion zone). Below the threshold the tonic multiplier applies instead.
         /// </summary>
         double DecayMultiplierSexualInterest = 1.50,
+        /// <summary>
+        /// SexualInterest value below which tonic (baseline physical desire) logic applies.
+        /// Below this threshold, the decay rate is reduced by <see cref="TonicSexualInterestDecayFactor"/>.
+        /// Above it, the full phasic <see cref="DecayMultiplierSexualInterest"/> applies.
+        /// Default 40.0.
+        /// </summary>
+        double TonicSexualInterestThreshold = 40.0,
+
+        /// <summary>
+        /// Multiplier applied to <see cref="DecayMultiplierSexualInterest"/> when
+        /// SexualInterest is below <see cref="TonicSexualInterestThreshold"/>.
+        /// Default 0.30 → tonic zone decays at 1.50 × 0.30 = 0.45 per day
+        /// instead of 1.50, giving a half-life of roughly 5–6 months.
+        /// Reference: Baumeister, Catanese &amp; Vohs (2001).
+        /// </summary>
+        double TonicSexualInterestDecayFactor = 0.30,
+
+        /// <summary>
+        /// Fraction of normalised PhysicalAttraction used to seed SexualInterest
+        /// at <see cref="GameEngineTools.Characters.Engines.Relationships.FirstImpressionFormed"/>.
+        /// Models the involuntary lust component triggered by physical attractiveness
+        /// (Regan &amp; Berscheid 1999). Orientation weight is applied multiplicatively on top,
+        /// so cross-orientation pairs receive a proportionally smaller seed.
+        /// Default 0.50 → PhysicalAttraction 70 → SexualInterest seed ≈ 35.
+        /// Clamped to [0, 45] so first impression only seeds the tonic baseline,
+        /// never phasic passion (which requires repeated intimate interaction).
+        /// </summary>
+        double SexualInterestSeedFactor = 0.50,
         /// <summary>
         /// Decay multiplier for Familiarity. Default 0.08 → very slow decay
         /// (knowledge of the person persists long after felt familiarity fades).
