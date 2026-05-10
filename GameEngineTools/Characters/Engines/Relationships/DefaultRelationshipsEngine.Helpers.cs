@@ -114,9 +114,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
             var gate = ((Math.Max(0, e.Comfort - 40) / 60) * 0.35)
                 + ((Math.Max(0, e.Closeness - 20) / 80) * 0.25);
 
+            // Coolidge efekt — novelty bonus u nového partnera (Baumeister et al. 2001).
+            // Klesá logaritmicky s počtem interakcí; symetrický protějšek ke Coolidge decay.
+            var noveltyMult = e.PositiveInteractionCount <= 0
+                ? 1.8
+                : Math.Max(1.0, 1.8 - Math.Log(1.0 + e.PositiveInteractionCount) * 0.35);
+
             var delta = act switch
             {
-                SpeechAct.Invite => (context + gate) * 0.18,
+                SpeechAct.Invite => (context + gate) * 0.18 * noveltyMult,
                 _ => 0
             };
 

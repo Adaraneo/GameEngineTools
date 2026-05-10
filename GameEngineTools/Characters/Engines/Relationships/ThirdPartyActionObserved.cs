@@ -44,6 +44,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
         NegativeAct,
 
         /// <summary>A clear betrayal of trust — step-drop in Trust for the observer.</summary>
-        Betrayal
+        Betrayal,
+
+        /// <summary>
+        /// An intimate/sexual act witnessed between Actor and Target.
+        /// Triggers jealousy in the observer when they hold romantic or sexual interest in Actor.
+        /// </summary>
+        IntimateAct
     }
 }

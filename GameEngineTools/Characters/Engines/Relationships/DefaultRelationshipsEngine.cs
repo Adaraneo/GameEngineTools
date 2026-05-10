@@ -321,6 +321,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         outcome: "accepted",
                         detail: $"act={io.Act}, self={(io.From == self ? "initiator" : "recipient")}, from={io.From.Value}, to={io.To.Value}",
                         now: io.OccurredAt);
+
+                        // Žárlivost: pozorovatelé svědkové intimního aktu dostávají IntimateAct signal.
+                        if (io.Act == SpeechAct.Invite && ctx.Snapshot.InteractionSurface.Observers is { Count: > 0 })
+                        {
+                            EmitThirdPartyEvents(io.OccurredAt, self, io.From, io.To,
+                                ThirdPartyObservationType.IntimateAct, valence: 0.0,
+                                ctx.Snapshot.InteractionSurface.Observers, outbox);
+                        }
                         break;
                     }
 
@@ -506,6 +514,34 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         outcome: tpa.Type.ToString().ToLowerInvariant(),
                         detail: $"actor={tpa.Actor.Value}, target={tpa.Target.Value}, valence={tpa.Valence:F1}",
                         now: tpa.OccurredAt);
+
+                        // Žárlivost — IntimateAct u osoby, k níž má pozorovatel romantický/sexuální zájem.
+                        // Robustní sex difference ve forced-choice formátu (Buss et al. 1992, 48 zemí).
+                        // Distribuce se překrývají → individální variance přes AttachmentAnxiety a SOI.
+                        if (tpa.Type == ThirdPartyObservationType.IntimateAct
+                            && State.Edges.TryGetValue(tpa.Actor, out var actorEdge))
+                        {
+                            var intimacyInterest = actorEdge.RomanticInterest * 0.55 + actorEdge.SexualInterest * 0.45;
+                            if (intimacyInterest >= 25.0)
+                            {
+                                var anxiety = ctx.Personality.Attachment.Anxiety;
+                                var soiAttitude = ctx.Personality.Sociosexuality.Attitude;
+                                // Muži: mírně vyšší sexuální žárlivost (forced-choice d ~ 0,3; slabé v Likert)
+                                var sexualBias = ctx.Biology == SexBiology.Male ? 1.2 : 1.0;
+                                var jealousyBase = Math.Clamp(intimacyInterest / 100.0, 0, 1);
+                                var jealousyIntensity = jealousyBase * sexualBias
+                                                      * (1.0 + anxiety * 0.8)
+                                                      * (1.0 - soiAttitude * 0.3);
+                                var transgressionAmount = Math.Clamp(jealousyIntensity * 12.0, 0, 20.0);
+                                Upsert(self, tpa.Actor, e => e with
+                                {
+                                    TransgressionResidue = Math.Min(100, e.TransgressionResidue + transgressionAmount)
+                                },
+                                eventType: "JealousyDistress",
+                                outcome: $"distress={transgressionAmount:F1}",
+                                detail: $"actor={tpa.Actor.Value}, intimacyInterest={intimacyInterest:F0}");
+                            }
+                        }
                         break;
                     }
 

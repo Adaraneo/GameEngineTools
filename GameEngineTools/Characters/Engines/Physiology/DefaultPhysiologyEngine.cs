@@ -611,6 +611,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     if (s.Aging is { } dyedAging)
                         s = s with { Aging = dyedAging with { GreyFraction = 0.0 } };
                     break;
+
+                case BreastfeedingChanged bc:
+                    if (s.Postpartum is { } ppBf)
+                        s = s with { Postpartum = ppBf with { IsBreastfeeding = bc.IsBreastfeeding } };
+                    break;
             }
 
             // SAM spiky mimo switch — NightmareTriggered a StressSpiked
@@ -627,8 +632,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private PhysiologyState AdvanceCycleDay(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box)
         {
-            var (day, phase) = CalculateCycleProgression(s.Cycle!);
-            s = EmitCycleProgressionEvents(s, now, ctx, box, day, phase);
+            var (day, phase, length, ovulDay) = CalculateCycleProgression(s.Cycle!);
+            s = EmitCycleProgressionEvents(s, now, ctx, box, day, phase, length, ovulDay);
             s = ApplyCycleSymptoms(s);
 
             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
@@ -639,17 +644,20 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return s;
         }
 
-        private (int day, CyclePhase phase) CalculateCycleProgression(MenstrualCycleState c)
+        private (int day, CyclePhase phase, int length, int ovulDay) CalculateCycleProgression(MenstrualCycleState c)
         {
             var length = Math.Max(_cycleCfg.MinCycleLengthDays, Math.Min(_cycleCfg.MaxCycleLengthDays,
                 _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
+            // Ovulace = délka cyklu − střední luteální fáze (Bull 2019: luteální ~11,7 dní, SD 2,8).
+            // Folikulární fáze je hlavní zdroj variability — ovulDay se mění každý cyklus.
+            var ovulDay = Math.Max(_cycleCfg.MensesMeanDays + 2, length - _cycleCfg.LutealMeanDays);
             var day = c.DayInCycle + 1;
             if (day > length) day = 1;
-            var phase = PhaseFor(day, length, _cycleCfg.MensesMeanDays, _cycleCfg.OvulationDayOfCycle);
-            return (day, phase);
+            var phase = PhaseFor(day, length, _cycleCfg.MensesMeanDays, ovulDay);
+            return (day, phase, length, ovulDay);
         }
 
-        private PhysiologyState EmitCycleProgressionEvents(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box, int day, CyclePhase phase)
+        private PhysiologyState EmitCycleProgressionEvents(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box, int day, CyclePhase phase, int length, int ovulDay)
         {
             var c = s.Cycle!;
             box.Add(new CycleDayAdvanced(now, ctx.Id, day, phase));
@@ -664,10 +672,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && !c.OvulationWindow)
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
 
+            // Při resetu na den 1 uložit skutečnou délku tohoto cyklu (ovulDay se pak počítá z ní).
+            var currentLength = day == 1 ? length : c.CurrentCycleLength;
+
             var next = c with
             {
                 DayInCycle = day, Phase = phase, OvulationWindow = ovulWindow,
-                LastMensesStart = (day == 1) ? now.Date : c.LastMensesStart
+                LastMensesStart = (day == 1) ? now.Date : c.LastMensesStart,
+                CurrentCycleLength = currentLength
             };
             return s with { Cycle = next };
         }
@@ -676,7 +688,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle!, s.CurrentContraception);
             var day       = (double)s.Cycle!.DayInCycle;
-            var ovulDay   = (double)_cycleCfg.OvulationDayOfCycle;
+            var ovulDay   = (double)Math.Max(_cycleCfg.MensesMeanDays + 2, s.Cycle.CurrentCycleLength - _cycleCfg.LutealMeanDays);
             var lutealFactor = Math.Max(0, (day - (ovulDay + 7)) / 7.0);
             var isPmddActive = _cycleCfg.PmsRisk > 0.3 && lutealFactor > 0.5;
             return s with
@@ -695,6 +707,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private PhysiologyState AdvancePregnancy(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector outbox, PregnancyState pregnancy)
         {
             var daysPregnant = pregnancy.ConceivedOn.DaysUntil(now.Date);
+            // LibidoMod per trimestr (Basson 2006 review): 1. tri ↓ (nevolnost/únava), 2. tri ↑, 3. tri ↓↓
+            var pregnancyLibidoMod = daysPregnant < 93 ? 0.5 : daysPregnant < 186 ? 0.8 : 0.4;
 
             if (!pregnancy.Discovered && daysPregnant >= Config.PregnancyDiscoveryMinDays)
             {
@@ -729,7 +743,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     Energy     = 20,  // vyčerpaná po porodu
                     Cycle = s.Cycle is null
                         ? null
-                        : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 },
+                        : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.3 },
                     Postpartum = new PostpartumState(0, PostpartumPhase.Immediate, HormonalCrashActive: true),
                     // Postpartum HairLoss: estrogen propad → telogen effluvium
                     Aging = s.Aging is { } birthAging
@@ -743,7 +757,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Pregnancy = pregnancy,
                 Cycle = s.Cycle is null
                     ? null
-                    : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 }
+                    : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = pregnancyLibidoMod }
             };
         }
 
@@ -761,6 +775,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             if (newPhase != pp.Phase)
                 outbox.Add(new PostpartumPhaseChanged(now, ctx.Id, newPhase));
+
+            // Postpartum LibidoMod: prolaktin-mediovaná suprese klesá za ~6 měsíců (0.3 → 1.0).
+            // Kojení prodlužuje supresi přes prolaktin → násobení 0.7.
+            var postpartumLibidoMod = Math.Clamp(0.3 + (days / 180.0) * 0.7, 0.3, 1.0);
+            if (pp.IsBreastfeeding) postpartumLibidoMod = Math.Max(0.3, postpartumLibidoMod * 0.7);
+            if (s.Cycle?.Phase == CyclePhase.Paused)
+                s = s with { Cycle = s.Cycle with { LibidoMod = postpartumLibidoMod } };
 
             if (newPhase == PostpartumPhase.FullRecovery)
             {
@@ -825,7 +846,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Pregnancy = pregnancy,
                 Cycle = s.Cycle is null
                     ? null
-                    : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.8 }
+                    : s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 0.5 } // 1. trimestr
             };
         }
 
@@ -920,7 +941,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 return (0.0, 0.0, 0.0, 1.0);
 
             var day      = (double)c.DayInCycle;
-            var ovulDay  = (double)_cycleCfg.OvulationDayOfCycle;
+            // Ovulační den pro tento cyklus — dynamický per-cyklus (uložen v CurrentCycleLength).
+            var ovulDay  = (double)Math.Max(_cycleCfg.MensesMeanDays + 2, c.CurrentCycleLength - _cycleCfg.LutealMeanDays);
             var mensesMid = _cycleCfg.MensesMeanDays / 2.0;
 
             // Bolest: Gaussový spike v menstruaci + luteální eskalace
@@ -983,9 +1005,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private static MenstrualCycleState SeedCycle(MenstrualCycleConfig cfg, IRandomSource rng, WDateOnly now)
         {
-            var day = rng.Next(1, Math.Max(2, cfg.MeanCycleLengthDays));
-            day = Math.Clamp(day, 1, 35);
-            var phase = PhaseFor(day, cfg.MeanCycleLengthDays, cfg.MensesMeanDays, cfg.OvulationDayOfCycle);
+            // Vzorkuj délku tohoto inicializačního cyklu ze stejného rozdělení jako za běhu.
+            var cycleLength = Math.Max(cfg.MinCycleLengthDays, Math.Min(cfg.MaxCycleLengthDays,
+                cfg.MeanCycleLengthDays + (int)Math.Round(Normal(rng, 0, cfg.VariabilityDaysStdDev))));
+            var ovulDay = Math.Max(cfg.MensesMeanDays + 2, cycleLength - cfg.LutealMeanDays);
+            var day = rng.Next(1, Math.Max(2, cycleLength));
+            day = Math.Clamp(day, 1, cfg.MaxCycleLengthDays);
+            var phase = PhaseFor(day, cycleLength, cfg.MensesMeanDays, ovulDay);
 
             // Zpětný odhad, kdy začala menstruace
             var lastMensesStart = now.AddDays(-(day - 1));
@@ -995,7 +1021,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 OvulationWindow: false,
                 SymptomPain: 0, SymptomBreastTender: 0, SymptomBloat: 0,
                 LibidoMod: 1.0,
-                LastMensesStart: lastMensesStart);
+                LastMensesStart: lastMensesStart,
+                CurrentCycleLength: cycleLength);
         }
 
         private double SafeHours(WTimeSpan dt) => Math.Max(0, dt.TotalHours);

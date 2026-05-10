@@ -79,9 +79,15 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 target.RejectionRisk,
                 target.ExpectedAcceptance);
 
+            // DCM SIS2: kontextová suprese (crowding, pozorovatelé) přes VulnerabilitySafety proxy
+            var dcmContextMult = DualControlBehaviorMath.ContextSuppressionMultiplier(
+                context.HumanContext.Personality.DualControl,
+                target.VulnerabilitySafety);
+
             var utility = BehaviorMath.Util(context.State.NeedIntimacy, sexuality)
                 * (0.35 + target.Score * 0.65)
                 * sociosexualityMultiplier
+                * dcmContextMult
                 + target.VulnerabilitySafety * 10.0
                 - target.RejectionRisk * 6.0;
 

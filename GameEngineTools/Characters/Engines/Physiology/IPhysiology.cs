@@ -220,20 +220,26 @@ namespace GameEngineTools.Characters.Engines.Physiology
     { Menses, Follicular, Ovulation, Luteal, Paused /* např. těhotenství/antiko */ }
 
     public sealed record MenstrualCycleConfig(
-        int MeanCycleLengthDays = 28,
-        double VariabilityDaysStdDev = 2.0,
+        /// <summary>Bull et al. 2019 (n = 3 324 cyklů): průměr 30,3 dní.</summary>
+        int MeanCycleLengthDays = 30,
+        /// <summary>Bull et al. 2019: SD 6,7 dní — folikulární fáze je hlavní zdroj variability.</summary>
+        double VariabilityDaysStdDev = 6.7,
         int MensesMeanDays = 5,
         double PmsRisk = 0.35,
         bool EnableOvulationWindowEvents = true,
         bool EnableSymptoms = true,
-        int OvulationDayOfCycle = 14,
+        /// <summary>
+        /// Střední délka luteální fáze (Bull et al. 2019: průměr 11,7 dne, SD 2,8).
+        /// Engine z tohoto počítá dynamický den ovulace per-cyklus: ovulDay = length − LutealMeanDays.
+        /// </summary>
+        int LutealMeanDays = 12,
         int MinCycleLengthDays = 21,
-        int MaxCycleLengthDays = 35,
+        int MaxCycleLengthDays = 36,
         double PainBaseMultiplier = 1.0,
         double BloatBaseMultiplier = 1.0,
         double BreastTenderMultiplier = 1.0)
     {
-        public MenstrualCycleConfig() : this(28, 2.0, 5, 0.35, true, true, 14, 21, 35, 1.0, 1.0, 1.0) { }
+        public MenstrualCycleConfig() : this(30, 6.7, 5, 0.35, true, true, 12, 21, 36, 1.0, 1.0, 1.0) { }
     }
 
     public sealed record MenstrualCycleState(
@@ -249,7 +255,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Aktivní PMDD epizoda — nastává v pozdní luteální fázi u postav s PmsRisk &gt; 0.3.
         /// Způsobuje závažnější emocionální labilitu a vyšší Stress v Psychology.
         /// </summary>
-        bool PmddActive = false);
+        bool PmddActive = false,
+        /// <summary>
+        /// Skutečná délka aktuálního cyklu (vzorkovaná z normálního rozdělení při každém resetu na den 1).
+        /// Použita pro výpočet dynamického dne ovulace: ovulDay = CurrentCycleLength − LutealMeanDays.
+        /// Default = MeanCycleLengthDays při inicializaci.
+        /// </summary>
+        int CurrentCycleLength = 30);
 
     /// <summary>Stav probíhajícího těhotenství postavy.</summary>
     public sealed record PregnancyState(
@@ -289,7 +301,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Způsobuje emocionální labilitu a zpomalené MoodBaseline recovery v Psychology.
         /// Automaticky deaktivován po 7 dnech.
         /// </summary>
-        bool HormonalCrashActive = true);
+        bool HormonalCrashActive = true,
+        /// <summary>
+        /// Probíhající kojení — prodlužuje prolaktin-mediovanou supresi libida.
+        /// Nastaveno eventem <see cref="BreastfeedingChanged"/>.
+        /// Při aktivním kojení je LibidoMod snížen o dalších ~30 %.
+        /// </summary>
+        bool IsBreastfeeding = false);
 
     /// <summary>
     /// Stav mužského testosteronového cyklu. Modeluje diurnální rytmus (vrchol v ranních
@@ -347,6 +365,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
     public sealed record HairCut(WDateTime OccurredAt, HumanId Human, double NewLengthCm) : IDomainEvent;
     /// <summary>Událost — postava si obarvila vlasy (narrativní; resetuje šedivost pro zobrazení).</summary>
     public sealed record HairDyed(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
+    /// <summary>
+    /// Událost — postava začala nebo ukončila kojení.
+    /// Kojení prodlužuje prolaktin-mediovanou supresi libida přibližně o 30 % po dobu trvání.
+    /// </summary>
+    public sealed record BreastfeedingChanged(WDateTime OccurredAt, HumanId Human, bool IsBreastfeeding) : IDomainEvent;
 
     /// <summary>
     /// Odvozené fyziologické vitální parametry — čisté funkce stávajících stavů.

@@ -249,10 +249,10 @@ namespace EngineTests
                 Cycle = initialCycle with { DayInCycle = 1, Phase = CyclePhase.Menses }
             });
 
-            // Act — advance exactly 28 days (each Tick accumulates 24 h → one cycle-day advance)
+            // Act — advance exactly 30 days (each Tick accumulates 24 h → one cycle-day advance)
             int wraps = 0;
             int prevDay = engine.State.Cycle!.DayInCycle;
-            for (int i = 0; i < 28; i++)
+            for (int i = 0; i < 30; i++)
             {
                 engine.Tick(now, WTimeSpan.FromHours(24), ctx, outbox);
                 var newDay = engine.State.Cycle!.DayInCycle;
@@ -261,9 +261,9 @@ namespace EngineTests
                 prevDay = newDay;
             }
 
-            // With ZeroRandom Normal(0, std)=0, length = Clamp(28+0, 21, 35) = 28 → exactly 1 wrap
+            // With ZeroRandom Normal(0, std)=0, length = Clamp(30+0, 21, 36) = 30 → exactly 1 wrap
             Assert.AreEqual(1, wraps,
-                $"ZeroRandom must produce cycle length of 28 days (one wrap after 28 advances). Wraps={wraps}");
+                $"ZeroRandom must produce cycle length of 30 days (one wrap after 30 advances). Wraps={wraps}");
         }
 
         /// <summary>
@@ -523,8 +523,8 @@ namespace EngineTests
 
             Assert.AreEqual(CyclePhase.Paused, engine.State.Cycle?.Phase,
                 "Cycle must be Paused after childbirth (postpartum amenorrhea).");
-            Assert.AreEqual(0.8, engine.State.Cycle?.LibidoMod ?? 0, delta: 0.001,
-                "LibidoMod must be 0.8 during postpartum period.");
+            Assert.AreEqual(0.3, engine.State.Cycle?.LibidoMod ?? 0, delta: 0.001,
+                "LibidoMod must be 0.3 immediately after childbirth (prolaktin-mediovaná suprese).");
         }
 
         #endregion Postpartum state
