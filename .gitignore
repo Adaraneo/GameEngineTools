@@ -380,3 +380,4 @@ FodyWeavers.xsd
 /CLAUDE.md
 /LogReader
 /.claude/celestial-bodies-get.skill
+/.claude/agent-memory-local/code-reviewer-impl-planner/logreader_arch.md
