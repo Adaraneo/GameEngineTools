@@ -62,7 +62,7 @@ namespace EngineTests
             var target = new HumanId(Guid.NewGuid());
             var relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
-                [target] = Edge(self, target, trust: 45, comfort: 46, closeness: 52, physical: 82, aesthetic: 80, romantic: 50, sexual: 78)
+                [target] = Edge(self, target, trust: 55, comfort: 55, closeness: 55, physical: 82, aesthetic: 80, romantic: 50, sexual: 78)
             });
             var restricted = BehaviorComponentTestFactory.Context(
                 selfId: self,

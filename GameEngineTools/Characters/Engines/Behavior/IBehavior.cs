@@ -35,7 +35,17 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// Maximum utility reduction applied to Work/Create when Noise=1.0 (Glass &amp; Singer 1972).
         /// At Noise=0.55 penalty is 0; at Noise=1.0 penalty equals this value.
         /// </summary>
-        double NoiseCognitivePenaltyMax = 0.45)
+        double NoiseCognitivePenaltyMax = 0.45,
+        /// <summary>
+        /// ReachOut utility bonus per point of PerceivedPrestige above 50.
+        /// High-prestige targets attract voluntary social approach (Redhead et al. 2019).
+        /// </summary>
+        double PrestigeReachOutBonusPerPoint = 0.06,
+        /// <summary>
+        /// ReachOut utility penalty per point of PerceivedDominance above 70 when Closeness &lt; 30.
+        /// Dominant strangers trigger avoidance; close dominant figures do not (Cheng et al. 2013).
+        /// </summary>
+        double DominanceAvoidancePenaltyPerPoint = 0.08)
     {
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
     }
