@@ -687,7 +687,8 @@ namespace GameEngineTools.Narrative
                 Number = Number.Singular,
                 Gender = actor.IsFemale ? Gender.Feminine : Gender.Masculine,
                 IsAnimate = actor.IsFemale ? false : true,
-                Pattern = pattern
+                Pattern = pattern,
+                HasMobileE = false
             };
 
             return _wordComposer.GetFullForm(request).Form;
