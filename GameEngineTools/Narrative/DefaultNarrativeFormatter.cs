@@ -675,7 +675,7 @@ namespace GameEngineTools.Narrative
                 true when actor.Name.EndsWith("a") || actor.Name.EndsWith("ia") => "žena",
                 true when actor.Name.EndsWith("e") => "růže",
                 false when actor.Name.EndsWith("us") => "muž",
-                false when actor.Name.EndsWith("tor") => "muž",
+                false when actor.Name.EndsWith("tor") => "pán",
                 _ => "pán"
             };
 
