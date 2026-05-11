@@ -381,3 +381,6 @@ FodyWeavers.xsd
 /LogReader
 /.claude/celestial-bodies-get.skill
 /.claude/agent-memory-local/code-reviewer-impl-planner/logreader_arch.md
+/.claude/agent-memory-local/plan-implementer/feedback_build_test.md
+/.claude/agent-memory-local/plan-implementer/feedback_psychology_config.md
+/.claude/agent-memory-local/plan-implementer/MEMORY.md
