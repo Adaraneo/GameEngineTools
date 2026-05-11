@@ -361,15 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/GameSandbox/appsettings.json
-/.claude/settings.local.json
-/.claude/agents/code-reviewer-impl-planner.md
-/.claude/agents/plan-implementer.md
-/.claude/csharp-conventions.skill
-/.claude/csharp-mstest.skill
-/.claude/human-behavior-npc.skill
-/.claude/agent-memory-local/code-reviewer-impl-planner/MEMORY.md
-/.claude/agent-memory-local/code-reviewer-impl-planner/project_context.md
+/.claude
 /COMPILATION_FIX_SUMMARY.md
 /FINAL_BUILD_AND_TEST_REPORT.md
 /PHASE1_COMPLETION_REPORT.txt
@@ -379,8 +371,3 @@ FodyWeavers.xsd
 /PHASE4_IMPLEMENTATION_REPORT.md
 /CLAUDE.md
 /LogReader
-/.claude/celestial-bodies-get.skill
-/.claude/agent-memory-local/code-reviewer-impl-planner/logreader_arch.md
-/.claude/agent-memory-local/plan-implementer/feedback_build_test.md
-/.claude/agent-memory-local/plan-implementer/feedback_psychology_config.md
-/.claude/agent-memory-local/plan-implementer/MEMORY.md
