@@ -292,10 +292,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Fyzická únava — akumulace při Work, decay při odpočinku/spánku
             // Sarkopenie: méně svalové hmoty = Work fatigue se akumuluje rychleji
             {
-                var muscleFactor = s.Aging?.MuscleMassFraction ?? 1.0;
+                var muscleFactor  = s.Aging?.MuscleMassFraction ?? 1.0;
+                var gravityFactor = ctx.Snapshot.Celestial?.SurfaceGravityVsEarth ?? 1.0;
                 var fatigueDelta = action switch
                 {
-                    Work     => (Config.PhysicalFatigueAccumPerWorkHour / Math.Max(0.1, muscleFactor)) * h,
+                    Work     => (Config.PhysicalFatigueAccumPerWorkHour / Math.Max(0.1, muscleFactor)) * gravityFactor * h,
                     Sleep    => -Config.PhysicalFatigueDecayPerSleepHour * h,
                     Idle     => -Config.PhysicalFatigueDecayPerIdleHour * h,
                     SelfCare => -(Config.PhysicalFatigueDecayPerIdleHour + Config.PhysicalFatigueSelfCareDecayBonus) * h,

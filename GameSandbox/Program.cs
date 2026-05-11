@@ -18,6 +18,7 @@ using GameEngineTools.FileSystem;
 using GameEngineTools.Narrative;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Objects;
+using GameEngineTools.Universe;
 using GameEngineTools.World.Core.Astro;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
@@ -133,6 +134,21 @@ var currDir = Directory.GetCurrentDirectory();
 
 var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.World.json").Build();
 var perceptionOptions = configProvider.GetSection("World:Perception").Get<CharacterPerceptionOptions>() ?? new CharacterPerceptionOptions();
+var astroOptions = configProvider.GetSection("World:Astro").Get<AstroConfig>() ?? new AstroConfig();
+var universeOptions = configProvider.GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
+
+// ── World habitability ────────────────────────────────────────────────────────
+{
+    var star = universeOptions.ToStarPhysics();
+    var orbit = universeOptions.ToOrbitalElements();
+    var planet = universeOptions.ToPlanetConfig();
+    var hab = HabitabilityCalculator.Compute(planet, orbit, star);
+    Console.ForegroundColor = ConsoleColor.DarkCyan;
+    Console.WriteLine($"[World] {planet.Name} — Habitability {hab.OverallScore:P0} ({hab.ExpectedLifeComplexity})");
+    if (hab.LimitingFactors.Count > 0)
+        Console.WriteLine($"[World] Limiting: {string.Join(", ", hab.LimitingFactors)}");
+    Console.ResetColor();
+}
 
 var generatedBlankPeopleLogFiles = new DirectoryInfo(TFSC.gfiles).GetFiles().ToImmutableList();
 
@@ -191,7 +207,8 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
     LocationService = locationService,
-    AstroConfig = new AstroConfig(),
+    AstroConfig = astroOptions,
+    UniverseConfig = universeOptions,
     SimulationDays = simulationDays,
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
@@ -275,6 +292,8 @@ if (characters.Count > 0)
         Characters = characters,
         LocationService = locationService,
         TickStep = WTimeSpan.FromHours(5),
+        AstroConfig = astroOptions,
+        UniverseConfig = universeOptions,
         SimulationDays = simulationDays,
         DefaultCharacterLod = CognitiveResolutionLevel.Background,
         InternalSubstep = WTimeSpan.FromMinutes(30),

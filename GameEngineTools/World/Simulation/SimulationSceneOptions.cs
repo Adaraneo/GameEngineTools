@@ -7,6 +7,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
+    using GameEngineTools.Universe;
     using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;
@@ -223,6 +224,13 @@ namespace GameEngineTools.World.Simulation
         /// <see cref="IHuman.SetAmbientContext"/>.
         /// </summary>
         public AstroConfig? AstroConfig { get; init; }
+
+        /// <summary>
+        /// Volitelná konfigurace planetárního systému (Phase 2).
+        /// Pokud nastavena společně s <see cref="AstroConfig"/>, scéna použije
+        /// Keplerovu mechaniku pro výpočet sezóny, teploty a gravitace.
+        /// </summary>
+        public UniverseConfig? UniverseConfig { get; init; }
 
         #endregion Astronomický kontext
 

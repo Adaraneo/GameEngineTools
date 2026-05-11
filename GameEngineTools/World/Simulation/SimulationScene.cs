@@ -12,6 +12,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
+    using GameEngineTools.Universe;
     using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Utils.Time;
 
@@ -65,6 +66,9 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Astronomy config — non-null právě když <see cref="_celestialComputer"/> není null.</summary>
         private readonly AstroConfig? _astroConfig;
 
+        /// <summary>Phase 2 planetární objekty — null pokud <c>UniverseConfig</c> není nastaven.</summary>
+        private readonly (StarPhysics Star, OrbitalElements Orbit, PlanetConfig Planet)? _universeObjects;
+
         #endregion Privátní pole
 
         #region Konstruktor
@@ -102,6 +106,9 @@ namespace GameEngineTools.World.Simulation
                 _astroConfig        = astroCfg;
                 _celestialComputer  = new CelestialContextComputer(new SunModel());
             }
+
+            if (options.UniverseConfig is { } uc)
+                _universeObjects = (uc.ToStarPhysics(), uc.ToOrbitalElements(), uc.ToPlanetConfig());
         }
 
         #endregion Konstruktor
@@ -158,7 +165,10 @@ namespace GameEngineTools.World.Simulation
             // před tickem — aby enginy viděly aktuální ozáření, teplotu a sezónu.
             if (_celestialComputer is not null)
             {
-                var celestial = _celestialComputer.Compute(now, _astroConfig!);
+                var celestial = _universeObjects is { } u
+                    ? _celestialComputer.Compute(now, _astroConfig!, u.Star, u.Orbit, u.Planet)
+                    : _celestialComputer.Compute(now, _astroConfig!);
+
                 foreach (var character in chars)
                     character.SetAmbientContext(celestial.BaseAmbientTempCelsius, celestial);
             }

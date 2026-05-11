@@ -3,6 +3,7 @@
 
 namespace GameEngineTools.World.Core.Astro;
 
+using GameEngineTools.Universe;
 using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
 
@@ -56,5 +57,62 @@ internal sealed class CelestialContextComputer
             VernalPhase:            cfg.VernalPhase,
             IsDay:                  irradiance > 0.0,
             BaseAmbientTempCelsius: tempC);
+    }
+
+    /// <summary>
+    /// Phase 2 overload — SeasonFraction z Keplerovy rovnice, teplota z fyzikálního modelu,
+    /// gravitace z <see cref="PlanetConfig.SurfaceGravityVsEarth"/>.
+    /// </summary>
+    internal CelestialContext Compute(
+        WDateTime now,
+        AstroConfig cfg,
+        StarPhysics star,
+        OrbitalElements orbit,
+        PlanetConfig planet)
+    {
+        // SunParams: ObliquityDeg z planety, refrakce/twilight z cfg.Sun
+        var sunCfg = cfg.Sun ?? new SunParamsConfig();
+        var sp = new SunParams(
+            planet.ObliquityDeg,
+            orbit.Eccentricity,
+            sunCfg.PeriapsisPhase,
+            sunCfg.RefractionDeg,
+            sunCfg.ApparentRadiusDeg,
+            sunCfg.TwilightCivilDeg,
+            sunCfg.TwilightNauticalDeg,
+            sunCfg.TwilightAstronomicalDeg);
+
+        var spec = WWorld.Spec;
+
+        var (solarNoon, sunrise, sunset, daylight) = _sunModel.SolarDay(
+            now, cfg.LatitudeDeg, cfg.LongitudeDeg, in sp, cfg.VernalPhase);
+        var irradiance = _sunModel.IrradianceFactor(
+            now, cfg.LatitudeDeg, cfg.LongitudeDeg, in sp, cfg.VernalPhase);
+
+        // SeasonFraction z Keplerovy rovnice (true anomaly → frakce roku)
+        var dayIdx = now.WorldTicks / spec.TicksPerDay;
+        var secondsPerWorldDay = (double)spec.HoursPerDay * spec.MinutesPerHour * spec.SecondsPerMinute;
+        var tSinceEpochEarthDays = dayIdx * secondsPerWorldDay / 86_400.0;
+        var (kx, ky) = KeplerSolver.OrbitalPositionAu(orbit, tSinceEpochEarthDays, star.GravitationalParameter);
+        var trueAnomaly = Math.Atan2(ky, kx);                              // −π..+π
+        var seasonFrac  = ((trueAnomaly / (2.0 * Math.PI)) + 1.0) % 1.0;
+
+        // Teplota z fyzikálního modelu + sezónní offset z AstroConfig
+        var orbitAu   = Math.Sqrt(kx * kx + ky * ky);
+        var meanTempC = star.EquilibriumTempK(orbitAu, planet.Albedo) + planet.GreenhouseWarmingK - 273.15;
+        var tempC     = meanTempC
+                      + cfg.SeasonalAmplitudeCelsius * Math.Sin(seasonFrac * 2.0 * Math.PI - Math.PI / 2.0);
+
+        return new CelestialContext(
+            IrradianceFactor:       irradiance,
+            DaylightHours:          daylight,
+            SunriseHour:            sunrise,
+            SunsetHour:             sunset,
+            SolarNoonHour:          solarNoon,
+            SeasonFraction:         seasonFrac,
+            VernalPhase:            cfg.VernalPhase,
+            IsDay:                  irradiance > 0.0,
+            BaseAmbientTempCelsius: tempC,
+            SurfaceGravityVsEarth:  planet.SurfaceGravityVsEarth);
     }
 }
