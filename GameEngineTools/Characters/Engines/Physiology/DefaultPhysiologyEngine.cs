@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -159,9 +160,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
             // Cirkadiánní tělesná teplota: sinusoidální vlna ±CircadianTempAmplitude (Waterhouse 2005)
             var hoursOfDayT = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-            // cos: maximum na PeakHour (17h), minimum na PeakHour±HalfDay (4h)
+            // Peak ukotvíme na SolarNoon+5h pokud máme astronomický kontext (Waterhouse: tělesná teplota ~5h po poledni)
+            var circTempPeakHour = ctx.Snapshot.Celestial is { } celT && !double.IsNaN(celT.SolarNoonHour)
+                ? celT.SolarNoonHour + 5.0
+                : Config.CircadianTempPeakHour;
+            // cos: maximum na circTempPeakHour, minimum na ±HalfDay
             var circadianTempComponent = Config.CircadianTempAmplitude
-                * Math.Cos((hoursOfDayT - Config.CircadianTempPeakHour) * 2 * Math.PI / WWorld.Spec.HoursPerDay);
+                * Math.Cos((hoursOfDayT - circTempPeakHour) * 2 * Math.PI / WWorld.Spec.HoursPerDay);
             var targetBodyTemp = feverDelta + circadianTempComponent;
 
             s = s with
@@ -194,7 +199,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     Nutrition = nut with
                     {
                         Calories         = Clamp01p(nut.Calories + caloriesDelta),
-                        VitaminD         = Clamp01p(nut.VitaminD - Config.NutritionDecayPerHour * h * 0.5),
+                        VitaminD         = ComputeVitaminD(nut.VitaminD, h, ctx.Snapshot.Celestial, ctx.Snapshot.InteractionSurface.Kind),
                         Iron             = Clamp01p(nut.Iron     + ironDelta),
                         Protein          = Clamp01p(nut.Protein  + proteinDelta),
                         BloodGlucoseLevel = Math.Clamp(nut.BloodGlucoseLevel + glucoseDelta, 0, 100),
@@ -308,8 +313,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Kortizol — diurnální křivka (HPA osa) + chronický stres + imunitní elevace
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+                // CAR (Cortisol Awakening Response) ukotvíme na SunriseHour+2h (světelný signál nastavuje peak)
+                var cortisolPeakHour = ctx.Snapshot.Celestial is { } celC && !double.IsNaN(celC.SunriseHour)
+                    ? celC.SunriseHour + 2.0
+                    : Config.CortisolDiurnalPeakHour;
                 var diurnal = Config.CortisolDiurnalAmplitude
-                              * Math.Exp(-Math.Pow(hoursOfDay - Config.CortisolDiurnalPeakHour, 2) / 8.0);
+                              * Math.Exp(-Math.Pow(hoursOfDay - cortisolPeakHour, 2) / 8.0);
                 // Hypocortisolismus paradox (Fries 2005): při extrémním AlloLoad HPA downreguluje
                 var alloComponent = s.AllostaticLoad < Config.HypocortisolismAlloThreshold
                     ? s.AllostaticLoad * Config.CortisolAlloWeight
@@ -1040,6 +1049,28 @@ namespace GameEngineTools.Characters.Engines.Physiology
             (value < target) ? Math.Min(target, value + by) : Math.Max(target, value - by);
 
         private static double Clamp01p(double v) => Math.Max(0, Math.Min(100, v));
+
+        /// <summary>
+        /// Vypočítá novou hladinu vitaminu D: odečte diurnální ztrátu a — pokud je postava
+        /// venku za dostatečného ozáření — přidá sluneční restauraci.
+        /// </summary>
+        private double ComputeVitaminD(double current, double h, CelestialContext? celestial, SurfaceKind surface)
+        {
+            var net = -Config.NutritionDecayPerHour * h * 0.5;
+
+            if (celestial is { } cel && cel.IrradianceFactor > Config.VitaminDSunThreshold)
+            {
+                if (surface is SurfaceKind.Public or SurfaceKind.Social)
+                {
+                    var restoration = Math.Min(
+                        Config.VitaminDRestorationPerHourPerIrradiance * cel.IrradianceFactor * h,
+                        Config.VitaminDMaxOutdoorRestorationPerHour * h);
+                    net += restoration;
+                }
+            }
+
+            return Clamp01p(current + net);
+        }
 
         /// <summary>
         /// Replaces the current state with the provided snapshot.

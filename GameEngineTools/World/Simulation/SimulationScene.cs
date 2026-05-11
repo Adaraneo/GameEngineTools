@@ -12,6 +12,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
+    using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -58,6 +59,12 @@ namespace GameEngineTools.World.Simulation
 
         private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
 
+        /// <summary>Null pokud astronomická logika není nakonfigurována.</summary>
+        private readonly CelestialContextComputer? _celestialComputer;
+
+        /// <summary>Astronomy config — non-null právě když <see cref="_celestialComputer"/> není null.</summary>
+        private readonly AstroConfig? _astroConfig;
+
         #endregion Privátní pole
 
         #region Konstruktor
@@ -89,6 +96,12 @@ namespace GameEngineTools.World.Simulation
             _clock = clock;
             _options = options;
             _lodRuntime = characterLodRuntime;
+
+            if (options.AstroConfig is { } astroCfg)
+            {
+                _astroConfig        = astroCfg;
+                _celestialComputer  = new CelestialContextComputer(new SunModel());
+            }
         }
 
         #endregion Konstruktor
@@ -139,6 +152,16 @@ namespace GameEngineTools.World.Simulation
             ApplyCharacterLods(chars);
 
             var now = _clock.Now;
+
+            // ── Krok 0b: Astronomický kontext ──────────────────────────────────────
+            // Vypočítá CelestialContext jednou za tick a injektuje ho každé postavě
+            // před tickem — aby enginy viděly aktuální ozáření, teplotu a sezónu.
+            if (_celestialComputer is not null)
+            {
+                var celestial = _celestialComputer.Compute(now, _astroConfig!);
+                foreach (var character in chars)
+                    character.SetAmbientContext(celestial.BaseAmbientTempCelsius, celestial);
+            }
 
             _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
 

@@ -13,6 +13,7 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
 
@@ -460,6 +461,7 @@ namespace GameEngineTools.Characters.Core
         /// </summary>
         private void RefreshSnapshot()
         {
+            var prev = Snapshot;
             Snapshot = new EnginesSnapshot(
                 _physio.State,
                 _psych.State,
@@ -467,8 +469,22 @@ namespace GameEngineTools.Characters.Core
                 _interact.State,
                 _relations.State,
                 _memory.State,
-                _semanticMemory.State);
+                _semanticMemory.State,
+                AmbientTemperature: prev.AmbientTemperature,
+                AltitudeMeters:     prev.AltitudeMeters,
+                Celestial:          prev.Celestial);
 
+            _ctx.Snapshot = Snapshot;
+        }
+
+        /// <inheritdoc/>
+        public void SetAmbientContext(double ambientTempC, CelestialContext? celestial)
+        {
+            Snapshot = Snapshot with
+            {
+                AmbientTemperature = ambientTempC,
+                Celestial          = celestial,
+            };
             _ctx.Snapshot = Snapshot;
         }
 

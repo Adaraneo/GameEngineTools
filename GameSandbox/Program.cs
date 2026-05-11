@@ -18,6 +18,7 @@ using GameEngineTools.FileSystem;
 using GameEngineTools.Narrative;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Objects;
+using GameEngineTools.World.Core.Astro;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;
@@ -190,6 +191,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
 {
     Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
     LocationService = locationService,
+    AstroConfig = new AstroConfig(),
     SimulationDays = simulationDays,
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),

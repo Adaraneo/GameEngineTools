@@ -14,6 +14,7 @@ namespace GameEngineTools.Characters.Core
     using Characters.Engines.SemanticMemory;
     using Characters.Traits;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
 
@@ -60,6 +61,13 @@ namespace GameEngineTools.Characters.Core
         void ReceiveEvent(IDomainEvent @event);
 
         void RestoreSnapshot(EnginesSnapshot snapshot);
+
+        /// <summary>
+        /// Injektuje ambientní stav prostředí před tickem postavy.
+        /// Volá <see cref="SimulationScene"/> jednou za tick, před <c>Tick()</c>.
+        /// Výchozí implementace je no-op — pro testovací stuby.
+        /// </summary>
+        void SetAmbientContext(double ambientTempC, CelestialContext? celestial) { }
 
         bool EqualsByIdentity(IHuman? other) => other is not null && Id == other.Id;
     }
@@ -181,5 +189,12 @@ namespace GameEngineTools.Characters.Core
         /// &gt;2000 m → hypoxie (Energy↓, CogLoad↑). &gt;4000 m → AMS (Pain↑).
         /// Výchozí 0 = hladina moře.
         /// </summary>
-        double AltitudeMeters = 0.0);
+        double AltitudeMeters = 0.0,
+        /// <summary>
+        /// Astronomický kontext pro aktuální tick — ozáření, délka dne, východ/západ Slunce,
+        /// sezóna a teplota prostředí. Nastaveno <see cref="SimulationScene"/> přes
+        /// <see cref="IHuman.SetAmbientContext"/> před tickem každé postavy.
+        /// <c>null</c> pokud astronomická logika není nakonfigurována.
+        /// </summary>
+        CelestialContext? Celestial = null);
 }

@@ -7,6 +7,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
+    using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;
 
@@ -212,6 +213,18 @@ namespace GameEngineTools.World.Simulation
         public Action<NarrativeEntry>? OnNarrative { get; init; }
 
         #endregion Narativní výstup
+
+        #region Astronomický kontext
+
+        /// <summary>
+        /// Volitelná konfigurace astronomické logiky (sluneční model).
+        /// Pokud nastavena, scéna před každým tickem postav vypočítá
+        /// <see cref="CelestialContext"/> a injektuje ho přes
+        /// <see cref="IHuman.SetAmbientContext"/>.
+        /// </summary>
+        public AstroConfig? AstroConfig { get; init; }
+
+        #endregion Astronomický kontext
 
         #region Sleep handling
 

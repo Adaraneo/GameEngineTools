@@ -126,9 +126,25 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double BoneFragilityInjuryMultiplier = 0.5,
         // Spánek a věk
         double AgeSleepQualityThreshold = 50.0,
-        double AgeSleepQualityPenaltyPerYear = 0.008)
+        double AgeSleepQualityPenaltyPerYear = 0.008,
+        // Sluneční světlo — restaurace vitaminu D
+        /// <summary>
+        /// Minimální <c>IrradianceFactor</c> ze <see cref="CelestialContext"/>, při kterém
+        /// se vitamín D obnovuje (pod touto hodnotou záření nestačí ke kožní syntéze).
+        /// </summary>
+        double VitaminDSunThreshold = 0.3,
+        /// <summary>
+        /// Rychlost obnovy vitaminu D (0..100) na hodinu na jednotku <c>IrradianceFactor</c>
+        /// při pobytu venku (SurfaceKind.Public nebo Social).
+        /// </summary>
+        double VitaminDRestorationPerHourPerIrradiance = 4.0,
+        /// <summary>
+        /// Maximální obnova vitaminu D za hodinu bez ohledu na výši ozáření.
+        /// Chrání před nerealistickými hodnotami při velmi vysokém <c>IrradianceFactor</c>.
+        /// </summary>
+        double VitaminDMaxOutdoorRestorationPerHour = 6.0)
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0, 0.00175, 30.0, 0.02, 0.0001, 25.0, 0.005, 70.0, 0.0005, 0.15, 0.00002, 25.0, 0.5, 0.001, 30.0, 0.005, 0.3, 30.0, 0.005, 2.5, 0.5, 50.0, 0.008) { }
+        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0, 0.00175, 30.0, 0.02, 0.0001, 25.0, 0.005, 70.0, 0.0005, 0.15, 0.00002, 25.0, 0.5, 0.001, 30.0, 0.005, 0.3, 30.0, 0.005, 2.5, 0.5, 50.0, 0.008, 0.3, 4.0, 6.0) { }
     }
 
     public sealed record PhysiologyState(
