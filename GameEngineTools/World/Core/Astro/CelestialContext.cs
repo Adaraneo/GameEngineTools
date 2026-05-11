@@ -40,4 +40,10 @@ public sealed record CelestialContext(
     double VernalPhase,
     bool IsDay,
     double BaseAmbientTempCelsius,
-    double SurfaceGravityVsEarth = 1.0);
+    double SurfaceGravityVsEarth = 1.0,
+    /// <summary>
+    /// Fáze slapového cyklu primárního měsíce [0..1].
+    /// 0 = nov (měsíc mezi planetou a hvězdou), 0.5 = úplněk.
+    /// <c>null</c> pokud planeta nemá měsíc nebo astronomická logika není nakonfigurována.
+    /// </summary>
+    double? TidalPhase = null);

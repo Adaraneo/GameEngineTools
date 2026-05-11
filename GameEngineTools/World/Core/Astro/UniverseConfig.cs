@@ -39,9 +39,26 @@ public sealed record UniverseConfig(
     double PlanetAtmospherePressureBar       = 1.013,
     string PlanetAtmosphere                  = "EarthLike",
     string PlanetArchetype                   = "RockyTerrestrial",
-    double PlanetMagneticFieldStrengthVsEarth = 1.0)
+    double PlanetMagneticFieldStrengthVsEarth = 1.0,
+
+    // ── Primární měsíc — výchozí: Luna ───────────────────────────────────────
+    bool   HasMoon                            = false,
+    double MoonMassKg                         = 7.342e22,
+    double MoonMeanRadiusKm                   = 1_737.4,
+    double MoonOrbitalDistanceKm              = 384_400,
+    double MoonOrbitalEccentricity            = 0.0549,
+    double MoonOrbitalInclinationDeg          = 5.145,
+    double MoonAlbedo                         = 0.12,
+    bool   MoonTidallyLocked                  = true,
+
+    // ── Prstencový systém — výchozí: žádné prstence ──────────────────────────
+    bool   HasRings                           = false,
+    double RingInnerRadiusKm                  = 0.0,
+    double RingOuterRadiusKm                  = 0.0,
+    double RingMeanOpticalDepth               = 1.0,
+    double RingAlbedo                         = 0.7)
 {
-    /// <summary>Výchozí konstruktor — hodnoty Země/Sol.</summary>
+    /// <summary>Výchozí konstruktor — hodnoty Země/Sol, bez měsíce a prstenců.</summary>
     public UniverseConfig() : this(
         StarSpectralType:                  "G2 V",
         StarMassKg:                        1.9885e30,
@@ -62,7 +79,20 @@ public sealed record UniverseConfig(
         PlanetAtmospherePressureBar:       1.013,
         PlanetAtmosphere:                  "EarthLike",
         PlanetArchetype:                   "RockyTerrestrial",
-        PlanetMagneticFieldStrengthVsEarth: 1.0) { }
+        PlanetMagneticFieldStrengthVsEarth: 1.0,
+        HasMoon:                           false,
+        MoonMassKg:                        7.342e22,
+        MoonMeanRadiusKm:                  1_737.4,
+        MoonOrbitalDistanceKm:             384_400,
+        MoonOrbitalEccentricity:           0.0549,
+        MoonOrbitalInclinationDeg:         5.145,
+        MoonAlbedo:                        0.12,
+        MoonTidallyLocked:                 true,
+        HasRings:                          false,
+        RingInnerRadiusKm:                 0.0,
+        RingOuterRadiusKm:                 0.0,
+        RingMeanOpticalDepth:              1.0,
+        RingAlbedo:                        0.7) { }
 
     /// <summary>Sestaví <see cref="StarPhysics"/> z flat properties.</summary>
     public StarPhysics ToStarPhysics() => new(
@@ -99,5 +129,54 @@ public sealed record UniverseConfig(
         OceanFraction                = 0.5,
         LandFraction                 = 0.5,
         HasPlateTectonics            = true,
+        PrimaryMoon                  = ToMoon(),
+        Rings                        = ToRingSystem(),
     };
+
+    /// <summary>
+    /// Sestaví primární měsíc z flat properties.
+    /// Vrátí <c>null</c> pokud <see cref="HasMoon"/> je <c>false</c>.
+    /// </summary>
+    public (MoonPhysics Physics, MoonOrbit Orbit)? ToMoon()
+    {
+        if (!HasMoon) return null;
+        return (
+            new MoonPhysics(
+                MassKg:              MoonMassKg,
+                MeanRadiusKm:        MoonMeanRadiusKm,
+                EquatorialRadiusKm:  MoonMeanRadiusKm,
+                PolarRadiusKm:       MoonMeanRadiusKm,
+                MeanDensityKgM3:     0,
+                SurfaceGravityMs2:   0,
+                EscapeVelocityKms:   0,
+                ObliquityDeg:        0,
+                SiderealRotationHrs: 0,
+                Albedo:              MoonAlbedo,
+                TidallyLocked:       MoonTidallyLocked,
+                OrbitalResonance:    null,
+                HasSubsurfaceOcean:  false),
+            new MoonOrbit(
+                SemiMajorAxisKm:  MoonOrbitalDistanceKm,
+                Eccentricity:     MoonOrbitalEccentricity,
+                InclinationDeg:   MoonOrbitalInclinationDeg,
+                LongAscNodeDeg:   0,
+                ArgPeriapsisDeg:  0,
+                MeanLongitudeDeg: 0,
+                IsRetrograde:     false));
+    }
+
+    /// <summary>
+    /// Sestaví prstencový systém z flat properties.
+    /// Vrátí <c>null</c> pokud <see cref="HasRings"/> je <c>false</c>.
+    /// </summary>
+    public RingSystem? ToRingSystem()
+    {
+        if (!HasRings || RingOuterRadiusKm <= RingInnerRadiusKm) return null;
+        return new RingSystem(
+            PlanetName,
+            PlanetEquatorialRadiusKm,
+            PhysicalConstants.G * PlanetMassKg,
+            new[] { new RingBand("Main", RingInnerRadiusKm, RingOuterRadiusKm,
+                                 RingMeanOpticalDepth, RingAlbedo) });
+    }
 }

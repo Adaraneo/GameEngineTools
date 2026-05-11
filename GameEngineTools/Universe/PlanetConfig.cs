@@ -93,6 +93,19 @@ public record PlanetConfig
 
     #endregion
 
+    #region Moon and ring system
+
+    /// <summary>
+    /// Volitelný primární měsíc — nejhmotnější těleso na oběžné dráze planety.
+    /// <c>null</c> = planeta bez měsíce.
+    /// </summary>
+    public (MoonPhysics Physics, MoonOrbit Orbit)? PrimaryMoon { get; init; }
+
+    /// <summary>Volitelný prstencový systém. <c>null</c> = žádné prstence.</summary>
+    public RingSystem? Rings { get; init; }
+
+    #endregion
+
     #region Computed physical properties
 
     /// <summary>Standard gravitational parameter μ = GM [m³ s⁻²].</summary>
@@ -140,6 +153,30 @@ public record PlanetConfig
         LandFraction                  = 0.29,
         HasPlateTectonics             = true,
         MagneticFieldStrengthVsEarth  = 1.0,
+        PrimaryMoon = (
+            new MoonPhysics(
+                MassKg:             7.342e22,
+                MeanRadiusKm:       1_737.4,
+                EquatorialRadiusKm: 1_738.1,
+                PolarRadiusKm:      1_736.0,
+                MeanDensityKgM3:    3_346.4,
+                SurfaceGravityMs2:  1.62,
+                EscapeVelocityKms:  2.38,
+                ObliquityDeg:       6.68,
+                SiderealRotationHrs: 655.7,
+                Albedo:             0.12,
+                TidallyLocked:      true,
+                OrbitalResonance:   null,
+                HasSubsurfaceOcean: false),
+            new MoonOrbit(
+                SemiMajorAxisKm:  384_400,
+                Eccentricity:     0.0549,
+                InclinationDeg:   5.145,
+                LongAscNodeDeg:   0,
+                ArgPeriapsisDeg:  0,
+                MeanLongitudeDeg: 0,
+                IsRetrograde:     false)),
+        Rings = null,
     };
 
     #endregion

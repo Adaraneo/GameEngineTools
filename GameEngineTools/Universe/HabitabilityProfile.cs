@@ -80,7 +80,8 @@ public static class HabitabilityCalculator
         double grav    = GravityScore(planet.SurfaceGravityVsEarth);
         double atm     = AtmosphereScore(planet.AtmospherePressureBar, planet.Atmosphere);
         double mag     = MagneticScore(planet.MagneticFieldStrengthVsEarth);
-        double climate = ClimateStabilityScore(planet.ObliquityDeg, orbit.Eccentricity, planet.IsTidallyLocked);
+        double climate = ClimateStabilityScore(planet.ObliquityDeg, orbit.Eccentricity,
+                             planet.IsTidallyLocked, planet.PrimaryMoon, planet.MassKg);
 
         double tempK = star.EquilibriumTempK(orbit.SemiMajorAxisAu, planet.Albedo)
                      + planet.GreenhouseWarmingK;
@@ -142,7 +143,12 @@ public static class HabitabilityCalculator
          : fieldVsEarth >= 0.01 ? 0.4
          : 0.1;
 
-    private static double ClimateStabilityScore(double obliquityDeg, double eccentricity, bool tidallyLocked)
+    private static double ClimateStabilityScore(
+        double obliquityDeg,
+        double eccentricity,
+        bool   tidallyLocked,
+        (MoonPhysics Physics, MoonOrbit Orbit)? primaryMoon = null,
+        double planetMassKg = PhysicalConstants.EarthMassKg)
     {
         if (tidallyLocked) return 0.5;
         double oblScore = obliquityDeg < 35 ? 1.0
@@ -151,7 +157,18 @@ public static class HabitabilityCalculator
         double eccScore = eccentricity < 0.2  ? 1.0
                         : eccentricity < 0.4  ? 0.7
                         : eccentricity < 0.6  ? 0.4 : 0.1;
-        return oblScore * eccScore;
+        double baseScore = oblScore * eccScore;
+
+        // Velký měsíc stabilizuje sklon osy → bonus ke klimatické stabilitě
+        if (primaryMoon is { } moon)
+        {
+            var stab  = MoonHabitabilityEffects.ObliquityStabilisationStrength(
+                moon.Physics.MassKg, moon.Orbit.SemiMajorAxisKm, planetMassKg);
+            var bonus = Math.Min(0.15, stab * 0.15);   // max +15 % za Luně-ekvivalentní měsíc
+            baseScore = Math.Min(1.0, baseScore + bonus);
+        }
+
+        return baseScore;
     }
 
     private static IReadOnlyList<string> ComputeLimitingFactors(

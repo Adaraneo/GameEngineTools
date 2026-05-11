@@ -103,6 +103,39 @@ internal sealed class CelestialContextComputer
         var tempC     = meanTempC
                       + cfg.SeasonalAmplitudeCelsius * Math.Sin(seasonFrac * 2.0 * Math.PI - Math.PI / 2.0);
 
+        // ── Primární měsíc — slapová fáze ─────────────────────────────────────────
+        double? tidalPhase = null;
+        if (planet.PrimaryMoon is { } moon)
+        {
+            var moonPeriodSec  = moon.Orbit.OrbitalPeriodSeconds(planet.GravitationalParameter);
+            var elapsedSec     = dayIdx * secondsPerWorldDay;
+            tidalPhase         = elapsedSec % moonPeriodSec / moonPeriodSec;   // 0..1
+        }
+
+        // ── Prstencový systém — shadow belt + polární záře ─────────────────────────
+        if (planet.Rings is { } rings)
+        {
+            var materialBands = rings.Bands.Where(b => !b.IsGap).ToList();
+            if (materialBands.Count > 0)
+            {
+                // Shadow belt blokuje část přímého záření
+                var maxOpticalDepth = materialBands.Max(b => b.MeanOpticalDepth);
+                var shadowLat       = RingSystem.ShadowBeltLatitudeDeg(planet.ObliquityDeg, seasonFrac);
+                var shadowFrac      = RingSystem.ShadowFraction(cfg.LatitudeDeg, shadowLat, maxOpticalDepth);
+                irradiance         *= (1.0 - shadowFrac);
+
+                // Polární záře v noci — prsteny odrážejí hvězdné světlo k pólům
+                if (irradiance <= 0.0 && Math.Abs(cfg.LatitudeDeg) > 60)
+                {
+                    var starFlux     = star.IrradianceAtAu(orbitAu);
+                    var refFlux      = star.IrradianceAtAu(1.0);           // normalizační reference
+                    var avgAlbedo    = materialBands.Average(b => b.AlbedoGeometric);
+                    var ringGlowW    = rings.ApproximatePolarRingGlow(starFlux, avgAlbedo);
+                    irradiance       = refFlux > 0.0 ? ringGlowW / refFlux : 0.0;
+                }
+            }
+        }
+
         return new CelestialContext(
             IrradianceFactor:       irradiance,
             DaylightHours:          daylight,
@@ -113,6 +146,7 @@ internal sealed class CelestialContextComputer
             VernalPhase:            cfg.VernalPhase,
             IsDay:                  irradiance > 0.0,
             BaseAmbientTempCelsius: tempC,
-            SurfaceGravityVsEarth:  planet.SurfaceGravityVsEarth);
+            SurfaceGravityVsEarth:  planet.SurfaceGravityVsEarth,
+            TidalPhase:             tidalPhase);
     }
 }
