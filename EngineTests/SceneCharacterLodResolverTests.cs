@@ -177,6 +177,10 @@ namespace EngineTests
             public void RestoreSnapshot(EnginesSnapshot snapshot)
             {
             }
+
+            public void FlushInbox()
+            {
+            }
         }
 
         #endregion Test doubles

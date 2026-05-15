@@ -317,6 +317,21 @@ namespace GameEngineTools.Characters.Core
             _semanticMemory.RestoreState(snapshot.SemanticMemory ?? SemanticMemoryState.Empty);
         }
 
+        /// <inheritdoc/>
+        public void FlushInbox()
+        {
+            if (_inbox.IsEmpty) return;
+
+            var outbox = new EventCollector();
+            while (_inbox.TryDequeue(out var ev))
+            {
+                SafeHandle(ev, outbox);
+            }
+
+            // Rebuild snapshot so Snapshot.Relationships reflects the seeded edges.
+            RefreshSnapshot();
+        }
+
         #endregion IHuman — public API
 
         #region Phase A — Handle

@@ -667,6 +667,10 @@ namespace EngineTests
             public void Tick(WDateTime now, WTimeSpan dt) { }
             public void ReceiveEvent(IDomainEvent @event) { }
             public void RestoreSnapshot(EnginesSnapshot snapshot) => Snapshot = snapshot;
+
+            public void FlushInbox()
+            {
+            }
         }
     }
 }

@@ -214,6 +214,7 @@ namespace EngineTests
             public void Tick(WDateTime now, WTimeSpan dt) { }
             public void ReceiveEvent(IDomainEvent @event) { }
             public void RestoreSnapshot(EnginesSnapshot snapshot) { }
+            public void FlushInbox() { }
         }
 
         private sealed class NeverConflictRandom : IRandomSource

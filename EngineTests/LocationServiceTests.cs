@@ -659,6 +659,11 @@ namespace EngineTests
                 throw new NotImplementedException();
             }
 
+            public void FlushInbox()
+            {
+                throw new NotImplementedException();
+            }
+
             #endregion IHuman
         }
 

@@ -63,6 +63,13 @@ namespace GameEngineTools.Characters.Core
         void RestoreSnapshot(EnginesSnapshot snapshot);
 
         /// <summary>
+        /// Immediately processes all queued inbox events without advancing time.
+        /// Use at world-setup time after FamilyBuilder.Wire() to make seeded edges
+        /// immediately visible in Snapshot.Relationships.
+        /// </summary>
+        void FlushInbox();
+
+        /// <summary>
         /// Injektuje ambientní stav prostředí před tickem postavy.
         /// Volá <see cref="SimulationScene"/> jednou za tick, před <c>Tick()</c>.
         /// Výchozí implementace je no-op — pro testovací stuby.

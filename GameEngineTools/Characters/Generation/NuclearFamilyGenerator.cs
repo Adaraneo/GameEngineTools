@@ -265,6 +265,7 @@ namespace GameEngineTools.Characters.Generation
         private static void BumpInteractionCount(IHuman owner, HumanId targetId, int bonus, WDateTime now)
         {
             owner.ReceiveEvent(new FamilyInteractionCountAdjusted(now, owner.Id, targetId, bonus));
+            owner.FlushInbox();
         }
 
         /// <summary>

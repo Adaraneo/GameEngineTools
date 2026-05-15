@@ -569,6 +569,10 @@ namespace EngineTests
             {
                 Snapshot = snapshot;
             }
+
+            public void FlushInbox()
+            {
+            }
         }
 
         #endregion Test doubles
