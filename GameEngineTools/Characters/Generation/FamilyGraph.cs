@@ -117,6 +117,73 @@ namespace GameEngineTools.Characters.Generation
         public bool AreRelated(HumanId a, HumanId b, KinRole role)
             => GetKin(a).Any(k => k.RelativeId == b && k.Role == role);
 
+
+        /// <summary>
+        /// Returns all character IDs that share the given family name
+        /// AND have at least one registered kin bond — i.e. are actual clan members.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the preferred method for querying clan membership.
+        /// Unlike <see cref="GetByName"/>, it excludes characters who merely share
+        /// the surname by coincidence (e.g. a randomly generated stranger named "Jan Ventifer"
+        /// who has no family connections within the scene).
+        /// </para>
+        /// <para>
+        /// A character is considered a clan member when they are registered under
+        /// <paramref name="familyName"/> AND their kin link list is non-empty.
+        /// The kin links are populated exclusively by <see cref="FamilyBuilder"/> —
+        /// so only characters who were explicitly wired into a family structure qualify.
+        /// </para>
+        /// </remarks>
+        /// <param name="familyName">
+        /// The male form of the surname (e.g. <c>"Ventifer"</c>).
+        /// Lookup is case-insensitive.
+        /// </param>
+        /// <returns>
+        /// Read-only list of <see cref="HumanId"/> values for confirmed clan members,
+        /// or an empty list when no such members exist.
+        /// </returns>
+        public IReadOnlyList<HumanId> GetClanMembers(string familyName)
+        {
+            if (!_byName.TryGetValue(familyName, out var members))
+            {
+                return Array.Empty<HumanId>();
+            }
+
+            // Filter to only those who have at least one KinLink registered —
+            // meaning FamilyBuilder explicitly wired them into a family.
+            return members
+                .Where(id => _byCharacter.TryGetValue(id, out var links) && links.Count > 0)
+                .ToList()
+                .AsReadOnly();
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when the character belongs to the named clan —
+        /// i.e. shares the surname AND has at least one registered kin bond.
+        /// </summary>
+        /// <param name="characterId">The character to check.</param>
+        /// <param name="familyName">
+        /// The male form of the surname (e.g. <c>"Ventifer"</c>).
+        /// Lookup is case-insensitive.
+        /// </param>
+        /// <returns>
+        /// <c>true</c> if the character is a confirmed clan member; <c>false</c> otherwise.
+        /// </returns>
+        public bool IsClanMember(HumanId characterId, string familyName)
+        {
+            if (!_byName.TryGetValue(familyName, out var members))
+            {
+                return false;
+            }
+
+            // Must be in the surname bucket AND have at least one kin link.
+            return members.Contains(characterId)
+                && _byCharacter.TryGetValue(characterId, out var links)
+                && links.Count > 0;
+        }
+
         #endregion Public queries
 
         #region Mutations
