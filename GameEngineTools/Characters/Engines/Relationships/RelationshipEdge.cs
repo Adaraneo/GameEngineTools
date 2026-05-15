@@ -114,5 +114,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// acts (PositiveAct observed, meaningful SelfDisclosure). Drives voluntary approach and
         /// social copying. Cheng et al. (2013, JPSP); Redhead et al. (2019, R. Soc. Open Sci.)
         /// </summary>
-        double PerceivedPrestige = 50);
+        double PerceivedPrestige = 50,
+        /// <summary>
+        /// Identifies the family bond type on this directed edge.
+        /// Set once by <see cref="GameEngineTools.Characters.Generation.FamilyBuilder"/>
+        /// at world-setup time; never mutated by runtime engines.
+        /// Defaults to <see cref="KinRole.None"/> for all ordinary social edges.
+        /// </summary>
+        KinRole KinRole = KinRole.None);
 }

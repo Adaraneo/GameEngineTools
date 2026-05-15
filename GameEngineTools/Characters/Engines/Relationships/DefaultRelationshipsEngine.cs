@@ -613,6 +613,23 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                         break;
                     }
+
+                case FamilyBondSeeded fbs when fbs.OwnerId == self:
+                    {
+                        var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges)
+                        {
+                            [fbs.TargetId] = fbs.Edge
+                        };
+
+                        State = new RelationshipState(dict);
+
+                        using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: fbs.TargetId.Value))
+                        {
+                            _log.RelEdgeCreated(self.Value.ToString(), self.Value.ToString(), fbs.TargetId.Value.ToString());
+                        }
+
+                        break;
+                    }
             }
         }
 
