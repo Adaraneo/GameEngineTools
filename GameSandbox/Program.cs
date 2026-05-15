@@ -45,7 +45,7 @@ var initTicks = File.Exists(gameTimePath) && long.TryParse(File.ReadAllText(game
 
 // ── Runtime ───────────────────────────────────────────────────────────────────
 await using var runtime = await GameEngineToolsRuntime.StartAsync(
-    consoleLogs: false,
+    consoleLogs: true,
     writeTextLogs: false,
     generatedFileOptions: new GeneratedFileOptions
     {
