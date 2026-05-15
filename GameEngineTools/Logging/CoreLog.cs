@@ -704,6 +704,73 @@ namespace GameEngineTools.Logging
 
         #endregion Relationships — vztahy
 
+        #region Goals — 1300–1399
+
+        /// <summary>Goal activated — new persistent goal entered the active list.</summary>
+        [LoggerMessage(
+            EventId = 1300,
+            Level = LogLevel.Information,
+            Message = "[GOAL] {HumanId} Goal activated: {Kind} (origin={Origin}, salience={Salience:F2})")]
+        public static partial void GoalActivated(
+            this ILogger logger,
+            string HumanId,
+            string Kind,
+            string Origin,
+            double Salience);
+
+        /// <summary>Goal salience or progress changed meaningfully.</summary>
+        [LoggerMessage(
+            EventId = 1301,
+            Level = LogLevel.Debug,
+            Message = "[GOAL] {HumanId} {Kind} salience {OldSalience:F2}->{NewSalience:F2} progress {OldProgress:F2}->{NewProgress:F2}")]
+        public static partial void GoalProgressed(
+            this ILogger logger,
+            string HumanId,
+            string Kind,
+            double OldSalience,
+            double NewSalience,
+            double OldProgress,
+            double NewProgress);
+
+        /// <summary>Goal resolved — completed, abandoned, faded, or displaced.</summary>
+        [LoggerMessage(
+            EventId = 1302,
+            Level = LogLevel.Information,
+            Message = "[GOAL] {HumanId} Goal resolved: {Kind} → {Resolution} (progress={Progress:F2}, frustration={Frustration:F2})")]
+        public static partial void GoalResolved(
+            this ILogger logger,
+            string HumanId,
+            string Kind,
+            string Resolution,
+            double Progress,
+            double Frustration);
+
+        /// <summary>Goal bias applied to a behavior candidate.</summary>
+        [LoggerMessage(
+            EventId = 1303,
+            Level = LogLevel.Debug,
+            Message = "[GOAL] {HumanId} Bias applied to {Action}: +{Bias:F2} from goal {Kind} (salience={Salience:F2})")]
+        public static partial void GoalBiasApplied(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            double Bias,
+            string Kind,
+            double Salience);
+
+        /// <summary>Goal seeded from personality at character creation.</summary>
+        [LoggerMessage(
+            EventId = 1304,
+            Level = LogLevel.Debug,
+            Message = "[GOAL] {HumanId} Seeded {Kind} from personality (salience={Salience:F2})")]
+        public static partial void GoalSeededFromPersonality(
+            this ILogger logger,
+            string HumanId,
+            string Kind,
+            double Salience);
+
+        #endregion Goals — 1300–1399
+
         #region Scheduler a infrastruktura
 
         /// <summary>Scheduler byl spuštěn.</summary>

@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Core
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using Characters.Engines.Behavior;
+    using Characters.Engines.Goals;
     using Characters.Engines.Interactions;
     using Characters.Engines.Physiology;
     using Characters.Engines.Psychology;
@@ -203,5 +204,10 @@ namespace GameEngineTools.Characters.Core
         /// <see cref="IHuman.SetAmbientContext"/> před tickem každé postavy.
         /// <c>null</c> pokud astronomická logika není nakonfigurována.
         /// </summary>
-        CelestialContext? Celestial = null);
+        CelestialContext? Celestial = null,
+        /// <summary>
+        /// Persistent long-term goals for this character.
+        /// <c>null</c> for characters created before this field existed (backward compatibility).
+        /// </summary>
+        GoalState? Goals = null);
 }

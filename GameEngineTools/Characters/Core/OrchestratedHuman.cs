@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Core
 {
     using System.Collections.Concurrent;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
@@ -108,6 +109,7 @@ namespace GameEngineTools.Characters.Core
         private readonly IRelationshipsEngine _relations;
         private readonly IMemoryEngine _memory;
         private readonly ISemanticMemoryEngine _semanticMemory;
+        private readonly IGoalEngine _goal;
 
         // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
         private readonly ConcurrentQueue<IDomainEvent> _inbox = new();
@@ -146,6 +148,8 @@ namespace GameEngineTools.Characters.Core
         /// <param name="interact">Interaction engine instance.</param>
         /// <param name="relations">Relationships engine instance.</param>
         /// <param name="memory">Memory engine instance.</param>
+        /// <param name="semanticMemory">Semantic memory engine instance.</param>
+        /// <param name="goal">Goal engine instance.</param>
         /// <param name="initialSnapshot">Initial engine snapshot (provided by the factory).</param>
         public OrchestratedHuman(
             HumanId id,
@@ -167,6 +171,7 @@ namespace GameEngineTools.Characters.Core
             IRelationshipsEngine relations,
             IMemoryEngine memory,
             ISemanticMemoryEngine semanticMemory,
+            IGoalEngine goal,
             // initial snapshot (from factory)
             EnginesSnapshot initialSnapshot,
             // optional behavior cadence override
@@ -192,6 +197,7 @@ namespace GameEngineTools.Characters.Core
             _relations = relations;
             _memory = memory;
             _semanticMemory = semanticMemory;
+            _goal = goal;
 
             Snapshot = initialSnapshot;
             _behaviorCadencePolicy = behaviorCadencePolicy;
@@ -286,6 +292,7 @@ namespace GameEngineTools.Characters.Core
             _relations.Tick(now, dt, _ctx, outbox);
             _memory.Tick(now, dt, _ctx, outbox);
             _semanticMemory.Tick(now, dt, _ctx, outbox);
+            _goal.Tick(now, dt, _ctx, outbox);
 
             // Final snapshot after all Phase B engines complete.
             RefreshSnapshot();
@@ -315,6 +322,7 @@ namespace GameEngineTools.Characters.Core
             _relations.RestoreState(snapshot.Relationships);
             _memory.RestoreState(snapshot.Memory);
             _semanticMemory.RestoreState(snapshot.SemanticMemory ?? SemanticMemoryState.Empty);
+            _goal.RestoreState(snapshot.Goals ?? GoalState.Empty);
         }
 
         /// <inheritdoc/>
@@ -421,6 +429,7 @@ namespace GameEngineTools.Characters.Core
             try { _relations.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Relationships.Handle failed.", Id.Value); }
             try { _memory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
             try { _semanticMemory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SemanticMemory.Handle failed.", Id.Value); }
+            try { _goal.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Goal.Handle failed.", Id.Value); }
         }
 
         private void Deliver(IEventCollector collector)
@@ -487,7 +496,8 @@ namespace GameEngineTools.Characters.Core
                 _semanticMemory.State,
                 AmbientTemperature: prev.AmbientTemperature,
                 AltitudeMeters:     prev.AltitudeMeters,
-                Celestial:          prev.Celestial);
+                Celestial:          prev.Celestial,
+                Goals:              _goal.State);
 
             _ctx.Snapshot = Snapshot;
         }

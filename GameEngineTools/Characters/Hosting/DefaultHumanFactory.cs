@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Hosting
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
@@ -123,18 +124,23 @@ namespace GameEngineTools.Characters.Hosting
             var rel = _sp.GetRequiredService<IRelationshipsEngine>();
             var mem = _sp.GetRequiredService<IMemoryEngine>();
             var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
+            var goal = _sp.GetRequiredService<IGoalEngine>();
 
             // Initial snapshot — State is always valid immediately after factory creation
             var snapshot = new EnginesSnapshot(
-                physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State);
+                physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
+                Goals: goal.State);
 
-            return new OrchestratedHuman(
+            var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.PhysicalAppearance,
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
-                physio, psych, behav, inter, rel, mem, semantic,
+                physio, psych, behav, inter, rel, mem, semantic, goal,
                 snapshot,
                 _behaviorCadencePolicy);
+
+            goal.SeedFromPersonality(b.Personality, _clock.Now);
+            return human;
         }
 
         #endregion IHumanFactory

@@ -4,6 +4,7 @@
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
+using GameEngineTools.Characters.Engines.Goals;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Physiology;
@@ -45,6 +46,7 @@ namespace GameEngineTools.Characters.Hosting
             services.TryAddSingleton<IPerceptionFidelityPolicy, DefaultPerceptionFidelityPolicy>();
             services.TryAddSingleton<ISocialFidelityPolicy, DefaultSocialFidelityPolicy>();
             services.TryAddSingleton<IHumanFactory, DefaultHumanFactory>();
+            services.TryAddTransient<IGoalEngine, DefaultGoalEngine>();
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();
             lodOb.BindConfiguration("Characters:Lod");
@@ -313,6 +315,26 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
+        /// <summary>Registrace implementace Goal engine + jeho konfigurace přes Options.</summary>
+        public static IServiceCollection AddGoalEngine<TImpl>(
+            this IServiceCollection services,
+            Action<GoalConfig>? configure = null)
+            where TImpl : class, IGoalEngine
+        {
+            services.AddTransient<IGoalEngine, TImpl>();
+            var ob = services.AddOptions<GoalConfig>();
+            if (configure != null)
+            {
+                ob.Configure(configure);
+            }
+            else
+            {
+                ob.BindConfiguration("Characters:Goals");
+            }
+
+            return services;
+        }
+
         #endregion Engine registrace
 
         #region Zkrácená registrace všeho najednou
@@ -358,6 +380,36 @@ namespace GameEngineTools.Characters.Hosting
                     .AddRelationshipsEngine<TRel>(rel)
                     .AddMemoryEngine<TMem>(mem)
                     .AddSemanticMemoryEngine<TSem>(semantic);
+
+            return services;
+        }
+
+        /// <summary>
+        /// Zkrácená registrace všech enginů najednou, včetně goal enginu.
+        /// </summary>
+        public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem, TGoal>(
+            this IServiceCollection services,
+            Action<PhysiologyConfig>? physio = null,
+            Action<PsychologyConfig>? psych = null,
+            Action<BehaviorConfig>? behav = null,
+            Action<SleepConfig>? sleep = null,
+            Action<InteractionConfig>? inter = null,
+            Action<RelationshipsConfig>? rel = null,
+            Action<MemoryConfig>? mem = null,
+            Action<SemanticMemoryConfig>? semantic = null,
+            Action<GoalConfig>? goal = null)
+            where TPhysio : class, IPhysiologyEngine
+            where TPsych : class, IPsychologyEngine
+            where TBehav : class, IBehaviorEngine
+            where TInter : class, IInteractionEngine
+            where TRel : class, IRelationshipsEngine
+            where TMem : class, IMemoryEngine
+            where TSem : class, ISemanticMemoryEngine
+            where TGoal : class, IGoalEngine
+        {
+            services.AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem>(
+                physio, psych, behav, sleep, inter, rel, mem, semantic);
+            services.AddGoalEngine<TGoal>(goal);
 
             return services;
         }
