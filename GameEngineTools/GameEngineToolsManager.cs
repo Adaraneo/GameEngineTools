@@ -126,13 +126,14 @@ namespace GameEngineTools
         /// Vygeneruje náhodnou postavu s věkem v zadaném rozsahu.
         /// </summary>
         /// <param name="maxAge">Maximální věk v letech.</param>
+        /// <param name="sexBiology">Pohlaví, pokud je nastaveno na null, vybere se náhodně.</param>
         /// <param name="minAge">Minimální věk v letech (výchozí 0).</param>
         /// <returns>Nová náhodně vygenerovaná postava.</returns>
         /// <remarks>
         /// Datum narození se náhodně volí uvnitř okna odvozeného od aktuálního
         /// herního času a zadaného věkového rozsahu.
         /// </remarks>
-        public IHuman RandomizePerson(int maxAge, int minAge = 0)
+        public IHuman RandomizePerson(int maxAge, SexBiology? sexBiology, int minAge = 0)
         {
             var now = _clock.Now;
             var year = now.Year;
@@ -157,7 +158,8 @@ namespace GameEngineTools
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
                 new HumanBlueprintRequest(
                     MinBirthDate: minBirth,
-                    MaxBirthDate: maxBirth));
+                    MaxBirthDate: maxBirth,
+                    Sex: sexBiology));
 
             return factory.Create(hpb);
         }

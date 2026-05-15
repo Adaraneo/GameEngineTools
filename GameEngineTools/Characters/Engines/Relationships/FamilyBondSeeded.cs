@@ -31,14 +31,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
     /// existing edge for <see cref="TargetId"/>.
     /// </para>
     /// </remarks>
+    /// <param name="OccurredAt">World time at which the bond was seeded (world setup time).</param>
     /// <param name="OwnerId">The character whose graph receives the edge (the observer).</param>
     /// <param name="TargetId">The character being described by the edge (the target).</param>
     /// <param name="Edge">The pre-built edge to inject.</param>
     public sealed record FamilyBondSeeded(
+        WDateTime OccurredAt,
         HumanId OwnerId,
         HumanId TargetId,
-        RelationshipEdge Edge) : IDomainEvent
-    {
-        public WDateTime OccurredAt => Edge.LastContactTime.GetValueOrDefault();
-    }
+        RelationshipEdge Edge) : IDomainEvent;
 }

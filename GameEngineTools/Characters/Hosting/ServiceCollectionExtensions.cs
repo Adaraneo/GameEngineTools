@@ -103,6 +103,27 @@ namespace GameEngineTools.Characters.Hosting
         }
 
         /// <summary>
+        /// Registers the family generation and topology services.
+        /// </summary>
+        /// <remarks>
+        /// Call after <c>AddCharacterGeneration()</c> — NuclearFamilyGenerator depends
+        /// on IHumanBlueprintGenerator, IChildBlueprintGenerator, and IHumanFactory
+        /// which are registered there.
+        /// </remarks>
+        public static IServiceCollection AddFamilySystem(this IServiceCollection services)
+        {
+            // Central family registry — one instance per scene lifetime.
+            // Holds surname → members and character → kin links indexes.
+            services.AddSingleton<FamilyGraph>();
+
+            // Orchestrates parent generation, genetic child inheritance,
+            // and FamilyBuilder edge seeding in a single call.
+            services.AddSingleton<NuclearFamilyGenerator>();
+
+            return services;
+        }
+
+        /// <summary>
         /// Sdílená registrace generátorů — volaná oběma overloady <c>AddCharacterGeneration</c>.
         /// </summary>
         private static IServiceCollection AddCharacterGenerationCore(this IServiceCollection services)

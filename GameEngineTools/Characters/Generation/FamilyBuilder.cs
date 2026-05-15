@@ -92,8 +92,8 @@ namespace GameEngineTools.Characters.Generation
             }
 
             // ── Partner bond (bidirectional) ──────────────────────────────────
-            SeedEdge(partnerA, partnerB, BuildPartnerEdge(partnerA.Id, partnerB.Id, partnerB.Biology, now));
-            SeedEdge(partnerB, partnerA, BuildPartnerEdge(partnerB.Id, partnerA.Id, partnerA.Biology, now));
+            SeedEdge(partnerA, partnerB, BuildPartnerEdge(partnerA.Id, partnerB.Id, partnerB.Biology, now), now);
+            SeedEdge(partnerB, partnerA, BuildPartnerEdge(partnerB.Id, partnerA.Id, partnerA.Biology, now), now);
             graph.AddKinLink(partnerA.Id, partnerB.Id, KinRole.Partner);
             graph.AddKinLink(partnerB.Id, partnerA.Id, KinRole.Partner);
 
@@ -105,10 +105,10 @@ namespace GameEngineTools.Characters.Generation
                     continue;
                 }
 
-                SeedEdge(partnerA, child, BuildParentToChildEdge(partnerA.Id, child.Id, now));
-                SeedEdge(partnerB, child, BuildParentToChildEdge(partnerB.Id, child.Id, now));
-                SeedEdge(child, partnerA, BuildChildToParentEdge(child.Id, partnerA.Id, partnerA.Biology, now));
-                SeedEdge(child, partnerB, BuildChildToParentEdge(child.Id, partnerB.Id, partnerB.Biology, now));
+                SeedEdge(partnerA, child, BuildParentToChildEdge(partnerA.Id, child.Id, now), now);
+                SeedEdge(partnerB, child, BuildParentToChildEdge(partnerB.Id, child.Id, now), now);
+                SeedEdge(child, partnerA, BuildChildToParentEdge(child.Id, partnerA.Id, partnerA.Biology, now), now);
+                SeedEdge(child, partnerB, BuildChildToParentEdge(child.Id, partnerB.Id, partnerB.Biology, now), now);
 
                 graph.AddKinLink(partnerA.Id, child.Id, KinRole.Parent);
                 graph.AddKinLink(partnerB.Id, child.Id, KinRole.Parent);
@@ -129,8 +129,8 @@ namespace GameEngineTools.Characters.Generation
                         continue;
                     }
 
-                    SeedEdge(sibA, sibB, BuildSiblingEdge(sibA.Id, sibB.Id, now));
-                    SeedEdge(sibB, sibA, BuildSiblingEdge(sibB.Id, sibA.Id, now));
+                    SeedEdge(sibA, sibB, BuildSiblingEdge(sibA.Id, sibB.Id, now), now);
+                    SeedEdge(sibB, sibA, BuildSiblingEdge(sibB.Id, sibA.Id, now), now);
                     graph.AddKinLink(sibA.Id, sibB.Id, KinRole.Sibling);
                     graph.AddKinLink(sibB.Id, sibA.Id, KinRole.Sibling);
                 }
@@ -164,10 +164,10 @@ namespace GameEngineTools.Characters.Generation
 
             graph.Register(newborn);
 
-            SeedEdge(parentA, newborn, BuildParentToChildEdge(parentA.Id, newborn.Id, now));
-            SeedEdge(parentB, newborn, BuildParentToChildEdge(parentB.Id, newborn.Id, now));
-            SeedEdge(newborn, parentA, BuildChildToParentEdge(newborn.Id, parentA.Id, parentA.Biology, now));
-            SeedEdge(newborn, parentB, BuildChildToParentEdge(newborn.Id, parentB.Id, parentB.Biology, now));
+            SeedEdge(parentA, newborn, BuildParentToChildEdge(parentA.Id, newborn.Id, now), now);
+            SeedEdge(parentB, newborn, BuildParentToChildEdge(parentB.Id, newborn.Id, now), now);
+            SeedEdge(newborn, parentA, BuildChildToParentEdge(newborn.Id, parentA.Id, parentA.Biology, now), now);
+            SeedEdge(newborn, parentB, BuildChildToParentEdge(newborn.Id, parentB.Id, parentB.Biology, now), now);
 
             graph.AddKinLink(parentA.Id, newborn.Id, KinRole.Parent);
             graph.AddKinLink(parentB.Id, newborn.Id, KinRole.Parent);
@@ -193,8 +193,8 @@ namespace GameEngineTools.Characters.Generation
             ArgumentNullException.ThrowIfNull(siblingA);
             ArgumentNullException.ThrowIfNull(siblingB);
 
-            SeedEdge(siblingA, siblingB, BuildSiblingEdge(siblingA.Id, siblingB.Id, now));
-            SeedEdge(siblingB, siblingA, BuildSiblingEdge(siblingB.Id, siblingA.Id, now));
+            SeedEdge(siblingA, siblingB, BuildSiblingEdge(siblingA.Id, siblingB.Id, now), now);
+            SeedEdge(siblingB, siblingA, BuildSiblingEdge(siblingB.Id, siblingA.Id, now), now);
             graph.AddKinLink(siblingA.Id, siblingB.Id, KinRole.Sibling);
             graph.AddKinLink(siblingB.Id, siblingA.Id, KinRole.Sibling);
         }
@@ -221,8 +221,8 @@ namespace GameEngineTools.Characters.Generation
             ArgumentNullException.ThrowIfNull(grandparent);
             ArgumentNullException.ThrowIfNull(grandchild);
 
-            SeedEdge(grandparent, grandchild, BuildGrandparentEdge(grandparent.Id, grandchild.Id, now));
-            SeedEdge(grandchild, grandparent, BuildGrandchildEdge(grandchild.Id, grandparent.Id, grandparent.Biology, now));
+            SeedEdge(grandparent, grandchild, BuildGrandparentEdge(grandparent.Id, grandchild.Id, now), now);
+            SeedEdge(grandchild, grandparent, BuildGrandchildEdge(grandchild.Id, grandparent.Id, grandparent.Biology, now), now);
             graph.AddKinLink(grandparent.Id, grandchild.Id, KinRole.Grandparent);
             graph.AddKinLink(grandchild.Id, grandparent.Id, KinRole.Grandchild);
         }
@@ -423,9 +423,9 @@ namespace GameEngineTools.Characters.Generation
         /// This adheres to the Dependency Inversion Principle: FamilyBuilder depends only
         /// on the <see cref="IHuman"/> interface, not on any concrete engine.
         /// </remarks>
-        private static void SeedEdge(IHuman character, IHuman target, RelationshipEdge edge)
+        private static void SeedEdge(IHuman character, IHuman target, RelationshipEdge edge, WDateTime now)
         {
-            character.ReceiveEvent(new FamilyBondSeeded(character.Id, target.Id, edge));
+            character.ReceiveEvent(new FamilyBondSeeded(now, character.Id, target.Id, edge));
         }
 
         #endregion Private helpers

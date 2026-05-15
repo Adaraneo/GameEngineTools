@@ -4,6 +4,7 @@
 namespace GameEngineTools.Characters.Engines.Relationships
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -627,6 +628,30 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         {
                             _log.RelEdgeCreated(self.Value.ToString(), self.Value.ToString(), fbs.TargetId.Value.ToString());
                         }
+
+                        break;
+                    }
+
+                case FamilyInteractionCountAdjusted fica when fica.OwnerId == self:
+                    {
+                        if (!State.Edges.TryGetValue(fica.TargetId, out var existing))
+                        {
+                            break;
+                        }
+
+                        const int MaxInteractionCount = 200;
+
+                        var updated = existing with
+                        {
+                            PositiveInteractionCount = Math.Min(existing.PositiveInteractionCount + fica.Bonus, MaxInteractionCount)
+                        };
+
+                        var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges)
+                        {
+                            [fica.TargetId] = updated
+                        };
+
+                        State = new RelationshipState(dict);
 
                         break;
                     }

@@ -123,9 +123,9 @@
 
             Console.WriteLine("Generator will generate player's character and non-playable character's...");
 
-            player = new PC(100, manager.RandomizePerson(40, 18));
+            player = new PC(100, manager.RandomizePerson(40, null, 18));
             significantOther = new NPC(100, manager.RandomizePerson(player));
-            friend = new NPC(100, manager.RandomizePerson(50, 18));
+            friend = new NPC(100, manager.RandomizePerson(50, null, 18));
             friendSignificantOther = new NPC(100, manager.RandomizePerson(friend));
 
             var characters = manager.Characters;
@@ -147,7 +147,7 @@
                     {
                         try
                         {
-                            var npc = new NPC(100, manager.RandomizePerson(40, 18));
+                            var npc = new NPC(100, manager.RandomizePerson(40, null));
                             characters.Add(npc);
                             successfull++;
                         }

@@ -283,6 +283,8 @@ namespace EngineTests
                 return HumanBlueprintSpec.Default(clock.Now.Date);
             });
 
+            services.AddFamilySystem();
+
             // ── Manager ───────────────────────────────────────────────────────
             services.AddSingleton<IGameEngineToolsManager, GameEngineToolsManager>();
             services.Configure<GameEngineToolsManagerOptions>(opt =>
