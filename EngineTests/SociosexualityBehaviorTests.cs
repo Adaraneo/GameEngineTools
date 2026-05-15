@@ -117,7 +117,7 @@ namespace EngineTests
             var restricted = ApplyAcceptedInvite(self, other, start, Sociosexuality.Restricted);
             var unrestricted = ApplyAcceptedInvite(self, other, start, Sociosexuality.Unrestricted);
 
-            Assert.IsTrue(restricted.RomanticInterest - start.RomanticInterest > unrestricted.RomanticInterest - start.RomanticInterest);
+            Assert.IsTrue(restricted.IntimateAffinity - start.IntimateAffinity > unrestricted.IntimateAffinity - start.IntimateAffinity);
             Assert.IsTrue(unrestricted.SexualInterest - start.SexualInterest > restricted.SexualInterest - start.SexualInterest);
             Assert.IsTrue(restricted.Comfort > unrestricted.Comfort);
         }
@@ -137,7 +137,7 @@ namespace EngineTests
             var femaleAfter = ApplyAcceptedInvite(self, femaleTarget, femaleStart, Sociosexuality.Intermediate, profile, SexBiology.Male, SexBiology.Female);
             var maleAfter = ApplyAcceptedInvite(self, maleTarget, maleStart, Sociosexuality.Intermediate, profile, SexBiology.Male, SexBiology.Male);
 
-            Assert.IsTrue(femaleAfter.RomanticInterest - femaleStart.RomanticInterest > maleAfter.RomanticInterest - maleStart.RomanticInterest);
+            Assert.IsTrue(femaleAfter.IntimateAffinity - femaleStart.IntimateAffinity > maleAfter.IntimateAffinity - maleStart.IntimateAffinity);
             Assert.IsTrue(femaleAfter.SexualInterest - femaleStart.SexualInterest > maleAfter.SexualInterest - maleStart.SexualInterest);
         }
 
@@ -266,7 +266,7 @@ namespace EngineTests
                 Familiarity: 65,
                 AestheticAttraction: aesthetic,
                 PhysicalAttraction: physical,
-                RomanticInterest: romantic,
+                IntimateAffinity: romantic,
                 SexualInterest: sexual,
                 Closeness: closeness,
                 Respect: 55,

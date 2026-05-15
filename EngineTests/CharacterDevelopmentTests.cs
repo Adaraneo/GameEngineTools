@@ -127,7 +127,7 @@ namespace EngineTests
                         Familiarity: 80,
                         AestheticAttraction: 80,
                         PhysicalAttraction: 80,
-                        RomanticInterest: 80,
+                        IntimateAffinity: 80,
                         SexualInterest: 80,
                         Closeness: 80,
                         Respect: 80,

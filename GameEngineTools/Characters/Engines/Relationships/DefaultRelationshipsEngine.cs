@@ -132,7 +132,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Closeness = Math.Max(e.Closeness, 0),
                                 AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.8),
                                 PhysicalAttraction  = Lerp(e.PhysicalAttraction,  fi.BasePhysical    / 40.0 * 100.0, 0.8),
-                                RomanticInterest = e.RomanticInterest,
+                                IntimateAffinity = e.IntimateAffinity,
                                 SexualInterest   = Math.Max(e.SexualInterest, sexualInterestSeed),
                                 Breakdown = e.Breakdown with
                                 {
@@ -298,7 +298,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Closeness = Math.Min(closenessMax, Bump(e.Closeness, closenessGain)),
                                 Like = Bump(e.Like, +0.5 + stabilization * 0.20),
                                 Comfort = Bump(e.Comfort, +0.8 + stabilization * 0.45 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
-                                RomanticInterest = Bump(e.RomanticInterest, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
+                                IntimateAffinity = Bump(e.IntimateAffinity, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation),
                                 Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
@@ -353,7 +353,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 Comfort = Bump(e.Comfort, -0.5),
                                 Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty) : e.Trust,
-                                RomanticInterest = Bump(e.RomanticInterest, -0.5),
+                                IntimateAffinity = Bump(e.IntimateAffinity, -0.5),
                                 AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.50),
                                 PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.35),
                                 TargetBiology = otherBiology ?? e.TargetBiology,
@@ -380,7 +380,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     Like = Bump(e.Like, -1.5 * stingMultiplier),
                                     Comfort = Bump(e.Comfort, -2.0 * stingMultiplier),
                                     Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty * stingMultiplier) : e.Trust,
-                                    RomanticInterest = Bump(e.RomanticInterest, (io.Act == SpeechAct.Invite ? -2.0 : -1.0) * stingMultiplier),
+                                    IntimateAffinity = Bump(e.IntimateAffinity, (io.Act == SpeechAct.Invite ? -2.0 : -1.0) * stingMultiplier),
                                     AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act)),
                                     PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.65),
                                     TargetBiology = otherBiology ?? e.TargetBiology,
@@ -422,9 +422,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     Comfort = Bump(e.Comfort, +1.5),
                                     Closeness = Bump(e.Closeness, +1.0),
                                     SexualInterest = Bump(e.SexualInterest, to.Level == TouchLevel.Intimate ? +4.0 : to.Level == TouchLevel.Friendly ? +1.5 : +0.4),
-                                    RomanticInterest = to.Level == TouchLevel.Intimate && e.Trust >= 60 && e.Comfort >= 60
-                                        ? Bump(e.RomanticInterest, +1.5)
-                                        : e.RomanticInterest,
+                                    IntimateAffinity = to.Level == TouchLevel.Intimate && e.Trust >= 60 && e.Comfort >= 60
+                                        ? Bump(e.IntimateAffinity, +1.5)
+                                        : e.IntimateAffinity,
                                     // Intimate touch builds communal relationship norms (Clark & Mills 2012)
                                     CommunalStrength = to.Level == TouchLevel.Intimate
                                         ? Math.Min(100, e.CommunalStrength + Config.CommunalGrowthPerIntimateInteraction)
@@ -451,7 +451,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Upsert(self, otherId, e => e with
                                 {
                                     Comfort = Bump(e.Comfort, -1.0),
-                                    RomanticInterest = Bump(e.RomanticInterest, to.Level == TouchLevel.Intimate ? -1.5 : -0.5)
+                                    IntimateAffinity = Bump(e.IntimateAffinity, to.Level == TouchLevel.Intimate ? -1.5 : -0.5)
                                 },
                                 eventType: nameof(TouchOutcome),
                                 outcome: "rejected",
@@ -522,7 +522,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         if (tpa.Type == ThirdPartyObservationType.IntimateAct
                             && State.Edges.TryGetValue(tpa.Actor, out var actorEdge))
                         {
-                            var intimacyInterest = actorEdge.RomanticInterest * 0.55 + actorEdge.SexualInterest * 0.45;
+                            var intimacyInterest = actorEdge.IntimateAffinity * 0.55 + actorEdge.SexualInterest * 0.45;
                             if (intimacyInterest >= 25.0)
                             {
                                 var anxiety = ctx.Personality.Attachment.Anxiety;
@@ -581,7 +581,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 Comfort = Bump(e.Comfort, +1.2 + SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality)),
                                 Closeness = Bump(e.Closeness, +2.0),
-                                RomanticInterest = Bump(e.RomanticInterest, 0.8 * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(ctx.Personality.Sociosexuality) * SexualOrientationBehaviorMath.RomanticInterestMultiplier(ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
+                                IntimateAffinity = Bump(e.IntimateAffinity, 0.8 * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(ctx.Personality.Sociosexuality) * SexualOrientationBehaviorMath.RomanticInterestMultiplier(ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 SexualInterest = Bump(e.SexualInterest, 2.4 * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(ctx.Personality.Sociosexuality) * SexualOrientationBehaviorMath.SexualInterestMultiplier(ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 TargetBiology = otherBiology ?? e.TargetBiology,
                                 // Sexual encounter deepens communal norms (Clark & Mills 2012)
@@ -602,7 +602,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 Comfort = Bump(e.Comfort, -2.0),
                                 Trust = Bump(e.Trust, -0.8),
-                                RomanticInterest = Bump(e.RomanticInterest, -1.2),
+                                IntimateAffinity = Bump(e.IntimateAffinity, -1.2),
                                 SexualInterest = Bump(e.SexualInterest, se.From == self ? -2.4 : -0.8),
                                 TargetBiology = otherBiology ?? e.TargetBiology
                             },
@@ -696,7 +696,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         ///   <item>Closeness — fastest decay (distance is felt quickly)</item>
         ///   <item>Trust — slowest decay (trust earned persists)</item>
         ///   <item>Familiarity — very slow decay (repeated exposure leaves a long memory)</item>
-        ///   <item>RomanticInterest / SexualInterest — drift back toward soft neutral when not reinforced</item>
+        ///   <item>IntimateAffinity / SexualInterest — drift back toward soft neutral when not reinforced</item>
         /// </list>
         /// Note: <c>PositiveInteractionCount</c> does <b>not</b> decay — it is a cumulative
         /// historical counter, not a relationship intensity measure.
@@ -836,7 +836,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Familiarity = Clamp(Approach(e.Familiarity, Config.FamiliarityDecayFloor, d * Config.DecayMultiplierFamiliarity)),
                     AestheticAttraction = e.AestheticAttraction,
                     PhysicalAttraction = e.PhysicalAttraction,
-                    RomanticInterest = Clamp(Approach(e.RomanticInterest, 5, d * Config.DecayMultiplierRomanticInterest)),
+                    IntimateAffinity = Clamp(Approach(e.IntimateAffinity, 5, d * Config.DecayMultiplierRomanticInterest)),
                     SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * effectiveSexualInterestDecayMult)),
                     Closeness = Clamp(Approach(e.Closeness, 5, d * Config.DecayMultiplierCloseness)),
                     Respect = Clamp(Approach(e.Respect, 55, d * Config.DecayMultiplierRespect)),

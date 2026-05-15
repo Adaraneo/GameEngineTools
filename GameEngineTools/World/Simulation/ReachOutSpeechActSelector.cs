@@ -84,7 +84,7 @@ namespace GameEngineTools.World.Simulation
             var trust = edge?.Trust ?? 50.0;
             var comfort = edge?.Comfort ?? 45.0;
             var closeness = edge?.Closeness ?? 0.0;
-            var romanticInterest = edge?.RomanticInterest ?? 0.0;
+            var romanticInterest = edge?.IntimateAffinity ?? 0.0;
             var expectedAcceptance = targetId is { } other
                 ? SemanticMemoryMath.ExpectedAcceptance(semanticMemory, other, SpeechAct.SmallTalk, edge, profile, episodes)
                 : 0.5;

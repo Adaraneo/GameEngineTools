@@ -216,7 +216,7 @@ namespace EngineTests
                 Familiarity: familiarity,
                 AestheticAttraction: 55,
                 PhysicalAttraction: 55,
-                RomanticInterest: romanticInterest,
+                IntimateAffinity: romanticInterest,
                 SexualInterest: 20,
                 Closeness: closeness,
                 Respect: 55,

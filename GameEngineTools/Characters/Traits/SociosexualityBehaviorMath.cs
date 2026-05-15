@@ -165,7 +165,7 @@ namespace GameEngineTools.Characters.Traits
             var comfort = relationship?.Comfort ?? 0.0;
             var intimacyInterest = relationship is null
                 ? 0.0
-                : (relationship.SexualInterest * 0.65) + (relationship.RomanticInterest * 0.35);
+                : (relationship.SexualInterest * 0.65) + (relationship.IntimateAffinity * 0.35);
 
             var minCloseness        = Lerp(70.0, 55.0, soi.Attitude);
             var minComfort          = Lerp(60.0,  0.0, soi.Attitude);
@@ -211,7 +211,7 @@ namespace GameEngineTools.Characters.Traits
                 relationship.SexualInterest * 0.40
                 + relationship.PhysicalAttraction * 0.25
                 + relationship.AestheticAttraction * 0.20
-                + relationship.RomanticInterest * 0.15,
+                + relationship.IntimateAffinity * 0.15,
                 0.0,
                 100.0) / 100.0;
         }

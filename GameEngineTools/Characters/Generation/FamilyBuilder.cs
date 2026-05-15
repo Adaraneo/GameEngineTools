@@ -27,7 +27,7 @@ namespace GameEngineTools.Characters.Generation
     /// <b>Bond baselines (scientific rationale):</b>
     /// <list type="bullet">
     ///   <item>
-    ///     <b>Partner bond</b> — Closeness 85, Trust 80, CommunalStrength 70, RomanticInterest 75.
+    ///     <b>Partner bond</b> — Closeness 85, Trust 80, CommunalStrength 70, IntimateAffinity 75.
     ///     Hazan &amp; Shaver 1987 pair-bond; Basson 2001 responsive desire baseline.
     ///   </item>
     ///   <item>
@@ -245,7 +245,7 @@ namespace GameEngineTools.Characters.Generation
                 Familiarity: 85,
                 AestheticAttraction: 60,
                 PhysicalAttraction: 55,
-                RomanticInterest: 75,
+                IntimateAffinity: 75,
                 SexualInterest: 55,
                 Closeness: 85,
                 Respect: 75,
@@ -274,7 +274,7 @@ namespace GameEngineTools.Characters.Generation
                 Familiarity: 80,
                 AestheticAttraction: 0,
                 PhysicalAttraction: 0,
-                RomanticInterest: 0,
+                IntimateAffinity: 0,
                 SexualInterest: 0,
                 Closeness: 88,
                 Respect: 70,
@@ -304,7 +304,7 @@ namespace GameEngineTools.Characters.Generation
                 Familiarity: 80,
                 AestheticAttraction: 0,
                 PhysicalAttraction: 0,
-                RomanticInterest: 0,
+                IntimateAffinity: 0,
                 SexualInterest: 0,
                 Closeness: 78,
                 Respect: 80,
@@ -333,7 +333,7 @@ namespace GameEngineTools.Characters.Generation
                 Familiarity: 70,
                 AestheticAttraction: 0,
                 PhysicalAttraction: 0,
-                RomanticInterest: 0,
+                IntimateAffinity: 0,
                 SexualInterest: 0,
                 Closeness: 55,
                 Respect: 60,
@@ -362,7 +362,7 @@ namespace GameEngineTools.Characters.Generation
                 Familiarity: 65,
                 AestheticAttraction: 0,
                 PhysicalAttraction: 0,
-                RomanticInterest: 0,
+                IntimateAffinity: 0,
                 SexualInterest: 0,
                 Closeness: 60,
                 Respect: 65,
@@ -392,7 +392,7 @@ namespace GameEngineTools.Characters.Generation
                 Familiarity: 65,
                 AestheticAttraction: 0,
                 PhysicalAttraction: 0,
-                RomanticInterest: 0,
+                IntimateAffinity: 0,
                 SexualInterest: 0,
                 Closeness: 55,
                 Respect: 75,

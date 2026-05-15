@@ -36,7 +36,7 @@ namespace GameEngineTools.World.Simulation
                 (edge.Closeness * 0.35) +
                 (edge.Trust * 0.20) +
                 (edge.Familiarity * 0.15) +
-                (edge.RomanticInterest * 0.20) +
+                (edge.IntimateAffinity * 0.20) +
                 (edge.SexualInterest * 0.10);
         }
 

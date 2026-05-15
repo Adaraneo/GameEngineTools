@@ -37,7 +37,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Romantic inclination toward B.
         /// More context-dependent than raw physical attraction.
         /// </summary>
-        double RomanticInterest,
+        double IntimateAffinity,
         /// <summary>
         /// Sexual inclination toward B.
         /// Strongly shaped by physical attraction plus comfort and intimacy context.

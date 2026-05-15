@@ -277,7 +277,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 Familiarity: 0,
                 AestheticAttraction: 0,
                 PhysicalAttraction: 0,
-                RomanticInterest: 0,
+                IntimateAffinity: 0,
                 SexualInterest: 0,
                 Closeness: 0,
                 Respect: 50,
@@ -300,7 +300,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             AppendChange(changes, nameof(RelationshipEdge.Respect), before.Respect, after.Respect);
             AppendChange(changes, nameof(RelationshipEdge.AestheticAttraction), before.AestheticAttraction, after.AestheticAttraction);
             AppendChange(changes, nameof(RelationshipEdge.PhysicalAttraction), before.PhysicalAttraction, after.PhysicalAttraction);
-            AppendChange(changes, nameof(RelationshipEdge.RomanticInterest), before.RomanticInterest, after.RomanticInterest);
+            AppendChange(changes, nameof(RelationshipEdge.IntimateAffinity), before.IntimateAffinity, after.IntimateAffinity);
             AppendChange(changes, nameof(RelationshipEdge.SexualInterest), before.SexualInterest, after.SexualInterest);
 
             if (before.PositiveInteractionCount != after.PositiveInteractionCount)
@@ -431,7 +431,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 _log.RelEdgeUpdated(
                     self.Value.ToString(), self.Value.ToString(), other.Value.ToString(),
                     updated.Like, updated.Trust, updated.Closeness,
-                    updated.Comfort, updated.Respect, updated.Familiarity, updated.RomanticInterest, updated.SexualInterest, updated.AestheticAttraction, updated.PhysicalAttraction);
+                    updated.Comfort, updated.Respect, updated.Familiarity, updated.IntimateAffinity, updated.SexualInterest, updated.AestheticAttraction, updated.PhysicalAttraction);
             }
 
             dict[other] = updated;

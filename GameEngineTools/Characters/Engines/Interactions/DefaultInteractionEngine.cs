@@ -113,7 +113,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var closeness = edge?.Closeness ?? 0;
             var intimacyInterest = edge is null
                 ? 0
-                : (edge.SexualInterest * 0.65) + (edge.RomanticInterest * 0.35);
+                : (edge.SexualInterest * 0.65) + (edge.IntimateAffinity * 0.35);
             var comfort = edge?.Comfort ?? 0;
             var psych = ctx.Snapshot.Psychology;
 
@@ -379,7 +379,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 edge.Trust * 0.24
                 + edge.Comfort * 0.28
                 + edge.Closeness * 0.20
-                + edge.RomanticInterest * 0.14
+                + edge.IntimateAffinity * 0.14
                 + edge.SexualInterest * 0.14;
 
             return edge.Trust >= 72

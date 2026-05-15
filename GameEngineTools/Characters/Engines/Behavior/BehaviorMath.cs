@@ -112,7 +112,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             {
                 var basePotential =
                     (e.SexualInterest * 0.50) +
-                    (e.RomanticInterest * 0.25) +
+                    (e.IntimateAffinity * 0.25) +
                     (e.Comfort * 0.15) +
                     (e.Closeness * 0.10);
 
