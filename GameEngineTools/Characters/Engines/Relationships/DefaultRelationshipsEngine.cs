@@ -617,16 +617,42 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 case FamilyBondSeeded fbs when fbs.OwnerId == self:
                     {
+                        RelationshipEdge edgeToStore;
+
+                        if (State.Edges.TryGetValue(fbs.TargetId, out var existing))
+                        {
+                            // Edge already exists — an organic relationship has developed between these characters.
+                            // Preserve all emotional values (Trust, Closeness, Like, etc.) that were earned
+                            // through real interaction history. Only inject KinRole — a structural label that
+                            // cannot be derived from emotional values and would otherwise be lost.
+                            //
+                            // Example: two siblings who met as strangers and built a friendship organically.
+                            // FamilyBuilder retroactively labels them as siblings without erasing their history.
+                            edgeToStore = existing with { KinRole = fbs.Edge.KinRole };
+                        }
+                        else
+                        {
+                            // No prior edge — seed the full baseline from FamilyBuilder.
+                            // This is the common case for world-setup and newborn wiring.
+                            edgeToStore = fbs.Edge;
+                        }
+
                         var dict = new Dictionary<HumanId, RelationshipEdge>(State.Edges)
                         {
-                            [fbs.TargetId] = fbs.Edge
+                            [fbs.TargetId] = edgeToStore
                         };
 
                         State = new RelationshipState(dict);
 
-                        using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: fbs.TargetId.Value))
+                        using (_log.BeginCharacterScope(
+                            self.Value,
+                            nameof(DefaultRelationshipsEngine),
+                            relatedPersonId: fbs.TargetId.Value))
                         {
-                            _log.RelEdgeCreated(self.Value.ToString(), self.Value.ToString(), fbs.TargetId.Value.ToString());
+                            _log.RelEdgeCreated(
+                                self.Value.ToString(),
+                                self.Value.ToString(),
+                                fbs.TargetId.Value.ToString());
                         }
 
                         break;
