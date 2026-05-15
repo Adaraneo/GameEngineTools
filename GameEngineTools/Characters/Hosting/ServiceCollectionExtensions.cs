@@ -354,7 +354,7 @@ namespace GameEngineTools.Characters.Hosting
         ///     DefaultMemoryEngine&gt;();
         /// </code>
         /// </example>
-        public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem>(
+        private static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem>(
             this IServiceCollection services,
             Action<PhysiologyConfig>? physio = null,
             Action<PsychologyConfig>? psych = null,
