@@ -78,7 +78,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
 
             if (leadDayIdx > newState.LastScheduledDayIndex && newState.Slots.Count > 0)
             {
-                ScheduleDay(leadAhead.Date.ToDateTime(), ctx.Scheduler, ctx.Id);
+                ScheduleDay(leadAhead.Date.ToDateTime(), ctx.Scheduler, ctx.Id, outbox, now);
                 newState = newState with { LastScheduledDayIndex = leadDayIdx };
             }
 
@@ -127,7 +127,12 @@ namespace GameEngineTools.Characters.Engines.Schedule
 
         #region Private helpers
 
-        private void ScheduleDay(WDateTime dayStart, IScheduler scheduler, HumanId humanId)
+        private void ScheduleDay(
+            WDateTime dayStart,
+            IScheduler scheduler,
+            HumanId humanId,
+            IEventCollector? outbox = null,
+            WDateTime? occurredAt = null)
         {
             if (State.Slots.Count == 0) return;
 
@@ -151,6 +156,9 @@ namespace GameEngineTools.Characters.Engines.Schedule
             }
 
             State = State with { LastScheduledDayIndex = dayIndex };
+
+            var at = occurredAt ?? dayStart;
+            outbox?.Add(new ScheduleDayRegistered(at, humanId, State.Slots.Count, dayIndex));
 
             using (_log.BeginCharacterScope(humanId.Value, nameof(DefaultDailyScheduleEngine)))
             {

@@ -78,6 +78,9 @@ namespace GameEngineTools.Characters.Engines.Schedule
                 {
                     candidates[i] = c with { Utility = Math.Max(0.0, c.Utility + flatBias) };
 
+                    context.Outbox.Add(new ScheduleSlotBiasApplied(
+                        context.Now, context.HumanContext.Id, activeSlot.SlotId, c.Name, flatBias));
+
                     if (_log is not null)
                     {
                         using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DailyScheduleBehaviorModifier)))
