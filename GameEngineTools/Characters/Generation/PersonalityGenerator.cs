@@ -380,7 +380,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
 
         // 5) poskládej Personality
         var bigFive = new BigFive(O, C, E, A, N);
-        return new Personality(bigFive, attach, comm, motivation, socio, chrono);
+        return new Personality(bigFive, attach, comm, motivation, socio, chrono, SexualResponsiveness.Default);
     }
 
     private static (double O, double C, double E, double A, double N) GenerateBigFive(IRandomSource rng, PersonalitySpec spec)

@@ -6,10 +6,12 @@ namespace GameEngineTools
     using System.Globalization;
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Hosting.Defaults;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
     using GameEngineTools.World.Core.Time;

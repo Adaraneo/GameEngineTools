@@ -12,11 +12,6 @@ namespace GameEngineTools.Extensions
 
     public static class TestExtension
     {
-        public static List<CharacterBase> CreateFamilyForPlayer(this GameEngineToolsManager instance, PC player)
-        {
-            throw new NotImplementedException();
-        }
-
         public static void DoMagic(this CharacterBase caster, params object[] tagrets)
         {
             if (caster != null)

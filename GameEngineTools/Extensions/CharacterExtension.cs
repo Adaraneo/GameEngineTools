@@ -4,6 +4,12 @@
 namespace GameEngineTools.Extensions
 {
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Generation;
+    using GameEngineTools.Characters.Hosting;
+    using GameEngineTools.Characters.Traits;
+    using GameEngineTools.World.Core.Time;
+    using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.DependencyInjection;
 
     public static class CharacterExtension
     {
