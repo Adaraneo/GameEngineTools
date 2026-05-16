@@ -179,6 +179,20 @@ var significantOtherPerson = significantOther.Person;
 var friendPerson = friend.Person;
 var friendSOPerson = friendSO.Person;
 
+Console.WriteLine("Before simulation starts:");
+
+playerPerson.Snapshot.Goals.Deconstruct(out var playersGoals);
+var sbPlayerGoals = new StringBuilder();
+foreach (var goal in playersGoals)
+{
+    sbPlayerGoals.AppendLine($"Kind: {goal.Kind}");
+}
+
+Console.WriteLine("Goals for player: {0}", playersGoals.Count > 0 ? sbPlayerGoals.ToString() : "None");
+
+Console.WriteLine("Press any key to continue...");
+Console.ReadKey();
+
 var diary = new List<NarrativeEntry>();
 
 var rng = new Random();

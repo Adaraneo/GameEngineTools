@@ -363,81 +363,6 @@ namespace GameEngineTools.Characters.Hosting
 
         /// <summary>
         /// Zkrácená registrace všech enginů najednou.
-        /// Konkrétní implementace předáváš jako generické parametry.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// services.AddCharacters&lt;
-        ///     DefaultPhysiologyEngine,
-        ///     DefaultPsychologyEngine,
-        ///     DefaultBehaviorEngine,
-        ///     DefaultInteractionEngine,
-        ///     DefaultRelationshipsEngine,
-        ///     DefaultMemoryEngine&gt;();
-        /// </code>
-        /// </example>
-        private static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem>(
-            this IServiceCollection services,
-            Action<PhysiologyConfig>? physio = null,
-            Action<PsychologyConfig>? psych = null,
-            Action<BehaviorConfig>? behav = null,
-            Action<SleepConfig>? sleep = null,
-            Action<InteractionConfig>? inter = null,
-            Action<RelationshipsConfig>? rel = null,
-            Action<MemoryConfig>? mem = null,
-            Action<SemanticMemoryConfig>? semantic = null)
-            where TPhysio : class, IPhysiologyEngine
-            where TPsych : class, IPsychologyEngine
-            where TBehav : class, IBehaviorEngine
-            where TInter : class, IInteractionEngine
-            where TRel : class, IRelationshipsEngine
-            where TMem : class, IMemoryEngine
-            where TSem : class, ISemanticMemoryEngine
-        {
-            services.AddCharactersCore()
-                    .AddPhysiologyEngine<TPhysio>(physio)
-                    .AddPsychologyEngine<TPsych>(psych)
-                    .AddBehaviorEngine<TBehav>(behav, sleep)
-                    .AddInteractionEngine<TInter>(inter)
-                    .AddRelationshipsEngine<TRel>(rel)
-                    .AddMemoryEngine<TMem>(mem)
-                    .AddSemanticMemoryEngine<TSem>(semantic);
-
-            return services;
-        }
-
-        /// <summary>
-        /// Zkrácená registrace všech enginů najednou, včetně goal enginu.
-        /// </summary>
-        public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem, TGoal>(
-            this IServiceCollection services,
-            Action<PhysiologyConfig>? physio = null,
-            Action<PsychologyConfig>? psych = null,
-            Action<BehaviorConfig>? behav = null,
-            Action<SleepConfig>? sleep = null,
-            Action<InteractionConfig>? inter = null,
-            Action<RelationshipsConfig>? rel = null,
-            Action<MemoryConfig>? mem = null,
-            Action<SemanticMemoryConfig>? semantic = null,
-            Action<GoalConfig>? goal = null)
-            where TPhysio : class, IPhysiologyEngine
-            where TPsych : class, IPsychologyEngine
-            where TBehav : class, IBehaviorEngine
-            where TInter : class, IInteractionEngine
-            where TRel : class, IRelationshipsEngine
-            where TMem : class, IMemoryEngine
-            where TSem : class, ISemanticMemoryEngine
-            where TGoal : class, IGoalEngine
-        {
-            services.AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem>(
-                physio, psych, behav, sleep, inter, rel, mem, semantic);
-            services.AddGoalEngine<TGoal>(goal);
-
-            return services;
-        }
-
-        /// <summary>
-        /// Zkrácená registrace všech enginů najednou, včetně goal a daily schedule enginů.
         /// </summary>
         public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem, TGoal, TSchedule>(
             this IServiceCollection services,
@@ -461,9 +386,16 @@ namespace GameEngineTools.Characters.Hosting
             where TGoal : class, IGoalEngine
             where TSchedule : class, IDailyScheduleEngine
         {
-            services.AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem, TGoal>(
-                physio, psych, behav, sleep, inter, rel, mem, semantic, goal);
-            services.AddDailyScheduleEngine<TSchedule>(schedule);
+            services.AddCharactersCore()
+                    .AddPhysiologyEngine<TPhysio>(physio)
+                    .AddPsychologyEngine<TPsych>(psych)
+                    .AddBehaviorEngine<TBehav>(behav, sleep)
+                    .AddInteractionEngine<TInter>(inter)
+                    .AddRelationshipsEngine<TRel>(rel)
+                    .AddMemoryEngine<TMem>(mem)
+                    .AddSemanticMemoryEngine<TSem>(semantic)
+                    .AddGoalEngine<TGoal>(goal)
+                    .AddDailyScheduleEngine<TSchedule>(schedule);
 
             return services;
         }

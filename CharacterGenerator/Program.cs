@@ -7,6 +7,7 @@
     using GameEngineTools.FileSystem;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
+    using System.Text;
     using System.Threading.Tasks;
     using GFC = GameEngineTools.Constants.FileSystemConstantsForTest;
 
