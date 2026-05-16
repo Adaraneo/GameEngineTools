@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Persistence
 {
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
@@ -25,8 +26,8 @@ namespace GameEngineTools.Characters.Persistence
         /// <summary>Gets the personality traits of the character.</summary>
         public required Personality Personality { get; init; }
 
-        /// <summary>Gets the stable physical appearance traits (generated once at creation).</summary>
-        public required PhysicalAppearance PhysicalAppearance { get; init; }
+        /// <summary>Gets the immutable genetic blueprint used to project physical appearance at runtime.</summary>
+        public required GeneticBlueprint GeneticBlueprint { get; init; }
 
         /// <summary>
         /// Gets the character's personal attraction preferences (generated once at creation).

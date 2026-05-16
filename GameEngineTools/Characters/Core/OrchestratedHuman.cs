@@ -13,6 +13,7 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Astro;
@@ -53,7 +54,10 @@ namespace GameEngineTools.Characters.Core
         public PsychologicalProfile PsychologyProfile { get; }
 
         /// <inheritdoc/>
-        public PhysicalAppearance PhysicalAppearance { get; }
+        public PhysicalAppearance PhysicalAppearance => _projectedAppearance;
+
+        /// <inheritdoc/>
+        public GeneticBlueprint GeneticBlueprint => _geneticBlueprint;
 
         /// <inheritdoc/>
         public AttractionProfile? AttractionProfile { get; }
@@ -96,6 +100,10 @@ namespace GameEngineTools.Characters.Core
 
         private readonly List<IDomainEvent> _lastOutboxAccumulator = new();
 
+        // Appearance — blueprint is immutable; projected appearance is recomputed each snapshot refresh
+        private readonly GeneticBlueprint _geneticBlueprint;
+        private PhysicalAppearance _projectedAppearance;
+
         // Services
         private readonly IEventBus _bus;
         private readonly IScheduler _scheduler;
@@ -135,7 +143,7 @@ namespace GameEngineTools.Characters.Core
         /// <param name="identity">Name and birth date.</param>
         /// <param name="biology">Biological sex.</param>
         /// <param name="personality">Personality traits.</param>
-        /// <param name="appearance">Stable physical appearance traits.</param>
+        /// <param name="geneticBlueprint">Immutable genetic blueprint — physical appearance is projected from this at runtime.</param>
         /// <param name="attractionProfile">
         /// Personal attraction preferences, or <c>null</c> for legacy characters loaded from
         /// saves created before this field existed.
@@ -159,7 +167,7 @@ namespace GameEngineTools.Characters.Core
             Identity identity,
             SexBiology biology,
             Personality personality,
-            PhysicalAppearance appearance,
+            GeneticBlueprint geneticBlueprint,
             AttractionProfile? attractionProfile,
             // services
             IEventBus bus,
@@ -186,7 +194,7 @@ namespace GameEngineTools.Characters.Core
             Biology = biology;
             Personality = personality;
             PsychologyProfile = PsychologicalProfile.FromPersonality(personality);
-            PhysicalAppearance = appearance;
+            _geneticBlueprint = geneticBlueprint;
             AttractionProfile = attractionProfile;
 
             _bus = bus;
@@ -222,6 +230,8 @@ namespace GameEngineTools.Characters.Core
                 Logger = _log,
                 Snapshot = Snapshot
             };
+
+            RefreshAppearance();
         }
 
         #endregion Constructor
@@ -491,8 +501,12 @@ namespace GameEngineTools.Characters.Core
         /// Rebuilds the externally visible snapshot from the current live engine states.
         /// Called after both Phase B and Phase C so consumers see the final state of the tick.
         /// </summary>
+        private void RefreshAppearance()
+            => _projectedAppearance = Generation.AppearanceProjector.Project(_geneticBlueprint, Age);
+
         private void RefreshSnapshot()
         {
+            RefreshAppearance();
             var prev = Snapshot;
             Snapshot = new EnginesSnapshot(
                 _physio.State,

@@ -18,6 +18,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
+    using GenProjector = GameEngineTools.Characters.Generation.AppearanceProjector;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
@@ -79,9 +80,9 @@ namespace EngineTests
             Assert.AreEqual(a.Biology, b.Biology);
             Assert.AreEqual(a.Identity.BirthDate, b.Identity.BirthDate);
             Assert.AreEqual(mother.Identity.LastName, a.Identity.LastName);
-            Assert.AreEqual(a.PhysicalAppearance, b.PhysicalAppearance);
+            Assert.AreEqual(a.GeneticBlueprint, b.GeneticBlueprint);
             Assert.AreEqual(a.Personality, b.Personality);
-            Assert.IsTrue(a.PhysicalAppearance.Body.Proportions.HeightCm is >= 45 and <= 95);
+            Assert.IsTrue(GenProjector.Project(a.GeneticBlueprint, ageYears: 0.5).Body.Proportions.HeightCm is >= 45 and <= 95);
         }
 
         [TestMethod]

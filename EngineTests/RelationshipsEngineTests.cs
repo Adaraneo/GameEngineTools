@@ -13,7 +13,9 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
+    using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
@@ -1410,18 +1412,8 @@ namespace EngineTests
                 Sociosexuality.Intermediate,
                 Chronotype.Neutral);
 
-            var appearance = TestAppearanceFactory.Build(
-                heightCm: 170,
-                frame: BodyFrame.Medium,
-                skinTone: SkinTone.Medium,
-                eyeColor: EyeColor.Brown,
-                hairColor: HairColorNatural.Brown,
-                hairType: HairType.Wavy,
-                faceShape: FaceShape.Oval,
-                shoulderBreadthCm: 40,
-                hipBreadthCm: 38,
-                noseProjection: 0.5,
-                lipFullness: 0.5);
+            var rngFactory = ServiceProvider.GetRequiredService<IRandomSourceFactory>();
+            var geneticBlueprint = new AppearanceGenerator(rngFactory).GenerateBlueprint(biology, seed: 42);
 
             var physio = physioFactory.Create(random, biology, identity.BirthDate, WDateOnly.New(100, 1, 1));
             var psych = psychFactory.Create(random);
@@ -1449,7 +1441,7 @@ namespace EngineTests
                 identity,
                 biology,
                 personality,
-                appearance,
+                geneticBlueprint,
                 attractionProfile: null,
                 bus: new NullEventBus(),
                 scheduler: new NullScheduler(),

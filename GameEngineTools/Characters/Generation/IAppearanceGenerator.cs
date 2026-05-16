@@ -7,34 +7,23 @@ namespace GameEngineTools.Characters.Generation
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
-    /// Generates a randomised <see cref="PhysicalAppearance"/> for a character.
+    /// Generates appearance data for a character.
     /// </summary>
-    /// <remarks>
-    /// The generation is fully deterministic when a fixed seed is provided —
-    /// the same seed and the same biological sex will always produce the same result.
-    /// </remarks>
     public interface IAppearanceGenerator
     {
         /// <summary>
-        /// Generates a <see cref="PhysicalAppearance"/> for a character of the given biological sex.
+        /// Generates an immutable <see cref="GeneticBlueprint"/> that stores age-agnostic genetic traits.
+        /// Always uses Adult-neutral parameters — age effects are applied by <see cref="AppearanceProjector"/> at runtime.
         /// </summary>
-        /// <param name="sex">
-        /// Biological sex of the character.
-        /// Drives soft statistical morphology tendencies through the effective spec.
-        /// </param>
-        /// <param name="seed">
-        /// RNG seed. The same seed combined with the same <paramref name="sex"/>
-        /// always produces identical output (deterministic generation).
-        /// </param>
-        /// <param name="stadium">
-        /// Life stage of the character. Drives height ranges, proportions and facial feature
-        /// distributions appropriate for the character's age group.
-        /// </param>
-        /// <param name="spec">
-        /// Optional generation parameters.
-        /// Defaults to <see cref="AppearanceGenSpec.Default"/> when <c>null</c>.
-        /// </param>
-        /// <returns>An immutable <see cref="PhysicalAppearance"/> record.</returns>
+        /// <param name="sex">Biological sex of the character.</param>
+        /// <param name="seed">RNG seed. The same seed and sex always produce identical output.</param>
+        /// <param name="spec">Optional generation parameters. Defaults to <see cref="AppearanceGenSpec.Default"/>.</param>
+        GeneticBlueprint GenerateBlueprint(SexBiology sex, int seed, AppearanceGenSpec? spec = null);
+
+        /// <summary>
+        /// Convenience wrapper — projects the blueprint at the representative age for the given stadium.
+        /// Prefer <see cref="GenerateBlueprint"/> for new code.
+        /// </summary>
         PhysicalAppearance Generate(SexBiology sex, int seed, StadiumType stadium = StadiumType.Adult, AppearanceGenSpec? spec = null);
     }
 }

@@ -13,6 +13,7 @@ namespace GameEngineTools.Characters.Hosting
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Core.Time;
@@ -41,7 +42,7 @@ namespace GameEngineTools.Characters.Hosting
     /// <param name="Identity">Name and birth date.</param>
     /// <param name="Biology">Biological sex.</param>
     /// <param name="Personality">Big Five + motivation weights.</param>
-    /// <param name="PhysicalAppearance">Stable morphological traits (height, frame, colouring…).</param>
+    /// <param name="GeneticBlueprint">Immutable genetic traits — age effects are projected at runtime by <see cref="AppearanceProjector"/>.</param>
     /// <param name="AttractionProfile">
     /// Personal physical-preference profile used by <c>IAttractionCalculator</c>.
     /// Nullable for backwards compatibility with characters created before this field existed.
@@ -56,7 +57,7 @@ namespace GameEngineTools.Characters.Hosting
         Identity Identity,
         SexBiology Biology,
         Personality Personality,
-        PhysicalAppearance PhysicalAppearance,
+        GeneticBlueprint GeneticBlueprint,
         AttractionProfile? AttractionProfile = null,
         int? Seed = null,
         OccupationKind? Occupation = null);
@@ -130,7 +131,7 @@ namespace GameEngineTools.Characters.Hosting
             var rel = _sp.GetRequiredService<IRelationshipsEngine>();
             var mem = _sp.GetRequiredService<IMemoryEngine>();
             var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
-            var goal     = _sp.GetRequiredService<IGoalEngine>();
+            var goal = _sp.GetRequiredService<IGoalEngine>();
             var schedule = _sp.GetRequiredService<IDailyScheduleEngine>();
 
             // Initial snapshot — State is always valid immediately after factory creation
@@ -139,17 +140,26 @@ namespace GameEngineTools.Characters.Hosting
                 Goals: goal.State, Schedule: schedule.State);
 
             var human = new OrchestratedHuman(
-                b.Id, b.Identity, b.Biology, b.Personality, b.PhysicalAppearance,
+                b.Id, b.Identity, b.Biology, b.Personality, b.GeneticBlueprint,
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
                 physio, psych, behav, inter, rel, mem, semantic, goal, schedule,
                 snapshot,
                 _behaviorCadencePolicy);
 
-            goal.SeedFromPersonality(b.Personality, _clock.Now);
+            goal.SeedFromPersonality(b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now);
 
             var occupation = b.Occupation ?? OccupationKind.None;
-            schedule.SeedFromOccupation(occupation, b.Personality, _clock.Now, scheduler, b.Id);
+            schedule.SeedFromOccupation(occupation, b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now, scheduler, b.Id);
+
+            // Propagate seeded states into the externally visible snapshot so that
+            // code reading human.Snapshot before the first Tick() sees the correct state,
+            // and persistence snapshots include goals and schedule from the moment of creation.
+            human.RestoreSnapshot(human.Snapshot with
+            {
+                Goals    = goal.State,
+                Schedule = schedule.State
+            });
 
             return human;
         }

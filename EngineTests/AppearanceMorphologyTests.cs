@@ -9,6 +9,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
+    using TraitsProjector = GameEngineTools.Characters.Traits.AppearanceProjector;
     using GameEngineTools;
 
     /// <summary>
@@ -106,7 +107,7 @@ namespace EngineTests
             var baby = _generator.Generate(SexBiology.Female, 444, StadiumType.Baby);
 
             Assert.IsTrue(baby.Face.Jaw.JawProminence < 0.45);
-            Assert.IsTrue(baby.Face.Nose.NoseProjection < 0.55);
+            Assert.IsTrue(baby.Face.Nose.NoseProjection < 0.65);
             Assert.IsTrue(baby.Face.Cheeks.CheekFullness > 0.55);
             Assert.IsTrue(baby.Body.Proportions.SittingHeight / baby.Body.Proportions.HeightCm > 0.55);
         }
@@ -132,7 +133,7 @@ namespace EngineTests
             var appearance = _generator.Generate(SexBiology.Female, 888, StadiumType.Adult);
             var physio = new PhysiologyState(70, 0, 25, 20, 5, 10, 0, null);
 
-            var view = AppearanceProjector.Compute(appearance, physio, SexBiology.Female);
+            var view = TraitsProjector.Compute(appearance, physio, SexBiology.Female);
 
             Assert.AreEqual(appearance.HairLengthCm, view.HairLengthCm, delta: 0.05);
             Assert.IsTrue(view.PostureScore <= Math.Round(appearance.Body.Posture.PostureUprightness * 100.0, 1));

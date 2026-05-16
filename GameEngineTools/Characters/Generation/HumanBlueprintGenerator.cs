@@ -258,10 +258,10 @@ namespace GameEngineTools.Characters.Generation
 
             var personality = _personalityGenerator.Generate(rng.Next(int.MinValue, int.MaxValue), hints, spec);
 
-            var appearance = _appearanceGenerator.Generate(sex, runtimeSeed, stadium);
+            var geneticBlueprint = _appearanceGenerator.GenerateBlueprint(sex, runtimeSeed);
             var attractionProfile = _attractionProfileGenerator.Generate(sex, rng);
 
-            return new HumanBlueprint(id, identity, sex, personality, appearance, attractionProfile, runtimeSeed);
+            return new HumanBlueprint(id, identity, sex, personality, geneticBlueprint, attractionProfile, runtimeSeed);
         }
 
         #endregion IHumanBlueprintGenerator

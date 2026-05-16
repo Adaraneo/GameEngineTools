@@ -30,6 +30,8 @@ using System.Text;
 using static GameEngineTools.Characters.Engines.ActionNames;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
+using GameEngineTools.Characters.Engines.Goals;
+using GameEngineTools.Characters.Engines.Schedule;
 
 // ── Game time ─────────────────────────────────────────────────────────────────
 var gameTimePath = Path.Combine(
@@ -189,6 +191,13 @@ foreach (var goal in playersGoals)
 }
 
 Console.WriteLine("Goals for player: {0}", playersGoals.Count > 0 ? sbPlayerGoals.ToString() : "None");
+
+sbPlayerGoals.Clear();
+var geng = runtime.Services.GetRequiredService<IGoalEngine>();
+var scheduler = runtime.Services.GetRequiredService<IScheduler>();
+
+var goalCharacters = manager.Characters.Where(c => c is NPC).Select(c => c).ToList();
+Console.WriteLine("Goal Characters: {0}", goalCharacters.Count);
 
 Console.WriteLine("Press any key to continue...");
 Console.ReadKey();

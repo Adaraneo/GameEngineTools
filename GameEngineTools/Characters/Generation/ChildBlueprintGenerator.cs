@@ -22,7 +22,7 @@ namespace GameEngineTools.Characters.Generation
 
     /// <summary>
     /// Minimal inheritance-based implementation for newborn blueprints.
-    /// It blends parent traits with a baby-stage baseline and deterministic variation.
+    /// Blends parent genetic latents with a baby-stage baseline and deterministic variation.
     /// </summary>
     public sealed class ChildBlueprintGenerator : IChildBlueprintGenerator
     {
@@ -65,8 +65,12 @@ namespace GameEngineTools.Characters.Generation
 
             var biology = PickBiology(rng);
             var identity = CreateIdentity(parentA, biology, bornOn, rng);
-            var baselineAppearance = _appearanceGenerator.Generate(biology, runtimeSeed, StadiumType.Baby);
-            var appearance = InheritAppearance(parentA.PhysicalAppearance, parentB.PhysicalAppearance, baselineAppearance, rng);
+
+            var baselineBlueprint = _appearanceGenerator.GenerateBlueprint(biology, runtimeSeed);
+            var parentABlueprint = parentA.GeneticBlueprint ?? baselineBlueprint;
+            var parentBBlueprint = parentB.GeneticBlueprint ?? baselineBlueprint;
+            var inheritedBlueprint = InheritLatents(parentABlueprint, parentBBlueprint, baselineBlueprint, rng);
+
             var baselinePersonality = _personalityGenerator.Generate(
                 runtimeSeed,
                 PersonalityHints.ForStadium(StadiumType.Baby),
@@ -78,7 +82,7 @@ namespace GameEngineTools.Characters.Generation
                 identity,
                 biology,
                 personality,
-                appearance,
+                inheritedBlueprint,
                 AttractionProfile: null,
                 Seed: runtimeSeed);
         }
@@ -87,33 +91,32 @@ namespace GameEngineTools.Characters.Generation
 
         #region Inheritance
 
-        private static PhysicalAppearance InheritAppearance(
-            PhysicalAppearance parentA,
-            PhysicalAppearance parentB,
-            PhysicalAppearance baseline,
+        private static GeneticBlueprint InheritLatents(
+            GeneticBlueprint parentA,
+            GeneticBlueprint parentB,
+            GeneticBlueprint baseline,
             IRandomSource rng)
         {
-            var parentHeightMean = (parentA.Body.Proportions.HeightCm + parentB.Body.Proportions.HeightCm) * 0.5;
-            var heightAdjustment = Math.Clamp((parentHeightMean - 170.0) * 0.06, -5.0, 5.0);
-            var height = Round1(Math.Clamp(baseline.Body.Proportions.HeightCm + heightAdjustment + Normalish(rng) * 1.5, 45.0, 95.0));
-            var noseProjection = Clamp01(Blend(parentA.Face.Nose.NoseProjection, parentB.Face.Nose.NoseProjection, baseline.Face.Nose.NoseProjection, rng, parentWeight: 0.35));
-            var lipFullness = Clamp01(Blend(
-                (parentA.Face.Mouth.UpperLipFullness + parentA.Face.Mouth.LowerLipFullness) * 0.5,
-                (parentB.Face.Mouth.UpperLipFullness + parentB.Face.Mouth.LowerLipFullness) * 0.5,
-                (baseline.Face.Mouth.UpperLipFullness + baseline.Face.Mouth.LowerLipFullness) * 0.5,
-                rng,
-                parentWeight: 0.45));
+            // Height: blend parent HeightNorm values with mild regression toward mean
+            var parentHeightNorm = (parentA.BodyLatent.HeightNorm + parentB.BodyLatent.HeightNorm) * 0.5;
+            var heightNorm = ClampSigned(parentHeightNorm * 0.45 + baseline.BodyLatent.HeightNorm * 0.55 + Normalish(rng) * 0.10);
+
+            // Nose and lip signals from face latents
+            var nose = Clamp01(Blend(parentA.FaceLatent.NoseScale, parentB.FaceLatent.NoseScale, baseline.FaceLatent.NoseScale, rng, parentWeight: 0.35));
+            var lip = Clamp01(Blend(parentA.FaceLatent.LipFullness, parentB.FaceLatent.LipFullness, baseline.FaceLatent.LipFullness, rng, parentWeight: 0.45));
+
+            // Colors — direct genetic inheritance
+            var colors = new ColorTraits(
+                PickInherited(parentA.Colors.SkinTone, parentB.Colors.SkinTone, baseline.Colors.SkinTone, rng),
+                PickInherited(parentA.Colors.EyeColor, parentB.Colors.EyeColor, baseline.Colors.EyeColor, rng),
+                PickInherited(parentA.Colors.HairColor, parentB.Colors.HairColor, baseline.Colors.HairColor, rng),
+                PickInherited(parentA.Colors.HairType, parentB.Colors.HairType, baseline.Colors.HairType, rng));
 
             return baseline with
             {
-                Body = ScaleBodyToHeight(baseline.Body, height),
-                Face = ApplyInheritedFaceSignals(baseline.Face, noseProjection, lipFullness),
-                Colors = new ColorTraits(
-                    PickInherited(parentA.Colors.SkinTone, parentB.Colors.SkinTone, baseline.Colors.SkinTone, rng),
-                    PickInherited(parentA.Colors.EyeColor, parentB.Colors.EyeColor, baseline.Colors.EyeColor, rng),
-                    PickInherited(parentA.Colors.HairColor, parentB.Colors.HairColor, baseline.Colors.HairColor, rng),
-                    PickInherited(parentA.Colors.HairType, parentB.Colors.HairType, baseline.Colors.HairType, rng)),
-                HairLengthCm = Round1(Math.Clamp(baseline.HairLengthCm + Normalish(rng) * 1.5, 0.0, 12.0))
+                Colors = colors,
+                BodyLatent = baseline.BodyLatent with { HeightNorm = Round3(heightNorm) },
+                FaceLatent = baseline.FaceLatent with { NoseScale = Round3(nose), LipFullness = Round3(lip) }
             };
         }
 
@@ -154,16 +157,8 @@ namespace GameEngineTools.Characters.Generation
         private static T PickInherited<T>(T parentA, T parentB, T baseline, IRandomSource rng)
         {
             var r = rng.NextUnit();
-            if (r < 0.42)
-            {
-                return parentA;
-            }
-
-            if (r < 0.84)
-            {
-                return parentB;
-            }
-
+            if (r < 0.42) return parentA;
+            if (r < 0.84) return parentB;
             return baseline;
         }
 
@@ -177,68 +172,9 @@ namespace GameEngineTools.Characters.Generation
         private static double Normalish(IRandomSource rng)
             => rng.NextUnit() + rng.NextUnit() + rng.NextUnit() - 1.5;
 
-        private static double Clamp01(double value)
-            => Math.Clamp(value, 0.0, 1.0);
-
-        private static double Round1(double value)
-            => Math.Round(value, 1);
-
-        private static BodyMorphology ScaleBodyToHeight(BodyMorphology body, double heightCm)
-        {
-            var scale = heightCm / Math.Max(1.0, body.Proportions.HeightCm);
-            var proportions = body.Proportions with
-            {
-                HeightCm = heightCm,
-                SittingHeight = Round1(body.Proportions.SittingHeight * scale),
-                LegLength = Round1(body.Proportions.LegLength * scale),
-                TorsoLength = Round1(body.Proportions.TorsoLength * scale),
-                ArmLength = Round1(body.Proportions.ArmLength * scale),
-                ForearmLength = Round1(body.Proportions.ForearmLength * scale),
-                UpperArmLength = Round1(body.Proportions.UpperArmLength * scale),
-                NeckLength = Round1(body.Proportions.NeckLength * scale)
-            };
-
-            return body with
-            {
-                Proportions = proportions,
-                Skeletal = body.Skeletal with
-                {
-                    ClavicleBreadth = Round1(body.Skeletal.ClavicleBreadth * scale),
-                    ShoulderBreadth = Round1(body.Skeletal.ShoulderBreadth * scale),
-                    RibcageWidth = Round1(body.Skeletal.RibcageWidth * scale),
-                    RibcageDepth = Round1(body.Skeletal.RibcageDepth * scale),
-                    ChestBreadth = Round1(body.Skeletal.ChestBreadth * scale),
-                    PelvicBreadth = Round1(body.Skeletal.PelvicBreadth * scale),
-                    WaistBaseWidth = Round1(body.Skeletal.WaistBaseWidth * scale),
-                    NeckThickness = Round1(body.Skeletal.NeckThickness * scale),
-                    HandSize = Round1(body.Skeletal.HandSize * scale),
-                    FootSize = Round1(body.Skeletal.FootSize * scale)
-                },
-                Silhouette = body.Silhouette with
-                {
-                    WaistWidth = Round1(body.Silhouette.WaistWidth * scale),
-                    HipWidth = Round1(body.Silhouette.HipWidth * scale)
-                }
-            };
-        }
-
-        private static FacialMorphology ApplyInheritedFaceSignals(FacialMorphology face, double noseProjection, double lipFullness)
-        {
-            return face with
-            {
-                Nose = face.Nose with
-                {
-                    NoseProjection = noseProjection,
-                    NoseTipProjection = Clamp01((face.Nose.NoseTipProjection + noseProjection) * 0.5)
-                },
-                Mouth = face.Mouth with
-                {
-                    UpperLipFullness = Clamp01(lipFullness * 0.92),
-                    LowerLipFullness = lipFullness,
-                    VermilionHeight = Clamp01(0.22 + lipFullness * 0.31)
-                }
-            };
-        }
+        private static double Clamp01(double value) => Math.Clamp(value, 0.0, 1.0);
+        private static double ClampSigned(double value) => Math.Clamp(value, -1.0, 1.0);
+        private static double Round3(double value) => Math.Round(value, 3);
 
         private static int DeriveSeed(HumanId parentA, HumanId parentB, WDateOnly bornOn)
         {
@@ -246,15 +182,9 @@ namespace GameEngineTools.Characters.Generation
             {
                 var hash = 17;
                 foreach (var b in parentA.Value.ToByteArray())
-                {
                     hash = hash * 31 + b;
-                }
-
                 foreach (var b in parentB.Value.ToByteArray())
-                {
                     hash = hash * 31 + b;
-                }
-
                 hash = hash * 31 + bornOn.DayIndex.GetHashCode();
                 return hash;
             }

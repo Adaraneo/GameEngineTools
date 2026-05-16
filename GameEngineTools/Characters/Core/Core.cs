@@ -16,6 +16,7 @@ namespace GameEngineTools.Characters.Core
     using Characters.Engines.SemanticMemory;
     using Characters.Traits;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Generation;
     using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -44,6 +45,11 @@ namespace GameEngineTools.Characters.Core
         Personality Personality { get; } // Trait modul (nemění se rychle)
         PsychologicalProfile PsychologyProfile { get; }
         PhysicalAppearance PhysicalAppearance { get; }
+
+        /// <summary>
+        /// Immutable genetic blueprint — null for test stubs that do not exercise appearance projection.
+        /// </summary>
+        GeneticBlueprint? GeneticBlueprint => null;
 
         AttractionProfile? AttractionProfile { get; }
 

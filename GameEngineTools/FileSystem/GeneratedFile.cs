@@ -138,7 +138,7 @@ namespace GameEngineTools.FileSystem
         public NPC ImportNPC(string filename)
         {
             var data = ReadJson(ResolveFileUnderRoot(NPCDirectory, filename));
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance, data.AttractionProfile);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
@@ -160,7 +160,7 @@ namespace GameEngineTools.FileSystem
         public PC ImportPC(string filename)
         {
             var data = ReadJson(ResolveFileUnderRoot(PlayerDirectory, filename));
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.PhysicalAppearance, data.AttractionProfile);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
@@ -200,7 +200,7 @@ namespace GameEngineTools.FileSystem
             Identity = character.Person.Identity,
             Biology = character.Person.Biology,
             Personality = character.Person.Personality,
-            PhysicalAppearance = character.Person.PhysicalAppearance,
+            GeneticBlueprint = character.Person.GeneticBlueprint ?? throw new InvalidOperationException($"Character {character.Person.Id.Value} has no GeneticBlueprint — cannot export."),
             AttractionProfile = character.Person.AttractionProfile,
             Snapshot = character.Person.Snapshot,
             MaxHealth = character.MaxHealth,
