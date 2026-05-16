@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Hosting
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
@@ -46,6 +47,10 @@ namespace GameEngineTools.Characters.Hosting
     /// Nullable for backwards compatibility with characters created before this field existed.
     /// </param>
     /// <param name="Seed">Optional RNG seed for deterministic engine initialisation.</param>
+    /// <param name="Occupation">
+    /// The character's occupation, used to seed the daily schedule.
+    /// <c>null</c> or <see cref="OccupationKind.None"/> means no fixed routine.
+    /// </param>
     public sealed record HumanBlueprint(
         HumanId Id,
         Identity Identity,
@@ -53,7 +58,8 @@ namespace GameEngineTools.Characters.Hosting
         Personality Personality,
         PhysicalAppearance PhysicalAppearance,
         AttractionProfile? AttractionProfile = null,
-        int? Seed = null);
+        int? Seed = null,
+        OccupationKind? Occupation = null);
 
     /// <summary>
     /// Default implementation of <see cref="IHumanFactory"/>.
@@ -124,22 +130,27 @@ namespace GameEngineTools.Characters.Hosting
             var rel = _sp.GetRequiredService<IRelationshipsEngine>();
             var mem = _sp.GetRequiredService<IMemoryEngine>();
             var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
-            var goal = _sp.GetRequiredService<IGoalEngine>();
+            var goal     = _sp.GetRequiredService<IGoalEngine>();
+            var schedule = _sp.GetRequiredService<IDailyScheduleEngine>();
 
             // Initial snapshot — State is always valid immediately after factory creation
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
-                Goals: goal.State);
+                Goals: goal.State, Schedule: schedule.State);
 
             var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.PhysicalAppearance,
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
-                physio, psych, behav, inter, rel, mem, semantic, goal,
+                physio, psych, behav, inter, rel, mem, semantic, goal, schedule,
                 snapshot,
                 _behaviorCadencePolicy);
 
             goal.SeedFromPersonality(b.Personality, _clock.Now);
+
+            var occupation = b.Occupation ?? OccupationKind.None;
+            schedule.SeedFromOccupation(occupation, b.Personality, _clock.Now, scheduler, b.Id);
+
             return human;
         }
 

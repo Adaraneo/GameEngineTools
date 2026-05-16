@@ -3,6 +3,7 @@
 
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Goals;
+using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Physiology;
@@ -207,7 +208,8 @@ namespace GameEngineTools
                 DefaultRelationshipsEngine,
                 DefaultMemoryEngine,
                 DefaultSemanticMemoryEngine,
-                DefaultGoalEngine>();
+                DefaultGoalEngine,
+                DefaultDailyScheduleEngine>();
 
             services.AddOptions<MenstrualCycleConfig>()
                     .BindConfiguration("Characters:MenstrualCycle");

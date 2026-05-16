@@ -6,6 +6,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
@@ -1429,7 +1430,8 @@ namespace EngineTests
             var relations = ServiceProvider.GetRequiredService<IRelationshipsEngine>();
             var memory = ServiceProvider.GetRequiredService<IMemoryEngine>();
             var semanticMemory = ServiceProvider.GetRequiredService<ISemanticMemoryEngine>();
-            var goal = ServiceProvider.GetRequiredService<IGoalEngine>();
+            var goal     = ServiceProvider.GetRequiredService<IGoalEngine>();
+            var schedule = ServiceProvider.GetRequiredService<IDailyScheduleEngine>();
 
             var snapshot = new EnginesSnapshot(
                 physio.State,
@@ -1439,7 +1441,8 @@ namespace EngineTests
                 relations.State,
                 memory.State,
                 semanticMemory.State,
-                Goals: goal.State);
+                Goals: goal.State,
+                Schedule: schedule.State);
 
             return new OrchestratedHuman(
                 id,
@@ -1460,6 +1463,7 @@ namespace EngineTests
                 memory: memory,
                 semanticMemory: semanticMemory,
                 goal: goal,
+                schedule: schedule,
                 initialSnapshot: snapshot,
                 behaviorCadencePolicy: null);
         }

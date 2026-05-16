@@ -650,7 +650,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 2005,
             Level = LogLevel.Debug,
-            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}, Familiarity={Familiarity:F1}, RomanticInterest={Romantic:F1}, SexualInterest={Sexual:F1}, AestheticAttraction={Aesthetic:F1}, PhysicalAttraction={Physical:F1}")]
+            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}, Familiarity={Familiarity:F1}, IntimateAffinity={IntimateAffinity:F1}, SexualInterest={Sexual:F1}, AestheticAttraction={Aesthetic:F1}, PhysicalAttraction={Physical:F1}")]
         public static partial void RelEdgeUpdated(
             this ILogger logger,
             string HumanId,
@@ -662,7 +662,7 @@ namespace GameEngineTools.Logging
             double Comfort,
             double Respect,
             double Familiarity,
-            double Romantic,
+            double IntimateAffinity,
             double Sexual,
             double Aesthetic,
             double Physical);
@@ -703,6 +703,68 @@ namespace GameEngineTools.Logging
             string Result);
 
         #endregion Relationships — vztahy
+
+        #region DailySchedule — 1400–1499
+
+        /// <summary>A new calendar day's slots have been registered with the scheduler.</summary>
+        [LoggerMessage(
+            EventId = 1400,
+            Level = LogLevel.Debug,
+            Message = "[SCHEDULE] {HumanId} Day {DayIndex} registered: {SlotCount} slots")]
+        public static partial void ScheduleDayRegistered(
+            this ILogger logger,
+            string HumanId,
+            int SlotCount,
+            long DayIndex);
+
+        /// <summary>A scheduled slot has fired and the action window is now active.</summary>
+        [LoggerMessage(
+            EventId = 1401,
+            Level = LogLevel.Debug,
+            Message = "[SCHEDULE] {HumanId} Slot triggered: {SlotId} → {Action} @ {Location}")]
+        public static partial void ScheduleSlotTriggered(
+            this ILogger logger,
+            string HumanId,
+            string SlotId,
+            string Action,
+            string Location);
+
+        /// <summary>A slot bias has been applied to a behavior candidate.</summary>
+        [LoggerMessage(
+            EventId = 1402,
+            Level = LogLevel.Debug,
+            Message = "[SCHEDULE] {HumanId} Bias +{Bias:F2} on {Action} from slot {SlotId}")]
+        public static partial void ScheduleSlotBiasApplied(
+            this ILogger logger,
+            string HumanId,
+            double Bias,
+            string Action,
+            string SlotId);
+
+        /// <summary>A skippable slot was ignored due to high stress or low energy.</summary>
+        [LoggerMessage(
+            EventId = 1403,
+            Level = LogLevel.Debug,
+            Message = "[SCHEDULE] {HumanId} Slot {SlotId} skipped (stress={Stress:F1}, energy={Energy:F1})")]
+        public static partial void ScheduleSlotSkipped(
+            this ILogger logger,
+            string HumanId,
+            string SlotId,
+            double Stress,
+            double Energy);
+
+        /// <summary>Daily schedule seeded from occupation at character creation.</summary>
+        [LoggerMessage(
+            EventId = 1404,
+            Level = LogLevel.Information,
+            Message = "[SCHEDULE] {HumanId} Schedule seeded: occupation={Occupation}, slots={SlotCount}")]
+        public static partial void ScheduleSeeded(
+            this ILogger logger,
+            string HumanId,
+            string Occupation,
+            int SlotCount);
+
+        #endregion DailySchedule — 1400–1499
 
         #region Goals — 1300–1399
 

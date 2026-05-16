@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Core
     using System.Text.Json.Serialization;
     using Characters.Engines.Behavior;
     using Characters.Engines.Goals;
+    using Characters.Engines.Schedule;
     using Characters.Engines.Interactions;
     using Characters.Engines.Physiology;
     using Characters.Engines.Psychology;
@@ -209,5 +210,10 @@ namespace GameEngineTools.Characters.Core
         /// Persistent long-term goals for this character.
         /// <c>null</c> for characters created before this field existed (backward compatibility).
         /// </summary>
-        GoalState? Goals = null);
+        GoalState? Goals = null,
+        /// <summary>
+        /// Daily schedule state for this character.
+        /// <c>null</c> for characters created before this field existed (backward compatibility).
+        /// </summary>
+        DailyScheduleState? Schedule = null);
 }

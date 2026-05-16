@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Core
     using System.Collections.Concurrent;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
@@ -110,6 +111,7 @@ namespace GameEngineTools.Characters.Core
         private readonly IMemoryEngine _memory;
         private readonly ISemanticMemoryEngine _semanticMemory;
         private readonly IGoalEngine _goal;
+        private readonly IDailyScheduleEngine _schedule;
 
         // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
         private readonly ConcurrentQueue<IDomainEvent> _inbox = new();
@@ -150,6 +152,7 @@ namespace GameEngineTools.Characters.Core
         /// <param name="memory">Memory engine instance.</param>
         /// <param name="semanticMemory">Semantic memory engine instance.</param>
         /// <param name="goal">Goal engine instance.</param>
+        /// <param name="schedule">Daily schedule engine instance.</param>
         /// <param name="initialSnapshot">Initial engine snapshot (provided by the factory).</param>
         public OrchestratedHuman(
             HumanId id,
@@ -172,6 +175,7 @@ namespace GameEngineTools.Characters.Core
             IMemoryEngine memory,
             ISemanticMemoryEngine semanticMemory,
             IGoalEngine goal,
+            IDailyScheduleEngine schedule,
             // initial snapshot (from factory)
             EnginesSnapshot initialSnapshot,
             // optional behavior cadence override
@@ -198,6 +202,7 @@ namespace GameEngineTools.Characters.Core
             _memory = memory;
             _semanticMemory = semanticMemory;
             _goal = goal;
+            _schedule = schedule;
 
             Snapshot = initialSnapshot;
             _behaviorCadencePolicy = behaviorCadencePolicy;
@@ -293,6 +298,7 @@ namespace GameEngineTools.Characters.Core
             _memory.Tick(now, dt, _ctx, outbox);
             _semanticMemory.Tick(now, dt, _ctx, outbox);
             _goal.Tick(now, dt, _ctx, outbox);
+            _schedule.Tick(now, dt, _ctx, outbox);
 
             // Final snapshot after all Phase B engines complete.
             RefreshSnapshot();
@@ -323,6 +329,7 @@ namespace GameEngineTools.Characters.Core
             _memory.RestoreState(snapshot.Memory);
             _semanticMemory.RestoreState(snapshot.SemanticMemory ?? SemanticMemoryState.Empty);
             _goal.RestoreState(snapshot.Goals ?? GoalState.Empty);
+            _schedule.RestoreState(snapshot.Schedule ?? DailyScheduleState.Empty);
         }
 
         /// <inheritdoc/>
@@ -430,6 +437,7 @@ namespace GameEngineTools.Characters.Core
             try { _memory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
             try { _semanticMemory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SemanticMemory.Handle failed.", Id.Value); }
             try { _goal.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Goal.Handle failed.", Id.Value); }
+            try { _schedule.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Schedule.Handle failed.", Id.Value); }
         }
 
         private void Deliver(IEventCollector collector)
@@ -497,7 +505,8 @@ namespace GameEngineTools.Characters.Core
                 AmbientTemperature: prev.AmbientTemperature,
                 AltitudeMeters:     prev.AltitudeMeters,
                 Celestial:          prev.Celestial,
-                Goals:              _goal.State);
+                Goals:              _goal.State,
+                Schedule:           _schedule.State);
 
             _ctx.Snapshot = Snapshot;
         }

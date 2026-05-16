@@ -13,6 +13,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Goals;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
@@ -272,7 +273,8 @@ namespace EngineTests
                 DefaultRelationshipsEngine,
                 DefaultMemoryEngine,
                 DefaultSemanticMemoryEngine,
-                DefaultGoalEngine>();
+                DefaultGoalEngine,
+                DefaultDailyScheduleEngine>();
 
             services.AddOptions<MenstrualCycleConfig>()
                     .BindConfiguration("Characters:MenstrualCycle");
