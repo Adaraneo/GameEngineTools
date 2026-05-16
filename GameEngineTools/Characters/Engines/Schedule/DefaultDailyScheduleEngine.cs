@@ -115,7 +115,13 @@ namespace GameEngineTools.Characters.Engines.Schedule
         #region IEngine — RestoreState
 
         /// <inheritdoc/>
-        public void RestoreState(DailyScheduleState state) => State = state;
+        public void RestoreState(DailyScheduleState state)
+        {
+            // Reset LastScheduledDayIndex so the first Tick() after restore re-registers
+            // today's slots with the (now empty) scheduler. Without this, the scheduler
+            // would have no callbacks and no slots would ever fire after a save/load.
+            State = state with { LastScheduledDayIndex = -1, ActiveSlot = null };
+        }
 
         #endregion
 
