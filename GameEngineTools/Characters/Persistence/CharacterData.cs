@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Persistence
 {
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
 
@@ -55,5 +56,11 @@ namespace GameEngineTools.Characters.Persistence
 
         /// <summary>Gets the total protection value derived from armour and other sources.</summary>
         public double Protection { get; init; }
+
+        /// <summary>
+        /// Gets the character's occupation, used to re-seed the daily schedule on import.
+        /// <c>null</c> for saves that pre-date this field — treated as <see cref="OccupationKind.None"/>.
+        /// </summary>
+        public OccupationKind? Occupation { get; init; }
     }
 }

@@ -31,7 +31,10 @@ using static GameEngineTools.Characters.Engines.ActionNames;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
 using GameEngineTools.Characters.Engines.Goals;
+using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Schedule;
+using GameEngineTools.Characters.Generation;
+using AppearanceProjector = GameEngineTools.Characters.Traits.AppearanceProjector;
 
 // ── Game time ─────────────────────────────────────────────────────────────────
 var gameTimePath = Path.Combine(
@@ -72,6 +75,15 @@ clock.SetNow(startNow);
 
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
+
+// Register all imported characters in FamilyGraph so that kin queries
+// work from the first tick. FamilyBuilder.Wire() calls Register() internally
+// for freshly generated families; for loaded characters we must do it manually.
+var familyGraph = runtime.Services.GetRequiredService<FamilyGraph>();
+foreach (var character in manager.Characters)
+{
+    familyGraph.Register(character.Person);
+}
 
 #region input settings
 
@@ -280,6 +292,8 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
         DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
         OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
+
+        HandleChildBornEvents(now, chars, familyGraph, manager, gf, runtime.Services);
 
         Console.Title = now.Date.ToString();
     }
@@ -713,6 +727,110 @@ static string? FindBestMoveTarget(
 
     // ochrana proti "move for no real gain" můžeš později zpřísnit
     return best.Score > 0.0 ? best.Id : null;
+}
+
+static void HandleChildBornEvents(
+    WDateTime now,
+    IReadOnlyList<IHuman> chars,
+    FamilyGraph familyGraph,
+    GameEngineToolsManager manager,
+    GeneratedFile gf,
+    IServiceProvider services)
+{
+    foreach (var character in chars)
+    {
+        // ChildBorn is emitted by the MOTHER's PhysiologyEngine.
+        // ParentA = mother (ctx.Id), ParentB = father (pregnancy.OtherParent).
+        var childBornEvent = character.LastOutbox
+            .OfType<ChildBorn>()
+            .FirstOrDefault();
+
+        if (childBornEvent is null)
+            continue;
+
+        var mother = character;
+        var father = chars.FirstOrDefault(c => c.Id == childBornEvent.ParentB);
+
+        if (father is null)
+        {
+            Console.WriteLine(
+                $"[ChildBorn] Warning: father {childBornEvent.ParentB.Value} " +
+                $"not found in scene — skipping newborn creation.");
+            continue;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine(
+            $"[ChildBorn] {mother.Identity.FirstName} + {father.Identity.FirstName} → new child!");
+        Console.ResetColor();
+
+        // ── Step 1: Generate the newborn blueprint from both parents ──────
+        var childBlueprintGen = services.GetRequiredService<IChildBlueprintGenerator>();
+        var humanFactory      = services.GetRequiredService<IHumanFactory>();
+
+        var childBlueprint = childBlueprintGen.Generate(
+            parentA: father,
+            parentB: mother,
+            bornOn:  now.Date,
+            seed:    null);
+
+        // ── Step 2: Create the IHuman ──────────────────────────────────────
+        // IHumanFactory.Create() automatically calls SeedFromPersonality and
+        // SeedFromOccupation(OccupationKind.None) — no manual seeding needed.
+        var newborn = humanFactory.Create(childBlueprint);
+
+        // ── Step 3: Wire family bonds into FamilyGraph ────────────────────
+        FamilyBuilder.WireNewborn(familyGraph, father, mother, newborn, now);
+
+        // Sibling bonds with all existing children of the father.
+        // GetKin(father, KinRole.Parent) returns KinLinks toward characters
+        // that father is a Parent of — i.e. father's children (= newborn's siblings).
+        var existingSiblings = familyGraph
+            .GetKin(father.Id, KinRole.Parent)
+            .Select(k => k.RelativeId)
+            .Where(id => id != newborn.Id)
+            .Select(id => chars.FirstOrDefault(c => c.Id == id))
+            .OfType<IHuman>()
+            .ToList();
+
+        foreach (var sibling in existingSiblings)
+        {
+            FamilyBuilder.AddSiblingBond(familyGraph, newborn, sibling, now);
+        }
+
+        // Paternal grandparents: GetKin(father, KinRole.Child) returns characters
+        // that father is a Child of — i.e. father's own parents.
+        foreach (var link in familyGraph.GetKin(father.Id, KinRole.Child))
+        {
+            var grandparent = chars.FirstOrDefault(c => c.Id == link.RelativeId);
+            if (grandparent is not null)
+                FamilyBuilder.AddGrandparentBond(familyGraph, grandparent, newborn, now);
+        }
+
+        // Maternal grandparents.
+        foreach (var link in familyGraph.GetKin(mother.Id, KinRole.Child))
+        {
+            var grandparent = chars.FirstOrDefault(c => c.Id == link.RelativeId);
+            if (grandparent is not null)
+                FamilyBuilder.AddGrandparentBond(familyGraph, grandparent, newborn, now);
+        }
+
+        // ── Step 4: Flush inbox so FamilyBondSeeded edges are applied ─────
+        newborn.FlushInbox();
+
+        // ── Step 5: Add to scene and export ───────────────────────────────
+        var npc = new NPC(maxHealth: 100, person: newborn);
+        manager.Characters.Add(npc);
+
+        gf.Export(npc);
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine(
+            $"[ChildBorn] Newborn added to scene and exported: " +
+            $"{newborn.Identity.FirstName} ({newborn.Biology}, age=0) " +
+            $"id={newborn.Id.Value}");
+        Console.ResetColor();
+    }
 }
 
 static double ScoreMoveTarget(

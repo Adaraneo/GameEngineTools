@@ -7,6 +7,7 @@ namespace GameEngineTools.FileSystem
     using System.Text.Json.Serialization;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Persistence;
@@ -138,7 +139,7 @@ namespace GameEngineTools.FileSystem
         public NPC ImportNPC(string filename)
         {
             var data = ReadJson(ResolveFileUnderRoot(NPCDirectory, filename));
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile, Occupation: data.Occupation ?? OccupationKind.None);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
@@ -160,7 +161,7 @@ namespace GameEngineTools.FileSystem
         public PC ImportPC(string filename)
         {
             var data = ReadJson(ResolveFileUnderRoot(PlayerDirectory, filename));
-            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile);
+            var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile, Occupation: data.Occupation ?? OccupationKind.None);
             var person = _humanFactory.Create(blueprint);
             person.RestoreSnapshot(data.Snapshot);
 
@@ -203,6 +204,7 @@ namespace GameEngineTools.FileSystem
             GeneticBlueprint = character.Person.GeneticBlueprint ?? throw new InvalidOperationException($"Character {character.Person.Id.Value} has no GeneticBlueprint — cannot export."),
             AttractionProfile = character.Person.AttractionProfile,
             Snapshot = character.Person.Snapshot,
+            Occupation = character.Person.Snapshot.Schedule?.Occupation,
             MaxHealth = character.MaxHealth,
             Health = character.Health,
             Armor = character.Armor,
