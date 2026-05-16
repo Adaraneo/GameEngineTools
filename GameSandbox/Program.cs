@@ -73,6 +73,8 @@ var startNow = initTicks == defaultTicks ? WDateTime.New(player.Person.Identity.
 
 clock.SetNow(startNow);
 
+Console.Title = startNow.Date.ToString();
+
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
 
@@ -193,23 +195,7 @@ var significantOtherPerson = significantOther.Person;
 var friendPerson = friend.Person;
 var friendSOPerson = friendSO.Person;
 
-Console.WriteLine("Before simulation starts:");
-
-playerPerson.Snapshot.Goals.Deconstruct(out var playersGoals);
-var sbPlayerGoals = new StringBuilder();
-foreach (var goal in playersGoals)
-{
-    sbPlayerGoals.AppendLine($"Kind: {goal.Kind}");
-}
-
-Console.WriteLine("Goals for player: {0}", playersGoals.Count > 0 ? sbPlayerGoals.ToString() : "None");
-
-sbPlayerGoals.Clear();
-var geng = runtime.Services.GetRequiredService<IGoalEngine>();
-var scheduler = runtime.Services.GetRequiredService<IScheduler>();
-
-var goalCharacters = manager.Characters.Where(c => c is NPC).Select(c => c).ToList();
-Console.WriteLine("Goal Characters: {0}", goalCharacters.Count);
+//Console.WriteLine("Before simulation starts:");
 
 Console.WriteLine("Press any key to continue...");
 Console.ReadKey();
@@ -344,6 +330,8 @@ if (characters.Count > 0)
             DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
             OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
+
+            HandleChildBornEvents(now, chars, familyGraph, manager, gf, runtime.Services);
 
             Console.Title = now.Date.ToString();
         }

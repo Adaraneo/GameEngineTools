@@ -49,6 +49,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
         private WDateTime? _stressAbove70Since;
+        private double _previousAllostaticLoad;
 
         /// <summary>
         /// Initialises the engine with a neutral resting state:
@@ -580,9 +581,37 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var newDom = InferEmotion(s);
             if (newDom != s.DominantEmotion)
             {
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
+                {
+                    _log.EmotionTransition(ctx.Id.Value.ToString(),
+                        s.DominantEmotion.ToString(), newDom.ToString(),
+                        s.Valence, s.Arousal, s.Stress);
+                }
                 s = s with { DominantEmotion = newDom };
                 outbox.Add(new EmotionShifted(now, ctx.Id, newDom, s.Valence, s.Arousal, s.Dominance));
             }
+
+            var moodDelta = s.MoodBaseline - State.MoodBaseline;
+            if (Math.Abs(moodDelta) > 5.0)
+            {
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
+                {
+                    _log.MoodBaselineShifted(ctx.Id.Value.ToString(), State.MoodBaseline, s.MoodBaseline, moodDelta);
+                }
+            }
+
+            foreach (var threshold in new[] { 60.0, 80.0 })
+            {
+                if (_previousAllostaticLoad < threshold && ph.AllostaticLoad >= threshold)
+                {
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
+                    {
+                        _log.AllostaticLoadMilestone(ctx.Id.Value.ToString(),
+                            threshold, _previousAllostaticLoad, ph.AllostaticLoad, ph.CortisolLevel);
+                    }
+                }
+            }
+            _previousAllostaticLoad = ph.AllostaticLoad;
 
             State = s;
 

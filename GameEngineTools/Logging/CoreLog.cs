@@ -149,6 +149,34 @@ namespace GameEngineTools.Logging
             Message = "[PSYCH/SLEEP] Nekvalitní spánek (kvalita={Quality:F0}) → stres +{StressDelta:F1}.")]
         public static partial void PsychSleepInterrupted(this ILogger logger, double Quality, double StressDelta);
 
+        /// <summary>Dominant emotion changed — transition with VAD context.</summary>
+        [LoggerMessage(
+            EventId = 5103,
+            Level = LogLevel.Information,
+            Message = "[PSYCH/EMOTION] {HumanId} {OldEmotion}->{NewEmotion} V:{Valence:+0.00;-0.00} A:{Arousal:F2} stress={Stress:F1}")]
+        public static partial void EmotionTransition(
+            this ILogger logger, string HumanId,
+            string OldEmotion, string NewEmotion,
+            double Valence, double Arousal, double Stress);
+
+        /// <summary>MoodBaseline shifted significantly (delta > 5 points).</summary>
+        [LoggerMessage(
+            EventId = 5104,
+            Level = LogLevel.Debug,
+            Message = "[PSYCH/MOOD] {HumanId} MoodBaseline {OldBaseline:F1}->{NewBaseline:F1} (Δ={Delta:+0.0;-0.0})")]
+        public static partial void MoodBaselineShifted(
+            this ILogger logger, string HumanId,
+            double OldBaseline, double NewBaseline, double Delta);
+
+        /// <summary>AllostaticLoad crossed a critical threshold (60 or 80).</summary>
+        [LoggerMessage(
+            EventId = 5105,
+            Level = LogLevel.Information,
+            Message = "[PSYCH/ALLOSTATIC] {HumanId} AllostaticLoad crossed {Threshold:F0}: {OldLoad:F1}->{NewLoad:F1} (cortisol={Cortisol:F1})")]
+        public static partial void AllostaticLoadMilestone(
+            this ILogger logger, string HumanId,
+            double Threshold, double OldLoad, double NewLoad, double Cortisol);
+
         #endregion Psychology
 
         #region Behavior — snapshoty
@@ -376,6 +404,24 @@ namespace GameEngineTools.Logging
             double Multiplier,
             double FlatBias);
 
+        /// <summary>Decision dominated by a habit trace (habit contributed >40% of utility).</summary>
+        [LoggerMessage(
+            EventId = 1015,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/HABIT] {HumanId} Habit dominated decision: {Action} (habitBias={HabitBias:F3}, totalUtility={TotalUtility:F3}, ratio={Ratio:F2})")]
+        public static partial void HabitDominatedDecision(
+            this ILogger logger, string HumanId, string Action,
+            double HabitBias, double TotalUtility, double Ratio);
+
+        /// <summary>A behavior need crossed a critical threshold.</summary>
+        [LoggerMessage(
+            EventId = 1016,
+            Level = LogLevel.Information,
+            Message = "[BEHAV/NEED] {HumanId} {Need} crossed threshold {Threshold:F0}: {OldValue:F1}->{NewValue:F1}")]
+        public static partial void NeedThresholdCrossed(
+            this ILogger logger, string HumanId, string Need,
+            double Threshold, double OldValue, double NewValue);
+
         #endregion Behavior — rozhodování
 
         #region Behavior/Sleep — spánkový subsystém
@@ -572,6 +618,15 @@ namespace GameEngineTools.Logging
             string ReprPotential,
             string Contraception);
 
+        /// <summary>Stress and noise caused misattribution — interaction outcome modified.</summary>
+        [LoggerMessage(
+            EventId = 1204,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/INTERACT] {HumanId} Misattribution penalty applied: {From}->{To}, stress={Stress:F1}, noise={Noise:F2}, penalty={Penalty:F2}")]
+        public static partial void MisattributionPenaltyApplied(
+            this ILogger logger, string HumanId, string From, string To,
+            double Stress, double Noise, double Penalty);
+
         #endregion Behavior/Interaction — kontext
 
         #region Memory — epizodická paměť
@@ -602,6 +657,24 @@ namespace GameEngineTools.Logging
             this ILogger logger,
             string HumanId,
             int Count);
+
+        /// <summary>Episodic memory drifted during recall (reconsolidation).</summary>
+        [LoggerMessage(
+            EventId = 3002,
+            Level = LogLevel.Debug,
+            Message = "[MEM/RECONSOL] {HumanId} Episode '{Tag}' drifted: emotion {OldEmotion}->{NewEmotion}, drift={DriftFraction:F3}")]
+        public static partial void MemoryReconsolidated(
+            this ILogger logger, string HumanId,
+            string Tag, string OldEmotion, string NewEmotion, double DriftFraction);
+
+        /// <summary>SemanticMemory belief updated significantly (delta > 0.1).</summary>
+        [LoggerMessage(
+            EventId = 3003,
+            Level = LogLevel.Debug,
+            Message = "[MEM/BELIEF] {HumanId} Belief about {Other}: {Kind} {OldStrength:F2}->{NewStrength:F2} (evidence={EvidenceCount})")]
+        public static partial void BeliefUpdated(
+            this ILogger logger, string HumanId, string Other,
+            string Kind, double OldStrength, double NewStrength, int EvidenceCount);
 
         #endregion Memory — epizodická paměť
 
@@ -688,6 +761,50 @@ namespace GameEngineTools.Logging
             string A,
             string B,
             double Like);
+
+        /// <summary>Sexual encounter outcome resolved — accepted or declined.</summary>
+        [LoggerMessage(
+            EventId = 2008,
+            Level = LogLevel.Information,
+            Message = "[REL/SEX] {HumanId} Sexual encounter {From}->{To}: outcome={Outcome}, intimateAffinity={IntimateAffinity:F1}, sexualInterest={SexualInterest:F1}, closeness={Closeness:F1}")]
+        public static partial void SexualEncounterOutcome(
+            this ILogger logger, string HumanId, string From, string To,
+            string Outcome, double IntimateAffinity, double SexualInterest, double Closeness);
+
+        /// <summary>Per-edge dimension detail for decay — which dims changed and by how much.</summary>
+        [LoggerMessage(
+            EventId = 2009,
+            Level = LogLevel.Debug,
+            Message = "[REL/DECAY] {HumanId} Edge {From}->{To}: {Changes}")]
+        public static partial void RelDecayDimensionDetail(
+            this ILogger logger, string HumanId, string From, string To, string Changes);
+
+        /// <summary>A relationship dimension crossed a significant milestone threshold.</summary>
+        [LoggerMessage(
+            EventId = 2010,
+            Level = LogLevel.Information,
+            Message = "[REL/MILESTONE] {HumanId} {From}->{To}: {Dimension} crossed {Threshold:F0} ({OldValue:F1}->{NewValue:F1})")]
+        public static partial void RelationshipMilestoneReached(
+            this ILogger logger, string HumanId, string From, string To,
+            string Dimension, double Threshold, double OldValue, double NewValue);
+
+        /// <summary>Third-party observation changed B's edge toward A.</summary>
+        [LoggerMessage(
+            EventId = 2011,
+            Level = LogLevel.Debug,
+            Message = "[REL/THIRD] {Observer} observed {Actor} act on {Target}: {Dimension} {OldValue:F1}->{NewValue:F1} (weight={Weight:F2})")]
+        public static partial void ThirdPartyReputationChanged(
+            this ILogger logger, string Observer, string Actor, string Target,
+            string Dimension, double OldValue, double NewValue, double Weight);
+
+        /// <summary>Jealousy distress applied — TransgressionResidue increased.</summary>
+        [LoggerMessage(
+            EventId = 2012,
+            Level = LogLevel.Information,
+            Message = "[REL/JEALOUSY] {HumanId} Jealousy distress: {IntimateActor}->{IntimateTarget} observed, transgressionResidue {OldResidue:F2}->{NewResidue:F2}")]
+        public static partial void JealousyDistressApplied(
+            this ILogger logger, string HumanId, string IntimateActor, string IntimateTarget,
+            double OldResidue, double NewResidue);
 
         [LoggerMessage(
             EventId = 1202,

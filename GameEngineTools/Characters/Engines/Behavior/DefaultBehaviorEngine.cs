@@ -93,7 +93,32 @@ namespace GameEngineTools.Characters.Engines.Behavior
             // Build the tick-local behavior context before delegating to sub-engines.
             var updatedCooldowns = BehaviorMath.UpdateCooldowns(State.Cooldowns, Math.Max(0, dt.TotalHours));
             var stateWithHabits = State with { HabitTraces = BehaviorHabitLearning.Decay(State.HabitTraces, dt, Config, ctx, _log) };
+            var previousNeeds = stateWithHabits;
             var stateWithNeeds = BehaviorMath.ComputeNeedState(ctx, updatedCooldowns, stateWithHabits) with { Cooldowns = updatedCooldowns };
+
+            // Log need threshold crossings (thresholds: 70 and 85)
+            {
+                var needThresholds = new[] { 70.0, 85.0 };
+                void CheckNeed(string name, double before, double after)
+                {
+                    foreach (var t in needThresholds)
+                    {
+                        if (before < t && after >= t)
+                        {
+                            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultBehaviorEngine)))
+                            {
+                                _log.NeedThresholdCrossed(ctx.Id.Value.ToString(), name, t, before, after);
+                            }
+                        }
+                    }
+                }
+                CheckNeed("Rest", previousNeeds.NeedRest, stateWithNeeds.NeedRest);
+                CheckNeed("Food", previousNeeds.NeedFood, stateWithNeeds.NeedFood);
+                CheckNeed("Water", previousNeeds.NeedWater, stateWithNeeds.NeedWater);
+                CheckNeed("Belonging", previousNeeds.NeedBelonging, stateWithNeeds.NeedBelonging);
+                CheckNeed("Intimacy", previousNeeds.NeedIntimacy, stateWithNeeds.NeedIntimacy);
+            }
+
             State = stateWithNeeds;
 
             IReadOnlyList<WorldObject>? availableObjects = null;

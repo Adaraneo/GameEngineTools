@@ -252,6 +252,23 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var pAcc = Math.Clamp(baseP, 0.05, 0.95);
             var accepted = ctx.Random.Chance(pAcc);
 
+            if (misattrib > 0.05)
+            {
+                using (_log.BeginCharacterScope(
+                    ctx.Id.Value,
+                    nameof(DefaultInteractionEngine),
+                    relatedPersonId: p.From.Value,
+                    locationId: State.Location,
+                    tickKey: p.OccurredAt.WorldTicks.ToString()))
+                {
+                    _log.MisattributionPenaltyApplied(
+                        ctx.Id.Value.ToString(),
+                        p.From.Value.ToString(),
+                        p.To.Value.ToString(),
+                        psych.Stress, noise, misattrib);
+                }
+            }
+
             using (_log.BeginCharacterScope(
                 ctx.Id.Value,
                 nameof(DefaultInteractionEngine),

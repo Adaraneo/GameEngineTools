@@ -516,6 +516,28 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         detail: $"actor={tpa.Actor.Value}, target={tpa.Target.Value}, valence={tpa.Valence:F1}",
                         now: tpa.OccurredAt);
 
+                        // Log third-party reputation change
+                        if (State.Edges.TryGetValue(tpa.Actor, out var tpaEdgeAfter))
+                        {
+                            var (tpaDimension, tpaOldValue, tpaNewValue) = tpa.Type switch
+                            {
+                                ThirdPartyObservationType.PositiveAct  => ("Like", tpaEdgeAfter.Like - 2.0 * gossipScale, tpaEdgeAfter.Like),
+                                ThirdPartyObservationType.NegativeAct  => ("Like", tpaEdgeAfter.Like + 2.5 * gossipScale, tpaEdgeAfter.Like),
+                                ThirdPartyObservationType.Betrayal     => ("Like", tpaEdgeAfter.Like + 20.0 * gossipScale, tpaEdgeAfter.Like),
+                                _                                       => ("Like", tpaEdgeAfter.Like, tpaEdgeAfter.Like)
+                            };
+                            using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: tpa.Actor.Value))
+                            {
+                                _log.ThirdPartyReputationChanged(
+                                    self.Value.ToString(),
+                                    tpa.Actor.Value.ToString(),
+                                    tpa.Target.Value.ToString(),
+                                    tpaDimension,
+                                    tpaOldValue, tpaNewValue,
+                                    gossipScale);
+                            }
+                        }
+
                         // Žárlivost — IntimateAct u osoby, k níž má pozorovatel romantický/sexuální zájem.
                         // Robustní sex difference ve forced-choice formátu (Buss et al. 1992, 48 zemí).
                         // Distribuce se překrývají → individální variance přes AttachmentAnxiety a SOI.
@@ -534,6 +556,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                                       * (1.0 + anxiety * 0.8)
                                                       * (1.0 - soiAttitude * 0.3);
                                 var transgressionAmount = Math.Clamp(jealousyIntensity * 12.0, 0, 20.0);
+                                var oldResidue = State.Edges.TryGetValue(tpa.Actor, out var jealEdge) ? jealEdge.TransgressionResidue : 0.0;
                                 Upsert(self, tpa.Actor, e => e with
                                 {
                                     TransgressionResidue = Math.Min(100, e.TransgressionResidue + transgressionAmount)
@@ -541,6 +564,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 eventType: "JealousyDistress",
                                 outcome: $"distress={transgressionAmount:F1}",
                                 detail: $"actor={tpa.Actor.Value}, intimacyInterest={intimacyInterest:F0}");
+
+                                using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: tpa.Actor.Value))
+                                {
+                                    _log.JealousyDistressApplied(
+                                        self.Value.ToString(),
+                                        tpa.Actor.Value.ToString(),
+                                        tpa.Target.Value.ToString(),
+                                        oldResidue, oldResidue + transgressionAmount);
+                                }
                             }
                         }
                         break;
@@ -610,6 +642,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             outcome: "declined",
                             detail: $"self={(se.From == self ? "initiator" : "recipient")}",
                             now: se.OccurredAt);
+                        }
+
+                        if (State.Edges.TryGetValue(otherId, out var seEdge))
+                        {
+                            using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: otherId.Value))
+                            {
+                                _log.SexualEncounterOutcome(
+                                    self.Value.ToString(), se.From.Value.ToString(), se.To.Value.ToString(),
+                                    se.Accepted ? "accepted" : "declined",
+                                    seEdge.IntimateAffinity, seEdge.SexualInterest, seEdge.Closeness);
+                            }
                         }
 
                         break;
@@ -829,7 +872,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     ? Config.DecayMultiplierSexualInterest * Config.TonicSexualInterestDecayFactor
                     : Config.DecayMultiplierSexualInterest;
 
-                dict[kv.Key] = e with
+                var decayed = e with
                 {
                     Like = Clamp(Approach(e.Like, 50, d * Config.DecayMultiplierLike) + valenceEffect - stressEffect - familiarityLikePenalty),
                     Trust = Clamp(Approach(e.Trust, 50, d * Config.DecayMultiplierTrust)),
@@ -856,6 +899,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         Physical: e.Breakdown.Physical
                     )
                 };
+
+                // Log meaningful dimension changes and milestone crossings
+                var decayChanges = BuildDecayChangesString(e, decayed);
+                if (decayChanges.Length > 0)
+                {
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: kv.Key.Value))
+                    {
+                        _log.RelDecayDimensionDetail(ctx.Id.Value.ToString(), e.A.Value.ToString(), e.B.Value.ToString(), decayChanges);
+                    }
+                }
+                CheckMilestones(ctx.Id, e, decayed);
+
+                dict[kv.Key] = decayed;
             }
 
             State = new RelationshipState(dict);

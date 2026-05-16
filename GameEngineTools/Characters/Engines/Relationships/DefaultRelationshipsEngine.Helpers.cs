@@ -434,6 +434,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     updated.Comfort, updated.Respect, updated.Familiarity, updated.IntimateAffinity, updated.SexualInterest, updated.AestheticAttraction, updated.PhysicalAttraction);
             }
 
+            CheckMilestones(self, e, updated);
+
             dict[other] = updated;
             State = new RelationshipState(dict);
         }
@@ -464,6 +466,53 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 : Math.Max(target, cur - amount);
 
         #endregion Private methods — helpers
+
+        #region Private methods — decay logging helpers
+
+        /// <summary>
+        /// Produces a compact string listing relationship dimensions that changed by more than 0.05
+        /// between <paramref name="before"/> and <paramref name="after"/>.
+        /// </summary>
+        private static string BuildDecayChangesString(RelationshipEdge before, RelationshipEdge after)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            void Check(string name, double b, double a) { if (Math.Abs(a - b) > 0.05) parts.Add($"{name}:{b:F1}→{a:F1}"); }
+            Check("Like", before.Like, after.Like);
+            Check("Trust", before.Trust, after.Trust);
+            Check("Closeness", before.Closeness, after.Closeness);
+            Check("Familiarity", before.Familiarity, after.Familiarity);
+            Check("IntimateAffinity", before.IntimateAffinity, after.IntimateAffinity);
+            return string.Join(", ", parts);
+        }
+
+        /// <summary>
+        /// Checks whether any tracked relationship dimension crossed a milestone threshold
+        /// (25, 50, 75, or 90) between <paramref name="before"/> and <paramref name="after"/>,
+        /// and logs via <see cref="CoreLog.RelationshipMilestoneReached"/> when it did.
+        /// </summary>
+        private void CheckMilestones(HumanId self, RelationshipEdge before, RelationshipEdge after)
+        {
+            var milestones = new[] { 25.0, 50.0, 75.0, 90.0 };
+            void CheckDim(string name, double b, double a)
+            {
+                foreach (var t in milestones)
+                {
+                    if (b < t && a >= t)
+                    {
+                        using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine)))
+                        {
+                            _log.RelationshipMilestoneReached(self.Value.ToString(), after.A.Value.ToString(), after.B.Value.ToString(), name, t, b, a);
+                        }
+                    }
+                }
+            }
+            CheckDim("Like", before.Like, after.Like);
+            CheckDim("Trust", before.Trust, after.Trust);
+            CheckDim("Closeness", before.Closeness, after.Closeness);
+            CheckDim("IntimateAffinity", before.IntimateAffinity, after.IntimateAffinity);
+        }
+
+        #endregion Private methods — decay logging helpers
 
         #region Private methods — third-party gossip
 

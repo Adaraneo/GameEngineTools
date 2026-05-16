@@ -640,6 +640,19 @@ namespace GameEngineTools.Characters.Engines.Memory
                                 Emotion = newEmotion
                             };
                             State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
+
+                            if (newEmotion != ep.Emotion)
+                            {
+                                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultMemoryEngine)))
+                                {
+                                    _log.MemoryReconsolidated(
+                                        ctx.Id.Value.ToString(),
+                                        ep.What,
+                                        ep.Emotion.ToString(),
+                                        newEmotion.ToString(),
+                                        driftRate);
+                                }
+                            }
                         }
                         break;
                     }

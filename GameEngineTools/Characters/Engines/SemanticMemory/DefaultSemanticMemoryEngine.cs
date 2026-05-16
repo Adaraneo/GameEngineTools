@@ -9,7 +9,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using static GameEngineTools.Characters.Engines.Memory.MemoryWhatParser;
 
@@ -23,11 +25,19 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         #endregion
 
+        #region Private fields
+
+        private readonly ILogger _log;
+
+        #endregion
+
         #region Construction
 
-        public DefaultSemanticMemoryEngine(IOptions<SemanticMemoryConfig> cfg)
+        public DefaultSemanticMemoryEngine(IOptions<SemanticMemoryConfig> cfg, ILoggerFactory? loggerFactory = null)
         {
             Config = cfg.Value;
+            _log = (loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance)
+                .CreateLogger<DefaultSemanticMemoryEngine>();
             State = SemanticMemoryState.Empty;
         }
 
@@ -139,6 +149,20 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 beliefs[interpretation.Kind] = updated;
                 ApplyContradiction(encoded.OccurredAt, beliefs, interpretation.Kind, interpretation.Weight, interpretation.SupportCount, contradictionMult);
                 outbox.Add(new SemanticBeliefUpdated(encoded.OccurredAt, ctx.Id, other.Value, interpretation.Kind, updated.Strength, updated.EvidenceCount));
+
+                if (Math.Abs(updated.Strength - current.Strength) > 0.1)
+                {
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSemanticMemoryEngine), relatedPersonId: other.Value.Value))
+                    {
+                        _log.BeliefUpdated(
+                            ctx.Id.Value.ToString(),
+                            other.Value.Value.ToString(),
+                            interpretation.Kind.ToString(),
+                            current.Strength,
+                            updated.Strength,
+                            updated.EvidenceCount);
+                    }
+                }
             }
 
             people[other.Value] = set with { Beliefs = beliefs };

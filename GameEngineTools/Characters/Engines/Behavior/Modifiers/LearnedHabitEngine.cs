@@ -50,6 +50,24 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 var afterUtility = Math.Max(0.0, (candidate.Utility * multiplier) + flatBias);
                 candidates[i] = candidate with { Utility = afterUtility };
                 LogBiasApplied(context, candidate.Name, beforeUtility, afterUtility, bias, multiplier, flatBias);
+
+                if (_log is not null && afterUtility > 0.0)
+                {
+                    var habitContribution = afterUtility - beforeUtility;
+                    var ratio = habitContribution / afterUtility;
+                    if (ratio > 0.40)
+                    {
+                        using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(LearnedHabitEngine)))
+                        {
+                            _log.HabitDominatedDecision(
+                                context.HumanContext.Id.Value.ToString(),
+                                candidate.Name,
+                                habitContribution,
+                                afterUtility,
+                                ratio);
+                        }
+                    }
+                }
             }
         }
 
