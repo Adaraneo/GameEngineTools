@@ -5,7 +5,6 @@ namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Memory;
-    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.World.Utils.Time;
     using System;
     using static GameEngineTools.Characters.Engines.Memory.MemoryWhatParser;
@@ -79,7 +78,7 @@ namespace EngineTests
             Assert.AreNotEqual(keyHelp, keySupport);
         }
 
-        #endregion
+        #endregion Reinforcement
 
         #region Parser
 
@@ -122,7 +121,7 @@ namespace EngineTests
             Assert.AreEqual(PerceivedMemoryTone.Threat, descriptor.PerceivedTone);
         }
 
-        #endregion
+        #endregion Parser
 
         [TestMethod]
         public void GetMicroEventKind_Help_ReturnsCanonicalToken()

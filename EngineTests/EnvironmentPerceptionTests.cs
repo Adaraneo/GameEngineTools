@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -16,6 +14,7 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
 
     /// <summary>
     /// Tests for E1 (proxemics), E2 (noise misattribution), E3 (privacy non-monotonicity),
@@ -52,10 +51,10 @@ namespace EngineTests
         {
             // Being > 3.6m away should not add proxemics stress.
             // Use identical surfaces so E3 privacy mismatch is equal for both.
-            var engineFar   = BuildPsychEngine();
+            var engineFar = BuildPsychEngine();
             var engineNoPos = BuildPsychEngine();
 
-            var ctxFar   = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Public,
+            var ctxFar = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Public,
                 proxemicDistance: 5.0);
             // Same surface as ctxFar but no proxemic distance — only difference is distance
             var ctxNoPos = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Public,
@@ -74,11 +73,11 @@ namespace EngineTests
         {
             // With HasPrivacy=true (e.g. partner in private room), intimate zone is NOT a violation.
             var enginePrivate = BuildPsychEngine();
-            var enginePublic  = BuildPsychEngine();
+            var enginePublic = BuildPsychEngine();
 
             var ctxPrivate = BuildCtx(hasPrivacy: true, surfaceKind: SurfaceKind.Private,
                 proxemicDistance: 0.20);
-            var ctxPublic  = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Social,
+            var ctxPublic = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Social,
                 proxemicDistance: 0.20);
 
             var outbox = new EventCollector();
@@ -102,9 +101,9 @@ namespace EngineTests
             var engineNoisy = new DefaultInteractionEngine(Options.Create(cfg),
                 LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
 
-            var self     = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var proposer = new HumanId(Guid.NewGuid());
-            var rng      = new SeededRandom(42);
+            var rng = new SeededRandom(42);
 
             engineQuiet.Handle(new ContextChanged(WDateTime.New(100, 1, 1), self,
                 "loc", false, 0.05, 0.3, SurfaceKind.Social), BuildMinCtx(self), new EventCollector());
@@ -141,12 +140,12 @@ namespace EngineTests
         public void E3_IntrovertInPublic_HigherStress_ThanInPrivate()
         {
             // Introvert (E=0.1) in public → strong privacy mismatch → more stress
-            var enginePublic  = BuildPsychEngine(extraversion: 0.1);
+            var enginePublic = BuildPsychEngine(extraversion: 0.1);
             var enginePrivate = BuildPsychEngine(extraversion: 0.1);
 
-            var ctxPublic  = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Public,
+            var ctxPublic = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Public,
                 extraversion: 0.1);
-            var ctxPrivate = BuildCtx(hasPrivacy: true,  surfaceKind: SurfaceKind.Private,
+            var ctxPrivate = BuildCtx(hasPrivacy: true, surfaceKind: SurfaceKind.Private,
                 extraversion: 0.1);
 
             var outbox = new EventCollector();
@@ -162,12 +161,12 @@ namespace EngineTests
         public void E3_ExtrovertInIsolation_HigherStress_ThanInPublic()
         {
             // Extravert (E=0.9) in isolation (HasPrivacy=true, Private) → stress from over-privacy
-            var enginePublic   = BuildPsychEngine(extraversion: 0.9);
+            var enginePublic = BuildPsychEngine(extraversion: 0.9);
             var engineIsolated = BuildPsychEngine(extraversion: 0.9);
 
-            var ctxPublic   = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Social,
+            var ctxPublic = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Social,
                 extraversion: 0.9);
-            var ctxIsolated = BuildCtx(hasPrivacy: true,  surfaceKind: SurfaceKind.Private,
+            var ctxIsolated = BuildCtx(hasPrivacy: true, surfaceKind: SurfaceKind.Private,
                 extraversion: 0.9);
 
             var outbox = new EventCollector();
@@ -185,10 +184,10 @@ namespace EngineTests
         public void E4_HighNeuroticism_HigherStress_FromZoneViolation()
         {
             // High-N character should accumulate more stress from intimate zone violation.
-            var engineLowN  = BuildPsychEngine(neuroticism: 0.1);
+            var engineLowN = BuildPsychEngine(neuroticism: 0.1);
             var engineHighN = BuildPsychEngine(neuroticism: 0.9);
 
-            var ctxLowN  = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Social,
+            var ctxLowN = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Social,
                 proxemicDistance: 0.30, neuroticism: 0.1);
             var ctxHighN = BuildCtx(hasPrivacy: false, surfaceKind: SurfaceKind.Social,
                 proxemicDistance: 0.30, neuroticism: 0.9);
@@ -260,7 +259,7 @@ namespace EngineTests
             double neuroticism = 0.5, double extraversion = 0.5)
         {
             var physio = new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null);
-            var psych  = new PsychologyState(0.0, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral,
+            var psych = new PsychologyState(0.0, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral,
                 Motivations: new MotivationState());
             var personality = new Personality(
                 new BigFive(0.5, 0.5, extraversion, 0.5, neuroticism),
@@ -283,18 +282,22 @@ namespace EngineTests
                 new MemoryIndex(new System.Collections.Generic.List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id = new HumanId(Guid.NewGuid()), Biology = SexBiology.Female,
-                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot = snapshot, Random = new ZeroRandom(),
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
         private static IHumanContext BuildMinCtx(HumanId id)
         {
             var physio = new PhysiologyState(80, 0, 5, 5, 0, 0, 0, null);
-            var psych  = new PsychologyState(0.0, 0.4, 0.5, 0, 10, DiscreteEmotion.Neutral);
+            var psych = new PsychologyState(0.0, 0.4, 0.5, 0, 10, DiscreteEmotion.Neutral);
             var personality = new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
@@ -307,18 +310,22 @@ namespace EngineTests
                 new MemoryIndex(new System.Collections.Generic.List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id = id, Biology = SexBiology.Female,
-                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot = snapshot, Random = new ZeroRandom(),
+                Id = id,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
         private static IHumanContext BuildMinCtxWithStress(HumanId id, double stress, IRandomSource random)
         {
             var physio = new PhysiologyState(80, 0, 5, 5, 0, 0, 0, null);
-            var psych  = new PsychologyState(0.0, 0.4, 0.5, stress, 10, DiscreteEmotion.Neutral);
+            var psych = new PsychologyState(0.0, 0.4, 0.5, stress, 10, DiscreteEmotion.Neutral);
             var personality = new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
@@ -331,45 +338,65 @@ namespace EngineTests
                 new MemoryIndex(new System.Collections.Generic.List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id = id, Biology = SexBiology.Female,
-                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot = snapshot, Random = random,
+                Id = id,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = random,
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
         private sealed class ZeroRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => false;
         }
 
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _r;
+
             public SeededRandom(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent e) { }
+            public void Publish(IDomainEvent e)
+            { }
+
             public IDisposable Subscribe<T>(Action<T> h) where T : class, IDomainEvent => new D();
         }
 
         private sealed class NullScheduler : IScheduler
         {
             public ScheduledId ScheduleAt(WDateTime w, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime n, WTimeSpan d, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => true;
+
             public System.Collections.Generic.IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime n)
                 => System.Linq.Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
-        private sealed class D : IDisposable { public void Dispose() { } }
+        private sealed class D : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
     }
 }

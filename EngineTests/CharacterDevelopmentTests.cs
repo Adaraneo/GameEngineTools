@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -18,14 +15,17 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
-    using GenProjector = GameEngineTools.Characters.Generation.AppearanceProjector;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
+    using GenProjector = GameEngineTools.Characters.Generation.AppearanceProjector;
 
     [TestClass]
     public class CharacterDevelopmentTests : TestBase
@@ -212,16 +212,26 @@ namespace EngineTests
             public IReadOnlyList<IDomainEvent> LastOutbox => Array.Empty<IDomainEvent>();
             public int Age => 30;
             public StadiumType Stadium => StadiumType.Adult;
-            public void Tick(WDateTime now, WTimeSpan dt) { }
-            public void ReceiveEvent(IDomainEvent @event) { }
-            public void RestoreSnapshot(EnginesSnapshot snapshot) { }
-            public void FlushInbox() { }
+
+            public void Tick(WDateTime now, WTimeSpan dt)
+            { }
+
+            public void ReceiveEvent(IDomainEvent @event)
+            { }
+
+            public void RestoreSnapshot(EnginesSnapshot snapshot)
+            { }
+
+            public void FlushInbox()
+            { }
         }
 
         private sealed class NeverConflictRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0;
+
             public bool Chance(double p) => false;
         }
     }

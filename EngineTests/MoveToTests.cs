@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -20,6 +17,9 @@ namespace EngineTests
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -142,8 +142,8 @@ namespace EngineTests
                 competence: 0.5, curiosity: 0.5,
                 chronotype: Chronotype.Neutral);
 
-            var engine  = BuildEngine();
-            var outbox  = new EventCollector();
+            var engine = BuildEngine();
+            var outbox = new EventCollector();
 
             // Act — dead of night: chronoBonus=0 for all chronotypes
             engine.Tick(DeadOfNight, WTimeSpan.FromHours(1), ctx, outbox);
@@ -591,7 +591,7 @@ namespace EngineTests
             // there is no strong independent movement pressure either.
             foreach (var chronotype in new[] { Chronotype.Lark, Chronotype.Owl, Chronotype.Neutral })
             {
-                var ctx    = BuildContext(noise: 0.3, crowding: 0.3, stress: 0,
+                var ctx = BuildContext(noise: 0.3, crowding: 0.3, stress: 0,
                                          affiliation: 0.5, competence: 0.5, curiosity: 0.5,
                                          chronotype: chronotype);
                 var engine = BuildEngine();
@@ -626,7 +626,7 @@ namespace EngineTests
         public void Tick_UnplacedCharacterWithNaNSurface_ProducesValidUtilities()
         {
             // Arrange — default context uses InteractionSurface(null, false, NaN, NaN)
-            var ctx    = BuildContext(noise: double.NaN, crowding: double.NaN,
+            var ctx = BuildContext(noise: double.NaN, crowding: double.NaN,
                                      stress: 0, affiliation: 0.5,
                                      competence: 0.5, curiosity: 0.5,
                                      chronotype: Chronotype.Neutral);
@@ -947,13 +947,17 @@ namespace EngineTests
         private sealed class ZeroRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
-            public double NextUnit()          => 0.0;
-            public bool Chance(double p)      => false;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => false;
         }
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> h)
                 where TEvent : class, IDomainEvent => new Disposable();
         }
@@ -974,7 +978,8 @@ namespace EngineTests
 
         private sealed class Disposable : IDisposable
         {
-            public void Dispose() { }
+            public void Dispose()
+            { }
         }
 
         #endregion Fake implementations

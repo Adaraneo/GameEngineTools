@@ -1,6 +1,6 @@
-using System.Text.Json;
 using LogsResolver.Models;
 using LogsResolver.Services;
+using System.Text.Json;
 
 namespace LogsResolverTests;
 

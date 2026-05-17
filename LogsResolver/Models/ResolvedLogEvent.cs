@@ -2,19 +2,19 @@ namespace LogsResolver.Models;
 
 public sealed class ResolvedLogEvent
 {
-    public required long EventInstanceId { get; init; }
+    public long EventInstanceId { get; init; }
 
-    public required DateTimeOffset RealTimestamp { get; init; }
+    public DateTimeOffset RealTimestamp { get; init; }
 
-    public required string WorldTimeText { get; init; }
+    public string WorldTimeText { get; init; }
 
-    public required string Level { get; init; }
+    public string Level { get; init; }
 
-    public required string Category { get; init; }
+    public string Category { get; init; }
 
-    public required int EventId { get; init; }
+    public int EventId { get; init; }
 
-    public required string Message { get; init; }
+    public string Message { get; init; }
 
     public string? ExceptionType { get; init; }
 

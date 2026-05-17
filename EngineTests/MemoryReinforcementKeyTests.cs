@@ -3,9 +3,9 @@
 
 namespace EngineTests
 {
-    using System;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Memory;
+    using System;
 
     [TestClass]
     public class MemoryReinforcementKeyTests

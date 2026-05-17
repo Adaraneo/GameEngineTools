@@ -95,5 +95,4 @@ public sealed class LogQueryEngine
     private static bool Contains(string? value, string? filter)
         => string.IsNullOrWhiteSpace(filter)
            || (!string.IsNullOrWhiteSpace(value) && value.Contains(filter, StringComparison.OrdinalIgnoreCase));
-
 }

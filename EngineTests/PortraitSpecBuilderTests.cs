@@ -13,7 +13,6 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Generation.Portraits;
     using GameEngineTools.Characters.Traits;
-    using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 
     /// <summary>

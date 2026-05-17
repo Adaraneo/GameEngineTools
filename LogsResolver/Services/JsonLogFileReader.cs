@@ -1,5 +1,5 @@
-using System.Text.Json;
 using LogsResolver.Models;
+using System.Text.Json;
 
 namespace LogsResolver.Services;
 

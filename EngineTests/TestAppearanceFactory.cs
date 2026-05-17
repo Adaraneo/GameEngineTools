@@ -3,7 +3,6 @@
 
 namespace EngineTests
 {
-    using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
 
     internal static class TestAppearanceFactory

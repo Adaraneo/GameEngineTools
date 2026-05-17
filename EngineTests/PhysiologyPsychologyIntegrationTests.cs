@@ -10,7 +10,6 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
-    using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -155,7 +154,7 @@ namespace EngineTests
             }
         }
 
-        #endregion Scenario 1
+        #endregion Scenario 1 — Full menstrual cycle progression
 
         #region Scenario 2 — Pregnancy discovery triggers stress spike into psychology
 
@@ -219,7 +218,7 @@ namespace EngineTests
                 "Neurotic character (Neuroticism=0.8) must emit StressSpiked when stress crosses 70 via PregnancyDiscovered.");
         }
 
-        #endregion Scenario 2
+        #endregion Scenario 2 — Pregnancy discovery triggers stress spike into psychology
 
         #region Scenario 3 — Compound stress scenario
 
@@ -233,7 +232,7 @@ namespace EngineTests
         {
             // Arrange — two engines: one with compound stressors, one clean
             var (stressedPhysio, stressedPsych, stressedCtx, now) = BuildIntegrationPair();
-            var (cleanPhysio, cleanPsych, cleanCtx, _)             = BuildIntegrationPair();
+            var (cleanPhysio, cleanPsych, cleanCtx, _) = BuildIntegrationPair();
 
             // Compound stressors: 8 h sleep debt, pain=60, bodyTemp=2.0, stress=50
             stressedPhysio.RestoreState(stressedPhysio.State with
@@ -255,11 +254,11 @@ namespace EngineTests
 
             // Act — Tick both
             var stressedOutbox = new EventCollector();
-            var cleanOutbox    = new EventCollector();
+            var cleanOutbox = new EventCollector();
 
             // Build contexts with the appropriate physiology
             var stressedCtxWithPhysio = RebuildContext(stressedCtx, stressedPhysio.State, "stressed");
-            var cleanCtxWithPhysio    = RebuildContext(cleanCtx, cleanPhysio.State, "clean");
+            var cleanCtxWithPhysio = RebuildContext(cleanCtx, cleanPhysio.State, "clean");
 
             stressedPsych.Tick(now, WTimeSpan.FromHours(1), stressedCtxWithPhysio, stressedOutbox);
             cleanPsych.Tick(now, WTimeSpan.FromHours(1), cleanCtxWithPhysio, cleanOutbox);
@@ -306,7 +305,7 @@ namespace EngineTests
                 $"Single={singlePsych.State.Valence:F4}, Compound={compoundPsych.State.Valence:F4}");
         }
 
-        #endregion Scenario 3
+        #endregion Scenario 3 — Compound stress scenario
 
         #region Scenario 4 — Postpartum recovery arc
 
@@ -336,7 +335,7 @@ namespace EngineTests
             var childBornEvent = new ChildBorn(now, ctx.Id, otherParent);
 
             var valenceBefore = psychEngine.State.Valence;
-            var stressBefore  = psychEngine.State.Stress;
+            var stressBefore = psychEngine.State.Stress;
 
             // Act — psychology handles the birth event
             var psychOutbox = new EventCollector();
@@ -390,7 +389,7 @@ namespace EngineTests
                 "A paused cycle must not emit OvulationWindowOpened.");
         }
 
-        #endregion Scenario 4
+        #endregion Scenario 4 — Postpartum recovery arc
 
         #region Scenario 5 — Testosteron → NeedIntimacy
 
@@ -411,19 +410,19 @@ namespace EngineTests
             var rng = new ZeroRandom();
 
             var highTestoPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var lowTestoPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var lowTestoPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
 
             // Obě instance začínají se stejným NeedIntimacy=50
             highTestoPsych.RestoreState(highTestoPsych.State with
-                { Motivations = new MotivationState(NeedIntimacy: 50) });
+            { Motivations = new MotivationState(NeedIntimacy: 50) });
             lowTestoPsych.RestoreState(lowTestoPsych.State with
-                { Motivations = new MotivationState(NeedIntimacy: 50) });
+            { Motivations = new MotivationState(NeedIntimacy: 50) });
 
             var highTestoPhysio = MakePhysioWithTestosterone(testosteroneLevel: 85);
-            var lowTestoPhysio  = MakePhysioWithTestosterone(testosteroneLevel: 30);
+            var lowTestoPhysio = MakePhysioWithTestosterone(testosteroneLevel: 30);
 
             var highCtx = BuildRawContext(neuroticism: 0.5, physio: highTestoPhysio);
-            var lowCtx  = BuildRawContext(neuroticism: 0.5, physio: lowTestoPhysio);
+            var lowCtx = BuildRawContext(neuroticism: 0.5, physio: lowTestoPhysio);
 
             var now = new WDateTime(0);
             highTestoPsych.Tick(now, WTimeSpan.FromHours(4), highCtx, new EventCollector());
@@ -436,7 +435,7 @@ namespace EngineTests
                 $"Nízký={lowTestoPsych.State.Motivations.NeedIntimacy:F4}");
         }
 
-        #endregion Scenario 5
+        #endregion Scenario 5 — Testosteron → NeedIntimacy
 
         #region Scenario 6 — Sleep Inertia → Psychology
 
@@ -454,15 +453,15 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var withInertia    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var withInertia = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var withoutInertia = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             withInertia.RestoreState(withInertia.State with { Arousal = 0.6 });
             withoutInertia.RestoreState(withoutInertia.State with { Arousal = 0.6 });
 
-            var physioWithInertia    = MakePhysio(0, 0, 0) with { SleepInertiaHours = 1.2 };
+            var physioWithInertia = MakePhysio(0, 0, 0) with { SleepInertiaHours = 1.2 };
             var physioWithoutInertia = MakePhysio(0, 0, 0) with { SleepInertiaHours = 0.0 };
 
-            var ctxWith    = BuildRawContext(neuroticism: 0.5, physio: physioWithInertia);
+            var ctxWith = BuildRawContext(neuroticism: 0.5, physio: physioWithInertia);
             var ctxWithout = BuildRawContext(neuroticism: 0.5, physio: physioWithoutInertia);
             var now = new WDateTime(0);
 
@@ -474,7 +473,7 @@ namespace EngineTests
                 $"S inertií={withInertia.State.Arousal:F4}, Bez={withoutInertia.State.Arousal:F4}");
         }
 
-        #endregion Scenario 6
+        #endregion Scenario 6 — Sleep Inertia → Psychology
 
         #region Scenario 7 — Hangry neutrální bias
 
@@ -494,8 +493,8 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var hungryPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var normalPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var hungryPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var normalPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             hungryPsych.RestoreState(hungryPsych.State with { Valence = 0.0 });
             normalPsych.RestoreState(normalPsych.State with { Valence = 0.0 });
 
@@ -554,7 +553,7 @@ namespace EngineTests
                 $"Hangry bias se nesmí spouštět při negativní Valenci (rozdíl musí být jen fyzio drift). Rozdíl={valenceDiff:F4}");
         }
 
-        #endregion Scenario 7
+        #endregion Scenario 7 — Hangry neutrální bias
 
         #region Scenario 8 — Sickness anhedonie a letargie
 
@@ -573,17 +572,17 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var sickPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             sickPsych.RestoreState(sickPsych.State with
-                { Arousal = 0.6, Motivations = new MotivationState(SicknessWithdraw: false) });
+            { Arousal = 0.6, Motivations = new MotivationState(SicknessWithdraw: false) });
             healthyPsych.RestoreState(healthyPsych.State with
-                { Arousal = 0.6, Motivations = new MotivationState(SicknessWithdraw: false) });
+            { Arousal = 0.6, Motivations = new MotivationState(SicknessWithdraw: false) });
 
-            var sickPhysio    = MakePhysio(0, 0, 0) with { ImmuneLoad = 70 };  // > threshold 50
+            var sickPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 70 };  // > threshold 50
             var healthyPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 10 };
 
-            var ctxSick    = BuildRawContext(neuroticism: 0.5, physio: sickPhysio);
+            var ctxSick = BuildRawContext(neuroticism: 0.5, physio: sickPhysio);
             var ctxHealthy = BuildRawContext(neuroticism: 0.5, physio: healthyPhysio);
             var now = new WDateTime(0);
 
@@ -608,16 +607,16 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var sickPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var initMotiv = new MotivationState(NeedSocial: 50);
             sickPsych.RestoreState(sickPsych.State with { Motivations = initMotiv });
             healthyPsych.RestoreState(healthyPsych.State with { Motivations = initMotiv });
 
-            var sickPhysio    = MakePhysio(0, 0, 0) with { ImmuneLoad = 70 };
+            var sickPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 70 };
             var healthyPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 10 };
 
-            var sickCtx    = BuildRawContext(neuroticism: 0.5, physio: sickPhysio);
+            var sickCtx = BuildRawContext(neuroticism: 0.5, physio: sickPhysio);
             var healthyCtx = BuildRawContext(neuroticism: 0.5, physio: healthyPhysio);
 
             var io = new GameEngineTools.Characters.Engines.Interactions.InteractionOutcome(
@@ -638,7 +637,7 @@ namespace EngineTests
                 $"Nemocný={sickPsych.State.Motivations.NeedSocial:F4}");
         }
 
-        #endregion Scenario 8
+        #endregion Scenario 8 — Sickness anhedonie a letargie
 
         #region Scenario 9 — SAM → Psychology Arousal
 
@@ -654,12 +653,12 @@ namespace EngineTests
             var rng = new ZeroRandom();
 
             var highSAMPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var noSAMPsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var noSAMPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             highSAMPsych.RestoreState(highSAMPsych.State with { Arousal = 0.4 });
             noSAMPsych.RestoreState(noSAMPsych.State with { Arousal = 0.4 });
 
             var highSAMPhysio = MakePhysio(0, 0, 0) with { AcuteArousalLevel = 80 };
-            var noSAMPhysio   = MakePhysio(0, 0, 0) with { AcuteArousalLevel = 0 };
+            var noSAMPhysio = MakePhysio(0, 0, 0) with { AcuteArousalLevel = 0 };
 
             var ctxHigh = BuildRawContext(0.5, highSAMPhysio);
             var ctxNone = BuildRawContext(0.5, noSAMPhysio);
@@ -672,7 +671,7 @@ namespace EngineTests
                 $"SAM aktivace musí zvyšovat PAD Arousal. High={highSAMPsych.State.Arousal:F4}, None={noSAMPsych.State.Arousal:F4}");
         }
 
-        #endregion Scenario 9
+        #endregion Scenario 9 — SAM → Psychology Arousal
 
         #region Scenario 10 — Yerkes-Dodson kortizol optimum
 
@@ -689,16 +688,16 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var optimalPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var suboptPsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var optimalPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var suboptPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             optimalPsych.RestoreState(optimalPsych.State with { CognitiveLoad = 50 });
             suboptPsych.RestoreState(suboptPsych.State with { CognitiveLoad = 50 });
 
             var optimalPhysio = MakePhysio(0, 0, 0) with { CortisolLevel = 65 };  // v optimu
-            var suboptPhysio  = MakePhysio(0, 0, 0) with { CortisolLevel = 30 };  // mimo optimum
+            var suboptPhysio = MakePhysio(0, 0, 0) with { CortisolLevel = 30 };  // mimo optimum
 
-            var ctxOpt  = BuildRawContext(0.5, optimalPhysio);
-            var ctxSub  = BuildRawContext(0.5, suboptPhysio);
+            var ctxOpt = BuildRawContext(0.5, optimalPhysio);
+            var ctxSub = BuildRawContext(0.5, suboptPhysio);
             var now = new WDateTime(0);
 
             optimalPsych.Tick(now, WTimeSpan.FromHours(2), ctxOpt, new EventCollector());
@@ -708,7 +707,7 @@ namespace EngineTests
                 $"Optimální kortizol musí snižovat CogLoad více. Optimal={optimalPsych.State.CognitiveLoad:F4}, Subopt={suboptPsych.State.CognitiveLoad:F4}");
         }
 
-        #endregion Scenario 10
+        #endregion Scenario 10 — Yerkes-Dodson kortizol optimum
 
         #region Scenario 11 — Vagální tonus (přes Neuroticism)
 
@@ -723,13 +722,13 @@ namespace EngineTests
             var rng = new ZeroRandom();
 
             var highNPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var lowNPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var lowNPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             highNPsych.RestoreState(highNPsych.State with { Stress = 80 });
             lowNPsych.RestoreState(lowNPsych.State with { Stress = 80 });
 
             var physio = MakePhysio(0, 0, 0);
             var highNCtx = BuildRawContext(neuroticism: 0.9, physio: physio);
-            var lowNCtx  = BuildRawContext(neuroticism: 0.1, physio: physio);
+            var lowNCtx = BuildRawContext(neuroticism: 0.1, physio: physio);
             var now = new WDateTime(0);
 
             highNPsych.Tick(now, WTimeSpan.FromHours(4), highNCtx, new EventCollector());
@@ -739,7 +738,7 @@ namespace EngineTests
                 $"High Neuroticism musí mít pomalejší stress recovery (vagal tone). High N={highNPsych.State.Stress:F2}, Low N={lowNPsych.State.Stress:F2}");
         }
 
-        #endregion Scenario 11
+        #endregion Scenario 11 — Vagální tonus (přes Neuroticism)
 
         #region Scenario 12 — Ambientní teplota
 
@@ -755,13 +754,13 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var hotPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var hotPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var normalPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             hotPsych.RestoreState(hotPsych.State with { Valence = 0.0 });
             normalPsych.RestoreState(normalPsych.State with { Valence = 0.0 });
 
             var physio = MakePhysio(0, 0, 0);
-            var hotCtx    = BuildRawContext(neuroticism: 0.5, physio: physio, ambientTemperature: 35.0);
+            var hotCtx = BuildRawContext(neuroticism: 0.5, physio: physio, ambientTemperature: 35.0);
             var normalCtx = BuildRawContext(neuroticism: 0.5, physio: physio, ambientTemperature: 20.0);
 
             var now = new WDateTime(0);
@@ -772,7 +771,7 @@ namespace EngineTests
                 $"Horko musí snižovat Valenci více než neutrální teplota. Hot={hotPsych.State.Valence:F4}, Normal={normalPsych.State.Valence:F4}");
         }
 
-        #endregion Scenario 12
+        #endregion Scenario 12 — Ambientní teplota
 
         #region Scenario 13 — Dehydratace → CogLoad
 
@@ -793,10 +792,10 @@ namespace EngineTests
             thirstyPsych.RestoreState(thirstyPsych.State with { CognitiveLoad = 20 });
             hydratedPsych.RestoreState(hydratedPsych.State with { CognitiveLoad = 20 });
 
-            var thirstyPhysio  = new PhysiologyState(70, 2, 25, 80, 0, 5, 0, null);  // Thirst=80 > 50
+            var thirstyPhysio = new PhysiologyState(70, 2, 25, 80, 0, 5, 0, null);  // Thirst=80 > 50
             var hydratedPhysio = new PhysiologyState(70, 2, 25, 10, 0, 5, 0, null);  // Thirst=10
 
-            var ctxThirsty  = BuildRawContext(0.5, thirstyPhysio);
+            var ctxThirsty = BuildRawContext(0.5, thirstyPhysio);
             var ctxHydrated = BuildRawContext(0.5, hydratedPhysio);
             var now = new WDateTime(0);
 
@@ -807,7 +806,7 @@ namespace EngineTests
                 $"Dehydratace musí zvyšovat CogLoad. Thirsty={thirstyPsych.State.CognitiveLoad:F4}, Hydrated={hydratedPsych.State.CognitiveLoad:F4}");
         }
 
-        #endregion Scenario 13
+        #endregion Scenario 13 — Dehydratace → CogLoad
 
         #region Scenario 14 — Hyperalgezie (sickness pain amplification)
 
@@ -823,16 +822,16 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var sickPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             sickPsych.RestoreState(sickPsych.State with { Valence = 0.0 });
             healthyPsych.RestoreState(healthyPsych.State with { Valence = 0.0 });
 
             // Obě postavy mají stejnou bolest (40), ale liší se imunitní zátěží
-            var sickPhysio    = new PhysiologyState(70, 2, 25, 20, 40, 80, 0, null); // ImmuneLoad=80 > 40
-            var healthyPhysio = new PhysiologyState(70, 2, 25, 20, 40, 5,  0, null); // ImmuneLoad=5
+            var sickPhysio = new PhysiologyState(70, 2, 25, 20, 40, 80, 0, null); // ImmuneLoad=80 > 40
+            var healthyPhysio = new PhysiologyState(70, 2, 25, 20, 40, 5, 0, null); // ImmuneLoad=5
 
-            var ctxSick    = BuildRawContext(0.5, sickPhysio);
+            var ctxSick = BuildRawContext(0.5, sickPhysio);
             var ctxHealthy = BuildRawContext(0.5, healthyPhysio);
             var now = new WDateTime(0);
 
@@ -844,7 +843,7 @@ namespace EngineTests
                 $"Sick={sickPsych.State.Valence:F4}, Healthy={healthyPsych.State.Valence:F4}");
         }
 
-        #endregion Scenario 14
+        #endregion Scenario 14 — Hyperalgezie (sickness pain amplification)
 
         #region Scenario 15 — Chronická bolest → MoodBaseline
 
@@ -864,17 +863,17 @@ namespace EngineTests
             var rng = new ZeroRandom();
 
             var chronicPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var acutePsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var acutePsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             chronicPsych.RestoreState(chronicPsych.State with { MoodBaseline = 50 });
             acutePsych.RestoreState(acutePsych.State with { MoodBaseline = 50 });
 
             // Chronická bolest: ChronicPainDays=20 (přes onset 7); chronicity = min(20/30, 1) = 0.667
             var chronicPhysio = new PhysiologyState(70, 2, 25, 20, 40, 5, 0, null) with { ChronicPainDays = 20 };
             // Akutní bolest: stejná Pain, ale ChronicPainDays=0 (pod onset) → žádná penalta
-            var acutePhysio   = new PhysiologyState(70, 2, 25, 20, 40, 5, 0, null) with { ChronicPainDays = 0 };
+            var acutePhysio = new PhysiologyState(70, 2, 25, 20, 40, 5, 0, null) with { ChronicPainDays = 0 };
 
             var ctxChronic = BuildRawContext(0.5, chronicPhysio);
-            var ctxAcute   = BuildRawContext(0.5, acutePhysio);
+            var ctxAcute = BuildRawContext(0.5, acutePhysio);
             var now = new WDateTime(0);
 
             chronicPsych.Tick(now, WTimeSpan.FromHours(24), ctxChronic, new EventCollector());
@@ -885,7 +884,7 @@ namespace EngineTests
                 $"Chronic={chronicPsych.State.MoodBaseline:F4}, Acute={acutePsych.State.MoodBaseline:F4}");
         }
 
-        #endregion Scenario 15
+        #endregion Scenario 15 — Chronická bolest → MoodBaseline
 
         #region Scenario 16 — Stresová vulnerabilita v noci (kortizol)
 
@@ -901,16 +900,16 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var lowCortPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var lowCortPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var highCortPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             lowCortPsych.RestoreState(lowCortPsych.State with { Stress = 80 });
             highCortPsych.RestoreState(highCortPsych.State with { Stress = 80 });
 
             // Nízký kortizol (noc) vs vysoký kortizol (ráno)
-            var lowCortPhysio  = MakePhysio(0, 0, 0) with { CortisolLevel = 10 };  // noc → faktor 0.3
+            var lowCortPhysio = MakePhysio(0, 0, 0) with { CortisolLevel = 10 };  // noc → faktor 0.3
             var highCortPhysio = MakePhysio(0, 0, 0) with { CortisolLevel = 90 };  // ráno → faktor 1.8
 
-            var ctxLow  = BuildRawContext(0.5, lowCortPhysio);
+            var ctxLow = BuildRawContext(0.5, lowCortPhysio);
             var ctxHigh = BuildRawContext(0.5, highCortPhysio);
             var now = new WDateTime(0);
 
@@ -922,7 +921,7 @@ namespace EngineTests
                 $"LowCort={lowCortPsych.State.Stress:F2}, HighCort={highCortPsych.State.Stress:F2}");
         }
 
-        #endregion Scenario 16
+        #endregion Scenario 16 — Stresová vulnerabilita v noci (kortizol)
 
         #region Scenario 17 — Serotonin IDO pathway
 
@@ -940,16 +939,16 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var sickPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var sickPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var healthyPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             // Obě instance startují s nízkou MoodBaseline (30), cílí na 50
             sickPsych.RestoreState(sickPsych.State with { MoodBaseline = 30 });
             healthyPsych.RestoreState(healthyPsych.State with { MoodBaseline = 30 });
 
-            var sickPhysio    = MakePhysio(0, 0, 0) with { ImmuneLoad = 80 };  // > threshold 60
+            var sickPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 80 };  // > threshold 60
             var healthyPhysio = MakePhysio(0, 0, 0) with { ImmuneLoad = 10 };
 
-            var ctxSick    = BuildRawContext(0.5, sickPhysio);
+            var ctxSick = BuildRawContext(0.5, sickPhysio);
             var ctxHealthy = BuildRawContext(0.5, healthyPhysio);
             var now = new WDateTime(0);
 
@@ -961,7 +960,7 @@ namespace EngineTests
                 $"Sick={sickPsych.State.MoodBaseline:F4}, Healthy={healthyPsych.State.MoodBaseline:F4}");
         }
 
-        #endregion Scenario 17
+        #endregion Scenario 17 — Serotonin IDO pathway
 
         #region Scenario 18 — Wanting amplification pod stresem
 
@@ -978,15 +977,15 @@ namespace EngineTests
             var rng = new ZeroRandom();
 
             var highStressPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var lowStressPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var lowStressPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             highStressPsych.RestoreState(highStressPsych.State with
-                { Stress = 80, Motivations = new MotivationState(NeedIntimacy: 50) });
+            { Stress = 80, Motivations = new MotivationState(NeedIntimacy: 50) });
             lowStressPsych.RestoreState(lowStressPsych.State with
-                { Stress = 20, Motivations = new MotivationState(NeedIntimacy: 50) });
+            { Stress = 20, Motivations = new MotivationState(NeedIntimacy: 50) });
 
             var physio = MakePhysio(0, 0, 0);
             var ctxHigh = BuildRawContext(0.5, physio);
-            var ctxLow  = BuildRawContext(0.5, physio);
+            var ctxLow = BuildRawContext(0.5, physio);
             var now = new WDateTime(0);
 
             highStressPsych.Tick(now, WTimeSpan.FromHours(2), ctxHigh, new EventCollector());
@@ -998,14 +997,14 @@ namespace EngineTests
                 $"High={highStressPsych.State.Motivations.NeedIntimacy:F4}, Low={lowStressPsych.State.Motivations.NeedIntimacy:F4}");
         }
 
-        #endregion Scenario 18
+        #endregion Scenario 18 — Wanting amplification pod stresem
 
         #region Scenario 19 — Cirkadiánní tělesná teplota
 
         [TestMethod]
         public void CircadianTemp_EveningHour_RaisesBodyTempDelta()
         {
-            var nightEngine   = BuildPhysioEngine();
+            var nightEngine = BuildPhysioEngine();
             var eveningEngine = BuildPhysioEngine();
 
             // Obě instance startují na 0 BodyTempDelta, nulová imunita (žádná horečka)
@@ -1015,7 +1014,7 @@ namespace EngineTests
             var ctx = BuildRawContext(0.5);
 
             // Noční hodina (4h) = teplota minimální; večerní (17h) = maximální
-            var nightHour   = new WDateTime(WTimeSpan.FromHours(4).Ticks);
+            var nightHour = new WDateTime(WTimeSpan.FromHours(4).Ticks);
             var eveningHour = new WDateTime(WTimeSpan.FromHours(17).Ticks);
 
             nightEngine.Tick(nightHour, WTimeSpan.FromHours(4), ctx, new EventCollector());
@@ -1039,7 +1038,7 @@ namespace EngineTests
                 SexBiology.Female, WDateOnly.New(100, 1, 1), WDateOnly.New(116, 1, 1));
         }
 
-        #endregion Scenario 19
+        #endregion Scenario 19 — Cirkadiánní tělesná teplota
 
         #region Scenario 20 — Altitude → CogLoad
 
@@ -1056,13 +1055,13 @@ namespace EngineTests
             var rng = new ZeroRandom();
 
             var highAltPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var seaPsych     = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var seaPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             highAltPsych.RestoreState(highAltPsych.State with { CognitiveLoad = 20 });
             seaPsych.RestoreState(seaPsych.State with { CognitiveLoad = 20 });
 
             var physio = MakePhysio(0, 0, 0);
             var ctxHighAlt = BuildRawContext(0.5, physio, altitudeMeters: 4000.0);  // > threshold 2500
-            var ctxSea     = BuildRawContext(0.5, physio, altitudeMeters: 0.0);
+            var ctxSea = BuildRawContext(0.5, physio, altitudeMeters: 0.0);
 
             var now = new WDateTime(0);
             highAltPsych.Tick(now, WTimeSpan.FromHours(2), ctxHighAlt, new EventCollector());
@@ -1072,7 +1071,7 @@ namespace EngineTests
                 $"Vysoká nadmořská výška musí zvyšovat CogLoad. HighAlt={highAltPsych.State.CognitiveLoad:F4}, Sea={seaPsych.State.CognitiveLoad:F4}");
         }
 
-        #endregion Scenario 20
+        #endregion Scenario 20 — Altitude → CogLoad
 
         #region Scenario 21 — Kognitivní stárnutí + percepce
 
@@ -1088,15 +1087,15 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var oldPsych   = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var oldPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             var youngPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             oldPsych.RestoreState(oldPsych.State with { CognitiveLoad = 10 });
             youngPsych.RestoreState(youngPsych.State with { CognitiveLoad = 10 });
 
-            var oldPhysio   = MakePhysio(0, 0, 0) with { Aging = new PhysicalAgingState(AgeYears: 70) };
+            var oldPhysio = MakePhysio(0, 0, 0) with { Aging = new PhysicalAgingState(AgeYears: 70) };
             var youngPhysio = MakePhysio(0, 0, 0) with { Aging = new PhysicalAgingState(AgeYears: 30) };
 
-            var ctxOld   = BuildRawContext(0.5, oldPhysio);
+            var ctxOld = BuildRawContext(0.5, oldPhysio);
             var ctxYoung = BuildRawContext(0.5, youngPhysio);
             var now = new WDateTime(0);
 
@@ -1120,8 +1119,8 @@ namespace EngineTests
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 
-            var postMenoPsych  = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
-            var normalPsych    = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var postMenoPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
+            var normalPsych = new DefaultPsychologyEngine(psychCfg, logFactory, rng);
             postMenoPsych.RestoreState(postMenoPsych.State with { MoodBaseline = 50 });
             normalPsych.RestoreState(normalPsych.State with { MoodBaseline = 50 });
 
@@ -1133,10 +1132,10 @@ namespace EngineTests
                     CyclePhase.Paused, 1, false, 0, 0, 0, 1.0, WDateOnly.New(61, 1, 1))
             };
             var normalPhysio = MakePhysio(0, 0, 0) with
-                { Aging = new PhysicalAgingState(AgeYears: 55) }; // bez Cycle.Paused
+            { Aging = new PhysicalAgingState(AgeYears: 55) }; // bez Cycle.Paused
 
             var ctxPostMeno = BuildRawContext(0.5, postMenoPhysio);
-            var ctxNormal   = BuildRawContext(0.5, normalPhysio);
+            var ctxNormal = BuildRawContext(0.5, normalPhysio);
             var now = new WDateTime(0);
 
             postMenoPsych.Tick(now, WTimeSpan.FromHours(8), ctxPostMeno, new EventCollector());
@@ -1147,7 +1146,7 @@ namespace EngineTests
                 $"PostMeno={postMenoPsych.State.MoodBaseline:F4}, Normal={normalPsych.State.MoodBaseline:F4}");
         }
 
-        #endregion Scenario 21
+        #endregion Scenario 21 — Kognitivní stárnutí + percepce
 
         #region Helpers
 
@@ -1166,8 +1165,8 @@ namespace EngineTests
                 double neuroticism = 0.5)
         {
             var physioCfg = Options.Create(PhysioCfg);
-            var cycleCfg  = Options.Create(CycleCfg);
-            var psychCfg  = Options.Create(PsychCfg);
+            var cycleCfg = Options.Create(CycleCfg);
+            var psychCfg = Options.Create(PsychCfg);
             var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
             var rng = new ZeroRandom();
 

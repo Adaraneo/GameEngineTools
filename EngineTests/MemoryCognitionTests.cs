@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -13,6 +10,9 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static EngineTests.MemoryCognitionTestData;
     using static GameEngineTools.Characters.Engines.ActionNames;
 

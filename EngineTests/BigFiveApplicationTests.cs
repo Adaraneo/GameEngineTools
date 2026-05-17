@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -18,6 +15,9 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -41,10 +41,10 @@ namespace EngineTests
                 Energy: 70, SleepDebtHours: 4, Hunger: 10, Thirst: 10,
                 Pain: 30, ImmuneLoad: 0, BodyTempDelta: 0, Cycle: null);
 
-            var engineLowN  = BuildPsychEngine();
+            var engineLowN = BuildPsychEngine();
             var engineHighN = BuildPsychEngine();
 
-            var ctxLowN  = BuildPsychContext(neuroticism: 0.1, physio: physio);
+            var ctxLowN = BuildPsychContext(neuroticism: 0.1, physio: physio);
             var ctxHighN = BuildPsychContext(neuroticism: 0.9, physio: physio);
 
             var outbox = new EventCollector();
@@ -63,7 +63,7 @@ namespace EngineTests
             // Both characters have no social contact (MeanCloseness=50 from empty edges)
             // and same negative valence — maximum possible belonging pressure.
             var physio = new PhysiologyState(70, 0, 5, 5, 0, 0, 0, null);
-            var psych  = new PsychologyState(Valence: -1.0, Arousal: 0.5, Dominance: 0.5,
+            var psych = new PsychologyState(Valence: -1.0, Arousal: 0.5, Dominance: 0.5,
                 Stress: 0, CognitiveLoad: 0, DominantEmotion: DiscreteEmotion.Neutral);
 
             var ctxIntrovert = BuildBehaviorContext(extraversion: 0.1, physio: physio, psych: psych);
@@ -95,15 +95,15 @@ namespace EngineTests
             var farFuture = new WDateTime(WTimeSpan.FromDays(2).Ticks);
 
             var engineHighC = BuildBehaviorEngine();
-            var engineLowC  = BuildBehaviorEngine();
+            var engineLowC = BuildBehaviorEngine();
 
             engineHighC.RestoreState(engineHighC.State with
-                { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
+            { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
             engineLowC.RestoreState(engineLowC.State with
-                { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
+            { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
 
             var ctxHighC = BuildBehaviorContext(conscientiousness: 0.9, curiosity: 0.6);
-            var ctxLowC  = BuildBehaviorContext(conscientiousness: 0.1, curiosity: 0.6);
+            var ctxLowC = BuildBehaviorContext(conscientiousness: 0.1, curiosity: 0.6);
 
             var outboxH = new EventCollector();
             var outboxL = new EventCollector();
@@ -111,7 +111,7 @@ namespace EngineTests
             engineLowC.Tick(farFuture, WTimeSpan.FromHours(1), ctxLowC, outboxL);
 
             var highCChoice = outboxH.Drain().OfType<ActionCommitted>().FirstOrDefault()?.ActionName;
-            var lowCChoice  = outboxL.Drain().OfType<ActionCommitted>().FirstOrDefault()?.ActionName;
+            var lowCChoice = outboxL.Drain().OfType<ActionCommitted>().FirstOrDefault()?.ActionName;
 
             Assert.AreEqual(Work, highCChoice,
                 $"High-C should keep Work via strong inertia. Got: {highCChoice}");
@@ -129,13 +129,13 @@ namespace EngineTests
             var cfg = new InteractionConfig();
             var engineHighA = new DefaultInteractionEngine(Options.Create(cfg),
                 LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
-            var engineLowA  = new DefaultInteractionEngine(Options.Create(cfg),
+            var engineLowA = new DefaultInteractionEngine(Options.Create(cfg),
                 LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
 
             // Predictable random (fixed seed via seeded random)
             var rng = new SeededRandom(42);
             var ctxHighA = BuildInteractionContext(agreeableness: 0.9, random: rng);
-            var ctxLowA  = BuildInteractionContext(agreeableness: 0.1, random: new SeededRandom(42));
+            var ctxLowA = BuildInteractionContext(agreeableness: 0.1, random: new SeededRandom(42));
 
             var outboxH = new EventCollector();
             var outboxL = new EventCollector();
@@ -149,7 +149,7 @@ namespace EngineTests
             }
 
             var highAAccepted = outboxH.Drain().OfType<InteractionOutcome>().Count(o => o.Accepted);
-            var lowAAccepted  = outboxL.Drain().OfType<InteractionOutcome>().Count(o => o.Accepted);
+            var lowAAccepted = outboxL.Drain().OfType<InteractionOutcome>().Count(o => o.Accepted);
 
             Assert.IsTrue(highAAccepted > lowAAccepted,
                 $"High-A accepted {highAAccepted}/200, Low-A accepted {lowAAccepted}/200 — High-A should be higher");
@@ -172,18 +172,18 @@ namespace EngineTests
             var farFuture = new WDateTime(WTimeSpan.FromDays(2).Ticks);
 
             var engineHighO = BuildBehaviorEngine();
-            var engineLowO  = BuildBehaviorEngine();
+            var engineLowO = BuildBehaviorEngine();
 
             engineHighO.RestoreState(engineHighO.State with
-                { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
+            { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
             engineLowO.RestoreState(engineLowO.State with
-                { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
+            { CurrentPlan = new PlannedAction(Work, new WDateTime(0), WTimeSpan.FromMinutes(1), 50.0) });
 
             // affiliation=0.65 → NeedBelonging×affil ≈ 53 for ReachOut
             // competence=0.5   → Work=50
             var ctxHighO = BuildBehaviorContext(openness: 1.0, affiliation: 0.65, competence: 0.5,
                                                conscientiousness: 0.0);  // C=0 → inertia=0
-            var ctxLowO  = BuildBehaviorContext(openness: 0.0, affiliation: 0.65, competence: 0.5,
+            var ctxLowO = BuildBehaviorContext(openness: 0.0, affiliation: 0.65, competence: 0.5,
                                                conscientiousness: 0.0);
 
             var outboxH = new EventCollector();
@@ -192,7 +192,7 @@ namespace EngineTests
             engineLowO.Tick(farFuture, WTimeSpan.FromHours(1), ctxLowO, outboxL);
 
             var highOChoice = outboxH.Drain().OfType<ActionCommitted>().FirstOrDefault()?.ActionName;
-            var lowOChoice  = outboxL.Drain().OfType<ActionCommitted>().FirstOrDefault()?.ActionName;
+            var lowOChoice = outboxL.Drain().OfType<ActionCommitted>().FirstOrDefault()?.ActionName;
 
             // High-O: weaker penalty → social action beats Work
             // Low-O:  stronger penalty → Work wins (social is penalized below Work)
@@ -226,11 +226,15 @@ namespace EngineTests
                 new MemoryIndex(new List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id = new HumanId(Guid.NewGuid()), Biology = SexBiology.Female,
-                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot = snapshot, Random = new ZeroRandom(),
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
@@ -242,7 +246,7 @@ namespace EngineTests
             IRandomSource? random = null)
         {
             physio ??= new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null);
-            psych  ??= new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral);
+            psych ??= new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral);
             var personality = new Personality(
                 BigFive: new BigFive(openness, conscientiousness, extraversion, 0.5, 0.5),
                 Attachment: AttachmentProfile.Secure,
@@ -257,18 +261,22 @@ namespace EngineTests
                 new MemoryIndex(new List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id = new HumanId(Guid.NewGuid()), Biology = SexBiology.Female,
-                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot = snapshot, Random = random ?? new ZeroRandom(),
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = random ?? new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
         private static IHumanContext BuildInteractionContext(double agreeableness, IRandomSource random)
         {
             var physio = new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null);
-            var psych  = new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral);
+            var psych = new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral);
             var personality = new Personality(
                 BigFive: new BigFive(0.5, 0.5, 0.5, agreeableness, 0.5),
                 Attachment: AttachmentProfile.Secure,
@@ -283,11 +291,15 @@ namespace EngineTests
                 new MemoryIndex(new List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id = new HumanId(Guid.NewGuid()), Biology = SexBiology.Female,
-                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot = snapshot, Random = random,
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = random,
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
@@ -301,25 +313,37 @@ namespace EngineTests
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent e) { }
+            public void Publish(IDomainEvent e)
+            { }
+
             public IDisposable Subscribe<T>(Action<T> h) where T : class, IDomainEvent => new D();
         }
 
         private sealed class NullScheduler : IScheduler
         {
             public ScheduledId ScheduleAt(WDateTime w, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime n, WTimeSpan d, ScheduledAction a, string? t = null) => new(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => true;
+
             public System.Collections.Generic.IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime n)
                 => System.Linq.Enumerable.Empty<(ScheduledId, ScheduledAction)>();
         }
 
-        private sealed class D : IDisposable { public void Dispose() { } }
+        private sealed class D : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
 
         private sealed class ZeroRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => false;  // never conflicts — best candidate always wins
         }
 
@@ -327,9 +351,13 @@ namespace EngineTests
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _r;
+
             public SeededRandom(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
     }

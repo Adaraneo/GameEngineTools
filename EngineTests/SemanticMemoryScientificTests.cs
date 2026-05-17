@@ -3,10 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -20,6 +16,8 @@ namespace EngineTests
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
     using static EngineTests.SemanticSciTestHelper;
 
     // =========================================================================
@@ -38,10 +36,10 @@ namespace EngineTests
             var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
 
-            var engineSecure  = BuildEngine();
+            var engineSecure = BuildEngine();
             var engineAnxious = BuildEngine();
-            var ctxSecure     = BuildCtxWith(self, AttachmentProfile.Secure);
-            var ctxAnxious    = BuildCtxWith(self, AttachmentProfile.Preoccupied);
+            var ctxSecure = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxAnxious = BuildCtxWith(self, AttachmentProfile.Preoccupied);
             var outbox = new EventCollector();
 
             for (var i = 0; i < 3; i++)
@@ -51,7 +49,7 @@ namespace EngineTests
                 engineAnxious.Handle(ev, ctxAnxious, outbox);
             }
 
-            var secureStrength  = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
+            var secureStrength = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
             var anxiousStrength = engineAnxious.State.GetStrength(other, PersonBeliefKind.Rejecting);
 
             Assert.IsTrue(anxiousStrength > secureStrength,
@@ -62,12 +60,12 @@ namespace EngineTests
         public void Avoidant_AttachmentStyle_SuppressesEmotionallySafe_RelativeTo_Warm()
         {
             // Avoidant: safeDiscount = 0.45 → EmotionallySafe výrazně nižší než Warm
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
 
-            var engineSecure  = BuildEngine();
+            var engineSecure = BuildEngine();
             var engineAvoidant = BuildEngine();
-            var ctxSecure   = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxSecure = BuildCtxWith(self, AttachmentProfile.Secure);
             var ctxAvoidant = BuildCtxWith(self, AttachmentProfile.Dismissing);
             var outbox = new EventCollector();
 
@@ -79,7 +77,7 @@ namespace EngineTests
                 engineAvoidant.Handle(ev, ctxAvoidant, outbox);
             }
 
-            var secureRatio  = engineSecure.State.GetStrength(other, PersonBeliefKind.EmotionallySafe)
+            var secureRatio = engineSecure.State.GetStrength(other, PersonBeliefKind.EmotionallySafe)
                              / Math.Max(0.001, engineSecure.State.GetStrength(other, PersonBeliefKind.Warm));
             var avoidantRatio = engineAvoidant.State.GetStrength(other, PersonBeliefKind.EmotionallySafe)
                               / Math.Max(0.001, engineAvoidant.State.GetStrength(other, PersonBeliefKind.Warm));
@@ -93,12 +91,12 @@ namespace EngineTests
         public void Avoidant_AttachmentStyle_ProducesLowerOverallBeliefStrength_ThanSecure()
         {
             // Avoidant: learningMult = 0.75 → pomalejší growth
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
 
-            var engineSecure   = BuildEngine();
+            var engineSecure = BuildEngine();
             var engineAvoidant = BuildEngine();
-            var ctxSecure   = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxSecure = BuildCtxWith(self, AttachmentProfile.Secure);
             var ctxAvoidant = BuildCtxWith(self, AttachmentProfile.Dismissing);
             var outbox = new EventCollector();
 
@@ -109,7 +107,7 @@ namespace EngineTests
                 engineAvoidant.Handle(ev, ctxAvoidant, outbox);
             }
 
-            var secureStrength   = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
+            var secureStrength = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
             var avoidantStrength = engineAvoidant.State.GetStrength(other, PersonBeliefKind.Rejecting);
 
             Assert.IsTrue(avoidantStrength < secureStrength,
@@ -122,12 +120,12 @@ namespace EngineTests
             // Disorganized: contradictionMult = 1.40 → každý Warm event smaže více z Rejecting.
             // Test: stejná počáteční Rejecting strength (via RestoreState), pak 1 Warm event.
             // Zjistíme amplitudu poklesu — Disorganized musí klesnout více.
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
 
-            var engineSecure       = BuildEngine();
+            var engineSecure = BuildEngine();
             var engineDisorganized = BuildEngine();
-            var ctxSecure       = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxSecure = BuildCtxWith(self, AttachmentProfile.Secure);
             var ctxDisorganized = BuildCtxWith(self, AttachmentProfile.Fearful);
             var outbox = new EventCollector();
 
@@ -141,11 +139,11 @@ namespace EngineTests
             engineSecure.Handle(warmEv, ctxSecure, outbox);
             engineDisorganized.Handle(warmEv, ctxDisorganized, outbox);
 
-            var secureRejecting       = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
+            var secureRejecting = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
             var disorganizedRejecting = engineDisorganized.State.GetStrength(other, PersonBeliefKind.Rejecting);
 
             // Disorganized: contradictionMult=1.40 → větší pokles Rejecting
-            var secureDropped       = 0.50 - secureRejecting;
+            var secureDropped = 0.50 - secureRejecting;
             var disorganizedDropped = 0.50 - disorganizedRejecting;
 
             Assert.IsTrue(disorganizedDropped > secureDropped,
@@ -157,13 +155,13 @@ namespace EngineTests
         public void Secure_AttachmentStyle_MatchesBaseline_Behavior()
         {
             // Secure = baseline (multiplikátory 1.0, 1.0, 1.0) — ověřuje backward compat
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
 
             var engineDefault = BuildEngine();
-            var engineSecure  = BuildEngine();
+            var engineSecure = BuildEngine();
             var ctxDefault = BuildCtxWith(self, AttachmentProfile.Secure);
-            var ctxSecure  = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctxSecure = BuildCtxWith(self, AttachmentProfile.Secure);
             var outbox = new EventCollector();
 
             for (var i = 0; i < 3; i++)
@@ -174,7 +172,7 @@ namespace EngineTests
             }
 
             var defaultStrength = engineDefault.State.GetStrength(other, PersonBeliefKind.Rejecting);
-            var secureStrength  = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
+            var secureStrength = engineSecure.State.GetStrength(other, PersonBeliefKind.Rejecting);
 
             Assert.AreEqual(defaultStrength, secureStrength, 0.0001,
                 "Secure attachment musí dávat identické výsledky jako výchozí config.");
@@ -195,16 +193,16 @@ namespace EngineTests
             // Closeness = 30 → expectedInterval = 21 dní → threshold = 168 dní
             // Gap = 200 dní >> 168 → gapMultiplier = 3.0
             var now = WDateTime.New(100, 5, 1, 0);
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
             var dt = WTimeSpan.FromDays(1);
 
-            var engineGap    = BuildEngine();
+            var engineGap = BuildEngine();
             var engineNormal = BuildEngine();
             var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
 
             // Stav s velmi starým LastUpdatedAt (200 dní před now)
-            var oldTime    = now - WTimeSpan.FromDays(200);
+            var oldTime = now - WTimeSpan.FromDays(200);
             var recentTime = now - WTimeSpan.FromDays(5);
 
             engineGap.RestoreState(BeliefState(other, PersonBeliefKind.Warm, 0.80, 0.10, oldTime));
@@ -214,7 +212,7 @@ namespace EngineTests
             engineGap.Tick(now, dt, ctx, outbox);
             engineNormal.Tick(now, dt, ctx, outbox);
 
-            var gapStrength    = engineGap.State.GetStrength(other, PersonBeliefKind.Warm);
+            var gapStrength = engineGap.State.GetStrength(other, PersonBeliefKind.Warm);
             var normalStrength = engineNormal.State.GetStrength(other, PersonBeliefKind.Warm);
 
             Assert.IsTrue(gapStrength < normalStrength,
@@ -223,7 +221,7 @@ namespace EngineTests
 
             // Diferenece by měla odpovídat přibližně 3× zrychlení
             var expectedDecayRatio = 3.0;
-            var decayGap    = 0.80 - gapStrength;
+            var decayGap = 0.80 - gapStrength;
             var decayNormal = 0.80 - normalStrength;
             Assert.IsTrue(decayGap > decayNormal * (expectedDecayRatio * 0.8),
                 $"Navarro decay musí být alespoň ~3× větší. decayGap={decayGap:F4}, decayNormal={decayNormal:F4}");
@@ -234,7 +232,7 @@ namespace EngineTests
         {
             // Gap = 5 dní << 168 → gapMultiplier = 1.0 → normální decay
             var now = WDateTime.New(100, 2, 1, 0);
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
             var dt = WTimeSpan.FromDays(1);
 
@@ -267,7 +265,7 @@ namespace EngineTests
         [TestMethod]
         public void ForgetPerson_RemovesAllBeliefsAboutThatPerson()
         {
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
             var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
             var engine = BuildEngine();
@@ -303,15 +301,15 @@ namespace EngineTests
         [TestMethod]
         public void ForgetPerson_DoesNotAffectOtherPeople()
         {
-            var self   = new HumanId(Guid.NewGuid());
-            var alpha  = new HumanId(Guid.NewGuid());
-            var beta   = new HumanId(Guid.NewGuid());
-            var ctx    = BuildCtxWith(self, AttachmentProfile.Secure);
+            var self = new HumanId(Guid.NewGuid());
+            var alpha = new HumanId(Guid.NewGuid());
+            var beta = new HumanId(Guid.NewGuid());
+            var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
             var engine = BuildEngine();
             var outbox = new EventCollector();
 
             engine.Handle(RejectingEvent(self, alpha, new WDateTime(1)), ctx, outbox);
-            engine.Handle(RejectingEvent(self, beta,  new WDateTime(2)), ctx, outbox);
+            engine.Handle(RejectingEvent(self, beta, new WDateTime(2)), ctx, outbox);
 
             engine.ForgetPerson(alpha);
 
@@ -322,9 +320,9 @@ namespace EngineTests
         [TestMethod]
         public void GetBeliefsSorted_ReturnsBeliefsByStrengthDescending()
         {
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx   = BuildCtxWith(self, AttachmentProfile.Secure);
+            var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
             var engine = BuildEngine();
             var outbox = new EventCollector();
 
@@ -340,14 +338,14 @@ namespace EngineTests
             for (var i = 1; i < sorted.Count; i++)
             {
                 Assert.IsTrue(sorted[i - 1].Strength >= sorted[i].Strength,
-                    $"Beliefs musí být seřazeny sestupně. [{i-1}]={sorted[i-1].Strength:F4} < [{i}]={sorted[i].Strength:F4}");
+                    $"Beliefs musí být seřazeny sestupně. [{i - 1}]={sorted[i - 1].Strength:F4} < [{i}]={sorted[i].Strength:F4}");
             }
         }
 
         [TestMethod]
         public void GetBeliefsSorted_UnknownPerson_ReturnsEmptyList()
         {
-            var engine  = BuildEngine();
+            var engine = BuildEngine();
             var unknown = new HumanId(Guid.NewGuid());
 
             var result = engine.GetBeliefsSorted(unknown);
@@ -368,25 +366,38 @@ namespace EngineTests
         private sealed class LocalZeroRandom : IRandomSource
         {
             public int Next(int minInclusive, int maxExclusive) => minInclusive;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => p >= 1.0;
         }
 
         private sealed class LocalNullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
-            private sealed class NullDisposable : IDisposable { public void Dispose() { } }
+
+            private sealed class NullDisposable : IDisposable
+            {
+                public void Dispose()
+                {
+                }
+            }
         }
 
         private sealed class LocalNullScheduler : IScheduler
         {
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
                 => new(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
                 => new(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => false;
+
             public IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now)
                 => Array.Empty<(ScheduledId, ScheduledAction)>();
         }

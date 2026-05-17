@@ -1,5 +1,5 @@
-using System.Windows;
 using LogsResolver.ViewModels;
+using System.Windows;
 
 namespace LogsResolver;
 

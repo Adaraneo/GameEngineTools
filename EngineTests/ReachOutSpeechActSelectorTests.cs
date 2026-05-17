@@ -3,12 +3,12 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.World.Simulation;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Tests for <see cref="ReachOutSpeechActSelector"/>.

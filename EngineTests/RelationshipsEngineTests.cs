@@ -6,12 +6,12 @@ namespace EngineTests
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
-    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
@@ -21,8 +21,8 @@ namespace EngineTests
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
-    using System.Linq;
     using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Unit testy pro <see cref="DefaultRelationshipsEngine"/>.
@@ -705,6 +705,7 @@ namespace EngineTests
             Assert.IsTrue(afterNegative.PhysicalAttraction < 50);
             Assert.IsTrue(50 - afterNegative.AestheticAttraction < 8.0);
         }
+
         #endregion Relationship signals
 
         #region Runtime wiring
@@ -790,7 +791,7 @@ namespace EngineTests
         {
             // Dismissing (high Avoidance = 0.8): closeness cap = 100 - 0.8 * 40 = 68
             var engine = BuildEngine();
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
             var avoidance = 0.8;
             var personality = new Personality(
@@ -828,11 +829,11 @@ namespace EngineTests
         public void AttachmentProfile_HighAnxiety_AmplifiesRejectionSting()
         {
             // Preoccupied (high Anxiety): rejection sting should be larger than for Secure
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
 
-            var engineSecure   = BuildEngine();
-            var engineAnxious  = BuildEngine();
+            var engineSecure = BuildEngine();
+            var engineAnxious = BuildEngine();
 
             var ctxSecure = BuildContext(self, new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.3),
@@ -863,7 +864,7 @@ namespace EngineTests
             engineSecure.Handle(rejection, ctxSecure, _outbox);
             engineAnxious.Handle(rejection, ctxAnxious, _outbox);
 
-            var likeDeltaSecure  = edge.Like - engineSecure.State.Edges[other].Like;
+            var likeDeltaSecure = edge.Like - engineSecure.State.Edges[other].Like;
             var likeDeltaAnxious = edge.Like - engineAnxious.State.Edges[other].Like;
 
             Assert.IsTrue(likeDeltaAnxious > likeDeltaSecure,
@@ -874,10 +875,10 @@ namespace EngineTests
         public void AttachmentProfile_HighAvoidance_ReducesRepairGain()
         {
             // Dismissing (high Avoidance): RepairAttempt.Accepted gives less Trust
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
 
-            var engineSecure    = BuildEngine();
+            var engineSecure = BuildEngine();
             var engineDismissing = BuildEngine();
 
             var ctxSecure = BuildContext(self, new Personality(
@@ -902,7 +903,7 @@ namespace EngineTests
             engineSecure.Handle(repair, ctxSecure, _outbox);
             engineDismissing.Handle(repair, ctxDismissing, _outbox);
 
-            var trustGainSecure    = engineSecure.State.Edges[other].Trust - edge.Trust;
+            var trustGainSecure = engineSecure.State.Edges[other].Trust - edge.Trust;
             var trustGainDismissing = engineDismissing.State.Edges[other].Trust - edge.Trust;
 
             Assert.IsTrue(trustGainDismissing < trustGainSecure,
@@ -917,9 +918,9 @@ namespace EngineTests
         public void TransgressionResidue_MicroNegativeAccumulates()
         {
             var engine = BuildEngine();
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx   = BuildContext(self);
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 55, Attraction: 40), ctx, _outbox);
             Assert.AreEqual(0, engine.State.Edges[other].TransgressionResidue, "Initial residue should be 0");
@@ -937,9 +938,9 @@ namespace EngineTests
         public void TransgressionResidue_PowerLawDecay()
         {
             var engine = BuildEngine();
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx   = BuildContext(self);
+            var ctx = BuildContext(self);
 
             // Seed edge with known TransgressionResidue
             engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
@@ -964,9 +965,9 @@ namespace EngineTests
         public void TransgressionResidue_RepairAccepted_Reduces()
         {
             var engine = BuildEngine();
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx   = BuildContext(self);
+            var ctx = BuildContext(self);
 
             engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
@@ -994,15 +995,15 @@ namespace EngineTests
         {
             // Two identical edges: one with recent contact, one with contact 150 days ago.
             // The stale one (150 > 8 × 14 = 112 days) should decay faster.
-            var self   = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var recent = new HumanId(Guid.NewGuid());
-            var stale  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var stale = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
             var engine = BuildEngine();
 
             var now = _now;
             var recentContact = now - WTimeSpan.FromDays(5);
-            var staleContact  = now - WTimeSpan.FromDays(150);
+            var staleContact = now - WTimeSpan.FromDays(150);
 
             var baseEdge = new RelationshipEdge(self, recent,
                 Like: 70, Trust: 70, Familiarity: 50,
@@ -1014,13 +1015,13 @@ namespace EngineTests
             engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
                 [recent] = baseEdge with { A = self, B = recent, LastContactTime = recentContact },
-                [stale]  = baseEdge with { A = self, B = stale,  LastContactTime = staleContact }
+                [stale] = baseEdge with { A = self, B = stale, LastContactTime = staleContact }
             }));
 
             engine.Tick(now, WTimeSpan.FromDays(7), ctx, _outbox);
 
             var recentCloseness = engine.State.Edges[recent].Closeness;
-            var staleCloseness  = engine.State.Edges[stale].Closeness;
+            var staleCloseness = engine.State.Edges[stale].Closeness;
 
             Assert.IsTrue(staleCloseness < recentCloseness,
                 $"Stale edge Closeness ({staleCloseness:F1}) should be lower than recent ({recentCloseness:F1}) due to Navarro gap");
@@ -1034,9 +1035,9 @@ namespace EngineTests
         public void CommunalStrength_GrowsFromIntimateTouch()
         {
             var engine = BuildEngine();
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx   = BuildContext(self);
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, _outbox);
             var before = engine.State.Edges[other].CommunalStrength;
@@ -1057,12 +1058,12 @@ namespace EngineTests
         public void FamiliarityDissonance_HighFamiliarityWithoutContact_ReducesLike()
         {
             var engine = BuildEngine();
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var other = new HumanId(Guid.NewGuid());
-            var ctx   = BuildContext(self);
+            var ctx = BuildContext(self);
 
-            var now          = _now;
-            var lastContact  = now - WTimeSpan.FromDays(40);  // 40 days since last contact
+            var now = _now;
+            var lastContact = now - WTimeSpan.FromDays(40);  // 40 days since last contact
 
             engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
@@ -1091,11 +1092,11 @@ namespace EngineTests
         [TestMethod]
         public void RejectionNeedsThreat_PublishedOnInviteRejected()
         {
-            var engine  = BuildEngine();
-            var self    = new HumanId(Guid.NewGuid());
-            var other   = new HumanId(Guid.NewGuid());
-            var ctx     = BuildContext(self);
-            var outbox  = new EventCollector();
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, outbox);
 
@@ -1122,8 +1123,8 @@ namespace EngineTests
             // B's relationship engine receives ThirdPartyActionObserved → Trust/Like of A should rise.
             var engine = BuildEngine();
             var observer = new HumanId(Guid.NewGuid());
-            var actor    = new HumanId(Guid.NewGuid());
-            var target   = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
 
             // Observer context (observer's engine processes the event)
             var ctx = BuildContext(observer);
@@ -1143,11 +1144,11 @@ namespace EngineTests
         [TestMethod]
         public void ThirdPartyGossip_NegativeAct_DecreasesObserverTrustOfActor()
         {
-            var engine   = BuildEngine();
+            var engine = BuildEngine();
             var observer = new HumanId(Guid.NewGuid());
-            var actor    = new HumanId(Guid.NewGuid());
-            var target   = new HumanId(Guid.NewGuid());
-            var ctx      = BuildContext(observer);
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(observer);
 
             engine.Handle(new FirstImpressionFormed(_now, observer, actor, Like: 60, Attraction: 30), ctx, _outbox);
             var trustBefore = engine.State.Edges[actor].Trust;
@@ -1165,11 +1166,11 @@ namespace EngineTests
         {
             // When MicroPositive is processed and Observers are in InteractionSurface,
             // ThirdPartyActionObserved events should appear in the outbox for each observer.
-            var engine   = BuildEngine();
-            var self     = new HumanId(Guid.NewGuid());
-            var actor    = new HumanId(Guid.NewGuid());   // mn.B = perpetrator
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());   // mn.B = perpetrator
             var observer = new HumanId(Guid.NewGuid());
-            var outbox   = new EventCollector();
+            var outbox = new EventCollector();
 
             // Context with an observer in InteractionSurface
             var ctx = BuildContextWithObservers(self, new[] { observer });
@@ -1194,9 +1195,9 @@ namespace EngineTests
         public void Contempt_SetsIsContemptuouslyDestroyed_Flag()
         {
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 70, Attraction: 40), ctx, _outbox);
             Assert.IsFalse(engine.State.Edges[other].IsContemptuouslyDestroyed,
@@ -1212,13 +1213,13 @@ namespace EngineTests
         public void Contempt_CausesMajorTrustAndLikeDrop()
         {
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 70, Attraction: 40), ctx, _outbox);
             var trustBefore = engine.State.Edges[other].Trust;
-            var likeBefore  = engine.State.Edges[other].Like;
+            var likeBefore = engine.State.Edges[other].Like;
 
             engine.Handle(new ContemptuousActPerformed(_now, From: self, To: other), ctx, _outbox);
 
@@ -1233,9 +1234,9 @@ namespace EngineTests
         {
             // After contempt, RepairAttempt.Accepted cannot rebuild Trust above 30 or Closeness above 20.
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 70, Attraction: 40), ctx, _outbox);
             engine.Handle(new ContemptuousActPerformed(_now, From: self, To: other), ctx, _outbox);
@@ -1258,9 +1259,9 @@ namespace EngineTests
         public void ExchangeStrength_GrowsFromMetaInteraction()
         {
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
             var exchangeBefore = engine.State.Edges[other].ExchangeStrength;
@@ -1278,9 +1279,9 @@ namespace EngineTests
         public void ExchangeStrength_DoesNotGrow_FromSmallTalk()
         {
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
             var exchangeBefore = engine.State.Edges[other].ExchangeStrength;
@@ -1302,9 +1303,9 @@ namespace EngineTests
             // Edge with high CommunalStrength + high PositiveInteractionCount should
             // drift ResponsiveDesireLevel toward its target over many days.
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
@@ -1331,9 +1332,9 @@ namespace EngineTests
         {
             // Low CommunalStrength + low PositiveInteractionCount → ResponsiveDesireLevel stays at 0
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 40), ctx, _outbox);
 
@@ -1352,11 +1353,11 @@ namespace EngineTests
         {
             // High-attraction first impression should seed higher Comfort and Respect than low.
             var engine = BuildEngine();
-            var self   = new HumanId(Guid.NewGuid());
-            var other  = new HumanId(Guid.NewGuid());
-            var ctx    = BuildContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
 
-            var engineLow  = BuildEngine();
+            var engineLow = BuildEngine();
             var engineHigh = BuildEngine();
 
             // Low attraction: Attraction=10
@@ -1367,7 +1368,7 @@ namespace EngineTests
             engineHigh.Handle(new FirstImpressionFormed(_now, self, other,
                 Like: 70, Attraction: 90, BasePhysical: 38, PreferenceMatch: 32), ctx, _outbox);
 
-            var lowEdge  = engineLow.State.Edges[other];
+            var lowEdge = engineLow.State.Edges[other];
             var highEdge = engineHigh.State.Edges[other];
 
             Assert.IsTrue(highEdge.Comfort > lowEdge.Comfort,
@@ -1422,7 +1423,7 @@ namespace EngineTests
             var relations = ServiceProvider.GetRequiredService<IRelationshipsEngine>();
             var memory = ServiceProvider.GetRequiredService<IMemoryEngine>();
             var semanticMemory = ServiceProvider.GetRequiredService<ISemanticMemoryEngine>();
-            var goal     = ServiceProvider.GetRequiredService<IGoalEngine>();
+            var goal = ServiceProvider.GetRequiredService<IGoalEngine>();
             var schedule = ServiceProvider.GetRequiredService<IDailyScheduleEngine>();
 
             var snapshot = new EnginesSnapshot(
@@ -1624,11 +1625,11 @@ namespace EngineTests
         public void ThirdPartyPositiveAct_IncreasesPerceivedPrestige()
         {
             // Arrange
-            var self    = new HumanId(Guid.NewGuid());
-            var actor   = new HumanId(Guid.NewGuid());
-            var target  = new HumanId(Guid.NewGuid());
-            var engine  = BuildEngine();
-            var ctx     = BuildCtx(self);
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var engine = BuildEngine();
+            var ctx = BuildCtx(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, actor, Like: 50, Attraction: 40), ctx, _outbox);
             var prestigeBefore = engine.State.Edges[actor].PerceivedPrestige;
@@ -1655,11 +1656,11 @@ namespace EngineTests
         public void ThirdPartyNegativeAct_IncreasesPerceivedDominance()
         {
             // Arrange
-            var self    = new HumanId(Guid.NewGuid());
-            var actor   = new HumanId(Guid.NewGuid());
-            var target  = new HumanId(Guid.NewGuid());
-            var engine  = BuildEngine();
-            var ctx     = BuildCtx(self);
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var engine = BuildEngine();
+            var ctx = BuildCtx(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, actor, Like: 50, Attraction: 40), ctx, _outbox);
             var dominanceBefore = engine.State.Edges[actor].PerceivedDominance;
@@ -1686,19 +1687,19 @@ namespace EngineTests
         public void ThirdPartyBetrayal_IncreasesPerceivedDominance_MoreThanNegativeAct()
         {
             // Arrange
-            var self          = new HumanId(Guid.NewGuid());
-            var actorNeg      = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
+            var actorNeg = new HumanId(Guid.NewGuid());
             var actorBetrayal = new HumanId(Guid.NewGuid());
-            var target        = new HumanId(Guid.NewGuid());
-            var ctx           = BuildCtx(self);
+            var target = new HumanId(Guid.NewGuid());
+            var ctx = BuildCtx(self);
 
-            var engineNeg      = BuildEngine();
+            var engineNeg = BuildEngine();
             var engineBetrayal = BuildEngine();
 
             engineNeg.Handle(new FirstImpressionFormed(_now, self, actorNeg, Like: 50, Attraction: 40), ctx, _outbox);
             engineBetrayal.Handle(new FirstImpressionFormed(_now, self, actorBetrayal, Like: 50, Attraction: 40), ctx, _outbox);
 
-            var negBefore      = engineNeg.State.Edges[actorNeg].PerceivedDominance;
+            var negBefore = engineNeg.State.Edges[actorNeg].PerceivedDominance;
             var betrayalBefore = engineBetrayal.State.Edges[actorBetrayal].PerceivedDominance;
 
             // Act
@@ -1706,7 +1707,7 @@ namespace EngineTests
             engineBetrayal.Handle(new ThirdPartyActionObserved(_now, self, actorBetrayal, target, -1.0, ThirdPartyObservationType.Betrayal), ctx, _outbox);
 
             // Assert — Betrayal dává DominanceGainPerNegativeAct × 2
-            var negGain      = engineNeg.State.Edges[actorNeg].PerceivedDominance - negBefore;
+            var negGain = engineNeg.State.Edges[actorNeg].PerceivedDominance - negBefore;
             var betrayalGain = engineBetrayal.State.Edges[actorBetrayal].PerceivedDominance - betrayalBefore;
 
             Assert.IsTrue(betrayalGain > negGain,
@@ -1722,10 +1723,10 @@ namespace EngineTests
         public void ContemptuousActReceived_IncreasesPerceivedDominance()
         {
             // Arrange
-            var self   = new HumanId(Guid.NewGuid());
-            var actor  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
             var engine = BuildEngine();
-            var ctx    = BuildCtx(self);
+            var ctx = BuildCtx(self);
 
             engine.Handle(new FirstImpressionFormed(_now, self, actor, Like: 50, Attraction: 40), ctx, _outbox);
             var dominanceBefore = engine.State.Edges[actor].PerceivedDominance;
@@ -1747,10 +1748,10 @@ namespace EngineTests
         {
             // Arrange — engine se zapnutým decayem
             var decayCfg = new RelationshipsConfig(DecayPerDay: 0.5);
-            var self     = new HumanId(Guid.NewGuid());
-            var other    = new HumanId(Guid.NewGuid());
-            var engine   = BuildEngine(decayCfg);
-            var ctx      = BuildCtx(self);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var engine = BuildEngine(decayCfg);
+            var ctx = BuildCtx(self);
 
             // Restore edge s extrémními hodnotami dominance/prestige
             engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
@@ -1866,14 +1867,14 @@ namespace EngineTests
                 AttentionBudgetPressurePerExcessTier1: 10.0);  // obří tlak → zcela jiná rychlost
 
             var self = new HumanId(Guid.NewGuid());
-            var ctx  = BuildCtx(self);
+            var ctx = BuildCtx(self);
 
             // 3 Tier-1 přátele (closeness=80, nad prahem 70) → 1 přebytek
             var tier1a = new HumanId(Guid.NewGuid());
             var tier1b = new HumanId(Guid.NewGuid());
             var tier1c = new HumanId(Guid.NewGuid());
             // 1 Tier-2 přítel (closeness=50, mezi 40 a 70)
-            var tier2  = new HumanId(Guid.NewGuid());
+            var tier2 = new HumanId(Guid.NewGuid());
 
             // Engine s tlakem (3 tier-1, kapacita=2 → 1 přebytek)
             var engineWithPressure = BuildEngine(cfg);
@@ -1882,7 +1883,7 @@ namespace EngineTests
                 [tier1a] = MakeEdge(self, tier1a, closeness: 80),
                 [tier1b] = MakeEdge(self, tier1b, closeness: 80),
                 [tier1c] = MakeEdge(self, tier1c, closeness: 80),
-                [tier2]  = MakeEdge(self, tier2,  closeness: 50, like: 70)
+                [tier2] = MakeEdge(self, tier2, closeness: 50, like: 70)
             }));
 
             // Engine bez tlaku (jen 1 tier-1, pod kapacitou)
@@ -1890,7 +1891,7 @@ namespace EngineTests
             engineNoPressure.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
                 [tier1a] = MakeEdge(self, tier1a, closeness: 80),
-                [tier2]  = MakeEdge(self, tier2,  closeness: 50, like: 70)
+                [tier2] = MakeEdge(self, tier2, closeness: 50, like: 70)
             }));
 
             // Act — 1 den (krátce, aby Like nesáhlo na floor 50)

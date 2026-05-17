@@ -7,34 +7,29 @@ using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
+using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.SemanticMemory;
-using GameEngineTools.Characters.GameObjects;
+using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Generation.Portraits;
 using GameEngineTools.Characters.Hosting;
-using GameEngineTools.Characters.Traits;
 using GameEngineTools.Extensions;
 using GameEngineTools.FileSystem;
 using GameEngineTools.Narrative;
-using GameEngineTools.World.Location;
-using GameEngineTools.World.Objects;
 using GameEngineTools.Universe;
 using GameEngineTools.World.Core.Astro;
+using GameEngineTools.World.Location;
+using GameEngineTools.World.Objects;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
-using System.Runtime.InteropServices;
 using System.Text;
 using static GameEngineTools.Characters.Engines.ActionNames;
+using AppearanceProjector = GameEngineTools.Characters.Traits.AppearanceProjector;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
-using GameEngineTools.Characters.Engines.Goals;
-using GameEngineTools.Characters.Engines.Physiology;
-using GameEngineTools.Characters.Engines.Schedule;
-using GameEngineTools.Characters.Generation;
-using AppearanceProjector = GameEngineTools.Characters.Traits.AppearanceProjector;
 
 // ── Game time ─────────────────────────────────────────────────────────────────
 var gameTimePath = Path.Combine(
@@ -144,7 +139,7 @@ static void SetDaysForSimulation(ref long simulationDays, bool printInfo = true)
     Console.WriteLine("Simulation days: {0}", simulationDays);
 }
 
-#endregion
+#endregion input settings
 
 var currDir = Directory.GetCurrentDirectory();
 
@@ -216,8 +211,8 @@ var mainCharactersQuery = from mainCharacters in manager.Characters
                           select mainCharacters.Person;
 
 var locationQuery = from locations in mainCharactersQuery
-        where locations.Snapshot.InteractionSurface.Location == "Unknown"
-        select locations;
+                    where locations.Snapshot.InteractionSurface.Location == "Unknown"
+                    select locations;
 
 foreach (var personToMove in locationQuery)
 {
@@ -304,7 +299,7 @@ if (characters.Count > 0)
 {
     var ocLocations = worldMap.GetLocationsInRegion("Village");
 
-    foreach(var character in characters)
+    foreach (var character in characters)
     {
         locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
     }
@@ -405,7 +400,7 @@ Console.ReadKey();
 
 # region Helper Methods
 
-static void DynamicReachOutRouting(WDateTime now,IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy, CharacterPerceptionOptions perceptionOptions)
+static void DynamicReachOutRouting(WDateTime now, IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy, CharacterPerceptionOptions perceptionOptions)
 {
     foreach (var character in chars)
     {
@@ -754,13 +749,13 @@ static void HandleChildBornEvents(
 
         // ── Step 1: Generate the newborn blueprint from both parents ──────
         var childBlueprintGen = services.GetRequiredService<IChildBlueprintGenerator>();
-        var humanFactory      = services.GetRequiredService<IHumanFactory>();
+        var humanFactory = services.GetRequiredService<IHumanFactory>();
 
         var childBlueprint = childBlueprintGen.Generate(
             parentA: father,
             parentB: mother,
-            bornOn:  now.Date,
-            seed:    null);
+            bornOn: now.Date,
+            seed: null);
 
         // ── Step 2: Create the IHuman ──────────────────────────────────────
         // IHumanFactory.Create() automatically calls SeedFromPersonality and

@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -13,13 +10,15 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
-    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static EngineTests.MemoryScientificTestData;
 
     // =========================================================================
@@ -38,7 +37,7 @@ namespace EngineTests
             var now = WDateTime.New(100, 1, 10, 12);
             var target = new HumanId(Guid.NewGuid());
             var intimate = Episode(now, 2, "Interaction:SelfDisclosure:Accepted|from=a|to=b", EmotionalTag.Positive, 0.80, target, salience: 0.94);
-            var casual   = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b",      EmotionalTag.Positive, 0.80, target, salience: 0.80);
+            var casual = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.80, target, salience: 0.80);
             var memory = new MemoryIndex(new List<EpisodicMemory> { casual, intimate });
 
             var recall = MemoryCognition.Recall(memory,
@@ -57,7 +56,7 @@ namespace EngineTests
             var now = WDateTime.New(100, 1, 10, 12);
             var target = new HumanId(Guid.NewGuid());
             var highSalience = Episode(now, 2, "Interaction:SmallTalk:Rejected|from=a|to=b", EmotionalTag.Negative, 0.80, target, salience: 0.90);
-            var lowSalience  = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.80, target, salience: 0.50);
+            var lowSalience = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.80, target, salience: 0.50);
             var memory = new MemoryIndex(new List<EpisodicMemory> { lowSalience, highSalience });
 
             var recall = MemoryCognition.Recall(memory,
@@ -76,7 +75,7 @@ namespace EngineTests
             var now = WDateTime.New(100, 1, 10, 12);
             var target = new HumanId(Guid.NewGuid());
             var accepted = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.80, target, salience: 0.70);
-            var rejected = Episode(now, 2, "Interaction:Invite:Rejected|from=a|to=b",    EmotionalTag.Negative, 0.80, target, salience: 0.90);
+            var rejected = Episode(now, 2, "Interaction:Invite:Rejected|from=a|to=b", EmotionalTag.Negative, 0.80, target, salience: 0.90);
 
             Assert.IsTrue(rejected.Salience > accepted.Salience,
                 "Fallback: rejected epizoda (0.90) má vyšší salience než accepted (0.70).");
@@ -100,7 +99,7 @@ namespace EngineTests
             const double currentValence = 0.7;
 
             var negNumeric = -1.0;
-            var posNumeric =  1.0;
+            var posNumeric = 1.0;
 
             var negDelta = Math.Abs((negNumeric + (currentValence - negNumeric) * (driftRate * 1.3)) - negNumeric);
             var posDelta = Math.Abs((posNumeric + (currentValence - posNumeric) * (driftRate * 1.0)) - posNumeric);
@@ -216,7 +215,7 @@ namespace EngineTests
 
             // Positive current mood (valence=+0.5) → bias = 0 bez ohledu na N
             var highSalience = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.80, target, salience: 0.80);
-            var lowSalience  = Episode(now, 2, "Interaction:SmallTalk:Rejected|from=a|to=b", EmotionalTag.Negative, 0.80, target, salience: 0.50);
+            var lowSalience = Episode(now, 2, "Interaction:SmallTalk:Rejected|from=a|to=b", EmotionalTag.Negative, 0.80, target, salience: 0.50);
             var memory = new MemoryIndex(new List<EpisodicMemory> { lowSalience, highSalience });
 
             var recall = MemoryCognition.Recall(memory,
@@ -470,7 +469,7 @@ namespace EngineTests
 
             // Spiral musí mít větší diferenci (silnější bias)
             var negRelNoSpiral = withoutSpiral.Items.FirstOrDefault(i => i.Episode.Id == negative.Id)?.Relevance ?? 0;
-            var negRelSpiral   = withSpiral.Items.FirstOrDefault(i => i.Episode.Id == negative.Id)?.Relevance ?? 0;
+            var negRelSpiral = withSpiral.Items.FirstOrDefault(i => i.Episode.Id == negative.Id)?.Relevance ?? 0;
             Assert.IsTrue(negRelSpiral >= negRelNoSpiral,
                 $"Se spirálou musí mít negativní epizoda alespoň stejně vysokou relevance. " +
                 $"Spiral={negRelSpiral:F4}, NoSpiral={negRelNoSpiral:F4}");
@@ -512,7 +511,7 @@ namespace EngineTests
         {
             // Stejná salience, různá emoce → negativní musí mít vyšší počáteční strength
             // intensity: Negative=1.0, Positive=0.85 → Neg strength > Pos strength
-            var now    = WDateTime.New(100, 1, 10, 12);
+            var now = WDateTime.New(100, 1, 10, 12);
             var target = new HumanId(Guid.NewGuid());
 
             // Tyto epizody simulují co engine zakóduje
@@ -535,7 +534,7 @@ namespace EngineTests
         {
             // Vyšší salience → vyšší strength (monotonicky)
             var highSalience = 0.90 * 0.85 * 0.7 + 0.3; // salience=0.90, Positive
-            var lowSalience  = 0.40 * 0.85 * 0.7 + 0.3; // salience=0.40, Positive
+            var lowSalience = 0.40 * 0.85 * 0.7 + 0.3; // salience=0.40, Positive
 
             Assert.IsTrue(highSalience > lowSalience,
                 $"Vyšší salience musí dát vyšší strength. High={highSalience:F4}, Low={lowSalience:F4}");
@@ -654,7 +653,7 @@ namespace EngineTests
         public void KnowsAbout_ReturnsTrue_AfterDirectWitnessEvent()
         {
             // Arrange
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var actor = new HumanId(Guid.NewGuid());
             var engine = BuildMemoryEngine();
             var ctx = BuildMemoryContext(self);
@@ -685,8 +684,8 @@ namespace EngineTests
         public void KnowsAbout_ReturnsFalse_WhenNoKnowledge()
         {
             // Arrange
-            var engine  = BuildMemoryEngine();
-            var someId  = new HumanId(Guid.NewGuid());
+            var engine = BuildMemoryEngine();
+            var someId = new HumanId(Guid.NewGuid());
 
             // Assert — prázdný engine, žádná znalost
             Assert.IsFalse(engine.KnowsAbout(someId, "SelfDisclosure"),
@@ -716,7 +715,7 @@ namespace EngineTests
         public void Knowledge_DecaysOver_Time()
         {
             // Arrange
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var actor = new HumanId(Guid.NewGuid());
             var engine = BuildMemoryEngine();
             var ctx = BuildMemoryContext(self);
@@ -743,7 +742,7 @@ namespace EngineTests
         public void Knowledge_MergesWhenSameFact_RecordedTwice()
         {
             // Arrange
-            var self  = new HumanId(Guid.NewGuid());
+            var self = new HumanId(Guid.NewGuid());
             var actor = new HumanId(Guid.NewGuid());
             var engine = BuildMemoryEngine();
             var ctx = BuildMemoryContext(self);
@@ -767,11 +766,11 @@ namespace EngineTests
         public void ThirdPartyActionObserved_Betrayal_CreatesGossipKnowledge()
         {
             // Arrange
-            var self    = new HumanId(Guid.NewGuid());
-            var actor   = new HumanId(Guid.NewGuid());
-            var target  = new HumanId(Guid.NewGuid());
-            var engine  = BuildMemoryEngine();
-            var ctx     = BuildMemoryContext(self);
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var engine = BuildMemoryEngine();
+            var ctx = BuildMemoryContext(self);
 
             var @event = new ThirdPartyActionObserved(
                 OccurredAt: _now,

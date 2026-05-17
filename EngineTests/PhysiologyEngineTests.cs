@@ -539,7 +539,7 @@ namespace EngineTests
         public void Tick_ImmuneLoad_AboveThreshold_RaisesBodyTempDelta()
         {
             var highImmuneEngine = BuildEngine(immuneLoad: 80, birthYear: 100, todayYear: 116);
-            var lowImmuneEngine  = BuildEngine(immuneLoad: 10, birthYear: 100, todayYear: 116);
+            var lowImmuneEngine = BuildEngine(immuneLoad: 10, birthYear: 100, todayYear: 116);
             var ctx = BuildContext();
 
             // Start both at neutral temp
@@ -796,14 +796,14 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Cortisol_DayTimePeak_HigherThanNightTrough()
         {
-            var enginePeak  = BuildEngine();
+            var enginePeak = BuildEngine();
             var engineTrough = BuildEngine();
             // Obě instance se stejnou allostatickou zátěží 0 — čistě diurnální efekt
             enginePeak.RestoreState(enginePeak.State with { AllostaticLoad = 0, CortisolLevel = 50 });
             engineTrough.RestoreState(engineTrough.State with { AllostaticLoad = 0, CortisolLevel = 50 });
             var ctx = BuildContextWithAction(null);
 
-            var hour8  = new WDateTime(WTimeSpan.FromHours(8).Ticks);
+            var hour8 = new WDateTime(WTimeSpan.FromHours(8).Ticks);
             var hour22 = new WDateTime(WTimeSpan.FromHours(22).Ticks);
 
             enginePeak.Tick(hour8, WTimeSpan.FromHours(2), ctx, new EventCollector());
@@ -895,7 +895,7 @@ namespace EngineTests
         [TestMethod]
         public void Handle_SleepEnded_HighRecoveryDebt_ReducesEnergyRecovery()
         {
-            var freshEngine  = BuildEngine(energy: 0);
+            var freshEngine = BuildEngine(energy: 0);
             var debtedEngine = BuildEngine(energy: 0);
             freshEngine.RestoreState(freshEngine.State with { RecoveryDebtHours = 0 });
             debtedEngine.RestoreState(debtedEngine.State with { RecoveryDebtHours = 40 });
@@ -920,7 +920,7 @@ namespace EngineTests
         [TestMethod]
         public void Constructor_Testosterone_InitializedForMale_NullForFemale()
         {
-            var maleEngine   = BuildEngineForBiology(SexBiology.Male);
+            var maleEngine = BuildEngineForBiology(SexBiology.Male);
             var femaleEngine = BuildEngineForBiology(SexBiology.Female);
 
             Assert.IsNotNull(maleEngine.State.Testosterone,
@@ -995,7 +995,7 @@ namespace EngineTests
         {
             var poorEngine = BuildEngine();
             var goodEngine = BuildEngine();
-            poorEngine.Handle(MakeSleepEnded(quality: 0,   hoursSlept: 8, wasInterrupted: true),  _ctx, new EventCollector());
+            poorEngine.Handle(MakeSleepEnded(quality: 0, hoursSlept: 8, wasInterrupted: true), _ctx, new EventCollector());
             goodEngine.Handle(MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false), _ctx, new EventCollector());
 
             Assert.IsTrue(poorEngine.State.SleepInertiaHours > goodEngine.State.SleepInertiaHours,
@@ -1086,9 +1086,9 @@ namespace EngineTests
                 return engine.State.Pain;
             }
 
-            var painMenses      = GetPainAfterTick(2,  CyclePhase.Menses);
-            var painFollicular  = GetPainAfterTick(8,  CyclePhase.Follicular);
-            var painLuteal      = GetPainAfterTick(26, CyclePhase.Luteal);
+            var painMenses = GetPainAfterTick(2, CyclePhase.Menses);
+            var painFollicular = GetPainAfterTick(8, CyclePhase.Follicular);
+            var painLuteal = GetPainAfterTick(26, CyclePhase.Luteal);
 
             Assert.IsTrue(painFollicular < painMenses,
                 $"Follicular ({painFollicular:F4}) musí mít nižší bolest než Menses ({painMenses:F4}).");
@@ -1176,7 +1176,7 @@ namespace EngineTests
         [TestMethod]
         public void Hypocortisolism_ExtremeAlloLoad_BluntsCortisolRise()
         {
-            var normalEngine  = BuildEngine();
+            var normalEngine = BuildEngine();
             var extremeEngine = BuildEngine();
 
             // Vysoké (70, těsně pod threshold 75) vs. extrémní (100, přes threshold) AlloLoad.
@@ -1275,7 +1275,7 @@ namespace EngineTests
 
             // Vytvoříme kontext s vysokým NeedSocial (simulace izolace přes minulý snapshot)
             var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
-            var psych  = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral,
+            var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral,
                 Motivations: new MotivationState(NeedSocial: 90)); // vysoko nad 80
             var snapshot = new EnginesSnapshot(
                 physio, psych,
@@ -1310,11 +1310,11 @@ namespace EngineTests
         [TestMethod]
         public void Vitals_Compute_HighArousal_RaisesHeartRate()
         {
-            var lowArousalState  = new PsychologyState(0.0, 0.1, 0.5, 10, 10, DiscreteEmotion.Neutral);
+            var lowArousalState = new PsychologyState(0.0, 0.1, 0.5, 10, 10, DiscreteEmotion.Neutral);
             var highArousalState = new PsychologyState(0.0, 0.9, 0.5, 10, 10, DiscreteEmotion.Neutral);
             var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
 
-            var low  = PhysiologicalVitals.Compute(physio, lowArousalState);
+            var low = PhysiologicalVitals.Compute(physio, lowArousalState);
             var high = PhysiologicalVitals.Compute(physio, highArousalState);
 
             Assert.IsTrue(high.HeartRateBpm > low.HeartRateBpm,
@@ -1324,11 +1324,11 @@ namespace EngineTests
         [TestMethod]
         public void Vitals_Compute_HighStress_RaisesBP()
         {
-            var lowStressState  = new PsychologyState(0.0, 0.4, 0.5, 10,  10, DiscreteEmotion.Neutral);
+            var lowStressState = new PsychologyState(0.0, 0.4, 0.5, 10, 10, DiscreteEmotion.Neutral);
             var highStressState = new PsychologyState(0.0, 0.4, 0.5, 90, 10, DiscreteEmotion.Neutral);
             var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
 
-            var low  = PhysiologicalVitals.Compute(physio, lowStressState);
+            var low = PhysiologicalVitals.Compute(physio, lowStressState);
             var high = PhysiologicalVitals.Compute(physio, highStressState);
 
             Assert.IsTrue(high.SystolicBP > low.SystolicBP,
@@ -1372,7 +1372,7 @@ namespace EngineTests
         public void Aging_EnergyRecovery_ReducedAfterAge40()
         {
             var youngEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25);
-            var oldEngine   = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 55);
+            var oldEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 55);
             youngEngine.RestoreState(youngEngine.State with { Energy = 0 });
             oldEngine.RestoreState(oldEngine.State with { Energy = 0 });
 
@@ -1418,22 +1418,25 @@ namespace EngineTests
         [TestMethod]
         public void Contraception_High_ReducesPmddSeverity()
         {
-            var noContraEngine   = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25, cycleEnabled: true);
+            var noContraEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25, cycleEnabled: true);
             var highContraEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25, cycleEnabled: true);
 
             // Nastavit High contraception
             highContraEngine.RestoreState(highContraEngine.State with
-                { CurrentContraception = ContraceptionLevel.High });
+            { CurrentContraception = ContraceptionLevel.High });
 
             // Obě v pozdní luteální fázi (den 26 → PMDD aktivní pro vysoký PmsRisk)
             var lateLutealCycle = noContraEngine.State.Cycle! with
             {
-                DayInCycle = 26, Phase = CyclePhase.Luteal,
-                SymptomPain = 0, SymptomBloat = 0, SymptomBreastTender = 0
+                DayInCycle = 26,
+                Phase = CyclePhase.Luteal,
+                SymptomPain = 0,
+                SymptomBloat = 0,
+                SymptomBreastTender = 0
             };
             noContraEngine.RestoreState(noContraEngine.State with { Cycle = lateLutealCycle, Pain = 0 });
             highContraEngine.RestoreState(highContraEngine.State with
-                { Cycle = lateLutealCycle, Pain = 0, CurrentContraception = ContraceptionLevel.High });
+            { Cycle = lateLutealCycle, Pain = 0, CurrentContraception = ContraceptionLevel.High });
 
             var ctx = BuildContextWithAction(null);
             noContraEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
@@ -1465,21 +1468,27 @@ namespace EngineTests
 
             var ctxHighAlt = new HumanContext
             {
-                Id = new HumanId(System.Guid.NewGuid()), Biology = SexBiology.Female,
+                Id = new HumanId(System.Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure,
                     CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate, Chronotype.Neutral),
-                Snapshot = highAltSnapshot, Random = new ZeroRandom(),
+                Snapshot = highAltSnapshot,
+                Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
             var ctxSea = new HumanContext
             {
-                Id = ctxHighAlt.Id, Biology = SexBiology.Female,
+                Id = ctxHighAlt.Id,
+                Biology = SexBiology.Female,
                 Personality = ctxHighAlt.Personality,
-                Snapshot = seaSnapshot, Random = new ZeroRandom(),
+                Snapshot = seaSnapshot,
+                Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
 
             seaEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(4), ctxSea, new EventCollector());
@@ -1503,13 +1512,16 @@ namespace EngineTests
                 AltitudeMeters: 5000.0);  // > 4000 AMS threshold
             var ctx = new HumanContext
             {
-                Id = new HumanId(System.Guid.NewGuid()), Biology = SexBiology.Female,
+                Id = new HumanId(System.Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = new Personality(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure,
                     CommunicationStyle.Direct, new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                     Sociosexuality.Intermediate, Chronotype.Neutral),
-                Snapshot = amsSnapshot, Random = new ZeroRandom(),
+                Snapshot = amsSnapshot,
+                Random = new ZeroRandom(),
                 Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
 
             engine.Tick(new WDateTime(0), WTimeSpan.FromHours(2), ctx, new EventCollector());
@@ -1541,7 +1553,7 @@ namespace EngineTests
         {
             var engine = BuildEngine();
             engine.RestoreState(engine.State with
-                { Aging = engine.State.Aging! with { HairLengthCm = 30.0 } });
+            { Aging = engine.State.Aging! with { HairLengthCm = 30.0 } });
 
             var hairCut = new HairCut(_now, new HumanId(System.Guid.NewGuid()), 5.0);
             engine.Handle(hairCut, _ctx, _outbox);
@@ -1556,7 +1568,7 @@ namespace EngineTests
             // Postava 40 let (věk > HairGreyingAgeStart=30)
             var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 40);
             engine.RestoreState(engine.State with
-                { Aging = engine.State.Aging! with { GreyFraction = 0.0 } });
+            { Aging = engine.State.Aging! with { GreyFraction = 0.0 } });
             var ctx = BuildContextWithAction(null);
 
             var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
@@ -1572,12 +1584,12 @@ namespace EngineTests
             // Tick 1 hodinu — při default HairGreyingCortisolBoost=0.0001:
             // Normal (CortisolLevel=50): 50*0.0001*1 = 0.005 přírůstek za hodinu
             // Stressed (CortisolLevel=90): 90*0.0001*1 = 0.009 přírůstek → stressed > normal
-            var normalEngine   = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 35);
+            var normalEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 35);
             var stressedEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 35);
             normalEngine.RestoreState(normalEngine.State with
-                { CortisolLevel = 50, Aging = normalEngine.State.Aging! with { GreyFraction = 0.0 } });
+            { CortisolLevel = 50, Aging = normalEngine.State.Aging! with { GreyFraction = 0.0 } });
             stressedEngine.RestoreState(stressedEngine.State with
-                { CortisolLevel = 90, Aging = stressedEngine.State.Aging! with { GreyFraction = 0.0 } });
+            { CortisolLevel = 90, Aging = stressedEngine.State.Aging! with { GreyFraction = 0.0 } });
             var ctx = BuildContextWithAction(null);
             var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
 
@@ -1594,7 +1606,7 @@ namespace EngineTests
         {
             var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 28, cycleEnabled: true);
             engine.RestoreState(engine.State with
-                { Aging = engine.State.Aging! with { HairDensity = 1.0 } });
+            { Aging = engine.State.Aging! with { HairDensity = 1.0 } });
 
             // Simulujeme porod — nastavíme Postpartum state
             var beforeDensity = engine.State.Aging!.HairDensity;
@@ -1619,7 +1631,7 @@ namespace EngineTests
             // Postava 40 let (věk > WrinklingAgeStart=25)
             var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 40);
             engine.RestoreState(engine.State with
-                { CortisolLevel = 80, Aging = engine.State.Aging! with { WrinkleScore = 0.0 } });
+            { CortisolLevel = 80, Aging = engine.State.Aging! with { WrinkleScore = 0.0 } });
             var ctx = BuildContextWithAction(null);
             var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
 
@@ -1635,7 +1647,7 @@ namespace EngineTests
             // Postava 50 let (věk > SarcopeniaAgeStart=30)
             var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 50);
             engine.RestoreState(engine.State with
-                { Aging = engine.State.Aging! with { MuscleMassFraction = 1.0 } });
+            { Aging = engine.State.Aging! with { MuscleMassFraction = 1.0 } });
             var ctx = BuildContextWithAction(null);
             var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
 
@@ -1673,7 +1685,7 @@ namespace EngineTests
             // Postava 40 let — AgeYears musí být nastaveno v Aging při ticku s rokem 116
             var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 40);
             engine.RestoreState(engine.State with
-                { Aging = engine.State.Aging! with { AgeYears = 0 } });
+            { Aging = engine.State.Aging! with { AgeYears = 0 } });
             var ctx = BuildContextWithAction(null);
             var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
 
@@ -1688,7 +1700,7 @@ namespace EngineTests
         {
             var engine = BuildEngine();
             engine.RestoreState(engine.State with
-                { Aging = engine.State.Aging! with { GreyFraction = 0.4 } });
+            { Aging = engine.State.Aging! with { GreyFraction = 0.4 } });
 
             var hairDyed = new HairDyed(_now, new HumanId(System.Guid.NewGuid()));
             engine.Handle(hairDyed, _ctx, _outbox);
@@ -1703,7 +1715,7 @@ namespace EngineTests
             // Postava 50 let (věk > BoneDensityDeclineAgeStart=30)
             var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 50);
             engine.RestoreState(engine.State with
-                { Aging = engine.State.Aging! with { BoneDensity = 1.0 } });
+            { Aging = engine.State.Aging! with { BoneDensity = 1.0 } });
             var ctx = BuildContextWithAction(null);
             var year116 = WDateOnly.New(116, 1, 1).ToDateTime();
 
@@ -1716,12 +1728,12 @@ namespace EngineTests
         [TestMethod]
         public void BoneDensity_LowerDensity_AmplifiiesInjurySeverity()
         {
-            var healthyEngine    = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25);
-            var osteoEngine      = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25);
+            var healthyEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25);
+            var osteoEngine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25);
             healthyEngine.RestoreState(healthyEngine.State with
-                { Aging = healthyEngine.State.Aging! with { BoneDensity = 1.0 } });
+            { Aging = healthyEngine.State.Aging! with { BoneDensity = 1.0 } });
             osteoEngine.RestoreState(osteoEngine.State with
-                { Aging = osteoEngine.State.Aging! with { BoneDensity = 0.5 } }); // výrazná osteoporóza
+            { Aging = osteoEngine.State.Aging! with { BoneDensity = 0.5 } }); // výrazná osteoporóza
 
             var injury = new InjuryReceived(_now, new HumanId(System.Guid.NewGuid()), 40, InjuryType.Sprain);
             healthyEngine.Handle(injury, _ctx, new EventCollector());
@@ -1736,13 +1748,13 @@ namespace EngineTests
         public void Vitals_OlderAge_HigherSystolicBP()
         {
             var youngPhysio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null) with
-                { Aging = new PhysicalAgingState(AgeYears: 25) };
+            { Aging = new PhysicalAgingState(AgeYears: 25) };
             var oldPhysio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null) with
-                { Aging = new PhysicalAgingState(AgeYears: 65) };
+            { Aging = new PhysicalAgingState(AgeYears: 65) };
 
             var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
             var youngVitals = PhysiologicalVitals.Compute(youngPhysio, psych);
-            var oldVitals   = PhysiologicalVitals.Compute(oldPhysio, psych);
+            var oldVitals = PhysiologicalVitals.Compute(oldPhysio, psych);
 
             Assert.IsTrue(oldVitals.SystolicBP > youngVitals.SystolicBP,
                 $"Starší postava musí mít vyšší systolický TK. " +
@@ -1991,7 +2003,9 @@ namespace EngineTests
         private sealed class AlwaysConceiveRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             // Always conceive — probability check always passes
             public bool Chance(double p) => true;
         }

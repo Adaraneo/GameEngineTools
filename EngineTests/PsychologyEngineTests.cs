@@ -436,10 +436,10 @@ namespace EngineTests
             var physio = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0);
 
             var ctxSleep = BuildContext(neuroticism: 0.5, physio: physio, currentAction: GameEngineTools.Characters.Engines.ActionNames.Sleep);
-            var ctxIdle  = BuildContext(neuroticism: 0.5, physio: physio, currentAction: null);
+            var ctxIdle = BuildContext(neuroticism: 0.5, physio: physio, currentAction: null);
 
             var sleepEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 50);
-            var idleEngine  = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 50);
+            var idleEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 50);
 
             // Act
             sleepEngine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxSleep, new EventCollector());
@@ -462,13 +462,13 @@ namespace EngineTests
         public void Tick_Fever_HighBodyTemp_IncreasesCognitiveLoad()
         {
             // Arrange
-            var physioFever  = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 2.5);
+            var physioFever = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 2.5);
             var physioNormal = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0.0);
 
-            var ctxFever  = BuildContext(neuroticism: 0.5, physio: physioFever);
+            var ctxFever = BuildContext(neuroticism: 0.5, physio: physioFever);
             var ctxNormal = BuildContext(neuroticism: 0.5, physio: physioNormal);
 
-            var feverEngine  = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+            var feverEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
             var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
 
             // Act
@@ -488,13 +488,13 @@ namespace EngineTests
         public void Tick_Fever_HighBodyTemp_SuppressesArousal()
         {
             // Arrange
-            var physioFever  = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 2.5);
+            var physioFever = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 2.5);
             var physioNormal = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0.0);
 
-            var ctxFever  = BuildContext(neuroticism: 0.5, physio: physioFever);
+            var ctxFever = BuildContext(neuroticism: 0.5, physio: physioFever);
             var ctxNormal = BuildContext(neuroticism: 0.5, physio: physioNormal);
 
-            var feverEngine  = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+            var feverEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
             var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
 
             // Act
@@ -515,12 +515,12 @@ namespace EngineTests
         {
             // Arrange — teplota těsně pod prahem
             var physioSubThreshold = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 1.0);
-            var physioNormal       = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0.0);
+            var physioNormal = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0.0);
 
-            var ctxSub    = BuildContext(neuroticism: 0.5, physio: physioSubThreshold);
+            var ctxSub = BuildContext(neuroticism: 0.5, physio: physioSubThreshold);
             var ctxNormal = BuildContext(neuroticism: 0.5, physio: physioNormal);
 
-            var subEngine    = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
+            var subEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
             var normalEngine = BuildEngine(initialValence: 0.0, initialStress: 0, initialCogLoad: 0);
 
             // Act
@@ -563,13 +563,13 @@ namespace EngineTests
         public void Handle_PregnancyDiscovered_HighNeuroticism_SpikesMoreStress()
         {
             // Arrange
-            var stableEngine  = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var stableEngine = BuildEngine(initialValence: 0.0, initialStress: 20);
             var neurotiEngine = BuildEngine(initialValence: 0.0, initialStress: 20);
 
-            var stableCtx  = BuildContext(neuroticism: 0.0);
+            var stableCtx = BuildContext(neuroticism: 0.0);
             var neurotiCtx = BuildContext(neuroticism: 1.0);
 
-            var stableEvt  = new PregnancyDiscovered(WDateTime.New(100, 1, 1), stableCtx.Id, new HumanId(Guid.NewGuid()));
+            var stableEvt = new PregnancyDiscovered(WDateTime.New(100, 1, 1), stableCtx.Id, new HumanId(Guid.NewGuid()));
             var neurotiEvt = new PregnancyDiscovered(WDateTime.New(100, 1, 1), neurotiCtx.Id, new HumanId(Guid.NewGuid()));
 
             // Act
@@ -994,12 +994,12 @@ namespace EngineTests
         {
             // Arrange
             var engineSmall = BuildEngine(initialValence: 0.0, initialStress: 20);
-            var engineSelf  = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var engineSelf = BuildEngine(initialValence: 0.0, initialStress: 20);
             var ctx = BuildContext(neuroticism: 0.5);
 
             var toId = new HumanId(Guid.NewGuid());
             var ioSmall = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, SpeechAct.SmallTalk);
-            var ioSelf  = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, SpeechAct.SelfDisclosure);
+            var ioSelf = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, SpeechAct.SelfDisclosure);
 
             // Act
             engineSmall.Handle(ioSmall, ctx, new EventCollector());
@@ -1048,13 +1048,13 @@ namespace EngineTests
         {
             // Arrange — Pain=50
             var physioHighPain = MakePhysio(sleepDebtHours: 0, pain: 50, bodyTempDelta: 0);
-            var physioNoPain   = MakePhysio(sleepDebtHours: 0, pain: 0,  bodyTempDelta: 0);
+            var physioNoPain = MakePhysio(sleepDebtHours: 0, pain: 0, bodyTempDelta: 0);
 
             var ctxHighPain = BuildContext(neuroticism: 0.5, physio: physioHighPain);
-            var ctxNoPain   = BuildContext(neuroticism: 0.5, physio: physioNoPain);
+            var ctxNoPain = BuildContext(neuroticism: 0.5, physio: physioNoPain);
 
             var engineHighPain = BuildEngine(initialValence: 0.0, initialStress: 0);
-            var engineNoPain   = BuildEngine(initialValence: 0.0, initialStress: 0);
+            var engineNoPain = BuildEngine(initialValence: 0.0, initialStress: 0);
 
             // Act
             engineHighPain.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1.0), ctxHighPain, new EventCollector());
@@ -1097,7 +1097,7 @@ namespace EngineTests
             engineLowStress.RestoreState(engineLowStress.State with { MoodBaseline = 30 });
 
             var ctxHigh = BuildContext(neuroticism: 0.5);
-            var ctxLow  = BuildContext(neuroticism: 0.5);
+            var ctxLow = BuildContext(neuroticism: 0.5);
 
             engineHighStress.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxHigh, new EventCollector());
             engineLowStress.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLow, new EventCollector());
@@ -1308,17 +1308,17 @@ namespace EngineTests
                 EnableCircadianRhythm: true,
                 CircadianInfluence: 0.15);
 
-            var enginePeak  = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
+            var enginePeak = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
             var engineTrough = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
 
             // Two-Gaussian model: morning peak at 10h, night trough at ~3h
-            var nowPeak  = new WDateTime(0) + WTimeSpan.FromHours(10);
+            var nowPeak = new WDateTime(0) + WTimeSpan.FromHours(10);
             var nowTrough = new WDateTime(0) + WTimeSpan.FromHours(3);
 
-            var ctxPeak  = BuildContext(neuroticism: 0.5);
+            var ctxPeak = BuildContext(neuroticism: 0.5);
             var ctxTrough = BuildContext(neuroticism: 0.5);
 
-            enginePeak.Tick(nowPeak,  WTimeSpan.FromHours(0.1), ctxPeak,  new EventCollector());
+            enginePeak.Tick(nowPeak, WTimeSpan.FromHours(0.1), ctxPeak, new EventCollector());
             engineTrough.Tick(nowTrough, WTimeSpan.FromHours(0.1), ctxTrough, new EventCollector());
 
             Assert.IsTrue(enginePeak.State.Arousal > engineTrough.State.Arousal,
@@ -1335,10 +1335,10 @@ namespace EngineTests
             var engine1 = BuildEngine(initialValence: 0.0, initialStress: 0);
             var engine2 = BuildEngine(initialValence: 0.0, initialStress: 0);
 
-            var ctxLowIron  = BuildContext(0.5, MakePhysioWithNutrition(iron: 10, vitaminD: 80));
+            var ctxLowIron = BuildContext(0.5, MakePhysioWithNutrition(iron: 10, vitaminD: 80));
             var ctxHighIron = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 80));
 
-            engine1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLowIron,  new EventCollector());
+            engine1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLowIron, new EventCollector());
             engine2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxHighIron, new EventCollector());
 
             Assert.IsTrue(engine1.State.Valence < engine2.State.Valence,
@@ -1358,10 +1358,10 @@ namespace EngineTests
             var engine1 = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
             var engine2 = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
 
-            var ctxLowVitD  = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 5));
+            var ctxLowVitD = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 5));
             var ctxHighVitD = BuildContext(0.5, MakePhysioWithNutrition(iron: 80, vitaminD: 80));
 
-            engine1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLowVitD,  new EventCollector());
+            engine1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxLowVitD, new EventCollector());
             engine2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(1), ctxHighVitD, new EventCollector());
 
             Assert.IsTrue(engine1.State.MoodBaseline < engine2.State.MoodBaseline,
@@ -1573,7 +1573,7 @@ namespace EngineTests
         {
             // DualControl with SES=0.9 should produce higher NeedIntimacy than baseline (SES=0.5)
             var engineBaseline = Build(SexualResponsiveness.Default);
-            var engineHighSES  = Build(new SexualResponsiveness(SES: 0.9, SIS1: 0.5, SIS2: 0.5));
+            var engineHighSES = Build(new SexualResponsiveness(SES: 0.9, SIS1: 0.5, SIS2: 0.5));
 
             var ctx = BuildCtx(engineBaseline, ses: 0.9, stress: 0, crowding: 0);
             var outbox = new EventCollector();
@@ -1592,14 +1592,14 @@ namespace EngineTests
         public void HighSIS1_UnderStress_ReducesNeedIntimacy()
         {
             // SIS1=0.9 under high stress should suppress NeedIntimacy more than SIS1=0.1
-            var engineLowSIS1  = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.1, SIS2: 0.5));
+            var engineLowSIS1 = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.1, SIS2: 0.5));
             var engineHighSIS1 = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.9, SIS2: 0.5));
 
             var outbox = new EventCollector();
             engineLowSIS1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.1, 0.5), stress: 80, crowding: 0), outbox);
             engineHighSIS1.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.9, 0.5), stress: 80, crowding: 0), outbox);
 
-            var lowSIS1Intimacy  = engineLowSIS1.State.Motivations?.NeedIntimacy ?? 50;
+            var lowSIS1Intimacy = engineLowSIS1.State.Motivations?.NeedIntimacy ?? 50;
             var highSIS1Intimacy = engineHighSIS1.State.Motivations?.NeedIntimacy ?? 50;
 
             Assert.IsTrue(highSIS1Intimacy < lowSIS1Intimacy,
@@ -1610,14 +1610,14 @@ namespace EngineTests
         public void HighSIS2_InHighCrowding_ReducesNeedIntimacy()
         {
             // SIS2=0.9 in crowded environment should suppress NeedIntimacy more than SIS2=0.1
-            var engineLowSIS2  = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.5, SIS2: 0.1));
+            var engineLowSIS2 = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.5, SIS2: 0.1));
             var engineHighSIS2 = Build(new SexualResponsiveness(SES: 0.5, SIS1: 0.5, SIS2: 0.9));
 
             var outbox = new EventCollector();
             engineLowSIS2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.5, 0.1), stress: 0, crowding: 0.9), outbox);
             engineHighSIS2.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(new SexualResponsiveness(0.5, 0.5, 0.9), stress: 0, crowding: 0.9), outbox);
 
-            var lowSIS2Intimacy  = engineLowSIS2.State.Motivations?.NeedIntimacy ?? 50;
+            var lowSIS2Intimacy = engineLowSIS2.State.Motivations?.NeedIntimacy ?? 50;
             var highSIS2Intimacy = engineHighSIS2.State.Motivations?.NeedIntimacy ?? 50;
 
             Assert.IsTrue(highSIS2Intimacy < lowSIS2Intimacy,
@@ -1628,14 +1628,14 @@ namespace EngineTests
         public void NullDualControl_NoChangeToBaseline()
         {
             // null DualControl (no DCM profile) should behave identically to population average
-            var engineNull    = Build(null);
+            var engineNull = Build(null);
             var engineDefault = Build(SexualResponsiveness.Default);
 
             var outbox = new EventCollector();
             engineNull.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(null, stress: 0, crowding: 0), outbox);
             engineDefault.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), BuildCtxWithDCM(SexualResponsiveness.Default, stress: 0, crowding: 0), outbox);
 
-            var nullIntimacy    = engineNull.State.Motivations?.NeedIntimacy ?? 50;
+            var nullIntimacy = engineNull.State.Motivations?.NeedIntimacy ?? 50;
             var defaultIntimacy = engineDefault.State.Motivations?.NeedIntimacy ?? 50;
 
             // SES=0.5 → sesBoost=0; SIS at 0.5 but stress=0, crowding=0 → inhibition=0 → no change
@@ -1658,7 +1658,7 @@ namespace EngineTests
         private IHumanContext BuildCtxWithDCM(SexualResponsiveness? dcm, double stress, double crowding)
         {
             var physio = new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null);
-            var psych  = new PsychologyState(0.0, 0.4, 0.5, stress, 20, DiscreteEmotion.Neutral,
+            var psych = new PsychologyState(0.0, 0.4, 0.5, stress, 20, DiscreteEmotion.Neutral,
                 Motivations: new MotivationState());
             var personality = new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.3),
@@ -1676,11 +1676,15 @@ namespace EngineTests
                 new MemoryIndex(new System.Collections.Generic.List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id = new HumanId(System.Guid.NewGuid()), Biology = SexBiology.Female,
-                Personality = personality, PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot = snapshot, Random = new ZeroRandom(),
+                Id = new HumanId(System.Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
                 Logger = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Warning)).CreateLogger("Test"),
-                EventBus = new NullEventBus(), Scheduler = new NullScheduler()
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
@@ -1699,17 +1703,17 @@ namespace EngineTests
         // Build a config using only the named parameters we care about;
         // all others remain at their documented defaults.
         private static PsychologyConfig CfgWithDecays(
-            double fear      = 3.0,
-            double sadness   = 0.06,
-            double shame     = 0.4,
-            double anger     = 0.6,
-            double joy       = 1.0)
+            double fear = 3.0,
+            double sadness = 0.06,
+            double shame = 0.4,
+            double anger = 0.6,
+            double joy = 1.0)
             => new PsychologyConfig(
-                EmotionDecayFear:    fear,
+                EmotionDecayFear: fear,
                 EmotionDecaySadness: sadness,
-                EmotionDecayShame:   shame,
-                EmotionDecayAnger:   anger,
-                EmotionDecayJoy:     joy);
+                EmotionDecayShame: shame,
+                EmotionDecayAnger: anger,
+                EmotionDecayJoy: joy);
 
         /// <summary>
         /// Sadness musí mít nižší decay multiplier než Fear —
@@ -1814,8 +1818,8 @@ namespace EngineTests
         public void IsolationStress_ExtravertInPrivateSpace_GetsMoreStress_ThanIntrovert()
         {
             // Arrange
-            var extravertEngine  = BuildIsolationEngine(initialStress: 10);
-            var introvertEngine  = BuildIsolationEngine(initialStress: 10);
+            var extravertEngine = BuildIsolationEngine(initialStress: 10);
+            var introvertEngine = BuildIsolationEngine(initialStress: 10);
 
             var extravertCtx = BuildIsolationContext(extraversion: 0.9);  // E=0.9 → silný extravert
             var introvertCtx = BuildIsolationContext(extraversion: 0.1);  // E=0.1 → introvert

@@ -1,7 +1,7 @@
-using System.Windows;
 using LogsResolver.Services;
 using LogsResolver.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using System.Windows;
 
 namespace LogsResolver;
 

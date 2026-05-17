@@ -647,6 +647,7 @@ namespace EngineTests
             public SexBiology Biology => SexBiology.Female;
             public Personality Personality { get; }
             public PsychologicalProfile PsychologyProfile { get; }
+
             public PhysicalAppearance PhysicalAppearance => TestAppearanceFactory.Build(
                 heightCm: 170,
                 frame: BodyFrame.Medium,
@@ -659,13 +660,19 @@ namespace EngineTests
                 hipBreadthCm: 38,
                 noseProjection: 0.5,
                 lipFullness: 0.5);
+
             public AttractionProfile AttractionProfile => null!;
             public EnginesSnapshot Snapshot { get; private set; }
             public IReadOnlyList<IDomainEvent> LastOutbox => Array.Empty<IDomainEvent>();
             public int Age => 20;
             public StadiumType Stadium => StadiumType.Adult;
-            public void Tick(WDateTime now, WTimeSpan dt) { }
-            public void ReceiveEvent(IDomainEvent @event) { }
+
+            public void Tick(WDateTime now, WTimeSpan dt)
+            { }
+
+            public void ReceiveEvent(IDomainEvent @event)
+            { }
+
             public void RestoreSnapshot(EnginesSnapshot snapshot) => Snapshot = snapshot;
 
             public void FlushInbox()

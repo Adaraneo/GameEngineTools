@@ -1,7 +1,7 @@
-using System.Windows.Input;
 using LogsResolver.Commands;
 using LogsResolver.Models;
 using LogsResolver.Services;
+using System.Windows.Input;
 
 namespace LogsResolver.ViewModels;
 

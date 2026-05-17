@@ -2,7 +2,7 @@ namespace LogsResolver.Models;
 
 public sealed class LogLoadProgress
 {
-    public required string Phase { get; init; }
+    public string Phase { get; init; }
 
     public string? FilePath { get; init; }
 

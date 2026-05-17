@@ -3,14 +3,14 @@
 
 namespace EngineTests
 {
-    using System.Text.Json;
+    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
+    using System.Text.Json;
     using TraitsProjector = GameEngineTools.Characters.Traits.AppearanceProjector;
-    using GameEngineTools;
 
     /// <summary>
     /// Tests for high-resolution appearance morphology generation.

@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -13,6 +10,9 @@ namespace EngineTests
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Unit tests for <see cref="DefaultLocationService"/>.
@@ -464,7 +464,7 @@ namespace EngineTests
             Assert.AreEqual(2, events.Count,
                 $"After movement a new event must be dispatched. Total: {events.Count}");
             Assert.AreEqual(Library.Id, events[0].Location);
-            Assert.AreEqual(Tavern.Id,  events[1].Location);
+            Assert.AreEqual(Tavern.Id, events[1].Location);
         }
 
         /// <summary>
@@ -512,10 +512,10 @@ namespace EngineTests
             _sut.RegisterLocation(Tavern);
 
             var libraryChar = NewFakeCharacter();
-            var tavernChar  = NewFakeCharacter();
+            var tavernChar = NewFakeCharacter();
 
             _sut.MoveCharacter(libraryChar.Id, Library.Id);
-            _sut.MoveCharacter(tavernChar.Id,  Tavern.Id);
+            _sut.MoveCharacter(tavernChar.Id, Tavern.Id);
 
             var characters = new IHuman[] { libraryChar, tavernChar };
 
@@ -525,13 +525,13 @@ namespace EngineTests
             // Assert — library: 1 character → Noise=0.07, Crowding=0.10
             var libEv = libraryChar.ReceivedEvents.OfType<ContextChanged>().Single();
             Assert.AreEqual(Library.Id, libEv.Location);
-            Assert.AreEqual(0.07, libEv.Noise,    delta: 0.001, "Library Noise mismatch.");
+            Assert.AreEqual(0.07, libEv.Noise, delta: 0.001, "Library Noise mismatch.");
             Assert.AreEqual(0.10, libEv.Crowding, delta: 0.001, "Library Crowding mismatch.");
 
             // Assert — tavern: 1 character → Noise = 0.4 + 0.05*1 = 0.45, Crowding = 1/20 = 0.05
             var tavEv = tavernChar.ReceivedEvents.OfType<ContextChanged>().Single();
             Assert.AreEqual(Tavern.Id, tavEv.Location);
-            Assert.AreEqual(0.45, tavEv.Noise,    delta: 0.001, "Tavern Noise mismatch.");
+            Assert.AreEqual(0.45, tavEv.Noise, delta: 0.001, "Tavern Noise mismatch.");
             Assert.AreEqual(0.05, tavEv.Crowding, delta: 0.001, "Tavern Crowding mismatch.");
         }
 
@@ -652,7 +652,8 @@ namespace EngineTests
                 => ReceivedEvents.Add(@event);
 
             /// <summary>Not exercised in these tests.</summary>
-            public void Tick(WDateTime now, WTimeSpan dt) { }
+            public void Tick(WDateTime now, WTimeSpan dt)
+            { }
 
             public void RestoreSnapshot(EnginesSnapshot snapshot)
             {

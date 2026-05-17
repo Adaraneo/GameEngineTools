@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior.Needs;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -17,6 +14,9 @@ namespace EngineTests
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     [TestClass]
@@ -130,9 +130,11 @@ namespace EngineTests
             var maleTarget = new HumanId(Guid.NewGuid());
             var profile = HeterosexualMaleProfile();
             var femaleStart = Edge(self, femaleTarget, trust: 72, comfort: 74, closeness: 72, physical: 82, aesthetic: 80, romantic: 35, sexual: 35)
-                with { TargetBiology = SexBiology.Female };
+                with
+            { TargetBiology = SexBiology.Female };
             var maleStart = Edge(self, maleTarget, trust: 72, comfort: 74, closeness: 72, physical: 82, aesthetic: 80, romantic: 35, sexual: 35)
-                with { TargetBiology = SexBiology.Male };
+                with
+            { TargetBiology = SexBiology.Male };
 
             var femaleAfter = ApplyAcceptedInvite(self, femaleTarget, femaleStart, Sociosexuality.Intermediate, profile, SexBiology.Male, SexBiology.Female);
             var maleAfter = ApplyAcceptedInvite(self, maleTarget, maleStart, Sociosexuality.Intermediate, profile, SexBiology.Male, SexBiology.Male);
@@ -151,12 +153,14 @@ namespace EngineTests
             var femaleRelationship = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
                 [femaleFrom] = Edge(to, femaleFrom, trust: 55, comfort: 55, closeness: 55, physical: 80, aesthetic: 78, romantic: 55, sexual: 70)
-                    with { TargetBiology = SexBiology.Female }
+                    with
+                { TargetBiology = SexBiology.Female }
             });
             var maleRelationship = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
                 [maleFrom] = Edge(to, maleFrom, trust: 55, comfort: 55, closeness: 55, physical: 80, aesthetic: 78, romantic: 55, sexual: 70)
-                    with { TargetBiology = SexBiology.Male }
+                    with
+                { TargetBiology = SexBiology.Male }
             });
             var femaleCtx = BehaviorComponentTestFactory.Context(
                 selfId: to,
@@ -189,9 +193,11 @@ namespace EngineTests
             var relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
                 [femaleTarget] = Edge(self, femaleTarget, trust: 56, comfort: 58, closeness: 42, physical: 58, aesthetic: 58, romantic: 28, sexual: 30)
-                    with { TargetBiology = SexBiology.Female },
+                    with
+                { TargetBiology = SexBiology.Female },
                 [maleTarget] = Edge(self, maleTarget, trust: 56, comfort: 58, closeness: 42, physical: 58, aesthetic: 58, romantic: 28, sexual: 30)
-                    with { TargetBiology = SexBiology.Male }
+                    with
+                { TargetBiology = SexBiology.Male }
             });
             var semantic = new SemanticMemoryState(new Dictionary<HumanId, PersonBeliefSet>
             {

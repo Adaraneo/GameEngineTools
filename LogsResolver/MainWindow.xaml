@@ -117,7 +117,7 @@
                             </StackPanel>
                         </StackPanel>
                     </GroupBox>
-                    
+
                     <GroupBox Header="NPC Timeline">
                         <StackPanel>
                             <TextBlock Text="NPC JSON files:" FontWeight="SemiBold" />

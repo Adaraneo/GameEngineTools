@@ -2,9 +2,9 @@ namespace LogsResolver.Models;
 
 public sealed class NpcCharacterDescriptor
 {
-    public required Guid PersonId { get; init; }
+    public Guid PersonId { get; init; }
 
-    public required string FilePath { get; init; }
+    public string FilePath { get; init; }
 
     public string? DisplayName { get; init; }
 

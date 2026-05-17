@@ -2,11 +2,11 @@ namespace LogsResolver.Models;
 
 public sealed class LogDiagnosticIssue
 {
-    public required LogDiagnosticIssueKind Kind { get; init; }
+    public LogDiagnosticIssueKind Kind { get; init; }
 
-    public required string Title { get; init; }
+    public string Title { get; init; }
 
-    public required string Description { get; init; }
+    public string Description { get; init; }
 
     public string? AffectedFile { get; init; }
 

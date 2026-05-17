@@ -1,5 +1,5 @@
-using System.Collections.ObjectModel;
 using LogsResolver.Models;
+using System.Collections.ObjectModel;
 
 namespace LogsResolver.ViewModels;
 

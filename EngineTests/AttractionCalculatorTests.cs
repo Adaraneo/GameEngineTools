@@ -52,9 +52,9 @@ namespace EngineTests
         public void Calculate_ExtremeFavourableInputs_ScoreDoesNotExceed100()
         {
             // Arrange
-            var profile    = BuildNeutralProfile();
+            var profile = BuildNeutralProfile();
             var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
-            var view       = BuildView(postureScore: 100, acneLevel: 0, bloating: BloatingLevel.None);
+            var view = BuildView(postureScore: 100, acneLevel: 0, bloating: BloatingLevel.None);
 
             // Act
             var result = _sut.Calculate(profile, appearance, view, SexBiology.Female);
@@ -70,9 +70,9 @@ namespace EngineTests
         public void Calculate_ExtremeUnfavourableState_ScoreIsNotNegative()
         {
             // Arrange
-            var profile    = BuildNeutralProfile();
+            var profile = BuildNeutralProfile();
             var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
-            var view       = BuildView(postureScore: 0, acneLevel: 100, bloating: BloatingLevel.High);
+            var view = BuildView(postureScore: 0, acneLevel: 100, bloating: BloatingLevel.High);
 
             // Act
             var result = _sut.Calculate(profile, appearance, view, SexBiology.Female);
@@ -81,7 +81,7 @@ namespace EngineTests
             Assert.IsTrue(result.Score >= 0.0, $"Score was negative: {result.Score}");
         }
 
-        #endregion
+        #endregion Score — hranice
 
         // ── BasePhysical ─────────────────────────────────────────────────────────
 
@@ -95,13 +95,13 @@ namespace EngineTests
         public void Calculate_TargetAtOptimumHeight_BasePhysicalHigherThanExtremeHeight()
         {
             // Arrange
-            var profile       = BuildNeutralProfile();
-            var viewNeutral   = BuildView(50, 10, BloatingLevel.None);
+            var profile = BuildNeutralProfile();
+            var viewNeutral = BuildView(50, 10, BloatingLevel.None);
             var appearanceOpt = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
             var appearanceTall = BuildAppearance(heightCm: 210, frame: BodyFrame.Medium);
 
             // Act
-            var resultOpt  = _sut.Calculate(profile, appearanceOpt,  viewNeutral, SexBiology.Female);
+            var resultOpt = _sut.Calculate(profile, appearanceOpt, viewNeutral, SexBiology.Female);
             var resultTall = _sut.Calculate(profile, appearanceTall, viewNeutral, SexBiology.Female);
 
             // Assert
@@ -117,10 +117,10 @@ namespace EngineTests
         public void Calculate_AnyInput_BasePhysicalDoesNotExceedCeiling()
         {
             // Arrange
-            var profile    = BuildNeutralProfile();
+            var profile = BuildNeutralProfile();
             var appearance = BuildAppearance(heightCm: 168, frame: BodyFrame.Medium,
                                              noseProminence: 0.5, lipFullness: 0.5);
-            var view       = BuildView(50, 0, BloatingLevel.None);
+            var view = BuildView(50, 0, BloatingLevel.None);
 
             // Act
             var result = _sut.Calculate(profile, appearance, view, SexBiology.Female);
@@ -130,7 +130,7 @@ namespace EngineTests
                 $"BasePhysical {result.BasePhysical:F2} exceeded ceiling of 40.");
         }
 
-        #endregion
+        #endregion BasePhysical
 
         // ── PreferenceMatch ──────────────────────────────────────────────────────
 
@@ -145,19 +145,19 @@ namespace EngineTests
         {
             // Arrange — observer prefers 170 cm
             var profile = new AttractionProfile(
-                PreferredHeightCm:  170.0,
-                HeightToleranceCm:  10.0,
-                FramePreference:    BodyFramePreference.None,
-                PreferredWhr:       0.70,
-                SymmetryWeight:     0.5);
+                PreferredHeightCm: 170.0,
+                HeightToleranceCm: 10.0,
+                FramePreference: BodyFramePreference.None,
+                PreferredWhr: 0.70,
+                SymmetryWeight: 0.5);
 
-            var viewNeutral    = BuildView(50, 10, BloatingLevel.None);
+            var viewNeutral = BuildView(50, 10, BloatingLevel.None);
             var appearanceGood = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
-            var appearanceBad  = BuildAppearance(heightCm: 200, frame: BodyFrame.Medium);
+            var appearanceBad = BuildAppearance(heightCm: 200, frame: BodyFrame.Medium);
 
             // Act
             var resultGood = _sut.Calculate(profile, appearanceGood, viewNeutral, SexBiology.Female);
-            var resultBad  = _sut.Calculate(profile, appearanceBad,  viewNeutral, SexBiology.Female);
+            var resultBad = _sut.Calculate(profile, appearanceBad, viewNeutral, SexBiology.Female);
 
             // Assert
             Assert.IsTrue(
@@ -175,19 +175,19 @@ namespace EngineTests
         {
             // Arrange — observer prefers Petite
             var profile = new AttractionProfile(
-                PreferredHeightCm:  165.0,
-                HeightToleranceCm:  15.0,
-                FramePreference:    BodyFramePreference.Petite,
-                PreferredWhr:       0.70,
-                SymmetryWeight:     0.5);
+                PreferredHeightCm: 165.0,
+                HeightToleranceCm: 15.0,
+                FramePreference: BodyFramePreference.Petite,
+                PreferredWhr: 0.70,
+                SymmetryWeight: 0.5);
 
-            var view            = BuildView(50, 10, BloatingLevel.None);
+            var view = BuildView(50, 10, BloatingLevel.None);
             var appearancePetite = BuildAppearance(heightCm: 165, frame: BodyFrame.Petite);
-            var appearanceLarge  = BuildAppearance(heightCm: 165, frame: BodyFrame.Large);
+            var appearanceLarge = BuildAppearance(heightCm: 165, frame: BodyFrame.Large);
 
             // Act
-            var resultMatch    = _sut.Calculate(profile, appearancePetite, view, SexBiology.Female);
-            var resultMismatch = _sut.Calculate(profile, appearanceLarge,  view, SexBiology.Female);
+            var resultMatch = _sut.Calculate(profile, appearancePetite, view, SexBiology.Female);
+            var resultMismatch = _sut.Calculate(profile, appearanceLarge, view, SexBiology.Female);
 
             // Assert
             Assert.IsTrue(
@@ -241,7 +241,7 @@ namespace EngineTests
             Assert.IsTrue(low.BasePhysical > high.BasePhysical);
         }
 
-        #endregion
+        #endregion PreferenceMatch
 
         // ── StateModifier ────────────────────────────────────────────────────────
 
@@ -326,7 +326,7 @@ namespace EngineTests
             Assert.IsTrue(asexual.Score < bisexual.Score * 0.35);
         }
 
-        #endregion
+        #endregion SexualOrientation
 
         #region StateModifier
 
@@ -337,14 +337,14 @@ namespace EngineTests
         public void Calculate_HighBloating_StateModifierLowerThanNoBloating()
         {
             // Arrange
-            var profile    = BuildNeutralProfile();
+            var profile = BuildNeutralProfile();
             var appearance = BuildAppearance(170, BodyFrame.Medium);
             var viewNormal = BuildView(postureScore: 70, acneLevel: 5, bloating: BloatingLevel.None);
-            var viewBloat  = BuildView(postureScore: 70, acneLevel: 5, bloating: BloatingLevel.High);
+            var viewBloat = BuildView(postureScore: 70, acneLevel: 5, bloating: BloatingLevel.High);
 
             // Act
             var resultNormal = _sut.Calculate(profile, appearance, viewNormal, SexBiology.Female);
-            var resultBloat  = _sut.Calculate(profile, appearance, viewBloat,  SexBiology.Female);
+            var resultBloat = _sut.Calculate(profile, appearance, viewBloat, SexBiology.Female);
 
             // Assert
             Assert.IsTrue(
@@ -360,10 +360,10 @@ namespace EngineTests
         public void Calculate_GoodPostureVsPoorPosture_StateModifierDiffers()
         {
             // Arrange
-            var profile     = BuildNeutralProfile();
-            var appearance  = BuildAppearance(170, BodyFrame.Medium);
-            var viewGood    = BuildView(postureScore: 100, acneLevel: 0, bloating: BloatingLevel.None);
-            var viewPoor    = BuildView(postureScore: 0,   acneLevel: 0, bloating: BloatingLevel.None);
+            var profile = BuildNeutralProfile();
+            var appearance = BuildAppearance(170, BodyFrame.Medium);
+            var viewGood = BuildView(postureScore: 100, acneLevel: 0, bloating: BloatingLevel.None);
+            var viewPoor = BuildView(postureScore: 0, acneLevel: 0, bloating: BloatingLevel.None);
 
             // Act
             var good = _sut.Calculate(profile, appearance, viewGood, SexBiology.Female);
@@ -376,7 +376,7 @@ namespace EngineTests
                 $"poor posture modifier ({poor.StateModifier:F2}).");
         }
 
-        #endregion
+        #endregion StateModifier
 
         // ── MereExposure — přesunuto do RelationshipsEngine ─────────────────────
         // Mere-exposure effect je nyní zodpovědností DefaultRelationshipsEngine.
@@ -395,9 +395,9 @@ namespace EngineTests
         public void Calculate_NeutralValenceAndMidAttraction_FirstImpressionLikeIsBaseline()
         {
             // Arrange — profile tuned so attraction ≈ 50
-            var profile    = BuildNeutralProfile();
+            var profile = BuildNeutralProfile();
             var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
-            var view       = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
+            var view = BuildView(postureScore: 50, acneLevel: 0, bloating: BloatingLevel.None);
 
             // Act
             var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
@@ -418,14 +418,14 @@ namespace EngineTests
         public void Calculate_PositiveValence_FirstImpressionLikeHigherThanNegativeValence()
         {
             // Arrange
-            var profile    = BuildNeutralProfile();
+            var profile = BuildNeutralProfile();
             var appearance = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium);
-            var view       = BuildView(postureScore: 60, acneLevel: 5, bloating: BloatingLevel.None);
+            var view = BuildView(postureScore: 60, acneLevel: 5, bloating: BloatingLevel.None);
 
             // Act
             var resultGoodMood = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                                                 observerValence: +0.8);
-            var resultBadMood  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+            var resultBadMood = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                                                 observerValence: -0.8);
 
             // Assert
@@ -444,22 +444,22 @@ namespace EngineTests
         {
             // Arrange — profile strongly preferring 170 cm female, Medium frame
             var profile = new AttractionProfile(
-                PreferredHeightCm:  170.0,
-                HeightToleranceCm:  5.0,     // tight window → big preference bonus at 170
-                FramePreference:    BodyFramePreference.Medium,
-                PreferredWhr:       0.70,
-                SymmetryWeight:     0.5);
+                PreferredHeightCm: 170.0,
+                HeightToleranceCm: 5.0,     // tight window → big preference bonus at 170
+                FramePreference: BodyFramePreference.Medium,
+                PreferredWhr: 0.70,
+                SymmetryWeight: 0.5);
 
-            var viewNeutral     = BuildView(50, 0, BloatingLevel.None);
-            var appearanceGood  = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium,
+            var viewNeutral = BuildView(50, 0, BloatingLevel.None);
+            var appearanceGood = BuildAppearance(heightCm: 170, frame: BodyFrame.Medium,
                                                   noseProminence: 0.5, lipFullness: 0.5);
-            var appearancePoor  = BuildAppearance(heightCm: 200, frame: BodyFrame.Petite,
+            var appearancePoor = BuildAppearance(heightCm: 200, frame: BodyFrame.Petite,
                                                   noseProminence: 0.9, lipFullness: 0.9);
 
             // Act
             var resultHigh = _sut.Calculate(profile, appearanceGood, viewNeutral, SexBiology.Female,
                                             observerValence: 0.0);
-            var resultLow  = _sut.Calculate(profile, appearancePoor, viewNeutral, SexBiology.Female,
+            var resultLow = _sut.Calculate(profile, appearancePoor, viewNeutral, SexBiology.Female,
                                             observerValence: 0.0);
 
             // Assert
@@ -473,15 +473,15 @@ namespace EngineTests
         /// FirstImpressionLike must always stay within [0, 100] regardless of extreme inputs.
         /// </summary>
         [DataTestMethod]
-        [DataRow(+1.0, 100.0, 0.0,  BloatingLevel.None)]  // best case
-        [DataRow(-1.0, 0.0,   100.0, BloatingLevel.High)]  // worst case
+        [DataRow(+1.0, 100.0, 0.0, BloatingLevel.None)]  // best case
+        [DataRow(-1.0, 0.0, 100.0, BloatingLevel.High)]  // worst case
         public void Calculate_ExtremeValenceAndState_FirstImpressionLikeStaysInBounds(
             double valence, double postureScore, double acneLevel, BloatingLevel bloating)
         {
             // Arrange
-            var profile    = BuildNeutralProfile();
+            var profile = BuildNeutralProfile();
             var appearance = BuildAppearance(170, BodyFrame.Medium);
-            var view       = BuildView(postureScore, acneLevel, bloating);
+            var view = BuildView(postureScore, acneLevel, bloating);
 
             // Act
             var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
@@ -492,7 +492,7 @@ namespace EngineTests
                 $"FirstImpressionLike={result.FirstImpressionLike:F2} is outside [0, 100].");
         }
 
-        #endregion
+        #endregion FirstImpressionLike
 
         // ── Builders ─────────────────────────────────────────────────────────────
 
@@ -501,17 +501,17 @@ namespace EngineTests
         /// <summary>Neutral profile with no strong preferences — mid values throughout.</summary>
         private static AttractionProfile BuildNeutralProfile()
             => new(
-                PreferredHeightCm:  170.0,
-                HeightToleranceCm:  15.0,
-                FramePreference:    BodyFramePreference.None,
-                PreferredWhr:       0.70,
-                SymmetryWeight:     0.5);
+                PreferredHeightCm: 170.0,
+                HeightToleranceCm: 15.0,
+                FramePreference: BodyFramePreference.None,
+                PreferredWhr: 0.70,
+                SymmetryWeight: 0.5);
 
         private static PhysicalAppearance BuildAppearance(
             double heightCm,
             BodyFrame frame,
             double noseProminence = 0.5,
-            double lipFullness    = 0.5)
+            double lipFullness = 0.5)
             => TestAppearanceFactory.Build(
                 heightCm: heightCm,
                 frame: frame,
@@ -530,14 +530,14 @@ namespace EngineTests
             double acneLevel,
             BloatingLevel bloating)
             => new(
-                WeightKg:      65.0,
-                Bmi:           22.0,
-                BodyFatPct:    20.0,
-                HairLengthCm:  25.0,
-                PostureScore:  postureScore,
-                SkinOiliness:  20.0,
-                AcneLevel:     acneLevel,
-                Bloating:      bloating);
+                WeightKg: 65.0,
+                Bmi: 22.0,
+                BodyFatPct: 20.0,
+                HairLengthCm: 25.0,
+                PostureScore: postureScore,
+                SkinOiliness: 20.0,
+                AcneLevel: acneLevel,
+                Bloating: bloating);
 
         private static PhysicalAppearance WithStructuredWhr(PhysicalAppearance appearance, double whr)
         {
@@ -571,7 +571,7 @@ namespace EngineTests
             };
         }
 
-        #endregion
+        #endregion Helpers
 
         #region A1 — Excitatory transfer
 
@@ -580,10 +580,10 @@ namespace EngineTests
         {
             // High arousal (80) + high-attraction target → bonus applied
             var appearance = BuildAppearance(170.0, BodyFrame.Medium);
-            var view       = BuildView(70, 0, BloatingLevel.None);
-            var profile    = BuildNeutralProfile();
+            var view = BuildView(70, 0, BloatingLevel.None);
+            var profile = BuildNeutralProfile();
 
-            var baseline  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+            var baseline = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerValence: 0, observerArousal: 0);
             var withArousal = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerValence: 0, observerArousal: 80);
@@ -605,10 +605,10 @@ namespace EngineTests
         {
             // Very unattractive target (base score ≤ 50): no excitatory transfer
             var appearance = WithStructuredWhr(BuildAppearance(100.0, BodyFrame.Medium), 1.0); // extreme values → low score
-            var view       = BuildView(70, 0, BloatingLevel.None);
-            var profile    = BuildNeutralProfile();
+            var view = BuildView(70, 0, BloatingLevel.None);
+            var profile = BuildNeutralProfile();
 
-            var baseline    = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+            var baseline = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerValence: 0, observerArousal: 0);
             var withArousal = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerValence: 0, observerArousal: 90);
@@ -624,13 +624,13 @@ namespace EngineTests
         [TestMethod]
         public void ExcitatoryTransfer_ZeroArousal_NoBoost()
         {
-            var appearance  = BuildAppearance(170.0, BodyFrame.Medium);
-            var view        = BuildView(70, 0, BloatingLevel.None);
-            var profile     = BuildNeutralProfile();
+            var appearance = BuildAppearance(170.0, BodyFrame.Medium);
+            var view = BuildView(70, 0, BloatingLevel.None);
+            var profile = BuildNeutralProfile();
 
-            var zero   = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+            var zero = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerArousal: 0);
-            var also0  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+            var also0 = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerArousal: 39); // below threshold of 40
 
             Assert.AreEqual(zero.Score, also0.Score, 0.01,
@@ -647,12 +647,12 @@ namespace EngineTests
             // The halo effect is tested via RelationshipsEngine FirstImpressionFormed handler.
             // Here we verify the calculator's FirstImpressionLike scales with attraction.
             var highAttr = BuildAppearance(170.0, BodyFrame.Medium);   // optimised appearance
-            var lowAttr  = WithStructuredWhr(BuildAppearance(100.0, BodyFrame.Medium), 1.0);  // poor appearance
-            var profile  = BuildNeutralProfile();
-            var view     = BuildView(70, 0, BloatingLevel.None);
+            var lowAttr = WithStructuredWhr(BuildAppearance(100.0, BodyFrame.Medium), 1.0);  // poor appearance
+            var profile = BuildNeutralProfile();
+            var view = BuildView(70, 0, BloatingLevel.None);
 
             var highResult = _sut.Calculate(profile, highAttr, view, SexBiology.Female);
-            var lowResult  = _sut.Calculate(profile, lowAttr, view, SexBiology.Female);
+            var lowResult = _sut.Calculate(profile, lowAttr, view, SexBiology.Female);
 
             Assert.IsTrue(highResult.FirstImpressionLike > lowResult.FirstImpressionLike,
                 $"Higher attraction → higher halo Like (high={highResult.FirstImpressionLike:F1}, low={lowResult.FirstImpressionLike:F1})");
@@ -666,10 +666,10 @@ namespace EngineTests
         public void AgeMatch_SameAge_HigherPreferenceMatch_ThanLargeAgeDiff()
         {
             var appearance = BuildAppearance(170.0, BodyFrame.Medium);
-            var view       = BuildView(70, 0, BloatingLevel.None);
-            var profile    = BuildNeutralProfile();
+            var view = BuildView(70, 0, BloatingLevel.None);
+            var profile = BuildNeutralProfile();
 
-            var sameAge  = _sut.Calculate(profile, appearance, view, SexBiology.Female,
+            var sameAge = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerAgeYears: 30, targetAgeYears: 30);
             var ageDiff20 = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerAgeYears: 30, targetAgeYears: 50);
@@ -683,10 +683,10 @@ namespace EngineTests
         public void AgeMatch_NullAges_SameResultAsBaseline()
         {
             var appearance = BuildAppearance(170.0, BodyFrame.Medium);
-            var view       = BuildView(70, 0, BloatingLevel.None);
-            var profile    = BuildNeutralProfile();
+            var view = BuildView(70, 0, BloatingLevel.None);
+            var profile = BuildNeutralProfile();
 
-            var withNull    = _sut.Calculate(profile, appearance, view, SexBiology.Female);
+            var withNull = _sut.Calculate(profile, appearance, view, SexBiology.Female);
             var withExplicit = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerAgeYears: null, targetAgeYears: null);
 
@@ -699,8 +699,8 @@ namespace EngineTests
         {
             // Even with perfect age match AND perfect physical match, PreferenceMatch ≤ 35
             var appearance = BuildAppearance(170.0, BodyFrame.Medium);
-            var view       = BuildView(70, 0, BloatingLevel.None);
-            var profile    = BuildNeutralProfile();
+            var view = BuildView(70, 0, BloatingLevel.None);
+            var profile = BuildNeutralProfile();
 
             var result = _sut.Calculate(profile, appearance, view, SexBiology.Female,
                 observerAgeYears: 25, targetAgeYears: 25);

@@ -3,10 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Collections.Immutable;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -20,6 +16,10 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -39,7 +39,7 @@ namespace EngineTests
 
         private static readonly WDateTime Now = new WDateTime(10000);
 
-        #endregion
+        #endregion Private state
 
         #region Tests — no-op when AvailableObjects is null
 
@@ -50,8 +50,8 @@ namespace EngineTests
         [TestMethod]
         public void Modify_NullObjects_LeavesUtilityUnchanged()
         {
-            var sut        = new WorldObjectAffordanceEngine();
-            var context    = BuildContext(availableObjects: null);
+            var sut = new WorldObjectAffordanceEngine();
+            var context = BuildContext(availableObjects: null);
             var candidates = BuildCandidates(Eat, ReachOut, Work);
 
             sut.Modify(context, candidates);
@@ -67,8 +67,8 @@ namespace EngineTests
         [TestMethod]
         public void Modify_EmptyObjectList_LeavesUtilityUnchanged()
         {
-            var sut        = new WorldObjectAffordanceEngine();
-            var context    = BuildContext(availableObjects: new List<WorldObject>());
+            var sut = new WorldObjectAffordanceEngine();
+            var context = BuildContext(availableObjects: new List<WorldObject>());
             var candidates = BuildCandidates(Eat, ReachOut);
 
             sut.Modify(context, candidates);
@@ -78,7 +78,7 @@ namespace EngineTests
                     $"Candidate '{c.Name}' should be unchanged for empty object list.");
         }
 
-        #endregion
+        #endregion Tests — no-op when AvailableObjects is null
 
         #region Tests — Hunger affordance
 
@@ -116,8 +116,8 @@ namespace EngineTests
         [TestMethod]
         public void Modify_FoodObject_DoesNotBoostWorkOrReachOut()
         {
-            var sut        = new WorldObjectAffordanceEngine();
-            var obj        = MakeSingleAffordanceObject(AffordanceType.Hunger, satisfaction: 1.0);
+            var sut = new WorldObjectAffordanceEngine();
+            var obj = MakeSingleAffordanceObject(AffordanceType.Hunger, satisfaction: 1.0);
             var candidates = BuildCandidates(Work, Create, ReachOut);
 
             sut.Modify(BuildContext([obj], needFood: 100), candidates);
@@ -127,7 +127,7 @@ namespace EngineTests
                     $"Food affordance must not affect candidate '{c.Name}'.");
         }
 
-        #endregion
+        #endregion Tests — Hunger affordance
 
         #region Tests — StressRaise penalty
 
@@ -139,7 +139,7 @@ namespace EngineTests
         [TestMethod]
         public void Modify_Hazard_PenalisesSensitiveActions_SparesBiologicalRegulation()
         {
-            var sut    = new WorldObjectAffordanceEngine();
+            var sut = new WorldObjectAffordanceEngine();
             var hazard = MakeSingleAffordanceObject(AffordanceType.StressRaise, satisfaction: 0.8);
 
             var candidates = BuildCandidates(ReachOut, Work, Create, Eat, Drink);
@@ -147,22 +147,22 @@ namespace EngineTests
 
             // Sensitive actions must be penalised.
             var reachOut = candidates.First(c => c.Name == ReachOut);
-            var work     = candidates.First(c => c.Name == Work);
-            var create   = candidates.First(c => c.Name == Create);
+            var work = candidates.First(c => c.Name == Work);
+            var create = candidates.First(c => c.Name == Create);
 
             Assert.IsTrue(reachOut.Utility < 30.0, $"ReachOut must be penalised. Actual: {reachOut.Utility}");
-            Assert.IsTrue(work.Utility     < 30.0, $"Work must be penalised. Actual: {work.Utility}");
-            Assert.IsTrue(create.Utility   < 30.0, $"Create must be penalised. Actual: {create.Utility}");
+            Assert.IsTrue(work.Utility < 30.0, $"Work must be penalised. Actual: {work.Utility}");
+            Assert.IsTrue(create.Utility < 30.0, $"Create must be penalised. Actual: {create.Utility}");
 
             // Biological regulation must be immune.
-            var eat   = candidates.First(c => c.Name == Eat);
+            var eat = candidates.First(c => c.Name == Eat);
             var drink = candidates.First(c => c.Name == Drink);
 
-            Assert.AreEqual(30.0, eat.Utility,   0.001, "Eat must NOT be penalised by a hazard.");
+            Assert.AreEqual(30.0, eat.Utility, 0.001, "Eat must NOT be penalised by a hazard.");
             Assert.AreEqual(30.0, drink.Utility, 0.001, "Drink must NOT be penalised by a hazard.");
         }
 
-        #endregion
+        #endregion Tests — StressRaise penalty
 
         #region Tests — delta cap
 
@@ -179,10 +179,10 @@ namespace EngineTests
                 .Range(0, 10)
                 .Select(i => new WorldObject
                 {
-                    Id          = $"food_{i}",
+                    Id = $"food_{i}",
                     DisplayName = "Food",
-                    Category    = WorldObjectCategory.Food,
-                    LocationId  = "loc",
+                    Category = WorldObjectCategory.Food,
+                    LocationId = "loc",
                     IsAvailable = true,
                     Affordances = ImmutableArray.Create(
                         new WorldObjectAffordance(AffordanceType.Hunger, 1.0))
@@ -198,7 +198,7 @@ namespace EngineTests
                 $"Utility must be capped at base+20. Actual: {candidates[0].Utility:F4}");
         }
 
-        #endregion
+        #endregion Tests — delta cap
 
         #region Tests — AffordanceCandidateMap coverage
 
@@ -220,7 +220,7 @@ namespace EngineTests
             }
         }
 
-        #endregion
+        #endregion Tests — AffordanceCandidateMap coverage
 
         #region Private factory helpers
 
@@ -231,40 +231,40 @@ namespace EngineTests
         /// </summary>
         private static BehaviorContext BuildContext(
             IReadOnlyList<WorldObject>? availableObjects,
-            double needFood  = 50,
-            double needRest  = 50,
-            double needBel   = 50,
-            double needComp  = 50)
+            double needFood = 50,
+            double needRest = 50,
+            double needBel = 50,
+            double needComp = 50)
         {
             var physio = new PhysiologyState(
-                Energy:         80,
+                Energy: 80,
                 SleepDebtHours: 0,
-                Hunger:         needFood,   // engine reads from physio, but we also set BehaviorState below
-                Thirst:         25,
-                Pain:           0,
-                ImmuneLoad:     0,
-                BodyTempDelta:  0,
-                Cycle:          null);
+                Hunger: needFood,   // engine reads from physio, but we also set BehaviorState below
+                Thirst: 25,
+                Pain: 0,
+                ImmuneLoad: 0,
+                BodyTempDelta: 0,
+                Cycle: null);
 
             var psych = new PsychologyState(
-                Valence:         0.0,
-                Arousal:         0.5,
-                Dominance:       0.5,
-                Stress:          0,
-                CognitiveLoad:   0,
+                Valence: 0.0,
+                Arousal: 0.5,
+                Dominance: 0.5,
+                Stress: 0,
+                CognitiveLoad: 0,
                 DominantEmotion: DiscreteEmotion.Neutral);
 
             // Pre-set BehaviorState with the requested need values so the modifier
             // can read them directly from context.State without a full engine Tick().
             var behaviorState = new BehaviorState(
-                NeedRest:       needRest,
-                NeedFood:       needFood,
-                NeedWater:      25,
-                NeedBelonging:  needBel,
+                NeedRest: needRest,
+                NeedFood: needFood,
+                NeedWater: 25,
+                NeedBelonging: needBel,
                 NeedCompetence: needComp,
-                NeedIntimacy:   30,
-                CurrentPlan:    null,
-                Cooldowns:      new Dictionary<string, double>());
+                NeedIntimacy: 30,
+                CurrentPlan: null,
+                Cooldowns: new Dictionary<string, double>());
 
             var snapshot = new EnginesSnapshot(
                 physio, psych, behaviorState,
@@ -274,39 +274,39 @@ namespace EngineTests
                     new System.Collections.Generic.List<EpisodicMemory>()));
 
             var personality = new Personality(
-                BigFive:        new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                Attachment:     AttachmentProfile.Secure,
-                Communication:  CommunicationStyle.Direct,
-                Motivation:     new MotivationWeights(
+                BigFive: new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                Attachment: AttachmentProfile.Secure,
+                Communication: CommunicationStyle.Direct,
+                Motivation: new MotivationWeights(
                     Affiliation: 0.5, Achievement: 0.5, Power: 0.3,
-                    Altruism:    0.4, Competence:   0.5, Autonomy: 0.5,
-                    Curiosity:   0.5, Rest:          0.6, Sexuality: 0.4),
+                    Altruism: 0.4, Competence: 0.5, Autonomy: 0.5,
+                    Curiosity: 0.5, Rest: 0.6, Sexuality: 0.4),
                 Sociosexuality: Sociosexuality.Intermediate,
-                Chronotype:     Chronotype.Neutral);
+                Chronotype: Chronotype.Neutral);
 
             var humanCtx = new HumanContext
             {
-                Id          = new HumanId(Guid.NewGuid()),
-                Biology     = SexBiology.Female,
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = personality,
-                Snapshot    = snapshot,
-                Random      = new AlwaysFalseRandom(),
-                Logger      = BuildLoggerFactory().CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler()
+                Snapshot = snapshot,
+                Random = new AlwaysFalseRandom(),
+                Logger = BuildLoggerFactory().CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
 
             return new BehaviorContext(
-                Now:                         Now,
-                Dt:                          WTimeSpan.FromHours(1),
-                HumanContext:                humanCtx,
-                Outbox:                      new EventCollector(),
-                State:                       behaviorState,
-                Config:                      new BehaviorConfig(),
-                Cooldowns:                   new Dictionary<string, double>(),
-                DecisionWorkingSets:         null,
+                Now: Now,
+                Dt: WTimeSpan.FromHours(1),
+                HumanContext: humanCtx,
+                Outbox: new EventCollector(),
+                State: behaviorState,
+                Config: new BehaviorConfig(),
+                Cooldowns: new Dictionary<string, double>(),
+                DecisionWorkingSets: null,
                 HabitApplicabilityModulator: null,
-                AvailableObjects:            availableObjects);
+                AvailableObjects: availableObjects);
         }
 
         /// <summary>
@@ -325,10 +325,10 @@ namespace EngineTests
         private static WorldObject MakeSingleAffordanceObject(AffordanceType type, double satisfaction)
             => new()
             {
-                Id          = "test_obj",
+                Id = "test_obj",
                 DisplayName = "Test Object",
-                Category    = WorldObjectCategory.Furniture,
-                LocationId  = "test_location",
+                Category = WorldObjectCategory.Furniture,
+                LocationId = "test_location",
                 IsAvailable = true,
                 Affordances = ImmutableArray.Create(new WorldObjectAffordance(type, satisfaction))
             };
@@ -336,22 +336,26 @@ namespace EngineTests
         private static ILoggerFactory BuildLoggerFactory()
             => LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Warning));
 
-        #endregion
+        #endregion Private factory helpers
 
         #region Stub implementations
 
         /// <summary>IRandomSource that always returns the minimum — disables random events.</summary>
         private sealed class AlwaysFalseRandom : IRandomSource
         {
-            public int Next(int min, int max)  => min;
-            public double NextUnit()           => 0.0;
-            public bool Chance(double p)       => false;
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => false;
         }
 
         /// <summary>IEventBus that discards all published events.</summary>
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
         }
@@ -361,18 +365,22 @@ namespace EngineTests
         {
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => false;
+
             public IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now)
                 => Array.Empty<(ScheduledId, ScheduledAction)>();
         }
 
         private sealed class NullDisposable : IDisposable
         {
-            public void Dispose() { }
+            public void Dispose()
+            { }
         }
 
-        #endregion
+        #endregion Stub implementations
     }
 }

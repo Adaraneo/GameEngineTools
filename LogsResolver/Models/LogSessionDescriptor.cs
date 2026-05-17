@@ -2,7 +2,7 @@ namespace LogsResolver.Models;
 
 public sealed class LogSessionDescriptor
 {
-    public required string RootPath { get; init; }
+    public string RootPath { get; init; }
 
     public string? GlobalJsonLinesPath { get; init; }
 

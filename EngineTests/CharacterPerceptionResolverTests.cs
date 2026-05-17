@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -21,6 +18,9 @@ namespace EngineTests
     using GameEngineTools.World.Simulation;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Unit tests for <see cref="CharacterPerceptionResolver"/>.

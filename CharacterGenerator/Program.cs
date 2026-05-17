@@ -7,7 +7,6 @@
     using GameEngineTools.FileSystem;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
-    using System.Text;
     using System.Threading.Tasks;
     using GFC = GameEngineTools.Constants.FileSystemConstantsForTest;
 
@@ -34,7 +33,7 @@
             if (!logsDirInfo.Exists) return;
 
             var files = logsDirInfo.GetFiles();
-            foreach(var file in files)
+            foreach (var file in files)
             {
                 file.Delete();
             }
@@ -78,7 +77,7 @@
                     continue;
 
                 var filename = $"{character.Person.Id.Value}.txt";
-                
+
                 var path = Path.Combine(dirinfo.FullName, filename);
                 File.WriteAllText(path, character.PrintPortraitInfo(psb, ppf));
             }
