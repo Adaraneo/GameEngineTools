@@ -716,7 +716,7 @@ namespace EngineTests
         [TestMethod]
         public void RuntimeFlow_InteractionOutcome_UpdatesRelationshipSnapshotsOnBothSides()
         {
-            var now = new WDateTime(0);
+            var now = WDateTime.New(100, 1, 1);
             var dt = WTimeSpan.FromHours(0.5);
             var initiator = CreateRuntimeHuman(SexBiology.Male);
             var recipient = CreateRuntimeHuman(SexBiology.Female);
@@ -751,7 +751,7 @@ namespace EngineTests
         [TestMethod]
         public void RuntimeFlow_TouchOutcome_UpdatesRelationshipSnapshotsOnBothSides()
         {
-            var now = new WDateTime(0);
+            var now = WDateTime.New(100, 1, 1);
             var dt = WTimeSpan.FromHours(0.5);
             var initiator = CreateRuntimeHuman(SexBiology.Male);
             var recipient = CreateRuntimeHuman(SexBiology.Female);

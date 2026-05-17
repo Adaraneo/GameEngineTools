@@ -282,6 +282,9 @@ namespace GameEngineTools.Characters.Core
         /// <inheritdoc/>
         public void Tick(WDateTime now, WTimeSpan dt)
         {
+            if (now.Date < _ctx.Identity.BirthDate)
+                return;
+
             _lastOutboxAccumulator.Clear();
 
             // Phase A: deliver scheduled actions and all queued inbox events
