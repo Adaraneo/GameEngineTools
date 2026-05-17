@@ -302,6 +302,7 @@ var mainCharactersScene = new SimulationScene(clock, mainCharactersSceneOpts, lo
 await mainCharactersScene.RunAsync();
 
 var characters = new List<IHuman>();
+
 foreach (var character in manager.Characters.Select(c => c.Person).ToList())
 {
     var mainCharacters = mainCharactersPersonQuery.ToList();
@@ -309,6 +310,9 @@ foreach (var character in manager.Characters.Select(c => c.Person).ToList())
     {
         continue;
     }
+
+    if (character.Identity.BirthDate < startNow.Date)
+        continue;
 
     characters.Add(character);
 }
@@ -322,7 +326,8 @@ if (characters.Count > 0)
         locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
     }
 
-    clock.SetNow(clock.Now.AddDays(-simulationDays));
+    clock.SetNow(startNow);
+
     var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
         Characters = characters,
