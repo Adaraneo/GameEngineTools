@@ -182,7 +182,21 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 ctx.Id.Value,
                 nameof(DefaultBehaviorEngine),
                 relatedPersonId: result.SelectedCandidate.SocialTargeting?.TargetHuman.Value,
-                tickKey: now.WorldTicks.ToString())) _log.BehaviorActionChosen(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.Duration.ToString());
+                tickKey: now.WorldTicks.ToString()))
+            {
+                _log.BehaviorActionChosen(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.Duration.ToString());
+
+                // Log object interaction detail when committing InteractWithObject actions
+                if (result.SelectedCandidate.ObjectInteraction is { } oi)
+                    _log.ObjectInteractionCommitted(ctx.Id.Value.ToString(), oi.ObjectId, oi.Kind.ToString(), oi.LocationId, result.SelectedCandidate.Utility);
+
+                // Log explicit move actions so the location tracker can follow movement
+                if (result.SelectedCandidate.Name.StartsWith("MoveTo:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var currentLocation = ctx.Snapshot.InteractionSurface?.Location ?? string.Empty;
+                    _log.MoveActionCommitted(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, currentLocation, result.SelectedCandidate.Utility);
+                }
+            }
         }
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)

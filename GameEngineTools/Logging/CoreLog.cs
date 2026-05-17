@@ -639,6 +639,31 @@ namespace GameEngineTools.Logging
             this ILogger logger, string HumanId, string From, string To,
             double Stress, double Noise, double Penalty);
 
+        /// <summary>Character committed to interacting with a world object.</summary>
+        [LoggerMessage(
+            EventId = 1205,
+            Level = LogLevel.Information,
+            Message = "[BEHAV/OBJ] {HumanId} Object interaction: {ObjectId} kind={Kind} at={LocationId} (utility={Utility:F2})")]
+        public static partial void ObjectInteractionCommitted(
+            this ILogger logger,
+            string HumanId,
+            string ObjectId,
+            string Kind,
+            string LocationId,
+            double Utility);
+
+        /// <summary>Character arrived at (or departed) a named location — explicit move action committed.</summary>
+        [LoggerMessage(
+            EventId = 1206,
+            Level = LogLevel.Information,
+            Message = "[BEHAV/MOVE] {HumanId} Move: {Action} (from='{From}', utility={Utility:F2})")]
+        public static partial void MoveActionCommitted(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            string From,
+            double Utility);
+
         #endregion Behavior/Interaction — kontext
 
         #region Memory — epizodická paměť
