@@ -631,8 +631,9 @@ namespace GameEngineTools.Narrative
             // Plurál — "vzpomínku" vs. "vzpomínky" (gramatika číslovek v češtině)
             var countText = mc.Count switch
             {
-                1 => "1 vzpomínku",
-                _ => $"{mc.Count} vzpomínek"
+                1 => $"1 {DeclString("vzpomínka", Case.Accusative, Number.Singular, WordCategory.Noun, "žena")}",
+                2 or 3 or 4 => $"{mc.Count} {DeclString("vzpomínka", Case.Accusative, Number.Plural, WordCategory.Noun, "žena")}",
+                _ => $"{mc.Count} {DeclString("vzpomínka", Case.Genitive, Number.Plural, WordCategory.Noun, "žena")}"
             };
 
             var dat = Decl(actor, Grammar.Core.Enums.Case.Dative);
@@ -694,13 +695,15 @@ namespace GameEngineTools.Narrative
             return _wordComposer.GetFullForm(request).Form;
         }
 
-        private string DeclString(string lemma, Case @case)
+        private string DeclString(string lemma, Case @case, Number? number = null, WordCategory wordCategory = WordCategory.Pronoun, string? pattern = null)
         {
             var request = new CzechWordRequest
             {
                 Lemma = lemma,
-                WordCategory = WordCategory.Pronoun,
-                Case = @case
+                WordCategory = wordCategory,
+                Case = @case,
+                Number = number,
+                Pattern = pattern
             };
 
             return _wordComposer.GetFullForm(request).Form;
