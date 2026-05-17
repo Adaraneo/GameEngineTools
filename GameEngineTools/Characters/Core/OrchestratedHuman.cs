@@ -8,8 +8,8 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
-    using GameEngineTools.Characters.Engines.Inventory;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
@@ -121,7 +121,7 @@ namespace GameEngineTools.Characters.Core
         private readonly ISemanticMemoryEngine _semanticMemory;
         private readonly IGoalEngine _goal;
         private readonly IDailyScheduleEngine _schedule;
-        private readonly IInventoryEngine _inventory;
+        private readonly IObjectInteractionEngine? _objectInteraction;
 
         // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
         private readonly ConcurrentQueue<IDomainEvent> _inbox = new();
@@ -163,7 +163,7 @@ namespace GameEngineTools.Characters.Core
         /// <param name="semanticMemory">Semantic memory engine instance.</param>
         /// <param name="goal">Goal engine instance.</param>
         /// <param name="schedule">Daily schedule engine instance.</param>
-        /// <param name="inventory">Inventory engine instance.</param>
+        /// <param name="objectInteraction">Optional object interaction engine. Wired between Interactions and Relationships in Phase B.</param>
         /// <param name="initialSnapshot">Initial engine snapshot (provided by the factory).</param>
         public OrchestratedHuman(
             HumanId id,
@@ -187,11 +187,12 @@ namespace GameEngineTools.Characters.Core
             ISemanticMemoryEngine semanticMemory,
             IGoalEngine goal,
             IDailyScheduleEngine schedule,
-            IInventoryEngine inventory,
             // initial snapshot (from factory)
             EnginesSnapshot initialSnapshot,
             // optional behavior cadence override
-            Hosting.IBehaviorCadencePolicy? behaviorCadencePolicy = null)
+            Hosting.IBehaviorCadencePolicy? behaviorCadencePolicy = null,
+            // optional object interaction engine
+            IObjectInteractionEngine? objectInteraction = null)
         {
             Id = id;
             Identity = identity;
@@ -215,7 +216,7 @@ namespace GameEngineTools.Characters.Core
             _semanticMemory = semanticMemory;
             _goal = goal;
             _schedule = schedule;
-            _inventory = inventory;
+            _objectInteraction = objectInteraction;
 
             Snapshot = initialSnapshot;
             _behaviorCadencePolicy = behaviorCadencePolicy;
@@ -309,10 +310,10 @@ namespace GameEngineTools.Characters.Core
             }
 
             _interact.Tick(now, dt, _ctx, outbox);
+            _objectInteraction?.Tick(now, dt, _ctx, outbox);
             _relations.Tick(now, dt, _ctx, outbox);
             _memory.Tick(now, dt, _ctx, outbox);
             _semanticMemory.Tick(now, dt, _ctx, outbox);
-            _inventory.Tick(now, dt, _ctx, outbox);
             _goal.Tick(now, dt, _ctx, outbox);
             _schedule.Tick(now, dt, _ctx, outbox);
 
@@ -344,7 +345,6 @@ namespace GameEngineTools.Characters.Core
             _relations.RestoreState(snapshot.Relationships);
             _memory.RestoreState(snapshot.Memory);
             _semanticMemory.RestoreState(snapshot.SemanticMemory ?? SemanticMemoryState.Empty);
-            _inventory.RestoreState(snapshot.Inventory ?? InventoryState.Empty);
             _goal.RestoreState(snapshot.Goals ?? GoalState.Empty);
             _schedule.RestoreState(snapshot.Schedule ?? DailyScheduleState.Empty);
         }
@@ -453,7 +453,7 @@ namespace GameEngineTools.Characters.Core
             try { _relations.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Relationships.Handle failed.", Id.Value); }
             try { _memory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Memory.Handle failed.", Id.Value); }
             try { _semanticMemory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SemanticMemory.Handle failed.", Id.Value); }
-            try { _inventory.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Inventory.Handle failed.", Id.Value); }
+            if (_objectInteraction is not null) try { _objectInteraction.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] ObjectInteraction.Handle failed.", Id.Value); }
             try { _goal.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Goal.Handle failed.", Id.Value); }
             try { _schedule.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Schedule.Handle failed.", Id.Value); }
         }
@@ -528,8 +528,7 @@ namespace GameEngineTools.Characters.Core
                 AltitudeMeters:     prev.AltitudeMeters,
                 Celestial:          prev.Celestial,
                 Goals:              _goal.State,
-                Schedule:           _schedule.State,
-                Inventory:          _inventory.State);
+                Schedule:           _schedule.State);
 
             _ctx.Snapshot = Snapshot;
         }

@@ -94,8 +94,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
     /// <summary>
     /// Emitted when the orchestrator commits an action to the behavior state.
+    /// <see cref="ObjectInteraction"/> is populated when <see cref="ActionName"/> == <see cref="ActionNames.InteractWithObject"/>.
     /// </summary>
-    public sealed record ActionCommitted(WDateTime OccurredAt, HumanId Human, string ActionName, WTimeSpan Duration, HumanId? TargetHuman = null, string? IntendedActionName = null, string? ConflictReason = null) : IDomainEvent;
+    public sealed record ActionCommitted(WDateTime OccurredAt, HumanId Human, string ActionName, WTimeSpan Duration, HumanId? TargetHuman = null, string? IntendedActionName = null, string? ConflictReason = null, ObjectInteractionData? ObjectInteraction = null) : IDomainEvent;
 
     #endregion
 }

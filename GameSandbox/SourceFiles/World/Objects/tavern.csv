@@ -1,8 +1,8 @@
-Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind
-tavern_fireplace;Fireplace;LightSource;0.70;0.15;false;true;Warmth:0.8|Social:0.4|MoodBoost:0.3;false;0;None
-bar_counter;Bar Counter;Furniture;0.00;0.20;false;true;Social:0.6|Hunger:0.5;false;0;None
-round_table_01;Round Table;Furniture;0.00;0.00;false;true;Social:0.5;false;0;None
-round_table_02;Round Table;Furniture;0.00;0.00;false;true;Social:0.5;false;0;None
-lute_corner;Lute on Hook;Tool;0.00;0.10;false;true;Entertainment:0.7|Social:0.3|MoodBoost:0.4;false;0;None
-food_shelf;Food Shelf;Food;0.00;0.00;false;true;Hunger:0.6;false;0;None
-ale_barrel;Ale Barrel;Food;0.00;0.00;false;true;Hunger:0.4|Social:0.2|MoodBoost:0.1;false;0;None
+Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind;Respawns;RespawnMinutes
+tavern_fireplace;Fireplace;LightSource;0.70;0.15;false;true;Warmth:0.8|Social:0.4|MoodBoost:0.3;false;0;None;false;0
+bar_counter;Bar Counter;Furniture;0.00;0.20;false;true;Social:0.6|Hunger:0.5;false;0;None;false;0
+round_table_01;Round Table;Furniture;0.00;0.00;false;true;Social:0.5;false;0;None;false;0
+round_table_02;Round Table;Furniture;0.00;0.00;false;true;Social:0.5;false;0;None;false;0
+lute_corner;Lute on Hook;Tool;0.00;0.10;false;true;Entertainment:0.7|Social:0.3|MoodBoost:0.4;false;0;None;false;0
+food_shelf;Food Shelf;Food;0.00;0.00;false;true;Hunger:0.6;false;0;None;false;0
+ale_barrel;Ale Barrel;Food;0.00;0.00;false;true;Hunger:0.4|Social:0.2|MoodBoost:0.1;false;0;None;false;0

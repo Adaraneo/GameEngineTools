@@ -5,6 +5,7 @@ using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Goals;
+using GameEngineTools.Characters.Engines.Objects;
 using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
@@ -358,6 +359,22 @@ namespace GameEngineTools.Characters.Hosting
         }
 
         #endregion Engine registrace
+
+        #region Object Interaction engine
+
+        /// <summary>
+        /// Registers the object interaction subsystem: policy and engine.
+        /// Requires <see cref="GameEngineTools.World.Objects.CsvWorldObjectProvider"/> and
+        /// <see cref="GameEngineTools.World.Location.ILocationService"/> to also be registered.
+        /// </summary>
+        public static IServiceCollection AddObjectInteractionEngine(this IServiceCollection services)
+        {
+            services.TryAddSingleton<IObjectInteractionPolicy, DefaultObjectInteractionPolicy>();
+            services.TryAddSingleton<IObjectInteractionEngine, DefaultObjectInteractionEngine>();
+            return services;
+        }
+
+        #endregion Object Interaction engine
 
         #region Zkrácená registrace všeho najednou
 

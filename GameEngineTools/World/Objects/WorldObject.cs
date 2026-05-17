@@ -4,6 +4,8 @@
 namespace GameEngineTools.World.Objects
 {
     using System.Collections.Immutable;
+    using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Utils.Time;
 
     /// <summary>
     /// Represents a physical or conceptual object present in a world location.
@@ -105,6 +107,33 @@ namespace GameEngineTools.World.Objects
         /// Semantic category used by the inventory engine when resolving pickup behaviour.
         /// </summary>
         public PickupItemKind ItemKind { get; init; } = PickupItemKind.None;
+
+        #endregion
+
+        #region Runtime ownership state
+
+        /// <summary>
+        /// Character currently holding this object, or <c>null</c> if it is not held.
+        /// Set by <see cref="CsvWorldObjectProvider.SetHeldBy"/> when a character picks up the object.
+        /// </summary>
+        public HumanId? HeldBy { get; init; } = null;
+
+        /// <summary>
+        /// When the object was consumed (eaten, drunk, destroyed), or <c>null</c> if still available.
+        /// Used by <see cref="ObjectRespawnScheduler"/> to compute respawn eligibility.
+        /// </summary>
+        public WDateTime? ConsumedAt { get; init; } = null;
+
+        /// <summary>
+        /// Whether this object respawns after being consumed.
+        /// </summary>
+        public bool Respawns { get; init; } = false;
+
+        /// <summary>
+        /// How many in-world minutes after consumption the object reappears.
+        /// Only meaningful when <see cref="Respawns"/> is <c>true</c>.
+        /// </summary>
+        public int RespawnMinutes { get; init; } = 1440;
 
         #endregion
     }

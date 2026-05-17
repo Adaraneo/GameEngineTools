@@ -23,8 +23,6 @@ namespace GameEngineTools.Characters.Engines
         public const string MoveToRest = "MoveTo:Rest";
         public const string MoveToPublic = "MoveTo:Public";
 
-        public const string PickupItem = "PickupItem";
-        public const string UseItem    = "UseItem";
-        public const string DropItem   = "DropItem";
+        public const string InteractWithObject = "InteractWithObject";
     }
 }

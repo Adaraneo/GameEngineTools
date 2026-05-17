@@ -5,8 +5,8 @@ namespace GameEngineTools.Characters.Hosting
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
-    using GameEngineTools.Characters.Engines.Inventory;
     using GameEngineTools.Characters.Engines.Goals;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
@@ -134,20 +134,24 @@ namespace GameEngineTools.Characters.Hosting
             var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
             var goal = _sp.GetRequiredService<IGoalEngine>();
             var schedule = _sp.GetRequiredService<IDailyScheduleEngine>();
-            var inventory = new DefaultInventoryEngine();
+
+            // Object interaction engine is optional — only wired when both the world object provider
+            // and location service are registered in the DI container.
+            var objectInteraction = _sp.GetService<IObjectInteractionEngine>();
 
             // Initial snapshot — State is always valid immediately after factory creation
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
-                Goals: goal.State, Schedule: schedule.State, Inventory: inventory.State);
+                Goals: goal.State, Schedule: schedule.State);
 
             var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.GeneticBlueprint,
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
-                physio, psych, behav, inter, rel, mem, semantic, goal, schedule, inventory,
+                physio, psych, behav, inter, rel, mem, semantic, goal, schedule,
                 snapshot,
-                _behaviorCadencePolicy);
+                _behaviorCadencePolicy,
+                objectInteraction);
 
             goal.SeedFromPersonality(b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now);
 

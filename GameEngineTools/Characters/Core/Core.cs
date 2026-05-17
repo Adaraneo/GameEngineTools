@@ -15,7 +15,6 @@ namespace GameEngineTools.Characters.Core
     using Characters.Engines.Relationships;
     using Characters.Engines.SemanticMemory;
     using Characters.Traits;
-    using GameEngineTools.Characters.Engines.Inventory;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.World.Core.Astro;
@@ -222,10 +221,5 @@ namespace GameEngineTools.Characters.Core
         /// Daily schedule state for this character.
         /// <c>null</c> for characters created before this field existed (backward compatibility).
         /// </summary>
-        DailyScheduleState? Schedule = null,
-        /// <summary>
-        /// Current inventory carried by this character.
-        /// Defaults to an empty inventory for characters created before this field existed.
-        /// </summary>
-        InventoryState? Inventory = null);
+        DailyScheduleState? Schedule = null);
 }

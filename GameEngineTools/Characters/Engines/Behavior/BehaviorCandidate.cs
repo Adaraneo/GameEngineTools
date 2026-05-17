@@ -28,5 +28,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
         WTimeSpan Duration,
         BehaviorDomain Domain,
         IReadOnlyList<string>? Tags = null,
-        SocialTargetingData? SocialTargeting = null);
+        SocialTargetingData? SocialTargeting = null,
+        /// <summary>
+        /// Present when <see cref="Name"/> == <see cref="ActionNames.InteractWithObject"/>.
+        /// Carries the target object ID, location, and intended interaction kind.
+        /// </summary>
+        ObjectInteractionData? ObjectInteraction = null);
 }

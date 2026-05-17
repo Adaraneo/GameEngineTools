@@ -11,9 +11,11 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -129,7 +131,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     };
 
                     episodes[existingIndex] = reinforced;
-                    State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
+                    State = new MemoryIndex(episodes) { Knowledge = State.Knowledge, KnownObjects = State.KnownObjects };
 
                     _log.MemoryEncoded(
                         ctx.Id.Value.ToString(),
@@ -151,7 +153,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 };
 
                 episodes.Add(encoded);
-                State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
+                State = new MemoryIndex(episodes) { Knowledge = State.Knowledge, KnownObjects = State.KnownObjects };
 
                 _log.MemoryEncoded(
                     ctx.Id.Value.ToString(),
@@ -639,7 +641,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                                 RecallConfidence = Math.Clamp(ep.RecallConfidence + 0.03, 0.0, 1.0),
                                 Emotion = newEmotion
                             };
-                            State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
+                            State = new MemoryIndex(episodes) { Knowledge = State.Knowledge, KnownObjects = State.KnownObjects };
 
                             if (newEmotion != ep.Emotion)
                             {
@@ -662,6 +664,19 @@ namespace GameEngineTools.Characters.Engines.Memory
                 // Viz ConsolidateMemories() — posílí top-N epizod dle salience.
                 case SleepEnded se:
                     ConsolidateMemories(se.OccurredAt, ctx, outbox);
+                    break;
+
+                // ── Objektové interakce — prostorová paměť ────────────────────────────────
+                case ObjectTaken taken when taken.Actor == ctx.Id:
+                    UpdateObjectLocationFact(taken.ObjectId, locationId: null, taken.OccurredAt, confidence: 1.0, itemKind: PickupItemKind.None);
+                    break;
+
+                case ObjectUsed used when used.Actor == ctx.Id && used.WasConsumed:
+                    RemoveObjectLocationFact(used.ObjectId);
+                    break;
+
+                case ObjectDropped dropped when dropped.Actor == ctx.Id:
+                    UpdateObjectLocationFact(dropped.ObjectId, dropped.AtLocationId, dropped.OccurredAt, confidence: 1.0, itemKind: PickupItemKind.None);
                     break;
             }
         }
@@ -715,7 +730,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 .ToList();
 
             // Preserve existing Knowledge facts when rebuilding episodic state
-            State = new MemoryIndex(episodes) { Knowledge = State.Knowledge };
+            State = new MemoryIndex(episodes) { Knowledge = State.Knowledge, KnownObjects = State.KnownObjects };
 
             // Knowledge fact confidence decay (Theory of Mind: facts fade slowly over time)
             if (State.Knowledge.Count > 0)
@@ -731,6 +746,22 @@ namespace GameEngineTools.Characters.Engines.Memory
 
                 State = State with { Knowledge = decayedKnowledge };
             }
+
+            // Object location fact confidence decay (spatial memory degrades over time)
+            if (State.KnownObjects.Count > 0)
+            {
+                const double objectPruneThreshold = 0.01;
+                var decayedObjects = State.KnownObjects
+                    .Select(f =>
+                    {
+                        var newConf = f.Confidence - Config.ObjectLocationDecayPerDay * (hours / 24.0);
+                        return f with { Confidence = newConf };
+                    })
+                    .Where(f => f.Confidence >= objectPruneThreshold)
+                    .ToList();
+
+                State = State with { KnownObjects = decayedObjects };
+            }
         }
 
         #endregion Tick — zapomínání (Ebbinghausova křivka)
@@ -744,6 +775,47 @@ namespace GameEngineTools.Characters.Engines.Memory
         public void RestoreState(MemoryIndex state) => State = state;
 
         #endregion Obnovení stavu
+
+        #region Prostorová paměť objektů
+
+        /// <summary>
+        /// Records or updates the spatial memory of where an object was last seen.
+        /// Pass <c>null</c> for <paramref name="locationId"/> when the object is now held by this character.
+        /// </summary>
+        private void UpdateObjectLocationFact(
+            string objectId,
+            string? locationId,
+            WDateTime seenAt,
+            double confidence,
+            PickupItemKind itemKind)
+        {
+            var facts = State.KnownObjects.ToList();
+            var idx = facts.FindIndex(f => f.ObjectId == objectId);
+            var updated = new ObjectLocationFact(
+                objectId,
+                locationId ?? string.Empty,
+                seenAt,
+                Math.Clamp(confidence, 0.0, 1.0),
+                itemKind);
+
+            if (idx >= 0)
+                facts[idx] = updated;
+            else
+                facts.Add(updated);
+
+            State = State with { KnownObjects = facts };
+        }
+
+        /// <summary>
+        /// Removes an object from spatial memory (e.g. after it was consumed).
+        /// </summary>
+        private void RemoveObjectLocationFact(string objectId)
+        {
+            var facts = State.KnownObjects.Where(f => f.ObjectId != objectId).ToList();
+            State = State with { KnownObjects = facts };
+        }
+
+        #endregion Prostorová paměť objektů
 
         #region Privátní metody
 

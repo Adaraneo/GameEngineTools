@@ -5,7 +5,18 @@ namespace GameEngineTools.Characters.Engines.Memory
 {
     using Characters.Core;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
+
+    /// <summary>
+    /// A spatial memory of where a specific world object was last seen.
+    /// </summary>
+    public sealed record ObjectLocationFact(
+        string ObjectId,
+        string LocationId,
+        WDateTime SeenAt,
+        double Confidence,
+        PickupItemKind ItemKind);
 
     public sealed record MemoryConfig(
         double BaseEncoding = 0.5,
@@ -34,9 +45,14 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <summary>
         /// Facts below this confidence are pruned (forgotten).
         /// </summary>
-        double KnowledgePruneThreshold = 0.05)
+        double KnowledgePruneThreshold = 0.05,
+        /// <summary>
+        /// Confidence decay per day for object location facts.
+        /// Default 0.05 → a directly-seen object's confidence drops from 0.85 to 0.0 in ~17 days.
+        /// </summary>
+        double ObjectLocationDecayPerDay = 0.05)
     {
-        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35, 0.04, 0.65, 0.90, 0.35, 0.005, 0.05) { }
+        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35, 0.04, 0.65, 0.90, 0.35, 0.005, 0.05, 0.05) { }
     }
 
     public sealed record MemoryIndex(IReadOnlyList<EpisodicMemory> Episodes)
@@ -48,6 +64,14 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </summary>
         public IReadOnlyList<KnowledgeFact> Knowledge { get; init; }
             = Array.Empty<KnowledgeFact>();
+
+        /// <summary>
+        /// Spatial memories of where world objects were last seen.
+        /// Populated passively during observation and actively via object interaction events.
+        /// Confidence decays over time; pruned when below 0.01.
+        /// </summary>
+        public IReadOnlyList<ObjectLocationFact> KnownObjects { get; init; }
+            = Array.Empty<ObjectLocationFact>();
     }
 
     public sealed record EpisodicMemory(

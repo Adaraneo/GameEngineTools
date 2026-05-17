@@ -1,5 +1,5 @@
-Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind
-mushroom_cluster;Wild Mushrooms;Food;0.00;0.00;false;true;Hunger:0.3;true;120;Food
-fallen_branch;Fallen Branch;Tool;0.00;0.00;false;true;Work:0.2;true;1500;Tool
-stream_water;Stream Water;Food;0.00;0.05;false;true;Hunger:0.2;true;300;Drink
-campfire_ring;Old Campfire Ring;LightSource;0.30;0.05;false;true;Warmth:0.4|Social:0.2;false;0;None
+Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind;Respawns;RespawnMinutes
+mushroom_cluster;Wild Mushrooms;Food;0.00;0.00;false;true;Hunger:0.3|Ownership:0.7;true;120;Food;true;1440
+fallen_branch;Fallen Branch;Tool;0.00;0.00;false;true;Work:0.2|Ownership:0.4;true;1500;Tool;false;0
+stream_water;Stream Water;Food;0.00;0.05;false;true;Hunger:0.2;false;300;Drink;true;60
+campfire_ring;Old Campfire Ring;LightSource;0.30;0.05;false;true;Warmth:0.4|Social:0.2;false;0;None;false;0

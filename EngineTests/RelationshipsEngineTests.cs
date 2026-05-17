@@ -1457,7 +1457,6 @@ namespace EngineTests
                 semanticMemory: semanticMemory,
                 goal: goal,
                 schedule: schedule,
-                inventory: new GameEngineTools.Characters.Engines.Inventory.DefaultInventoryEngine(),
                 initialSnapshot: snapshot,
                 behaviorCadencePolicy: null);
         }

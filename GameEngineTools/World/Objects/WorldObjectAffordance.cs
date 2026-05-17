@@ -61,6 +61,12 @@ namespace GameEngineTools.World.Objects
         /// Raises stress or threat perception — hazards, weapons, fire.
         /// Negative affordance: satisfaction here means "how much stress it adds".
         /// </summary>
-        StressRaise
+        StressRaise,
+
+        /// <summary>
+        /// Signals that an object can be taken and carried by the character.
+        /// Satisfaction = desirability of taking this object [0, 1].
+        /// </summary>
+        Ownership
     }
 }

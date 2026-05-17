@@ -10,6 +10,7 @@ namespace GameEngineTools.World.Objects
     using System.Globalization;
     using System.IO;
     using System.Linq;
+    using GameEngineTools.Characters.Core;
     using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
 
@@ -92,7 +93,8 @@ namespace GameEngineTools.World.Objects
             ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
 
             // GetOrAdd is atomic — the factory will only run once per locationId.
-            return _cache.GetOrAdd(locationId, LoadForLocation);
+            return _cache.GetOrAdd(locationId, LoadForLocation)
+                         .Where(o => o.HeldBy is null && o.ConsumedAt is null);
         }
 
         /// <summary>
@@ -129,6 +131,63 @@ namespace GameEngineTools.World.Objects
                     var locationId = Path.GetFileNameWithoutExtension(filePath);
                     return (IReadOnlyList<WorldObject>)_cache.GetOrAdd(locationId, _ => LoadFromPath(filePath, locationId));
                 });
+        }
+
+        /// <summary>
+        /// Returns all objects at <paramref name="locationId"/>, including those that are
+        /// currently held or consumed — unlike <see cref="GetObjectsAt"/> which filters those out.
+        /// </summary>
+        public IEnumerable<WorldObject> GetAllObjectsAt(string locationId)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
+            return _cache.GetOrAdd(locationId, LoadForLocation);
+        }
+
+        /// <summary>
+        /// Returns all location IDs that have been loaded into the cache.
+        /// Used by <see cref="ObjectRespawnScheduler"/> to iterate all known locations.
+        /// </summary>
+        public IEnumerable<string> GetKnownLocationIds()
+            => _cache.Keys;
+
+        /// <summary>
+        /// Sets or clears the holder of an object. Pass <c>null</c> to release the object.
+        /// </summary>
+        public bool SetHeldBy(string locationId, string objectId, Characters.Core.HumanId? holder)
+        {
+            if (!_cache.TryGetValue(locationId, out var list))
+                return false;
+            var idx = list.FindIndex(o => o.Id == objectId);
+            if (idx < 0) return false;
+            list[idx] = list[idx] with { HeldBy = holder };
+            return true;
+        }
+
+        /// <summary>
+        /// Marks an object as consumed at the given simulation time.
+        /// The object is excluded from <see cref="GetObjectsAt"/> until respawned.
+        /// </summary>
+        public bool ConsumeObject(string locationId, string objectId, World.Utils.Time.WDateTime now)
+        {
+            if (!_cache.TryGetValue(locationId, out var list))
+                return false;
+            var idx = list.FindIndex(o => o.Id == objectId);
+            if (idx < 0) return false;
+            list[idx] = list[idx] with { ConsumedAt = now };
+            return true;
+        }
+
+        /// <summary>
+        /// Restores a held/consumed object to its available state.
+        /// </summary>
+        public bool RestoreObject(string locationId, string objectId)
+        {
+            if (!_cache.TryGetValue(locationId, out var list))
+                return false;
+            var idx = list.FindIndex(o => o.Id == objectId);
+            if (idx < 0) return false;
+            list[idx] = list[idx] with { HeldBy = null, ConsumedAt = null };
+            return true;
         }
 
         #endregion
@@ -188,7 +247,9 @@ namespace GameEngineTools.World.Objects
                 Affordances      = ParseAffordances(v[7].Trim()),
                 IsPickable       = v.Length > 8  ? bool.Parse(v[8].Trim()) : false,
                 WeightGrams      = v.Length > 9  ? int.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0,
-                ItemKind         = v.Length > 10 ? Enum.Parse<PickupItemKind>(v[10].Trim(), ignoreCase: true) : PickupItemKind.None
+                ItemKind         = v.Length > 10 ? Enum.Parse<PickupItemKind>(v[10].Trim(), ignoreCase: true) : PickupItemKind.None,
+                Respawns         = v.Length > 11 ? bool.Parse(v[11].Trim()) : false,
+                RespawnMinutes   = v.Length > 12 ? int.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 1440
             };
 
         /// <summary>

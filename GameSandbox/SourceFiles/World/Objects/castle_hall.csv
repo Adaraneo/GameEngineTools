@@ -1,7 +1,7 @@
-Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind
-fireplace_01;Fireplace;LightSource;0.60;0.10;false;true;Warmth:0.7|Social:0.3|MoodBoost:0.2;false;0;None
-long_table;Long Table;Furniture;0.00;0.00;false;true;Social:0.4|Work:0.2;false;0;None
-banner_north;Northern Banner;Ambient;0.00;0.00;false;true;MoodBoost:0.1;false;0;None
-chair_row_east;Row of Chairs;Furniture;0.00;0.00;false;true;Rest:0.4;false;0;None
-torch_west;Wall Torch;LightSource;0.20;0.00;false;true;Warmth:0.2|MoodBoost:0.1;false;0;None
-torch_east;Wall Torch;LightSource;0.20;0.00;false;true;Warmth:0.2|MoodBoost:0.1;false;0;None
+Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind;Respawns;RespawnMinutes
+fireplace_01;Fireplace;LightSource;0.60;0.10;false;true;Warmth:0.7|Social:0.3|MoodBoost:0.2;false;0;None;false;0
+long_table;Long Table;Furniture;0.00;0.00;false;true;Social:0.4|Work:0.2;false;0;None;false;0
+banner_north;Northern Banner;Ambient;0.00;0.00;false;true;MoodBoost:0.1;false;0;None;false;0
+chair_row_east;Row of Chairs;Furniture;0.00;0.00;false;true;Rest:0.4;false;0;None;false;0
+torch_west;Wall Torch;LightSource;0.20;0.00;false;true;Warmth:0.2|MoodBoost:0.1;false;0;None;false;0
+torch_east;Wall Torch;LightSource;0.20;0.00;false;true;Warmth:0.2|MoodBoost:0.1;false;0;None;false;0
