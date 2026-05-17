@@ -3,12 +3,14 @@
 
 using GameEngineTools;
 using GameEngineTools.Characters.Core;
+using GameEngineTools.Characters.Engines;
 using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Generation.Portraits;
@@ -91,11 +93,11 @@ if (answerKey == ConsoleKey.Y)
     canGeneratePrompts = true;
 
 Console.Clear();
-Console.Write("Would you like to export players and significants other's info after simulation? [y\\N] \b");
-bool canExportPlayersAndSOInfos = false;
+Console.Write("Would you like to export player's and other main character's info after simulation? [y\\N] \b");
+bool canExportMainCharactersInfo = false;
 answerKey = Console.ReadKey().Key;
 if (answerKey == ConsoleKey.Y)
-    canExportPlayersAndSOInfos = true;
+    canExportMainCharactersInfo = true;
 
 Console.Clear();
 Console.Write("Would you like to export diary after simulation? [y\\N] \b");
@@ -190,10 +192,7 @@ var significantOtherPerson = significantOther.Person;
 var friendPerson = friend.Person;
 var friendSOPerson = friendSO.Person;
 
-//Console.WriteLine("Before simulation starts:");
-
-Console.WriteLine("Press any key to continue...");
-Console.ReadKey();
+Console.WriteLine("Before simulation starts:");
 
 var diary = new List<NarrativeEntry>();
 
@@ -207,10 +206,13 @@ var objectProvider = new CsvWorldObjectProvider();
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
 var mainCharactersQuery = from mainCharacters in manager.Characters
-                          where mainCharacters.Person.Id.Value.Equals(playerPerson.Id.Value) && mainCharacters.Person.Id.Value.Equals(soid) && mainCharacters.Person.Id.Value.Equals(friendId) && mainCharacters.Person.Id.Value.Equals(friendSOId)
-                          select mainCharacters.Person;
+                          where mainCharacters.Person.Id.Value == playerPerson.Id.Value || mainCharacters.Person.Id.Value == soid || mainCharacters.Person.Id.Value == friendId || mainCharacters.Person.Id.Value ==friendSOId
+                          select mainCharacters;
 
-var locationQuery = from locations in mainCharactersQuery
+var mainCharactersPersonQuery = from mainCharacters in mainCharactersQuery
+                                select mainCharacters.Person;
+
+var locationQuery = from locations in mainCharactersPersonQuery
                     where locations.Snapshot.InteractionSurface.Location == "Unknown"
                     select locations;
 
@@ -218,6 +220,20 @@ foreach (var personToMove in locationQuery)
 {
     locationService.MoveCharacter(personToMove.Id, mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count)]);
 }
+
+Console.WriteLine($"{nameof(mainCharactersPersonQuery)}: {mainCharactersPersonQuery.Count()}, {nameof(mainCharactersQuery)}: {mainCharactersQuery.Count()}, {nameof(locationQuery)}, {locationQuery.Count()}");
+
+foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
+{
+    string slotId = $"sl.{mainCharacter.Id.Value.ToString()}";
+    var slot = new ScheduleSlot(slotId, 13, ActionNames.SelfCare, "stables");
+    mainCharacter.ReceiveEvent(new ScheduleSlotTriggered(startNow.AddDays(1), mainCharacter.Id, slotId, ActionNames.SelfCare, "stables", 0.65));
+
+    Console.WriteLine("Slot: {0}", slotId);
+}
+
+Console.WriteLine("Press any key to continue...");
+Console.ReadKey();
 
 var mainCharactersSceneOpts = new SimulationSceneOptions
 {
@@ -286,7 +302,7 @@ await mainCharactersScene.RunAsync();
 var characters = new List<IHuman>();
 foreach (var character in manager.Characters.Select(c => c.Person).ToList())
 {
-    var mainCharacters = mainCharactersQuery.ToList();
+    var mainCharacters = mainCharactersPersonQuery.ToList();
     if (mainCharacters.Contains(character))
     {
         continue;
@@ -361,15 +377,23 @@ foreach (var other in others)
 
 var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-if (canExportPlayersAndSOInfos)
+if (canExportMainCharactersInfo)
 {
     await File.WriteAllTextAsync(
-        Path.Combine(desktopPath, $"player.{playerPerson.Id.Value}.txt"),
+        Path.Combine(desktopPath, $"player.{playerPerson.Id.Value.ToString()}.txt"),
         player.PrintInfo(false));
 
     await File.WriteAllTextAsync(
-        Path.Combine(desktopPath, $"significantOther.{significantOtherPerson.Id.Value}.txt"),
+        Path.Combine(desktopPath, $"{so}.{significantOtherPerson.Id.Value.ToString()}.txt"),
         significantOther.PrintInfo(false));
+
+    await File.AppendAllTextAsync(
+        Path.Combine(desktopPath, $"{fr}.{friendPerson.Id.Value.ToString()}.txt"),
+        friend.PrintInfo(false));
+
+    await File.AppendAllTextAsync(
+        Path.Combine(desktopPath, $"{frso}.{friendSOPerson.Id.Value.ToString()}.txt"),
+        friendSO.PrintInfo(false));
 }
 
 if (canGeneratePrompts)
