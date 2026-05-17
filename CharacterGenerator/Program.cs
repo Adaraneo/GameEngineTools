@@ -88,7 +88,7 @@
             var pcFolderPath = GFC.Pc;
             var npcFolderPath = GFC.Npc;
 
-            await using var runtime = await GameEngineToolsRuntime.StartAsync(consoleLogs: true, writeJsonLines: false, writeTextLogs: false, generatedFileOptions: new GeneratedFileOptions
+            await using var runtime = await GameEngineToolsRuntime.StartAsync(consoleLogs: false, writeJsonLines: false, writeTextLogs: false, generatedFileOptions: new GeneratedFileOptions
             {
                 NPCDirectory = GFC.Npc,
                 PlayerDirectory = GFC.Pc
