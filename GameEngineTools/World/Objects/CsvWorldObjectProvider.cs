@@ -49,8 +49,9 @@ namespace GameEngineTools.World.Objects
         /// Per-location object cache. Populated lazily on first access.
         /// Uses <see cref="ConcurrentDictionary{TKey,TValue}"/> to be safe
         /// if multiple threads ever access the provider simultaneously.
+        /// Stored as <see cref="List{T}"/> internally so items can be removed at runtime.
         /// </summary>
-        private readonly ConcurrentDictionary<string, IReadOnlyList<WorldObject>> _cache = new();
+        private readonly ConcurrentDictionary<string, List<WorldObject>> _cache = new();
 
         #endregion
 
@@ -94,6 +95,20 @@ namespace GameEngineTools.World.Objects
             return _cache.GetOrAdd(locationId, LoadForLocation);
         }
 
+        /// <summary>
+        /// Removes an object from the cached list for the specified location.
+        /// Call this when a character picks up an item to make it unavailable to others.
+        /// </summary>
+        /// <param name="locationId">Location where the object is present.</param>
+        /// <param name="objectId">ID of the object to remove.</param>
+        /// <returns><c>true</c> if the object was found and removed; <c>false</c> otherwise.</returns>
+        public bool RemoveObject(string locationId, string objectId)
+        {
+            if (!_cache.TryGetValue(locationId, out var list))
+                return false;
+            return list.RemoveAll(o => o.Id == objectId) > 0;
+        }
+
         /// <inheritdoc/>
         /// <remarks>
         /// Loads ALL per-location CSV files from the objects directory.
@@ -112,7 +127,7 @@ namespace GameEngineTools.World.Objects
                 {
                     // Derive locationId from filename (e.g. "castle_hall.csv" → "castle_hall").
                     var locationId = Path.GetFileNameWithoutExtension(filePath);
-                    return _cache.GetOrAdd(locationId, _ => LoadFromPath(filePath, locationId));
+                    return (IReadOnlyList<WorldObject>)_cache.GetOrAdd(locationId, _ => LoadFromPath(filePath, locationId));
                 });
         }
 
@@ -125,7 +140,7 @@ namespace GameEngineTools.World.Objects
         /// Constructs the expected file path from <paramref name="locationId"/> and loads it.
         /// </summary>
         /// <param name="locationId">Location ID (used as filename without extension).</param>
-        private IReadOnlyList<WorldObject> LoadForLocation(string locationId)
+        private List<WorldObject> LoadForLocation(string locationId)
         {
             var path = Path.Combine(_objectsDirectory, locationId + FileSystemConstant.Extension.SourceCsv);
             return LoadFromPath(path, locationId);
@@ -137,10 +152,10 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         /// <param name="filePath">Full path to the CSV file.</param>
         /// <param name="locationId">Location ID injected into every parsed object.</param>
-        private static IReadOnlyList<WorldObject> LoadFromPath(string filePath, string locationId)
+        private static List<WorldObject> LoadFromPath(string filePath, string locationId)
         {
             if (!File.Exists(filePath))
-                return Array.Empty<WorldObject>();
+                return new List<WorldObject>();
 
             return CsvLoader.Load(filePath, v => ParseObjectRow(v, locationId));
         }
@@ -170,7 +185,10 @@ namespace GameEngineTools.World.Objects
                 AmbientNoise     = double.Parse(v[4].Trim(), CultureInfo.InvariantCulture),
                 BlocksLineOfSight = bool.Parse(v[5].Trim()),
                 IsAvailable      = bool.Parse(v[6].Trim()),
-                Affordances      = ParseAffordances(v[7].Trim())
+                Affordances      = ParseAffordances(v[7].Trim()),
+                IsPickable       = v.Length > 8  ? bool.Parse(v[8].Trim()) : false,
+                WeightGrams      = v.Length > 9  ? int.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0,
+                ItemKind         = v.Length > 10 ? Enum.Parse<PickupItemKind>(v[10].Trim(), ignoreCase: true) : PickupItemKind.None
             };
 
         /// <summary>

@@ -61,7 +61,10 @@ namespace GameEngineTools.World.Location
         double NoisePerPerson,
         int Capacity,
         bool AllowsPrivacy,
-        LocationType Type);
+        LocationType Type,
+        TerrainType Terrain = TerrainType.Indoor,
+        double DangerLevel = 0.0,
+        bool AllowsPickup = true);
 
     #endregion
 

@@ -98,7 +98,7 @@ namespace GameEngineTools.World.Objects
                 .ToDictionary(
                     g => g.Key,
                     g => (IReadOnlyList<WorldConnection>)g
-                        .Select(c => new WorldConnection(c.TargetLocationId, c.TravelMinutes))
+                        .Select(c => new WorldConnection(c.TargetLocationId, c.DistanceMeters))
                         .ToList());
 
             return new WorldMap(locations, adjacency, regions);
@@ -117,7 +117,7 @@ namespace GameEngineTools.World.Objects
         /// <summary>
         /// Intermediate DTO for a parsed connection row before building <see cref="WorldConnection"/>.
         /// </summary>
-        private sealed record ConnectionRow(string FromId, string TargetLocationId, int TravelMinutes);
+        private sealed record ConnectionRow(string FromId, string TargetLocationId, double DistanceMeters);
 
         /// <summary>
         /// Parses a single row from Locations.csv.
@@ -134,20 +134,23 @@ namespace GameEngineTools.World.Objects
                 BaseNoise:     double.Parse(v[4].Trim(), CultureInfo.InvariantCulture),
                 NoisePerPerson:double.Parse(v[5].Trim(), CultureInfo.InvariantCulture),
                 Capacity:      int.Parse(v[6].Trim(), CultureInfo.InvariantCulture),
-                AllowsPrivacy: bool.Parse(v[7].Trim()));
+                AllowsPrivacy: bool.Parse(v[7].Trim()),
+                Terrain:       v.Length > 8 ? Enum.Parse<TerrainType>(v[8].Trim(), ignoreCase: true) : TerrainType.Indoor,
+                DangerLevel:   v.Length > 9 ? double.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0.0,
+                AllowsPickup:  v.Length > 10 ? bool.Parse(v[10].Trim()) : true);
 
             return new LocationRow(descriptor, Region: v[3].Trim());
         }
 
         /// <summary>
         /// Parses a single row from Connections.csv.
-        /// Expected columns: 0=FromId, 1=ToId, 2=TravelMinutes
+        /// Expected columns: 0=FromId, 1=ToId, 2=DistanceMeters
         /// </summary>
         private static ConnectionRow ParseConnectionRow(string[] v)
             => new(
                 FromId:           v[0].Trim(),
                 TargetLocationId: v[1].Trim(),
-                TravelMinutes:    int.Parse(v[2].Trim(), CultureInfo.InvariantCulture));
+                DistanceMeters:   double.Parse(v[2].Trim(), CultureInfo.InvariantCulture));
 
         #endregion
     }

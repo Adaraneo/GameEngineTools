@@ -21,6 +21,7 @@ using GameEngineTools.Narrative;
 using GameEngineTools.Universe;
 using GameEngineTools.World.Core.Astro;
 using GameEngineTools.World.Location;
+using GameEngineTools.World.Movement;
 using GameEngineTools.World.Objects;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
@@ -66,7 +67,7 @@ var perceptionPolicy = runtime.Services.GetRequiredService<IPerceptionFidelityPo
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
 manager.Characters.Add(player);
 
-var startNow = initTicks == defaultTicks ? WDateTime.New(player.Person.Identity.BirthDate.AddYears(16)) : new WDateTime(initTicks);
+var startNow = initTicks == defaultTicks ? WDateTime.New(player.Person.Identity.BirthDate.AddYears(14)) : new WDateTime(initTicks);
 
 clock.SetNow(startNow);
 
@@ -202,6 +203,7 @@ var worldMap = WorldMapLoader.Load();
 var locationService = new DefaultLocationService();
 worldMap.RegisterAllLocations(locationService);
 var objectProvider = new CsvWorldObjectProvider();
+var speedProvider = new DefaultMovementSpeedProvider();
 
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
@@ -284,7 +286,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
         FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy, perceptionOptions);
 
         // ── NPC movement — route MoveTo:* actions from previous tick ─────────
-        RouteMoveTo(now, chars, locationService, rng);
+        RouteMoveTo(now, chars, locationService, worldMap, speedProvider, rng);
 
         DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
@@ -336,7 +338,7 @@ if (characters.Count > 0)
         {
             FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy, perceptionOptions);
 
-            RouteMoveTo(now, chars, locationService, rng);
+            RouteMoveTo(now, chars, locationService, worldMap, speedProvider, rng);
 
             DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
 
@@ -655,6 +657,8 @@ static void RouteMoveTo(
     WDateTime now,
     IReadOnlyList<IHuman> chars,
     ILocationService locations,
+    WorldMap worldMap,
+    IMovementSpeedProvider speedProvider,
     Random rng)
 {
     foreach (var character in chars)
@@ -673,7 +677,7 @@ static void RouteMoveTo(
 
         var currentLocation = locations.GetLocation(character.Id);
 
-        var chosen = FindBestMoveTarget(character, locations, currentLocation, requestedType);
+        var chosen = FindBestMoveTarget(character, locations, worldMap, speedProvider, currentLocation, requestedType);
 
         if (chosen is null)
         {
@@ -688,9 +692,30 @@ static void RouteMoveTo(
 static string? FindBestMoveTarget(
     IHuman character,
     ILocationService locations,
+    WorldMap worldMap,
+    IMovementSpeedProvider speedProvider,
     string? currentLocationId,
     LocationType requestedType)
 {
+    if (currentLocationId is null)
+        return null;
+
+    var speed = speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
+
+    // Prefer adjacent locations of the requested type (adjacency-graph-based selection)
+    var adjacentTarget = worldMap
+        .GetConnections(currentLocationId)
+        .Select(conn => (conn, descriptor: worldMap.GetLocation(conn.TargetLocationId)))
+        .Where(t => t.descriptor?.Type == requestedType)
+        .OrderBy(t => TravelDurationComputer.ComputeMinutes(t.conn.DistanceMeters, speed))
+        .Select(t => t.conn.TargetLocationId)
+        .FirstOrDefault();
+
+    if (adjacentTarget is not null)
+        return adjacentTarget;
+
+    // Fallback: any location of the requested type that is not the current one,
+    // scored by noise/crowding/privacy heuristic.
     var candidates = locations
         .GetLocationsByType(requestedType)
         .Where(id => id != currentLocationId)

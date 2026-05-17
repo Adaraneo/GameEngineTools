@@ -1,0 +1,2 @@
+Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind
+trees;Trees;Ambient;0.1;0.0;true;true;MoodBoost:0.2;false;0;None

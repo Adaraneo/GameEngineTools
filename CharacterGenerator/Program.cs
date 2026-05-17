@@ -147,7 +147,7 @@
                     {
                         try
                         {
-                            var npc = new NPC(100, manager.RandomizePerson(40, null, 9));
+                            var npc = new NPC(100, manager.RandomizePerson(40, null, 14));
                             characters.Add(npc);
                             successfull++;
                         }

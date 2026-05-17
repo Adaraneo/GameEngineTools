@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Hosting
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Inventory;
     using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -133,17 +134,18 @@ namespace GameEngineTools.Characters.Hosting
             var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
             var goal = _sp.GetRequiredService<IGoalEngine>();
             var schedule = _sp.GetRequiredService<IDailyScheduleEngine>();
+            var inventory = new DefaultInventoryEngine();
 
             // Initial snapshot — State is always valid immediately after factory creation
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
-                Goals: goal.State, Schedule: schedule.State);
+                Goals: goal.State, Schedule: schedule.State, Inventory: inventory.State);
 
             var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.GeneticBlueprint,
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
-                physio, psych, behav, inter, rel, mem, semantic, goal, schedule,
+                physio, psych, behav, inter, rel, mem, semantic, goal, schedule, inventory,
                 snapshot,
                 _behaviorCadencePolicy);
 

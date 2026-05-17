@@ -88,5 +88,24 @@ namespace GameEngineTools.World.Objects
         public bool IsAvailable { get; init; } = true;
 
         #endregion
+
+        #region Pickup properties
+
+        /// <summary>
+        /// Whether this object can be picked up and added to an NPC's inventory.
+        /// </summary>
+        public bool IsPickable { get; init; } = false;
+
+        /// <summary>
+        /// Weight of this object in grams. Used to compute inventory carry weight.
+        /// </summary>
+        public int WeightGrams { get; init; } = 0;
+
+        /// <summary>
+        /// Semantic category used by the inventory engine when resolving pickup behaviour.
+        /// </summary>
+        public PickupItemKind ItemKind { get; init; } = PickupItemKind.None;
+
+        #endregion
     }
 }

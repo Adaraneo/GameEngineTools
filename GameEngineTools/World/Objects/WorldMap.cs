@@ -12,11 +12,11 @@ namespace GameEngineTools.World.Objects
     /// Describes a directed connection between two locations.
     /// </summary>
     /// <param name="TargetLocationId">The ID of the destination location.</param>
-    /// <param name="TravelMinutes">
-    /// Approximate travel time in simulation minutes.
-    /// Used by the behavior engine when emitting <c>MoveTo:*</c> actions.
+    /// <param name="DistanceMeters">
+    /// Distance between the two locations in metres.
+    /// Used by the movement system to compute travel duration based on character speed.
     /// </param>
-    public sealed record WorldConnection(string TargetLocationId, int TravelMinutes);
+    public sealed record WorldConnection(string TargetLocationId, double DistanceMeters);
 
     /// <summary>
     /// Immutable map of the game world: location descriptors, adjacency graph,
@@ -111,7 +111,7 @@ namespace GameEngineTools.World.Objects
         /// <param name="locationId">Source location ID.</param>
         public IReadOnlyList<string> GetNeighbors(string locationId)
             => GetConnections(locationId)
-                .OrderBy(c => c.TravelMinutes)
+                .OrderBy(c => c.DistanceMeters)
                 .Select(c => c.TargetLocationId)
                 .ToList();
 
