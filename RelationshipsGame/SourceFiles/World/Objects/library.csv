@@ -1,0 +1,6 @@
+Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances
+bookshelf_north;Bookshelf;Tool;0.00;0.00;true;true;Work:0.6|Entertainment:0.5|MoodBoost:0.2
+bookshelf_south;Bookshelf;Tool;0.00;0.00;true;true;Work:0.6|Entertainment:0.5|MoodBoost:0.2
+reading_desk;Reading Desk;Furniture;0.00;0.00;false;true;Work:0.8|Rest:0.2
+candle_desk;Desk Candle;LightSource;0.10;0.00;false;true;Warmth:0.1|MoodBoost:0.1
+armchair;Armchair;Furniture;0.00;0.00;false;true;Rest:0.7|Entertainment:0.3
