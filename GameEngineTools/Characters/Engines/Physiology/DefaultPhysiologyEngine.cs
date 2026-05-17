@@ -484,8 +484,34 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     { Level = Math.Clamp(Approach(testo.Level, targetLevel, 10.0 * h), 0, 100) } };
             }
 
+            #region Natural mortality check
+
+            {
+                var ageYears = now.Date.Year - _birthDate.Year;
+                if (ageYears >= Config.NaturalMortalityGompertzStart || HasCriticalState(s))
+                {
+                    var risk = NaturalMortalityCalculator.ComputeHourlyRisk(s, ageYears, Config);
+                    // P(death in dt hours) = 1 − (1 − risk_per_hour)^dt
+                    var tickRisk = 1.0 - Math.Pow(1.0 - risk, h);
+                    if (ctx.Random.Chance(tickRisk))
+                    {
+                        var cause = NaturalMortalityCalculator.ResolveCause(s, ageYears);
+                        using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
+                        {
+                            _log.NaturalDeathOccurred(ctx.Id.Value.ToString(), cause.ToString(), ageYears, risk);
+                        }
+                        outbox.Add(new CharacterDied(now, ctx.Id, cause));
+                    }
+                }
+            }
+
+            #endregion Natural mortality check
+
             State = s;
         }
+
+        private static bool HasCriticalState(PhysiologyState s) =>
+            s.Energy < 2 || s.Hunger > 98 || s.AllostaticLoad > 95;
 
         /// <summary>
         /// Reacts to discrete domain events by applying instantaneous state mutations.

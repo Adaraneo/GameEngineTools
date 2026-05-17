@@ -106,6 +106,18 @@ namespace GameEngineTools.Logging
             string ConceivedOn,
             string EstimatedDueDate);
 
+        /// <summary>A character died of natural causes during the physiology tick.</summary>
+        [LoggerMessage(
+            EventId = 5007,
+            Level = LogLevel.Warning,
+            Message = "[PHYSIO/DEATH] {HumanId} died of {Cause} at age {Age} (risk/h={Risk:F5}).")]
+        public static partial void NaturalDeathOccurred(
+            this ILogger logger,
+            string HumanId,
+            string Cause,
+            int Age,
+            double Risk);
+
         #endregion Physiology
 
         #region Psychology

@@ -540,35 +540,42 @@ namespace GameEngineTools.Characters.Core
         {
             var s = Snapshot;
 
-            _log.PhysiologySnapshot(
-                Id.Value.ToString(),
-                s.Physiology.Energy, s.Physiology.Hunger, s.Physiology.Thirst,
-                s.Physiology.Pain, s.Physiology.SleepDebtHours,
-                s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad);
-
-            if (s.Physiology.Cycle is { } c)
+            // Snapshots must be logged inside a character scope so that PersonId
+            // is set on the log entry. Without it the log reader cannot attribute
+            // these events to the correct character (they land in Characters.jsonl
+            // with PersonId=null and are filtered out by the reader).
+            using (_log.BeginCharacterScope(Id.Value, nameof(OrchestratedHuman)))
             {
-                _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle);
-            }
-
-            _log.PsychologySnapshot(
-                Id.Value.ToString(),
-                s.Psychology.DominantEmotion.ToString(),
-                s.Psychology.Valence, s.Psychology.Arousal, s.Psychology.Dominance,
-                s.Psychology.Stress, s.Psychology.CognitiveLoad);
-
-            var plan = s.Behavior.CurrentPlan;
-            _log.BehaviorSnapshot(
-                Id.Value.ToString(),
-                plan?.Name ?? "—",
-                s.Behavior.NeedRest, s.Behavior.NeedFood, s.Behavior.NeedWater,
-                s.Behavior.NeedBelonging, s.Behavior.NeedCompetence, s.Behavior.NeedIntimacy);
-
-            if (plan is not null)
-            {
-                _log.BehaviorPlan(
+                _log.PhysiologySnapshot(
                     Id.Value.ToString(),
-                    plan.Name, plan.Start.ToString(), plan.ExpectedDuration.ToString(), plan.Utility);
+                    s.Physiology.Energy, s.Physiology.Hunger, s.Physiology.Thirst,
+                    s.Physiology.Pain, s.Physiology.SleepDebtHours,
+                    s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad);
+
+                if (s.Physiology.Cycle is { } c)
+                {
+                    _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle);
+                }
+
+                _log.PsychologySnapshot(
+                    Id.Value.ToString(),
+                    s.Psychology.DominantEmotion.ToString(),
+                    s.Psychology.Valence, s.Psychology.Arousal, s.Psychology.Dominance,
+                    s.Psychology.Stress, s.Psychology.CognitiveLoad);
+
+                var plan = s.Behavior.CurrentPlan;
+                _log.BehaviorSnapshot(
+                    Id.Value.ToString(),
+                    plan?.Name ?? "—",
+                    s.Behavior.NeedRest, s.Behavior.NeedFood, s.Behavior.NeedWater,
+                    s.Behavior.NeedBelonging, s.Behavior.NeedCompetence, s.Behavior.NeedIntimacy);
+
+                if (plan is not null)
+                {
+                    _log.BehaviorPlan(
+                        Id.Value.ToString(),
+                        plan.Name, plan.Start.ToString(), plan.ExpectedDuration.ToString(), plan.Utility);
+                }
             }
         }
 

@@ -9,6 +9,7 @@ namespace GameEngineTools.World.Simulation
     using System.Threading.Tasks;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
@@ -68,6 +69,9 @@ namespace GameEngineTools.World.Simulation
 
         /// <summary>Phase 2 planetární objekty — null pokud <c>UniverseConfig</c> není nastaven.</summary>
         private readonly (StarPhysics Star, OrbitalElements Orbit, PlanetConfig Planet)? _universeObjects;
+
+        /// <summary>Characters that have died and must no longer tick.</summary>
+        private readonly HashSet<HumanId> _deadCharacters = new();
 
         #endregion Privátní pole
 
@@ -186,6 +190,7 @@ namespace GameEngineTools.World.Simulation
             // Ensures outcome delivery is independent of character list order.
             foreach (var character in chars)
             {
+                if (_deadCharacters.Contains(character.Id)) continue;
                 character.Tick(now, dt);
             }
 
@@ -194,6 +199,7 @@ namespace GameEngineTools.World.Simulation
             // of their next tick (Phase A) — regardless of position in the character list.
             foreach (var character in chars)
             {
+                if (_deadCharacters.Contains(character.Id)) continue;
                 RouteOutcomes(character, chars);
             }
 
@@ -215,9 +221,17 @@ namespace GameEngineTools.World.Simulation
                 }
             }
 
+            // Detect characters that died this tick — they must not tick in subsequent steps.
+            foreach (var character in chars)
+            {
+                if (character.LastOutbox.OfType<CharacterDied>().Any())
+                    _deadCharacters.Add(character.Id);
+            }
+
             // ── Krok 3: Sleep prompty ───────────────────────────────────────────────
             foreach (var character in chars)
             {
+                if (_deadCharacters.Contains(character.Id)) continue;
                 HandleSleepPrompt(now, character);
             }
 

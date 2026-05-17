@@ -107,7 +107,7 @@ namespace GameEngineTools.Characters.GameObjects
                 this.health = 0;
                 IsDead = true;
 
-                Person.ReceiveEvent(new CharacterDied(now, Person.Id, amount));
+                Person.ReceiveEvent(new CharacterDied(now, Person.Id, DeathCause.Combat, amount));
             }
         }
 
