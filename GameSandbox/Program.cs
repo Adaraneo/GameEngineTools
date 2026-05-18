@@ -230,7 +230,7 @@ Console.WriteLine($"{nameof(mainCharactersPersonQuery)}: {mainCharactersPersonQu
 
 foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
 {
-    string slotId = $"sl.{mainCharacter.Id.Value.ToString()}";
+    string slotId = $"idle_in_stables";
     var slot = new ScheduleSlot(slotId, 13, ActionNames.SelfCare, "stables");
     mainCharacter.ReceiveEvent(new ScheduleSlotTriggered(startNow.AddDays(1), mainCharacter.Id, slotId, ActionNames.SelfCare, "stables", 0.65));
 
