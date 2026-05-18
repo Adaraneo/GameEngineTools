@@ -4,6 +4,7 @@
 namespace GameEngineTools.World.Objects
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.World.Location;
@@ -42,16 +43,16 @@ namespace GameEngineTools.World.Objects
         #region Private state
 
         /// <summary>All location descriptors keyed by location ID.</summary>
-        private readonly IReadOnlyDictionary<string, LocationDescriptor> _locations;
+        private readonly ConcurrentDictionary<string, LocationDescriptor> _locations;
 
         /// <summary>
         /// Adjacency list keyed by source location ID.
         /// Value is the list of outgoing connections from that location.
         /// </summary>
-        private readonly IReadOnlyDictionary<string, IReadOnlyList<WorldConnection>> _adjacency;
+        private readonly ConcurrentDictionary<string, List<WorldConnection>> _adjacency;
 
         /// <summary>Region name → list of location IDs belonging to that region.</summary>
-        private readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _regions;
+        private readonly ConcurrentDictionary<string, List<string>> _regions;
 
         #endregion
 
@@ -69,9 +70,11 @@ namespace GameEngineTools.World.Objects
             IReadOnlyDictionary<string, IReadOnlyList<WorldConnection>> adjacency,
             IReadOnlyDictionary<string, IReadOnlyList<string>> regions)
         {
-            _locations = locations;
-            _adjacency = adjacency;
-            _regions   = regions;
+            _locations = new ConcurrentDictionary<string, LocationDescriptor>(locations);
+            _adjacency = new ConcurrentDictionary<string, List<WorldConnection>>(
+                adjacency.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()));
+            _regions = new ConcurrentDictionary<string, List<string>>(
+                regions.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()));
         }
 
         #endregion
@@ -146,6 +149,76 @@ namespace GameEngineTools.World.Objects
                     return region;
             }
             return null;
+        }
+
+        #endregion
+
+        #region Runtime mutation
+
+        /// <summary>
+        /// Registers a new location in the world map at runtime.
+        /// The location becomes immediately reachable via <see cref="GetLocation"/>,
+        /// <see cref="GetLocationsInRegion"/>, and connection queries.
+        /// </summary>
+        /// <param name="descriptor">The location to add.</param>
+        /// <param name="region">
+        /// Optional region name to file this location under.
+        /// Pass <c>null</c> or empty to skip region indexing.
+        /// </param>
+        /// <param name="locationService">
+        /// When provided, the location is also registered with the service so characters
+        /// can be placed there and context events are dispatched correctly.
+        /// </param>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when a location with the same ID is already registered.
+        /// </exception>
+        public void AddLocation(
+            LocationDescriptor descriptor,
+            string? region = null,
+            ILocationService? locationService = null)
+        {
+            if (!_locations.TryAdd(descriptor.Id, descriptor))
+                throw new InvalidOperationException(
+                    $"Location '{descriptor.Id}' already exists in the world map.");
+
+            if (!string.IsNullOrEmpty(region))
+            {
+                _regions.AddOrUpdate(
+                    region,
+                    _ => [descriptor.Id],
+                    (_, list) => { list.Add(descriptor.Id); return list; });
+            }
+
+            locationService?.RegisterLocation(descriptor);
+        }
+
+        /// <summary>
+        /// Adds a directed connection from <paramref name="fromId"/> to <paramref name="toId"/>.
+        /// To create a bidirectional edge, call this method twice (both directions).
+        /// </summary>
+        /// <param name="fromId">Source location ID. Must already be registered.</param>
+        /// <param name="toId">Target location ID. Must already be registered.</param>
+        /// <param name="distanceMeters">Straight-line distance in metres.</param>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when either location ID is not registered in the world map.
+        /// </exception>
+        public void AddConnection(string fromId, string toId, double distanceMeters)
+        {
+            if (!_locations.ContainsKey(fromId))
+                throw new InvalidOperationException(
+                    $"Source location '{fromId}' is not registered in the world map.");
+            if (!_locations.ContainsKey(toId))
+                throw new InvalidOperationException(
+                    $"Target location '{toId}' is not registered in the world map.");
+
+            _adjacency.AddOrUpdate(
+                fromId,
+                _ => [new WorldConnection(toId, distanceMeters)],
+                (_, list) =>
+                {
+                    list.Add(new WorldConnection(toId, distanceMeters));
+                    return list;
+                });
         }
 
         #endregion
