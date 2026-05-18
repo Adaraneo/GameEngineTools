@@ -202,17 +202,6 @@ var rng = new Random();
 
 var worldMap = WorldMapLoader.Load();
 var locationService = new DefaultLocationService();
-
-for(int index = 0; index < 10; index++)
-{
-    locationService.RegisterLocation(new LocationDescriptor($"village_house_{index}", "Village house", 0.1, 0.3, 10, true, LocationType.Private, TerrainType.Indoor));
-}
-
-for (int index = 0; index < 10; index++)
-{
-    locationService.RegisterLocation(new LocationDescriptor($"castle_house_{index}", "Castle house", 0.1, 0.5, 5, true, LocationType.Private, TerrainType.Indoor));
-}
-
 worldMap.RegisterAllLocations(locationService);
 var objectProvider = new CsvWorldObjectProvider();
 var speedProvider = new DefaultMovementSpeedProvider();
