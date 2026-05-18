@@ -27,6 +27,7 @@ using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Text;
 using static GameEngineTools.Characters.Engines.ActionNames;
@@ -234,6 +235,10 @@ foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
     Console.WriteLine("Slot: {0}", slotId);
 }
 
+var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>();
+var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger);
+var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger);
+
 Console.WriteLine("Press any key to continue...");
 Console.ReadKey();
 
@@ -281,18 +286,9 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
 
     OnTick = (now, chars) =>
     {
-        // ── First impressions — all unmet pairs sharing a location ────────────
-        // Replaces the old hardcoded p/so pair check.
-        FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy, perceptionOptions);
+        mainSceneOrchestrator.OnTick(now, chars);
 
-        // ── NPC movement — route MoveTo:* actions from previous tick ─────────
-        RouteMoveTo(now, chars, locationService, worldMap, speedProvider, rng);
-
-        DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
-
-        OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
-
-        HandleChildBornEvents(now, chars, familyGraph, manager, gf, locationService, runtime.Services);
+        HandleChildBornEvents(now, chars, familyGraph, manager, gf, locationService, runtime.Services, mainSceneOrchestrator);
 
         Console.Title = now.Date.ToString();
     }
@@ -328,10 +324,6 @@ if (characters.Count > 0)
 
     clock.SetNow(startNow);
 
-    var fullyMetLocations = new HashSet<string>(StringComparer.Ordinal);
-
-    var socialChars = new List<IHuman>(characters.Count);
-
     var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
     {
         Characters = characters,
@@ -344,29 +336,9 @@ if (characters.Count > 0)
         InternalSubstep = WTimeSpan.FromMinutes(30),
         OnTick = (now, chars) =>
         {
-            socialChars.Clear();
-            var allChars = chars;
+            bgSceneOrchestrator.OnTick(now, chars);
 
-            foreach (var ch in chars)
-            {
-                var lod = lodRuntime.Get(ch.Id);
-
-                if (lod != CognitiveResolutionLevel.Background)
-                    socialChars.Add(ch);
-            }
-
-            FireFirstImpressions(now, chars, attractionCalculator, locationService, perceptionPolicy, perceptionOptions);
-
-            RouteMoveTo(now, chars, locationService, worldMap, speedProvider, rng);
-
-            if (socialChars.Count > 0)
-            {
-                DynamicReachOutRouting(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
-
-                OrganicMicroPositives(now, chars, locationService, rng, perceptionPolicy, perceptionOptions);
-            }
-
-            HandleChildBornEvents(now, chars, familyGraph, manager, gf, locationService, runtime.Services, fullyMetLocations);
+            HandleChildBornEvents(now, chars, familyGraph, manager, gf, locationService, runtime.Services, bgSceneOrchestrator);
 
             Console.Title = now.Date.ToString();
         }
@@ -448,428 +420,10 @@ Console.ReadKey();
 
 # region Helper Methods
 
-static void DynamicReachOutRouting(WDateTime now, IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy, CharacterPerceptionOptions perceptionOptions)
-{
-    foreach (var character in chars)
-    {
-        var reachOut = character.LastOutbox
-            .OfType<ActionCommitted>()
-            .FirstOrDefault(a => a.ActionName == ReachOut);
-
-        if (reachOut is null)
-            continue;
-
-        // Ask the location service who is in the same location right now.
-        var locationId = locationService.GetLocation(character.Id);
-        if (locationId is null)
-            continue;
-
-        var candidates = CharacterPerceptionResolver.GetPerceivedCharacters(character, chars, locationService, perceptionPolicy, perceptionOptions);
-
-        if (candidates.Count == 0)
-            continue;
-
-        var targetMode = character.Snapshot.Behavior.NeedIntimacy >= 55
-            ? SocialTargetMode.Intimacy
-            : SocialTargetMode.ReachOut;
-        var target = SemanticTargeting.ChooseTarget(character, candidates, targetMode);
-        if (target is null)
-            continue;
-
-        var selection = ReachOutSpeechActSelector.SelectSpeechAct(character, target, now, rng);
-        var act = selection.Act;
-
-        Console.WriteLine(
-            "[ReachOut] {0} -> {1}: action={2}, familiarity={3:F1}, trust={4:F1}, comfort={5:F1}, closeness={6:F1}, romantic={7:F1}, privacy={8}, character's gender={9}, target's gender={10}.",
-            character.Id.Value,
-            target.Id.Value,
-            act,
-            selection.Familiarity,
-            selection.Trust,
-            selection.Comfort,
-            selection.Closeness,
-            selection.RomanticInterest,
-            selection.HasPrivacy ? "yes" : "no",
-            character.Biology.ToString(),
-            target.Biology.ToString());
-
-        target.ReceiveEvent(new InteractionProposed(now, character.Id, target.Id, act, null, character.Biology));
-        TryTouch(now, character, target, rng);
-    }
-}
-
-static void OrganicMicroPositives(WDateTime now, IReadOnlyList<IHuman> chars, ILocationService locationService, Random rng, IPerceptionFidelityPolicy perceptionPolicy, CharacterPerceptionOptions perceptionOptions)
-{
-    foreach (var character in chars)
-    {
-        var justCreated = character.LastOutbox
-            .OfType<ActionCommitted>()
-            .Any(a => a.ActionName is Create or Work);
-
-        if (!justCreated)
-            continue;
-
-        var locationId = locationService.GetLocation(character.Id);
-        if (locationId is null)
-            continue;
-
-        var witnesses = CharacterPerceptionResolver.GetPerceivedCharacters(character, chars, locationService, perceptionPolicy, perceptionOptions);
-
-        if (witnesses.Count == 0)
-            continue;
-
-        // Pick one random witness — only one MicroPositive per creative action.
-        var witness = witnesses[rng.Next(witnesses.Count)];
-
-        if (rng.NextDouble() < 0.30)
-            character.ReceiveEvent(new MicroPositive(now, witness.Id, character.Id, MemoryMicroEventKinds.Validation));
-    }
-}
-
-/// <summary>
-/// Attempts a physical touch interaction if the relationship conditions are met.
-/// </summary>
-/// <remarks>
-/// Touch is gated on Closeness, Comfort, and Attraction to prevent unrealistic
-/// physical contact between characters who have not built the necessary trust.
-/// Privacy context further modulates the probability of intimate touch.
-/// </remarks>
-/// <param name="now">Current game time.</param>
-/// <param name="from">Initiating character.</param>
-/// <param name="to">Receiving character.</param>
-/// <param name="rng">Random source from the initiating character's context.</param>
-static void TryTouch(WDateTime now, IHuman from, IHuman to, Random rng)
-{
-    var edge = from.Snapshot.Relationships.Edges.GetValueOrDefault(to.Id);
-    var hasPrivacy = from.Snapshot.InteractionSurface.HasPrivacy;
-    var level = ReachOutTouchSelector.SelectTouchLevel(edge, hasPrivacy, rng);
-    if (level is not null)
-    {
-        to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, level.Value));
-    }
-}
-
 static void AddDiaryEntry(StringBuilder stringBuilder, string entry)
 {
     Console.WriteLine(entry);
     stringBuilder.AppendLine(entry);
-}
-
-/// <summary>
-/// Selects one element from <paramref name="candidates"/> using weighted random sampling.
-/// Higher weight means higher probability of being selected.
-/// Falls back to uniform random when all weights are zero.
-/// </summary>
-/// <typeparam name="T">Element type.</typeparam>
-/// <param name="candidates">Non-empty list of candidates.</param>
-/// <param name="weight">Weight function — must return a non-negative value.</param>
-/// <param name="rng">Random source.</param>
-static T PickWeightedRandom<T>(IReadOnlyList<T> candidates, Func<T, double> weight, Random rng)
-{
-    var totalWeight = candidates.Sum(weight);
-
-    // Uniform fallback when all weights are zero (e.g. all strangers with Like=0)
-    if (totalWeight <= 0)
-        return candidates[rng.Next(candidates.Count)];
-
-    var threshold = rng.NextDouble() * totalWeight;
-    var accumulated = 0.0;
-
-    foreach (var candidate in candidates)
-    {
-        accumulated += weight(candidate);
-        if (accumulated >= threshold)
-            return candidate;
-    }
-
-    // Floating-point safety net — return last element
-    return candidates[^1];
-}
-
-/// <summary>
-/// Fires <see cref="FirstImpressionFormed"/> for every perceivable pair of characters
-/// that share a location and have not yet met (no relationship edge exists).
-/// Each ordered pair (A→B and B→A) is processed exactly once per call.
-/// </summary>
-/// <param name="now">Current simulation time.</param>
-/// <param name="chars">All characters in the scene.</param>
-/// <param name="calculator">Shared attraction calculator singleton.</param>
-/// <param name="locations">Location service used to group characters by place.</param>
-/// <param name="perceptionPolicy">Runtime perception fidelity policy (LOD-backed).</param>
-/// <param name="perceptionOptions">Noise and crowding thresholds for perception tiers.</param>
-/// <param name="fullyMetLocations">
-/// Optional caller-owned cache of location ids where every perceivable pair has already met.
-/// When provided:
-/// <list type="bullet">
-///   <item>Locations present in the set are skipped entirely — no perceivedBy scan.</item>
-///   <item>A location is added to the set after a pass produces zero new impressions.</item>
-/// </list>
-/// Invalidation responsibility lies with <see cref="RouteMoveTo"/> — it removes a location
-/// from the set whenever a character moves into it.
-/// Pass <c>null</c> to disable caching (correct for small scenes like mainScene).
-/// </param>
-static void FireFirstImpressions(
-    WDateTime now,
-    IReadOnlyList<IHuman> chars,
-    IAttractionCalculator calculator,
-    ILocationService locations,
-    IPerceptionFidelityPolicy perceptionPolicy,
-    CharacterPerceptionOptions perceptionOptions,
-    HashSet<string>? fullyMetLocations = null)
-{
-    // Build a scene-wide id → IHuman lookup for O(1) resolution inside the loops.
-    var byId = chars.ToDictionary(c => c.Id);
-
-    // Collect occupied location ids — one O(N) pass, no duplicates.
-    var occupiedLocations = chars
-        .Select(c => locations.GetLocation(c.Id))
-        .Where(loc => loc is not null)
-        .Distinct()!;
-
-    foreach (var locationId in occupiedLocations)
-    {
-        // ── Fast path: saturated location ────────────────────────────────────
-        // Every perceivable pair in this location has already met.
-        // Skip the perceivedBy build entirely — the most expensive part.
-        if (fullyMetLocations is not null && fullyMetLocations.Contains(locationId))
-            continue;
-
-        // ── Resolve local characters ──────────────────────────────────────────
-        // Work only with chars registered at this location — O(k) not O(N).
-        // Passing localChars to GetPerceivedCharacters means the internal
-        // same-location filter iterates k items instead of N.
-        var localChars = locations
-            .GetCharactersAt(locationId)
-            .Select(id => byId.TryGetValue(id, out var h) ? h : null)
-            .OfType<IHuman>()
-            .ToList();
-
-        if (localChars.Count < 2)
-        {
-            // Single occupant — nothing to pair. Mark saturated immediately.
-            fullyMetLocations?.Add(locationId);
-            continue;
-        }
-
-        // ── Per-location perceivedBy — O(k²) not O(N²) ───────────────────────
-        // Previously built upfront for ALL N chars every substep. Now built only
-        // for the k chars in this location, and only when not cached.
-        // Passing localChars as the candidate list short-circuits the O(N) scan
-        // inside GetPerceivedCharacters — it already knows they are co-located.
-        var perceivedBy = localChars.ToDictionary(
-            c => c.Id,
-            c => CharacterPerceptionResolver
-                .GetPerceivedCharacters(c, localChars, locations, perceptionPolicy, perceptionOptions)
-                .Select(x => x.Id)
-                .ToHashSet());
-
-        var anyNewImpression = false;
-
-        // ── Unique-pair loop: A→B and B→A in a single pass ───────────────────
-        for (var i = 0; i < localChars.Count; i++)
-        {
-            for (var j = i + 1; j < localChars.Count; j++)
-            {
-                var a = localChars[i];
-                var b = localChars[j];
-
-                // Mutual perception required — both must notice each other.
-                if (!perceivedBy[a.Id].Contains(b.Id)) continue;
-                if (!perceivedBy[b.Id].Contains(a.Id)) continue;
-
-                // Skip pairs that already share a relationship edge — they have met.
-                if (a.Snapshot.Relationships.Edges.ContainsKey(b.Id)) continue;
-
-                anyNewImpression = true;
-
-                var viewA = AppearanceProjector.Compute(
-                    a.PhysicalAppearance, a.Snapshot.Physiology, a.Biology, a.Snapshot.Physiology.Aging);
-                var viewB = AppearanceProjector.Compute(
-                    b.PhysicalAppearance, b.Snapshot.Physiology, b.Biology, b.Snapshot.Physiology.Aging);
-
-                // A sees B.
-                var aResult = a.AttractionProfile is not null
-                    ? calculator.Calculate(
-                        a.AttractionProfile, b.PhysicalAppearance, viewB, b.Biology,
-                        observerValence: a.Snapshot.Psychology.Valence,
-                        observerArousal: a.Snapshot.Psychology.Arousal,
-                        observerAgeYears: a.Age,
-                        targetAgeYears: b.Age)
-                    : AttractionResult.Neutral;
-
-                // B sees A.
-                var bResult = b.AttractionProfile is not null
-                    ? calculator.Calculate(
-                        b.AttractionProfile, a.PhysicalAppearance, viewA, a.Biology,
-                        observerValence: b.Snapshot.Psychology.Valence,
-                        observerArousal: b.Snapshot.Psychology.Arousal,
-                        observerAgeYears: b.Age,
-                        targetAgeYears: a.Age)
-                    : AttractionResult.Neutral;
-
-                a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
-                    aResult.FirstImpressionLike, aResult.Score,
-                    aResult.BasePhysical, aResult.PreferenceMatch));
-                b.ReceiveEvent(new FirstImpressionFormed(now, b.Id, a.Id,
-                    bResult.FirstImpressionLike, bResult.Score,
-                    bResult.BasePhysical, bResult.PreferenceMatch));
-            }
-        }
-
-        // ── Cache saturation ──────────────────────────────────────────────────
-        // No new impression fired → every perceivable pair in this location has met.
-        // Mark as saturated; future substeps skip the perceivedBy scan.
-        // RouteMoveTo removes this location from the set when a newcomer arrives.
-        if (!anyNewImpression)
-            fullyMetLocations?.Add(locationId);
-    }
-}
-
-/// <summary>
-/// Routes <c>MoveTo:*</c> actions emitted by <see cref="DefaultBehaviorEngine"/>
-/// to a concrete location via <see cref="ILocationService"/>.
-/// </summary>
-/// <remarks>
-/// <para>
-/// The engine emits the intent (e.g. <c>"MoveTo:Social"</c>). This method resolves
-/// a concrete destination using the world adjacency graph — adjacent locations of the
-/// requested type are preferred, ordered by travel duration at the character's current
-/// movement speed. Falls back to any registered location of the type when no adjacent
-/// match exists.
-/// </para>
-/// <para>
-/// When a character is moved, the destination is removed from
-/// <paramref name="fullyMetLocations"/> so <c>FireFirstImpressions</c> rescans it
-/// on the next substep — the arriving character may be a stranger to everyone there.
-/// </para>
-/// </remarks>
-/// <param name="now">Current simulation time.</param>
-/// <param name="chars">All characters whose outboxes are inspected for <c>MoveTo:*</c> actions.</param>
-/// <param name="locations">Location service that performs the actual move.</param>
-/// <param name="worldMap">World adjacency graph used to prefer nearby destinations.</param>
-/// <param name="speedProvider">Provides movement speed in metres per minute per character.</param>
-/// <param name="rng">Random source — used only in the scored fallback path.</param>
-/// <param name="fullyMetLocations">
-/// Optional first-impression saturation cache. The destination location is removed
-/// from this set whenever a character moves into it.
-/// Pass <c>null</c> to disable cache invalidation (correct for mainScene with 4 chars).
-/// </param>
-static void RouteMoveTo(
-    WDateTime now,
-    IReadOnlyList<IHuman> chars,
-    ILocationService locations,
-    WorldMap worldMap,
-    IMovementSpeedProvider speedProvider,
-    Random rng,
-    HashSet<string>? fullyMetLocations = null)
-{
-    foreach (var character in chars)
-    {
-        var moveTo = character.LastOutbox
-            .OfType<ActionCommitted>()
-            .FirstOrDefault(a => a.ActionName.StartsWith("MoveTo:"));
-
-        if (moveTo is null)
-            continue;
-
-        // Parse the requested LocationType from the action name suffix.
-        var typeName = moveTo.ActionName["MoveTo:".Length..];
-        if (!Enum.TryParse<LocationType>(typeName, out var requestedType))
-            continue;
-
-        var currentLocation = locations.GetLocation(character.Id);
-
-        var chosen = FindBestMoveTarget(
-            character, locations, worldMap, speedProvider, currentLocation, requestedType);
-
-        if (chosen is null)
-        {
-            Console.WriteLine(
-                $"[MoveTo] {character.Id.Value} requested {requestedType}, " +
-                $"but no suitable alternative location exists.");
-            continue;
-        }
-
-        locations.MoveCharacter(character.Id, chosen);
-
-        // ── Cache invalidation ────────────────────────────────────────────────
-        // A character entering a location may be a stranger to everyone there.
-        // Remove it from the saturation cache so FireFirstImpressions rescans
-        // that location on the next substep.
-        fullyMetLocations?.Remove(chosen);
-    }
-}
-
-static string? FindBestMoveTarget(
-    IHuman character,
-    ILocationService locations,
-    WorldMap worldMap,
-    IMovementSpeedProvider speedProvider,
-    string? currentLocationId,
-    LocationType requestedType)
-{
-    if (currentLocationId is null)
-        return null;
-
-    var speed = speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
-
-    // Prefer adjacent locations of the requested type (adjacency-graph-based selection)
-    var adjacentTarget = worldMap
-        .GetConnections(currentLocationId)
-        .Select(conn => (conn, descriptor: worldMap.GetLocation(conn.TargetLocationId)))
-        .Where(t => t.descriptor?.Type == requestedType)
-        .OrderBy(t => TravelDurationComputer.ComputeMinutes(t.conn.DistanceMeters, speed))
-        .Select(t => t.conn.TargetLocationId)
-        .FirstOrDefault();
-
-    if (adjacentTarget is not null)
-        return adjacentTarget;
-
-    // Fallback: any location of the requested type that is not the current one,
-    // scored by noise/crowding/privacy heuristic.
-    var candidates = locations
-        .GetLocationsByType(requestedType)
-        .Where(id => id != currentLocationId)
-        .Select(id => new
-        {
-            Id = id,
-            Descriptor = locations.GetDescriptor(id),
-            Occupants = locations.GetCharactersAt(id).Count
-        })
-        .Where(x => x.Descriptor is not null)
-        .Select(x => new
-        {
-            x.Id,
-            Desc = x.Descriptor!,
-            x.Occupants,
-            Noise = Math.Clamp(
-                x.Descriptor!.BaseNoise + x.Descriptor.NoisePerPerson * x.Occupants,
-                0.0,
-                1.0),
-            Crowding = Math.Clamp(
-                x.Descriptor!.Capacity > 0 ? (double)x.Occupants / x.Descriptor.Capacity : 1.0,
-                0.0,
-                1.0),
-            Privacy = x.Descriptor!.AllowsPrivacy && x.Occupants <= 1
-        })
-        .ToList();
-
-    if (candidates.Count == 0)
-        return null;
-
-    var scored = candidates
-        .Select(x => new
-        {
-            x.Id,
-            Score = ScoreMoveTarget(character, requestedType, x.Noise, x.Crowding, x.Privacy)
-        })
-        .OrderByDescending(x => x.Score)
-        .ToList();
-
-    var best = scored[0];
-
-    // ochrana proti "move for no real gain" můžeš později zpřísnit
-    return best.Score > 0.0 ? best.Id : null;
 }
 
 /// <summary>
@@ -899,11 +453,6 @@ static string? FindBestMoveTarget(
 /// <param name="gf">Generated-file exporter — persists the newborn's JSON.</param>
 /// <param name="locations">Location service used to place the newborn at the mother's location.</param>
 /// <param name="services">DI service provider for blueprint and factory resolution.</param>
-/// <param name="fullyMetLocations">
-/// Optional first-impression saturation cache. When the newborn is placed, the
-/// mother's location is removed from this set — the newborn is a stranger to everyone
-/// already there.
-/// </param>
 static void HandleChildBornEvents(
     WDateTime now,
     IReadOnlyList<IHuman> chars,
@@ -912,7 +461,7 @@ static void HandleChildBornEvents(
     GeneratedFile gf,
     ILocationService locations,
     IServiceProvider services,
-    HashSet<string>? fullyMetLocations = null)
+    DefaultSceneOrchestrator sceneOrchestrator)
 {
     foreach (var character in chars)
     {
@@ -999,11 +548,7 @@ static void HandleChildBornEvents(
         if (motherLocation is not null)
         {
             locations.MoveCharacter(newborn.Id, motherLocation);
-
-            // Invalidate the saturation cache for this location — the newborn
-            // is a stranger to everyone already there. FireFirstImpressions will
-            // rescan next substep and fire FirstImpressionFormed for each pair.
-            fullyMetLocations?.Remove(motherLocation);
+            sceneOrchestrator.InvalidateLocation(motherLocation);
         }
 
         // ── Step 6: Register in global manager and persist ────────────────────
@@ -1022,47 +567,6 @@ static void HandleChildBornEvents(
             $"id={newborn.Id.Value}");
         Console.ResetColor();
     }
-}
-
-static double ScoreMoveTarget(
-    IHuman character,
-    LocationType requestedType,
-    double noise,
-    double crowding,
-    bool privacy)
-{
-    var stress = character.Snapshot.Psychology.Stress / 100.0;
-
-    return requestedType switch
-    {
-        LocationType.Work =>
-            (1.0 - noise) * 0.45 +
-            (1.0 - crowding) * 0.40 +
-            (privacy ? 0.15 : 0.0),
-
-        LocationType.Rest =>
-            (1.0 - noise) * 0.50 +
-            (1.0 - crowding) * 0.20 +
-            (privacy ? 0.30 : 0.0) +
-            stress * 0.15,
-
-        LocationType.Private =>
-            (1.0 - noise) * 0.35 +
-            (1.0 - crowding) * 0.20 +
-            (privacy ? 0.45 : 0.0) +
-            stress * 0.20,
-
-        LocationType.Social =>
-            crowding * 0.45 +
-            (1.0 - noise) * 0.15 +
-            (privacy ? -0.10 : 0.0),
-
-        LocationType.Public =>
-            (1.0 - crowding) * 0.35 +
-            (1.0 - noise) * 0.15,
-
-        _ => 0.0
-    };
 }
 
 #endregion
