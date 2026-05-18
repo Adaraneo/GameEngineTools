@@ -307,9 +307,6 @@ foreach (var character in manager.Characters.Select(c => c.Person).ToList())
         continue;
     }
 
-    //if (character.Identity.BirthDate < startNow.Date)
-    //    continue;
-
     characters.Add(character);
 }
 
