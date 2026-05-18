@@ -8,7 +8,7 @@ namespace GameEngineTools.Characters.Core
     public sealed class HumanContext : IHumanContext
     {
         public HumanId Id { get; init; }
-        public Identity Identity { get; init; } = default!;
+        public Identity Identity { get; internal set; } = default!;
         public SexBiology Biology { get; init; }
         public Traits.Personality Personality { get; init; } = default!;
         public Traits.PsychologicalProfile PsychologyProfile { get; init; } = Traits.PsychologicalProfile.Default;

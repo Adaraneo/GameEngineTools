@@ -43,7 +43,7 @@ namespace GameEngineTools.Characters.Core
         public HumanId Id { get; }
 
         /// <inheritdoc/>
-        public Identity Identity { get; }
+        public Identity Identity { get; private set; }
 
         /// <inheritdoc/>
         public SexBiology Biology { get; }
@@ -545,6 +545,24 @@ namespace GameEngineTools.Characters.Core
                 Celestial          = celestial,
             };
             _ctx.Snapshot = Snapshot;
+        }
+
+        /// <inheritdoc/>
+        public void SetHomeLocation(string? locationId)
+        {
+            Identity    = Identity with { HomeLocationId = locationId };
+            _ctx.Identity = Identity;
+        }
+
+        /// <inheritdoc/>
+        public void ChangeOccupation(Engines.Schedule.OccupationKind newOccupation)
+        {
+            _schedule.SeedFromOccupation(
+                newOccupation,
+                Personality,
+                WDateTime.Now,
+                _scheduler,
+                Id);
         }
 
         private void LogState()

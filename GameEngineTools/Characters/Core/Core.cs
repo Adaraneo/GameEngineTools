@@ -85,6 +85,19 @@ namespace GameEngineTools.Characters.Core
         void SetAmbientContext(double ambientTempC, CelestialContext? celestial) { }
 
         bool EqualsByIdentity(IHuman? other) => other is not null && Id == other.Id;
+
+        /// <summary>
+        /// Updates the character's home location at runtime.
+        /// The next tick immediately uses the new value — no restart needed.
+        /// <c>null</c> removes the home assignment (traveller, displaced character).
+        /// </summary>
+        void SetHomeLocation(string? locationId) { }
+
+        /// <summary>
+        /// Changes the character's occupation and re-seeds the daily schedule.
+        /// Existing scheduled slots for the current and future days are replaced.
+        /// </summary>
+        void ChangeOccupation(Engines.Schedule.OccupationKind newOccupation) { }
     }
 
     public readonly record struct HumanId(Guid Value);

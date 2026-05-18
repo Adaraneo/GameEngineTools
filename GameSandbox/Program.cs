@@ -221,7 +221,9 @@ var locationQuery = from locations in mainCharactersPersonQuery
 
 foreach (var personToMove in locationQuery)
 {
-    locationService.MoveCharacter(personToMove.Id, mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count)]);
+    var homeLocationId = mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count)];
+    locationService.MoveCharacter(personToMove.Id, homeLocationId);
+    personToMove.SetHomeLocation(homeLocationId);
 }
 
 Console.WriteLine($"{nameof(mainCharactersPersonQuery)}: {mainCharactersPersonQuery.Count()}, {nameof(mainCharactersQuery)}: {mainCharactersQuery.Count()}, {nameof(locationQuery)}, {locationQuery.Count()}");
