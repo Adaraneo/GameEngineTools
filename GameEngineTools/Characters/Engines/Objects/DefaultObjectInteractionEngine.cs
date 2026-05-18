@@ -45,9 +45,14 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (data is null)
                 return;
 
-            // Resolve the world object — search the committed location
+            // Resolve the world object — search the committed location first,
+            // then fall back to a cache-wide search (needed for Drop when the object
+            // was picked up at a different location than where it is being dropped).
             var obj = _objectProvider.GetAllObjectsAt(data.LocationId)
-                                     .FirstOrDefault(o => o.Id == data.ObjectId);
+                                     .FirstOrDefault(o => o.Id == data.ObjectId)
+                      ?? (data.Kind == ObjectInteractionKind.Drop
+                             ? _objectProvider.FindObject(data.ObjectId)
+                             : null);
 
             if (obj is null)
                 return;
@@ -87,9 +92,28 @@ namespace GameEngineTools.Characters.Engines.Objects
                     break;
 
                 case ObjectInteractionKind.Drop:
-                    _objectProvider.SetHeldBy(data.LocationId, data.ObjectId, null);
+                {
+                    // data.LocationId = where the character is NOW (the drop location).
+                    // The object may still be cached under its original location — find it.
+                    var heldObj = _objectProvider.FindObject(data.ObjectId);
+                    if (heldObj is not null && heldObj.LocationId != data.LocationId)
+                    {
+                        // Object is moving to a new location: remove from original, add at drop location.
+                        _objectProvider.RemoveObject(heldObj.LocationId, data.ObjectId);
+                        _objectProvider.AddObject(heldObj with
+                        {
+                            LocationId = data.LocationId,
+                            HeldBy = null
+                        });
+                    }
+                    else
+                    {
+                        // Same location — just clear the holder.
+                        _objectProvider.SetHeldBy(data.LocationId, data.ObjectId, null);
+                    }
                     outbox.Add(new ObjectDropped(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId));
                     break;
+                }
             }
         }
 

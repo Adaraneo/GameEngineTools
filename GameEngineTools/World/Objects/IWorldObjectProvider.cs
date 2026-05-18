@@ -41,5 +41,12 @@ namespace GameEngineTools.World.Objects
         /// Useful for diagnostics and NPC Watcher visualization.
         /// </summary>
         IEnumerable<WorldObject> GetAllObjects();
+
+        /// <summary>
+        /// Adds a world object to a location at runtime.
+        /// The object exists only in the in-memory cache — it is never written back to CSV.
+        /// Use cases: character drops an item at a new location, crafting, narrative spawns.
+        /// </summary>
+        void AddObject(WorldObject obj);
     }
 }

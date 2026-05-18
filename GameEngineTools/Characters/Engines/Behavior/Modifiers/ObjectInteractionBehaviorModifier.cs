@@ -13,6 +13,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     /// usable world objects are present at the character's current location.
     /// Need-relevance gates utility: low-need situations produce low utility so that
     /// core physiological actions (eat, drink, sleep) remain dominant when pressing.
+    /// Also generates Drop candidates when the character is holding an object.
     /// </summary>
     internal sealed class ObjectInteractionBehaviorModifier : IBehaviorModifierEngine
     {
@@ -20,53 +21,87 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         private const double NeedScaleWeight = 0.4;
         private const double SatisfactionWeight = 0.3;
         private const double MinNeedThreshold = 20.0; // below this, need is not pressing enough
+        private const double DropBaseUtility = 5.0;   // low — only selected if truly nothing better
+
+        /// <summary>
+        /// Optional concrete provider used to find held objects.
+        /// <c>null</c> disables Drop candidate generation.
+        /// </summary>
+        private readonly CsvWorldObjectProvider? _objectProvider;
+
+        public ObjectInteractionBehaviorModifier(CsvWorldObjectProvider? objectProvider = null)
+        {
+            _objectProvider = objectProvider;
+        }
 
         public void Modify(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
-            if (context.AvailableObjects is null)
-                return;
-
-            var snapshot = context.HumanContext.Snapshot;
-
-            foreach (var obj in context.AvailableObjects.Where(o => o.IsAvailable))
+            // ── Take / UseInPlace candidates: objects present at current location ──
+            if (context.AvailableObjects is not null)
             {
-                ObjectInteractionData? bestInteraction = null;
-                double bestUtility = 0.0;
+                var snapshot = context.HumanContext.Snapshot;
 
-                foreach (var affordance in obj.Affordances)
+                foreach (var obj in context.AvailableObjects.Where(o => o.IsAvailable))
                 {
-                    var needScore = GetNeedScore(affordance, snapshot);
-                    if (needScore < MinNeedThreshold && affordance.Type != AffordanceType.Ownership)
-                        continue;
+                    ObjectInteractionData? bestInteraction = null;
+                    double bestUtility = 0.0;
 
-                    var kind = affordance.Type == AffordanceType.Ownership
-                        ? ObjectInteractionKind.Take
-                        : ObjectInteractionKind.UseInPlace;
-
-                    // Only generate Take candidates for pickable objects
-                    if (kind == ObjectInteractionKind.Take && !obj.IsPickable)
-                        continue;
-
-                    var utility = BaseCandidateUtility
-                        + (needScore / 100.0) * NeedScaleWeight * 100.0
-                        + affordance.Satisfaction * SatisfactionWeight * 100.0;
-
-                    if (utility > bestUtility)
+                    foreach (var affordance in obj.Affordances)
                     {
-                        bestUtility = utility;
-                        bestInteraction = new ObjectInteractionData(obj.Id, obj.LocationId, kind);
+                        var needScore = GetNeedScore(affordance, snapshot);
+                        if (needScore < MinNeedThreshold && affordance.Type != AffordanceType.Ownership)
+                            continue;
+
+                        var kind = affordance.Type == AffordanceType.Ownership
+                            ? ObjectInteractionKind.Take
+                            : ObjectInteractionKind.UseInPlace;
+
+                        // Only generate Take candidates for pickable objects
+                        if (kind == ObjectInteractionKind.Take && !obj.IsPickable)
+                            continue;
+
+                        var utility = BaseCandidateUtility
+                            + (needScore / 100.0) * NeedScaleWeight * 100.0
+                            + affordance.Satisfaction * SatisfactionWeight * 100.0;
+
+                        if (utility > bestUtility)
+                        {
+                            bestUtility = utility;
+                            bestInteraction = new ObjectInteractionData(obj.Id, obj.LocationId, kind);
+                        }
+                    }
+
+                    if (bestInteraction is not null)
+                    {
+                        candidates.Add(new BehaviorCandidate(
+                            Name: ActionNames.InteractWithObject,
+                            Utility: bestUtility,
+                            Duration: WTimeSpan.FromMinutes(1),
+                            Domain: BehaviorDomain.Physiological,
+                            ObjectInteraction: bestInteraction));
                     }
                 }
+            }
 
-                if (bestInteraction is not null)
-                {
-                    candidates.Add(new BehaviorCandidate(
-                        Name: ActionNames.InteractWithObject,
-                        Utility: bestUtility,
-                        Duration: WTimeSpan.FromMinutes(1),
-                        Domain: BehaviorDomain.Physiological,
-                        ObjectInteraction: bestInteraction));
-                }
+            // ── Drop candidates: character is holding something ────────────────
+            if (_objectProvider is null)
+                return;
+
+            var currentLocationId = context.HumanContext.Snapshot.InteractionSurface?.Location;
+            if (string.IsNullOrEmpty(currentLocationId))
+                return;
+
+            foreach (var heldObj in _objectProvider.GetHeldBy(context.HumanContext.Id))
+            {
+                candidates.Add(new BehaviorCandidate(
+                    Name: ActionNames.InteractWithObject,
+                    Utility: DropBaseUtility,
+                    Duration: WTimeSpan.FromMinutes(0.5),
+                    Domain: BehaviorDomain.Physiological,
+                    ObjectInteraction: new ObjectInteractionData(
+                        heldObj.Id,
+                        currentLocationId,
+                        ObjectInteractionKind.Drop)));
             }
         }
 

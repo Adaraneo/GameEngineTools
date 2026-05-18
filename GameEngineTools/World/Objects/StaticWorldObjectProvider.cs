@@ -79,6 +79,17 @@ namespace GameEngineTools.World.Objects
         public IEnumerable<WorldObject> GetAllObjects()
             => _objects.Values;
 
+        /// <inheritdoc/>
+        /// <remarks>
+        /// <see cref="StaticWorldObjectProvider"/> does not support runtime addition.
+        /// Objects are defined at construction time via <see cref="Register"/>.
+        /// This is a no-op for test/static scenarios.
+        /// </remarks>
+        public void AddObject(WorldObject obj)
+        {
+            // No-op: StaticWorldObjectProvider serves pre-registered objects only.
+        }
+
         #endregion
     }
 }

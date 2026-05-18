@@ -190,6 +190,37 @@ namespace GameEngineTools.World.Objects
             return true;
         }
 
+        /// <inheritdoc/>
+        public void AddObject(WorldObject obj)
+        {
+            var list = _cache.GetOrAdd(obj.LocationId, _ => new List<WorldObject>());
+            list.Add(obj);
+        }
+
+        /// <summary>
+        /// Finds a world object by ID across all currently cached locations.
+        /// Returns <c>null</c> if the object is not in the cache.
+        /// </summary>
+        public WorldObject? FindObject(string objectId)
+        {
+            foreach (var list in _cache.Values)
+            {
+                var obj = list.FirstOrDefault(o => o.Id == objectId);
+                if (obj is not null) return obj;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Returns all objects across all cached locations that are currently held by the specified character.
+        /// </summary>
+        public IEnumerable<WorldObject> GetHeldBy(Characters.Core.HumanId holder)
+        {
+            foreach (var list in _cache.Values)
+                foreach (var obj in list.Where(o => o.HeldBy == holder))
+                    yield return obj;
+        }
+
         #endregion
 
         #region Private loading
