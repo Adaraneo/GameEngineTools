@@ -97,7 +97,7 @@ namespace GameEngineTools.Characters.Core
         /// Changes the character's occupation and re-seeds the daily schedule.
         /// Existing scheduled slots for the current and future days are replaced.
         /// </summary>
-        void ChangeOccupation(Engines.Schedule.OccupationKind newOccupation) { }
+        void ChangeOccupation(string? newOccupationId) { }
     }
 
     public readonly record struct HumanId(Guid Value);

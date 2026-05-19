@@ -555,10 +555,10 @@ namespace GameEngineTools.Characters.Core
         }
 
         /// <inheritdoc/>
-        public void ChangeOccupation(Engines.Schedule.OccupationKind newOccupation)
+        public void ChangeOccupation(string? newOccupationId)
         {
             _schedule.SeedFromOccupation(
-                newOccupation,
+                newOccupationId,
                 Personality,
                 WDateTime.Now,
                 _scheduler,

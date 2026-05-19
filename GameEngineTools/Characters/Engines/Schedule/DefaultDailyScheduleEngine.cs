@@ -26,11 +26,16 @@ namespace GameEngineTools.Characters.Engines.Schedule
         #region Construction
 
         private readonly ILogger _log;
+        private readonly IOccupationRegistry _registry;
 
-        public DefaultDailyScheduleEngine(IOptions<DailyScheduleConfig> cfg, ILogger<DefaultDailyScheduleEngine> log)
+        public DefaultDailyScheduleEngine(
+            IOptions<DailyScheduleConfig> cfg,
+            ILogger<DefaultDailyScheduleEngine> log,
+            IOccupationRegistry registry)
         {
             Config = cfg.Value;
             _log = log;
+            _registry = registry;
             State = DailyScheduleState.Empty;
         }
 
@@ -40,14 +45,14 @@ namespace GameEngineTools.Characters.Engines.Schedule
 
         /// <inheritdoc/>
         public void SeedFromOccupation(
-            OccupationKind occupation,
+            string? occupationId,
             Personality personality,
             WDateTime now,
             IScheduler scheduler,
             HumanId humanId)
         {
-            var slots = OccupationScheduleSeeder.Seed(occupation, personality);
-            State = new DailyScheduleState(slots, null, -1, occupation);
+            var slots = OccupationScheduleSeeder.Seed(occupationId, personality, _registry);
+            State = new DailyScheduleState(slots, null, -1, occupationId);
 
             // Register today's slots immediately
             ScheduleDay(now.Date.ToDateTime(), scheduler, humanId);
@@ -55,7 +60,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             // Log seeding
             using (_log.BeginCharacterScope(humanId.Value, nameof(DefaultDailyScheduleEngine)))
             {
-                _log.ScheduleSeeded(humanId.Value.ToString(), occupation.ToString(), slots.Count);
+                _log.ScheduleSeeded(humanId.Value.ToString(), occupationId ?? "(none)", slots.Count);
             }
         }
 

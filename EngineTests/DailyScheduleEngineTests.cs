@@ -11,6 +11,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Schedule;
+    using static GameEngineTools.Characters.Engines.Schedule.OccupationIds;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
@@ -30,7 +31,7 @@ namespace EngineTests
         public void Seed_Craftsperson_ReturnsExpectedSlots()
         {
             var personality = BuildPersonality();
-            var slots = OccupationScheduleSeeder.Seed(OccupationKind.Craftsperson, personality);
+            var slots = OccupationScheduleSeeder.Seed(OccupationIds.Craftsperson, personality, BuildRegistry());
 
             Assert.AreEqual(3, slots.Count);
             Assert.IsTrue(slots.Any(s => s.PreferredAction == Work));
@@ -42,7 +43,7 @@ namespace EngineTests
         public void Seed_None_ReturnsEmptyList()
         {
             var personality = BuildPersonality();
-            var slots = OccupationScheduleSeeder.Seed(OccupationKind.None, personality);
+            var slots = OccupationScheduleSeeder.Seed(null, personality, BuildRegistry());
 
             Assert.AreEqual(0, slots.Count);
         }
@@ -53,8 +54,8 @@ namespace EngineTests
             var lark = BuildPersonality(chronotype: Chronotype.Lark);
             var neutral = BuildPersonality(chronotype: Chronotype.Neutral);
 
-            var larkSlots = OccupationScheduleSeeder.Seed(OccupationKind.Craftsperson, lark);
-            var neutralSlots = OccupationScheduleSeeder.Seed(OccupationKind.Craftsperson, neutral);
+            var larkSlots = OccupationScheduleSeeder.Seed(OccupationIds.Craftsperson, lark, BuildRegistry());
+            var neutralSlots = OccupationScheduleSeeder.Seed(OccupationIds.Craftsperson, neutral, BuildRegistry());
 
             for (var i = 0; i < larkSlots.Count; i++)
             {
@@ -70,8 +71,8 @@ namespace EngineTests
             var owl = BuildPersonality(chronotype: Chronotype.Owl);
             var neutral = BuildPersonality(chronotype: Chronotype.Neutral);
 
-            var owlSlots = OccupationScheduleSeeder.Seed(OccupationKind.Craftsperson, owl);
-            var neutralSlots = OccupationScheduleSeeder.Seed(OccupationKind.Craftsperson, neutral);
+            var owlSlots = OccupationScheduleSeeder.Seed(OccupationIds.Craftsperson, owl, BuildRegistry());
+            var neutralSlots = OccupationScheduleSeeder.Seed(OccupationIds.Craftsperson, neutral, BuildRegistry());
 
             // At least some slots should be later
             Assert.IsTrue(Enumerable.Range(0, owlSlots.Count).Any(i => owlSlots[i].HourOfDay > neutralSlots[i].HourOfDay),
@@ -84,8 +85,8 @@ namespace EngineTests
             var high = BuildPersonality(affiliation: 0.9);
             var normal = BuildPersonality(affiliation: 0.5);
 
-            var highSlots = OccupationScheduleSeeder.Seed(OccupationKind.Craftsperson, high);
-            var normalSlots = OccupationScheduleSeeder.Seed(OccupationKind.Craftsperson, normal);
+            var highSlots = OccupationScheduleSeeder.Seed(OccupationIds.Craftsperson, high, BuildRegistry());
+            var normalSlots = OccupationScheduleSeeder.Seed(OccupationIds.Craftsperson, normal, BuildRegistry());
 
             var highReachOut = highSlots.First(s => s.PreferredAction == ReachOut).BiasStrength;
             var normalReachOut = normalSlots.First(s => s.PreferredAction == ReachOut).BiasStrength;
@@ -105,7 +106,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var scheduler = new RecordingScheduler();
 
-            engine.SeedFromOccupation(OccupationKind.Craftsperson, personality, now, scheduler, self);
+            engine.SeedFromOccupation(OccupationIds.Craftsperson, personality, now, scheduler, self);
 
             Assert.AreEqual(3, scheduler.ScheduledCount, "Should have scheduled 3 slots for today");
         }
@@ -120,7 +121,7 @@ namespace EngineTests
             var day0 = new WDateTime(0);
             var scheduler = new RecordingScheduler();
 
-            engine.SeedFromOccupation(OccupationKind.Craftsperson, personality, day0, scheduler, self);
+            engine.SeedFromOccupation(OccupationIds.Craftsperson, personality, day0, scheduler, self);
             var afterSeed = scheduler.ScheduledCount;  // 3 slots for today
 
             // Advance to next day — use the same RecordingScheduler in the context
@@ -141,7 +142,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var scheduler = new RecordingScheduler();
 
-            engine.SeedFromOccupation(OccupationKind.Craftsperson, personality, now, scheduler, self);
+            engine.SeedFromOccupation(OccupationIds.Craftsperson, personality, now, scheduler, self);
             var afterSeed = scheduler.ScheduledCount;
 
             // Tick same day — RescheduleLeadHours=1.0, looking 1h ahead is still day 0
@@ -162,7 +163,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var scheduler = new RecordingScheduler();
 
-            engine.SeedFromOccupation(OccupationKind.Craftsperson, personality, now, scheduler, self);
+            engine.SeedFromOccupation(OccupationIds.Craftsperson, personality, now, scheduler, self);
             var slot = engine.State.Slots.First();
             var outbox = new EventCollector();
             var ctx = BuildContext(self);
@@ -180,7 +181,7 @@ namespace EngineTests
             var self = new HumanId(Guid.NewGuid());
             var now = new WDateTime(0);
             var slot = new ScheduleSlot("test_slot", 8, Work);
-            var state = new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationKind.Craftsperson);
+            var state = new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson);
             engine.RestoreState(state);
 
             var ctx = BuildContext(self);
@@ -196,7 +197,7 @@ namespace EngineTests
             var self = new HumanId(Guid.NewGuid());
             var now = new WDateTime(0);
             engine.RestoreState(new DailyScheduleState(
-                new[] { new ScheduleSlot("real_slot", 8, Work) }, null, now.Date.DayIndex, OccupationKind.Craftsperson));
+                new[] { new ScheduleSlot("real_slot", 8, Work) }, null, now.Date.DayIndex, OccupationIds.Craftsperson));
 
             engine.Handle(new ScheduleSlotTriggered(now, self, "nonexistent_slot", Work, null, 0.7), BuildContext(self), new EventCollector());
 
@@ -212,7 +213,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var slot = new ScheduleSlot("work_slot", 8, Work, BiasStrength: 0.7);
             var context = BuildBehaviorContext(
-                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationKind.Craftsperson),
+                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson),
                 stress: 20.0, energy: 80.0);
 
             var candidates = new List<BehaviorCandidate>
@@ -235,7 +236,7 @@ namespace EngineTests
             var modifier = new DailyScheduleBehaviorModifier();
             var now = new WDateTime(0);
             var context = BuildBehaviorContext(
-                new DailyScheduleState(Array.Empty<ScheduleSlot>(), null, now.Date.DayIndex, OccupationKind.None),
+                new DailyScheduleState(Array.Empty<ScheduleSlot>(), null, now.Date.DayIndex, null),
                 stress: 10.0, energy: 80.0);
 
             var candidates = new List<BehaviorCandidate>
@@ -256,7 +257,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var slot = new ScheduleSlot("work_slot", 8, Work, CanSkipWhenStressed: true);
             var context = BuildBehaviorContext(
-                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationKind.Craftsperson),
+                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson),
                 stress: 85.0, energy: 80.0);  // stress above threshold
 
             var candidates = new List<BehaviorCandidate>
@@ -277,7 +278,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var slot = new ScheduleSlot("work_slot", 8, Work, CanSkipWhenStressed: true);
             var context = BuildBehaviorContext(
-                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationKind.Craftsperson),
+                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson),
                 stress: 20.0, energy: 10.0);  // energy below threshold
 
             var candidates = new List<BehaviorCandidate>
@@ -298,7 +299,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var slot = new ScheduleSlot("social_slot", 19, ReachOut, CanSkipWhenStressed: false);
             var context = BuildBehaviorContext(
-                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationKind.Craftsperson),
+                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson),
                 stress: 85.0, energy: 80.0);  // high stress, but not skippable
 
             var candidates = new List<BehaviorCandidate>
@@ -323,7 +324,7 @@ namespace EngineTests
             var now = new WDateTime(0);
             var scheduler = new RecordingScheduler();
 
-            engine.SeedFromOccupation(OccupationKind.Craftsperson, personality, now, scheduler, self);
+            engine.SeedFromOccupation(OccupationIds.Craftsperson, personality, now, scheduler, self);
 
             // Simulate the morning Work slot firing
             var workSlot = engine.State.Slots.First(s => s.PreferredAction == Work);
@@ -341,8 +342,8 @@ namespace EngineTests
             var owl = BuildPersonality(chronotype: Chronotype.Owl);
             var neutral = BuildPersonality(chronotype: Chronotype.Neutral);
 
-            var owlSlots = OccupationScheduleSeeder.Seed(OccupationKind.Guard, owl);
-            var neutralSlots = OccupationScheduleSeeder.Seed(OccupationKind.Guard, neutral);
+            var owlSlots = OccupationScheduleSeeder.Seed(OccupationIds.Guard, owl, BuildRegistry());
+            var neutralSlots = OccupationScheduleSeeder.Seed(OccupationIds.Guard, neutral, BuildRegistry());
 
             // Night owl guard should have later slots
             Assert.IsTrue(
@@ -354,10 +355,18 @@ namespace EngineTests
 
         private static DefaultDailyScheduleEngine BuildEngine(DailyScheduleConfig? config = null)
         {
-            var cfg = Options.Create(config ?? new DailyScheduleConfig());
-            var log = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
-                                   .CreateLogger<DefaultDailyScheduleEngine>();
-            return new DefaultDailyScheduleEngine(cfg, log);
+            var cfg      = Options.Create(config ?? new DailyScheduleConfig());
+            var log      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
+                                        .CreateLogger<DefaultDailyScheduleEngine>();
+            var registry = BuildRegistry();
+            return new DefaultDailyScheduleEngine(cfg, log, registry);
+        }
+
+        private static IOccupationRegistry BuildRegistry()
+        {
+            var registry = new DefaultOccupationRegistry();
+            BuiltInOccupationRegistrar.RegisterAll(registry);
+            return registry;
         }
 
         private static Personality BuildPersonality(

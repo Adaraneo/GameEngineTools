@@ -49,6 +49,12 @@ namespace GameEngineTools.Characters.Hosting
             services.TryAddSingleton<ISocialFidelityPolicy, DefaultSocialFidelityPolicy>();
             services.TryAddSingleton<IHumanFactory, DefaultHumanFactory>();
             services.TryAddTransient<IGoalEngine, DefaultGoalEngine>();
+            services.TryAddSingleton<IOccupationRegistry>(_ =>
+            {
+                var registry = new DefaultOccupationRegistry();
+                BuiltInOccupationRegistrar.RegisterAll(registry);
+                return registry;
+            });
             services.TryAddTransient<IDailyScheduleEngine, DefaultDailyScheduleEngine>();
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();

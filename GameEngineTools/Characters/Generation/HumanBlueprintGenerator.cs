@@ -4,8 +4,10 @@
 namespace GameEngineTools.Characters.Generation
 {
     using System;
+    using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Attraction;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.World.Core.Time;
@@ -26,17 +28,30 @@ namespace GameEngineTools.Characters.Generation
         WDateOnly? MaxBirthDate = null,
         PersonalityHints? PersonalityHints = null,
         PersonalitySpec? PersonalitySpec = null,
-        int? Seed = null);
+        int? Seed = null,
+        /// <summary>
+        /// Explicitně zadané povolání (ID z <see cref="OccupationIds"/> nebo vlastní).
+        /// Pokud je <c>null</c>, povolání se vybere losem z
+        /// <see cref="HumanBlueprintSpec.OccupationWeights"/> s přihlédnutím k věkové skupině.
+        /// </summary>
+        string? Occupation = null);
 
     /// <summary>
-    /// Specifikace generátoru postav — váhy pohlaví a výchozí věkový rozsah.
+    /// Specifikace generátoru postav — váhy pohlaví, věkový rozsah a váhy povolání.
     /// Registruj do DI jako singleton přes
     /// <see cref="ServiceCollectionExtensions.AddCharacterGeneration(Microsoft.Extensions.DependencyInjection.IServiceCollection, Func{IServiceProvider, HumanBlueprintSpec})"/>.
     /// </summary>
     public sealed record HumanBlueprintSpec(
         (double Female, double Male, double Intersex, double Unknown) SexWeights,
         WDateOnly DefaultMinBirthDate,
-        WDateOnly DefaultMaxBirthDate)
+        WDateOnly DefaultMaxBirthDate,
+        /// <summary>
+        /// Váhy povolání použité při generování, pokud <see cref="HumanBlueprintRequest.Occupation"/>
+        /// není explicitně zadáno. Klíče jsou occupation ID (viz <see cref="OccupationIds"/>);
+        /// prázdný řetězec nebo <see cref="OccupationIds.None"/> znamená žádné povolání.
+        /// Hodnoty nemusí dávat dohromady 1 — generátor je normalizuje.
+        /// </summary>
+        IReadOnlyDictionary<string, double>? OccupationWeights = null)
     {
         /// <summary>
         /// Sestaví výchozí spec z aktuálního data ve světě.
@@ -60,6 +75,25 @@ namespace GameEngineTools.Characters.Generation
         /// });
         /// </code>
         /// </remarks>
+        /// <summary>
+        /// Výchozí váhy povolání — hrubá distribuce středověké populace.
+        /// Klíč <c>""</c> (<see cref="OccupationIds.None"/>) určuje pravděpodobnost
+        /// postavy bez povolání.
+        /// </summary>
+        public static IReadOnlyDictionary<string, double> DefaultOccupationWeights { get; } =
+            new Dictionary<string, double>
+            {
+                [OccupationIds.None]         = 0.10,
+                [OccupationIds.Craftsperson] = 0.15,
+                [OccupationIds.Merchant]     = 0.10,
+                [OccupationIds.Scholar]      = 0.05,
+                [OccupationIds.Farmer]       = 0.25,
+                [OccupationIds.Guard]        = 0.08,
+                [OccupationIds.Healer]       = 0.05,
+                [OccupationIds.Artist]       = 0.07,
+                [OccupationIds.Laborer]      = 0.15,
+            };
+
         public static HumanBlueprintSpec Default(
             WDateOnly now,
             int minAgeYears = 0,
@@ -261,7 +295,10 @@ namespace GameEngineTools.Characters.Generation
             var geneticBlueprint = _appearanceGenerator.GenerateBlueprint(sex, runtimeSeed);
             var attractionProfile = _attractionProfileGenerator.Generate(sex, rng);
 
-            return new HumanBlueprint(id, identity, sex, personality, geneticBlueprint, attractionProfile, runtimeSeed);
+            var occupation = request.Occupation
+                ?? PickOccupation(_spec.OccupationWeights ?? HumanBlueprintSpec.DefaultOccupationWeights, rng, stadium);
+
+            return new HumanBlueprint(id, identity, sex, personality, geneticBlueprint, attractionProfile, runtimeSeed, occupation);
         }
 
         #endregion IHumanBlueprintGenerator
@@ -312,6 +349,67 @@ namespace GameEngineTools.Characters.Generation
             var span = maxIdx - minIdx + 1;
             var offset = (long)(rng.NextUnit() * span);
             return new WDateOnly(minIdx + offset);
+        }
+
+        /// <summary>
+        /// Vybere povolání váhovým losem s přihlédnutím k věkové skupině postavy.
+        /// Vrátí <c>null</c> (= žádné povolání) pro mladé postavy a
+        /// při výběru prázdného klíče <c>""</c> (<see cref="OccupationIds.None"/>).
+        /// </summary>
+        /// <remarks>
+        /// Stadium modifikátory:
+        /// <list type="bullet">
+        ///   <item><b>Baby / Child / Teenager</b> — vždy null (nelze pracovat).</item>
+        ///   <item><b>Adult</b> — plná distribuce dle vah.</item>
+        ///   <item><b>MidAged</b> — built-in fyzické práce mají poloviční váhu.</item>
+        ///   <item><b>Old</b> — z built-in povolání povolena jen sedavá + null; ostatní built-in zeroed.</item>
+        /// </list>
+        /// Neznámá (custom) povolání nejsou modifikována stadiem — odpovědnost vývojáře.
+        /// </remarks>
+        private static string? PickOccupation(IReadOnlyDictionary<string, double> weights, IRandomSource rng, StadiumType stadium)
+        {
+            // Mladé postavy nepracují
+            if (stadium is StadiumType.Baby or StadiumType.Child or StadiumType.Teenager)
+                return null;
+
+            // Sestavíme efektivní váhy s stadium modifikátory
+            var effective = new List<(string id, double weight)>(weights.Count);
+            foreach (var (id, w) in weights)
+            {
+                var effectiveWeight = w;
+
+                if (stadium == StadiumType.MidAged)
+                {
+                    if (OccupationIds.PhysicalOccupations.Contains(id))
+                        effectiveWeight *= 0.5;
+                }
+                else if (stadium == StadiumType.Old)
+                {
+                    // Pro built-in povolání: pouze sedavá a "none" (prázdný řetězec)
+                    if (OccupationIds.All.Contains(id) && !OccupationIds.SedentaryOccupations.Contains(id))
+                        effectiveWeight = 0.0;
+                    // Custom (neznámá) povolání nejsou modifikována
+                }
+
+                if (effectiveWeight > 0.0)
+                    effective.Add((id, effectiveWeight));
+            }
+
+            var total = 0.0;
+            foreach (var (_, w) in effective) total += w;
+
+            if (total <= 0.0)
+                return null;
+
+            var r = rng.NextUnit() * total;
+            foreach (var (id, w) in effective)
+            {
+                r -= w;
+                if (r <= 0.0)
+                    return string.IsNullOrEmpty(id) ? null : id;
+            }
+
+            return null;
         }
 
         /// <summary>

@@ -58,9 +58,9 @@ namespace GameEngineTools.Characters.Persistence
         public double Protection { get; init; }
 
         /// <summary>
-        /// Gets the character's occupation, used to re-seed the daily schedule on import.
-        /// <c>null</c> for saves that pre-date this field — treated as <see cref="OccupationKind.None"/>.
+        /// Gets the character's occupation ID (see <c>OccupationIds</c>), used to re-seed the
+        /// daily schedule on import. <c>null</c> means no fixed occupation.
         /// </summary>
-        public OccupationKind? Occupation { get; init; }
+        public string? Occupation { get; init; }
     }
 }

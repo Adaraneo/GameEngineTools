@@ -5,49 +5,9 @@ namespace GameEngineTools.Characters.Engines.Schedule
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
-
-    #region OccupationKind
-
-    /// <summary>
-    /// Broad occupation category used to seed default daily schedule slots.
-    /// Maps to a set of <see cref="ScheduleSlot"/> entries via
-    /// <see cref="OccupationScheduleSeeder"/>.
-    /// </summary>
-    public enum OccupationKind
-    {
-        /// <summary>No fixed schedule.</summary>
-        None,
-
-        /// <summary>Morning and daytime Work at a work location.</summary>
-        Craftsperson,
-
-        /// <summary>Morning market move, daytime Work, evening Social.</summary>
-        Merchant,
-
-        /// <summary>Morning Work, afternoon Create, evening Rest.</summary>
-        Scholar,
-
-        /// <summary>Early-morning Work, midday Rest, afternoon Work.</summary>
-        Farmer,
-
-        /// <summary>Day shift or night shift Guard duty.</summary>
-        Guard,
-
-        /// <summary>Daytime Work at clinic, evening SelfCare.</summary>
-        Healer,
-
-        /// <summary>Morning Create, evening Social.</summary>
-        Artist,
-
-        /// <summary>Morning and daytime Work, evening Rest.</summary>
-        Laborer
-    }
-
-    #endregion
 
     #region ScheduleSlot
 
@@ -105,12 +65,15 @@ namespace GameEngineTools.Characters.Engines.Schedule
         /// <summary>Day index of the last day for which slots were scheduled.</summary>
         long LastScheduledDayIndex,
 
-        /// <summary>Occupation used when seeding — for diagnostics.</summary>
-        OccupationKind Occupation)
+        /// <summary>
+        /// Occupation ID used when seeding — for diagnostics and persistence.
+        /// <c>null</c> or empty string means no fixed occupation.
+        /// </summary>
+        string? Occupation)
     {
         /// <summary>Empty state for characters with no schedule.</summary>
         public static DailyScheduleState Empty { get; } =
-            new(Array.Empty<ScheduleSlot>(), null, -1, OccupationKind.None);
+            new(Array.Empty<ScheduleSlot>(), null, -1, null);
     }
 
     #endregion
@@ -163,13 +126,17 @@ namespace GameEngineTools.Characters.Engines.Schedule
         /// then immediately registers today's slots with <paramref name="scheduler"/>.
         /// Call once from <see cref="IHumanFactory.Create"/> before the first tick.
         /// </summary>
-        /// <param name="occupation">Occupation that determines the slot template.</param>
+        /// <param name="occupationId">
+        /// Occupation ID looked up in <see cref="IOccupationRegistry"/>.
+        /// <c>null</c> or empty means no schedule (no slots registered).
+        /// Use <see cref="OccupationIds"/> constants for built-in occupations.
+        /// </param>
         /// <param name="personality">Personality used for chronotype and motivation modulation.</param>
         /// <param name="now">Current world time — used to anchor the first day.</param>
         /// <param name="scheduler">Character's scheduler — receives the timed callbacks.</param>
         /// <param name="humanId">Character identifier for all emitted events.</param>
         void SeedFromOccupation(
-            OccupationKind occupation,
+            string? occupationId,
             Personality personality,
             WDateTime now,
             IScheduler scheduler,

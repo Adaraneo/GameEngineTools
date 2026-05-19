@@ -50,8 +50,8 @@ namespace GameEngineTools.Characters.Hosting
     /// </param>
     /// <param name="Seed">Optional RNG seed for deterministic engine initialisation.</param>
     /// <param name="Occupation">
-    /// The character's occupation, used to seed the daily schedule.
-    /// <c>null</c> or <see cref="OccupationKind.None"/> means no fixed routine.
+    /// The character's occupation ID (see <c>OccupationIds</c>), used to seed the daily schedule.
+    /// <c>null</c> or empty string means no fixed routine.
     /// </param>
     public sealed record HumanBlueprint(
         HumanId Id,
@@ -61,7 +61,7 @@ namespace GameEngineTools.Characters.Hosting
         GeneticBlueprint GeneticBlueprint,
         AttractionProfile? AttractionProfile = null,
         int? Seed = null,
-        OccupationKind? Occupation = null);
+        string? Occupation = null);
 
     /// <summary>
     /// Default implementation of <see cref="IHumanFactory"/>.
@@ -155,8 +155,7 @@ namespace GameEngineTools.Characters.Hosting
 
             goal.SeedFromPersonality(b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now);
 
-            var occupation = b.Occupation ?? OccupationKind.None;
-            schedule.SeedFromOccupation(occupation, b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now, scheduler, b.Id);
+            schedule.SeedFromOccupation(b.Occupation, b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now, scheduler, b.Id);
 
             // Propagate seeded states into the externally visible snapshot so that
             // code reading human.Snapshot before the first Tick() sees the correct state,
