@@ -21,6 +21,9 @@ namespace GameEngineTools.Constants
             internal const string Armory      = Root + @"Armory\";
             internal const string Names       = Root + @"Names\";
 
+            /// <summary>Character generation data: occupations, personalities…</summary>
+            internal const string Characters  = Root + @"Characters\";
+
             /// <summary>World layout: locations, connections, and per-location objects.</summary>
             internal const string World        = Root + @"World\";
 
@@ -68,6 +71,15 @@ namespace GameEngineTools.Constants
             public const string MaleNames   = SourceDirectory.Names  + SourceFilename.MaleNames   + Extension.SourceCsv;
             public const string Surnames    = SourceDirectory.Names  + SourceFilename.Surnames    + Extension.SourceCsv;
             public const string Weapons     = SourceDirectory.Armory + SourceFilename.Weapons     + Extension.SourceCsv;
+
+            // ── Characters ────────────────────────────────────────────────────
+
+            /// <summary>
+            /// Custom occupation definitions loaded at startup.
+            /// Built-in occupations are registered in code; this file provides
+            /// game-specific or modded additions.
+            /// </summary>
+            public const string Occupations = SourceDirectory.Characters + "Occupations" + Extension.SourceCsv;
 
             // ── World ─────────────────────────────────────────────────────────
 

@@ -7,6 +7,7 @@ REM Usage: prebuild.bat <OutputDir>
 set "sourceDir=SourceFiles\"
 set "sourceDirNames=SourceFiles\Names\"
 set "sourceDirArmory=SourceFiles\Armory\"
+set "sourceDirCharacters=SourceFiles\Characters\"
 set "sourceDirWorld=SourceFiles\World\"
 set "sourceDirWorldObjects=SourceFiles\World\Objects\"
 
@@ -14,6 +15,7 @@ REM ── Create output subdirectories if they do not exist ──────�
 
 if not exist "%~1%sourceDirNames%"         md "%~1%sourceDirNames%"
 if not exist "%~1%sourceDirArmory%"        md "%~1%sourceDirArmory%"
+if not exist "%~1%sourceDirCharacters%"    md "%~1%sourceDirCharacters%"
 if not exist "%~1%sourceDirWorld%"         md "%~1%sourceDirWorld%"
 if not exist "%~1%sourceDirWorldObjects%"  md "%~1%sourceDirWorldObjects%"
 
@@ -25,6 +27,10 @@ for %%F in ("%sourceDirNames%*.csv") do (
 
 for %%F in ("%sourceDirArmory%*.csv") do (
     if not exist "%~1%sourceDirArmory%%%~nxF" copy "%%F" "%~1%sourceDirArmory%"
+)
+
+for %%F in ("%sourceDirCharacters%*.csv") do (
+    if not exist "%~1%sourceDirCharacters%%%~nxF" copy "%%F" "%~1%sourceDirCharacters%"
 )
 
 REM Locations.csv and Connections.csv (top-level world files)

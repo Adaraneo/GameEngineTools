@@ -1,6 +1,7 @@
 // ServiceCollectionExtensions.cs
 // Copyright (c) 50PSoftware
 
+using System.IO;
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
@@ -53,6 +54,13 @@ namespace GameEngineTools.Characters.Hosting
             {
                 var registry = new DefaultOccupationRegistry();
                 BuiltInOccupationRegistrar.RegisterAll(registry);
+
+                // Load custom occupations from SourceFiles\Characters\Occupations.csv if present.
+                // Built-in occupations are always registered above — this file only adds extras.
+                var csvPath = Constants.FileSystemConstant.SourceFilePath.Occupations;
+                if (File.Exists(csvPath))
+                    OccupationDefinitionLoader.LoadFromCsv(csvPath, registry);
+
                 return registry;
             });
             services.TryAddTransient<IDailyScheduleEngine, DefaultDailyScheduleEngine>();

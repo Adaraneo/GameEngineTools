@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text;
     using System.Text.Json;
     using System.Text.Json.Serialization;
 
@@ -83,6 +84,72 @@ namespace GameEngineTools.Characters.Engines.Schedule
                 }
 
                 registry.Register(new OccupationDefinition(dto.Id, slots));
+            }
+        }
+
+        // ── CSV loading ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Loads and registers occupation definitions from a semicolon-delimited CSV file.
+        /// </summary>
+        /// <remarks>
+        /// Expected format — one row per slot, occupation ID repeated across rows:
+        /// <code>
+        /// OccupationId;SlotId;HourOfDay;Action;LocationKey;BiasStrength;CanSkipWhenStressed
+        /// innkeeper;innkeeper_prep;7;SelfCare;;0.6;false
+        /// innkeeper;innkeeper_work;10;Work;;0.8;true
+        /// </code>
+        /// The first row is always treated as a header and skipped.
+        /// Empty <c>LocationKey</c> is stored as <c>null</c>.
+        /// Lines starting with <c>#</c> are treated as comments and skipped.
+        /// </remarks>
+        /// <param name="path">Path to the CSV file.</param>
+        /// <param name="registry">Target registry.</param>
+        /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+        /// <exception cref="FormatException">Thrown when a row cannot be parsed.</exception>
+        public static void LoadFromCsv(string path, IOccupationRegistry registry)
+        {
+            using var reader = new StreamReader(path, Encoding.UTF8);
+            reader.ReadLine(); // skip header
+
+            // Accumulate slots grouped by occupation ID
+            var groups = new Dictionary<string, List<ScheduleSlotTemplate>>(StringComparer.OrdinalIgnoreCase);
+            var order  = new List<string>(); // preserve declaration order
+
+            string? line;
+            var lineNumber = 1;
+            while ((line = reader.ReadLine()) != null)
+            {
+                lineNumber++;
+                line = line.Trim();
+                if (string.IsNullOrEmpty(line) || line.StartsWith('#'))
+                    continue;
+
+                var cols = line.Split(';');
+                if (cols.Length < 7)
+                    throw new FormatException(
+                        $"Occupations.csv line {lineNumber}: expected 7 columns, got {cols.Length}.");
+
+                var occupationId = cols[0].Trim();
+                var slotId       = cols[1].Trim();
+                var hourOfDay    = int.Parse(cols[2].Trim());
+                var action       = cols[3].Trim();
+                var locationKey  = string.IsNullOrEmpty(cols[4].Trim()) ? null : cols[4].Trim();
+                var biasStrength = double.Parse(cols[5].Trim(), System.Globalization.CultureInfo.InvariantCulture);
+                var canSkip      = bool.Parse(cols[6].Trim());
+
+                if (!groups.ContainsKey(occupationId))
+                {
+                    groups[occupationId] = new List<ScheduleSlotTemplate>();
+                    order.Add(occupationId);
+                }
+
+                groups[occupationId].Add(new ScheduleSlotTemplate(slotId, hourOfDay, action, locationKey, biasStrength, canSkip));
+            }
+
+            foreach (var id in order)
+            {
+                registry.Register(new OccupationDefinition(id, groups[id]));
             }
         }
 

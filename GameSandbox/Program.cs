@@ -234,9 +234,9 @@ foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
     var slot = new ScheduleSlot(slotId, 13, ActionNames.SelfCare, "stables");
     mainCharacter.ReceiveEvent(new ScheduleSlotTriggered(startNow.AddDays(1), mainCharacter.Id, slotId, ActionNames.SelfCare, "stables", 0.65));
 
-    if (mainCharacter.Snapshot.Schedule.Occupation == OccupationKind.None)
+    if (mainCharacter.Snapshot.Schedule.Occupation is null)
     {
-        mainCharacter.ChangeOccupation(OccupationKind.Farmer);
+        mainCharacter.ChangeOccupation("farmer");
     }
 
     Console.WriteLine("Slot: {0}", slotId);
