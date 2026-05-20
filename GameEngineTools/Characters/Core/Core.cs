@@ -111,6 +111,23 @@ namespace GameEngineTools.Characters.Core
         /// <c>null</c> means no home is assigned (e.g. travellers, characters without fixed residence).
         /// </summary>
         public string? HomeLocationId { get; init; }
+
+        /// <summary>
+        /// Optional ancestry hint used by the portrait and narrative systems.
+        /// Expressed as a short natural-language descriptor understood by image generation models.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Examples: <c>"East Asian ancestry"</c>, <c>"West African features"</c>,
+        /// <c>"Northern European ancestry"</c>, <c>"South Asian features"</c>.
+        /// </para>
+        /// <para>
+        /// Set once at character-creation time by the identity generator.
+        /// The portrait pipeline forwards this verbatim to the image model prompt.
+        /// <c>null</c> means ancestry is unspecified — the prompt omits the hint entirely.
+        /// </para>
+        /// </remarks>
+        public string? AncestryHint { get; init; }
     }
 
     public enum SexBiology

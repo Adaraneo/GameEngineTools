@@ -24,6 +24,8 @@ namespace EngineTests
         private PortraitSpecBuilder _builder = default!;
         private PortraitPromptFormatter _formatter = default!;
 
+        private const int age = 15;
+
         [TestInitialize]
         public void Setup()
         {
@@ -37,8 +39,8 @@ namespace EngineTests
             var appearance = BuildReferenceAppearance();
             var snapshot = BuildSnapshot();
 
-            var left = _builder.Build(SexBiology.Female, appearance, snapshot);
-            var right = _builder.Build(SexBiology.Female, appearance, snapshot);
+            var left = _builder.Build(SexBiology.Female, appearance, age, null, snapshot);
+            var right = _builder.Build(SexBiology.Female, appearance, age, null, snapshot);
 
             Assert.AreEqual(left.Body, right.Body);
             Assert.AreEqual(left.Skin, right.Skin);
@@ -53,7 +55,7 @@ namespace EngineTests
         [TestMethod]
         public void Build_ReferenceAppearance_MapsEnumsExactly()
         {
-            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance());
+            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance(), 15);
 
             Assert.AreEqual("blue", spec.Eyes.HueFamily);
             Assert.AreEqual("dark blond", spec.Hair.BaseColorFamily);
@@ -67,7 +69,7 @@ namespace EngineTests
         [TestMethod]
         public void Build_ReferenceAppearance_MapsBodyAndFeatureBuckets()
         {
-            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance());
+            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance(), age);
 
             Assert.AreEqual("medium height", spec.Body.HeightBucket);
             Assert.AreEqual("balanced proportions", spec.Body.ProportionBucket);
@@ -102,7 +104,7 @@ namespace EngineTests
                 HairLengthCm = 6.0
             };
 
-            var spec = _builder.Build(SexBiology.Female, appearance);
+            var spec = _builder.Build(SexBiology.Female, appearance, age);
 
             Assert.AreEqual(0.72, spec.Body.WaistToHipRatio);
             Assert.AreEqual("very upright carriage", spec.Body.PostureBucket);
@@ -115,7 +117,7 @@ namespace EngineTests
         [TestMethod]
         public void Build_AlwaysSetsBeautificationGuards()
         {
-            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance());
+            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance(), age);
 
             Assert.IsTrue(spec.BiasGuard.ForbidSymmetryEnhancement);
             Assert.IsTrue(spec.BiasGuard.ForbidSkinSmoothing);
@@ -128,7 +130,7 @@ namespace EngineTests
         [TestMethod]
         public void Build_NeutralSnapshot_UsesNeutralExpression()
         {
-            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance(), BuildSnapshot());
+            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance(), age, snapshot: BuildSnapshot());
 
             Assert.AreEqual(PortraitExpressionKind.Neutral, spec.Expression.Kind);
             Assert.AreEqual("neutral", spec.Expression.ExpressionLabel);
@@ -140,7 +142,8 @@ namespace EngineTests
             var spec = _builder.Build(
                 SexBiology.Female,
                 BuildReferenceAppearance(),
-                BuildSnapshot(
+                age,
+                snapshot: BuildSnapshot(
                     physiology: new PhysiologyState(70, 12, 25, 20, 5, 10, 0, null),
                     behavior: new BehaviorState(85, 30, 25, 50, 50, 35, null)));
 
@@ -153,7 +156,8 @@ namespace EngineTests
             var spec = _builder.Build(
                 SexBiology.Female,
                 BuildReferenceAppearance(),
-                BuildSnapshot(
+                age,
+                snapshot: BuildSnapshot(
                     psychology: new PsychologyState(0.0, 0.55, 0.5, 75, 25, DiscreteEmotion.Fear)));
 
             Assert.AreEqual(PortraitExpressionKind.Tense, spec.Expression.Kind);
@@ -165,7 +169,8 @@ namespace EngineTests
             var spec = _builder.Build(
                 SexBiology.Female,
                 BuildReferenceAppearance(),
-                BuildSnapshot(
+                age,
+                snapshot: BuildSnapshot(
                     psychology: new PsychologyState(0.0, 0.8, 0.5, 35, 20, DiscreteEmotion.Surprise)));
 
             Assert.AreEqual(PortraitExpressionKind.Alert, spec.Expression.Kind);
@@ -174,17 +179,23 @@ namespace EngineTests
         [TestMethod]
         public void Format_ProducesGroundedPromptWithoutBeautificationLanguage()
         {
-            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance(), BuildSnapshot());
+            var spec = _builder.Build(SexBiology.Female, BuildReferenceAppearance(), age, snapshot: BuildSnapshot());
             var prompt = _formatter.Format(spec);
 
-            StringAssert.Contains(prompt, "blue eyes");
+            // ── Biology + appearance ───────────────────────────────────
+            // "Eyes: blue" — hue first, then eye scale context
+            StringAssert.Contains(prompt, "Eyes: blue");
             StringAssert.Contains(prompt, "dark blond hair");
             StringAssert.Contains(prompt, "straight");
             StringAssert.Contains(prompt, "fair skin");
+
+            // ── Expression ────────────────────────────────────────────
             StringAssert.Contains(prompt, "neutral");
-            StringAssert.Contains(prompt, "Do not smooth skin.");
-            StringAssert.Contains(prompt, "No beautification");
-            StringAssert.Contains(prompt, "no glamour styling");
+
+            // ── Bias guard — must match new formatter phrasing exactly ─
+            StringAssert.Contains(prompt, "No skin smoothing.");          // bylo: "Do not smooth skin."
+            StringAssert.Contains(prompt, "No beautification.");          // beze změny
+            StringAssert.Contains(prompt, "No glamour reinterpretation"); // bylo: "no glamour styling"
         }
 
         private static PhysicalAppearance BuildReferenceAppearance()
