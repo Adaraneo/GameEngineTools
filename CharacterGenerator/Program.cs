@@ -79,7 +79,7 @@
                 var filename = $"{character.Person.Id.Value}.txt";
 
                 var path = Path.Combine(dirinfo.FullName, filename);
-                File.WriteAllText(path, character.PrintPortraitInfo(psb, ppf));
+                File.WriteAllText(path, character.ToPortraitPrompt(psb, ppf));
             }
         }
 

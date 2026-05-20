@@ -401,7 +401,7 @@ if (canGeneratePrompts)
     var promptDir = Directory.CreateDirectory(Path.Combine(desktopPath, "Prompts")).FullName;
     foreach (var character in manager.Characters)
     {
-        await File.WriteAllTextAsync(Path.Combine(promptDir, $"{character.Person.Id.Value.ToString()}.txt"), character.PrintPortraitInfo(
+        await File.WriteAllTextAsync(Path.Combine(promptDir, $"{character.Person.Id.Value.ToString()}.txt"), character.ToPortraitPrompt(
             runtime.Services.GetRequiredService<IPortraitSpecBuilder>(), runtime.Services.GetRequiredService<IPortraitPromptFormatter>()));
     }
 }
