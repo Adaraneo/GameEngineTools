@@ -75,7 +75,13 @@ clock.SetNow(startNow);
 Console.Title = startNow.Date.ToString();
 
 foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
-    manager.Characters.Add(gf.ImportNPC(new FileInfo(filename).Name));
+{
+    var character = gf.ImportNPC(new FileInfo(filename).Name);
+    if (character.Person.Identity.BirthDate > startNow.Date)
+        continue;
+
+    manager.Characters.Add(character);
+}
 
 // Register all imported characters in FamilyGraph so that kin queries
 // work from the first tick. FamilyBuilder.Wire() calls Register() internally
@@ -88,25 +94,13 @@ foreach (var character in manager.Characters)
 
 #region input settings
 
-Console.Write("Would you like to export prompts after simulations is complete? [y\\N] \b");
-bool canGeneratePrompts = false;
-var answerKey = Console.ReadKey().Key;
-if (answerKey == ConsoleKey.Y)
-    canGeneratePrompts = true;
+var currDir = Directory.GetCurrentDirectory();
+var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.json").AddJsonFile("appsettings.World.json").Build();
 
-Console.Clear();
-Console.Write("Would you like to export player's and other main character's info after simulation? [y\\N] \b");
-bool canExportMainCharactersInfo = false;
-answerKey = Console.ReadKey().Key;
-if (answerKey == ConsoleKey.Y)
-    canExportMainCharactersInfo = true;
-
-Console.Clear();
-Console.Write("Would you like to export diary after simulation? [y\\N] \b");
-bool canExportDiary = false;
-answerKey = Console.ReadKey().Key;
-if (answerKey == ConsoleKey.Y)
-    canExportDiary = true;
+var gsSection = configProvider.GetSection("GameSandbox");
+bool canGeneratePrompts = gsSection.GetValue<bool>("CanGeneratePrompts");
+bool canExportMainCharactersInfo = gsSection.GetValue<bool>("CanExportMainCharactersInfo");
+bool canExportDiary = gsSection.GetValue<bool>("CanExportDiary");
 
 long simulationDays = 20;
 
@@ -145,9 +139,6 @@ static void SetDaysForSimulation(ref long simulationDays, bool printInfo = true)
 
 #endregion input settings
 
-var currDir = Directory.GetCurrentDirectory();
-
-var configProvider = new ConfigurationBuilder().SetBasePath(currDir).AddJsonFile("appsettings.World.json").Build();
 var perceptionOptions = configProvider.GetSection("World:Perception").Get<CharacterPerceptionOptions>() ?? new CharacterPerceptionOptions();
 var astroOptions = configProvider.GetSection("World:Astro").Get<AstroConfig>() ?? new AstroConfig();
 var universeOptions = configProvider.GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
