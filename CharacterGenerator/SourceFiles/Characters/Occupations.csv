@@ -1,0 +1,13 @@
+OccupationId;SlotId;HourOfDay;Action;LocationKey;BiasStrength;CanSkipWhenStressed
+# Toto je soubor pro vlastní povolání. Vestavěná povolání (craftsperson, merchant, …)
+# jsou registrována přímo v kódu — tady přidávej pouze nová, herně specifická.
+#
+# Formát: jeden řádek = jeden slot. Povolání se stejným OccupationId jsou seskupena.
+# LocationKey: symbolický klíč (např. TavernLocation) — nebo prázdné pro bez lokace.
+# BiasStrength: 0.0–1.0, síla utility biasu pro tuto akci.
+# CanSkipWhenStressed: true/false — zda se slot přeskočí při vysokém stresu/nízké energii.
+#
+# Příklad:
+# innkeeper;innkeeper_prep;7;SelfCare;;0.6;false
+# innkeeper;innkeeper_work;10;Work;TavernLocation;0.8;true
+# innkeeper;innkeeper_social;19;ReachOut;TavernLocation;0.7;false

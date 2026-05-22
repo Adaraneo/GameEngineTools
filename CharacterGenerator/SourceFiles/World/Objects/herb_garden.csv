@@ -1,0 +1,5 @@
+Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind;Respawns;RespawnMinutes
+herb_chamomile_01;Chamomile;Food;0.00;0.00;false;true;MoodBoost:0.2|Hunger:0.1|Ownership:0.6;true;20;Herb;true;2880
+herb_lavender_01;Lavender;Ambient;0.00;0.00;false;true;MoodBoost:0.3|Ownership:0.5;true;15;Herb;true;2880
+watering_can;Watering Can;Tool;0.00;0.00;false;true;Work:0.3;false;800;None;false;0
+garden_bench;Garden Bench;Furniture;0.00;0.00;false;true;Rest:0.5|MoodBoost:0.2;false;0;None;false;0
