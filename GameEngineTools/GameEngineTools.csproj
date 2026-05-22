@@ -24,7 +24,7 @@
   </Target>-->
 
   <ItemGroup>
-    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.13" />
+    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.14" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="10.0.5" />

@@ -4,12 +4,6 @@
 namespace GameEngineTools.Extensions
 {
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Generation;
-    using GameEngineTools.Characters.Hosting;
-    using GameEngineTools.Characters.Traits;
-    using GameEngineTools.World.Core.Time;
-    using GameEngineTools.World.Utils.Time;
-    using Microsoft.Extensions.DependencyInjection;
 
     public static class CharacterExtension
     {
@@ -25,9 +19,9 @@ namespace GameEngineTools.Extensions
             throw new Exception("No person was found!");
         }
 
-        public static string ToString(this Surname surname, GenusType genus)
+        public static string ToString(this Surname surname, SexBiology sex)
         {
-            if (genus == GenusType.Male)
+            if (sex == SexBiology.Male)
             {
                 return surname.Male;
             }

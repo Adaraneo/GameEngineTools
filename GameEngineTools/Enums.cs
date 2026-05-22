@@ -5,12 +5,7 @@ namespace GameEngineTools
 {
     #region Homo
 
-    public enum GenusType
-    { Male, Female };
-
     #region Relationship ortogonal enums
-
-    // Civilní stav osoby (náhrada za RelationshipStatusType; patří na Person)
     public enum CivilStatus
     {
         Single, InRelationship, Engaged, Married, Divorced, Widowed

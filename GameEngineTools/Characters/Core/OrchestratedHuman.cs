@@ -620,6 +620,17 @@ namespace GameEngineTools.Characters.Core
         public override int GetHashCode()
             => Id.GetHashCode();
 
+        public override string ToString()
+        {
+            var fname = Identity.FirstName.Original;
+            if (this.Biology == SexBiology.Female)
+            {
+                return string.Join(" ", fname, this.Identity.LastName.Female);
+            }
+
+            return string.Join(" ", fname, this.Identity.LastName.Male);
+        }
+
         #endregion Object overrides
     }
 }

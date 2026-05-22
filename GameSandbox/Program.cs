@@ -187,6 +187,27 @@ var friendSOPerson = friendSO.Person;
 
 Console.WriteLine("Before simulation starts:");
 
+var surnamesQuery = from npcs in manager.Characters
+                    select npcs.Person.Identity.LastName;
+
+var surnames = surnamesQuery.DistinctBy(ch => ch.Male).Select(c => c.Male).GetEnumerator();
+
+while (surnames.MoveNext())
+{
+    Console.WriteLine("Family: {0}", surnames.Current);
+    foreach (var fam in familyGraph.GetClanMembers(surnames.Current))
+    {
+        var person = manager.Characters.First(ch => ch.Person.Id == fam)?.Person!;
+        Console.WriteLine("Family Member: {0}, Kin roles: {1}, (Age: {2})", person.ToString(), familyGraph.GetKin(fam).Count, person.Age);
+    }
+
+    foreach (var fam in familyGraph.GetByName(surnames.Current))
+    {
+        var person = manager.Characters.First(ch => ch.Person.Id == fam)?.Person!;
+        Console.WriteLine("Family Graph Member: {0} (Age: {1})", person.ToString(), person.Age);
+    }
+}
+
 var diary = new List<NarrativeEntry>();
 
 var rng = new Random();

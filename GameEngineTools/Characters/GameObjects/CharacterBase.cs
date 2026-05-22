@@ -148,5 +148,11 @@ namespace GameEngineTools.Characters.GameObjects
         /// Once true it never returns to false — death is permanent.
         /// </summary>
         public bool IsDead { get; private set; }
+
+        public override string? ToString()
+        {
+            if (Person is null) return base.ToString();
+            return Person?.ToString();
+        }
     }
 }
