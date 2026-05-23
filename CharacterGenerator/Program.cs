@@ -170,11 +170,12 @@
                 var nfb = runtime.Services.GetRequiredService<NuclearFamilyGenerator>();
                 var now = player.Person.Identity.BirthDate;
                 var familyGraph = runtime.Services.GetRequiredService<FamilyGraph>();
-                var personalitySpec = new PersonalitySpec(O: new TraitDistribution(0.35, 0.5), new TraitDistribution(0.35, 0.3), new TraitDistribution(0.35, 0.3), new TraitDistribution(0.35, 0.6), new TraitDistribution(0.35, 0.6), PersonalitySpec.Default.Corr, PersonalitySpec.Default.AttachmentWeights, PersonalitySpec.Default.CommunicationWeights with { Direct = 0.6 }, PersonalitySpec.Default.ChronotypeWeights, PersonalitySpec.Default.SociosexualityWeights, PersonalitySpec.Default.MotivationMap);
+                var personalitySpec = new PersonalitySpec(PersonalitySpec.Default.O, PersonalitySpec.Default.C, PersonalitySpec.Default.E, PersonalitySpec.Default.A, PersonalitySpec.Default.N, PersonalitySpec.Default.Corr, PersonalitySpec.Default.AttachmentWeights, PersonalitySpec.Default.CommunicationWeights with { Direct = 0.6 }, PersonalitySpec.Default.ChronotypeWeights, PersonalitySpec.Default.SociosexualityWeights, PersonalitySpec.Default.MotivationMap);
+                var personalityHints = new PersonalityHints(Chronotype: GameEngineTools.Characters.Traits.Chronotype.Owl, Sociosexuality: GameEngineTools.Characters.Traits.Sociosexuality.Restricted);
                 var nf = nfb.Generate(new NuclearFamilySpec
                 (
-                    new HumanBlueprintRequest(SexBiology.Male, now.AddYears(-30), now.AddYears(-25), PersonalitySpec: personalitySpec, Occupation: OccupationIds.Guard),
-                    new HumanBlueprintRequest(SexBiology.Female, now.AddYears(-30), now.AddYears(-25), PersonalitySpec: personalitySpec, Occupation: OccupationIds.Healer),
+                    new HumanBlueprintRequest(SexBiology.Male, now.AddYears(-30), now.AddYears(-25), personalityHints, personalitySpec, Occupation: OccupationIds.Guard),
+                    new HumanBlueprintRequest(SexBiology.Female, now.AddYears(-30), now.AddYears(-25), personalityHints, personalitySpec, Occupation: OccupationIds.Healer),
                     Children:
                     [
                         new ChildSpec(now),
