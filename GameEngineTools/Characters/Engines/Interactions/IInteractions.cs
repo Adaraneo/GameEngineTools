@@ -35,7 +35,13 @@ namespace GameEngineTools.Characters.Engines.Interactions
         bool HasPrivacy,
         double Noise,
         double Crowding,
-        SurfaceKind Kind) : IDomainEvent;
+        SurfaceKind Kind,
+
+        /// <summary>
+        /// Active social norm context at the new location, or <c>null</c> for ordinary surfaces.
+        /// Passed through to <see cref="InteractionSurface.NormContext"/>.
+        /// </summary>
+        SocialNormContext? NormContext = null) : IDomainEvent;
 
     /// <summary>
     /// Popis aktuálního prostředí interakce — co je "po ruce".
@@ -60,7 +66,16 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// Used for Altman (1975) proxemics zone calculation.
         /// <c>null</c> = distance not measured / not relevant.
         /// </summary>
-        double? ProxemicDistanceMeters = null);
+        double? ProxemicDistanceMeters = null,
+
+        /// <summary>
+        /// Optional social norm context active on this surface.
+        /// When set, <see cref="GameEngineTools.Characters.Engines.Interactions.DefaultInteractionEngine"/>
+        /// will apply an anticipatory shame appraisal before resolving interaction acceptance,
+        /// and may emit <see cref="NormViolationOccurred"/> if the action proceeds despite a high score.
+        /// <c>null</c> = no active norm constraint (default for most surfaces).
+        /// </summary>
+        SocialNormContext? NormContext = null);
 
     public enum SurfaceKind
     {

@@ -618,36 +618,6 @@ namespace GameEngineTools.Characters.Engines.Psychology
             double Clamp01(double v) => Math.Max(0, Math.Min(1, v));
             double Clamp01p(double v) => Math.Max(0, Math.Min(100, v));
             double Clampm1p1(double v) => Math.Max(-1, Math.Min(1, v));
-            static DiscreteEmotion InferEmotion(PsychologyState ps)
-            {
-                // High stress — Dominance rozlišuje strach vs. hněv (PAD model)
-                if (ps.Stress > 70)
-                    return ps.Dominance < 0.4 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
-            
-                // Surprise — náhlý arousal spike bez jasné valence
-                if (ps.Arousal > 0.85 && ps.Valence is > -0.2 and < 0.2)
-                    return DiscreteEmotion.Surprise;
-            
-                // Pride — pozitivní + vysoká dominance
-                if (ps.Valence > 0.5 && ps.Dominance > 0.7)
-                    return DiscreteEmotion.Pride;
-            
-                // Shame — negativní + nízká dominance + nízký stres (ne panic)
-                if (ps.Valence < -0.3 && ps.Dominance < 0.3 && ps.Stress < 50)
-                    return DiscreteEmotion.Shame;
-            
-                // Tenderness — pozitivní + klidný + submisivní (péče)
-                if (ps.Valence > 0.3 && ps.Arousal < 0.4 && ps.Dominance < 0.45)
-                    return DiscreteEmotion.Tenderness;
-            
-                // Disgust — negativní + nízký arousal + střední dominance
-                if (ps.Valence < -0.4 && ps.Arousal < 0.4)
-                    return DiscreteEmotion.Disgust;
-            
-                if (ps.Valence > 0.4) return DiscreteEmotion.Joy;
-                if (ps.Valence < -0.4) return DiscreteEmotion.Sadness;
-                return DiscreteEmotion.Neutral;
-            }
             double RandomSym() => (_rng.NextUnit() - 0.5) * 2.0;
             double Approach(double val, double target, double by) =>
                 (val < target) ? Math.Min(target, val + by) : Math.Max(target, val - by);
@@ -998,6 +968,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                         break;
                     }
+
+                case Characters.Engines.Interactions.NormViolationOccurred nv when nv.Actor == ctx.Id:
+                    s = HandleNormViolation(nv, s, ctx, outbox);
+                    break;
             }
 
             State = s;
@@ -1032,6 +1006,94 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 DiscreteEmotion.Sadness    => cfg.EmotionDecaySadness,
                 _                          => 1.0
             };
+
+        /// <summary>
+        /// Infers the dominant discrete emotion from the continuous PAD state.
+        /// Extracted from Tick() local function to be callable from Handle-phase handlers.
+        /// </summary>
+        private static DiscreteEmotion InferEmotion(PsychologyState ps)
+        {
+            // High stress — Dominance rozlišuje strach vs. hněv (PAD model)
+            if (ps.Stress > 70)
+                return ps.Dominance < 0.4 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
+
+            // Surprise — náhlý arousal spike bez jasné valence
+            if (ps.Arousal > 0.85 && ps.Valence is > -0.2 and < 0.2)
+                return DiscreteEmotion.Surprise;
+
+            // Pride — pozitivní + vysoká dominance
+            if (ps.Valence > 0.5 && ps.Dominance > 0.7)
+                return DiscreteEmotion.Pride;
+
+            // Shame — negativní + nízká dominance + nízký stres (ne panic)
+            if (ps.Valence < -0.3 && ps.Dominance < 0.3 && ps.Stress < 50)
+                return DiscreteEmotion.Shame;
+
+            // Tenderness — pozitivní + klidný + submisivní (péče)
+            if (ps.Valence > 0.3 && ps.Arousal < 0.4 && ps.Dominance < 0.45)
+                return DiscreteEmotion.Tenderness;
+
+            // Disgust — negativní + nízký arousal + střední dominance
+            if (ps.Valence < -0.4 && ps.Arousal < 0.4)
+                return DiscreteEmotion.Disgust;
+
+            if (ps.Valence > 0.4) return DiscreteEmotion.Joy;
+            if (ps.Valence < -0.4) return DiscreteEmotion.Sadness;
+            return DiscreteEmotion.Neutral;
+        }
+
+        /// <summary>
+        /// Applies a shame spike to the actor's psychology when they commit a norm-violating action.
+        /// </summary>
+        /// <remarks>
+        /// VAD signature is distinct from VAD-emergent shame (InferEmotion threshold):
+        /// <list type="bullet">
+        ///   <item>Stronger Dominance drop — identity-level devaluation (Sznycer 2016).</item>
+        ///   <item>Arousal modulated by audience presence (Dickerson 2004 vs. Gruenewald 2004).</item>
+        ///   <item>Personality scaling: Neuroticism gain, Extraversion damping (Muris et al. 2018).</item>
+        /// </list>
+        /// The existing <see cref="PsychologyConfig.EmotionDecayShame"/> governs decay — no new decay rate needed.
+        /// </remarks>
+        private PsychologyState HandleNormViolation(
+            Characters.Engines.Interactions.NormViolationOccurred nv,
+            PsychologyState s,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            if (nv.ViolationScore < Config.NormShameMinViolationScore)
+                return s;
+
+            var (dv, da, dd) = Characters.Engines.Interactions.NormViolationMath.ComputeShameSpike(
+                nv.ViolationScore,
+                nv.HasAudience,
+                ctx.Personality);
+
+            s = s with
+            {
+                Valence   = Math.Clamp(s.Valence   + dv, -1.0, 1.0),
+                Arousal   = Math.Clamp(s.Arousal   + da,  0.0, 1.0),
+                Dominance = Math.Clamp(s.Dominance + dd,  0.0, 1.0)
+            };
+
+            // Force emotion inference — Shame should appear when the spike is large enough.
+            var newEmotion = InferEmotion(s);
+            if (newEmotion != s.DominantEmotion)
+            {
+                s = s with { DominantEmotion = newEmotion };
+                outbox.Add(new EmotionShifted(nv.OccurredAt, ctx.Id, newEmotion, s.Valence, s.Arousal, s.Dominance));
+            }
+
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
+            {
+                _log.NormViolationShameSpiked(
+                    ctx.Id.Value.ToString(),
+                    nv.NormKind.ToString(),
+                    nv.ViolationScore,
+                    nv.HasAudience);
+            }
+
+            return s;
+        }
 
         /// <summary>
         /// Replaces the current state with the provided snapshot.

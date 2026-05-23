@@ -179,7 +179,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 HasPrivacy: cc.HasPrivacy,
                 Noise: Math.Clamp(cc.Noise, 0, 1),
                 Crowding: Math.Clamp(cc.Crowding, 0, 1),
-                Kind: cc.Kind);
+                Kind: cc.Kind,
+                NormContext: cc.NormContext);
         }
 
         /// <summary>
@@ -249,6 +250,32 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var misattrib = ComputeMisattributionPenalty(p.Act, psych.Stress, trust, comfort, State.HasPrivacy, noise);
             baseP -= misattrib;
 
+            // ── Norm violation appraisal (Sznycer 2016 / FAtiMA double-appraisal pattern) ─────────────
+            // Anticipatory shame: if the surface has an active norm context, compute the violation score
+            // and penalise the acceptance probability BEFORE the random draw. This models the deterrent
+            // function of shame — the character "feels the weight" of inappropriateness pre-commit.
+            var normViolationScore = 0.0;
+            var normContext = State.NormContext;
+            if (normContext is not null)
+            {
+                var observerCount = State.Observers?.Count ?? 0;
+                normViolationScore = NormViolationMath.ComputeViolationScore(normContext, State.HasPrivacy, observerCount);
+
+                // Reduce recipient acceptance probability.
+                // baseP penalty: p *= (1 - AcceptancePenalty), clamped so p stays above 0.05.
+                var normPenalty = NormViolationMath.AcceptancePenalty(normViolationScore);
+                baseP = Math.Max(0.05, baseP * (1.0 - normPenalty));
+
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultInteractionEngine)))
+                {
+                    _log.NormViolationDetected(
+                        ctx.Id.Value.ToString(),
+                        normContext.Kind.ToString(),
+                        normViolationScore,
+                        normPenalty);
+                }
+            }
+
             var pAcc = Math.Clamp(baseP, 0.05, 0.95);
             var accepted = ctx.Random.Chance(pAcc);
 
@@ -299,6 +326,65 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 EndValence: endVal);
 
             outbox.Add(outcome);
+
+            // ── Norm violation post-commit: emit shame and observer cascade ───────────────────────────
+            // Only fires when a norm context is active AND the violation score is meaningful.
+            // Threshold 0.25 avoids spamming shame events for trivial norm infractions.
+            const double NormViolationThreshold = 0.25;
+            if (normContext is not null && normViolationScore >= NormViolationThreshold)
+            {
+                var hasAudience = (State.Observers?.Count ?? 0) > 0;
+
+                // Shame event for the actor (consumed by DefaultPsychologyEngine).
+                outbox.Add(new NormViolationOccurred(
+                    p.OccurredAt,
+                    Actor: p.From,
+                    NormKind: normContext.Kind,
+                    ViolationScore: normViolationScore,
+                    HasAudience: hasAudience));
+
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultInteractionEngine)))
+                {
+                    _log.NormViolationShameSpiked(
+                        ctx.Id.Value.ToString(),
+                        normContext.Kind.ToString(),
+                        normViolationScore,
+                        hasAudience);
+                }
+
+                // Observer cascade: one ObserverNormReaction per witness.
+                // Identity sharing is unknown at this layer → default to MoralOutrage for third parties.
+                // When RelationshipsEngine gains group-membership data, route VicariousShame there.
+                if (State.Observers is { Count: > 0 } observers)
+                {
+                    foreach (var observer in observers)
+                    {
+                        var reactionKind = NormViolationMath.RouteObserverReaction(
+                            observer,
+                            actor: p.From,
+                            victim: p.To,
+                            sharesIdentityWithActor: false); // TODO: wire group membership when available
+
+                        outbox.Add(new ObserverNormReaction(
+                            p.OccurredAt,
+                            Observer: observer,
+                            Actor: p.From,
+                            Victim: p.To,
+                            NormKind: normContext.Kind,
+                            ReactionKind: reactionKind,
+                            ViolationScore: normViolationScore));
+
+                        using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultInteractionEngine)))
+                        {
+                            _log.ObserverNormReactionRouted(
+                                ctx.Id.Value.ToString(),
+                                observer.Value.ToString(),
+                                reactionKind.ToString(),
+                                normViolationScore);
+                        }
+                    }
+                }
+            }
 
             if (accepted && p.Act == SpeechAct.Invite && HasSexualEncounterReadiness(p.OccurredAt, ctx, edge, expectedAcceptance))
             {

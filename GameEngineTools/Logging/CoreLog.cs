@@ -664,6 +664,50 @@ namespace GameEngineTools.Logging
             string From,
             double Utility);
 
+        /// <summary>
+        /// Norm violation detected pre-commit — score and acceptance penalty computed.
+        /// Logged at Debug to avoid noise in production runs.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1207,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/NORM] {HumanId} Norm violation detected: kind={NormKind}, score={Score:F2}, acceptancePenalty={Penalty:F2}")]
+        public static partial void NormViolationDetected(
+            this ILogger logger,
+            string HumanId,
+            string NormKind,
+            double Score,
+            double Penalty);
+
+        /// <summary>
+        /// Norm violation shame spike applied — emitted by DefaultPsychologyEngine after the fact.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1208,
+            Level = LogLevel.Information,
+            Message = "[BEHAV/NORM] {HumanId} Shame spike: kind={NormKind}, score={Score:F2}, audience={HasAudience}")]
+        public static partial void NormViolationShameSpiked(
+            this ILogger logger,
+            string HumanId,
+            string NormKind,
+            double Score,
+            bool HasAudience);
+
+        /// <summary>
+        /// Observer norm reaction event routed to a witness character.
+        /// Logged at Debug — one entry per observer per norm violation.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1209,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/NORM] {HumanId} Observer {ObserverId}: reaction={Reaction}, score={Score:F2}")]
+        public static partial void ObserverNormReactionRouted(
+            this ILogger logger,
+            string HumanId,
+            string ObserverId,
+            string Reaction,
+            double Score);
+
         #endregion Behavior/Interaction — kontext
 
         #region Memory — epizodická paměť
