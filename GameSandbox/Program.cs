@@ -83,9 +83,10 @@ foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
     manager.Characters.Add(character);
 }
 
-// Register all imported characters in FamilyGraph so that kin queries
-// work from the first tick. FamilyBuilder.Wire() calls Register() internally
-// for freshly generated families; for loaded characters we must do it manually.
+// Register all imported characters in FamilyGraph so that kin queries work
+// from the first tick. Register() now automatically reconstructs kin links
+// from the persisted RelationshipEdge.KinRole, so a single call per character
+// is sufficient — no additional setup needed here.
 var familyGraph = runtime.Services.GetRequiredService<FamilyGraph>();
 foreach (var character in manager.Characters)
 {

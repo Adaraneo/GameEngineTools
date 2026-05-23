@@ -189,13 +189,25 @@ namespace GameEngineTools.Characters.Generation
         #region Mutations
 
         /// <summary>
-        /// Registers a character in the family graph under their surname,
-        /// without adding any kin links.
+        /// Registers a character in the family graph under their surname and
+        /// reconstructs all kin links from their persisted relationship snapshot.
         /// </summary>
         /// <remarks>
-        /// Call this when a character is added to the scene and has no family yet
-        /// (e.g. a randomly generated stranger). <see cref="FamilyBuilder"/> calls
-        /// <see cref="AddKinLink"/> separately for the actual bonds.
+        /// <para>
+        /// For brand-new characters (no prior snapshot), the kin link list is
+        /// created empty — <see cref="FamilyBuilder"/> then adds the actual bonds
+        /// via <see cref="AddKinLink"/> in the normal generation flow.
+        /// </para>
+        /// <para>
+        /// For characters loaded from disk, every <see cref="RelationshipEdge"/> whose
+        /// <c>KinRole</c> is not <see cref="KinRole.None"/> is replayed as a kin link.
+        /// This makes <see cref="GetKin"/> and <see cref="GetClanMembers"/> correct from
+        /// the first tick without any additional setup in the caller.
+        /// </para>
+        /// <para>
+        /// The method is idempotent — calling it multiple times for the same character
+        /// is safe and produces no duplicates.
+        /// </para>
         /// </remarks>
         /// <param name="character">The character to register.</param>
         public void Register(IHuman character)
@@ -215,10 +227,21 @@ namespace GameEngineTools.Characters.Generation
                 members.Add(character.Id);
             }
 
-            // Ensure a kin entry exists even if no links are added yet.
+            // Ensure a kin entry exists even if no links are added below.
             if (!_byCharacter.ContainsKey(character.Id))
             {
                 _byCharacter[character.Id] = new List<KinLink>();
+            }
+
+            // Reconstruct kin links from the persisted snapshot.
+            // RelationshipEdge.KinRole is the durable source of truth — it is
+            // serialised as part of EnginesSnapshot and therefore survives restarts.
+            // AddKinLink() deduplicates, so this is safe for freshly generated
+            // characters whose edges carry KinRole.None throughout.
+            foreach (var (targetId, edge) in character.Snapshot.Relationships.Edges)
+            {
+                if (edge.KinRole != KinRole.None)
+                    AddKinLink(character.Id, targetId, edge.KinRole);
             }
         }
 
