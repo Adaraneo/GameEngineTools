@@ -33,15 +33,15 @@ namespace EngineTests
             string id,
             LocationType type = LocationType.Public)
             => new LocationDescriptor(
-                Id:            id,
-                DisplayName:   id,
-                BaseNoise:     0.1,
+                Id: id,
+                DisplayName: id,
+                BaseNoise: 0.1,
                 NoisePerPerson: 0.01,
-                Capacity:      10,
+                Capacity: 10,
                 AllowsPrivacy: false,
-                Type:          type);
+                Type: type);
 
-        #endregion
+        #endregion Helpers
 
         // ── AddLocation ──────────────────────────────────────────────────────
 
@@ -155,7 +155,7 @@ namespace EngineTests
             Assert.AreEqual(1, map.GetConnections("hall").Count);
             Assert.AreEqual(1, map.GetConnections("garden").Count);
             Assert.AreEqual("garden", map.GetConnections("hall")[0].TargetLocationId);
-            Assert.AreEqual("hall",   map.GetConnections("garden")[0].TargetLocationId);
+            Assert.AreEqual("hall", map.GetConnections("garden")[0].TargetLocationId);
         }
 
         [TestMethod]
@@ -185,13 +185,13 @@ namespace EngineTests
             map.AddLocation(MakeLocation("start"));
             map.AddLocation(MakeLocation("near"));
             map.AddLocation(MakeLocation("far"));
-            map.AddConnection("start", "far",  200.0);
-            map.AddConnection("start", "near",  30.0);
+            map.AddConnection("start", "far", 200.0);
+            map.AddConnection("start", "near", 30.0);
 
             var neighbors = map.GetNeighbors("start").ToList();
             Assert.AreEqual(2, neighbors.Count);
             Assert.AreEqual("near", neighbors[0]);
-            Assert.AreEqual("far",  neighbors[1]);
+            Assert.AreEqual("far", neighbors[1]);
         }
 
         [TestMethod]

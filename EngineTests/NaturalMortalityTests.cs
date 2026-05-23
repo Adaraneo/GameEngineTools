@@ -62,10 +62,10 @@ namespace EngineTests
             // AlloLoad=92 (above 90 spike threshold) → raw contribution far exceeds MaxRisk → capped
             // AlloLoad=72 (above 70 linear threshold) → small contribution, below cap
             var stateHigh = NominalState() with { AllostaticLoad = 92 };
-            var stateLow  = NominalState() with { AllostaticLoad = 72 };
+            var stateLow = NominalState() with { AllostaticLoad = 72 };
 
             var riskHigh = NaturalMortalityCalculator.ComputeHourlyRisk(stateHigh, ageYears: 30, cfg: DefaultCfg);
-            var riskLow  = NaturalMortalityCalculator.ComputeHourlyRisk(stateLow,  ageYears: 30, cfg: DefaultCfg);
+            var riskLow = NaturalMortalityCalculator.ComputeHourlyRisk(stateLow, ageYears: 30, cfg: DefaultCfg);
 
             Assert.AreEqual(DefaultCfg.NaturalMortalityMaxRiskPerHour, riskHigh, delta: 1e-10,
                 $"AlloLoad=92 must saturate MaxRiskPerHour ({DefaultCfg.NaturalMortalityMaxRiskPerHour}). Got {riskHigh:F6}");
@@ -275,7 +275,9 @@ namespace EngineTests
         private sealed class AlwaysTrueRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => true;
         }
 

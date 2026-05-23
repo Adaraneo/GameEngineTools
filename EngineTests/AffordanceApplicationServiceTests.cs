@@ -6,11 +6,7 @@ using GameEngineTools.Characters.Engines.Objects;
 using GameEngineTools.World.Objects;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 
 namespace EngineTests;
 
@@ -27,7 +23,9 @@ public class AffordanceApplicationServiceTests : TestBase
     {
         private readonly List<IDomainEvent> _events = new();
         public IReadOnlyList<IDomainEvent> Events => _events;
+
         public void Add(IDomainEvent @event) => _events.Add(@event);
+
         public IReadOnlyList<IDomainEvent> Drain()
         {
             var copy = _events.ToArray();

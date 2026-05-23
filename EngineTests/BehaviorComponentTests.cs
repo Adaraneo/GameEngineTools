@@ -86,9 +86,11 @@ namespace EngineTests
     }
 
     internal sealed class LocalZeroRandom : IRandomSource
+
     { public int Next(int min, int max) => min; public double NextUnit() => 0; public bool Chance(double p) => false; }
 
     internal sealed class LocalConflictRandom : IRandomSource
+
     { public int Next(int min, int max) => min; public double NextUnit() => 0; public bool Chance(double p) => p > 0; }
 
     internal sealed class LocalNullEventBus : IEventBus
@@ -96,9 +98,12 @@ namespace EngineTests
         public void Publish(IDomainEvent @event)
         {
         }
-        public IDisposable Subscribe<TEvent>(Action<TEvent> h) where TEvent : class, IDomainEvent => new LocalDisposable(); }
+
+        public IDisposable Subscribe<TEvent>(Action<TEvent> h) where TEvent : class, IDomainEvent => new LocalDisposable();
+    }
 
     internal sealed class LocalNullScheduler : IScheduler
+
     { public ScheduledId ScheduleAt(WDateTime w, ScheduledAction a, string? t = null) => new(Guid.NewGuid()); public ScheduledId ScheduleAfter(WDateTime n, WTimeSpan d, ScheduledAction a, string? t = null) => new(Guid.NewGuid()); public bool Cancel(ScheduledId id) => true; public IEnumerable<(ScheduledId, ScheduledAction)> Due(WDateTime n) => Enumerable.Empty<(ScheduledId, ScheduledAction)>(); }
 
     internal sealed class LocalDisposable : IDisposable
@@ -108,7 +113,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class PhysiologicalNeedsEngineTests : TestBase {
+    [TestClass]
+    public class PhysiologicalNeedsEngineTests : TestBase
+    {
         [TestMethod]
         public void Evaluate_HungerAndThirst_CreatesFoodAndWaterCandidates()
         {
@@ -143,7 +150,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class CompetenceNeedsEngineTests : TestBase {
+    [TestClass]
+    public class CompetenceNeedsEngineTests : TestBase
+    {
         [TestMethod]
         public void Evaluate_Competence_CreatesWorkCandidate()
         {
@@ -151,7 +160,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class AutonomyExplorationNeedsEngineTests : TestBase {
+    [TestClass]
+    public class AutonomyExplorationNeedsEngineTests : TestBase
+    {
         [TestMethod]
         public void Evaluate_Curiosity_CreatesPublicMovementCandidate()
         {
@@ -159,7 +170,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class SleepCoordinatorTests : TestBase {
+    [TestClass]
+    public class SleepCoordinatorTests : TestBase
+    {
         [TestMethod]
         public void Tick_HighRestNeed_RequestsSleepPrompt()
         {
@@ -189,7 +202,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class AffectiveStateEngineTests : TestBase {
+    [TestClass]
+    public class AffectiveStateEngineTests : TestBase
+    {
         [TestMethod]
         public void Modify_HighStress_BoostsSelfCare()
         {
@@ -197,7 +212,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class CircadianArousalEngineTests : TestBase {
+    [TestClass]
+    public class CircadianArousalEngineTests : TestBase
+    {
         [TestMethod]
         public void Modify_ChronotypePeak_BoostsMovement()
         {
@@ -205,7 +222,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class HabitRoutineEngineTests : TestBase {
+    [TestClass]
+    public class HabitRoutineEngineTests : TestBase
+    {
         [TestMethod]
         public void Modify_PreviousWorkPlan_BoostsWork()
         {
@@ -213,7 +232,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class MemoryInfluenceEngineTests : TestBase {
+    [TestClass]
+    public class MemoryInfluenceEngineTests : TestBase
+    {
         [TestMethod]
         public void Modify_NegativeInteraction_EmitsMemoryRecallAndPenalizesReachOut()
         {
@@ -221,7 +242,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class EnvironmentalAffordanceEngineTests : TestBase {
+    [TestClass]
+    public class EnvironmentalAffordanceEngineTests : TestBase
+    {
         [TestMethod]
         public void Modify_SocialSurface_PenalizesWorkHereAndBoostsMoveToWork()
         {
@@ -229,7 +252,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class ActionArbitrationEngineTests : TestBase {
+    [TestClass]
+    public class ActionArbitrationEngineTests : TestBase
+    {
         [TestMethod]
         public void Arbitrate_SelectsHighestUtilityCandidate()
         {
@@ -237,7 +262,9 @@ namespace EngineTests
         }
     }
 
-    [TestClass] public class HumanInconsistencyArbitrationTests : TestBase {
+    [TestClass]
+    public class HumanInconsistencyArbitrationTests : TestBase
+    {
         [TestMethod]
         public void Arbitrate_WhenIdentityAndCopingConflict_CanPickNonUtilityLeader()
         {

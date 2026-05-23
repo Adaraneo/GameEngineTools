@@ -42,7 +42,7 @@ namespace EngineTests
                 $"Funeral with 3 observers should score > 0.75. Got: {score:F3}");
         }
 
-        #endregion
+        #endregion Test 1 — FuneralContext: high violation score with observers
 
         #region Test 2 — High-severity norm in private context: reduced score
 
@@ -60,7 +60,7 @@ namespace EngineTests
                 $"Private high-severity score should be < 0.55. Got: {score:F3}");
         }
 
-        #endregion
+        #endregion Test 2 — High-severity norm in private context: reduced score
 
         #region Test 3 — AcceptancePenalty: funeral-level score halves baseP
 
@@ -80,7 +80,7 @@ namespace EngineTests
                 $"baseP after funeral penalty should be < 0.25. Penalty={penalty:F3}, pAfter={pAfter:F3}");
         }
 
-        #endregion
+        #endregion Test 3 — AcceptancePenalty: funeral-level score halves baseP
 
         #region Test 4 — ShameSpike: high Neuroticism amplifies valence delta
 
@@ -102,7 +102,7 @@ namespace EngineTests
                 $"High-N spike DeltaValence should be < -0.50. Got: {dv:F3}");
         }
 
-        #endregion
+        #endregion Test 4 — ShameSpike: high Neuroticism amplifies valence delta
 
         #region Test 5 — ShameSpike: low Neuroticism damps valence delta
 
@@ -123,7 +123,7 @@ namespace EngineTests
                 $"Low-N spike DeltaValence should be > -0.28. Got: {dv:F3}");
         }
 
-        #endregion
+        #endregion Test 5 — ShameSpike: low Neuroticism damps valence delta
 
         #region Test 6 — Observer routing: victim gets Anger
 
@@ -142,7 +142,7 @@ namespace EngineTests
             Assert.AreEqual(ObserverReactionKind.Anger, reaction);
         }
 
-        #endregion
+        #endregion Test 6 — Observer routing: victim gets Anger
 
         #region Test 7 — Observer routing: third party gets MoralOutrage
 
@@ -162,7 +162,7 @@ namespace EngineTests
             Assert.AreEqual(ObserverReactionKind.MoralOutrage, reaction);
         }
 
-        #endregion
+        #endregion Test 7 — Observer routing: third party gets MoralOutrage
 
         #region Test 8 — IsShameChannel: Greeting and PublicConduct return false
 
@@ -179,7 +179,7 @@ namespace EngineTests
                 "RitualContext should be shame channel");
         }
 
-        #endregion
+        #endregion Test 8 — IsShameChannel: Greeting and PublicConduct return false
 
         #region Test 9 — InteractionEngine: funeral surface reduces acceptance and emits NormViolationOccurred
 
@@ -229,7 +229,7 @@ namespace EngineTests
                 $"NormViolationOccurred must be emitted on funeral surface. Got: {normViolations}");
         }
 
-        #endregion
+        #endregion Test 9 — InteractionEngine: funeral surface reduces acceptance and emits NormViolationOccurred
 
         #region Test 10 — PsychologyEngine: NormViolationOccurred applies shame spike
 
@@ -285,16 +285,20 @@ namespace EngineTests
                 $"DominantEmotion must shift to Shame. Got: {shifted.To}");
         }
 
-        #endregion
+        #endregion Test 10 — PsychologyEngine: NormViolationOccurred applies shame spike
 
         #region Pomocné metody
 
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _r;
+
             public SeededRandom(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 
@@ -359,6 +363,6 @@ namespace EngineTests
             };
         }
 
-        #endregion
+        #endregion Pomocné metody
     }
 }

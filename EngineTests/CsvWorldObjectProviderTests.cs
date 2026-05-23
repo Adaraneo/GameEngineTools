@@ -3,13 +3,13 @@
 
 namespace EngineTests
 {
+    using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Objects;
+    using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
     using System.Collections.Immutable;
     using System.IO;
     using System.Linq;
-    using GameEngineTools.Characters.Core;
-    using GameEngineTools.World.Objects;
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
 
     /// <summary>
     /// Unit tests for <see cref="CsvWorldObjectProvider.AddObject"/>,
@@ -38,15 +38,15 @@ namespace EngineTests
             HumanId? heldBy = null)
             => new WorldObject
             {
-                Id          = id,
+                Id = id,
                 DisplayName = id,
-                Category    = WorldObjectCategory.Furniture,
-                LocationId  = locationId,
+                Category = WorldObjectCategory.Furniture,
+                LocationId = locationId,
                 Affordances = ImmutableArray<WorldObjectAffordance>.Empty,
-                HeldBy      = heldBy
+                HeldBy = heldBy
             };
 
-        #endregion
+        #endregion Helpers
 
         #region AddObject → GetObjectsAt
 
@@ -82,7 +82,7 @@ namespace EngineTests
             provider.AddObject(MakeObject("candle_01", "chapel"));
             provider.AddObject(MakeObject("tome_01", "library"));
 
-            var chapel  = provider.GetObjectsAt("chapel").ToList();
+            var chapel = provider.GetObjectsAt("chapel").ToList();
             var library = provider.GetObjectsAt("library").ToList();
 
             Assert.AreEqual(1, chapel.Count);
@@ -97,8 +97,8 @@ namespace EngineTests
         {
             // GetObjectsAt filters out held objects — same contract as CSV-loaded objects.
             var provider = EmptyProvider();
-            var holder   = new HumanId(Guid.NewGuid());
-            var obj      = MakeObject("key_02", "storeroom", heldBy: holder);
+            var holder = new HumanId(Guid.NewGuid());
+            var obj = MakeObject("key_02", "storeroom", heldBy: holder);
 
             provider.AddObject(obj);
             var result = provider.GetObjectsAt("storeroom").ToList();
@@ -106,7 +106,7 @@ namespace EngineTests
             Assert.AreEqual(0, result.Count, "Held objects must be filtered by GetObjectsAt.");
         }
 
-        #endregion
+        #endregion AddObject → GetObjectsAt
 
         #region FindObject
 
@@ -142,7 +142,7 @@ namespace EngineTests
             Assert.AreEqual("market", found!.LocationId);
         }
 
-        #endregion
+        #endregion FindObject
 
         #region GetHeldBy
 
@@ -162,8 +162,8 @@ namespace EngineTests
         [TestMethod]
         public void GetHeldBy_NoObjectsHeld_ReturnsEmpty()
         {
-            var provider  = EmptyProvider();
-            var holderId  = new HumanId(Guid.NewGuid());
+            var provider = EmptyProvider();
+            var holderId = new HumanId(Guid.NewGuid());
             provider.AddObject(MakeObject("chest_01", "dungeon")); // not held
 
             var held = provider.GetHeldBy(holderId).ToList();
@@ -176,26 +176,26 @@ namespace EngineTests
         {
             var provider = EmptyProvider();
             var holderId = new HumanId(Guid.NewGuid());
-            provider.AddObject(MakeObject("map_01",    "tavern",   heldBy: holderId));
-            provider.AddObject(MakeObject("dagger_01", "alley",    heldBy: holderId));
-            provider.AddObject(MakeObject("bread_01",  "bakery")); // unrelated, not held
+            provider.AddObject(MakeObject("map_01", "tavern", heldBy: holderId));
+            provider.AddObject(MakeObject("dagger_01", "alley", heldBy: holderId));
+            provider.AddObject(MakeObject("bread_01", "bakery")); // unrelated, not held
 
             var held = provider.GetHeldBy(holderId).ToList();
 
             Assert.AreEqual(2, held.Count);
         }
 
-        #endregion
+        #endregion GetHeldBy
 
         #region AddObject then RemoveObject (physical travel integration)
 
         [TestMethod]
         public void PhysicalTravel_RemoveFromOriginal_AddAtDrop_ObjectAppearsAtDropLocation()
         {
-            var provider     = EmptyProvider();
-            var pickupLoc    = "warehouse";
-            var dropLoc      = "market_square";
-            var holderId     = new HumanId(Guid.NewGuid());
+            var provider = EmptyProvider();
+            var pickupLoc = "warehouse";
+            var dropLoc = "market_square";
+            var holderId = new HumanId(Guid.NewGuid());
 
             // Simulate Take: object is in the warehouse, marked as held.
             var pickedUp = MakeObject("crate_01", pickupLoc, heldBy: holderId);
@@ -216,6 +216,6 @@ namespace EngineTests
             Assert.IsNull(atDrop[0].HeldBy, "Dropped object must have no holder.");
         }
 
-        #endregion
+        #endregion AddObject then RemoveObject (physical travel integration)
     }
 }

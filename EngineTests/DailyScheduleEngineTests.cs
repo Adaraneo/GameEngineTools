@@ -11,7 +11,6 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Schedule;
-    using static GameEngineTools.Characters.Engines.Schedule.OccupationIds;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
@@ -355,8 +354,8 @@ namespace EngineTests
 
         private static DefaultDailyScheduleEngine BuildEngine(DailyScheduleConfig? config = null)
         {
-            var cfg      = Options.Create(config ?? new DailyScheduleConfig());
-            var log      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
+            var cfg = Options.Create(config ?? new DailyScheduleConfig());
+            var log = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))
                                         .CreateLogger<DefaultDailyScheduleEngine>();
             var registry = BuildRegistry();
             return new DefaultDailyScheduleEngine(cfg, log, registry);

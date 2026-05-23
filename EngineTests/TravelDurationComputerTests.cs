@@ -1,7 +1,6 @@
 // TravelDurationComputerTests.cs
 // Copyright (c) 50PSoftware
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using GameEngineTools.World.Movement;
 
 namespace EngineTests;

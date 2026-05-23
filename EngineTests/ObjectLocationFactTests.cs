@@ -4,7 +4,6 @@
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.World.Objects;
 using GameEngineTools.World.Utils.Time;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace EngineTests;
 
@@ -31,10 +30,10 @@ public class ObjectLocationFactTests : TestBase
         var at = new WDateTime(99999);
         var fact = new ObjectLocationFact("mushroom_01", "forest_clearing", at, 0.7, PickupItemKind.Food);
 
-        Assert.AreEqual("mushroom_01",    fact.ObjectId);
+        Assert.AreEqual("mushroom_01", fact.ObjectId);
         Assert.AreEqual("forest_clearing", fact.LocationId);
-        Assert.AreEqual(at,               fact.SeenAt);
-        Assert.AreEqual(0.7,              fact.Confidence, 0.001);
+        Assert.AreEqual(at, fact.SeenAt);
+        Assert.AreEqual(0.7, fact.Confidence, 0.001);
         Assert.AreEqual(PickupItemKind.Food, fact.ItemKind);
     }
 

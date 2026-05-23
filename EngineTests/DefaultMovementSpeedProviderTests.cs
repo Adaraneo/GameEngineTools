@@ -1,7 +1,6 @@
 // DefaultMovementSpeedProviderTests.cs
 // Copyright (c) 50PSoftware
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Interactions;
@@ -11,7 +10,6 @@ using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.World.Movement;
-using System.Collections.Generic;
 
 namespace EngineTests;
 
@@ -21,14 +19,14 @@ public class DefaultMovementSpeedProviderTests
     private static EnginesSnapshot BuildSnapshot(double energy, double pain)
     {
         var physio = new PhysiologyState(
-            Energy:        energy,
+            Energy: energy,
             SleepDebtHours: 0,
-            Hunger:        10,
-            Thirst:        10,
-            Pain:          pain,
-            ImmuneLoad:    0,
+            Hunger: 10,
+            Thirst: 10,
+            Pain: pain,
+            ImmuneLoad: 0,
             BodyTempDelta: 0,
-            Cycle:         null);
+            Cycle: null);
 
         var psych = new PsychologyState(0.1, 0.5, 0.5, 10, 50, DiscreteEmotion.Neutral);
 
