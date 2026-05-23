@@ -72,8 +72,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// <inheritdoc/>
         public void Modify(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
-            // AvailableObjects is pre-filtered to current location + IsAvailable=true
-            // by DefaultBehaviorEngine before building BehaviorContext.
+            if (context.AvailableObjects is null)
+                return;
+
             ApplyGates(candidates, context.AvailableObjects);
         }
 
@@ -126,8 +127,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             ActionRequirement requirement,
             IReadOnlyList<WorldObject>? availableObjects)
         {
-            // No objects at all — every requirement fails immediately.
-            if (availableObjects is null or { Count: 0 })
+            if (availableObjects.Count == 0)
                 return false;
 
             // Iterate without LINQ — the list is small and this is a hot path (every tick).

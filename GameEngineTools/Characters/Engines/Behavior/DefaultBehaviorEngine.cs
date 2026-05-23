@@ -50,6 +50,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </summary>
         private readonly CsvWorldObjectProvider? _csvObjectProvider;
 
+        /// <summary>
+        /// Constraint gate that runs after all modifier engines and removes or suppresses
+        /// candidates whose required world objects are absent from the current location.
+        /// Always active — does not depend on any optional provider.
+        /// </summary>
         private readonly ObjectAffordanceGatingEngine _objectAffordanceGatingEngine;
 
         #endregion Private fields
