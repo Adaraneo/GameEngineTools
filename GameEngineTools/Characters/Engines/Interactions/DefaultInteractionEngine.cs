@@ -180,6 +180,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 Noise: Math.Clamp(cc.Noise, 0, 1),
                 Crowding: Math.Clamp(cc.Crowding, 0, 1),
                 Kind: cc.Kind,
+                Observers: cc.Observers,
                 NormContext: cc.NormContext);
         }
 

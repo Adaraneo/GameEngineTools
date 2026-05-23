@@ -38,6 +38,13 @@ namespace GameEngineTools.Characters.Engines.Interactions
         SurfaceKind Kind,
 
         /// <summary>
+        /// Characters present at the new location who can witness interactions.
+        /// Passed through to <see cref="InteractionSurface.Observers"/>.
+        /// <c>null</c> = no known observers (default).
+        /// </summary>
+        System.Collections.Generic.IReadOnlyList<HumanId>? Observers = null,
+
+        /// <summary>
         /// Active social norm context at the new location, or <c>null</c> for ordinary surfaces.
         /// Passed through to <see cref="InteractionSurface.NormContext"/>.
         /// </summary>
