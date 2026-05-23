@@ -17,6 +17,9 @@ using GameEngineTools.FileSystem;
 using GameEngineTools.Logging;
 using GameEngineTools.World.Core.Calendars;
 using GameEngineTools.World.Core.Time;
+using GameEngineTools.World.Location;
+using GameEngineTools.World.Movement;
+using GameEngineTools.World.Objects;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -220,6 +223,14 @@ namespace GameEngineTools
                 var clock = sp.GetRequiredService<IClock>();
                 return HumanBlueprintSpec.Default(clock.Now.Date);
             });
+
+            services.AddSingleton<ILocationService, DefaultLocationService>();
+            services.AddSingleton<CsvWorldObjectProvider>();
+            services.AddSingleton<IWorldObjectProvider>(sp => sp.GetRequiredService<CsvWorldObjectProvider>());
+            services.AddObjectInteractionEngine();
+
+            services.AddSingleton<DefaultMovementSpeedProvider>();
+            services.AddSingleton<IMovementSpeedProvider>(sp => sp.GetRequiredService<DefaultMovementSpeedProvider>());
 
             services.AddFamilySystem();
 

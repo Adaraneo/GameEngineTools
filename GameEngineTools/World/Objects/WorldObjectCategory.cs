@@ -21,10 +21,16 @@ namespace GameEngineTools.World.Objects
         Furniture,
 
         /// <summary>
-        /// Food source or consumable — apple, bread, barrel of mead.
-        /// Provides Hunger or Thirst satisfaction.
+        /// Food source or consumable — apple, bread.
+        /// Provides Hunger satisfaction.
         /// </summary>
         Food,
+
+        /// <summary>
+        /// Drink source - water, meed, beer, ale.
+        /// Provides Thirst satisfaction.
+        /// </summary>
+        Drink,
 
         /// <summary>
         /// Light source — torch, candle, fireplace, lantern.

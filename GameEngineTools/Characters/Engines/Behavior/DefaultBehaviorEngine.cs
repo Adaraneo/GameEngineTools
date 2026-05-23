@@ -50,6 +50,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </summary>
         private readonly CsvWorldObjectProvider? _csvObjectProvider;
 
+        private readonly ObjectAffordanceGatingEngine _objectAffordanceGatingEngine;
+
         #endregion Private fields
 
         #region Public properties
@@ -84,6 +86,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine() };
             _csvObjectProvider = csvObjectProvider;
             _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(_csvObjectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>()), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value) };
+            _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine();
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
@@ -140,6 +143,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
                         .Where(o => o.IsAvailable)
                         .ToList();
                 }
+                else
+                {
+                    availableObjects = new List<WorldObject>();
+                }
             }
 
             var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator, availableObjects);
@@ -154,6 +161,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
             foreach (var engine in _needEngines) candidates.AddRange(engine.Evaluate(context).Candidates);
             ApplyDevelopmentGate(context, candidates);
             foreach (var modifier in _modifierEngines) modifier.Modify(context, candidates);
+
+            _objectAffordanceGatingEngine.Modify(context, candidates);
 
             // Intent management stabilizes direction across ticks but still leaves final choice to arbitration.
             if (Config.UseIntentManagement)

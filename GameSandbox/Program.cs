@@ -208,10 +208,10 @@ var diary = new List<NarrativeEntry>();
 var rng = new Random();
 
 var worldMap = WorldMapLoader.Load();
-var locationService = new DefaultLocationService();
+var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
 worldMap.RegisterAllLocations(locationService);
-var objectProvider = new CsvWorldObjectProvider();
-var speedProvider = new DefaultMovementSpeedProvider();
+var objectProvider = runtime.Services.GetRequiredService<CsvWorldObjectProvider>();
+var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
 
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
