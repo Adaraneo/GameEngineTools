@@ -15,5 +15,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
         PrivacySeeking,
         Exploration,
         SelfCare,
+        /// <summary>
+        /// Character is actively seeking a location that has food or drink available.
+        /// </summary>
+        FoodSeeking,
     }
 }

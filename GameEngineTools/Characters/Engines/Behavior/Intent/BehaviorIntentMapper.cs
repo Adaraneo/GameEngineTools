@@ -20,6 +20,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
             MoveToPrivate or InviteIntimacy => BehaviorIntentKind.PrivacySeeking,
             SelfCare => BehaviorIntentKind.SelfCare,
             MoveToPublic => BehaviorIntentKind.Exploration,
+            MoveToFood or MoveToDrink => BehaviorIntentKind.FoodSeeking,
             Idle => BehaviorIntentKind.None,
             _ => BehaviorIntentKind.None,
         };

@@ -8,5 +8,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// </summary>
     internal sealed record BehaviorNeedOutput(
         IReadOnlyList<BehaviorDrive> Drives,
-        IReadOnlyList<BehaviorCandidate> Candidates);
+        IReadOnlyList<BehaviorCandidate> Candidates)
+    {
+        /// <summary>
+        /// Empty output — no drives, no candidates.
+        /// Returned when a need engine has nothing to contribute this tick.
+        /// </summary>
+        internal static readonly BehaviorNeedOutput Empty = new(Array.Empty<BehaviorDrive>(), Array.Empty<BehaviorCandidate>());
+    }
 }

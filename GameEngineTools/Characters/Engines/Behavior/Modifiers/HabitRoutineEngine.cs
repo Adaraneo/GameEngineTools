@@ -17,9 +17,21 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
         private static readonly Dictionary<string, ActionCategory> ActionCategories = new()
         {
-            { Work, ActionCategory.Productive }, { Create, ActionCategory.Productive }, { ReachOut, ActionCategory.Social }, { InviteIntimacy, ActionCategory.Social },
-            { Eat, ActionCategory.Biological }, { Drink, ActionCategory.Biological }, { SelfCare, ActionCategory.Biological }, { Idle, ActionCategory.Rest },
-            { MoveToSocial, ActionCategory.Social }, { MoveToPrivate, ActionCategory.Rest }, { MoveToWork, ActionCategory.Productive }, { MoveToRest, ActionCategory.Rest }, { MoveToPublic, ActionCategory.Social },
+            { Work,          ActionCategory.Productive },
+            { Create,        ActionCategory.Productive },
+            { ReachOut,      ActionCategory.Social     },
+            { InviteIntimacy,ActionCategory.Social     },
+            { Eat,           ActionCategory.Biological },
+            { Drink,         ActionCategory.Biological },
+            { SelfCare,      ActionCategory.Biological },
+            { MoveToFood,    ActionCategory.Biological },
+            { MoveToDrink,   ActionCategory.Biological },
+            { Idle,          ActionCategory.Rest        },
+            { MoveToSocial,  ActionCategory.Social      },
+            { MoveToPrivate, ActionCategory.Rest        },
+            { MoveToWork,    ActionCategory.Productive  },
+            { MoveToRest,    ActionCategory.Rest        },
+            { MoveToPublic,  ActionCategory.Social      },
         };
 
         #endregion Static data

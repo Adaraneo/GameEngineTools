@@ -106,6 +106,13 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private readonly List<IHuman> _socialCharsBuffer = new();
 
+        /// <summary>
+        /// Optional world object provider used to locate food and drink objects
+        /// across the scene when routing <c>MoveTo:Food</c> and <c>MoveTo:Drink</c> actions.
+        /// <c>null</c> disables object-category movement routing.
+        /// </summary>
+        private readonly IWorldObjectProvider? _objectProvider;
+
         #endregion Private fields
 
         #region Constructor
@@ -132,7 +139,8 @@ namespace GameEngineTools.World.Simulation
             WorldMap worldMap,
             IMovementSpeedProvider speedProvider,
             Random rng,
-            ILogger<DefaultSceneOrchestrator> log)
+            ILogger<DefaultSceneOrchestrator> log,
+            IWorldObjectProvider? objectProvider = null)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -143,6 +151,7 @@ namespace GameEngineTools.World.Simulation
             _speedProvider = speedProvider;
             _rng = rng;
             _log = log;
+            _objectProvider = objectProvider;
         }
 
         #endregion Constructor
@@ -359,12 +368,37 @@ namespace GameEngineTools.World.Simulation
                 if (moveTo is null)
                     continue;
 
-                // Parse the requested LocationType from the action name suffix.
+                var currentLocation = _locationService.GetLocation(character.Id);
+
+                // ── Object-category foraging movement (MoveTo:Food, MoveTo:Drink) ──────────
+                // These bypass LocationType routing and search by required object category.
+                if (moveTo.ActionName is MoveToFood or MoveToDrink)
+                {
+                    var category = moveTo.ActionName == MoveToFood
+                        ? WorldObjectCategory.Food
+                        : WorldObjectCategory.Drink;
+
+                    var destination = FindLocationWithCategory(character, currentLocation, category);
+
+                    if (destination is not null)
+                    {
+                        _locationService.MoveCharacter(character.Id, destination);
+                        _fullyMetLocations.Remove(destination);
+                    }
+                    else
+                    {
+                        _log.LogDebug(
+                            "[MoveTo] {CharId} needs {Category} but no location with that object exists.",
+                            character.Id.Value, category);
+                    }
+
+                    continue;
+                }
+
+                // ── Standard LocationType movement ─────────────────────────────────────────
                 var typeName = moveTo.ActionName["MoveTo:".Length..];
                 if (!Enum.TryParse<LocationType>(typeName, out var requestedType))
                     continue;
-
-                var currentLocation = _locationService.GetLocation(character.Id);
 
                 var chosen = FindBestMoveTarget(character, currentLocation, requestedType);
 
@@ -377,9 +411,6 @@ namespace GameEngineTools.World.Simulation
                 }
 
                 _locationService.MoveCharacter(character.Id, chosen);
-
-                // Invalidate the saturation cache for the destination — the arriving
-                // character may be a stranger to the characters already there.
                 _fullyMetLocations.Remove(chosen);
             }
         }
@@ -449,6 +480,50 @@ namespace GameEngineTools.World.Simulation
                 .First();
 
             return best.Id;
+        }
+
+        /// <summary>
+        /// Finds the best location that has at least one available object of the requested category.
+        /// Adjacent locations are preferred over distant ones.
+        /// Returns <c>null</c> when no provider is wired or no suitable location exists.
+        /// </summary>
+        /// <param name="character">The character that is about to move.</param>
+        /// <param name="currentLocationId">Character's current location, or <c>null</c> if unplaced.</param>
+        /// <param name="category">Required object category (e.g. Food, Drink).</param>
+        private string? FindLocationWithCategory(
+            IHuman character,
+            string? currentLocationId,
+            WorldObjectCategory category)
+        {
+            if (_objectProvider is null || currentLocationId is null)
+                return null;
+
+            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
+
+            // Build the set of locations that have the required category, excluding the current one.
+            var candidateLocations = _objectProvider
+                .GetAllObjects()
+                .Where(o => o.Category == category && o.IsAvailable && o.LocationId != currentLocationId)
+                .Select(o => o.LocationId)
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (candidateLocations.Count == 0)
+                return null;
+
+            // Prefer the nearest adjacent location that has the required objects.
+            var adjacentMatch = _worldMap
+                .GetConnections(currentLocationId)
+                .Where(conn => candidateLocations.Contains(conn.TargetLocationId))
+                .OrderBy(conn => TravelDurationComputer.ComputeMinutes(conn.DistanceMeters, speed))
+                .Select(conn => conn.TargetLocationId)
+                .FirstOrDefault();
+
+            if (adjacentMatch is not null)
+                return adjacentMatch;
+
+            // Fallback: pick arbitrarily from all known locations with the required object.
+            // Could be improved with distance scoring if WorldMap exposes path lengths.
+            return candidateLocations.First();
         }
 
         /// <summary>

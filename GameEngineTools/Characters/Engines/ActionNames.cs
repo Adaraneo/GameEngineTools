@@ -22,6 +22,8 @@ namespace GameEngineTools.Characters.Engines
         public const string MoveToWork = "MoveTo:Work";
         public const string MoveToRest = "MoveTo:Rest";
         public const string MoveToPublic = "MoveTo:Public";
+        public const string MoveToFood = "MoveTo:Food";
+        public const string MoveToDrink = "MoveTo:Drink";
 
         public const string InteractWithObject = "InteractWithObject";
     }
