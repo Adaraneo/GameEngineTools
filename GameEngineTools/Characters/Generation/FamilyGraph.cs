@@ -222,6 +222,14 @@ namespace GameEngineTools.Characters.Generation
             }
         }
 
+        public void RegisterToClan(IHuman relative, IHuman clanMember)
+        {
+            ArgumentNullException.ThrowIfNull(relative);
+            ArgumentNullException.ThrowIfNull(clanMember);
+
+            relative.SetLastName(clanMember);
+        }
+
         /// <summary>
         /// Adds a directed kin link from <paramref name="owner"/> to <paramref name="relative"/>.
         /// </summary>

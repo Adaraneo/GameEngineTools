@@ -98,6 +98,8 @@ namespace GameEngineTools.Characters.Core
         /// Existing scheduled slots for the current and future days are replaced.
         /// </summary>
         void ChangeOccupation(string? newOccupationId) { }
+
+        void SetLastName(IHuman partner) { }
     }
 
     public readonly record struct HumanId(Guid Value);

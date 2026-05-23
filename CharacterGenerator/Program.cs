@@ -1,6 +1,7 @@
 ﻿namespace CharacterGenerator
 {
     using GameEngineTools;
+    using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
@@ -168,22 +169,26 @@
 
                 var nfb = runtime.Services.GetRequiredService<NuclearFamilyGenerator>();
                 var now = player.Person.Identity.BirthDate;
+                var familyGraph = runtime.Services.GetRequiredService<FamilyGraph>();
                 var personalitySpec = new PersonalitySpec(O: new TraitDistribution(0.35, 0.5), new TraitDistribution(0.35, 0.3), new TraitDistribution(0.35, 0.3), new TraitDistribution(0.35, 0.6), new TraitDistribution(0.35, 0.6), PersonalitySpec.Default.Corr, PersonalitySpec.Default.AttachmentWeights, PersonalitySpec.Default.CommunicationWeights with { Direct = 0.6 }, PersonalitySpec.Default.ChronotypeWeights, PersonalitySpec.Default.SociosexualityWeights, PersonalitySpec.Default.MotivationMap);
                 var nf = nfb.Generate(new NuclearFamilySpec
                 (
-                    new HumanBlueprintRequest(GameEngineTools.Characters.Core.SexBiology.Male, now.AddYears(-30), now.AddYears(-25), PersonalitySpec: personalitySpec, Occupation: OccupationIds.Guard),
-                    new HumanBlueprintRequest(GameEngineTools.Characters.Core.SexBiology.Female, now.AddYears(-30), now.AddYears(-25), PersonalitySpec: personalitySpec, Occupation: OccupationIds.Healer),
+                    new HumanBlueprintRequest(SexBiology.Male, now.AddYears(-30), now.AddYears(-25), PersonalitySpec: personalitySpec, Occupation: OccupationIds.Guard),
+                    new HumanBlueprintRequest(SexBiology.Female, now.AddYears(-30), now.AddYears(-25), PersonalitySpec: personalitySpec, Occupation: OccupationIds.Healer),
                     Children:
                     [
                         new ChildSpec(now),
                     ]
-                ), new FamilyGraph(), now.ToDateTime());
+                ), familyGraph, now.ToDateTime());
 
                 foreach (var member in nf.AllMembers)
                 {
                     Console.WriteLine("Name: {0}, Stadium: {1}, Age: {2}", member.ToString(), member.Stadium, member.Age);
+                    member.FlushInbox();
                     characters.Add(new NPC(100, member));
                 }
+
+                familyGraph.RegisterToClan(nf.PartnerB, nf.PartnerA);
 
                 Console.WriteLine("NuclearFamilyGeneration: complete");
             }

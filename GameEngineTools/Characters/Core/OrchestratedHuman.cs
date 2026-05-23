@@ -565,6 +565,19 @@ namespace GameEngineTools.Characters.Core
                 Id);
         }
 
+        public void SetLastName(IHuman partner)
+        {
+            if (_ctx.Snapshot.Relationships.Edges is not null)
+            {
+                _ctx.Snapshot.Relationships.Deconstruct(out var edges);
+                if (edges.Count == 0) return;
+                var partnerId = edges.First(edge => edge.Value.KinRole == KinRole.Partner && edge.Key == partner.Id);
+                if (partnerId.Key != partner.Id) return;
+                Identity = Identity with { LastName = partner.Identity.LastName };
+                _ctx.Identity = Identity;
+            }
+        }
+
         private void LogState()
         {
             var s = Snapshot;
