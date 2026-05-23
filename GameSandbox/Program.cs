@@ -336,7 +336,10 @@ if (characters.Count > 0)
 
     foreach (var character in characters)
     {
-        locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
+        if (character.Snapshot.InteractionSurface.Location == "Unknown")
+        {
+            locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
+        }
     }
 
     clock.SetNow(startNow);
@@ -345,7 +348,7 @@ if (characters.Count > 0)
     {
         Characters = characters,
         LocationService = locationService,
-        TickStep = WTimeSpan.FromHours(5),
+        TickStep = WTimeSpan.FromHours(2),
         AstroConfig = astroOptions,
         UniverseConfig = universeOptions,
         SimulationDays = simulationDays,
