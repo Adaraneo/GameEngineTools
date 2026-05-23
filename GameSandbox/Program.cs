@@ -210,11 +210,10 @@ var rng = new Random();
 var worldMap = WorldMapLoader.Load();
 var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
 worldMap.RegisterAllLocations(locationService);
-var objectProvider = runtime.Services.GetRequiredService<CsvWorldObjectProvider>();
+var objectProvider = (CsvWorldObjectProvider)runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
 
-objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = "apple_01", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = new ImmutableArray<WorldObjectAffordance>{ new WorldObjectAffordance(AffordanceType.Hunger, 0.5)} });
-
+objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = "apple_01", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.5)] });
 
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
