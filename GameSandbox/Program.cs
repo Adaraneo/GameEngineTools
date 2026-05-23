@@ -213,6 +213,9 @@ worldMap.RegisterAllLocations(locationService);
 var objectProvider = runtime.Services.GetRequiredService<CsvWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
 
+objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = "apple_01", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = new ImmutableArray<WorldObjectAffordance>{ new WorldObjectAffordance(AffordanceType.Hunger, 0.5)} });
+
+
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
 var mainCharactersQuery = from mainCharacters in manager.Characters

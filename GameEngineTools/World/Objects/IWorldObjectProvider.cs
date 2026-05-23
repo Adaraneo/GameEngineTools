@@ -48,5 +48,12 @@ namespace GameEngineTools.World.Objects
         /// Use cases: character drops an item at a new location, crafting, narrative spawns.
         /// </summary>
         void AddObject(WorldObject obj);
+
+        /// <summary>
+        /// Finds a world object by its unique ID across all locations.
+        /// Returns <c>null</c> if no object with the given ID is known.
+        /// </summary>
+        /// <param name="objectId">The unique object identifier.</param>
+        WorldObject? FindObject(string objectId);
     }
 }

@@ -49,7 +49,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
             candidates.Sort((a, b) => b.Utility.CompareTo(a.Utility));
             var intended = candidates[0];
             var chosen = ChooseWithConflict(context, candidates, intended, out var reason);
-            var plan = new PlannedAction(chosen.Name, context.Now, chosen.Duration, chosen.Utility, chosen.SocialTargeting?.TargetHuman);
+            var plan = new PlannedAction(chosen.Name, context.Now, chosen.Duration, chosen.Utility, chosen.SocialTargeting?.TargetHuman, chosen.ObjectInteraction);
             return new ActionArbitrationResult(false, plan, chosen, context.State with { CurrentPlan = plan, Cooldowns = context.Cooldowns }, intended, reason);
         }
 

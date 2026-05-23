@@ -307,6 +307,24 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Hodiny od posledního jídla; reset při Eat; řídí glycemický dip okno.</summary>
         double PostMealHours = 0);
 
+    /// <summary>
+    /// Per-object nutritional gains applied each hour while the character
+    /// is performing an <c>Eat</c> or <c>Drink</c> action with this object.
+    /// Values are in the same [0..100] scale as <see cref="NutritionState"/>.
+    /// When a nutrient is not specified, its gain is zero (object does not provide it).
+    /// </summary>
+    public sealed record NutritionalProfile(
+        /// <summary>Calories restored per hour. Default config value used when null.</summary>
+        double? CalorieGain = null,
+        /// <summary>Protein restored per hour.</summary>
+        double? ProteinGain = null,
+        /// <summary>Iron restored per hour.</summary>
+        double? IronGain = null,
+        /// <summary>Vitamin D restored per hour.</summary>
+        double? VitaminDGain = null,
+        /// <summary>Thirst reduced per hour (for drink objects).</summary>
+        double? HydrationGain = null);
+
     public enum InjuryType
     { Sprain, Infection, Wound }
 

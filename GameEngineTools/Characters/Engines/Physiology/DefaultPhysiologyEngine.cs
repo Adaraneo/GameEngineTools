@@ -9,6 +9,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Core.Time;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -45,6 +46,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private readonly WDateOnly _birthDate;
 
         /// <summary>
+        /// Optional world object provider for resolving nutritional profiles
+        /// of consumed objects. <c>null</c> = use config defaults for all food.
+        /// </summary>
+        private readonly IWorldObjectProvider? _objectProvider;
+
+        /// <summary>
         /// Initialises the engine, computing an initial <see cref="PhysiologyState"/> including
         /// a seeded menstrual cycle when <paramref name="biology"/> is
         /// <see cref="SexBiology.Female"/>, the cycle is enabled in config, and
@@ -64,7 +71,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             IRandomSource rng,
             SexBiology biology,
             WDateOnly birthDate,
-            WDateOnly now)
+            WDateOnly now,
+            IWorldObjectProvider? objectProvider = null)
         {
             Config = cfg.Value;
             _cycleCfg = cycleCfg.Value;
@@ -80,6 +88,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var initialTestosterone = (Config.EnableTestosteroneCycle && biology == SexBiology.Male)
                 ? new TestosteroneState()
                 : null;
+
+            _objectProvider = objectProvider;
 
             State = new PhysiologyState(
                 Energy: 70,
@@ -117,6 +127,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var s = State;
 
             var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
+            var nutProfile = ResolveNutritionalProfile(ctx);
 
             // Modifikátory driftu podle akce
             var energyDelta = action switch
@@ -135,7 +146,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             var thirstDelta = action switch
             {
-                Drink => -50 * h,
+                Drink => -(nutProfile?.HydrationGain ?? 50) * h,
                 Sleep => 2.0 * h,
                 _ => 8 * h
             };
@@ -183,8 +194,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Iron se obnovuje spánkem; VitaminD pomalu klesá
             if (s.Nutrition is { } nut)
             {
-                var caloriesDelta = action == Eat ? Config.CaloriesEatingGainPerHour * h : -Config.NutritionDecayPerHour * h;
-                var proteinDelta = action == Eat ? Config.ProteinEatingGainPerHour * h : -Config.NutritionDecayPerHour * h;
+                var caloriesDelta = action == Eat ? (nutProfile?.CalorieGain ?? Config.CaloriesEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
+                var proteinDelta = action == Eat ? (nutProfile?.ProteinGain ?? Config.ProteinEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
                 var ironDelta = action == Sleep ? Config.IronSleepRecoveryPerHour * h : -Config.NutritionDecayPerHour * h * 0.3;
                 // Glykemický stav: spike při jídle, rebound dip 1–2h po jídle
                 var glucoseDelta = action == Eat ? Config.BloodGlucoseEatingGain * h : 0.0;
@@ -520,6 +531,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
             #endregion Natural mortality check
 
             State = s;
+        }
+
+        /// <summary>
+        /// Resolves the nutritional profile of the object currently being consumed,
+        /// or <c>null</c> when no provider is wired or the current action is not
+        /// food/drink-related.
+        /// </summary>
+        private NutritionalProfile? ResolveNutritionalProfile(IHumanContext ctx)
+        {
+            if (_objectProvider is null)
+                return null;
+
+            var interaction = ctx.Snapshot.Behavior.CurrentPlan?.ObjectInteraction;
+            if (interaction is null)
+                return null;
+
+            return _objectProvider.FindObject(interaction.ObjectId)?.NutritionalProfile;
         }
 
         private static bool HasCriticalState(PhysiologyState s) =>

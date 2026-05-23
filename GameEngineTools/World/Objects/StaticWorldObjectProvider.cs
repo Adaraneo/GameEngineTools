@@ -90,6 +90,10 @@ namespace GameEngineTools.World.Objects
             // No-op: StaticWorldObjectProvider serves pre-registered objects only.
         }
 
+        /// <inheritdoc/>
+        public WorldObject? FindObject(string objectId)
+            => _objects.TryGetValue(objectId, out var obj) ? obj : null;
+
         #endregion IWorldObjectProvider
     }
 }

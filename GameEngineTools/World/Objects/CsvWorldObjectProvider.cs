@@ -10,6 +10,7 @@ namespace GameEngineTools.World.Objects
     using System.Globalization;
     using System.IO;
     using System.Linq;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
 
@@ -279,7 +280,8 @@ namespace GameEngineTools.World.Objects
                 WeightGrams = v.Length > 9 ? int.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0,
                 ItemKind = v.Length > 10 ? Enum.Parse<PickupItemKind>(v[10].Trim(), ignoreCase: true) : PickupItemKind.None,
                 Respawns = v.Length > 11 ? bool.Parse(v[11].Trim()) : false,
-                RespawnMinutes = v.Length > 12 ? int.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 1440
+                RespawnMinutes = v.Length > 12 ? int.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 1440,
+                NutritionalProfile = v.Length > 13 ? ParseNutritionalProfile(v[13].Trim()) : null
             };
 
         /// <summary>
@@ -313,6 +315,47 @@ namespace GameEngineTools.World.Objects
             }
 
             return builder.ToImmutable();
+        }
+
+        /// <summary>
+        /// Parses the pipe-separated nutritional profile string into a
+        /// <see cref="NutritionalProfile"/> record.
+        /// </summary>
+        /// <example>
+        /// Input: <c>"Calories:60|Protein:40|Iron:20|VitaminD:5|Hydration:0"</c>
+        /// </example>
+        /// <param name="raw">Raw nutritional profile string from the CSV cell.</param>
+        private static NutritionalProfile? ParseNutritionalProfile(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            double? calories = null, protein = null, iron = null, vitaminD = null, hydration = null;
+
+            foreach (var token in raw.Split('|', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = token.Split(':');
+                if (parts.Length != 2)
+                    throw new FormatException(
+                        $"Nutritional profile token '{token}' is malformed. Expected format: 'Key:Value'.");
+
+                var value = double.Parse(parts[1].Trim(), CultureInfo.InvariantCulture);
+
+                switch (parts[0].Trim().ToLowerInvariant())
+                {
+                    case "calories": calories = value; break;
+                    case "protein": protein = value; break;
+                    case "iron": iron = value; break;
+                    case "vitamind": vitaminD = value; break;
+                    case "hydration": hydration = value; break;
+                    default:
+                        throw new FormatException(
+                            $"Unknown nutritional key '{parts[0].Trim()}'. " +
+                            $"Valid keys: Calories, Protein, Iron, VitaminD, Hydration.");
+                }
+            }
+
+            return new NutritionalProfile(calories, protein, iron, vitaminD, hydration);
         }
 
         #endregion CSV parsing

@@ -5,6 +5,7 @@ namespace GameEngineTools.World.Objects
 {
     using System.Collections.Immutable;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -136,5 +137,16 @@ namespace GameEngineTools.World.Objects
         public int RespawnMinutes { get; init; } = 1440;
 
         #endregion Runtime ownership state
+
+        #region Nutritional profile
+
+        /// <summary>
+        /// Per-hour nutritional gains this object provides when consumed via an
+        /// <c>Eat</c> or <c>Drink</c> action. <c>null</c> for non-consumable objects
+        /// or when the object uses engine config defaults.
+        /// </summary>
+        public NutritionalProfile? NutritionalProfile { get; init; } = null;
+
+        #endregion
     }
 }

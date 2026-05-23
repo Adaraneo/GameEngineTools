@@ -85,7 +85,18 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// <summary>
     /// Represents the currently committed action and its expected runtime.
     /// </summary>
-    public sealed record PlannedAction(string Name, WDateTime Start, WTimeSpan ExpectedDuration, double Utility, HumanId? TargetHuman = null);
+    public sealed record PlannedAction(
+        string Name,
+        WDateTime Start,
+        WTimeSpan ExpectedDuration,
+        double Utility,
+        HumanId? TargetHuman = null,
+        /// <summary>
+        /// Populated when <see cref="Name"/> is <c>Eat</c> or <c>Drink</c> —
+        /// identifies which world object is being consumed. Used by
+        /// <see cref="DefaultPhysiologyEngine"/> to apply per-object nutritional gains.
+        /// </summary>
+        ObjectInteractionData? ObjectInteraction = null);
 
     /// <summary>
     /// Emitted when the engine proposes a winning action for the current tick.
