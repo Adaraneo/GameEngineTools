@@ -23,6 +23,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             BehaviorCandidateEditor.Add(candidates, MoveToPublic, bonus * 0.4);
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
     }
 }

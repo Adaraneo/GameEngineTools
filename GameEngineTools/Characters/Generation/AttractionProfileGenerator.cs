@@ -4,7 +4,6 @@
 namespace GameEngineTools.Characters.Generation
 {
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
@@ -47,16 +46,18 @@ namespace GameEngineTools.Characters.Generation
         // ── Height preference baselines (cm) ────────────────────────────────────
         // Roughly: people tend to prefer partners close to their own sex-typical mean.
         private const double HeightMeanFemale = 175.0; // mean preferred height when observer is female
-        private const double HeightMeanMale   = 170.0; // mean preferred height when observer is male
-        private const double HeightStdDev     = 7.0;   // individual variation (σ)
+
+        private const double HeightMeanMale = 170.0; // mean preferred height when observer is male
+        private const double HeightStdDev = 7.0;   // individual variation (σ)
         private const double HeightToleranceMin = 8.0;
         private const double HeightToleranceMax = 20.0;
 
         // ── WHR preference baselines ─────────────────────────────────────────────
         // Female target optimum ~0.70, male target optimum ~0.90
-        private const double WhrMeanFemaleTarget  = 0.70;
-        private const double WhrMeanMaleTarget    = 0.90;
-        private const double WhrStdDev            = 0.06;
+        private const double WhrMeanFemaleTarget = 0.70;
+
+        private const double WhrMeanMaleTarget = 0.90;
+        private const double WhrStdDev = 0.06;
 
         /// <inheritdoc/>
         public AttractionProfile Generate(SexBiology biology, IRandomSource rng)
@@ -89,12 +90,12 @@ namespace GameEngineTools.Characters.Generation
             var mereExposureWeight = Math.Clamp(0.5 + SampleNormal(rng) * 0.15, 0.0, 1.0);
 
             return new AttractionProfile(
-                PreferredHeightCm:   Math.Round(preferredHeight, 1),
-                HeightToleranceCm:   Math.Round(heightTolerance, 1),
-                FramePreference:     framePreference,
-                PreferredWhr:        Math.Round(preferredWhr, 3),
-                SymmetryWeight:      Math.Round(symmetryWeight, 3),
-                Orientation:         orientation,
+                PreferredHeightCm: Math.Round(preferredHeight, 1),
+                HeightToleranceCm: Math.Round(heightTolerance, 1),
+                FramePreference: framePreference,
+                PreferredWhr: Math.Round(preferredWhr, 3),
+                SymmetryWeight: Math.Round(symmetryWeight, 3),
+                Orientation: orientation,
                 FemaleTargetAttraction: Math.Round(targetWeights.Female, 3),
                 MaleTargetAttraction: Math.Round(targetWeights.Male, 3),
                 OtherTargetAttraction: Math.Round(targetWeights.Other, 3));
@@ -116,7 +117,7 @@ namespace GameEngineTools.Characters.Generation
         {
             // Uniform over None, Petite, Medium, Large
             var values = (BodyFramePreference[])Enum.GetValues(typeof(BodyFramePreference));
-            var index  = (int)(rng.NextUnit() * values.Length);
+            var index = (int)(rng.NextUnit() * values.Length);
             return values[Math.Clamp(index, 0, values.Length - 1)];
         }
 

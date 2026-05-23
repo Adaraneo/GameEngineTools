@@ -22,7 +22,7 @@ namespace GameEngineTools.Characters.Hosting
         private readonly CharacterFidelityConfig _cfg;
         private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
 
-        #endregion
+        #endregion Private fields
 
         #region Constructor
 
@@ -34,7 +34,7 @@ namespace GameEngineTools.Characters.Hosting
             _lodRuntime = lodRuntime;
         }
 
-        #endregion
+        #endregion Constructor
 
         #region IMemoryFidelityPolicy
 
@@ -56,7 +56,7 @@ namespace GameEngineTools.Characters.Hosting
                 _ => true
             };
 
-        #endregion
+        #endregion IMemoryFidelityPolicy
 
         #region Private helpers
 
@@ -102,6 +102,6 @@ namespace GameEngineTools.Characters.Hosting
                 or MemoryMicroEventKinds.Validation;
         }
 
-        #endregion
+        #endregion Private helpers
     }
 }

@@ -30,7 +30,7 @@ public record HabitabilityProfile
     public double OverallScore =>
         HabitableZoneScore * GravityScore * AtmosphereScore * MagneticScore * ClimateStabilityScore;
 
-    #endregion
+    #endregion Core scores [0–1]
 
     #region Life implications
 
@@ -43,7 +43,7 @@ public record HabitabilityProfile
     /// <summary>Key limiting factors — what prevents higher life complexity.</summary>
     public required IReadOnlyList<string> LimitingFactors { get; init; }
 
-    #endregion
+    #endregion Life implications
 }
 
 /// <summary>Maximum expected complexity of life given planet conditions.</summary>
@@ -51,16 +51,22 @@ public enum LifeComplexityLevel
 {
     /// <summary>Chemistry cannot support life as we know it.</summary>
     Uninhabitable,
+
     /// <summary>Simple chemistry possible; no biological metabolism likely.</summary>
     PreBiotic,
+
     /// <summary>Microbial life (prokaryotes) possible.</summary>
     Microbial,
+
     /// <summary>Complex single-celled life (eukaryotes) possible.</summary>
     Eukaryotic,
+
     /// <summary>Multicellular organisms possible.</summary>
     Multicellular,
+
     /// <summary>Complex animals with organs and nervous systems possible.</summary>
     ComplexAnimal,
+
     /// <summary>Potentially intelligent life — all major constraints met.</summary>
     PotentiallyIntelligent,
 }
@@ -76,33 +82,33 @@ public static class HabitabilityCalculator
         OrbitalElements orbit,
         StarPhysics star)
     {
-        double hz      = HabitableZoneScore(orbit.SemiMajorAxisAu, star);
-        double grav    = GravityScore(planet.SurfaceGravityVsEarth);
-        double atm     = AtmosphereScore(planet.AtmospherePressureBar, planet.Atmosphere);
-        double mag     = MagneticScore(planet.MagneticFieldStrengthVsEarth);
+        double hz = HabitableZoneScore(orbit.SemiMajorAxisAu, star);
+        double grav = GravityScore(planet.SurfaceGravityVsEarth);
+        double atm = AtmosphereScore(planet.AtmospherePressureBar, planet.Atmosphere);
+        double mag = MagneticScore(planet.MagneticFieldStrengthVsEarth);
         double climate = ClimateStabilityScore(planet.ObliquityDeg, orbit.Eccentricity,
                              planet.IsTidallyLocked, planet.PrimaryMoon, planet.MassKg);
 
         double tempK = star.EquilibriumTempK(orbit.SemiMajorAxisAu, planet.Albedo)
                      + planet.GreenhouseWarmingK;
 
-        var limits    = ComputeLimitingFactors(planet, orbit, star, tempK, hz);
+        var limits = ComputeLimitingFactors(planet, orbit, star, tempK, hz);
         var complexity = DetermineComplexity(hz, grav, atm, mag, climate, tempK, limits);
 
         return new HabitabilityProfile
         {
-            HabitableZoneScore     = hz,
-            GravityScore           = grav,
-            AtmosphereScore        = atm,
-            MagneticScore          = mag,
-            ClimateStabilityScore  = climate,
-            MeanSurfaceTempK       = tempK,
+            HabitableZoneScore = hz,
+            GravityScore = grav,
+            AtmosphereScore = atm,
+            MagneticScore = mag,
+            ClimateStabilityScore = climate,
+            MeanSurfaceTempK = tempK,
             ExpectedLifeComplexity = complexity,
-            LimitingFactors        = limits,
+            LimitingFactors = limits,
         };
     }
 
-    #endregion
+    #endregion Main entry point
 
     #region Component scores
 
@@ -127,12 +133,12 @@ public static class HabitabilityCalculator
                           : pressureBar < 0.006 ? 0.0 : 0.2;
         double compScore = composition switch
         {
-            AtmosphereComposition.EarthLike       => 1.0,
-            AtmosphereComposition.CO2Dominated    => 0.4,
+            AtmosphereComposition.EarthLike => 1.0,
+            AtmosphereComposition.CO2Dominated => 0.4,
             AtmosphereComposition.NitrogenMethane => 0.2,
-            AtmosphereComposition.HydrogenHelium  => 0.1,
-            AtmosphereComposition.None            => 0.0,
-            _                                     => 0.6,
+            AtmosphereComposition.HydrogenHelium => 0.1,
+            AtmosphereComposition.None => 0.0,
+            _ => 0.6,
         };
         return pressScore * compScore;
     }
@@ -146,7 +152,7 @@ public static class HabitabilityCalculator
     private static double ClimateStabilityScore(
         double obliquityDeg,
         double eccentricity,
-        bool   tidallyLocked,
+        bool tidallyLocked,
         (MoonPhysics Physics, MoonOrbit Orbit)? primaryMoon = null,
         double planetMassKg = PhysicalConstants.EarthMassKg)
     {
@@ -154,15 +160,15 @@ public static class HabitabilityCalculator
         double oblScore = obliquityDeg < 35 ? 1.0
                         : obliquityDeg < 54 ? 0.7
                         : obliquityDeg < 75 ? 0.3 : 0.1;
-        double eccScore = eccentricity < 0.2  ? 1.0
-                        : eccentricity < 0.4  ? 0.7
-                        : eccentricity < 0.6  ? 0.4 : 0.1;
+        double eccScore = eccentricity < 0.2 ? 1.0
+                        : eccentricity < 0.4 ? 0.7
+                        : eccentricity < 0.6 ? 0.4 : 0.1;
         double baseScore = oblScore * eccScore;
 
         // Velký měsíc stabilizuje sklon osy → bonus ke klimatické stabilitě
         if (primaryMoon is { } moon)
         {
-            var stab  = MoonHabitabilityEffects.ObliquityStabilisationStrength(
+            var stab = MoonHabitabilityEffects.ObliquityStabilisationStrength(
                 moon.Physics.MassKg, moon.Orbit.SemiMajorAxisKm, planetMassKg);
             var bonus = Math.Min(0.15, stab * 0.15);   // max +15 % za Luně-ekvivalentní měsíc
             baseScore = Math.Min(1.0, baseScore + bonus);
@@ -176,8 +182,8 @@ public static class HabitabilityCalculator
         double tempK, double hzScore)
     {
         var list = new List<string>();
-        if (hzScore < 0.5)       list.Add("Outside habitable zone");
-        if (tempK < 200)         list.Add("Too cold for liquid water");
+        if (hzScore < 0.5) list.Add("Outside habitable zone");
+        if (tempK < 200) list.Add("Too cold for liquid water");
         if (tempK > 373 + planet.GreenhouseWarmingK) list.Add("Too hot — possible runaway greenhouse");
         if (planet.SurfaceGravityVsEarth > 3) list.Add("High gravity limits animal size and flight");
         if (planet.AtmospherePressureBar < 0.006) list.Add("Pressure below water triple point — no surface liquid");
@@ -202,5 +208,5 @@ public static class HabitabilityCalculator
         return LifeComplexityLevel.PotentiallyIntelligent;
     }
 
-    #endregion
+    #endregion Component scores
 }

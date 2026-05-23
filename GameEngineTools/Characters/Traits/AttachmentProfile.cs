@@ -41,15 +41,15 @@ namespace GameEngineTools.Characters.Traits
         /// Low anxiety, low avoidance — proportional, constructive, fast Trust recovery.
         /// Baseline (0, 0): no amplification of any dimension.
         /// </summary>
-        public static AttachmentProfile Secure      => new(0.0, 0.0);
+        public static AttachmentProfile Secure => new(0.0, 0.0);
 
         /// <summary>High anxiety, low avoidance — reassurance-seeking, jealousy, slow Trust decay with dramatic spikes.</summary>
         public static AttachmentProfile Preoccupied => new(0.8, 0.15);
 
         /// <summary>Low anxiety, high avoidance — suppressed intimacy, withdrawal under conflict.</summary>
-        public static AttachmentProfile Dismissing  => new(0.15, 0.8);
+        public static AttachmentProfile Dismissing => new(0.15, 0.8);
 
         /// <summary>High anxiety, high avoidance — unstable; alternates approach and withdrawal.</summary>
-        public static AttachmentProfile Fearful     => new(0.8, 0.8);
+        public static AttachmentProfile Fearful => new(0.8, 0.8);
     }
 }

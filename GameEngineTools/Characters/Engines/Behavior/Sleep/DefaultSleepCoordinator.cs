@@ -6,9 +6,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
     using System;
     using System.Collections.Generic;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
-    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using static ActionNames;
@@ -110,11 +110,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                     _activeSession = session;
                     using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepStarted(ctx.Id.Value.ToString(), sleepHours);
                     return state with { WaitingForSleepConfirmation = false, SleepGraceExpiresAt = null, SleepDeclineCount = 0, CurrentPlan = new PlannedAction(Sleep, sc.OccurredAt, WTimeSpan.FromHours(sleepHours), 100) };
+
                 case SleepDeclined sd:
                     var newDeclineCount = state.SleepDeclineCount + 1;
                     var graceHours = Math.Max(1.0, _sleepCfg.SleepGraceHours / newDeclineCount);
                     using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepDeclinedByPlayer(ctx.Id.Value.ToString(), newDeclineCount, graceHours);
                     return state with { WaitingForSleepConfirmation = false, SleepDeclineCount = newDeclineCount, SleepGraceExpiresAt = sd.OccurredAt + WTimeSpan.FromHours(graceHours) };
+
                 case SleepInterrupted si when _activeSession is { IsActive: true }:
                     _activeSession.Interrupt(si.OccurredAt, si.Cause, ctx, outbox);
                     break;

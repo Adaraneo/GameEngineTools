@@ -22,7 +22,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
         private readonly ILogger? _log;
         private readonly DailyScheduleConfig _config;
 
-        #endregion
+        #endregion Private fields
 
         #region Construction
 
@@ -32,7 +32,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             _config = config ?? new DailyScheduleConfig();
         }
 
-        #endregion
+        #endregion Construction
 
         #region IBehaviorModifierEngine
 
@@ -67,7 +67,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             }
 
             var flatBias = activeSlot.BiasStrength * _config.MaxSlotFlatBias;
-            var humanId  = context.HumanContext.Id.Value.ToString();
+            var humanId = context.HumanContext.Id.Value.ToString();
 
             for (var i = 0; i < candidates.Count; i++)
             {
@@ -97,6 +97,6 @@ namespace GameEngineTools.Characters.Engines.Schedule
             }
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
     }
 }

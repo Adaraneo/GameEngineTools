@@ -122,10 +122,10 @@ namespace GameEngineTools.Characters.Traits
                 100);
 
             // Vlasy: runtime aging state přepíše statický trait
-            var hairLen   = Math.Clamp(aging?.HairLengthCm ?? trait.HairLengthCm, 0.0, 120.0);
-            var greyFrac  = Math.Clamp(aging?.GreyFraction ?? 0.0, 0, 1);
-            var hairDens  = Math.Clamp(aging?.HairDensity ?? 1.0, 0, 1);
-            var wrinkles  = Math.Clamp(aging?.WrinkleScore ?? 0.0, 0, 100);
+            var hairLen = Math.Clamp(aging?.HairLengthCm ?? trait.HairLengthCm, 0.0, 120.0);
+            var greyFrac = Math.Clamp(aging?.GreyFraction ?? 0.0, 0, 1);
+            var hairDens = Math.Clamp(aging?.HairDensity ?? 1.0, 0, 1);
+            var wrinkles = Math.Clamp(aging?.WrinkleScore ?? 0.0, 0, 100);
 
             return new AppearanceView(
                 WeightKg: Round1(weight),

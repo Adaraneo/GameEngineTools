@@ -114,7 +114,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
 
             // Accumulate slots grouped by occupation ID
             var groups = new Dictionary<string, List<ScheduleSlotTemplate>>(StringComparer.OrdinalIgnoreCase);
-            var order  = new List<string>(); // preserve declaration order
+            var order = new List<string>(); // preserve declaration order
 
             string? line;
             var lineNumber = 1;
@@ -131,12 +131,12 @@ namespace GameEngineTools.Characters.Engines.Schedule
                         $"Occupations.csv line {lineNumber}: expected 7 columns, got {cols.Length}.");
 
                 var occupationId = cols[0].Trim();
-                var slotId       = cols[1].Trim();
-                var hourOfDay    = int.Parse(cols[2].Trim());
-                var action       = cols[3].Trim();
-                var locationKey  = string.IsNullOrEmpty(cols[4].Trim()) ? null : cols[4].Trim();
+                var slotId = cols[1].Trim();
+                var hourOfDay = int.Parse(cols[2].Trim());
+                var action = cols[3].Trim();
+                var locationKey = string.IsNullOrEmpty(cols[4].Trim()) ? null : cols[4].Trim();
                 var biasStrength = double.Parse(cols[5].Trim(), System.Globalization.CultureInfo.InvariantCulture);
-                var canSkip      = bool.Parse(cols[6].Trim());
+                var canSkip = bool.Parse(cols[6].Trim());
 
                 if (!groups.ContainsKey(occupationId))
                 {

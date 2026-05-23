@@ -7,7 +7,6 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
-    using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
@@ -137,10 +136,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Fyzio modulace (Pain efekty škálovány hyperalgezií)
             s = s with
             {
-                Valence   = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * painAmp * h + 0.0015 * ph.Energy * h),
+                Valence = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * painAmp * h + 0.0015 * ph.Energy * h),
                 // stressGrowthMult: High Neuroticism → HPA osa reaguje silněji na stejné stresory
-                Stress    = Clamp01p(s.Stress + (0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * painAmp * h) * stressGrowthMult),
-                Arousal   = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h),
+                Stress = Clamp01p(s.Stress + (0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * painAmp * h) * stressGrowthMult),
+                Arousal = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h),
                 Dominance = Clamp01(s.Dominance - 0.0005 * ph.Pain * painAmp * h - 0.01 * Math.Max(0, ph.BodyTempDelta - 1.5) * h)
             };
 
@@ -170,7 +169,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 {
                     s = s with
                     {
-                        Arousal       = Clamp01(s.Arousal - Config.SicknessLethargyArousalPenalty * h),
+                        Arousal = Clamp01(s.Arousal - Config.SicknessLethargyArousalPenalty * h),
                         CognitiveLoad = Clamp01p(s.CognitiveLoad + Config.SicknessBrainFogCogLoadBonus * h)
                     };
                 }
@@ -182,9 +181,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 var feverDegrees = Math.Max(0, ph.BodyTempDelta - feverThreshold);
                 var targetLoad = Clamp01p(
                     ph.SleepDebtHours * Config.CognitiveLoadSleepDebtWeight
-                    + ph.Pain          * Config.CognitiveLoadPainWeight
-                    + s.Stress         * Config.CognitiveLoadStressWeight
-                    + feverDegrees     * Config.FeverCognitiveLoadPerDegree);
+                    + ph.Pain * Config.CognitiveLoadPainWeight
+                    + s.Stress * Config.CognitiveLoadStressWeight
+                    + feverDegrees * Config.FeverCognitiveLoadPerDegree);
 
                 var recoveryRate = (action is GameEngineTools.Characters.Engines.ActionNames.Sleep
                                        or GameEngineTools.Characters.Engines.ActionNames.Idle)
@@ -208,7 +207,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 s = s with
                 {
                     CognitiveLoad = Clamp01p(s.CognitiveLoad + alloLoad * Config.AllostaticLoadCognitiveWeight * h),
-                    Valence       = Clampm1p1(s.Valence - alloLoad * 0.001 * h)
+                    Valence = Clampm1p1(s.Valence - alloLoad * 0.001 * h)
                 };
             }
 
@@ -223,7 +222,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 var inertiaSeverity = ph.SleepInertiaHours / Config.SleepInertiaMaxHours; // 0..1
                 s = s with
                 {
-                    Arousal       = Clamp01(s.Arousal - inertiaSeverity * 0.15 * h),
+                    Arousal = Clamp01(s.Arousal - inertiaSeverity * 0.15 * h),
                     CognitiveLoad = Clamp01p(s.CognitiveLoad + inertiaSeverity * 5.0 * h)
                 };
             }
@@ -263,7 +262,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 var nextWanting = wantingMotiv with
                 {
                     NeedIntimacy = Math.Min(100, wantingMotiv.NeedIntimacy + stressExcess * Config.WantingNeedIntimacyBoostPerHour * h),
-                    NeedSocial   = Math.Min(100, wantingMotiv.NeedSocial   + stressExcess * Config.WantingNeedSocialBoostPerHour   * h)
+                    NeedSocial = Math.Min(100, wantingMotiv.NeedSocial + stressExcess * Config.WantingNeedSocialBoostPerHour * h)
                 };
                 if (nextWanting != wantingMotiv)
                 {
@@ -338,15 +337,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     var e = ctx.Personality.BigFive.Extraversion;
                     // desiredPrivacy ∈ [0.2, 0.8]: E=0.1→0.74, E=0.5→0.50, E=0.9→0.26
                     var desiredPrivacy = 0.5 - (e - 0.5) * 0.60;
-                    var actualPrivacy  = surface.HasPrivacy ? 0.8 : 0.2;
+                    var actualPrivacy = surface.HasPrivacy ? 0.8 : 0.2;
 
                     // Crowding: actual < desired (too little privacy)
                     var crowdingDeficit = Math.Max(0.0, desiredPrivacy - actualPrivacy);
-                    var crowdingStress  = crowdingDeficit * Config.PrivacyMismatchStressWeight * stressGrowthMult * h;
+                    var crowdingStress = crowdingDeficit * Config.PrivacyMismatchStressWeight * stressGrowthMult * h;
 
                     // Isolation: actual > desired, only when E > 0.6 (extraverts feel lonely alone)
-                    var privacyExcess    = Math.Max(0.0, actualPrivacy - desiredPrivacy);
-                    var isolationStress  = e > 0.6
+                    var privacyExcess = Math.Max(0.0, actualPrivacy - desiredPrivacy);
+                    var isolationStress = e > 0.6
                         ? privacyExcess * e * Config.IsolationStressWeight * h
                         : 0.0;
 
@@ -371,8 +370,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     && surface.Kind != Interactions.SurfaceKind.Unknown
                     && surface.Location != null)
                 {
-                    var noiseExcess  = surface.Noise - Config.NoiseStressThreshold;
-                    var noiseStress  = noiseExcess * Config.NoiseStressWeightPerHour * stressGrowthMult * h;
+                    var noiseExcess = surface.Noise - Config.NoiseStressThreshold;
+                    var noiseStress = noiseExcess * Config.NoiseStressWeightPerHour * stressGrowthMult * h;
 
                     // Home territory: controllable noise → 60 % stress reduction
                     var isHome = ctx.Identity.HomeLocationId is { } homeId
@@ -389,7 +388,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 var samContrib = ph.AcuteArousalLevel / 100.0 * Config.AcuteArousalPsychWeight;
                 s = s with
                 {
-                    Arousal   = Clamp01(s.Arousal + samContrib * h * 2.0),
+                    Arousal = Clamp01(s.Arousal + samContrib * h * 2.0),
                     Dominance = Clamp01(s.Dominance + samContrib * 0.1 * h)
                 };
             }
@@ -401,7 +400,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 s = s with
                 {
                     Valence = Clampm1p1(s.Valence - excess * Config.PhysicalFatigueValencePenalty * h),
-                    Arousal = Clamp01(s.Arousal   - excess * Config.PhysicalFatigueArousalPenalty * h)
+                    Arousal = Clamp01(s.Arousal - excess * Config.PhysicalFatigueArousalPenalty * h)
                 };
             }
             else if (ph.PhysicalFatigueLevel > Config.PhysicalFatigueMildThreshold)
@@ -416,7 +415,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 var hypSeverity = (Config.HypoglycemiaThreshold - glycemicNut.BloodGlucoseLevel) / Config.HypoglycemiaThreshold;
                 s = s with
                 {
-                    Valence       = Clampm1p1(s.Valence - hypSeverity * Config.HypoglycemiaValencePenalty * h),
+                    Valence = Clampm1p1(s.Valence - hypSeverity * Config.HypoglycemiaValencePenalty * h),
                     CognitiveLoad = Clamp01p(s.CognitiveLoad + hypSeverity * Config.HypoglycemiaCogLoadBonus * h)
                 };
             }
@@ -434,7 +433,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 var chronicity = Math.Min(ph.ChronicPainDays / 30.0, 1.0); // nasycení za 30 dní
                 s = s with
                 {
-                    Valence      = Clampm1p1(s.Valence - chronicity * Config.ChronicPainValencePenaltyPerDay * h),
+                    Valence = Clampm1p1(s.Valence - chronicity * Config.ChronicPainValencePenaltyPerDay * h),
                     MoodBaseline = Math.Clamp(s.MoodBaseline - chronicity * Config.ChronicPainMoodBaselinePenaltyPerDay * h, 0, 100)
                 };
             }
@@ -449,7 +448,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 s = s with
                 {
                     Valence = Clampm1p1(s.Valence - Config.PmddValencePenaltyPerHour * h),
-                    Stress  = Clamp01p(s.Stress + Config.PmddStressBonus * h)
+                    Stress = Clamp01p(s.Stress + Config.PmddStressBonus * h)
                 };
             }
 
@@ -459,7 +458,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 var labilityNoise = RandomSym() * Config.PostpartumCrashValenceLability;
                 s = s with
                 {
-                    Valence      = Clampm1p1(s.Valence + labilityNoise * h),
+                    Valence = Clampm1p1(s.Valence + labilityNoise * h),
                     MoodBaseline = Math.Clamp(s.MoodBaseline - Config.PostpartumCrashMoodBaselinePenalty * h, 0, 100)
                 };
             }
@@ -481,7 +480,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     // Mírný chlad → affiliativní hledání tepla/blízkosti (Fay & Maner 2012)
                     var coldFactor = (Config.AmbientTempColdThreshold - ambientTemp) / 10.0;
                     var next = coldMotiv with
-                        { NeedSocial = Math.Min(100, coldMotiv.NeedSocial + coldFactor * Config.AmbientTempColdSocialBonus * h) };
+                    { NeedSocial = Math.Min(100, coldMotiv.NeedSocial + coldFactor * Config.AmbientTempColdSocialBonus * h) };
                     if (next != coldMotiv)
                     {
                         s = s with { Motivations = next };
@@ -542,11 +541,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Vrcholy jsou posunuty o CircadianPhaseShiftHours (chronotyp + jet-lag) z Physiology.
             if (Config.EnableCircadianRhythm)
             {
-                var hoursOfDay  = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-                var phaseShift  = ph.CircadianPhaseShiftHours;
+                var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
+                var phaseShift = ph.CircadianPhaseShiftHours;
                 var morningPeak = 0.35 * Math.Exp(-Math.Pow(hoursOfDay - 10.0 - phaseShift, 2) / 16.0);  // σ²=8, peak 10h ± posun
                 var eveningPeak = 0.25 * Math.Exp(-Math.Pow(hoursOfDay - 19.0 - phaseShift, 2) / 12.0);  // σ²=6, peak 19h ± posun
-                var lunchDip    = 0.20 * Math.Exp(-Math.Pow(hoursOfDay - 15.0 - phaseShift, 2) / 3.0);   // σ²=1.5, dip 15h ± posun
+                var lunchDip = 0.20 * Math.Exp(-Math.Pow(hoursOfDay - 15.0 - phaseShift, 2) / 3.0);   // σ²=1.5, dip 15h ± posun
                 var baseArousal = Math.Clamp(0.60 + morningPeak + eveningPeak - lunchDip, 0.40, 0.95);
                 var delta = (baseArousal - s.Arousal) * Config.CircadianInfluence * h;
                 s = s with { Arousal = Clamp01(s.Arousal + delta) };
@@ -662,7 +661,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         s = s with
                         {
                             Arousal = Math.Clamp(s.Arousal + 0.05 * hungerNorm, 0, 1),
-                            Valence = Math.Clamp(s.Valence  - 0.08 * hungerNorm, -1, 1)
+                            Valence = Math.Clamp(s.Valence - 0.08 * hungerNorm, -1, 1)
                         };
                     }
                     break;
@@ -735,7 +734,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             s = s with
                             {
                                 Arousal = Math.Clamp(s.Arousal + 0.05 * hungerNorm, 0, 1),
-                                Valence = Math.Clamp(s.Valence  - 0.08 * hungerNorm, -1, 1)
+                                Valence = Math.Clamp(s.Valence - 0.08 * hungerNorm, -1, 1)
                             };
                         }
                     }
@@ -751,27 +750,27 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     break;
 
                 case Characters.Engines.Interactions.SexualEncounterOutcome se when se.Accepted && (se.From == ctx.Id || se.To == ctx.Id):
-                {
-                    // Post-coital reward: liking (opioid system) — valence boost, tension release,
-                    // NeedIntimacy satisfied. Wanting (dopamine) recovers via normal physiology tick.
-                    // Reference: Dual Control Model (Bancroft & Janssen 2009); Basson 2001.
-                    var prevMotivSex = s.Motivations ?? new MotivationState();
-                    var liking = 0.07 + (ctx.Personality.DualControl?.SES ?? 0.5) * 0.06;
-                    s = s with
                     {
-                        Valence  = Math.Clamp(s.Valence  + liking, -1, 1),
-                        Arousal  = Math.Clamp(s.Arousal  - 0.12,   0, 1),   // post-coital relaxation
-                        Stress   = Math.Max(0, s.Stress  - 5.0),              // tension release
-                        Motivations = prevMotivSex with
+                        // Post-coital reward: liking (opioid system) — valence boost, tension release,
+                        // NeedIntimacy satisfied. Wanting (dopamine) recovers via normal physiology tick.
+                        // Reference: Dual Control Model (Bancroft & Janssen 2009); Basson 2001.
+                        var prevMotivSex = s.Motivations ?? new MotivationState();
+                        var liking = 0.07 + (ctx.Personality.DualControl?.SES ?? 0.5) * 0.06;
+                        s = s with
                         {
-                            // NeedIntimacy satisfied — recovers at normal SES-driven rate in Behavior
-                            NeedIntimacy = Math.Max(0, prevMotivSex.NeedIntimacy - 30.0)
-                        }
-                    };
-                    if (s.Motivations != prevMotivSex)
-                        outbox.Add(new MotivationChanged(se.OccurredAt, ctx.Id, prevMotivSex, s.Motivations!));
-                    break;
-                }
+                            Valence = Math.Clamp(s.Valence + liking, -1, 1),
+                            Arousal = Math.Clamp(s.Arousal - 0.12, 0, 1),   // post-coital relaxation
+                            Stress = Math.Max(0, s.Stress - 5.0),              // tension release
+                            Motivations = prevMotivSex with
+                            {
+                                // NeedIntimacy satisfied — recovers at normal SES-driven rate in Behavior
+                                NeedIntimacy = Math.Max(0, prevMotivSex.NeedIntimacy - 30.0)
+                            }
+                        };
+                        if (s.Motivations != prevMotivSex)
+                            outbox.Add(new MotivationChanged(se.OccurredAt, ctx.Id, prevMotivSex, s.Motivations!));
+                        break;
+                    }
 
                 case Characters.Engines.Psychology.StressSpiked sp:
                     s = s with { Stress = Math.Max(s.Stress, sp.NewStress) };
@@ -813,8 +812,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         {
                             Motivations = prevMotivPd with
                             {
-                                NeedCare     = Math.Clamp(prevMotivPd.NeedCare     + 15.0, 0, 100),
-                                NeedIntimacy = Math.Clamp(prevMotivPd.NeedIntimacy -  5.0, 0, 100)
+                                NeedCare = Math.Clamp(prevMotivPd.NeedCare + 15.0, 0, 100),
+                                NeedIntimacy = Math.Clamp(prevMotivPd.NeedIntimacy - 5.0, 0, 100)
                             }
                         };
                         if (s.Motivations != prevMotivPd)
@@ -826,13 +825,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     var prevMotivCb = s.Motivations ?? new MotivationState();
                     s = s with
                     {
-                        Valence   = Math.Clamp(s.Valence + 0.25, -1, 1),
-                        Arousal   = Math.Clamp(s.Arousal + 0.15, 0, 1),
+                        Valence = Math.Clamp(s.Valence + 0.25, -1, 1),
+                        Arousal = Math.Clamp(s.Arousal + 0.15, 0, 1),
                         Dominance = Math.Clamp(s.Dominance - 0.10, 0, 1),
-                        Stress    = Math.Clamp(s.Stress - 10, 0, 100),
+                        Stress = Math.Clamp(s.Stress - 10, 0, 100),
                         Motivations = prevMotivCb with
                         {
-                            NeedCare     = Math.Clamp(prevMotivCb.NeedCare     + 20.0, 0, 100),
+                            NeedCare = Math.Clamp(prevMotivCb.NeedCare + 20.0, 0, 100),
                             NeedIntimacy = Math.Clamp(prevMotivCb.NeedIntimacy - 10.0, 0, 100)
                         }
                     };
@@ -879,7 +878,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             };
                             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
                             {
-                        _log.PsychSleepInterrupted(se.Quality, stressDelta);
+                                _log.PsychSleepInterrupted(se.Quality, stressDelta);
                             }
                         }
                         else
@@ -913,10 +912,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                         // Need 2: Self-esteem — Valence drop + MoodBaseline erosion
                         var valenceDrop = 0.07 * intensity * intimacyScale;
-                        var moodDrop    = 6.0  * intensity * intimacyScale;
+                        var moodDrop = 6.0 * intensity * intimacyScale;
 
                         // Need 4: Meaningful existence — Stress spike (HPA activation)
-                        var stressGain  = 5.0  * intensity * intimacyScale;
+                        var stressGain = 5.0 * intensity * intimacyScale;
 
                         // Need 3: Control — Dominance penalty
                         var dominanceDrop = 0.05 * intensity * intimacyScale;
@@ -924,12 +923,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         var prevMotivRnt = s.Motivations ?? new MotivationState();
                         s = s with
                         {
-                            Valence      = Math.Clamp(s.Valence - valenceDrop, -1, 1),
+                            Valence = Math.Clamp(s.Valence - valenceDrop, -1, 1),
                             MoodBaseline = Math.Clamp(s.MoodBaseline - moodDrop, 0, 100),
-                            Stress       = Math.Clamp(s.Stress + stressGain, 0, 100),
-                            Dominance    = Math.Clamp(s.Dominance - dominanceDrop, 0, 1),
+                            Stress = Math.Clamp(s.Stress + stressGain, 0, 100),
+                            Dominance = Math.Clamp(s.Dominance - dominanceDrop, 0, 1),
                             // Need 1: Belonging — NeedSocial urgency increases (desire to reconnect)
-                            Motivations  = prevMotivRnt with
+                            Motivations = prevMotivRnt with
                             {
                                 NeedSocial = Math.Clamp(prevMotivRnt.NeedSocial + 8.0 * intensity * intimacyScale, 0, 100),
                                 NeedSafety = Math.Clamp(prevMotivRnt.NeedSafety + 4.0 * intensity * intimacyScale, 0, 100)
@@ -995,16 +994,16 @@ namespace GameEngineTools.Characters.Engines.Psychology
         private static double GetEmotionDecayMultiplier(DiscreteEmotion emotion, PsychologyConfig cfg)
             => emotion switch
             {
-                DiscreteEmotion.Fear       => cfg.EmotionDecayFear,
-                DiscreteEmotion.Surprise   => cfg.EmotionDecaySurprise,
-                DiscreteEmotion.Disgust    => cfg.EmotionDecayDisgust,
-                DiscreteEmotion.Joy        => cfg.EmotionDecayJoy,
-                DiscreteEmotion.Pride      => cfg.EmotionDecayPride,
+                DiscreteEmotion.Fear => cfg.EmotionDecayFear,
+                DiscreteEmotion.Surprise => cfg.EmotionDecaySurprise,
+                DiscreteEmotion.Disgust => cfg.EmotionDecayDisgust,
+                DiscreteEmotion.Joy => cfg.EmotionDecayJoy,
+                DiscreteEmotion.Pride => cfg.EmotionDecayPride,
                 DiscreteEmotion.Tenderness => cfg.EmotionDecayTenderness,
-                DiscreteEmotion.Anger      => cfg.EmotionDecayAnger,
-                DiscreteEmotion.Shame      => cfg.EmotionDecayShame,
-                DiscreteEmotion.Sadness    => cfg.EmotionDecaySadness,
-                _                          => 1.0
+                DiscreteEmotion.Anger => cfg.EmotionDecayAnger,
+                DiscreteEmotion.Shame => cfg.EmotionDecayShame,
+                DiscreteEmotion.Sadness => cfg.EmotionDecaySadness,
+                _ => 1.0
             };
 
         /// <summary>
@@ -1070,9 +1069,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
             s = s with
             {
-                Valence   = Math.Clamp(s.Valence   + dv, -1.0, 1.0),
-                Arousal   = Math.Clamp(s.Arousal   + da,  0.0, 1.0),
-                Dominance = Math.Clamp(s.Dominance + dd,  0.0, 1.0)
+                Valence = Math.Clamp(s.Valence + dv, -1.0, 1.0),
+                Arousal = Math.Clamp(s.Arousal + da, 0.0, 1.0),
+                Dominance = Math.Clamp(s.Dominance + dd, 0.0, 1.0)
             };
 
             // Force emotion inference — Shame should appear when the spike is large enough.

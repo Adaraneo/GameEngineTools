@@ -14,6 +14,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         #region Static data
 
         private static readonly HashSet<string> InertiaEligible = new() { Work, Create, ReachOut };
+
         private static readonly Dictionary<string, ActionCategory> ActionCategories = new()
         {
             { Work, ActionCategory.Productive }, { Create, ActionCategory.Productive }, { ReachOut, ActionCategory.Social }, { InviteIntimacy, ActionCategory.Social },
@@ -21,7 +22,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             { MoveToSocial, ActionCategory.Social }, { MoveToPrivate, ActionCategory.Rest }, { MoveToWork, ActionCategory.Productive }, { MoveToRest, ActionCategory.Rest }, { MoveToPublic, ActionCategory.Social },
         };
 
-        #endregion
+        #endregion Static data
 
         #region IBehaviorModifierEngine
 
@@ -57,12 +58,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             }
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
 
         #region Helpers
 
         private static ActionCategory GetCategory(string actionName) => ActionCategories.TryGetValue(actionName, out var cat) ? cat : ActionCategory.Rest;
 
-        #endregion
+        #endregion Helpers
     }
 }

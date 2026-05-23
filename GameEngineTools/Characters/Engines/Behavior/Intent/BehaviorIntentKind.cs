@@ -17,4 +17,3 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
         SelfCare,
     }
 }
-

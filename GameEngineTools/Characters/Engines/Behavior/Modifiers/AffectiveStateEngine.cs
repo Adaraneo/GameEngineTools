@@ -22,6 +22,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             BehaviorCandidateEditor.Multiply(candidates, SelfCare, selfCareBoost);
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
     }
 }

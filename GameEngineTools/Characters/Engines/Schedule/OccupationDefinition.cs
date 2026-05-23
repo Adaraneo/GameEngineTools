@@ -23,15 +23,16 @@ namespace GameEngineTools.Characters.Engines.Schedule
         /// In weights dictionaries use <c>""</c> (empty string) as the key for
         /// the "no occupation" probability.
         /// </remarks>
-        public const string None         = "";
+        public const string None = "";
+
         public const string Craftsperson = "craftsperson";
-        public const string Merchant     = "merchant";
-        public const string Scholar      = "scholar";
-        public const string Farmer       = "farmer";
-        public const string Guard        = "guard";
-        public const string Healer       = "healer";
-        public const string Artist       = "artist";
-        public const string Laborer      = "laborer";
+        public const string Merchant = "merchant";
+        public const string Scholar = "scholar";
+        public const string Farmer = "farmer";
+        public const string Guard = "guard";
+        public const string Healer = "healer";
+        public const string Artist = "artist";
+        public const string Laborer = "laborer";
 
         /// <summary>All built-in non-empty occupation IDs.</summary>
         public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

@@ -7,7 +7,6 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
-    using GameEngineTools.Universe;
     using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Utils.Time;

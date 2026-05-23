@@ -7,11 +7,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using System.Collections.Generic;
     using System.Linq;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Traits;
-    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
@@ -64,23 +64,23 @@ namespace GameEngineTools.Characters.Engines.Behavior
         internal static double MeanCloseness(RelationshipState rs)
         {
             if (rs.Edges is null || rs.Edges.Count == 0) return 50;
-        
+
             // Nejsilnější vztah má největší váhu (quality over quantity)
             var sorted = rs.Edges.Values
                 .Select(e => e.Closeness)
                 .OrderByDescending(c => c)
                 .ToList();
-        
+
             double weightedSum = 0;
             double totalWeight = 0;
             for (int i = 0; i < sorted.Count; i++)
             {
                 // Exponenciálně klesající váhy: 1.0, 0.5, 0.25, 0.125...
                 var weight = Math.Pow(0.5, i);
-                weightedSum  += sorted[i] * weight;
-                totalWeight  += weight;
+                weightedSum += sorted[i] * weight;
+                totalWeight += weight;
             }
-            
+
             return weightedSum / totalWeight;
         }
 
@@ -162,8 +162,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
         #region Surface multipliers
 
         internal static double ProductiveSurfaceMultiplier(SurfaceKind kind) => kind switch { SurfaceKind.Work => 1.00, SurfaceKind.Private => 0.78, SurfaceKind.Public => 0.52, SurfaceKind.Social => 0.38, SurfaceKind.Rest => 0.32, SurfaceKind.Unknown => 1.00, _ => 0.60 };
+
         internal static double SocialSurfaceMultiplier(SurfaceKind kind) => kind switch { SurfaceKind.Social => 1.00, SurfaceKind.Public => 0.75, SurfaceKind.Work => 0.45, SurfaceKind.Private => 0.60, SurfaceKind.Rest => 0.35, SurfaceKind.Unknown => 1.00, _ => 0.60 };
+
         internal static double PrivateSurfaceMultiplier(SurfaceKind kind) => kind switch { SurfaceKind.Private => 1.00, SurfaceKind.Rest => 0.90, SurfaceKind.Work => 0.50, SurfaceKind.Social => 0.20, SurfaceKind.Unknown => 1.00, _ => 0.60 };
+
         internal static double RestSurfaceMultiplier(SurfaceKind kind) => kind switch { SurfaceKind.Private => 1.00, SurfaceKind.Rest => 0.95, _ => 0.5 };
 
         #endregion Surface multipliers

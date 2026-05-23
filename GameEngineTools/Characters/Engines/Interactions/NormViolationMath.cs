@@ -112,7 +112,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             personalityMult = Math.Clamp(personalityMult, 0.30, 2.20);
 
             // Base VAD deltas from Singh & Bhushan (2025) shame profile.
-            var baseValence   = -0.55 * violationScore;
+            var baseValence = -0.55 * violationScore;
             var baseDominance = -0.65 * violationScore;
 
             // Arousal is context-dependent: high with audience (socially evaluative),
@@ -122,8 +122,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 : 0.20 * violationScore;  // Gruenewald et al. (2004): defeat/withdrawal
 
             return (
-                DeltaValence:   Math.Clamp(baseValence   * personalityMult, -0.85, 0.0),
-                DeltaArousal:   Math.Clamp(baseArousal   * personalityMult,  0.0,  0.80),
+                DeltaValence: Math.Clamp(baseValence * personalityMult, -0.85, 0.0),
+                DeltaArousal: Math.Clamp(baseArousal * personalityMult, 0.0, 0.80),
                 DeltaDominance: Math.Clamp(baseDominance * personalityMult, -0.85, 0.0));
         }
 
@@ -186,9 +186,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// </remarks>
         internal static bool IsShameChannel(SocialNormKind kind) => kind switch
         {
-            SocialNormKind.Greeting      => false, // embarrassment
+            SocialNormKind.Greeting => false, // embarrassment
             SocialNormKind.PublicConduct => false, // embarrassment
-            _                            => true   // shame
+            _ => true   // shame
         };
 
         #endregion Norm kind channel

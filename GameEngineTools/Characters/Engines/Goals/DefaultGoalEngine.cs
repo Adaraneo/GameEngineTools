@@ -28,7 +28,7 @@ namespace GameEngineTools.Characters.Engines.Goals
         /// <inheritdoc/>
         public GoalConfig Config { get; }
 
-        #endregion
+        #endregion State and configuration
 
         #region Construction
 
@@ -41,7 +41,7 @@ namespace GameEngineTools.Characters.Engines.Goals
             State = GoalState.Empty;
         }
 
-        #endregion
+        #endregion Construction
 
         #region IGoalEngine — SeedFromPersonality
 
@@ -77,7 +77,7 @@ namespace GameEngineTools.Characters.Engines.Goals
             State = new GoalState(goals);
         }
 
-        #endregion
+        #endregion IGoalEngine — SeedFromPersonality
 
         #region IEngine — Tick
 
@@ -154,7 +154,7 @@ namespace GameEngineTools.Characters.Engines.Goals
             State = new GoalState(updated);
         }
 
-        #endregion
+        #endregion IEngine — Tick
 
         #region IEngine — Handle
 
@@ -191,14 +191,14 @@ namespace GameEngineTools.Characters.Engines.Goals
             }
         }
 
-        #endregion
+        #endregion IEngine — Handle
 
         #region IEngine — RestoreState
 
         /// <inheritdoc/>
         public void RestoreState(GoalState state) => State = state;
 
-        #endregion
+        #endregion IEngine — RestoreState
 
         #region Private helpers
 
@@ -454,6 +454,6 @@ namespace GameEngineTools.Characters.Engines.Goals
 
         private static double Clamp01(double v) => Math.Clamp(v, 0.0, 1.0);
 
-        #endregion
+        #endregion Private helpers
     }
 }

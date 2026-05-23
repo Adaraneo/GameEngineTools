@@ -6,7 +6,6 @@ namespace GameEngineTools.Characters.Engines.Memory
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.World.Utils.Time;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
@@ -117,12 +116,12 @@ namespace GameEngineTools.Characters.Engines.Memory
                 episode.Emotion, query.CurrentValence, query.NeuroticismScore,
                 query.DaysInNegativeMood);
             var relevance = Math.Clamp(
-                (targetScore    * 0.30) +
+                (targetScore * 0.30) +
                 (situationScore * 0.24) +
-                (recencyWeight  * 0.18) +
+                (recencyWeight * 0.18) +
                 (Math.Clamp(episode.Salience, 0.0, 1.0) * 0.16) +
                 (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.08) +
-                (emotionScore   * 0.08) +
+                (emotionScore * 0.08) +
                 (confidenceScore * 0.04) +
                 neuroticismBias,
                 0.0, 1.0);
@@ -245,12 +244,12 @@ namespace GameEngineTools.Characters.Engines.Memory
                     var strength = Math.Clamp(0.10 + (warmthSignals * 0.12) - (recentNegativeSocial * 0.05), 0.0, 0.65);
                     if (strength >= 0.20)
                     {
-                    reflections.Add(new ReflectionSummary(
-                        ReflectionSummaryKind.WarmForCasualContact,
-                        query.TargetHuman,
-                        strength,
-                        (int)Math.Round(warmthSignals),
-                        "Repeated low-stakes contact felt warm."));
+                        reflections.Add(new ReflectionSummary(
+                            ReflectionSummaryKind.WarmForCasualContact,
+                            query.TargetHuman,
+                            strength,
+                            (int)Math.Round(warmthSignals),
+                            "Repeated low-stakes contact felt warm."));
                     }
                 }
 
@@ -259,12 +258,12 @@ namespace GameEngineTools.Characters.Engines.Memory
                     var strength = Math.Clamp(0.08 + (safeSignals * 0.14) + (recentPositiveSocial * 0.03) - (recentNegativeSocial * 0.06), 0.0, 0.70);
                     if (strength >= 0.22)
                     {
-                    reflections.Add(new ReflectionSummary(
-                        ReflectionSummaryKind.SafeForReachOut,
-                        query.TargetHuman,
-                        strength,
-                        (int)Math.Round(safeSignals),
-                        "Recent contact with this person has been safe enough for outreach."));
+                        reflections.Add(new ReflectionSummary(
+                            ReflectionSummaryKind.SafeForReachOut,
+                            query.TargetHuman,
+                            strength,
+                            (int)Math.Round(safeSignals),
+                            "Recent contact with this person has been safe enough for outreach."));
                     }
                 }
 
@@ -292,19 +291,19 @@ namespace GameEngineTools.Characters.Engines.Memory
                         "A recent intense rejection still weighs on vulnerable contact."));
                 }
 
-                #endregion
+                #endregion edit
 
                 if (intimacyRejections >= 1.5)
                 {
                     var strength = Math.Clamp(0.14 + (intimacyRejections * 0.18) - (positiveVulnerability * 0.10), 0.0, 0.78);
                     if (strength >= 0.25)
                     {
-                    reflections.Add(new ReflectionSummary(
-                        ReflectionSummaryKind.RejectsIntimacy,
-                        query.TargetHuman,
-                        strength,
-                        (int)Math.Round(intimacyRejections),
-                        "Repeated vulnerable contact was rejected or emotionally costly."));
+                        reflections.Add(new ReflectionSummary(
+                            ReflectionSummaryKind.RejectsIntimacy,
+                            query.TargetHuman,
+                            strength,
+                            (int)Math.Round(intimacyRejections),
+                            "Repeated vulnerable contact was rejected or emotionally costly."));
                     }
                 }
 
@@ -313,12 +312,12 @@ namespace GameEngineTools.Characters.Engines.Memory
                     var strength = Math.Clamp(0.08 + (recentNegativeSocial * 0.14) - (recentPositiveSocial * 0.05), 0.0, 0.68);
                     if (strength >= 0.20)
                     {
-                    reflections.Add(new ReflectionSummary(
-                        ReflectionSummaryKind.RecentSocialCost,
-                        query.TargetHuman,
-                        strength,
-                        (int)Math.Round(recentNegativeSocial),
-                        "Recent interactions with this person have been emotionally costly."));
+                        reflections.Add(new ReflectionSummary(
+                            ReflectionSummaryKind.RecentSocialCost,
+                            query.TargetHuman,
+                            strength,
+                            (int)Math.Round(recentNegativeSocial),
+                            "Recent interactions with this person have been emotionally costly."));
                     }
                 }
             }
@@ -488,8 +487,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         private static double WeightedEpisodeScore(
-            IReadOnlyList<EpisodicMemory> episodes, 
-            Func<EpisodicMemory, bool> predicate, 
+            IReadOnlyList<EpisodicMemory> episodes,
+            Func<EpisodicMemory, bool> predicate,
             WDateTime now)
         {
             return episodes

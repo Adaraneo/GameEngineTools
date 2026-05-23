@@ -24,7 +24,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         public static string RelationMicroNegative(string kind, HumanId? from = null, HumanId? to = null)
             => BuildRelationMicro("MicroNegative", NormalizeMicroKind(kind), from, to);
 
-        #endregion
+        #endregion Relation
 
         #region Private
 
@@ -68,6 +68,6 @@ namespace GameEngineTools.Characters.Engines.Memory
             return result;
         }
 
-        #endregion
+        #endregion Private
     }
 }

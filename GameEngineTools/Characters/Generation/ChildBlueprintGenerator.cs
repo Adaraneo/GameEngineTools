@@ -173,7 +173,9 @@ namespace GameEngineTools.Characters.Generation
             => rng.NextUnit() + rng.NextUnit() + rng.NextUnit() - 1.5;
 
         private static double Clamp01(double value) => Math.Clamp(value, 0.0, 1.0);
+
         private static double ClampSigned(double value) => Math.Clamp(value, -1.0, 1.0);
+
         private static double Round3(double value) => Math.Round(value, 3);
 
         private static int DeriveSeed(HumanId parentA, HumanId parentB, WDateOnly bornOn)

@@ -6,6 +6,7 @@ namespace GameEngineTools
     #region Homo
 
     #region Relationship ortogonal enums
+
     public enum CivilStatus
     {
         Single, InRelationship, Engaged, Married, Divorced, Widowed

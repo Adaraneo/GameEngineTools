@@ -27,7 +27,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             }
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
 
         #region Helpers
 
@@ -54,6 +54,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 _ => 0.0
             };
 
-        #endregion
+        #endregion Helpers
     }
 }

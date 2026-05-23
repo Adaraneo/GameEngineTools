@@ -11,12 +11,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
     {
         /// <summary>Health reached zero from damage.</summary>
         Combat,
+
         /// <summary>Terminal hunger + thirst.</summary>
         Starvation,
+
         /// <summary>Terminal energy depletion with extreme sleep debt.</summary>
         Exhaustion,
+
         /// <summary>Allostatic overload or systemic immune failure.</summary>
         SystemicFailure,
+
         /// <summary>Natural end-of-lifespan (Gompertz curve).</summary>
         OldAge
     }

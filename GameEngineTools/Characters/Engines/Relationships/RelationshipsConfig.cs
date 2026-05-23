@@ -248,6 +248,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             PrestigeGainPerSelfDisclosure: 1.0,
             DominanceGainPerContempt: 10.0,
             PrestigeReachOutBonusPerPoint: 0.06,
-            DominanceAvoidancePenaltyPerPoint: 0.08) { }
+            DominanceAvoidancePenaltyPerPoint: 0.08)
+        { }
     }
 }

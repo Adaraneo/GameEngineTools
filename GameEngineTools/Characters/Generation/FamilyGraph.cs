@@ -117,7 +117,6 @@ namespace GameEngineTools.Characters.Generation
         public bool AreRelated(HumanId a, HumanId b, KinRole role)
             => GetKin(a).Any(k => k.RelativeId == b && k.Role == role);
 
-
         /// <summary>
         /// Returns all character IDs that share the given family name
         /// AND have at least one registered kin bond — i.e. are actual clan members.

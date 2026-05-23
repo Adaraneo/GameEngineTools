@@ -19,6 +19,7 @@ namespace GameEngineTools.World.Location
     public sealed class DefaultLocationService : ILocationService
     {
         #region Public Methods
+
         /// <inheritdoc/>
         public IReadOnlyList<HumanId> GetCharactersAt(string locationId)
             => _characterLocation
@@ -32,7 +33,8 @@ namespace GameEngineTools.World.Location
                 .Where(d => d.Type == type)
                 .Select(d => d.Id)
                 .ToList();
-        #endregion
+
+        #endregion Public Methods
 
         #region Private state
 
@@ -48,7 +50,7 @@ namespace GameEngineTools.World.Location
         /// </summary>
         private readonly Dictionary<HumanId, string> _lastDispatchedLocation = new();
 
-        #endregion
+        #endregion Private state
 
         #region ILocationService — registration
 
@@ -77,7 +79,7 @@ namespace GameEngineTools.World.Location
         public LocationDescriptor? GetDescriptor(string locationId)
             => _descriptors.GetValueOrDefault(locationId);
 
-        #endregion
+        #endregion ILocationService — registration
 
         #region ILocationService — dispatch
 
@@ -126,7 +128,7 @@ namespace GameEngineTools.World.Location
             }
         }
 
-        #endregion
+        #endregion ILocationService — dispatch
 
         #region Private — environment formulas
 
@@ -168,6 +170,6 @@ namespace GameEngineTools.World.Location
                 _ => SurfaceKind.Unknown
             };
 
-        #endregion
+        #endregion Private — environment formulas
     }
 }

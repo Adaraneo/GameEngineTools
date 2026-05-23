@@ -6,13 +6,13 @@ namespace GameEngineTools.Characters.Core
     using System.Collections.Concurrent;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
-    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
@@ -103,16 +103,19 @@ namespace GameEngineTools.Characters.Core
 
         // Appearance — blueprint is immutable; projected appearance is recomputed each snapshot refresh
         private readonly GeneticBlueprint _geneticBlueprint;
+
         private PhysicalAppearance _projectedAppearance;
 
         // Services
         private readonly IEventBus _bus;
+
         private readonly IScheduler _scheduler;
         private readonly IRandomSource _random;
         private readonly ILogger _log;
 
         // Engines
         private readonly IPhysiologyEngine _physio;
+
         private readonly IPsychologyEngine _psych;
         private readonly IBehaviorEngine _behavior;
         private readonly IInteractionEngine _interact;
@@ -132,6 +135,7 @@ namespace GameEngineTools.Characters.Core
         // Optional cadence decoupling for behaviour-level reasoning.
         // When zero, behavior runs every incoming Tick(dt).
         private readonly Hosting.IBehaviorCadencePolicy? _behaviorCadencePolicy;
+
         private WTimeSpan _behaviorAccumulated;
 
         #endregion Private fields
@@ -295,7 +299,7 @@ namespace GameEngineTools.Characters.Core
             // Phase B: advance engines. Physiology / psychology / memory always progress with world time,
             // while behaviour-level reasoning can optionally run on a coarser cadence.
             // Pipeline order: Physiology → Psychology → Behavior → Interact → Relations → Memory.
-            var outbox    = new EventCollector();
+            var outbox = new EventCollector();
             var behaviorDt = ConsumeBehaviorDelta(dt);
 
             // Physiology and psychology must advance first — behavior reads their current state.
@@ -528,10 +532,10 @@ namespace GameEngineTools.Characters.Core
                 _memory.State,
                 _semanticMemory.State,
                 AmbientTemperature: prev.AmbientTemperature,
-                AltitudeMeters:     prev.AltitudeMeters,
-                Celestial:          prev.Celestial,
-                Goals:              _goal.State,
-                Schedule:           _schedule.State);
+                AltitudeMeters: prev.AltitudeMeters,
+                Celestial: prev.Celestial,
+                Goals: _goal.State,
+                Schedule: _schedule.State);
 
             _ctx.Snapshot = Snapshot;
         }
@@ -542,7 +546,7 @@ namespace GameEngineTools.Characters.Core
             Snapshot = Snapshot with
             {
                 AmbientTemperature = ambientTempC,
-                Celestial          = celestial,
+                Celestial = celestial,
             };
             _ctx.Snapshot = Snapshot;
         }
@@ -550,7 +554,7 @@ namespace GameEngineTools.Characters.Core
         /// <inheritdoc/>
         public void SetHomeLocation(string? locationId)
         {
-            Identity    = Identity with { HomeLocationId = locationId };
+            Identity = Identity with { HomeLocationId = locationId };
             _ctx.Identity = Identity;
         }
 

@@ -36,11 +36,11 @@ internal sealed class CelestialContextComputer
             now, cfg.LatitudeDeg, cfg.LongitudeDeg, in sp, cfg.VernalPhase);
 
         // SeasonFraction z day-of-year / délka roku
-        var dayIdx   = now.WorldTicks / spec.TicksPerDay;
+        var dayIdx = now.WorldTicks / spec.TicksPerDay;
         var (year, _, _) = spec.Calendar.DateFromDays(dayIdx);
-        var yearStart    = spec.Calendar.DaysFromDate(year, 1, 1);
-        var yearLen      = spec.Calendar.DaysInYear(year);
-        var seasonFrac   = ((dayIdx - yearStart) / (double)yearLen + cfg.VernalPhase) % 1.0;
+        var yearStart = spec.Calendar.DaysFromDate(year, 1, 1);
+        var yearLen = spec.Calendar.DaysInYear(year);
+        var seasonFrac = ((dayIdx - yearStart) / (double)yearLen + cfg.VernalPhase) % 1.0;
         if (seasonFrac < 0) seasonFrac += 1.0;   // guard pro záporný výsledek
 
         // Teplota: max v létě (0.25), min v zimě (0.75)
@@ -48,14 +48,14 @@ internal sealed class CelestialContextComputer
                   + cfg.SeasonalAmplitudeCelsius * Math.Sin(seasonFrac * 2.0 * Math.PI - Math.PI / 2.0);
 
         return new CelestialContext(
-            IrradianceFactor:       irradiance,
-            DaylightHours:          daylight,
-            SunriseHour:            sunrise,
-            SunsetHour:             sunset,
-            SolarNoonHour:          solarNoon,
-            SeasonFraction:         seasonFrac,
-            VernalPhase:            cfg.VernalPhase,
-            IsDay:                  irradiance > 0.0,
+            IrradianceFactor: irradiance,
+            DaylightHours: daylight,
+            SunriseHour: sunrise,
+            SunsetHour: sunset,
+            SolarNoonHour: solarNoon,
+            SeasonFraction: seasonFrac,
+            VernalPhase: cfg.VernalPhase,
+            IsDay: irradiance > 0.0,
             BaseAmbientTempCelsius: tempC);
     }
 
@@ -95,21 +95,21 @@ internal sealed class CelestialContextComputer
         var tSinceEpochEarthDays = dayIdx * secondsPerWorldDay / 86_400.0;
         var (kx, ky) = KeplerSolver.OrbitalPositionAu(orbit, tSinceEpochEarthDays, star.GravitationalParameter);
         var trueAnomaly = Math.Atan2(ky, kx);                              // −π..+π
-        var seasonFrac  = ((trueAnomaly / (2.0 * Math.PI)) + 1.0) % 1.0;
+        var seasonFrac = ((trueAnomaly / (2.0 * Math.PI)) + 1.0) % 1.0;
 
         // Teplota z fyzikálního modelu + sezónní offset z AstroConfig
-        var orbitAu   = Math.Sqrt(kx * kx + ky * ky);
+        var orbitAu = Math.Sqrt(kx * kx + ky * ky);
         var meanTempC = star.EquilibriumTempK(orbitAu, planet.Albedo) + planet.GreenhouseWarmingK - 273.15;
-        var tempC     = meanTempC
+        var tempC = meanTempC
                       + cfg.SeasonalAmplitudeCelsius * Math.Sin(seasonFrac * 2.0 * Math.PI - Math.PI / 2.0);
 
         // ── Primární měsíc — slapová fáze ─────────────────────────────────────────
         double? tidalPhase = null;
         if (planet.PrimaryMoon is { } moon)
         {
-            var moonPeriodSec  = moon.Orbit.OrbitalPeriodSeconds(planet.GravitationalParameter);
-            var elapsedSec     = dayIdx * secondsPerWorldDay;
-            tidalPhase         = elapsedSec % moonPeriodSec / moonPeriodSec;   // 0..1
+            var moonPeriodSec = moon.Orbit.OrbitalPeriodSeconds(planet.GravitationalParameter);
+            var elapsedSec = dayIdx * secondsPerWorldDay;
+            tidalPhase = elapsedSec % moonPeriodSec / moonPeriodSec;   // 0..1
         }
 
         // ── Prstencový systém — shadow belt + polární záře ─────────────────────────
@@ -120,33 +120,33 @@ internal sealed class CelestialContextComputer
             {
                 // Shadow belt blokuje část přímého záření
                 var maxOpticalDepth = materialBands.Max(b => b.MeanOpticalDepth);
-                var shadowLat       = RingSystem.ShadowBeltLatitudeDeg(planet.ObliquityDeg, seasonFrac);
-                var shadowFrac      = RingSystem.ShadowFraction(cfg.LatitudeDeg, shadowLat, maxOpticalDepth);
-                irradiance         *= (1.0 - shadowFrac);
+                var shadowLat = RingSystem.ShadowBeltLatitudeDeg(planet.ObliquityDeg, seasonFrac);
+                var shadowFrac = RingSystem.ShadowFraction(cfg.LatitudeDeg, shadowLat, maxOpticalDepth);
+                irradiance *= (1.0 - shadowFrac);
 
                 // Polární záře v noci — prsteny odrážejí hvězdné světlo k pólům
                 if (irradiance <= 0.0 && Math.Abs(cfg.LatitudeDeg) > 60)
                 {
-                    var starFlux     = star.IrradianceAtAu(orbitAu);
-                    var refFlux      = star.IrradianceAtAu(1.0);           // normalizační reference
-                    var avgAlbedo    = materialBands.Average(b => b.AlbedoGeometric);
-                    var ringGlowW    = rings.ApproximatePolarRingGlow(starFlux, avgAlbedo);
-                    irradiance       = refFlux > 0.0 ? ringGlowW / refFlux : 0.0;
+                    var starFlux = star.IrradianceAtAu(orbitAu);
+                    var refFlux = star.IrradianceAtAu(1.0);           // normalizační reference
+                    var avgAlbedo = materialBands.Average(b => b.AlbedoGeometric);
+                    var ringGlowW = rings.ApproximatePolarRingGlow(starFlux, avgAlbedo);
+                    irradiance = refFlux > 0.0 ? ringGlowW / refFlux : 0.0;
                 }
             }
         }
 
         return new CelestialContext(
-            IrradianceFactor:       irradiance,
-            DaylightHours:          daylight,
-            SunriseHour:            sunrise,
-            SunsetHour:             sunset,
-            SolarNoonHour:          solarNoon,
-            SeasonFraction:         seasonFrac,
-            VernalPhase:            cfg.VernalPhase,
-            IsDay:                  irradiance > 0.0,
+            IrradianceFactor: irradiance,
+            DaylightHours: daylight,
+            SunriseHour: sunrise,
+            SunsetHour: sunset,
+            SolarNoonHour: solarNoon,
+            SeasonFraction: seasonFrac,
+            VernalPhase: cfg.VernalPhase,
+            IsDay: irradiance > 0.0,
             BaseAmbientTempCelsius: tempC,
-            SurfaceGravityVsEarth:  planet.SurfaceGravityVsEarth,
-            TidalPhase:             tidalPhase);
+            SurfaceGravityVsEarth: planet.SurfaceGravityVsEarth,
+            TidalPhase: tidalPhase);
     }
 }

@@ -19,8 +19,10 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     {
         /// <summary>Nezávazný sociální kontakt (SmallTalk). Nikdy není psychologicky blokován.</summary>
         ReachOut,
+
         /// <summary>Otevření se vulnerabilitě (SelfDisclosure). Blokováno při nízkém EmotionallySafe.</summary>
         Vulnerability,
+
         /// <summary>Intimní přístupu (Invite). Blokováno sociosexualitou a orientací.</summary>
         Intimacy
     }

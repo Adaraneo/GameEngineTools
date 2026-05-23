@@ -16,19 +16,19 @@ namespace GameEngineTools.Universe;
 /// </param>
 /// <param name="HasSubsurfaceOcean">Confirmed or strongly inferred subsurface liquid water.</param>
 public record MoonPhysics(
-    double  MassKg,
-    double  MeanRadiusKm,
-    double  EquatorialRadiusKm,
-    double  PolarRadiusKm,
-    double  MeanDensityKgM3,
-    double  SurfaceGravityMs2,
-    double  EscapeVelocityKms,
-    double  ObliquityDeg,
-    double  SiderealRotationHrs,
-    double  Albedo,
-    bool    TidallyLocked,
+    double MassKg,
+    double MeanRadiusKm,
+    double EquatorialRadiusKm,
+    double PolarRadiusKm,
+    double MeanDensityKgM3,
+    double SurfaceGravityMs2,
+    double EscapeVelocityKms,
+    double ObliquityDeg,
+    double SiderealRotationHrs,
+    double Albedo,
+    bool TidallyLocked,
     string? OrbitalResonance,
-    bool    HasSubsurfaceOcean
+    bool HasSubsurfaceOcean
 );
 
 /// <summary>
@@ -42,7 +42,7 @@ public record MoonOrbit(
     double LongAscNodeDeg,
     double ArgPeriapsisDeg,
     double MeanLongitudeDeg,
-    bool   IsRetrograde         // inclination > 90° — means captured body
+    bool IsRetrograde         // inclination > 90° — means captured body
 )
 {
     /// <summary>Orbital period of the moon around its parent planet [s].</summary>
@@ -65,12 +65,12 @@ public static class MoonHabitabilityEffects
     /// </summary>
     public static double TidalForceRatio(double moonMassKg, double moonDistanceKm)
     {
-        const double lunaM      = 7.342e22;
+        const double lunaM = 7.342e22;
         const double lunaDistKm = 384_400;
         return (moonMassKg / lunaM) * Math.Pow(lunaDistKm / moonDistanceKm, 3);
     }
 
-    #endregion
+    #endregion Tidal force
 
     #region Obliquity stabilisation
 
@@ -86,12 +86,12 @@ public static class MoonHabitabilityEffects
         double planetMassKg)
     {
         const double lunaMoonRatio = 7.342e22 / 5.9726e24;  // Luna/Earth mass ratio
-        const double lunaDistKm   = 384_400;
+        const double lunaDistKm = 384_400;
 
-        double moonRatio  = moonMassKg / planetMassKg;
+        double moonRatio = moonMassKg / planetMassKg;
         double distFactor = Math.Pow(lunaDistKm / moonDistanceKm, 3);
         return (moonRatio / lunaMoonRatio) * distFactor;
     }
 
-    #endregion
+    #endregion Obliquity stabilisation
 }

@@ -9,7 +9,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.SemanticMemory;
-    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
@@ -76,7 +75,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             }
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
 
         #region Query building
 
@@ -122,7 +121,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 ? $"action={candidate.Name}|target={targeting.TargetHuman.Value:N}|act={targeting.SpeechAct}"
                 : $"action={candidate.Name}|target=none|act=none";
 
-        #endregion
+        #endregion Query building
 
         #region Events
 
@@ -157,7 +156,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             }
         }
 
-        #endregion
+        #endregion Events
 
         #region Influence scoring
 
@@ -291,6 +290,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 || (item.Episode.PerceivedWhat ?? item.Episode.What).Contains("Interaction:", StringComparison.Ordinal)
                 || (item.Episode.PerceivedWhat ?? item.Episode.What).Contains("Relation:", StringComparison.Ordinal);
 
-        #endregion
+        #endregion Influence scoring
     }
 }

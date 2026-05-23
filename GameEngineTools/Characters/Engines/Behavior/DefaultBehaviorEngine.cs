@@ -9,11 +9,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior.Intent;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
-    using GameEngineTools.Characters.Engines.Goals;
-    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Behavior.Needs;
     using GameEngineTools.Characters.Engines.Behavior.Sleep;
+    using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Objects;
@@ -216,7 +216,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
             State = _sleepCoordinator.Handle(@event, ctx, outbox, State);
         }
-        public void RestoreState(BehaviorState state) { State = state; _sleepCoordinator.RestoreState(); }
+
+        public void RestoreState(BehaviorState state)
+        { State = state; _sleepCoordinator.RestoreState(); }
 
         #endregion IEngine
 

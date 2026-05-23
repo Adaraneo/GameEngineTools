@@ -23,7 +23,7 @@ namespace GameEngineTools.World.Objects
         /// <summary>All registered world objects, keyed by object ID.</summary>
         private readonly Dictionary<string, WorldObject> _objects = new();
 
-        #endregion
+        #endregion Private state
 
         #region Registration
 
@@ -62,7 +62,7 @@ namespace GameEngineTools.World.Objects
             _objects[objectId] = existing with { IsAvailable = isAvailable };
         }
 
-        #endregion
+        #endregion Registration
 
         #region IWorldObjectProvider
 
@@ -90,6 +90,6 @@ namespace GameEngineTools.World.Objects
             // No-op: StaticWorldObjectProvider serves pre-registered objects only.
         }
 
-        #endregion
+        #endregion IWorldObjectProvider
     }
 }

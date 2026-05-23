@@ -15,8 +15,8 @@ public static class KeplerSolver
     public static double SolveEccentricAnomaly(
         double meanAnomalyRad,
         double eccentricity,
-        int    maxIterations = 10,
-        double tolerance     = 1e-10)
+        int maxIterations = 10,
+        double tolerance = 1e-10)
     {
         double E = meanAnomalyRad;
         for (int i = 0; i < maxIterations; i++)
@@ -29,7 +29,7 @@ public static class KeplerSolver
         return E;
     }
 
-    #endregion
+    #endregion Kepler's equation
 
     #region Position in orbital plane
 
@@ -57,12 +57,12 @@ public static class KeplerSolver
         double tSinceEpochDays,
         double centralBodyGM)
     {
-        double n  = 2.0 * Math.PI / orbit.OrbitalPeriodSeconds(centralBodyGM);
+        double n = 2.0 * Math.PI / orbit.OrbitalPeriodSeconds(centralBodyGM);
         double M0 = orbit.MeanLongitudeDeg * Math.PI / 180.0;
         return M0 + n * (tSinceEpochDays * 86_400.0);
     }
 
-    #endregion
+    #endregion Position in orbital plane
 
     #region Vis-viva velocity
 
@@ -76,5 +76,5 @@ public static class KeplerSolver
         double semiMajorAxisMeters)
         => Math.Sqrt(centralBodyGM * (2.0 / distanceMeters - 1.0 / semiMajorAxisMeters));
 
-    #endregion
+    #endregion Vis-viva velocity
 }

@@ -6,13 +6,13 @@ namespace GameEngineTools.Characters.Hosting
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
-    using GameEngineTools.Characters.Engines.Objects;
-    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
@@ -162,7 +162,7 @@ namespace GameEngineTools.Characters.Hosting
             // and persistence snapshots include goals and schedule from the moment of creation.
             human.RestoreSnapshot(human.Snapshot with
             {
-                Goals    = goal.State,
+                Goals = goal.State,
                 Schedule = schedule.State
             });
 

@@ -22,7 +22,7 @@ namespace GameEngineTools.Characters.Engines.Goals
         private readonly ILogger? _log;
         private readonly double _maxFlatBiasPerGoal;
 
-        #endregion
+        #endregion Private fields
 
         #region Construction
 
@@ -32,7 +32,7 @@ namespace GameEngineTools.Characters.Engines.Goals
             _maxFlatBiasPerGoal = maxFlatBiasPerGoal;
         }
 
-        #endregion
+        #endregion Construction
 
         #region IBehaviorModifierEngine
 
@@ -76,7 +76,7 @@ namespace GameEngineTools.Characters.Engines.Goals
             }
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
 
         #region Private helpers
 
@@ -145,6 +145,6 @@ namespace GameEngineTools.Characters.Engines.Goals
             };
         }
 
-        #endregion
+        #endregion Private helpers
     }
 }

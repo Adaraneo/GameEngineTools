@@ -93,20 +93,20 @@ namespace GameEngineTools.Characters.Traits
             var comfort = Normalize(relationship?.Comfort, fallback: 30.0);
             var closeness = Normalize(relationship?.Closeness, fallback: 0.0);
 
-            var minVulSafety  = Lerp(0.50, 0.28, soi.Attitude);
-            var maxRejRisk    = Lerp(0.60, 0.82, soi.Attitude);
-            var minCloseness  = Lerp(0.50, 0.24, soi.Attitude);
-            var minTrust      = Lerp(0.42, 0.0,  soi.Attitude);
-            var minComfort    = Lerp(0.45, 0.0,  soi.Attitude);
+            var minVulSafety = Lerp(0.50, 0.28, soi.Attitude);
+            var maxRejRisk = Lerp(0.60, 0.82, soi.Attitude);
+            var minCloseness = Lerp(0.50, 0.24, soi.Attitude);
+            var minTrust = Lerp(0.42, 0.0, soi.Attitude);
+            var minComfort = Lerp(0.45, 0.0, soi.Attitude);
 
             return vulnerabilitySafety < minVulSafety
                 || rejectionRisk > maxRejRisk
                 || closeness < minCloseness
-                || (minTrust  > 0.01 && trust   < minTrust)
+                || (minTrust > 0.01 && trust < minTrust)
                 || (minComfort > 0.01 && comfort < minComfort);
         }
 
-        #endregion
+        #endregion Behavior scoring
 
         #region Interaction acceptance
 
@@ -151,7 +151,7 @@ namespace GameEngineTools.Characters.Traits
             var comfort = Normalize(relationship?.Comfort, fallback: 30.0);
             var attraction = IntimacyAttraction(relationship);
 
-            var restrictedVal   = Math.Clamp(-0.16 + trust * 0.06 + comfort * 0.06 + (hasPrivacy ? 0.04 : -0.05), -0.20, 0.08);
+            var restrictedVal = Math.Clamp(-0.16 + trust * 0.06 + comfort * 0.06 + (hasPrivacy ? 0.04 : -0.05), -0.20, 0.08);
             var unrestrictedVal = Math.Clamp(-0.03 + attraction * 0.12 + (hasPrivacy ? 0.03 : 0.0), -0.08, 0.14);
 
             return Lerp(restrictedVal, unrestrictedVal, soi.Attitude);
@@ -167,8 +167,8 @@ namespace GameEngineTools.Characters.Traits
                 ? 0.0
                 : (relationship.SexualInterest * 0.65) + (relationship.IntimateAffinity * 0.35);
 
-            var minCloseness        = Lerp(70.0, 55.0, soi.Attitude);
-            var minComfort          = Lerp(60.0,  0.0, soi.Attitude);
+            var minCloseness = Lerp(70.0, 55.0, soi.Attitude);
+            var minComfort = Lerp(60.0, 0.0, soi.Attitude);
             var minIntimacyInterest = Lerp(65.0, 50.0, soi.Attitude);
 
             return closeness < minCloseness
@@ -176,7 +176,7 @@ namespace GameEngineTools.Characters.Traits
                 || intimacyInterest < minIntimacyInterest;
         }
 
-        #endregion
+        #endregion Interaction acceptance
 
         #region Relationship deltas
 
@@ -193,7 +193,7 @@ namespace GameEngineTools.Characters.Traits
                 ? Lerp(0.4, 0.0, soi.Behavior * 2.0)
                 : Lerp(0.0, -0.1, (soi.Behavior - 0.5) * 2.0);
 
-        #endregion
+        #endregion Relationship deltas
 
         #region Helpers
 
@@ -219,6 +219,6 @@ namespace GameEngineTools.Characters.Traits
         private static double Lerp(double a, double b, double t)
             => a + (b - a) * Math.Clamp(t, 0.0, 1.0);
 
-        #endregion
+        #endregion Helpers
     }
 }

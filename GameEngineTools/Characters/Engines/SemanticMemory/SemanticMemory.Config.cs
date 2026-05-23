@@ -46,6 +46,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         /// <summary>Bezparametrický konstruktor vyžadovaný Options patternem.</summary>
         public SemanticMemoryConfig() : this(
             0.18, 0.08, 0.01, 0.08, 6, 2, 0.05,
-            1.30, 0.75, 0.45, 1.15, 1.20, 1.40, 8, 3.0) { }
+            1.30, 0.75, 0.45, 1.15, 1.20, 1.40, 8, 3.0)
+        { }
     }
 }

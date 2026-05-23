@@ -34,33 +34,38 @@ namespace GameEngineTools.Characters.Engines.Attraction
     public sealed class DefaultAttractionCalculator : IAttractionCalculator
     {
         // ── Component ceilings ───────────────────────────────────────────────────
-        private const double MaxBasePhysical    = 40.0;
+        private const double MaxBasePhysical = 40.0;
+
         private const double MaxPreferenceMatch = 35.0;
 
         // ── WHR optimum windows (population-level baselines) ────────────────────
-        private const double WhrOptimumFemale   = 0.70;
-        private const double WhrOptimumMale     = 0.90;
-        private const double WhrToleranceHalf   = 0.12;
+        private const double WhrOptimumFemale = 0.70;
+
+        private const double WhrOptimumMale = 0.90;
+        private const double WhrToleranceHalf = 0.12;
 
         // ── Height window (population-level) ────────────────────────────────────
-        private const double HeightWindowHalf   = 25.0;
+        private const double HeightWindowHalf = 25.0;
 
         // ── First impression like constants ─────────────────────────────────────
-        private const double HaloBase            = 25.0;
+        private const double HaloBase = 25.0;
+
         private const double HaloAttractionScale = 0.40;
-        private const double ValenceLikeScale    = 8.0;
+        private const double ValenceLikeScale = 8.0;
 
         // ── A1: Excitatory transfer (Zillmann 1983) ──────────────────────────────
         // Arousal from ANY source boosts perceived attraction when base score > 50.
         // Max bonus at AcuteArousalLevel=100, baseScore=100: +ExcitatoryTransferMax
         private const double ExcitatoryTransferArousalThreshold = 40.0;
-        private const double ExcitatoryTransferScoreThreshold   = 50.0;
-        private const double ExcitatoryTransferMax              = 8.0;
+
+        private const double ExcitatoryTransferScoreThreshold = 50.0;
+        private const double ExcitatoryTransferMax = 8.0;
 
         // ── A3: Age-match preference ─────────────────────────────────────────────
         // Similar-age attraction penalty/bonus, Gaussian with tolerance 10 years.
         private const double AgeMatchTolerance = 10.0;   // σ in years (half-tolerance)
-        private const double AgeMatchWeight    = 7.0;    // contribution to PreferenceMatch
+
+        private const double AgeMatchWeight = 7.0;    // contribution to PreferenceMatch
 
         /// <inheritdoc/>
         public AttractionResult Calculate(
@@ -70,17 +75,17 @@ namespace GameEngineTools.Characters.Engines.Attraction
             SexBiology targetBiology,
             double observerValence = 0.0,
             double observerArousal = 0.0,
-            int? observerAgeYears  = null,
-            int? targetAgeYears    = null)
+            int? observerAgeYears = null,
+            int? targetAgeYears = null)
         {
             var orientationWeight = SexualOrientationBehaviorMath.TargetAttractionWeight(observerProfile, targetBiology);
-            var basePhysical    = ComputeBasePhysical(targetAppearance, targetBiology) * orientationWeight;
+            var basePhysical = ComputeBasePhysical(targetAppearance, targetBiology) * orientationWeight;
             var preferenceMatch = ComputePreferenceMatch(
                 observerProfile, targetAppearance, targetBiology,
                 observerAgeYears, targetAgeYears) * orientationWeight;
-            var stateModifier   = ComputeStateModifier(targetView);
+            var stateModifier = ComputeStateModifier(targetView);
 
-            var raw   = basePhysical + preferenceMatch + stateModifier;
+            var raw = basePhysical + preferenceMatch + stateModifier;
             var score = Math.Clamp(raw, 0.0, 100.0);
 
             // A1 — Excitatory transfer (Zillmann 1983; replaces Dutton & Aron misattribution model).
@@ -93,10 +98,10 @@ namespace GameEngineTools.Characters.Engines.Attraction
             var firstImpressionLike = ComputeFirstImpressionLike(score, observerValence);
 
             return new AttractionResult(
-                Score:               Math.Round(score, 2),
-                BasePhysical:        Math.Round(basePhysical, 2),
-                PreferenceMatch:     Math.Round(preferenceMatch, 2),
-                StateModifier:       Math.Round(stateModifier, 2),
+                Score: Math.Round(score, 2),
+                BasePhysical: Math.Round(basePhysical, 2),
+                PreferenceMatch: Math.Round(preferenceMatch, 2),
+                StateModifier: Math.Round(stateModifier, 2),
                 FirstImpressionLike: Math.Round(firstImpressionLike, 2));
         }
 
@@ -113,14 +118,14 @@ namespace GameEngineTools.Characters.Engines.Attraction
             // WHR approximation from shoulder/hip measurements
             // True WHR = waist/hip; we don't track waist, so we approximate via hip/shoulder ratio.
             // For females, hip > shoulder is attractive; for males, shoulder > hip is attractive.
-            var whr        = EstimateWhr(target, targetBiology);
+            var whr = EstimateWhr(target, targetBiology);
             var whrOptimum = targetBiology == SexBiology.Female ? WhrOptimumFemale : WhrOptimumMale;
-            var whrScore   = TriangularScore(whr, whrOptimum, WhrToleranceHalf) * 18.0;
+            var whrScore = TriangularScore(whr, whrOptimum, WhrToleranceHalf) * 18.0;
 
             // Height optimum is sex-specific — consistent with sex-specific WHR optimum above.
             // Population-level baselines (global averages): female ~163 cm, male ~176 cm.
             var heightOptimum = targetBiology == SexBiology.Female ? 163.0 : 176.0;
-            var heightScore   = TriangularScore(target.Body.Proportions.HeightCm, heightOptimum, HeightWindowHalf) * 12.0;
+            var heightScore = TriangularScore(target.Body.Proportions.HeightCm, heightOptimum, HeightWindowHalf) * 12.0;
 
             // Structured morphology provides an explicit subtle-asymmetry signal.
             var symmetryScore = EstimateSymmetry(target) * 10.0;
@@ -141,7 +146,7 @@ namespace GameEngineTools.Characters.Engines.Attraction
             PhysicalAppearance target,
             SexBiology targetBiology,
             int? observerAgeYears = null,
-            int? targetAgeYears   = null)
+            int? targetAgeYears = null)
         {
             // Height preference match
             var heightMatch = TriangularScore(
@@ -157,7 +162,7 @@ namespace GameEngineTools.Characters.Engines.Attraction
                 : 0.0;
 
             // WHR preference match
-            var whr      = EstimateWhr(target, targetBiology);
+            var whr = EstimateWhr(target, targetBiology);
             var whrMatch = TriangularScore(whr, profile.PreferredWhr, WhrToleranceHalf) * 9.0;
             var symmetryMatch = EstimateSymmetry(target) * Math.Clamp(profile.SymmetryWeight, 0.0, 1.0) * 5.0;
 
@@ -186,8 +191,8 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// </summary>
         private static double ComputeStateModifier(AppearanceView view)
         {
-            var posture  = (view.PostureScore - 50.0) * 0.10; // −5..+5
-            var acne     = -view.AcneLevel * 0.08;            // 0..−8
+            var posture = (view.PostureScore - 50.0) * 0.10; // −5..+5
+            var acne = -view.AcneLevel * 0.08;            // 0..−8
             var bloating = -(int)view.Bloating * 2.0;         // None=0, Light=−2, Medium=−4, High=−6
 
             return Math.Clamp(posture + acne + bloating, -15.0, 10.0);
@@ -226,11 +231,11 @@ namespace GameEngineTools.Characters.Engines.Attraction
         private static double ComputeExcitatoryTransfer(double baseScore, double observerArousal)
         {
             if (observerArousal <= ExcitatoryTransferArousalThreshold) return 0.0;
-            if (baseScore <= ExcitatoryTransferScoreThreshold)         return 0.0;
+            if (baseScore <= ExcitatoryTransferScoreThreshold) return 0.0;
 
             var arousalFactor = (observerArousal - ExcitatoryTransferArousalThreshold)
                                 / (100.0 - ExcitatoryTransferArousalThreshold);  // 0..1
-            var scoreFactor   = (baseScore - ExcitatoryTransferScoreThreshold)
+            var scoreFactor = (baseScore - ExcitatoryTransferScoreThreshold)
                                 / (100.0 - ExcitatoryTransferScoreThreshold);    // 0..1
 
             return arousalFactor * scoreFactor * ExcitatoryTransferMax;
@@ -264,7 +269,7 @@ namespace GameEngineTools.Characters.Engines.Attraction
         /// <param name="observerValence">Observer's current emotional valence in [−1, +1].</param>
         private static double ComputeFirstImpressionLike(double attractionScore, double observerValence)
         {
-            var halo      = HaloBase + attractionScore * HaloAttractionScale;
+            var halo = HaloBase + attractionScore * HaloAttractionScale;
             var moodBoost = observerValence * ValenceLikeScale;
 
             return Math.Clamp(halo + moodBoost, 0.0, 100.0);
@@ -275,11 +280,11 @@ namespace GameEngineTools.Characters.Engines.Attraction
         {
             return frame switch
             {
-                BodyFrame.Petite  => BodyFramePreference.Petite,
-                BodyFrame.Medium  => BodyFramePreference.Medium,
-                BodyFrame.Large   => BodyFramePreference.Large,
-                BodyFrame.Strong  => BodyFramePreference.Large,
-                _                 => BodyFramePreference.None
+                BodyFrame.Petite => BodyFramePreference.Petite,
+                BodyFrame.Medium => BodyFramePreference.Medium,
+                BodyFrame.Large => BodyFramePreference.Large,
+                BodyFrame.Strong => BodyFramePreference.Large,
+                _ => BodyFramePreference.None
             };
         }
 

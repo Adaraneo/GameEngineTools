@@ -80,12 +80,12 @@ namespace GameEngineTools.Characters.Generation
 
         private static double AgeFromStadium(StadiumType stadium) => stadium switch
         {
-            StadiumType.Baby     => 0.5,
-            StadiumType.Child    => 7.0,
+            StadiumType.Baby => 0.5,
+            StadiumType.Child => 7.0,
             StadiumType.Teenager => 15.0,
-            StadiumType.MidAged  => 45.0,
-            StadiumType.Old      => 72.0,
-            _                    => 25.0  // Adult
+            StadiumType.MidAged => 45.0,
+            StadiumType.Old => 72.0,
+            _ => 25.0  // Adult
         };
 
         #endregion Private helpers

@@ -17,15 +17,15 @@ namespace GameEngineTools.Constants
         /// </summary>
         private static class SourceDirectory
         {
-            internal const string Root        = @"SourceFiles\";
-            internal const string Armory      = Root + @"Armory\";
-            internal const string Names       = Root + @"Names\";
+            internal const string Root = @"SourceFiles\";
+            internal const string Armory = Root + @"Armory\";
+            internal const string Names = Root + @"Names\";
 
             /// <summary>Character generation data: occupations, personalities…</summary>
-            internal const string Characters  = Root + @"Characters\";
+            internal const string Characters = Root + @"Characters\";
 
             /// <summary>World layout: locations, connections, and per-location objects.</summary>
-            internal const string World        = Root + @"World\";
+            internal const string World = Root + @"World\";
 
             /// <summary>
             /// Per-location object files. Each file is named {locationId}.csv
@@ -34,7 +34,7 @@ namespace GameEngineTools.Constants
             internal const string WorldObjects = World + @"Objects\";
         }
 
-        #endregion
+        #endregion Source directories
 
         #region Source filenames (without extension)
 
@@ -43,20 +43,20 @@ namespace GameEngineTools.Constants
         /// </summary>
         private static class SourceFilename
         {
-            internal const string ArmorParts  = "ArmorParts";
+            internal const string ArmorParts = "ArmorParts";
             internal const string FemaleNames = "Female";
-            internal const string MaleNames   = "Male";
-            internal const string Surnames    = "Surnames";
-            internal const string Weapons     = "Weapons";
+            internal const string MaleNames = "Male";
+            internal const string Surnames = "Surnames";
+            internal const string Weapons = "Weapons";
 
             /// <summary>All location descriptors (Id, DisplayName, Type, Region, noise params…).</summary>
-            internal const string Locations   = "Locations";
+            internal const string Locations = "Locations";
 
             /// <summary>Adjacency graph between locations (FromId, ToId, TravelMinutes).</summary>
             internal const string Connections = "Connections";
         }
 
-        #endregion
+        #endregion Source filenames (without extension)
 
         #region Source file paths
 
@@ -66,11 +66,12 @@ namespace GameEngineTools.Constants
         internal static class SourceFilePath
         {
             // ── Existing ──────────────────────────────────────────────────────
-            public const string ArmorParts  = SourceDirectory.Armory + SourceFilename.ArmorParts  + Extension.SourceCsv;
-            public const string FemaleNames = SourceDirectory.Names  + SourceFilename.FemaleNames + Extension.SourceCsv;
-            public const string MaleNames   = SourceDirectory.Names  + SourceFilename.MaleNames   + Extension.SourceCsv;
-            public const string Surnames    = SourceDirectory.Names  + SourceFilename.Surnames    + Extension.SourceCsv;
-            public const string Weapons     = SourceDirectory.Armory + SourceFilename.Weapons     + Extension.SourceCsv;
+            public const string ArmorParts = SourceDirectory.Armory + SourceFilename.ArmorParts + Extension.SourceCsv;
+
+            public const string FemaleNames = SourceDirectory.Names + SourceFilename.FemaleNames + Extension.SourceCsv;
+            public const string MaleNames = SourceDirectory.Names + SourceFilename.MaleNames + Extension.SourceCsv;
+            public const string Surnames = SourceDirectory.Names + SourceFilename.Surnames + Extension.SourceCsv;
+            public const string Weapons = SourceDirectory.Armory + SourceFilename.Weapons + Extension.SourceCsv;
 
             // ── Characters ────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ namespace GameEngineTools.Constants
             /// Path to Locations.csv.
             /// Loaded once at startup; defines all <see cref="LocationDescriptor"/> records.
             /// </summary>
-            public const string Locations   = SourceDirectory.World + SourceFilename.Locations   + Extension.SourceCsv;
+            public const string Locations = SourceDirectory.World + SourceFilename.Locations + Extension.SourceCsv;
 
             /// <summary>
             /// Path to Connections.csv.
@@ -102,7 +103,7 @@ namespace GameEngineTools.Constants
             public const string WorldObjectsDirectory = SourceDirectory.WorldObjects;
         }
 
-        #endregion
+        #endregion Source file paths
 
         #region Extensions
 
@@ -110,10 +111,10 @@ namespace GameEngineTools.Constants
         public static class Extension
         {
             public const string GeneratedJson = ".json";
-            public const string SourceCsv     = ".csv";
+            public const string SourceCsv = ".csv";
         }
 
-        #endregion
+        #endregion Extensions
 
         #region Generated directories
 
@@ -123,19 +124,19 @@ namespace GameEngineTools.Constants
         public static class GeneratedDirectory
         {
             private const string root = @"Generated\";
-            public const string Npcs   = root + @"NPCs\";
+            public const string Npcs = root + @"NPCs\";
             public const string Player = root + @"Player\";
-            public const string Root   = root;
+            public const string Root = root;
         }
 
-        #endregion
+        #endregion Generated directories
     }
 
     /// <summary>For test purposes only!</summary>
     public static class FileSystemConstantsForTest
     {
-        public const string Npc  = FileSystemConstant.GeneratedDirectory.Npcs;
-        public const string Pc   = FileSystemConstant.GeneratedDirectory.Player;
+        public const string Npc = FileSystemConstant.GeneratedDirectory.Npcs;
+        public const string Pc = FileSystemConstant.GeneratedDirectory.Player;
         public const string Root = FileSystemConstant.GeneratedDirectory.Root;
     }
 

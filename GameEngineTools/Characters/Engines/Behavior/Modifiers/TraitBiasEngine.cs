@@ -3,7 +3,6 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
-    using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Traits;
     using static ActionNames;
 
@@ -45,12 +44,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             BehaviorCandidateEditor.Add(candidates, SelfCare, privacyBias * 0.5);
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
 
         #region Helpers
 
         private static double Centered(double value) => value - 0.5;
 
-        #endregion
+        #endregion Helpers
     }
 }

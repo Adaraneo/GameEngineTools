@@ -36,11 +36,11 @@ namespace GameEngineTools.Extensions
             ArgumentNullException.ThrowIfNull(builder);
 
             return builder.Build(
-                biology:      human.Biology,
-                appearance:   human.PhysicalAppearance,
-                ageYears:     human.Age,                      // critical — without age the model defaults to ~25yo
+                biology: human.Biology,
+                appearance: human.PhysicalAppearance,
+                ageYears: human.Age,                      // critical — without age the model defaults to ~25yo
                 ancestryHint: human.Identity.AncestryHint,    // null = omit hint from prompt
-                snapshot:     human.Snapshot);
+                snapshot: human.Snapshot);
         }
 
         /// <summary>

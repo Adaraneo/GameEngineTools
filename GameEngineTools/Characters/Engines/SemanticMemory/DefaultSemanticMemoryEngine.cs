@@ -23,13 +23,13 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         public SemanticMemoryConfig Config { get; }
 
-        #endregion
+        #endregion State and configuration
 
         #region Private fields
 
         private readonly ILogger _log;
 
-        #endregion
+        #endregion Private fields
 
         #region Construction
 
@@ -41,7 +41,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             State = SemanticMemoryState.Empty;
         }
 
-        #endregion
+        #endregion Construction
 
         #region IEngine
 
@@ -171,7 +171,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         public void RestoreState(SemanticMemoryState state) => State = state;
 
-        #endregion
+        #endregion IEngine
 
         #region Diagnostics & management
 
@@ -196,7 +196,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             State = new SemanticMemoryState(updated);
         }
 
-        #endregion
+        #endregion Diagnostics & management
 
         #region Private helpers
 
@@ -417,6 +417,6 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             int SupportCount,
             string Source);
 
-        #endregion
+        #endregion Private helpers
     }
 }

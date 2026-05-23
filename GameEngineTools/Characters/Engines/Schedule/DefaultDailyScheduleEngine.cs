@@ -21,7 +21,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
         /// <inheritdoc/>
         public DailyScheduleConfig Config { get; }
 
-        #endregion
+        #endregion State and configuration
 
         #region Construction
 
@@ -39,7 +39,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             State = DailyScheduleState.Empty;
         }
 
-        #endregion
+        #endregion Construction
 
         #region IDailyScheduleEngine — SeedFromOccupation
 
@@ -64,7 +64,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             }
         }
 
-        #endregion
+        #endregion IDailyScheduleEngine — SeedFromOccupation
 
         #region IEngine — Tick
 
@@ -78,7 +78,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
 
             // Check whether we need to pre-schedule a future day
             // Look ahead by RescheduleLeadHours to catch the next calendar day
-            var leadAhead  = now + WTimeSpan.FromHours(Config.RescheduleLeadHours);
+            var leadAhead = now + WTimeSpan.FromHours(Config.RescheduleLeadHours);
             var leadDayIdx = leadAhead.Date.DayIndex;
 
             if (leadDayIdx > newState.LastScheduledDayIndex && newState.Slots.Count > 0)
@@ -90,7 +90,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             State = newState;
         }
 
-        #endregion
+        #endregion IEngine — Tick
 
         #region IEngine — Handle
 
@@ -115,7 +115,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             }
         }
 
-        #endregion
+        #endregion IEngine — Handle
 
         #region IEngine — RestoreState
 
@@ -128,7 +128,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             State = state with { LastScheduledDayIndex = -1, ActiveSlot = null };
         }
 
-        #endregion
+        #endregion IEngine — RestoreState
 
         #region Private helpers
 
@@ -171,6 +171,6 @@ namespace GameEngineTools.Characters.Engines.Schedule
             }
         }
 
-        #endregion
+        #endregion Private helpers
     }
 }

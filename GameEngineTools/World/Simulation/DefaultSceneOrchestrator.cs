@@ -106,7 +106,7 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private readonly List<IHuman> _socialCharsBuffer = new();
 
-        #endregion
+        #endregion Private fields
 
         #region Constructor
 
@@ -135,17 +135,17 @@ namespace GameEngineTools.World.Simulation
             ILogger<DefaultSceneOrchestrator> log)
         {
             _attractionCalculator = attractionCalculator;
-            _locationService      = locationService;
-            _perceptionPolicy     = perceptionPolicy;
-            _perceptionOptions    = perceptionOptions;
-            _lodRuntime           = lodRuntime;
-            _worldMap             = worldMap;
-            _speedProvider        = speedProvider;
-            _rng                  = rng;
-            _log                  = log;
+            _locationService = locationService;
+            _perceptionPolicy = perceptionPolicy;
+            _perceptionOptions = perceptionOptions;
+            _lodRuntime = lodRuntime;
+            _worldMap = worldMap;
+            _speedProvider = speedProvider;
+            _rng = rng;
+            _log = log;
         }
 
-        #endregion
+        #endregion Constructor
 
         #region Public API
 
@@ -204,7 +204,7 @@ namespace GameEngineTools.World.Simulation
         public void InvalidateLocation(string locationId)
             => _fullyMetLocations.Remove(locationId);
 
-        #endregion
+        #endregion Public API
 
         #region FireFirstImpressions
 
@@ -298,20 +298,20 @@ namespace GameEngineTools.World.Simulation
                         var aResult = a.AttractionProfile is not null
                             ? _attractionCalculator.Calculate(
                                 a.AttractionProfile, b.PhysicalAppearance, viewB, b.Biology,
-                                observerValence:  a.Snapshot.Psychology.Valence,
-                                observerArousal:  a.Snapshot.Psychology.Arousal,
+                                observerValence: a.Snapshot.Psychology.Valence,
+                                observerArousal: a.Snapshot.Psychology.Arousal,
                                 observerAgeYears: a.Age,
-                                targetAgeYears:   b.Age)
+                                targetAgeYears: b.Age)
                             : AttractionResult.Neutral;
 
                         // B sees A.
                         var bResult = b.AttractionProfile is not null
                             ? _attractionCalculator.Calculate(
                                 b.AttractionProfile, a.PhysicalAppearance, viewA, a.Biology,
-                                observerValence:  b.Snapshot.Psychology.Valence,
-                                observerArousal:  b.Snapshot.Psychology.Arousal,
+                                observerValence: b.Snapshot.Psychology.Valence,
+                                observerArousal: b.Snapshot.Psychology.Arousal,
                                 observerAgeYears: b.Age,
-                                targetAgeYears:   a.Age)
+                                targetAgeYears: a.Age)
                             : AttractionResult.Neutral;
 
                         a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
@@ -331,7 +331,7 @@ namespace GameEngineTools.World.Simulation
             }
         }
 
-        #endregion
+        #endregion FireFirstImpressions
 
         #region RouteMoveTo
 
@@ -421,9 +421,9 @@ namespace GameEngineTools.World.Simulation
                 .Where(id => id != currentLocationId)
                 .Select(id => new
                 {
-                    Id         = id,
+                    Id = id,
                     Descriptor = _locationService.GetDescriptor(id),
-                    Occupants  = _locationService.GetCharactersAt(id).Count
+                    Occupants = _locationService.GetCharactersAt(id).Count
                 })
                 .Where(x => x.Descriptor is not null)
                 .Select(x => new
@@ -467,36 +467,36 @@ namespace GameEngineTools.World.Simulation
             return requestedType switch
             {
                 LocationType.Work =>
-                    (1.0 - noise)    * 0.45 +
+                    (1.0 - noise) * 0.45 +
                     (1.0 - crowding) * 0.40 +
                     (privacy ? 0.15 : 0.0),
 
                 LocationType.Rest =>
-                    (1.0 - noise)    * 0.50 +
+                    (1.0 - noise) * 0.50 +
                     (1.0 - crowding) * 0.20 +
                     (privacy ? 0.30 : 0.0) +
-                    stress           * 0.15,
+                    stress * 0.15,
 
                 LocationType.Private =>
-                    (1.0 - noise)    * 0.35 +
+                    (1.0 - noise) * 0.35 +
                     (1.0 - crowding) * 0.20 +
                     (privacy ? 0.45 : 0.0) +
-                    stress           * 0.20,
+                    stress * 0.20,
 
                 LocationType.Social =>
-                    crowding         * 0.45 +
-                    (1.0 - noise)    * 0.15 +
+                    crowding * 0.45 +
+                    (1.0 - noise) * 0.15 +
                     (privacy ? -0.10 : 0.0),
 
                 LocationType.Public =>
                     (1.0 - crowding) * 0.35 +
-                    (1.0 - noise)    * 0.15,
+                    (1.0 - noise) * 0.15,
 
                 _ => 0.0
             };
         }
 
-        #endregion
+        #endregion RouteMoveTo
 
         #region DynamicReachOutRouting
 
@@ -548,7 +548,7 @@ namespace GameEngineTools.World.Simulation
                     "comfort={Comfort:F1} closeness={Closeness:F1} romantic={Romantic:F1} privacy={Privacy}",
                     character.Id.Value, target.Id.Value, selection.Act,
                     selection.Familiarity, selection.Trust, selection.Comfort,
-                    selection.Closeness,  selection.RomanticInterest,
+                    selection.Closeness, selection.RomanticInterest,
                     selection.HasPrivacy ? "yes" : "no");
 
                 target.ReceiveEvent(new InteractionProposed(
@@ -558,7 +558,7 @@ namespace GameEngineTools.World.Simulation
             }
         }
 
-        #endregion
+        #endregion DynamicReachOutRouting
 
         #region OrganicMicroPositives
 
@@ -605,7 +605,7 @@ namespace GameEngineTools.World.Simulation
             }
         }
 
-        #endregion
+        #endregion OrganicMicroPositives
 
         #region TryTouch
 
@@ -623,14 +623,14 @@ namespace GameEngineTools.World.Simulation
         /// <param name="to">Receiving character.</param>
         private void TryTouch(WDateTime now, IHuman from, IHuman to)
         {
-            var edge       = from.Snapshot.Relationships.Edges.GetValueOrDefault(to.Id);
+            var edge = from.Snapshot.Relationships.Edges.GetValueOrDefault(to.Id);
             var hasPrivacy = from.Snapshot.InteractionSurface.HasPrivacy;
-            var level      = ReachOutTouchSelector.SelectTouchLevel(edge, hasPrivacy, _rng);
+            var level = ReachOutTouchSelector.SelectTouchLevel(edge, hasPrivacy, _rng);
 
             if (level is not null)
                 to.ReceiveEvent(new TouchAttempted(now, from.Id, to.Id, level.Value));
         }
 
-        #endregion
+        #endregion TryTouch
     }
 }

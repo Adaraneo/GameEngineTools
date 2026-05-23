@@ -11,7 +11,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
     internal interface ISleepCoordinator
     {
         SleepDecisionResult Tick(BehaviorContext context);
+
         BehaviorState Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox, BehaviorState state);
+
         void RestoreState();
     }
 }

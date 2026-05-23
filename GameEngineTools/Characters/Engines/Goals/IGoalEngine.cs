@@ -17,30 +17,36 @@ namespace GameEngineTools.Characters.Engines.Goals
     {
         // Existential
         FindMeaning,
+
         OvercomeTrauma,
         BuildIdentity,
 
         // Survival / Safety
         ProtectFamily,
+
         EscapeDanger,
 
         // Career / Mastery
         MasterCraft,
+
         BuildReputation,
 
         // Relational
         FindPartner,
+
         RepairRelationship,
         SeekRevenge
     }
 
     /// <summary>How the goal was created.</summary>
-    public enum GoalOrigin { Personality, Event, Scripted }
+    public enum GoalOrigin
+    { Personality, Event, Scripted }
 
     /// <summary>Why the goal was removed from the active list.</summary>
-    public enum GoalResolution { Completed, Abandoned, Faded, Displaced }
+    public enum GoalResolution
+    { Completed, Abandoned, Faded, Displaced }
 
-    #endregion
+    #endregion Enums
 
     #region PersistentGoal
 
@@ -86,7 +92,7 @@ namespace GameEngineTools.Characters.Engines.Goals
         /// <summary>Set when the goal is resolved; null while active.</summary>
         GoalResolution? Resolution = null);
 
-    #endregion
+    #endregion PersistentGoal
 
     #region GoalState
 
@@ -100,7 +106,7 @@ namespace GameEngineTools.Characters.Engines.Goals
         public IEnumerable<PersistentGoal> Active => Goals.Where(g => g.Resolution is null);
     }
 
-    #endregion
+    #endregion GoalState
 
     #region Domain events
 
@@ -142,7 +148,7 @@ namespace GameEngineTools.Characters.Engines.Goals
         double InitialSalience,
         HumanId? TargetHuman = null) : IDomainEvent;
 
-    #endregion
+    #endregion Domain events
 
     #region IGoalEngine
 
@@ -156,5 +162,5 @@ namespace GameEngineTools.Characters.Engines.Goals
         void SeedFromPersonality(Personality personality, WDateTime now);
     }
 
-    #endregion
+    #endregion IGoalEngine
 }

@@ -51,7 +51,7 @@ namespace GameEngineTools.Characters.Traits
         // because these are now static readonly properties of the record type.
 
         /// <summary>Low on all three facets — committed, context-requiring, low drive.</summary>
-        public static readonly Sociosexuality Restricted   = new(0.10, 0.10, 0.10);
+        public static readonly Sociosexuality Restricted = new(0.10, 0.10, 0.10);
 
         /// <summary>Moderate on all three facets — population average.</summary>
         public static readonly Sociosexuality Intermediate = new(0.50, 0.50, 0.50);

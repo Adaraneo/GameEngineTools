@@ -307,14 +307,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Hodiny od posledního jídla; reset při Eat; řídí glycemický dip okno.</summary>
         double PostMealHours = 0);
 
-    public enum InjuryType { Sprain, Infection, Wound }
+    public enum InjuryType
+    { Sprain, Infection, Wound }
 
     public sealed record InjuryState(
         double Severity,        // 0..100; current injury severity
         int DaysSinceOnset,     // days since injury occurred
         InjuryType Type);
 
-    public enum PostpartumPhase { Immediate, FirstWeek, SixWeeks, FullRecovery }
+    public enum PostpartumPhase
+    { Immediate, FirstWeek, SixWeeks, FullRecovery }
 
     public sealed record PostpartumState(
         int DaysSinceBirth,
@@ -407,10 +409,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Vypočítá vitální parametry z existujícího fyzio+psycho stavu.</summary>
         public static PhysiologicalVitals Compute(PhysiologyState ph, PsychologyState ps)
         {
-            var arousal     = ps.Arousal;
-            var stress      = ps.Stress / 100.0;
-            var cortisol    = ph.CortisolLevel / 100.0;
-            var acuteSAM    = ph.AcuteArousalLevel / 100.0;
+            var arousal = ps.Arousal;
+            var stress = ps.Stress / 100.0;
+            var cortisol = ph.CortisolLevel / 100.0;
+            var acuteSAM = ph.AcuteArousalLevel / 100.0;
             var physFatigue = ph.PhysicalFatigueLevel / 100.0;
 
             // Srdeční tep: klidový 60 bpm + modulace arousal/SAM/fyzická zátěž/horečka
@@ -421,16 +423,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (ph.BodyTempDelta > 1.0) hr += ph.BodyTempDelta * 10;
 
             // Krevní tlak: klidový 120/80 + stres/kortizol/SAM + věk
-            var systolic  = 120 + stress * 30 + cortisol * 15 + acuteSAM * 25 + ageBPBonus;
-            var diastolic = 80  + stress * 15 + cortisol * 8  + acuteSAM * 12 + ageBPBonus * 0.4;
+            var systolic = 120 + stress * 30 + cortisol * 15 + acuteSAM * 25 + ageBPBonus;
+            var diastolic = 80 + stress * 15 + cortisol * 8 + acuteSAM * 12 + ageBPBonus * 0.4;
 
             // Dechová frekvence: klidová 14 + arousal/SAM/stres
             var rr = 14 + arousal * 8 + acuteSAM * 10 + stress * 4;
 
             return new PhysiologicalVitals(
-                HeartRateBpm:    (int)System.Math.Clamp(hr,       40,  200),
-                SystolicBP:      (int)System.Math.Clamp(systolic,  90, 200),
-                DiastolicBP:     (int)System.Math.Clamp(diastolic, 60, 120),
+                HeartRateBpm: (int)System.Math.Clamp(hr, 40, 200),
+                SystolicBP: (int)System.Math.Clamp(systolic, 90, 200),
+                DiastolicBP: (int)System.Math.Clamp(diastolic, 60, 120),
                 RespiratoryRate: System.Math.Clamp(rr, 10, 30));
         }
     }

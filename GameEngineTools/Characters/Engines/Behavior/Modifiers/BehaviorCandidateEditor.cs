@@ -20,12 +20,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             for (var i = 0; i < candidates.Count; i++) if (candidates[i].Name == name) candidates[i] = candidates[i] with { Utility = Math.Max(0, candidates[i].Utility + value) };
         }
 
-        #endregion
+        #endregion Utility edits
 
         #region Tags
 
         internal static bool HasTag(BehaviorCandidate candidate, string tag) => candidate.Tags?.Contains(tag) == true;
 
-        #endregion
+        #endregion Tags
     }
 }

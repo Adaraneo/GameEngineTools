@@ -5,7 +5,6 @@ namespace GameEngineTools.Extensions
 {
     using System.Collections;
     using System.Text;
-    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation.Portraits;

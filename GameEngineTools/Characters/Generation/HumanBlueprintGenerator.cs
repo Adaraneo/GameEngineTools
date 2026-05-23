@@ -6,7 +6,6 @@ namespace GameEngineTools.Characters.Generation
     using System;
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines.Attraction;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Hosting.Defaults;
@@ -83,15 +82,15 @@ namespace GameEngineTools.Characters.Generation
         public static IReadOnlyDictionary<string, double> DefaultOccupationWeights { get; } =
             new Dictionary<string, double>
             {
-                [OccupationIds.None]         = 0.10,
+                [OccupationIds.None] = 0.10,
                 [OccupationIds.Craftsperson] = 0.15,
-                [OccupationIds.Merchant]     = 0.10,
-                [OccupationIds.Scholar]      = 0.05,
-                [OccupationIds.Farmer]       = 0.25,
-                [OccupationIds.Guard]        = 0.08,
-                [OccupationIds.Healer]       = 0.05,
-                [OccupationIds.Artist]       = 0.07,
-                [OccupationIds.Laborer]      = 0.15,
+                [OccupationIds.Merchant] = 0.10,
+                [OccupationIds.Scholar] = 0.05,
+                [OccupationIds.Farmer] = 0.25,
+                [OccupationIds.Guard] = 0.08,
+                [OccupationIds.Healer] = 0.05,
+                [OccupationIds.Artist] = 0.07,
+                [OccupationIds.Laborer] = 0.15,
             };
 
         public static HumanBlueprintSpec Default(
@@ -279,7 +278,7 @@ namespace GameEngineTools.Characters.Generation
 
             var today = WDateOnly.Today;
             var ageYears = today.Year - birthDate.Year;
-            if (today.Month < birthDate.Month || 
+            if (today.Month < birthDate.Month ||
                 (today.Month == birthDate.Month && today.Day < birthDate.Day))
             {
                 ageYears--;

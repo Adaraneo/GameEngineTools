@@ -7,7 +7,6 @@ namespace GameEngineTools.FileSystem
     using System.Text.Json.Serialization;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Persistence;

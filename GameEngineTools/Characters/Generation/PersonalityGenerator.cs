@@ -447,7 +447,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             {
                 throw new ArgumentException($"Diagonal element [{i},{i}] must be 1.0.");
             }
-    
+
             for (int j = i + 1; j < n; j++)
             {
                 if (Math.Abs(corr[i, j] - corr[j, i]) > 1e-8)
@@ -464,19 +464,19 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             for (int j = 0; j <= i; j++)
             {
                 double sum = corr[i, j];
-    
+
                 for (int k = 0; k < j; k++)
                 {
                     sum -= L[i, k] * L[j, k];
                 }
-    
+
                 if (i == j)
                 {
                     if (sum < jitter)
                     {
                         sum = jitter;
                     }
-    
+
                     L[i, j] = Math.Sqrt(sum);
                 }
                 else
@@ -485,7 +485,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
                 }
             }
         }
-    
+
         return L;
     }
 
@@ -494,24 +494,24 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // Abramowitz-Stegun-like erf approximation
         double t = 1.0 / (1.0 + 0.2316419 * Math.Abs(x));
         double d = 0.3989422804014327 * Math.Exp(-x * x / 2.0);
-    
+
         double prob = d * t *
             (0.319381530
             + t * (-0.356563782
             + t * (1.781477937
             + t * (-1.821255978
             + t * 1.330274429))));
-    
+
         return x > 0.0 ? 1.0 - prob : prob;
     }
-    
+
     private static double InverseNormalCdf(double p)
     {
         if (p <= 0.0 || p >= 1.0)
         {
             throw new ArgumentOutOfRangeException(nameof(p), "p must be in (0,1).");
         }
-    
+
         // Peter J. Acklam approximation
         double[] a =
         {
@@ -522,7 +522,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             -3.066479806614716e+01,
              2.506628277459239e+00
         };
-    
+
         double[] b =
         {
             -5.447609879822406e+01,
@@ -531,7 +531,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
              6.680131188771972e+01,
             -1.328068155288572e+01
         };
-    
+
         double[] c =
         {
             -7.784894002430293e-03,
@@ -541,7 +541,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
              4.374664141464968e+00,
              2.938163982698783e+00
         };
-    
+
         double[] d =
         {
              7.784695709041462e-03,
@@ -549,24 +549,24 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
              2.445134137142996e+00,
              3.754408661907416e+00
         };
-    
+
         const double plow = 0.02425;
         const double phigh = 1.0 - plow;
-    
+
         if (p < plow)
         {
             double q = Math.Sqrt(-2.0 * Math.Log(p));
             return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
                    ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0);
         }
-    
+
         if (p > phigh)
         {
             double q = Math.Sqrt(-2.0 * Math.Log(1.0 - p));
             return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
                      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0);
         }
-    
+
         double r = p - 0.5;
         double s = r * r;
         return (((((a[0] * s + a[1]) * s + a[2]) * s + a[3]) * s + a[4]) * s + a[5]) * r /
@@ -575,22 +575,22 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
 
     private static double StandardNormalPdf(double x)
         => 0.3989422804014327 * Math.Exp(-0.5 * x * x);
-    
+
     private static double MapToBoundedTrait(TraitDistribution p, double latent)
     {
         double mean = p.ClampedMean;
         double dev = p.ClampedDev;
-    
+
         // latent mean
         double mu = InverseNormalCdf(mean);
-    
+
         // delta-method approx: sd_out ≈ phi(mu) * sigma_latent
         // => sigma_latent ≈ sd_out / phi(mu)
         double phi = Math.Max(StandardNormalPdf(mu), 1e-4);
         double sigma = dev / phi;
 
         sigma /= p.ClampedConcentration;
-    
+
         // ochrana proti přehnanému roztahování
         sigma = Math.Clamp(sigma, 0.05, 3.0);
 
@@ -601,7 +601,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         {
             x += p.Skew * 0.35 * (latent * latent - 1.0);
         }
-    
+
         return Clamp01(NormalCdf(x));
     }
 

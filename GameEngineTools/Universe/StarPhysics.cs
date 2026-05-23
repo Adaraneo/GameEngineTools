@@ -28,7 +28,7 @@ public record StarPhysics(
     /// <summary>Luminosity expressed as a multiple of solar luminosity (L☉).</summary>
     public double LuminosityRatioToSun => LuminosityWatts / PhysicalConstants.SunLuminosity;
 
-    #endregion
+    #endregion Derived properties
 
     #region Irradiance
 
@@ -52,7 +52,7 @@ public record StarPhysics(
         return f / Math.Sqrt(1.0 - eccentricity * eccentricity);
     }
 
-    #endregion
+    #endregion Irradiance
 
     #region Habitable zone (Kopparapu et al. 2013)
 
@@ -74,7 +74,7 @@ public record StarPhysics(
     /// <summary>Optimistic HZ outer edge (early Mars limit) [AU].</summary>
     public double HzOuterOptimisticAu => Math.Sqrt(LuminosityRatioToSun / 0.320);
 
-    #endregion
+    #endregion Habitable zone (Kopparapu et al. 2013)
 
     #region Equilibrium temperature
 
@@ -90,17 +90,17 @@ public record StarPhysics(
                * Math.Pow(1.0 - albedo, 0.25);
     }
 
-    #endregion
+    #endregion Equilibrium temperature
 
     #region Known star instances
 
     /// <summary>The Sun — G2 V. Source: NASA NSSDCA.</summary>
     public static readonly StarPhysics Sol = new(
-        MassKg:          1.9885e30,
-        RadiusKm:        695_700,
+        MassKg: 1.9885e30,
+        RadiusKm: 695_700,
         LuminosityWatts: 3.828e26,
-        EffectiveTempK:  5_778,
-        SpectralType:    "G2 V"
+        EffectiveTempK: 5_778,
+        SpectralType: "G2 V"
     );
 
     /// <summary>
@@ -108,12 +108,12 @@ public record StarPhysics(
     /// Longer-lived than G stars (~30 Gyr), lower UV, HZ not too close.
     /// </summary>
     public static readonly StarPhysics IdealKDwarf = new(
-        MassKg:          0.72 * 1.9885e30,
-        RadiusKm:        0.72 * 695_700,
+        MassKg: 0.72 * 1.9885e30,
+        RadiusKm: 0.72 * 695_700,
         LuminosityWatts: 0.24 * 3.828e26,
-        EffectiveTempK:  4_400,
-        SpectralType:    "K5 V"
+        EffectiveTempK: 4_400,
+        SpectralType: "K5 V"
     );
 
-    #endregion
+    #endregion Known star instances
 }

@@ -6,7 +6,6 @@ namespace GameEngineTools.World.Simulation
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Net;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.World.Location;

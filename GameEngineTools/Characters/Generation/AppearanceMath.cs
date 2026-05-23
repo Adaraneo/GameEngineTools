@@ -4,7 +4,6 @@
 namespace GameEngineTools.Characters.Generation
 {
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
@@ -26,8 +25,8 @@ namespace GameEngineTools.Characters.Generation
             var correlated = GenerateFaceLatent(ms, body, rng);
             return correlated with
             {
-                NoseScale  = genetic.NoseScale,
-                EyeScale   = genetic.EyeScale,
+                NoseScale = genetic.NoseScale,
+                EyeScale = genetic.EyeScale,
                 LipFullness = genetic.LipFullness
             };
         }
@@ -173,13 +172,21 @@ namespace GameEngineTools.Characters.Generation
         #region Math helpers
 
         internal static double Normal(IRandomSource rng) => rng.NextUnit() + rng.NextUnit() + rng.NextUnit() - 1.5;
+
         internal static double J(IRandomSource rng, double a) => Normal(rng) * a;
+
         internal static double Lerp(double t, double a, double b) => a + (b - a) * t;
+
         internal static double Clamp(double v, double min, double max) => v < min ? min : (v > max ? max : v);
+
         internal static double C01(double v) => Clamp(v, 0.0, 1.0);
+
         internal static double ClampSigned(double v) => Clamp(v, -1.0, 1.0);
+
         internal static double R1(double v) => Math.Round(v, 1);
+
         internal static double R3(double v) => Math.Round(v, 3);
+
         internal static double R01(double v) => Math.Round(C01(v), 3);
 
         internal static T Pick<T>(IReadOnlyList<T> values, IReadOnlyList<double> weights, IRandomSource rng)

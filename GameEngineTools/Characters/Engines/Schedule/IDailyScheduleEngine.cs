@@ -45,7 +45,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
         double BiasStrength = 0.7,
         bool CanSkipWhenStressed = true);
 
-    #endregion
+    #endregion ScheduleSlot
 
     #region DailyScheduleState
 
@@ -76,7 +76,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             new(Array.Empty<ScheduleSlot>(), null, -1, null);
     }
 
-    #endregion
+    #endregion DailyScheduleState
 
     #region Domain events
 
@@ -111,7 +111,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
         string Action,
         double Bias) : IDomainEvent;
 
-    #endregion
+    #endregion Domain events
 
     #region IDailyScheduleEngine
 
@@ -143,5 +143,5 @@ namespace GameEngineTools.Characters.Engines.Schedule
             HumanId humanId);
     }
 
-    #endregion
+    #endregion IDailyScheduleEngine
 }

@@ -19,7 +19,7 @@ public record RingBand(
     double OuterRadiusKm,
     double MeanOpticalDepth,
     double AlbedoGeometric,
-    bool   IsGap = false
+    bool IsGap = false
 )
 {
     /// <summary>Radial width of the band [km].</summary>
@@ -40,9 +40,9 @@ public record RingBand(
 /// Complete ring system with climate effect calculations.
 /// </summary>
 public record RingSystem(
-    string                  PlanetName,
-    double                  PlanetEquatorialRadiusKm,
-    double                  PlanetGM,
+    string PlanetName,
+    double PlanetEquatorialRadiusKm,
+    double PlanetGM,
     IReadOnlyList<RingBand> Bands
 )
 {
@@ -65,7 +65,7 @@ public record RingSystem(
     public double RocheLimitKm(double planetMeanDensity, double bodyDensity) =>
         PlanetEquatorialRadiusKm * 2.44 * Math.Pow(planetMeanDensity / bodyDensity, 1.0 / 3.0);
 
-    #endregion
+    #endregion Geometry
 
     #region Climate effects
 
@@ -107,11 +107,11 @@ public record RingSystem(
     /// <param name="dominantRingAlbedo">Albedo of the main ring.</param>
     public double ApproximatePolarRingGlow(double starIrradianceAtPlanet, double dominantRingAlbedo)
     {
-        double ringArea   = Math.PI * (Math.Pow(OuterEdgeKm, 2) - Math.Pow(InnerEdgeKm, 2)) * 1e6; // m²
-        double r          = PlanetEquatorialRadiusKm * 1000.0;
+        double ringArea = Math.PI * (Math.Pow(OuterEdgeKm, 2) - Math.Pow(InnerEdgeKm, 2)) * 1e6; // m²
+        double r = PlanetEquatorialRadiusKm * 1000.0;
         double solidAngle = ringArea / (r * r);
         return dominantRingAlbedo * starIrradianceAtPlanet * solidAngle / (4.0 * Math.PI);
     }
 
-    #endregion
+    #endregion Climate effects
 }

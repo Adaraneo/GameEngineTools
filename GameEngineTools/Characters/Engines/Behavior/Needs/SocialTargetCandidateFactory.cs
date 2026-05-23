@@ -7,7 +7,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;

@@ -54,7 +54,7 @@ namespace GameEngineTools.World.Objects
         /// <summary>Region name → list of location IDs belonging to that region.</summary>
         private readonly ConcurrentDictionary<string, List<string>> _regions;
 
-        #endregion
+        #endregion Private state
 
         #region Construction
 
@@ -77,7 +77,7 @@ namespace GameEngineTools.World.Objects
                 regions.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()));
         }
 
-        #endregion
+        #endregion Construction
 
         #region Location queries
 
@@ -93,7 +93,7 @@ namespace GameEngineTools.World.Objects
         public LocationDescriptor? GetLocation(string locationId)
             => _locations.GetValueOrDefault(locationId);
 
-        #endregion
+        #endregion Location queries
 
         #region Adjacency queries
 
@@ -118,7 +118,7 @@ namespace GameEngineTools.World.Objects
                 .Select(c => c.TargetLocationId)
                 .ToList();
 
-        #endregion
+        #endregion Adjacency queries
 
         #region Region queries
 
@@ -151,7 +151,7 @@ namespace GameEngineTools.World.Objects
             return null;
         }
 
-        #endregion
+        #endregion Region queries
 
         #region Runtime mutation
 
@@ -221,7 +221,7 @@ namespace GameEngineTools.World.Objects
                 });
         }
 
-        #endregion
+        #endregion Runtime mutation
 
         #region ILocationService integration
 
@@ -241,6 +241,6 @@ namespace GameEngineTools.World.Objects
                 locationService.RegisterLocation(descriptor);
         }
 
-        #endregion
+        #endregion ILocationService integration
     }
 }

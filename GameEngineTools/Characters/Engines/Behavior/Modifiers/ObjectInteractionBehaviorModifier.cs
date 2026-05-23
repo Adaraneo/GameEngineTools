@@ -111,14 +111,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         {
             return affordance.Type switch
             {
-                AffordanceType.Hunger      => snapshot.Physiology.Hunger,
-                AffordanceType.Rest        => snapshot.Behavior.NeedRest,
-                AffordanceType.Social      => snapshot.Behavior.NeedBelonging,
-                AffordanceType.Work        => snapshot.Behavior.NeedCompetence,
+                AffordanceType.Hunger => snapshot.Physiology.Hunger,
+                AffordanceType.Rest => snapshot.Behavior.NeedRest,
+                AffordanceType.Social => snapshot.Behavior.NeedBelonging,
+                AffordanceType.Work => snapshot.Behavior.NeedCompetence,
                 AffordanceType.Entertainment => snapshot.Behavior.NeedCompetence,
-                AffordanceType.Warmth      => snapshot.Physiology.BodyTempDelta < -1.0 ? 70.0 : 10.0,
-                AffordanceType.MoodBoost   => (100.0 - snapshot.Psychology.MoodBaseline),
-                AffordanceType.Ownership   => 50.0, // flat moderate desire to take items
+                AffordanceType.Warmth => snapshot.Physiology.BodyTempDelta < -1.0 ? 70.0 : 10.0,
+                AffordanceType.MoodBoost => (100.0 - snapshot.Psychology.MoodBaseline),
+                AffordanceType.Ownership => 50.0, // flat moderate desire to take items
                 _ => 0.0
             };
         }

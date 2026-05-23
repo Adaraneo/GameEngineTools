@@ -54,7 +54,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             return slots;
         }
 
-        #endregion
+        #endregion Public API
 
         #region Private helpers
 
@@ -82,18 +82,18 @@ namespace GameEngineTools.Characters.Engines.Schedule
             var hourOffset = personality.Chronotype switch
             {
                 Chronotype.Lark => -1,
-                Chronotype.Owl  =>  2,
-                _               =>  0
+                Chronotype.Owl => 2,
+                _ => 0
             };
 
             // Motivation boosts
             var boostReachOut = personality.Motivation.Affiliation > 0.75 ? 0.1 : 0.0;
-            var boostWork     = personality.Motivation.Competence  > 0.75 ? 0.1 : 0.0;
+            var boostWork = personality.Motivation.Competence > 0.75 ? 0.1 : 0.0;
 
             var result = new List<ScheduleSlot>(slots.Count);
             foreach (var slot in slots)
             {
-                var hour     = Math.Clamp(slot.HourOfDay + hourOffset, 0, hoursPerDay - 1);
+                var hour = Math.Clamp(slot.HourOfDay + hourOffset, 0, hoursPerDay - 1);
                 var strength = slot.BiasStrength;
 
                 if (slot.PreferredAction == ReachOut)
@@ -133,6 +133,6 @@ namespace GameEngineTools.Characters.Engines.Schedule
             return result;
         }
 
-        #endregion
+        #endregion Private helpers
     }
 }

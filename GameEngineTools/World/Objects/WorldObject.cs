@@ -48,7 +48,7 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public required string LocationId { get; init; }
 
-        #endregion
+        #endregion Identity
 
         #region Perceptual signature
 
@@ -72,7 +72,7 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public bool BlocksLineOfSight { get; init; } = false;
 
-        #endregion
+        #endregion Perceptual signature
 
         #region Behavioral affordances
 
@@ -89,7 +89,7 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public bool IsAvailable { get; init; } = true;
 
-        #endregion
+        #endregion Behavioral affordances
 
         #region Pickup properties
 
@@ -108,7 +108,7 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public PickupItemKind ItemKind { get; init; } = PickupItemKind.None;
 
-        #endregion
+        #endregion Pickup properties
 
         #region Runtime ownership state
 
@@ -135,6 +135,6 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public int RespawnMinutes { get; init; } = 1440;
 
-        #endregion
+        #endregion Runtime ownership state
     }
 }

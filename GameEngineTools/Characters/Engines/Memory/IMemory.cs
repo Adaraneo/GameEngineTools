@@ -92,6 +92,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     {
         /// <summary>NPC was directly present when the event occurred.</summary>
         DirectWitness,
+
         /// <summary>NPC learned about the event via ThirdPartyActionObserved (gossip).</summary>
         Gossip
     }

@@ -15,13 +15,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
 
         private readonly ILogger _log;
 
-        #endregion
+        #endregion Private fields
 
         #region Construction
 
         public DefaultActionArbitrationEngine(ILogger log) => _log = log;
 
-        #endregion
+        #endregion Construction
 
         #region IActionArbitrationEngine
 
@@ -53,7 +53,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
             return new ActionArbitrationResult(false, plan, chosen, context.State with { CurrentPlan = plan, Cooldowns = context.Cooldowns }, intended, reason);
         }
 
-        #endregion
+        #endregion IActionArbitrationEngine
 
         private static BehaviorCandidate ChooseWithConflict(BehaviorContext context, List<BehaviorCandidate> candidates, BehaviorCandidate intended, out string? reason)
         {

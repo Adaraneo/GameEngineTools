@@ -310,8 +310,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             return result;
         }
 
-        #endregion
-
+        #endregion Percieved Memory
 
         // ══════════════════════════════════════════════════════════════════════════
         // Privátní pomocné metody

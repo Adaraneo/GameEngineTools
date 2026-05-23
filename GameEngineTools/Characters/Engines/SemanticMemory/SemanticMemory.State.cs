@@ -5,9 +5,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Traits;
-    using GameEngineTools.Characters.Engines.Memory;
 
     /// <summary>
     /// Immutable snapshot sémantické paměti — přesvědčení postavy o všech lidech, které zná.

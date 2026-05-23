@@ -17,7 +17,7 @@ public static class PhysicalConstants
     /// <summary>Stefan-Boltzmann constant σ [W m⁻² K⁻⁴].</summary>
     public const double StefanBoltzmann = 5.670374e-8;
 
-    #endregion
+    #endregion Fundamental
 
     #region Astronomical
 
@@ -51,5 +51,5 @@ public static class PhysicalConstants
     /// <summary>Earth surface gravity [m/s²].</summary>
     public const double EarthGravity = 9.78;
 
-    #endregion
+    #endregion Astronomical
 }

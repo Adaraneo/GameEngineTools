@@ -53,16 +53,16 @@ namespace GameEngineTools.Characters.Generation.Portraits
             ArgumentNullException.ThrowIfNull(appearance);
 
             return new PortraitSpec(
-                Biology:        biology,
-                AgeLabel:       BuildAgeLabel(biology, ageYears),
-                AncestryHint:   ancestryHint,
-                Body:           BuildBody(appearance),
-                Skin:           BuildSkin(appearance.Colors.SkinTone),
-                Eyes:           BuildEyes(appearance.Colors.EyeColor),
-                Hair:           BuildHair(appearance.Colors.HairColor, appearance.Colors.HairType, appearance.HairLengthCm),
-                Face:           BuildFace(appearance),
-                Expression:     BuildExpression(snapshot),
-                BiasGuard:      DefaultBiasGuard,
+                Biology: biology,
+                AgeLabel: BuildAgeLabel(biology, ageYears),
+                AncestryHint: ancestryHint,
+                Body: BuildBody(appearance),
+                Skin: BuildSkin(appearance.Colors.SkinTone),
+                Eyes: BuildEyes(appearance.Colors.EyeColor),
+                Hair: BuildHair(appearance.Colors.HairColor, appearance.Colors.HairType, appearance.HairLengthCm),
+                Face: BuildFace(appearance),
+                Expression: BuildExpression(snapshot),
+                BiasGuard: DefaultBiasGuard,
                 DistinctiveMarks: BuildDistinctiveMarks(appearance.DistinctiveMarks));
         }
 
@@ -88,7 +88,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
 
             return ageYears switch
             {
-                < 3  => "toddler",
+                < 3 => "toddler",
                 < 12 => "child",
                 < 16 => "young teenager",
                 < 20 => "older teenager",
@@ -100,7 +100,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
                 < 55 => $"{noun} in late 40s to early 50s",
                 < 65 => $"{noun} in late 50s to early 60s",
                 < 75 => $"older {noun}, mid 60s to early 70s",
-                _    => $"elderly {noun}, 75 or older"
+                _ => $"elderly {noun}, 75 or older"
             };
         }
 
@@ -109,51 +109,51 @@ namespace GameEngineTools.Characters.Generation.Portraits
         /// <returns>Body render specification with bucket labels.</returns>
         private static BodyRenderSpec BuildBody(PhysicalAppearance appearance)
         {
-            var heightCm        = appearance.Body.Proportions.HeightCm;
+            var heightCm = appearance.Body.Proportions.HeightCm;
             var shoulderBreadth = appearance.Body.Skeletal.ShoulderBreadth;
-            var hipBreadth      = appearance.Body.Silhouette.HipWidth;
-            var frame           = DeriveFrame(appearance.Body);
+            var hipBreadth = appearance.Body.Silhouette.HipWidth;
+            var frame = DeriveFrame(appearance.Body);
             var shoulderToHeight = shoulderBreadth / heightCm;
-            var hipToHeight      = hipBreadth      / heightCm;
+            var hipToHeight = hipBreadth / heightCm;
             var shoulderHipDelta = shoulderBreadth - hipBreadth;
 
             return new BodyRenderSpec(
-                HeightCm:          Math.Round(heightCm, 2),
+                HeightCm: Math.Round(heightCm, 2),
                 ShoulderBreadthCm: Math.Round(shoulderBreadth, 2),
-                HipBreadthCm:      Math.Round(hipBreadth, 2),
-                WaistToHipRatio:   Math.Round(appearance.Body.Proportions.WaistToHipRatio, 3),
-                Frame:             frame,
-                HeightBucket:      BucketHeight(heightCm),
-                ProportionBucket:  BucketProportions(shoulderToHeight, hipToHeight),
-                PostureBucket:     BucketPosture(appearance.Body.Posture.PostureUprightness),
-                FrameImpression:   BucketFrameImpression(frame, shoulderHipDelta));
+                HipBreadthCm: Math.Round(hipBreadth, 2),
+                WaistToHipRatio: Math.Round(appearance.Body.Proportions.WaistToHipRatio, 3),
+                Frame: frame,
+                HeightBucket: BucketHeight(heightCm),
+                ProportionBucket: BucketProportions(shoulderToHeight, hipToHeight),
+                PostureBucket: BucketPosture(appearance.Body.Posture.PostureUprightness),
+                FrameImpression: BucketFrameImpression(frame, shoulderHipDelta));
         }
 
         /// <summary>Maps a <see cref="SkinTone"/> enum to a natural-language skin render spec.</summary>
         private static SkinRenderSpec BuildSkin(SkinTone tone) => tone switch
         {
-            SkinTone.VeryFair    => new("very fair",     "very light",   "cool-neutral",  "natural skin texture visible", true, false),
-            SkinTone.Fair        => new("fair",          "light",        "neutral",        "natural skin texture visible", true, false),
-            SkinTone.Light       => new("light",         "light",        "neutral-warm",   "natural skin texture visible", true, false),
-            SkinTone.LightMedium => new("light-medium",  "light-medium", "warm",           "natural skin texture visible", true, false),
-            SkinTone.Medium      => new("medium",        "medium",       "neutral",        "natural skin texture visible", true, false),
-            SkinTone.Tan         => new("tan",           "medium-dark",  "warm",           "natural skin texture visible", true, false),
-            SkinTone.Dark        => new("dark",          "dark",         "neutral-cool",   "natural skin texture visible", true, false),
-            SkinTone.VeryDark    => new("very dark",     "very dark",    "neutral-cool",   "natural skin texture visible", true, false),
-            SkinTone.Olive       => new("olive",         "light-medium", "olive",          "natural skin texture visible", true, false),
-            _                    => new("medium",        "medium",       "neutral",        "natural skin texture visible", true, false)
+            SkinTone.VeryFair => new("very fair", "very light", "cool-neutral", "natural skin texture visible", true, false),
+            SkinTone.Fair => new("fair", "light", "neutral", "natural skin texture visible", true, false),
+            SkinTone.Light => new("light", "light", "neutral-warm", "natural skin texture visible", true, false),
+            SkinTone.LightMedium => new("light-medium", "light-medium", "warm", "natural skin texture visible", true, false),
+            SkinTone.Medium => new("medium", "medium", "neutral", "natural skin texture visible", true, false),
+            SkinTone.Tan => new("tan", "medium-dark", "warm", "natural skin texture visible", true, false),
+            SkinTone.Dark => new("dark", "dark", "neutral-cool", "natural skin texture visible", true, false),
+            SkinTone.VeryDark => new("very dark", "very dark", "neutral-cool", "natural skin texture visible", true, false),
+            SkinTone.Olive => new("olive", "light-medium", "olive", "natural skin texture visible", true, false),
+            _ => new("medium", "medium", "neutral", "natural skin texture visible", true, false)
         };
 
         /// <summary>Maps an <see cref="EyeColor"/> enum to a natural-language eye render spec.</summary>
         private static EyeRenderSpec BuildEyes(EyeColor color) => color switch
         {
-            EyeColor.Brown  => new("brown",  "low variation",      "medium", "do not enlarge eyes"),
-            EyeColor.Hazel  => new("hazel",  "moderate variation", "medium", "do not enlarge eyes"),
-            EyeColor.Green  => new("green",  "moderate variation", "medium", "do not enlarge eyes"),
-            EyeColor.Blue   => new("blue",   "low variation",      "medium", "do not enlarge eyes"),
-            EyeColor.Gray   => new("gray",   "low variation",      "soft",   "do not enlarge eyes"),
-            EyeColor.Amber  => new("amber",  "low variation",      "medium", "do not enlarge eyes"),
-            _               => new("brown",  "low variation",      "medium", "do not enlarge eyes")
+            EyeColor.Brown => new("brown", "low variation", "medium", "do not enlarge eyes"),
+            EyeColor.Hazel => new("hazel", "moderate variation", "medium", "do not enlarge eyes"),
+            EyeColor.Green => new("green", "moderate variation", "medium", "do not enlarge eyes"),
+            EyeColor.Blue => new("blue", "low variation", "medium", "do not enlarge eyes"),
+            EyeColor.Gray => new("gray", "low variation", "soft", "do not enlarge eyes"),
+            EyeColor.Amber => new("amber", "low variation", "medium", "do not enlarge eyes"),
+            _ => new("brown", "low variation", "medium", "do not enlarge eyes")
         };
 
         /// <summary>Maps hair colour, type and length data to a natural-language hair render spec.</summary>
@@ -161,32 +161,32 @@ namespace GameEngineTools.Characters.Generation.Portraits
         {
             var (baseColorFamily, brightnessRange) = color switch
             {
-                HairColorNatural.Black      => ("black",      "very dark"),
-                HairColorNatural.DarkBrown  => ("dark brown", "dark"),
-                HairColorNatural.Brown      => ("brown",      "medium"),
-                HairColorNatural.Auburn     => ("auburn",     "medium"),
-                HairColorNatural.Red        => ("red",        "medium"),
-                HairColorNatural.Blond      => ("blond",      "light"),
-                HairColorNatural.DarkBlond  => ("dark blond", "medium-light"),
-                _                           => ("brown",      "medium")
+                HairColorNatural.Black => ("black", "very dark"),
+                HairColorNatural.DarkBrown => ("dark brown", "dark"),
+                HairColorNatural.Brown => ("brown", "medium"),
+                HairColorNatural.Auburn => ("auburn", "medium"),
+                HairColorNatural.Red => ("red", "medium"),
+                HairColorNatural.Blond => ("blond", "light"),
+                HairColorNatural.DarkBlond => ("dark blond", "medium-light"),
+                _ => ("brown", "medium")
             };
 
             var (texture, straightness) = type switch
             {
                 HairType.Straight => ("smooth strand texture", "straight"),
-                HairType.Wavy     => ("soft wave texture",     "wavy"),
-                HairType.Curly    => ("defined curl texture",  "curly"),
-                HairType.Coily    => ("tight coil texture",    "coily"),
-                _                 => ("smooth strand texture", "straight")
+                HairType.Wavy => ("soft wave texture", "wavy"),
+                HairType.Curly => ("defined curl texture", "curly"),
+                HairType.Coily => ("tight coil texture", "coily"),
+                _ => ("smooth strand texture", "straight")
             };
 
             return new HairRenderSpec(
                 BaseColorFamily: baseColorFamily,
                 BrightnessRange: brightnessRange,
-                Texture:         texture,
-                Straightness:    straightness,
-                LengthBucket:    BucketHairLength(lengthCm),
-                VolumePolicy:    "natural volume only");
+                Texture: texture,
+                Straightness: straightness,
+                LengthBucket: BucketHairLength(lengthCm),
+                VolumePolicy: "natural volume only");
         }
 
         /// <summary>
@@ -194,18 +194,18 @@ namespace GameEngineTools.Characters.Generation.Portraits
         /// </summary>
         private static FaceRenderSpec BuildFace(PhysicalAppearance appearance)
         {
-            var faceShape  = DeriveFaceShape(appearance.Face.Craniofacial);
+            var faceShape = DeriveFaceShape(appearance.Face.Craniofacial);
             var lipFullness = (appearance.Face.Mouth.UpperLipFullness + appearance.Face.Mouth.LowerLipFullness) * 0.5;
 
             return new FaceRenderSpec(
-                ShapeLabel:            FaceShapeLabel(faceShape),
-                WidthHeightTendency:   FaceWidthHeightTendency(faceShape),
-                NoseProjectionBucket:  BucketNoseProjection(appearance.Face.Nose.NoseProjection),
-                LipFullnessBucket:     BucketLipFullness(lipFullness),
-                EyeScaleBucket:        BucketEyeScale(appearance.Face.EyeRegion.EyeSize),
-                JawDefinitionBucket:   BucketJawDefinition(appearance.Face.Jaw.JawProminence, appearance.Face.Jaw.JawRoundness),
+                ShapeLabel: FaceShapeLabel(faceShape),
+                WidthHeightTendency: FaceWidthHeightTendency(faceShape),
+                NoseProjectionBucket: BucketNoseProjection(appearance.Face.Nose.NoseProjection),
+                LipFullnessBucket: BucketLipFullness(lipFullness),
+                EyeScaleBucket: BucketEyeScale(appearance.Face.EyeRegion.EyeSize),
+                JawDefinitionBucket: BucketJawDefinition(appearance.Face.Jaw.JawProminence, appearance.Face.Jaw.JawRoundness),
                 FacialAsymmetryBucket: BucketFacialAsymmetry(appearance.Face.Asymmetry.FacialAsymmetry),
-                SymmetryPolicy:        "preserve natural asymmetry");
+                SymmetryPolicy: "preserve natural asymmetry");
         }
 
         /// <summary>
@@ -218,11 +218,11 @@ namespace GameEngineTools.Characters.Generation.Portraits
 
             return kind switch
             {
-                PortraitExpressionKind.Calm  => new(kind, "calm",    "closed mouth", "relaxed brows",        false),
-                PortraitExpressionKind.Alert => new(kind, "alert",   "closed mouth", "slight brow lift",     false),
-                PortraitExpressionKind.Tired => new(kind, "tired",   "closed mouth", "soft brow tension",    false),
-                PortraitExpressionKind.Tense => new(kind, "tense",   "closed mouth", "visible brow tension", false),
-                _                            => new(PortraitExpressionKind.Neutral, "neutral", "closed mouth", "neutral brows", false)
+                PortraitExpressionKind.Calm => new(kind, "calm", "closed mouth", "relaxed brows", false),
+                PortraitExpressionKind.Alert => new(kind, "alert", "closed mouth", "slight brow lift", false),
+                PortraitExpressionKind.Tired => new(kind, "tired", "closed mouth", "soft brow tension", false),
+                PortraitExpressionKind.Tense => new(kind, "tense", "closed mouth", "visible brow tension", false),
+                _ => new(PortraitExpressionKind.Neutral, "neutral", "closed mouth", "neutral brows", false)
             };
         }
 
@@ -265,7 +265,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
 
             // Explicitly calm: low stress, low arousal, neutral emotion
             if (snapshot.Psychology.Stress <= 30 &&
-                snapshot.Psychology.Arousal <= 0.4  &&
+                snapshot.Psychology.Arousal <= 0.4 &&
                 snapshot.Psychology.DominantEmotion == DiscreteEmotion.Neutral)
             {
                 return PortraitExpressionKind.Calm;
@@ -283,7 +283,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
         {
             < 155 => "short",
             < 171 => "medium height",
-            _     => "tall"
+            _ => "tall"
         };
 
         /// <summary>Maps shoulder-to-height and hip-to-height ratios to a proportion label.</summary>
@@ -295,7 +295,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
             {
                 < 0.220 => "narrow proportions",
                 < 0.245 => "balanced proportions",
-                _       => "broad proportions"
+                _ => "broad proportions"
             };
         }
 
@@ -310,7 +310,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
                 ? "medium frame with balanced silhouette"
                 : "medium frame",
 
-            BodyFrame.Large  => shoulderHipDelta >= 1.0
+            BodyFrame.Large => shoulderHipDelta >= 1.0
                 ? "large frame with shoulder-led silhouette"
                 : "large frame",
 
@@ -327,7 +327,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
             < 0.40 => "noticeably slouched carriage",
             < 0.62 => "softly relaxed carriage",
             < 0.82 => "neutral upright carriage",
-            _      => "very upright carriage"
+            _ => "very upright carriage"
         };
 
         #endregion Bucket helpers — body
@@ -337,11 +337,11 @@ namespace GameEngineTools.Characters.Generation.Portraits
         /// <summary>Maps hair length in cm to a natural-language length label.</summary>
         private static string BucketHairLength(double lengthCm) => lengthCm switch
         {
-            < 2.0  => "shaved or very short",
+            < 2.0 => "shaved or very short",
             < 10.0 => "short",
             < 30.0 => "medium length",
             < 65.0 => "long",
-            _      => "very long"
+            _ => "very long"
         };
 
         #endregion Bucket helpers — hair
@@ -351,25 +351,25 @@ namespace GameEngineTools.Characters.Generation.Portraits
         /// <summary>Returns the natural-language label for a derived face shape.</summary>
         private static string FaceShapeLabel(FaceShape faceShape) => faceShape switch
         {
-            FaceShape.Oval    => "oval",
-            FaceShape.Round   => "round",
-            FaceShape.Square  => "square",
-            FaceShape.Heart   => "heart",
+            FaceShape.Oval => "oval",
+            FaceShape.Round => "round",
+            FaceShape.Square => "square",
+            FaceShape.Heart => "heart",
             FaceShape.Diamond => "diamond",
-            FaceShape.Oblong  => "oblong",
-            _                 => "oval"
+            FaceShape.Oblong => "oblong",
+            _ => "oval"
         };
 
         /// <summary>Returns the width-to-height tendency label for a face shape.</summary>
         private static string FaceWidthHeightTendency(FaceShape faceShape) => faceShape switch
         {
-            FaceShape.Oval    => "balanced width-to-height tendency",
-            FaceShape.Round   => "wider-than-tall tendency",
-            FaceShape.Square  => "broad width with defined jaw tendency",
-            FaceShape.Heart   => "broader upper face with narrower jaw tendency",
+            FaceShape.Oval => "balanced width-to-height tendency",
+            FaceShape.Round => "wider-than-tall tendency",
+            FaceShape.Square => "broad width with defined jaw tendency",
+            FaceShape.Heart => "broader upper face with narrower jaw tendency",
             FaceShape.Diamond => "widest at cheek level tendency",
-            FaceShape.Oblong  => "longer-than-wide tendency",
-            _                 => "balanced width-to-height tendency"
+            FaceShape.Oblong => "longer-than-wide tendency",
+            _ => "balanced width-to-height tendency"
         };
 
         /// <summary>Maps nose projection (0–1) to a natural-language bucket.</summary>
@@ -379,7 +379,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
             < 0.45 => "moderate-low projection",
             < 0.65 => "moderate projection",
             < 0.80 => "moderate-high projection",
-            _      => "high projection"
+            _ => "high projection"
         };
 
         /// <summary>Maps average lip fullness (0–1) to a natural-language bucket.</summary>
@@ -389,7 +389,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
             < 0.45 => "medium-thin",
             < 0.65 => "medium-full",
             < 0.80 => "full",
-            _      => "very full"
+            _ => "very full"
         };
 
         /// <summary>Maps eye size (0–1) to a natural-language bucket.</summary>
@@ -397,7 +397,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
         {
             < 0.36 => "small eye scale",
             < 0.62 => "medium eye scale",
-            _      => "large eye scale"
+            _ => "large eye scale"
         };
 
         /// <summary>Maps jaw prominence and roundness to a natural-language definition label.</summary>
@@ -417,7 +417,7 @@ namespace GameEngineTools.Characters.Generation.Portraits
         {
             < 0.04 => "very subtle natural asymmetry",
             < 0.09 => "subtle natural asymmetry",
-            _      => "noticeable natural asymmetry"
+            _ => "noticeable natural asymmetry"
         };
 
         #endregion Bucket helpers — face
@@ -427,9 +427,9 @@ namespace GameEngineTools.Characters.Generation.Portraits
         /// <summary>Derives a discrete <see cref="BodyFrame"/> from skeletal and soft-tissue data.</summary>
         private static BodyFrame DeriveFrame(BodyMorphology body)
         {
-            var robustness  = body.Skeletal.SkeletalRobustness;
+            var robustness = body.Skeletal.SkeletalRobustness;
             var muscularity = body.SoftTissue.Muscularity;
-            var adiposity   = body.SoftTissue.Adiposity;
+            var adiposity = body.SoftTissue.Adiposity;
 
             if (muscularity >= 0.68 && robustness >= 0.58)
                 return BodyFrame.Strong;
@@ -443,14 +443,14 @@ namespace GameEngineTools.Characters.Generation.Portraits
         /// <summary>Derives a discrete <see cref="FaceShape"/> from craniofacial measurements.</summary>
         private static FaceShape DeriveFaceShape(CraniofacialStructure c)
         {
-            var ratio      = c.FaceWidthToHeightRatio;
-            var jawToFace  = c.JawWidth / Math.Max(1.0, c.FaceWidth);
+            var ratio = c.FaceWidthToHeightRatio;
+            var jawToFace = c.JawWidth / Math.Max(1.0, c.FaceWidth);
             var cheekToJaw = c.CheekboneWidth / Math.Max(1.0, c.JawWidth);
 
             if (ratio >= 0.86 && jawToFace >= 0.80) return FaceShape.Square;
-            if (ratio >= 0.86)                       return FaceShape.Round;
-            if (ratio <= 0.72)                       return FaceShape.Oblong;
-            if (cheekToJaw >= 1.23)                  return FaceShape.Diamond;
+            if (ratio >= 0.86) return FaceShape.Round;
+            if (ratio <= 0.72) return FaceShape.Oblong;
+            if (cheekToJaw >= 1.23) return FaceShape.Diamond;
 
             return jawToFace <= 0.68 ? FaceShape.Heart : FaceShape.Oval;
         }

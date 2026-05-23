@@ -34,11 +34,11 @@ public record OrbitalElements(
 
     /// <summary>Earth reference orbit (J2000.0).</summary>
     public static readonly OrbitalElements Earth = new(
-        SemiMajorAxisAu:   1.000001,
-        Eccentricity:      0.01671022,
-        InclinationDeg:    0.00005,
-        LongAscNodeDeg:   -11.26064,
-        ArgPeriapsisDeg:   102.94719,
-        MeanLongitudeDeg:  100.46435
+        SemiMajorAxisAu: 1.000001,
+        Eccentricity: 0.01671022,
+        InclinationDeg: 0.00005,
+        LongAscNodeDeg: -11.26064,
+        ArgPeriapsisDeg: 102.94719,
+        MeanLongitudeDeg: 100.46435
     );
 }

@@ -17,7 +17,7 @@ public record PlanetConfig
     /// <summary>Scientific classification of planet type.</summary>
     public required PlanetArchetype Archetype { get; init; }
 
-    #endregion
+    #endregion Identity
 
     #region Physical (bulk)
 
@@ -33,7 +33,7 @@ public record PlanetConfig
     /// <summary>Mean density [kg/m³]. Derived property, but can be set directly.</summary>
     public double MeanDensityKgM3 { get; init; }
 
-    #endregion
+    #endregion Physical (bulk)
 
     #region Rotation
 
@@ -49,7 +49,7 @@ public record PlanetConfig
     /// <summary>True when rotation period = orbital period (star-facing hemisphere fixed).</summary>
     public bool IsTidallyLocked { get; init; }
 
-    #endregion
+    #endregion Rotation
 
     #region Atmosphere
 
@@ -65,7 +65,7 @@ public record PlanetConfig
     /// </summary>
     public required double GreenhouseWarmingK { get; init; }
 
-    #endregion
+    #endregion Atmosphere
 
     #region Surface
 
@@ -81,7 +81,7 @@ public record PlanetConfig
     /// <summary>Whether the planet has active plate tectonics (CO₂ recycling, mountain building).</summary>
     public bool HasPlateTectonics { get; init; }
 
-    #endregion
+    #endregion Surface
 
     #region Magnetic field
 
@@ -91,7 +91,7 @@ public record PlanetConfig
     /// </summary>
     public required double MagneticFieldStrengthVsEarth { get; init; }
 
-    #endregion
+    #endregion Magnetic field
 
     #region Moon and ring system
 
@@ -104,7 +104,7 @@ public record PlanetConfig
     /// <summary>Volitelný prstencový systém. <c>null</c> = žádné prstence.</summary>
     public RingSystem? Rings { get; init; }
 
-    #endregion
+    #endregion Moon and ring system
 
     #region Computed physical properties
 
@@ -129,57 +129,57 @@ public record PlanetConfig
     public double Ellipticity =>
         (EquatorialRadiusKm - PolarRadiusKm) / EquatorialRadiusKm;
 
-    #endregion
+    #endregion Computed physical properties
 
     #region Known planet instances
 
     /// <summary>Earth — reference configuration.</summary>
     public static readonly PlanetConfig Earth = new()
     {
-        Name                          = "Earth",
-        Archetype                     = PlanetArchetype.RockyTerrestrial,
-        MassKg                        = 5.9726e24,
-        EquatorialRadiusKm            = 6_378.1,
-        PolarRadiusKm                 = 6_356.8,
-        MeanDensityKgM3               = 5_514,
-        SiderealRotationHrs           = 23.9345,
-        ObliquityDeg                  = 23.44,
-        IsTidallyLocked               = false,
-        AtmospherePressureBar         = 1.013,
-        Atmosphere                    = AtmosphereComposition.EarthLike,
-        GreenhouseWarmingK            = 33.0,
-        Albedo                        = 0.306,
-        OceanFraction                 = 0.71,
-        LandFraction                  = 0.29,
-        HasPlateTectonics             = true,
-        MagneticFieldStrengthVsEarth  = 1.0,
+        Name = "Earth",
+        Archetype = PlanetArchetype.RockyTerrestrial,
+        MassKg = 5.9726e24,
+        EquatorialRadiusKm = 6_378.1,
+        PolarRadiusKm = 6_356.8,
+        MeanDensityKgM3 = 5_514,
+        SiderealRotationHrs = 23.9345,
+        ObliquityDeg = 23.44,
+        IsTidallyLocked = false,
+        AtmospherePressureBar = 1.013,
+        Atmosphere = AtmosphereComposition.EarthLike,
+        GreenhouseWarmingK = 33.0,
+        Albedo = 0.306,
+        OceanFraction = 0.71,
+        LandFraction = 0.29,
+        HasPlateTectonics = true,
+        MagneticFieldStrengthVsEarth = 1.0,
         PrimaryMoon = (
             new MoonPhysics(
-                MassKg:             7.342e22,
-                MeanRadiusKm:       1_737.4,
+                MassKg: 7.342e22,
+                MeanRadiusKm: 1_737.4,
                 EquatorialRadiusKm: 1_738.1,
-                PolarRadiusKm:      1_736.0,
-                MeanDensityKgM3:    3_346.4,
-                SurfaceGravityMs2:  1.62,
-                EscapeVelocityKms:  2.38,
-                ObliquityDeg:       6.68,
+                PolarRadiusKm: 1_736.0,
+                MeanDensityKgM3: 3_346.4,
+                SurfaceGravityMs2: 1.62,
+                EscapeVelocityKms: 2.38,
+                ObliquityDeg: 6.68,
                 SiderealRotationHrs: 655.7,
-                Albedo:             0.12,
-                TidallyLocked:      true,
-                OrbitalResonance:   null,
+                Albedo: 0.12,
+                TidallyLocked: true,
+                OrbitalResonance: null,
                 HasSubsurfaceOcean: false),
             new MoonOrbit(
-                SemiMajorAxisKm:  384_400,
-                Eccentricity:     0.0549,
-                InclinationDeg:   5.145,
-                LongAscNodeDeg:   0,
-                ArgPeriapsisDeg:  0,
+                SemiMajorAxisKm: 384_400,
+                Eccentricity: 0.0549,
+                InclinationDeg: 5.145,
+                LongAscNodeDeg: 0,
+                ArgPeriapsisDeg: 0,
                 MeanLongitudeDeg: 0,
-                IsRetrograde:     false)),
+                IsRetrograde: false)),
         Rings = null,
     };
 
-    #endregion
+    #endregion Known planet instances
 }
 
 /// <summary>Dominant atmospheric chemistry — determines greenhouse potential and biochemistry.</summary>
@@ -187,14 +187,19 @@ public enum AtmosphereComposition
 {
     /// <summary>No significant atmosphere (airless body).</summary>
     None,
+
     /// <summary>~78% N₂, ~21% O₂, CO₂ trace. Aerobic life possible.</summary>
     EarthLike,
+
     /// <summary>CO₂ dominated (Venus, Mars type). Greenhouse dominated; no O₂.</summary>
     CO2Dominated,
+
     /// <summary>H₂/He dominated. Gas giant or hydrogen-rich super-Earth.</summary>
     HydrogenHelium,
+
     /// <summary>N₂ dominated with CH₄ haze (Titan type). Cold; organic chemistry.</summary>
     NitrogenMethane,
+
     /// <summary>Custom — parameters defined separately in simulation config.</summary>
     Custom,
 }

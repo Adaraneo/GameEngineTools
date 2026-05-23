@@ -16,7 +16,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         public const string Warmth = "warmth";
         public const string Validation = "validation";
 
-        #endregion
+        #endregion Positive
 
         #region Negative
 
@@ -26,6 +26,6 @@ namespace GameEngineTools.Characters.Engines.Memory
         public const string Dismissal = "dismissal";
         public const string Slight = "slight";
 
-        #endregion
+        #endregion Negative
     }
 }

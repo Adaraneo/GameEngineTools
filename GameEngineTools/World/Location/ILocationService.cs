@@ -66,7 +66,7 @@ namespace GameEngineTools.World.Location
         double DangerLevel = 0.0,
         bool AllowsPickup = true);
 
-    #endregion
+    #endregion Location data types
 
     #region ILocationService
 
@@ -145,5 +145,5 @@ namespace GameEngineTools.World.Location
         LocationDescriptor? GetDescriptor(string locationId);
     }
 
-    #endregion
+    #endregion ILocationService
 }

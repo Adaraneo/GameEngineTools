@@ -10,7 +10,6 @@ namespace GameEngineTools.World.Objects
     using System.Globalization;
     using System.IO;
     using System.Linq;
-    using GameEngineTools.Characters.Core;
     using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
 
@@ -54,7 +53,7 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         private readonly ConcurrentDictionary<string, List<WorldObject>> _cache = new();
 
-        #endregion
+        #endregion Private state
 
         #region Construction
 
@@ -78,7 +77,7 @@ namespace GameEngineTools.World.Objects
             _objectsDirectory = objectsDirectory;
         }
 
-        #endregion
+        #endregion Construction
 
         #region IWorldObjectProvider
 
@@ -221,7 +220,7 @@ namespace GameEngineTools.World.Objects
                     yield return obj;
         }
 
-        #endregion
+        #endregion IWorldObjectProvider
 
         #region Private loading
 
@@ -250,7 +249,7 @@ namespace GameEngineTools.World.Objects
             return CsvLoader.Load(filePath, v => ParseObjectRow(v, locationId));
         }
 
-        #endregion
+        #endregion Private loading
 
         #region CSV parsing
 
@@ -267,20 +266,20 @@ namespace GameEngineTools.World.Objects
         private static WorldObject ParseObjectRow(string[] v, string locationId)
             => new()
             {
-                Id               = v[0].Trim(),
-                DisplayName      = v[1].Trim(),
-                Category         = Enum.Parse<WorldObjectCategory>(v[2].Trim(), ignoreCase: true),
-                LocationId       = locationId,
-                HeatSignature    = double.Parse(v[3].Trim(), CultureInfo.InvariantCulture),
-                AmbientNoise     = double.Parse(v[4].Trim(), CultureInfo.InvariantCulture),
+                Id = v[0].Trim(),
+                DisplayName = v[1].Trim(),
+                Category = Enum.Parse<WorldObjectCategory>(v[2].Trim(), ignoreCase: true),
+                LocationId = locationId,
+                HeatSignature = double.Parse(v[3].Trim(), CultureInfo.InvariantCulture),
+                AmbientNoise = double.Parse(v[4].Trim(), CultureInfo.InvariantCulture),
                 BlocksLineOfSight = bool.Parse(v[5].Trim()),
-                IsAvailable      = bool.Parse(v[6].Trim()),
-                Affordances      = ParseAffordances(v[7].Trim()),
-                IsPickable       = v.Length > 8  ? bool.Parse(v[8].Trim()) : false,
-                WeightGrams      = v.Length > 9  ? int.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0,
-                ItemKind         = v.Length > 10 ? Enum.Parse<PickupItemKind>(v[10].Trim(), ignoreCase: true) : PickupItemKind.None,
-                Respawns         = v.Length > 11 ? bool.Parse(v[11].Trim()) : false,
-                RespawnMinutes   = v.Length > 12 ? int.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 1440
+                IsAvailable = bool.Parse(v[6].Trim()),
+                Affordances = ParseAffordances(v[7].Trim()),
+                IsPickable = v.Length > 8 ? bool.Parse(v[8].Trim()) : false,
+                WeightGrams = v.Length > 9 ? int.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0,
+                ItemKind = v.Length > 10 ? Enum.Parse<PickupItemKind>(v[10].Trim(), ignoreCase: true) : PickupItemKind.None,
+                Respawns = v.Length > 11 ? bool.Parse(v[11].Trim()) : false,
+                RespawnMinutes = v.Length > 12 ? int.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 1440
             };
 
         /// <summary>
@@ -307,7 +306,7 @@ namespace GameEngineTools.World.Objects
                     throw new FormatException(
                         $"Affordance token '{token}' is malformed. Expected format: 'Type:Value'.");
 
-                var type         = Enum.Parse<AffordanceType>(parts[0].Trim(), ignoreCase: true);
+                var type = Enum.Parse<AffordanceType>(parts[0].Trim(), ignoreCase: true);
                 var satisfaction = double.Parse(parts[1].Trim(), CultureInfo.InvariantCulture);
 
                 builder.Add(new WorldObjectAffordance(type, satisfaction));
@@ -316,6 +315,6 @@ namespace GameEngineTools.World.Objects
             return builder.ToImmutable();
         }
 
-        #endregion
+        #endregion CSV parsing
     }
 }

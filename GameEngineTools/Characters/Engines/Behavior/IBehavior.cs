@@ -68,7 +68,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         ActiveIntent? ActiveIntent = null,
         IReadOnlyDictionary<string, BehaviorHabitTrace>? HabitTraces = null);
 
-    #endregion
+    #endregion Configuration and state
 
     #region Engine contract
 
@@ -78,7 +78,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     public interface IBehaviorEngine : IEngine<BehaviorState, BehaviorConfig>
     { }
 
-    #endregion
+    #endregion Engine contract
 
     #region Plans and events
 
@@ -98,5 +98,5 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// </summary>
     public sealed record ActionCommitted(WDateTime OccurredAt, HumanId Human, string ActionName, WTimeSpan Duration, HumanId? TargetHuman = null, string? IntendedActionName = null, string? ConflictReason = null, ObjectInteractionData? ObjectInteraction = null) : IDomainEvent;
 
-    #endregion
+    #endregion Plans and events
 }

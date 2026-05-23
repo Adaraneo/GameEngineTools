@@ -107,8 +107,8 @@ namespace GameEngineTools.World.Simulation
 
             if (options.AstroConfig is { } astroCfg)
             {
-                _astroConfig        = astroCfg;
-                _celestialComputer  = new CelestialContextComputer(new SunModel());
+                _astroConfig = astroCfg;
+                _celestialComputer = new CelestialContextComputer(new SunModel());
             }
 
             if (options.UniverseConfig is { } uc)
@@ -364,6 +364,6 @@ namespace GameEngineTools.World.Simulation
             }
         }
 
-        #endregion
+        #endregion Private Helpers
     }
 }

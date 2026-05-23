@@ -104,7 +104,7 @@ namespace GameEngineTools.World.Objects
             return new WorldMap(locations, adjacency, regions);
         }
 
-        #endregion
+        #endregion Public API
 
         #region Private parsers
 
@@ -128,16 +128,16 @@ namespace GameEngineTools.World.Objects
         private static LocationRow ParseLocationRow(string[] v)
         {
             var descriptor = new LocationDescriptor(
-                Id:            v[0].Trim(),
-                DisplayName:   v[1].Trim(),
-                Type:          Enum.Parse<LocationType>(v[2].Trim(), ignoreCase: true),
-                BaseNoise:     double.Parse(v[4].Trim(), CultureInfo.InvariantCulture),
-                NoisePerPerson:double.Parse(v[5].Trim(), CultureInfo.InvariantCulture),
-                Capacity:      int.Parse(v[6].Trim(), CultureInfo.InvariantCulture),
+                Id: v[0].Trim(),
+                DisplayName: v[1].Trim(),
+                Type: Enum.Parse<LocationType>(v[2].Trim(), ignoreCase: true),
+                BaseNoise: double.Parse(v[4].Trim(), CultureInfo.InvariantCulture),
+                NoisePerPerson: double.Parse(v[5].Trim(), CultureInfo.InvariantCulture),
+                Capacity: int.Parse(v[6].Trim(), CultureInfo.InvariantCulture),
                 AllowsPrivacy: bool.Parse(v[7].Trim()),
-                Terrain:       v.Length > 8 ? Enum.Parse<TerrainType>(v[8].Trim(), ignoreCase: true) : TerrainType.Indoor,
-                DangerLevel:   v.Length > 9 ? double.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0.0,
-                AllowsPickup:  v.Length > 10 ? bool.Parse(v[10].Trim()) : true);
+                Terrain: v.Length > 8 ? Enum.Parse<TerrainType>(v[8].Trim(), ignoreCase: true) : TerrainType.Indoor,
+                DangerLevel: v.Length > 9 ? double.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0.0,
+                AllowsPickup: v.Length > 10 ? bool.Parse(v[10].Trim()) : true);
 
             return new LocationRow(descriptor, Region: v[3].Trim());
         }
@@ -148,10 +148,10 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         private static ConnectionRow ParseConnectionRow(string[] v)
             => new(
-                FromId:           v[0].Trim(),
+                FromId: v[0].Trim(),
                 TargetLocationId: v[1].Trim(),
-                DistanceMeters:   double.Parse(v[2].Trim(), CultureInfo.InvariantCulture));
+                DistanceMeters: double.Parse(v[2].Trim(), CultureInfo.InvariantCulture));
 
-        #endregion
+        #endregion Private parsers
     }
 }

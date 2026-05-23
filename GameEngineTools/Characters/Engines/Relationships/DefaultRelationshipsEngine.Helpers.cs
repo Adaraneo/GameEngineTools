@@ -40,8 +40,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 SpeechAct.Invite => bd,
                 // Accepted boundary: signals self-respect → raises Values alignment.
                 // Rejected boundary (mul = 0.5): values conflict → stronger penalty.
-                SpeechAct.Boundary when accepted  => bd with { Values = BumpD(bd.Values, +0.8) },
-                SpeechAct.Boundary                => bd with { Values = BumpD(bd.Values, -1.5 * mul) },
+                SpeechAct.Boundary when accepted => bd with { Values = BumpD(bd.Values, +0.8) },
+                SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.5 * mul) },
                 _ => bd
             };
         }

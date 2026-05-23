@@ -9,9 +9,9 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
-    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Logging;
@@ -187,10 +187,10 @@ namespace GameEngineTools.Characters.Engines.Memory
             var threshold = Config.CognitiveBurdenThreshold + (conscientiousness - 0.5) * 0.10;
             var enriched = query with
             {
-                CognitiveBurden      = burden,
-                CurrentValence       = ctx.Snapshot.Psychology.Valence,
-                NeuroticismScore     = ctx.Personality.BigFive.Neuroticism,
-                DaysInNegativeMood   = ComputeDaysInNegativeMood(ctx.Snapshot.Memory.Episodes, now)
+                CognitiveBurden = burden,
+                CurrentValence = ctx.Snapshot.Psychology.Valence,
+                NeuroticismScore = ctx.Personality.BigFive.Neuroticism,
+                DaysInNegativeMood = ComputeDaysInNegativeMood(ctx.Snapshot.Memory.Episodes, now)
             };
             return MemoryCognition.BuildWorkingSet(State, enriched, now, threshold);
         }
@@ -415,7 +415,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var what = MemoryWhatParser.Action(ac.ActionName);
                         var other = ac.TargetHuman == ctx.Id ? null : ac.TargetHuman;
                         var acSalience = SalienceForAction(ac.ActionName, ctx);
-                        var acEmotion  = EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence);
+                        var acEmotion = EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence);
 
                         Encode(new EpisodicMemory(
                             Guid.NewGuid(),
@@ -580,10 +580,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                     {
                         var actionKind = tpa.Type switch
                         {
-                            ThirdPartyObservationType.Betrayal    => "Betrayal",
+                            ThirdPartyObservationType.Betrayal => "Betrayal",
                             ThirdPartyObservationType.NegativeAct => "NegativeAct",
                             ThirdPartyObservationType.PositiveAct => "PositiveAct",
-                            _                                     => "Unknown"
+                            _ => "Unknown"
                         };
                         RecordKnowledge(tpa.Actor, tpa.Target, actionKind, FactSource.Gossip, tpa.OccurredAt);
                         break;
@@ -622,18 +622,18 @@ namespace GameEngineTools.Characters.Engines.Memory
                                             * (ep.Emotion == EmotionalTag.Negative ? 1.3 : 1.0);
                             var numericEmotion = ep.Emotion switch
                             {
-                                EmotionalTag.Positive =>  1.0,
+                                EmotionalTag.Positive => 1.0,
                                 EmotionalTag.Negative => -1.0,
-                                EmotionalTag.Mixed    => -0.3,
-                                _                     =>  0.0
+                                EmotionalTag.Mixed => -0.3,
+                                _ => 0.0
                             };
                             var drifted = numericEmotion + (currentValence - numericEmotion) * driftRate;
                             var newEmotion = drifted switch
                             {
-                                > 0.35  => EmotionalTag.Positive,
+                                > 0.35 => EmotionalTag.Positive,
                                 < -0.35 => EmotionalTag.Negative,
-                                < 0.0   => EmotionalTag.Mixed,
-                                _       => EmotionalTag.Neutral
+                                < 0.0 => EmotionalTag.Mixed,
+                                _ => EmotionalTag.Neutral
                             };
 
                             episodes[idx] = ep with
@@ -849,7 +849,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 updated[idx] = existing with
                 {
                     Confidence = Math.Min(1.0, Math.Max(existing.Confidence, confidence)),
-                    LearnedAt  = now   // refresh timestamp
+                    LearnedAt = now   // refresh timestamp
                 };
             }
             else
@@ -948,8 +948,8 @@ namespace GameEngineTools.Characters.Engines.Memory
             {
                 EmotionalTag.Negative => 1.00,
                 EmotionalTag.Positive => 0.85,
-                EmotionalTag.Mixed    => 0.65,
-                _                     => 0.45
+                EmotionalTag.Mixed => 0.65,
+                _ => 0.45
             };
             return Math.Clamp(salience * intensity * 0.7 + 0.3, 0.3, 1.0);
         }
@@ -966,13 +966,18 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         private static EmotionalTag ValenceToEmotionalTag(double? v)
-            => v switch { null => EmotionalTag.Neutral, > 0.2 => EmotionalTag.Positive,
-                          < -0.2 => EmotionalTag.Negative, _ => EmotionalTag.Mixed };
+            => v switch
+            {
+                null => EmotionalTag.Neutral,
+                > 0.2 => EmotionalTag.Positive,
+                < -0.2 => EmotionalTag.Negative,
+                _ => EmotionalTag.Mixed
+            };
 
         private static double ComputeCognitiveBurden(IHumanContext ctx)
         {
-            var stress   = Math.Clamp(ctx.Snapshot.Psychology.Stress / 100.0, 0.0, 1.0);
-            var fatigue  = Math.Clamp(1.0 - ctx.Snapshot.Physiology.Energy / 100.0, 0.0, 1.0);
+            var stress = Math.Clamp(ctx.Snapshot.Psychology.Stress / 100.0, 0.0, 1.0);
+            var fatigue = Math.Clamp(1.0 - ctx.Snapshot.Physiology.Energy / 100.0, 0.0, 1.0);
             var crowding = Math.Clamp(ctx.Snapshot.InteractionSurface.Crowding, 0.0, 1.0);
             return stress * 0.40 + fatigue * 0.35 + crowding * 0.25;
         }

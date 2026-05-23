@@ -81,7 +81,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// </summary>
         private const double StressRaisePenaltyFactor = 0.25;
 
-        #endregion
+        #endregion Constants
 
         #region IBehaviorModifierEngine
 
@@ -118,8 +118,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
                     // Scale delta by how much the character currently needs this domain.
                     var needScale = ResolveNeedScale(context, affordance.Type);
-                    var cap       = AffordanceDeltaCap.GetValueOrDefault(affordance.Type, 0.0);
-                    var rawDelta  = affordance.Satisfaction * cap * needScale;
+                    var cap = AffordanceDeltaCap.GetValueOrDefault(affordance.Type, 0.0);
+                    var rawDelta = affordance.Satisfaction * cap * needScale;
 
                     foreach (var actionName in targets)
                         deltas[actionName] = deltas.GetValueOrDefault(actionName, 0.0) + rawDelta;
@@ -136,7 +136,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 {
                     var bounded = Math.Min(delta, MaxTotalDeltaPerCandidate);
                     candidates[i] = candidate with { Utility = candidate.Utility + bounded };
-                    candidate     = candidates[i]; // refresh ref for penalty below
+                    candidate = candidates[i]; // refresh ref for penalty below
                 }
 
                 // Multiplicative penalty from hazards / stress-raising objects.
@@ -148,7 +148,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             }
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
 
         #region Need scaling
 
@@ -166,21 +166,21 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
             return type switch
             {
-                AffordanceType.Hunger       => state.NeedFood      / 100.0,
-                AffordanceType.Rest         => state.NeedRest       / 100.0,
-                AffordanceType.Social       => state.NeedBelonging  / 100.0,
-                AffordanceType.Work         => state.NeedCompetence / 100.0,
-                AffordanceType.Entertainment=> state.NeedCompetence / 100.0,
+                AffordanceType.Hunger => state.NeedFood / 100.0,
+                AffordanceType.Rest => state.NeedRest / 100.0,
+                AffordanceType.Social => state.NeedBelonging / 100.0,
+                AffordanceType.Work => state.NeedCompetence / 100.0,
+                AffordanceType.Entertainment => state.NeedCompetence / 100.0,
 
                 // Ambient affordances provide a flat benefit — independent of need level.
-                AffordanceType.Warmth       => 1.0,
-                AffordanceType.MoodBoost    => 1.0,
+                AffordanceType.Warmth => 1.0,
+                AffordanceType.MoodBoost => 1.0,
 
                 _ => 0.0
             };
         }
 
-        #endregion
+        #endregion Need scaling
 
         #region Static data: stress-sensitive actions
 
@@ -197,7 +197,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             InviteIntimacy
         };
 
-        #endregion
+        #endregion Static data: stress-sensitive actions
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -243,7 +243,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 { AffordanceType.StressRaise,   Array.Empty<string>() },
             };
 
-        #endregion
+        #endregion Lookup table
 
         #region Public API
 
@@ -255,6 +255,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         public static string[] TargetsFor(AffordanceType type)
             => Map.TryGetValue(type, out var targets) ? targets : Array.Empty<string>();
 
-        #endregion
+        #endregion Public API
     }
 }

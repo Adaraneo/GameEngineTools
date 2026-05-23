@@ -5,7 +5,6 @@ namespace GameEngineTools.Characters.Persistence
 {
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
 

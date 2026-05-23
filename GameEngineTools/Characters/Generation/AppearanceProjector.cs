@@ -4,7 +4,6 @@
 namespace GameEngineTools.Characters.Generation
 {
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
@@ -157,12 +156,12 @@ namespace GameEngineTools.Characters.Generation
             if (steps <= 0) return color;
             var next = color switch
             {
-                HairColorNatural.Black    => HairColorNatural.DarkBrown,
+                HairColorNatural.Black => HairColorNatural.DarkBrown,
                 HairColorNatural.DarkBrown => HairColorNatural.Brown,
-                HairColorNatural.Brown    => HairColorNatural.DarkBlond,
-                HairColorNatural.Auburn   => HairColorNatural.DarkBlond,
-                HairColorNatural.Red      => HairColorNatural.DarkBlond,
-                _                          => HairColorNatural.Blond
+                HairColorNatural.Brown => HairColorNatural.DarkBlond,
+                HairColorNatural.Auburn => HairColorNatural.DarkBlond,
+                HairColorNatural.Red => HairColorNatural.DarkBlond,
+                _ => HairColorNatural.Blond
             };
             return next == color ? color : LightenHair(next, steps - 1);
         }
@@ -184,9 +183,9 @@ namespace GameEngineTools.Characters.Generation
                     PostureFactor: 0.72 - agingVal * 0.20 + juvVal * 0.08,
                     SexDimorphismFactor: blueprint.Sex switch
                     {
-                        SexBiology.Male   => 0.35,
+                        SexBiology.Male => 0.35,
                         SexBiology.Female => -0.28,
-                        _                 => 0.0
+                        _ => 0.0
                     }),
                 Bounds: MorphologyBounds.Default);
 
@@ -201,9 +200,13 @@ namespace GameEngineTools.Characters.Generation
         private sealed class InlineRng : IRandomSource
         {
             private readonly Random _r;
+
             public InlineRng(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 

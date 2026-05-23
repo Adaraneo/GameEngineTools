@@ -4,7 +4,6 @@
 namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
     using GameEngineTools.Characters.Engines.Interactions;
-    using GameEngineTools.World.Core.Astro;
     using static ActionNames;
 
     /// <summary>
@@ -45,7 +44,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
             if (noiseCognitivePenalty > 0.0)
             {
-                BehaviorCandidateEditor.Multiply(candidates, Work,   1.0 - noiseCognitivePenalty);
+                BehaviorCandidateEditor.Multiply(candidates, Work, 1.0 - noiseCognitivePenalty);
                 BehaviorCandidateEditor.Multiply(candidates, Create, 1.0 - noiseCognitivePenalty);
             }
 

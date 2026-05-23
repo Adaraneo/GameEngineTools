@@ -4,7 +4,6 @@
 namespace GameEngineTools.Characters.Engines.Relationships
 {
     using System;
-    using System.Collections;
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -100,10 +99,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             // Weights applied above the neutral default only when attraction exceeds 50.
                             // Below 50: no halo bonus (unattractive target does not exceed neutral default).
                             var attraction = fi.Attraction;  // [0, 100]
-                            var haloBonus  = Math.Clamp(attraction - 50.0, 0.0, 50.0); // 0..50
+                            var haloBonus = Math.Clamp(attraction - 50.0, 0.0, 50.0); // 0..50
 
                             // Trust: small halo boost (easily overwritten by actual interaction)
-                            var haloTrust   = e.Trust <= 0 ? 50.0 + haloBonus * 0.10 : e.Trust;
+                            var haloTrust = e.Trust <= 0 ? 50.0 + haloBonus * 0.10 : e.Trust;
                             // Comfort: moderate boost above default (45) — attractive stranger feels safer
                             var haloComfort = Math.Max(e.Comfort, 45.0 + haloBonus * 0.40);
                             // Respect: above neutral (50) — attractive people are assumed more capable
@@ -124,19 +123,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 // Lerp 70% toward the first impression — does not fully override
                                 // if the character already knows the person slightly.
-                                Like   = Lerp(e.Like, fi.Like, 0.7),
+                                Like = Lerp(e.Like, fi.Like, 0.7),
                                 Familiarity = Math.Max(e.Familiarity, 2),
-                                Trust  = Clamp(haloTrust),
+                                Trust = Clamp(haloTrust),
                                 Comfort = Clamp(haloComfort),
                                 Respect = Clamp(haloRespect),
                                 Closeness = Math.Max(e.Closeness, 0),
                                 AestheticAttraction = Lerp(e.AestheticAttraction, fi.PreferenceMatch / 35.0 * 100.0, 0.8),
-                                PhysicalAttraction  = Lerp(e.PhysicalAttraction,  fi.BasePhysical    / 40.0 * 100.0, 0.8),
+                                PhysicalAttraction = Lerp(e.PhysicalAttraction, fi.BasePhysical / 40.0 * 100.0, 0.8),
                                 IntimateAffinity = e.IntimateAffinity,
-                                SexualInterest   = Math.Max(e.SexualInterest, sexualInterestSeed),
+                                SexualInterest = Math.Max(e.SexualInterest, sexualInterestSeed),
                                 Breakdown = e.Breakdown with
                                 {
-                                    Physical  = Lerp(e.Breakdown.Physical,   fi.BasePhysical    / 40.0 * 100.0, 0.8),
+                                    Physical = Lerp(e.Breakdown.Physical, fi.BasePhysical / 40.0 * 100.0, 0.8),
                                     Aesthetics = Lerp(e.Breakdown.Aesthetics, fi.PreferenceMatch / 35.0 * 100.0, 0.8)
                                 },
                                 TargetBiology = otherBiology ?? e.TargetBiology
@@ -209,7 +208,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         {
                             // R2 — Contempt ceiling: RepairAttempt cannot rebuild above 30/20 once
                             // IsContemptuouslyDestroyed is set (Gottman 1994: contempt is irreversible).
-                            const double ContemptTrustCeiling    = 30.0;
+                            const double ContemptTrustCeiling = 30.0;
                             const double ContemptClosenessCeiling = 20.0;
 
                             var trustGain = ra.Accepted
@@ -225,13 +224,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                             if (e.IsContemptuouslyDestroyed && ra.Accepted)
                             {
-                                newTrust    = Math.Min(newTrust,    ContemptTrustCeiling);
+                                newTrust = Math.Min(newTrust, ContemptTrustCeiling);
                                 newCloseness = Math.Min(newCloseness, ContemptClosenessCeiling);
                             }
 
                             return e with
                             {
-                                Trust     = newTrust,
+                                Trust = newTrust,
                                 Closeness = newCloseness,
                                 TransgressionResidue = ra.Accepted
                                     ? Math.Max(0, e.TransgressionResidue - Config.RepairGain)
@@ -492,20 +491,20 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         {
                             ThirdPartyObservationType.PositiveAct => e with
                             {
-                                Like  = Bump(e.Like,  +2.0 * gossipScale),
+                                Like = Bump(e.Like, +2.0 * gossipScale),
                                 Trust = Bump(e.Trust, +1.5 * gossipScale),
                                 PerceivedPrestige = Clamp(e.PerceivedPrestige + Config.PrestigeGainPerPositiveAct)
                             },
                             ThirdPartyObservationType.NegativeAct => e with
                             {
-                                Like  = Bump(e.Like,  -2.5 * gossipScale),
+                                Like = Bump(e.Like, -2.5 * gossipScale),
                                 Trust = Bump(e.Trust, -2.0 * gossipScale),
                                 PerceivedDominance = Clamp(e.PerceivedDominance + Config.DominanceGainPerNegativeAct)
                             },
                             // Betrayal: step-drop (Slovic 1993; skill ref: 30–70 % of Trust)
                             ThirdPartyObservationType.Betrayal => e with
                             {
-                                Like  = Bump(e.Like,  -20.0 * gossipScale),
+                                Like = Bump(e.Like, -20.0 * gossipScale),
                                 Trust = Bump(e.Trust, -30.0 * gossipScale),
                                 PerceivedDominance = Clamp(e.PerceivedDominance + Config.DominanceGainPerNegativeAct * 2.0)
                             },
@@ -521,10 +520,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         {
                             var (tpaDimension, tpaOldValue, tpaNewValue) = tpa.Type switch
                             {
-                                ThirdPartyObservationType.PositiveAct  => ("Like", tpaEdgeAfter.Like - 2.0 * gossipScale, tpaEdgeAfter.Like),
-                                ThirdPartyObservationType.NegativeAct  => ("Like", tpaEdgeAfter.Like + 2.5 * gossipScale, tpaEdgeAfter.Like),
-                                ThirdPartyObservationType.Betrayal     => ("Like", tpaEdgeAfter.Like + 20.0 * gossipScale, tpaEdgeAfter.Like),
-                                _                                       => ("Like", tpaEdgeAfter.Like, tpaEdgeAfter.Like)
+                                ThirdPartyObservationType.PositiveAct => ("Like", tpaEdgeAfter.Like - 2.0 * gossipScale, tpaEdgeAfter.Like),
+                                ThirdPartyObservationType.NegativeAct => ("Like", tpaEdgeAfter.Like + 2.5 * gossipScale, tpaEdgeAfter.Like),
+                                ThirdPartyObservationType.Betrayal => ("Like", tpaEdgeAfter.Like + 20.0 * gossipScale, tpaEdgeAfter.Like),
+                                _ => ("Like", tpaEdgeAfter.Like, tpaEdgeAfter.Like)
                             };
                             using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: tpa.Actor.Value))
                             {
@@ -588,7 +587,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         {
                             // Irreversible step-drop in Trust and Like
                             Trust = Bump(e.Trust, -35.0),
-                            Like  = Bump(e.Like,  -30.0),
+                            Like = Bump(e.Like, -30.0),
                             Comfort = Bump(e.Comfort, -20.0),
                             // Flag is permanent — cannot be cleared by repair
                             IsContemptuouslyDestroyed = true,
@@ -776,7 +775,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             // bandwidth per lower-tier edge shrinks → decay rate increases proportionally.
             var tier1Count = State.Edges.Values.Count(e => e.Closeness >= Config.DunbarTier1Threshold);
             var tier2Count = State.Edges.Values.Count(e => e.Closeness >= Config.DunbarTier2Threshold
-                                                         && e.Closeness <  Config.DunbarTier1Threshold);
+                                                         && e.Closeness < Config.DunbarTier1Threshold);
             var tier1Excess = Math.Max(0, tier1Count - Config.DunbarTier1Capacity);
             var tier2Excess = Math.Max(0, tier2Count - Config.DunbarTier2Capacity);
 
@@ -884,7 +883,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Closeness = Clamp(Approach(e.Closeness, 5, d * Config.DecayMultiplierCloseness)),
                     Respect = Clamp(Approach(e.Respect, 55, d * Config.DecayMultiplierRespect)),
                     PerceivedDominance = Clamp(Approach(e.PerceivedDominance, 50, d * Config.DecayMultiplierDominance)),
-                    PerceivedPrestige  = Clamp(Approach(e.PerceivedPrestige,  50, d * Config.DecayMultiplierPrestige)),
+                    PerceivedPrestige = Clamp(Approach(e.PerceivedPrestige, 50, d * Config.DecayMultiplierPrestige)),
                     Comfort = Clamp(Approach(e.Comfort, 45, d * Config.DecayMultiplierComfort) + valenceEffect * 0.5 - stressEffect * 0.5),
                     TransgressionResidue = newResidue,
                     ResponsiveDesireLevel = newResponsive,

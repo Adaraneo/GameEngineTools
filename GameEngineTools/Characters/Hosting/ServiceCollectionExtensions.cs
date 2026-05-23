@@ -1,18 +1,17 @@
 // ServiceCollectionExtensions.cs
 // Copyright (c) 50PSoftware
 
-using System.IO;
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Goals;
-using GameEngineTools.Characters.Engines.Objects;
-using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Engines.Interactions;
 using GameEngineTools.Characters.Engines.Memory;
+using GameEngineTools.Characters.Engines.Objects;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Engines.Sleep;
 using GameEngineTools.Characters.Generation;
