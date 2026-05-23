@@ -29,10 +29,6 @@
     </PackageReference>
   </ItemGroup>
 
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="call &quot;$(MSBuildProjectDirectory)\prebuild.bat&quot; $(OutDir)" WorkingDirectory="$(MSBuildProjectDirectory)" />
-  </Target>
-
   <ItemGroup>
     <ProjectReference Include="..\GameEngineTools\GameEngineTools.csproj" />
   </ItemGroup>
@@ -45,6 +41,21 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="appsettings.World.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="SourceFiles\Armory\ArmorParts.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="SourceFiles\Armory\Weapons.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="SourceFiles\Names\Female.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="SourceFiles\Names\Male.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="SourceFiles\Names\Surnames.csv">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -101,6 +101,12 @@ namespace GameEngineTools.Constants
             /// Each file is named <c>{locationId}.csv</c> and loaded lazily.
             /// </summary>
             public const string WorldObjectsDirectory = SourceDirectory.WorldObjects;
+
+            /// <summary>
+            /// Default path to the world SQLite database.
+            /// Created automatically on first run via <see cref="Data.WorldDatabaseSeeder"/>.
+            /// </summary>
+            public const string WorldDatabase = SourceDirectory.World + "world.db";
         }
 
         #endregion Source file paths

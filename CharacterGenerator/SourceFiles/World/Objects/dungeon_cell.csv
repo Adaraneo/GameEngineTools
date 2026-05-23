@@ -1,4 +1,4 @@
 Id;DisplayName;Category;HeatSignature;AmbientNoise;BlocksLineOfSight;IsAvailable;Affordances;IsPickable;WeightGrams;ItemKind;Respawns;RespawnMinutes
 iron_shackles;Iron Shackles;Furniture;0.00;0.00;false;true;;false;0;None;false;0
 straw_pile;Straw Pile;Furniture;0.05;0.00;false;true;Rest:0.1;false;0;None;false;0
-old_key;Old Key;Item;0.00;0.00;false;true;;true;50;Key;false;0
+old_key;Old Key;Tool;0.00;0.00;false;true;;true;50;Key;false;0

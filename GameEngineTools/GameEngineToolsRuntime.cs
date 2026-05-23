@@ -13,10 +13,12 @@ using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Hosting;
 using GameEngineTools.Config;
+using GameEngineTools.Constants;
 using GameEngineTools.FileSystem;
 using GameEngineTools.Logging;
 using GameEngineTools.World.Core.Calendars;
 using GameEngineTools.World.Core.Time;
+using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Movement;
 using GameEngineTools.World.Objects;
@@ -225,8 +227,25 @@ namespace GameEngineTools
             });
 
             services.AddSingleton<ILocationService, DefaultLocationService>();
+
+            #region TODO: REMOVE AFTER MIGRATION
             services.AddSingleton<CsvWorldObjectProvider>();
             services.AddSingleton<IWorldObjectProvider>(sp => sp.GetRequiredService<CsvWorldObjectProvider>());
+
+            #endregion
+
+            services.AddSingleton<SqliteWorldDatabase>(sp =>
+            {
+                var db = new SqliteWorldDatabase(FileSystemConstant.SourceFilePath.WorldDatabase);
+                // Seed from CSV on first run (INSERT OR IGNORE = safe to call always)
+                WorldDatabaseSeeder.SeedFromDefaultPaths(db);
+                return db;
+            });
+            services.AddSingleton<SqliteWorldObjectProvider>();
+            services.AddSingleton<IMutableWorldObjectProvider>(
+                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+            services.AddSingleton<IWorldObjectProvider>(
+                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
             services.AddObjectInteractionEngine();
 
             services.AddSingleton<DefaultMovementSpeedProvider>();

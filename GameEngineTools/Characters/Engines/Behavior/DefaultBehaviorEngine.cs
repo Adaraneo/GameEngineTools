@@ -42,7 +42,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// Optional provider of world objects at the character's current location.
         /// Populated at construction time; <c>null</c> means no object-affordance modulation.
         /// </summary>
-        private readonly IWorldObjectProvider? _objectProvider;
+        private readonly IMutableWorldObjectProvider? _mutableObjectProvider;
 
         /// <summary>
         /// Concrete CSV provider reference used by <see cref="Modifiers.ObjectInteractionBehaviorModifier"/>
@@ -81,7 +81,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             /// modifier pipeline and nudges candidate utility based on objects in the
             /// character's current location.
             /// </summary>
-            IWorldObjectProvider? objectProvider = null,
+            IMutableWorldObjectProvider? objectProvider = null,
             IOptions<DailyScheduleConfig>? scheduleCfg = null,
             CsvWorldObjectProvider? csvObjectProvider = null)
         {
@@ -97,7 +97,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
             _developmentPolicy = developmentPolicy ?? new DefaultCharacterDevelopmentPolicy();
             _habitApplicabilityModulator = habitApplicabilityModulator ?? NoOpHabitApplicabilityModulator.Instance;
-            _objectProvider = objectProvider;
+            _mutableObjectProvider = objectProvider;
         }
 
         #endregion Construction
@@ -138,12 +138,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
             State = stateWithNeeds;
 
             IReadOnlyList<WorldObject>? availableObjects = null;
-            if (_objectProvider is not null)
+            if (_mutableObjectProvider is not null)
             {
                 var locationId = ctx.Snapshot.InteractionSurface.Location;
                 if (!string.IsNullOrEmpty(locationId))
                 {
-                    availableObjects = _objectProvider
+                    availableObjects = _mutableObjectProvider
                         .GetObjectsAt(locationId)
                         .Where(o => o.IsAvailable)
                         .ToList();

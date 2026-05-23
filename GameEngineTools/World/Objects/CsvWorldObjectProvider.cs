@@ -37,7 +37,7 @@ namespace GameEngineTools.World.Objects
     /// <c>Warmth:0.7|Social:0.3|MoodBoost:0.2</c>
     /// </para>
     /// </remarks>
-    public sealed class CsvWorldObjectProvider : IWorldObjectProvider
+    public sealed class CsvWorldObjectProvider : IWorldObjectProvider, IMutableWorldObjectProvider
     {
         #region Private state
 
