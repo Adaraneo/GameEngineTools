@@ -111,7 +111,7 @@ namespace GameEngineTools.World.Simulation
         /// across the scene when routing <c>MoveTo:Food</c> and <c>MoveTo:Drink</c> actions.
         /// <c>null</c> disables object-category movement routing.
         /// </summary>
-        private readonly IWorldObjectProvider? _objectProvider;
+        private readonly IWorldObjectProvider _objectProvider;
 
         #endregion Private fields
 
@@ -130,6 +130,10 @@ namespace GameEngineTools.World.Simulation
         /// <param name="speedProvider">Provides movement speed in metres per minute.</param>
         /// <param name="rng">Random source shared across all orchestration methods.</param>
         /// <param name="log">Logger for reach-out diagnostics and movement warnings.</param>
+        /// <param name="objectProvider">
+        /// World object provider used to locate food and drink objects
+        /// across the scene when routing <c>MoveTo:Food</c> and <c>MoveTo:Drink</c> actions.
+        /// </param>
         public DefaultSceneOrchestrator(
             IAttractionCalculator attractionCalculator,
             ILocationService locationService,
@@ -140,7 +144,7 @@ namespace GameEngineTools.World.Simulation
             IMovementSpeedProvider speedProvider,
             Random rng,
             ILogger<DefaultSceneOrchestrator> log,
-            IWorldObjectProvider? objectProvider = null)
+            IWorldObjectProvider objectProvider)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -495,7 +499,7 @@ namespace GameEngineTools.World.Simulation
             string? currentLocationId,
             WorldObjectCategory category)
         {
-            if (_objectProvider is null || currentLocationId is null)
+            if (currentLocationId is null)
                 return null;
 
             var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
