@@ -30,7 +30,13 @@ public sealed record PersonalityHints(
     AttachmentProfile? Attachment = null,
     CommunicationStyle? Communication = null,
     Chronotype? Chronotype = null,
-    Sociosexuality? Sociosexuality = null
+    Sociosexuality? Sociosexuality = null,
+    /// <summary>
+    /// When set, clamps only the <see cref="Traits.Sociosexuality.Behavior"/> facet after generation.
+    /// Allows Attitude and Desire to vary freely while hard-capping experiential history.
+    /// Takes effect only when <see cref="Sociosexuality"/> is <c>null</c> (per-facet cap mode).
+    /// </summary>
+    double? SociosexualityBehaviorMax = null
 )
 {
     /// <summary>
@@ -56,9 +62,12 @@ public sealed record PersonalityHints(
         StadiumType.Child => new PersonalityHints(
             Sociosexuality: Characters.Traits.Sociosexuality.Restricted),
 
-        // Teenager — restricted to Intermediate at most (no Unrestricted)
+        // Teenager — Attitude and Desire generated freely up to Intermediate (0.50),
+        // but Behavior is hard-capped at 0.25: a teenager simply has not had time
+        // to accumulate a high-casualty history (SOI-R Behavior = past partner count).
         StadiumType.Teenager => new PersonalityHints(
-            Sociosexuality: Characters.Traits.Sociosexuality.Intermediate),
+            Sociosexuality: Characters.Traits.Sociosexuality.Intermediate,
+            SociosexualityBehaviorMax: 0.25),
 
         // Adult, MidAged, Old — no hard constraints
         _ => new PersonalityHints()
@@ -360,6 +369,15 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             (Sociosexuality.Restricted, spec.SociosexualityWeights.Restricted),
             (Sociosexuality.Intermediate, spec.SociosexualityWeights.Intermediate),
             (Sociosexuality.Unrestricted, spec.SociosexualityWeights.Unrestricted), rng);
+
+        // Apply per-facet Behavior cap when a fixed Sociosexuality preset was NOT used.
+        // This allows Attitude and Desire to vary freely while hard-capping
+        // the experiential-history facet for life stages where high past behavior
+        // is biologically implausible (e.g. teenagers).
+        if (hints.SociosexualityBehaviorMax is double behaviorMax)
+        {
+            socio = socio with { Behavior = Math.Min(socio.Behavior, behaviorMax) };
+        }
 
         // 4) motivace z BigFive (lineární mix + clamp do [0..1])
         var m = spec.MotivationMap;
