@@ -245,8 +245,11 @@ namespace GameEngineTools
             services.AddSingleton<SqliteWorldObjectProvider>();
             services.AddSingleton<IMutableWorldObjectProvider>(
                 sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+            services.AddSingleton<WorldObjectSnapshotCache>(sp =>
+                new WorldObjectSnapshotCache(sp.GetRequiredService<SqliteWorldObjectProvider>()));
+
             services.AddSingleton<IWorldObjectProvider>(
-                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+                sp => sp.GetRequiredService<WorldObjectSnapshotCache>());
             // Respawn scheduler — depends on IMutableWorldObjectProvider, not the concrete CSV class.
             services.AddSingleton<ObjectRespawnScheduler>();
 

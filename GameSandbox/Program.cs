@@ -256,11 +256,14 @@ foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
     Console.WriteLine("Slot: {0}", slotId);
 }
 
+Console.WriteLine("Press any key to continue...");
+
 var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>();
 var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger);
 var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger);
 
-Console.WriteLine("Press any key to continue...");
+var objectSnapshotCache = runtime.Services.GetRequiredService<WorldObjectSnapshotCache>();
+
 Console.ReadKey();
 
 var mainCharactersSceneOpts = new SimulationSceneOptions
@@ -273,6 +276,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
     TickStep = WTimeSpan.FromHours(0.5),
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
+    ObjectSnapshotCache = objectSnapshotCache,
     DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
     ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService, new HashSet<HumanId>
     {
@@ -353,6 +357,7 @@ if (characters.Count > 0)
         AstroConfig = astroOptions,
         UniverseConfig = universeOptions,
         SimulationDays = simulationDays,
+        ObjectSnapshotCache = objectSnapshotCache,
         DefaultCharacterLod = CognitiveResolutionLevel.Background,
         InternalSubstep = WTimeSpan.FromMinutes(30),
         OnTick = (now, chars) =>

@@ -9,6 +9,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Narrative;
     using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Location;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -265,5 +266,18 @@ namespace GameEngineTools.World.Simulation
         public IReadOnlyDictionary<HumanId, Func<SleepPromptRequested, bool>>? SleepPromptHandlers { get; init; }
 
         #endregion Sleep handling
+
+        /// <summary>
+        /// Optional per-tick object snapshot cache.
+        /// When set, <see cref="SimulationScene"/> calls <see cref="WorldObjectSnapshotCache.Refresh"/>
+        /// at the start of each substep, loading objects for all active locations in a single
+        /// batch instead of one query per character per tick.
+        /// </summary>
+        /// <remarks>
+        /// Assign the same <see cref="WorldObjectSnapshotCache"/> instance that is registered
+        /// as <see cref="IWorldObjectProvider"/> in DI. The behavior engine will then read
+        /// from the cache automatically, without any further changes.
+        /// </remarks>
+        public WorldObjectSnapshotCache? ObjectSnapshotCache { get; init; }
     }
 }

@@ -105,6 +105,15 @@ namespace GameEngineTools.World.Simulation
             _options = options;
             _lodRuntime = characterLodRuntime;
 
+            // Restore dead-character set from persisted snapshot.
+            // Characters that died in a previous session have Status = Dead in their PhysiologyState.
+            // Without this, a reimported dead character would tick once before dying again.
+            foreach (var character in options.Characters)
+            {
+                if (character.Snapshot.Physiology.Status == StatusType.Dead)
+                    _deadCharacters.Add(character.Id);
+            }
+
             if (options.AstroConfig is { } astroCfg)
             {
                 _astroConfig = astroCfg;
@@ -160,6 +169,18 @@ namespace GameEngineTools.World.Simulation
 
         private void SimulateSingleStep(WDateTime startTime, IReadOnlyList<IHuman> chars, WTimeSpan dt)
         {
+            // ── Cache refresh — must happen first, before any character reads objects ──
+            // Loads objects for all active locations in O(distinct locations) queries
+            // instead of O(characters) queries. No-op when cache is not configured.
+            if (_options.ObjectSnapshotCache is { } cache)
+            {
+                var activeLocations = chars
+                    .Select(c => _options.LocationService?.GetLocation(c.Id))
+                    .OfType<string>(); // filters out nulls (unplaced characters)
+
+                cache.Refresh(activeLocations);
+            }
+
             ApplyCharacterLods(chars);
 
             var now = _clock.Now;

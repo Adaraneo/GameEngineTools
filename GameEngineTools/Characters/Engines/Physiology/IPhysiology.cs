@@ -233,7 +233,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Dynamický stav fyzického stárnutí (vlasy, vrásky, svalová hmota).
         /// <c>null</c> = aging systém ještě nebyl inicializován; inicializace proběhne při prvním Tick().
         /// </summary>
-        PhysicalAgingState? Aging = null);
+        PhysicalAgingState? Aging = null,
+        /// <summary>
+        /// Vital status of the character.
+        /// Set to <see cref="StatusType.Dead"/> by <see cref="DefaultPhysiologyEngine"/>
+        /// when a natural death occurs. Persisted in the snapshot so that
+        /// <see cref="SimulationScene"/> can restore the dead-character set after save/load.
+        /// </summary>
+        StatusType Status = StatusType.Alive);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     { }

@@ -523,7 +523,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         {
                             _log.NaturalDeathOccurred(ctx.Id.Value.ToString(), cause.ToString(), ageYears, risk);
                         }
+                        State = s with { Status = StatusType.Dead };
                         outbox.Add(new CharacterDied(now, ctx.Id, cause));
+
+                        return;
                     }
                 }
             }
