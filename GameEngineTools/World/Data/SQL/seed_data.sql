@@ -93,32 +93,59 @@ VALUES
 
 -- ── World Objects ─────────────────────────────────────────────────────────────
 
- INSERT OR IGNORE INTO WorldObjects
-     (Id, DisplayName, Category, LocationId,
-      HeatSignature, AmbientNoise, BlocksLineOfSight,
-      IsAvailable, IsPickable, WeightGrams, ItemKind,
-      Respawns, RespawnMinutes, HeldBy)
- VALUES
-     ('tavern_bread_01', 'Bread', 'Food', 'tavern',
-      0.0, 0.0, 0,
-      1, 1, 200, 'Food',
-      1, 720, NULL),
-     ('tavern_ale_01', 'Ale Mug', 'Drink', 'tavern',
-      0.0, 0.0, 0,
-      1, 1, 300, 'Food',
-      1, 480, NULL),
-     ('castle_hall_table_01', 'Long Table', 'Furniture', 'castle_hall',
-      0.0, 0.0, 0,
-      1, 0, 0, 'None',
-      0, 0, NULL);
+INSERT OR IGNORE INTO WorldObjects
+    (Id, DisplayName, Category, LocationId,
+     HeatSignature, AmbientNoise, BlocksLineOfSight,
+     IsAvailable, IsPickable, WeightGrams, ItemKind,
+     Respawns, RespawnMinutes, HeldBy)
+VALUES
+    -- Taverna
+    ('tavern_bread_01', 'Bread', 'Food', 'tavern',
+     0, 0, 0, 1, 1, 200, 'Food', 1, 720, NULL),
+    ('tavern_ale_01', 'Ale', 'Drink', 'tavern',
+     0, 0, 0, 1, 1, 300, 'Food', 1, 480, NULL),
+    ('tavern_water_01', 'Water Jug', 'Drink', 'tavern',
+     0, 0, 0, 1, 1, 500, 'None', 1, 360, NULL),
 
--- ── Affordances ───────────────────────────────────────────────────────────────
+    -- Hrad
+    ('castle_bread_01', 'Bread', 'Food', 'castle_hall',
+     0, 0, 0, 1, 1, 200, 'Food', 1, 720, NULL),
+    ('castle_water_01', 'Water', 'Drink', 'castle_hall',
+     0, 0, 0, 1, 0, 0, 'None', 1, 360, NULL),
 
- INSERT OR IGNORE INTO Affordances (ObjectId, Type, Satisfaction)
- VALUES
-     ('tavern_bread_01', 'Hunger',  0.6),
-     ('tavern_ale_01',   'Hunger',  0.3),
-     ('castle_hall_table_01', 'Social', 0.2);
+    -- Vězení
+    ('dungeon_bread_01', 'Stale Bread', 'Food', 'dungeon_cell',
+     0, 0, 0, 1, 1, 150, 'Food', 1, 1440, NULL),
+    ('dungeon_water_01', 'Water Bowl', 'Drink', 'dungeon_cell',
+     0, 0, 0, 1, 0, 0, 'None', 1, 720, NULL),
+
+    -- Inn
+    ('inn_bread_01', 'Bread', 'Food', 'inn_room',
+     0, 0, 0, 1, 1, 200, 'Food', 1, 720, NULL),
+    ('inn_water_01', 'Water', 'Drink', 'inn_room',
+     0, 0, 0, 1, 0, 0, 'None', 1, 360, NULL),
+
+    -- Les (bobule)
+    ('forest_berries_01', 'Wild Berries', 'Food', 'forest',
+     0, 0, 0, 1, 1, 100, 'Food', 1, 2880, NULL),
+    ('forest_stream_01', 'Forest Stream', 'Drink', 'forest',
+     0, 0, 0, 1, 0, 0, 'None', 1, 0, NULL);
+
+-- ── Affordances ────────────────────────────────────────────────────────────────
+
+INSERT OR IGNORE INTO Affordances (ObjectId, Type, Satisfaction)
+VALUES
+    ('tavern_bread_01',  'Hunger', 0.6),
+    ('tavern_ale_01',    'Hunger', 0.3),
+    ('tavern_water_01',  'Hunger', 0.2),
+    ('castle_bread_01',  'Hunger', 0.6),
+    ('castle_water_01',  'Hunger', 0.2),
+    ('dungeon_bread_01', 'Hunger', 0.4),
+    ('dungeon_water_01', 'Hunger', 0.2),
+    ('inn_bread_01',     'Hunger', 0.6),
+    ('inn_water_01',     'Hunger', 0.2),
+    ('forest_berries_01','Hunger', 0.3),
+    ('forest_stream_01', 'Hunger', 0.2);
 
 -- ── Nutritional Profiles ──────────────────────────────────────────────────────
 
