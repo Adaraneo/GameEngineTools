@@ -31,7 +31,7 @@ namespace GameEngineTools.World.Objects
         /// <summary>Shared database access layer. Injected as singleton.</summary>
         private readonly SqliteWorldDatabase _db;
 
-        #endregion
+        #endregion Private state
 
         #region Construction
 
@@ -45,7 +45,7 @@ namespace GameEngineTools.World.Objects
             _db = db;
         }
 
-        #endregion
+        #endregion Construction
 
         #region IWorldObjectProvider
 
@@ -74,7 +74,7 @@ namespace GameEngineTools.World.Objects
             _db.AddObject(obj);
         }
 
-        #endregion
+        #endregion IWorldObjectProvider
 
         #region IMutableWorldObjectProvider — mutations
 
@@ -98,7 +98,7 @@ namespace GameEngineTools.World.Objects
         public IEnumerable<WorldObject> GetHeldBy(HumanId holder)
             => _db.GetHeldBy(holder);
 
-        #endregion
+        #endregion IMutableWorldObjectProvider — mutations
 
         #region IMutableWorldObjectProvider — respawn inspection
 
@@ -113,6 +113,6 @@ namespace GameEngineTools.World.Objects
             return _db.GetAllObjectsAt(locationId);
         }
 
-        #endregion
+        #endregion IMutableWorldObjectProvider — respawn inspection
     }
 }

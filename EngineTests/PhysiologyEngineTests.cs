@@ -41,7 +41,7 @@ namespace EngineTests
         [TestInitialize]
         public void Setup()
         {
-            _now = WDateTime.New(WDateOnly.New(116,1,1));
+            _now = WDateTime.New(WDateOnly.New(116, 1, 1));
             _outbox = new EventCollector();
             _ctx = BuildContext();
         }

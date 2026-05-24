@@ -65,7 +65,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 { Sleep,    new([WorldObjectCategory.Shelter],   IsHardGate: false) },
             };
 
-        #endregion
+        #endregion Action requirement map
 
         #region IBehaviorModifierEngine
 
@@ -78,7 +78,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             ApplyGates(candidates, context.AvailableObjects);
         }
 
-        #endregion
+        #endregion IBehaviorModifierEngine
 
         #region Gate application
 
@@ -140,6 +140,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             return false;
         }
 
-        #endregion
+        #endregion Gate application
     }
 }

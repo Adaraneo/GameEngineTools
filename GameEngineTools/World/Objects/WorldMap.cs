@@ -96,6 +96,7 @@ namespace GameEngineTools.World.Objects
         #endregion Location queries
 
         public IEnumerable<LocationDescriptor> AllLocations => _locations.Values;
+
         public IEnumerable<(string FromId, IReadOnlyList<WorldConnection> Connections)> AllConnections
             => _adjacency.Select(kv => (kv.Key, kv.Value as IReadOnlyList<WorldConnection>));
 

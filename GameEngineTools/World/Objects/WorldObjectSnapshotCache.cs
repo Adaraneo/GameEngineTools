@@ -6,7 +6,6 @@ namespace GameEngineTools.World.Objects
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using GameEngineTools.Characters.Core;
 
     /// <summary>
     /// Per-tick in-memory snapshot of world objects, eliminating repeated SQLite queries
@@ -67,7 +66,7 @@ namespace GameEngineTools.World.Objects
         /// <summary>Cached cross-location held-objects lookup. Rebuilt each substep.</summary>
         private List<WorldObject> _heldObjects = new();
 
-        #endregion
+        #endregion Private state
 
         #region Construction
 
@@ -84,7 +83,7 @@ namespace GameEngineTools.World.Objects
             _source = source;
         }
 
-        #endregion
+        #endregion Construction
 
         #region Cache management
 
@@ -116,11 +115,11 @@ namespace GameEngineTools.World.Objects
                 newSnapshot[locationId] = _source.GetObjectsAt(locationId).ToList();
             }
 
-            _snapshot    = newSnapshot;
+            _snapshot = newSnapshot;
             _heldObjects = newSnapshot.Values.SelectMany(objs => objs).ToList();
         }
 
-        #endregion
+        #endregion Cache management
 
         #region IWorldObjectProvider
 
@@ -163,6 +162,6 @@ namespace GameEngineTools.World.Objects
         public void AddObject(WorldObject obj)
             => _source.AddObject(obj);
 
-        #endregion
+        #endregion IWorldObjectProvider
     }
 }

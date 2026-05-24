@@ -40,7 +40,7 @@ namespace GameEngineTools.World.Data
         /// </summary>
         private const string EmbeddedResourcePrefix = "GameEngineTools.World.Data.SQL.";
 
-        #endregion
+        #endregion Constants
 
         #region Public API
 
@@ -94,6 +94,6 @@ namespace GameEngineTools.World.Data
             return File.Exists(diskPath);
         }
 
-        #endregion
+        #endregion Public API
     }
 }

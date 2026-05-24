@@ -3,16 +3,15 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Immutable;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Constants;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Immutable;
+    using System.Linq;
 
     /// <summary>
     /// Unit tests for <see cref="SqliteWorldObjectProvider"/>.
@@ -92,7 +91,7 @@ namespace EngineTests
             db.ExecuteScript(schemaSql);
         }
 
-        #endregion
+        #endregion Helpers
 
         #region AddObject → GetObjectsAt
 
@@ -164,7 +163,7 @@ namespace EngineTests
             Assert.AreEqual(0, result.Count, "Held objects must be filtered by GetObjectsAt.");
         }
 
-        #endregion
+        #endregion AddObject → GetObjectsAt
 
         #region FindObject
 
@@ -212,7 +211,7 @@ namespace EngineTests
             Assert.AreEqual("market", found!.LocationId);
         }
 
-        #endregion
+        #endregion FindObject
 
         #region GetHeldBy
 
@@ -269,7 +268,7 @@ namespace EngineTests
             Assert.AreEqual(2, held.Count);
         }
 
-        #endregion
+        #endregion GetHeldBy
 
         #region ConsumeObject + RestoreObject
 
@@ -319,7 +318,7 @@ namespace EngineTests
             Assert.IsFalse(result, "ConsumeObject must return false for an unknown object.");
         }
 
-        #endregion
+        #endregion ConsumeObject + RestoreObject
 
         #region RemoveObject
 
@@ -350,7 +349,7 @@ namespace EngineTests
             Assert.IsFalse(provider.RemoveObject("nowhere", "ghost_obj"));
         }
 
-        #endregion
+        #endregion RemoveObject
 
         #region SetHeldBy
 
@@ -390,7 +389,7 @@ namespace EngineTests
                 "Object with cleared holder must reappear in GetObjectsAt.");
         }
 
-        #endregion
+        #endregion SetHeldBy
 
         #region PhysicalTravel integration
 
@@ -420,7 +419,7 @@ namespace EngineTests
             Assert.IsNull(atDrop[0].HeldBy, "Dropped object must have no holder.");
         }
 
-        #endregion
+        #endregion PhysicalTravel integration
 
         #region Isolation — each test gets a fresh database
 
@@ -446,6 +445,6 @@ namespace EngineTests
             Assert.AreEqual(0, inB.Count, "Provider B must not see Provider A's objects.");
         }
 
-        #endregion
+        #endregion Isolation — each test gets a fresh database
     }
 }

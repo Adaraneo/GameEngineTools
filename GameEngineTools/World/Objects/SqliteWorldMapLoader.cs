@@ -7,7 +7,6 @@ namespace GameEngineTools.World.Objects
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.World.Data;
-    using GameEngineTools.World.Location;
 
     /// <summary>
     /// Loads a <see cref="WorldMap"/> from a <see cref="SqliteWorldDatabase"/>.

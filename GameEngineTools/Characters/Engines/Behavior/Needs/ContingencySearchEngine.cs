@@ -48,7 +48,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         /// </summary>
         private const double MinNeedToSearch = 20.0;
 
-        #endregion
+        #endregion Constants
 
         #region IBehaviorNeedEngine
 
@@ -98,7 +98,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 : new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), candidates);
         }
 
-        #endregion
+        #endregion IBehaviorNeedEngine
 
         #region Helpers
 
@@ -119,6 +119,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             return false;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

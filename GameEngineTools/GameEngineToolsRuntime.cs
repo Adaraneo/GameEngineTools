@@ -229,10 +229,11 @@ namespace GameEngineTools
             services.AddSingleton<ILocationService, DefaultLocationService>();
 
             #region TODO: REMOVE AFTER MIGRATION
+
             //services.AddSingleton<CsvWorldObjectProvider>();
             //services.AddSingleton<IWorldObjectProvider>(sp => sp.GetRequiredService<CsvWorldObjectProvider>());
 
-            #endregion
+            #endregion TODO: REMOVE AFTER MIGRATION
 
             services.AddSingleton<SqliteWorldDatabase>(sp =>
             {

@@ -19,7 +19,6 @@ namespace EngineTests
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Config;
-    using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Calendars;

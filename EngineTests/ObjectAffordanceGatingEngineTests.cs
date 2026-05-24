@@ -4,11 +4,8 @@
 namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
-    using GameEngineTools.Characters.Engines.Interactions;
-    using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -204,13 +201,17 @@ namespace EngineTests
         private sealed class AlwaysFalseRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => false;
         }
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
         }
@@ -219,23 +220,29 @@ namespace EngineTests
         {
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => false;
+
             public IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now)
                 => Array.Empty<(ScheduledId, ScheduledAction)>();
         }
 
         private sealed class NullDisposable : IDisposable
         {
-            public void Dispose() { }
+            public void Dispose()
+            { }
         }
 
         private sealed class EventCollector : IEventCollector
         {
             private readonly List<IDomainEvent> _events = new();
             public IReadOnlyList<IDomainEvent> Events => _events.AsReadOnly();
+
             public void Add(IDomainEvent @event) => _events.Add(@event);
+
             public IReadOnlyList<IDomainEvent> Drain()
             {
                 var result = _events.ToList();

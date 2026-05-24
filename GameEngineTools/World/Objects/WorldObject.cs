@@ -146,6 +146,6 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public NutritionalProfile? NutritionalProfile { get; init; } = null;
 
-        #endregion
+        #endregion Nutritional profile
     }
 }

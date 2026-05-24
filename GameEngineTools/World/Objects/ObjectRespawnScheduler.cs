@@ -33,7 +33,7 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         private readonly IMutableWorldObjectProvider _provider;
 
-        #endregion
+        #endregion Private state
 
         #region Construction
 
@@ -50,7 +50,7 @@ namespace GameEngineTools.World.Objects
             _provider = provider;
         }
 
-        #endregion
+        #endregion Construction
 
         #region Public API
 
@@ -81,6 +81,6 @@ namespace GameEngineTools.World.Objects
             }
         }
 
-        #endregion
+        #endregion Public API
     }
 }

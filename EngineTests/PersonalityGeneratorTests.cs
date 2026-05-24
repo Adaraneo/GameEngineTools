@@ -335,7 +335,7 @@ namespace EngineTests
             // We just verify that the cap did not accidentally clamp them too.
             // At least SOME results must have Attitude or Desire above 0.05.
             Assert.IsTrue(results.Any(s => s.Attitude > 0.05 + 0.001) ||
-                          results.Any(s => s.Desire   > 0.05 + 0.001),
+                          results.Any(s => s.Desire > 0.05 + 0.001),
                 "BehaviorMax cap must NOT silently clamp Attitude or Desire. " +
                 "Across 20 seeds, at least one profile must have Attitude or Desire above 0.05.");
         }

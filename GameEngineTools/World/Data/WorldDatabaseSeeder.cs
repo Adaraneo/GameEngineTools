@@ -34,12 +34,12 @@ namespace GameEngineTools.World.Data
         #region Script filenames
 
         /// <summary>DDL script — table and index definitions.</summary>
-        private const string SchemaScript   = "schema.sql";
+        private const string SchemaScript = "schema.sql";
 
         /// <summary>DML script — default world data (locations, objects, connections).</summary>
         private const string SeedDataScript = "seed_data.sql";
 
-        #endregion
+        #endregion Script filenames
 
         #region Public API
 
@@ -68,6 +68,6 @@ namespace GameEngineTools.World.Data
             db.ExecuteScript(seedSql);
         }
 
-        #endregion
+        #endregion Public API
     }
 }

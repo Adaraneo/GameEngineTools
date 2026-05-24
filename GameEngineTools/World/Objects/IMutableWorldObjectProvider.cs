@@ -67,7 +67,7 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         IEnumerable<WorldObject> GetHeldBy(HumanId holder);
 
-        #endregion
+        #endregion Runtime mutations
 
         #region Respawn inspection
 
@@ -86,6 +86,6 @@ namespace GameEngineTools.World.Objects
         /// <param name="locationId">Location to query.</param>
         IEnumerable<WorldObject> GetAllObjectsAt(string locationId);
 
-        #endregion
+        #endregion Respawn inspection
     }
 }

@@ -51,7 +51,7 @@ namespace GameEngineTools.World.Data
             return sb.ToString();
         }
 
-        #endregion
+        #endregion Public API
 
         #region Private — section builders
 
@@ -149,7 +149,7 @@ namespace GameEngineTools.World.Data
             }
         }
 
-        #endregion
+        #endregion Private — section builders
 
         #region Private — SQL value formatters
 
@@ -169,6 +169,6 @@ namespace GameEngineTools.World.Data
         private static string N(double? value)
             => value.HasValue ? R(value.Value) : "NULL";
 
-        #endregion
+        #endregion Private — SQL value formatters
     }
 }

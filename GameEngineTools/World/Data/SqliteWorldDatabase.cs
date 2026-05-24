@@ -7,12 +7,12 @@ namespace GameEngineTools.World.Data
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Linq;
-    using Microsoft.Data.Sqlite;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Data.Sqlite;
 
     /// <summary>
     /// Low-level SQLite access layer for the world database.
@@ -42,7 +42,7 @@ namespace GameEngineTools.World.Data
 
         private bool _disposed;
 
-        #endregion
+        #endregion Private state
 
         #region Construction
 
@@ -65,7 +65,7 @@ namespace GameEngineTools.World.Data
             Execute("PRAGMA foreign_keys=ON;");
         }
 
-        #endregion
+        #endregion Construction
 
         #region World Object queries
 
@@ -224,8 +224,8 @@ namespace GameEngineTools.World.Data
                 return ExecuteNonQuery(sql,
                     // WDateTime stores time as WorldTicks — NOT .Ticks (which doesn't exist).
                     ("@ticks", now.WorldTicks),
-                    ("@id",    objectId),
-                    ("@loc",   locationId)) > 0;
+                    ("@id", objectId),
+                    ("@loc", locationId)) > 0;
         }
 
         /// <summary>
@@ -241,7 +241,7 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
                 return ExecuteNonQuery(sql,
-                    ("@id",  objectId),
+                    ("@id", objectId),
                     ("@loc", locationId)) > 0;
         }
 
@@ -258,7 +258,7 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
                 return ExecuteNonQuery(sql,
-                    ("@id",  objectId),
+                    ("@id", objectId),
                     ("@loc", locationId)) > 0;
         }
 
@@ -277,11 +277,11 @@ namespace GameEngineTools.World.Data
             lock (_sync)
                 return ExecuteNonQuery(sql,
                     ("@holder", (object?)holder?.Value.ToString() ?? DBNull.Value),
-                    ("@id",     objectId),
-                    ("@loc",    locationId)) > 0;
+                    ("@id", objectId),
+                    ("@loc", locationId)) > 0;
         }
 
-        #endregion
+        #endregion World Object queries
 
         #region Location + Connection queries
 
@@ -307,16 +307,16 @@ namespace GameEngineTools.World.Data
                 while (reader.Read())
                 {
                     var descriptor = new LocationDescriptor(
-                        Id:             reader.GetString(0),
-                        DisplayName:    reader.GetString(1),
-                        Type:           Enum.Parse<LocationType>(reader.GetString(2), ignoreCase: true),
-                        BaseNoise:      reader.GetDouble(4),
+                        Id: reader.GetString(0),
+                        DisplayName: reader.GetString(1),
+                        Type: Enum.Parse<LocationType>(reader.GetString(2), ignoreCase: true),
+                        BaseNoise: reader.GetDouble(4),
                         NoisePerPerson: reader.GetDouble(5),
-                        Capacity:       reader.GetInt32(6),
-                        AllowsPrivacy:  reader.GetInt32(7) != 0,
-                        Terrain:        Enum.Parse<TerrainType>(reader.GetString(8), ignoreCase: true),
-                        DangerLevel:    reader.GetDouble(9),
-                        AllowsPickup:   reader.GetInt32(10) != 0);
+                        Capacity: reader.GetInt32(6),
+                        AllowsPrivacy: reader.GetInt32(7) != 0,
+                        Terrain: Enum.Parse<TerrainType>(reader.GetString(8), ignoreCase: true),
+                        DangerLevel: reader.GetDouble(9),
+                        AllowsPickup: reader.GetInt32(10) != 0);
 
                     results.Add((descriptor, reader.GetString(3)));
                 }
@@ -346,7 +346,7 @@ namespace GameEngineTools.World.Data
             }
         }
 
-        #endregion
+        #endregion Location + Connection queries
 
         #region Seed helpers (used by WorldDatabaseSeeder)
 
@@ -366,17 +366,17 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
                 ExecuteNonQuery(sql,
-                    ("@id",      d.Id),
-                    ("@name",    d.DisplayName),
-                    ("@type",    d.Type.ToString()),
-                    ("@region",  region),
-                    ("@noise",   d.BaseNoise),
-                    ("@npp",     d.NoisePerPerson),
-                    ("@cap",     d.Capacity),
-                    ("@priv",    d.AllowsPrivacy ? 1 : 0),
+                    ("@id", d.Id),
+                    ("@name", d.DisplayName),
+                    ("@type", d.Type.ToString()),
+                    ("@region", region),
+                    ("@noise", d.BaseNoise),
+                    ("@npp", d.NoisePerPerson),
+                    ("@cap", d.Capacity),
+                    ("@priv", d.AllowsPrivacy ? 1 : 0),
                     ("@terrain", d.Terrain.ToString()),
-                    ("@danger",  d.DangerLevel),
-                    ("@pickup",  d.AllowsPickup ? 1 : 0));
+                    ("@danger", d.DangerLevel),
+                    ("@pickup", d.AllowsPickup ? 1 : 0));
         }
 
         /// <summary>
@@ -392,11 +392,11 @@ namespace GameEngineTools.World.Data
             lock (_sync)
                 ExecuteNonQuery(sql,
                     ("@from", fromId),
-                    ("@to",   toId),
+                    ("@to", toId),
                     ("@dist", distanceMeters));
         }
 
-        #endregion
+        #endregion Seed helpers (used by WorldDatabaseSeeder)
 
         #region IDisposable
 
@@ -408,7 +408,7 @@ namespace GameEngineTools.World.Data
             _connection.Dispose();
         }
 
-        #endregion
+        #endregion IDisposable
 
         #region Private helpers — query execution
 
@@ -462,7 +462,7 @@ namespace GameEngineTools.World.Data
             }
         }
 
-        #endregion
+        #endregion Private helpers — query execution
 
         #region Private helpers — object reading
 
@@ -489,32 +489,32 @@ namespace GameEngineTools.World.Data
             {
                 var obj = new WorldObject
                 {
-                    Id                = reader.GetString(0),
-                    DisplayName       = reader.GetString(1),
-                    Category          = Enum.Parse<WorldObjectCategory>(reader.GetString(2), ignoreCase: true),
-                    LocationId        = reader.GetString(3),
-                    HeatSignature     = reader.GetDouble(4),
-                    AmbientNoise      = reader.GetDouble(5),
+                    Id = reader.GetString(0),
+                    DisplayName = reader.GetString(1),
+                    Category = Enum.Parse<WorldObjectCategory>(reader.GetString(2), ignoreCase: true),
+                    LocationId = reader.GetString(3),
+                    HeatSignature = reader.GetDouble(4),
+                    AmbientNoise = reader.GetDouble(5),
                     BlocksLineOfSight = reader.GetInt32(6) != 0,
-                    IsAvailable       = reader.GetInt32(7) != 0,
-                    IsPickable        = reader.GetInt32(8) != 0,
-                    WeightGrams       = reader.GetInt32(9),
-                    ItemKind          = Enum.Parse<PickupItemKind>(reader.GetString(10), ignoreCase: true),
-                    Respawns          = reader.GetInt32(11) != 0,
-                    RespawnMinutes    = reader.GetInt32(12),
+                    IsAvailable = reader.GetInt32(7) != 0,
+                    IsPickable = reader.GetInt32(8) != 0,
+                    WeightGrams = reader.GetInt32(9),
+                    ItemKind = Enum.Parse<PickupItemKind>(reader.GetString(10), ignoreCase: true),
+                    Respawns = reader.GetInt32(11) != 0,
+                    RespawnMinutes = reader.GetInt32(12),
                 };
 
                 if (includeRuntimeState)
                 {
                     // Column 13 = HeldBy (nullable TEXT — stored as GUID string)
                     // Column 14 = ConsumedAt (nullable INTEGER — stored as WorldTicks)
-                    var heldByText      = reader.IsDBNull(13) ? null : reader.GetString(13);
+                    var heldByText = reader.IsDBNull(13) ? null : reader.GetString(13);
                     var consumedAtTicks = reader.IsDBNull(14) ? (long?)null : reader.GetInt64(14);
 
                     obj = obj with
                     {
                         // WDateTime is constructed directly from WorldTicks — no static FromTicks().
-                        HeldBy     = heldByText is null ? null : new HumanId(Guid.Parse(heldByText)),
+                        HeldBy = heldByText is null ? null : new HumanId(Guid.Parse(heldByText)),
                         ConsumedAt = consumedAtTicks is null
                             ? null
                             : new WDateTime(consumedAtTicks.Value)
@@ -548,7 +548,7 @@ namespace GameEngineTools.World.Data
                 return Array.Empty<WorldObject>();
 
             // Build a shared IN clause for both child queries.
-            var ids      = objects.Select(o => o.Id).ToList();
+            var ids = objects.Select(o => o.Id).ToList();
             var inClause = string.Join(", ", ids.Select((_, i) => $"@p{i}"));
             var inParams = ids.Select((id, i) => ($"@p{i}", (object?)id)).ToArray();
 
@@ -589,10 +589,10 @@ namespace GameEngineTools.World.Data
                 while (reader.Read())
                 {
                     profileMap[reader.GetString(0)] = new NutritionalProfile(
-                        CalorieGain:   reader.IsDBNull(1) ? null : reader.GetDouble(1),
-                        ProteinGain:   reader.IsDBNull(2) ? null : reader.GetDouble(2),
-                        IronGain:      reader.IsDBNull(3) ? null : reader.GetDouble(3),
-                        VitaminDGain:  reader.IsDBNull(4) ? null : reader.GetDouble(4),
+                        CalorieGain: reader.IsDBNull(1) ? null : reader.GetDouble(1),
+                        ProteinGain: reader.IsDBNull(2) ? null : reader.GetDouble(2),
+                        IronGain: reader.IsDBNull(3) ? null : reader.GetDouble(3),
+                        VitaminDGain: reader.IsDBNull(4) ? null : reader.GetDouble(4),
                         HydrationGain: reader.IsDBNull(5) ? null : reader.GetDouble(5));
                 }
             }
@@ -601,13 +601,13 @@ namespace GameEngineTools.World.Data
             return objects
                 .Select(o => o with
                 {
-                    Affordances        = affordanceMap[o.Id].ToImmutable(),
+                    Affordances = affordanceMap[o.Id].ToImmutable(),
                     NutritionalProfile = profileMap.GetValueOrDefault(o.Id)
                 })
                 .ToList();
         }
 
-        #endregion
+        #endregion Private helpers — object reading
 
         #region Private helpers — write operations
 
@@ -625,18 +625,18 @@ namespace GameEngineTools.World.Data
                 """;
 
             ExecuteNonQuery(sql,
-                ("@id",      obj.Id),
-                ("@name",    obj.DisplayName),
-                ("@cat",     obj.Category.ToString()),
-                ("@loc",     obj.LocationId),
-                ("@heat",    obj.HeatSignature),
-                ("@noise",   obj.AmbientNoise),
-                ("@blos",    obj.BlocksLineOfSight ? 1 : 0),
-                ("@avail",   obj.IsAvailable ? 1 : 0),
-                ("@pick",    obj.IsPickable ? 1 : 0),
-                ("@weight",  obj.WeightGrams),
-                ("@kind",    obj.ItemKind.ToString()),
-                ("@resp",    obj.Respawns ? 1 : 0),
+                ("@id", obj.Id),
+                ("@name", obj.DisplayName),
+                ("@cat", obj.Category.ToString()),
+                ("@loc", obj.LocationId),
+                ("@heat", obj.HeatSignature),
+                ("@noise", obj.AmbientNoise),
+                ("@blos", obj.BlocksLineOfSight ? 1 : 0),
+                ("@avail", obj.IsAvailable ? 1 : 0),
+                ("@pick", obj.IsPickable ? 1 : 0),
+                ("@weight", obj.WeightGrams),
+                ("@kind", obj.ItemKind.ToString()),
+                ("@resp", obj.Respawns ? 1 : 0),
                 ("@respMin", obj.RespawnMinutes),
                 ("@heldBy", (object?)obj.HeldBy?.Value.ToString() ?? DBNull.Value));
         }
@@ -659,9 +659,9 @@ namespace GameEngineTools.World.Data
 
             foreach (var a in affordances)
                 ExecuteNonQuery(sql,
-                    ("@id",   objectId),
+                    ("@id", objectId),
                     ("@type", a.Type.ToString()),
-                    ("@sat",  a.Satisfaction));
+                    ("@sat", a.Satisfaction));
         }
 
         private void UpsertNutritionalProfile(string objectId, NutritionalProfile? profile)
@@ -676,14 +676,14 @@ namespace GameEngineTools.World.Data
                 """;
 
             ExecuteNonQuery(sql,
-                ("@id",    objectId),
-                ("@cal",   (object?)profile.CalorieGain   ?? DBNull.Value),
-                ("@prot",  (object?)profile.ProteinGain   ?? DBNull.Value),
-                ("@iron",  (object?)profile.IronGain      ?? DBNull.Value),
-                ("@vitd",  (object?)profile.VitaminDGain  ?? DBNull.Value),
+                ("@id", objectId),
+                ("@cal", (object?)profile.CalorieGain ?? DBNull.Value),
+                ("@prot", (object?)profile.ProteinGain ?? DBNull.Value),
+                ("@iron", (object?)profile.IronGain ?? DBNull.Value),
+                ("@vitd", (object?)profile.VitaminDGain ?? DBNull.Value),
                 ("@hydra", (object?)profile.HydrationGain ?? DBNull.Value));
         }
 
-        #endregion
+        #endregion Private helpers — write operations
     }
 }
