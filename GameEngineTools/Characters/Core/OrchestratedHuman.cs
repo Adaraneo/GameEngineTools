@@ -340,12 +340,16 @@ namespace GameEngineTools.Characters.Core
         }
 
         /// <inheritdoc/>
-        public void RestoreSnapshot(EnginesSnapshot snapshot)
+        public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default)
         {
             Snapshot = snapshot;
             _ctx.Snapshot = snapshot;
 
-            _physio.RestoreState(snapshot.Physiology);
+            if (today != default)
+                _physio.RestoreState(snapshot.Physiology, today);
+            else
+                _physio.RestoreState(snapshot.Physiology);
+
             _psych.RestoreState(snapshot.Psychology);
             _behavior.RestoreState(snapshot.Behavior);
             _interact.RestoreState(snapshot.InteractionSurface);

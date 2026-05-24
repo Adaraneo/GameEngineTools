@@ -81,7 +81,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             _log = loggerFactory.CreateLogger<DefaultPhysiologyEngine>();
             _rng = rng;
 
-            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && (now.Year - birthDate.Year) >= Config.MenstrualCycleBeginsInAge && now != default)
+            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && ComputeAgeYears(now) >= Config.MenstrualCycleBeginsInAge && now != default)
                 ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 
@@ -1168,16 +1168,22 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return Clamp01p(current + net);
         }
 
+        public void RestoreState(PhysiologyState state) => State = state;
+
         /// <summary>
         /// Replaces the current state with the provided snapshot.
         /// Used by the persistence layer to reload serialized state after a save/load cycle,
         /// and by tests to set up specific initial conditions.
         /// </summary>
         /// <param name="state">The state to restore.</param>
-        public void RestoreState(PhysiologyState state)
+        public void RestoreState(PhysiologyState state, WDateOnly today = default)
         {
-            var ageYears = state.Aging?.AgeYears ?? 0;
-            if (state.Cycle is not null && ageYears < Config.MenstrualCycleBeginsInAge)
+            var ageYears = ComputeAgeYears(today);
+
+            if (state.Aging is not null)
+                state = state with { Aging = state.Aging with { AgeYears = ageYears } };
+
+            if (state.Cycle is not null && ageYears > 0 && ageYears < Config.MenstrualCycleBeginsInAge)
                 state = state with { Cycle = null };
 
             State = state;

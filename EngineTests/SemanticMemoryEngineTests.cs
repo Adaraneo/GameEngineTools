@@ -678,6 +678,8 @@ namespace EngineTests
             public void FlushInbox()
             {
             }
+
+            public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default) => RestoreSnapshot(snapshot);
         }
     }
 }

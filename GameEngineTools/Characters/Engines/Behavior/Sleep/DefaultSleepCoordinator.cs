@@ -102,9 +102,21 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             switch (@event)
             {
                 case SleepConfirmed sc:
+                    var ph = ctx.Snapshot.Physiology;
                     // Sleep session creation stays here so the runtime session never leaks into BehaviorState.
                     var session = new DefaultSleepSession(_sleepCfg, _loggerFactory, ctx.Random);
-                    var sleepHours = Math.Clamp(_behaviorCfg.BaseSleepHours + ctx.Snapshot.Physiology.SleepDebtHours * 0.5, _behaviorCfg.MinSleepHours, _behaviorCfg.MaxSleepHours);
+                    var sleepHours = Math.Clamp(_behaviorCfg.BaseSleepHours + ph.SleepDebtHours * 0.5, _behaviorCfg.MinSleepHours, _behaviorCfg.MaxSleepHours);
+                    
+                    // Hunger disturbs sleep — high hunger reduces sleep duration.
+                    // Biological basis: ghrelin (hunger hormone) promotes wakefulness (Hanlon et al. 2016).
+                    if (ph.Hunger > _sleepCfg.HungerSleepShorteningThreshold)
+                    {
+                        var hungerFraction = (ph.Hunger - _sleepCfg.HungerSleepShorteningThreshold)
+                                           / (100.0 - _sleepCfg.HungerSleepShorteningThreshold);
+                        sleepHours *= (1.0 - hungerFraction * _sleepCfg.HungerSleepShorteningMax);
+                        sleepHours = Math.Max(sleepHours, _behaviorCfg.MinSleepHours);
+                    }
+
                     var plannedWakeUp = sc.PlannedWakeUp != default ? sc.PlannedWakeUp : sc.OccurredAt + WTimeSpan.FromHours(sleepHours);
                     session.Begin(sc.OccurredAt, plannedWakeUp, ctx, outbox, sc.Companion, sc.SharedType);
                     _activeSession = session;

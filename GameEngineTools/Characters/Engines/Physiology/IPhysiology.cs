@@ -243,7 +243,17 @@ namespace GameEngineTools.Characters.Engines.Physiology
         StatusType Status = StatusType.Alive);
 
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
-    { }
+    {
+        /// <summary>
+        /// Restores serialized state and revalidates age-dependent subsystems
+        /// (menstrual cycle, testosterone) against the current game time.
+        /// Preferred over <see cref="IEngine{TState,TConfig}.RestoreState"/> when
+        /// the character was generated in a different simulation context.
+        /// </summary>
+        /// <param name="state">The state to restore.</param>
+        /// <param name="today">Current game time used to recompute age from birth date.</param>
+        void RestoreState(PhysiologyState state, WDateOnly today);
+    }
 
     // --- Menstruační modul ---
     public enum CyclePhase

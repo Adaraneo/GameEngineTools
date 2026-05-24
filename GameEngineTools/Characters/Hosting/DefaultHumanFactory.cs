@@ -33,6 +33,12 @@ namespace GameEngineTools.Characters.Hosting
         /// <param name="blueprint">The blueprint that describes the character.</param>
         /// <returns>A fully initialised <see cref="IHuman"/> ready for simulation.</returns>
         IHuman Create(HumanBlueprint blueprint);
+
+        /// <summary>
+        /// Reconstructs a character from a persisted blueprint and snapshot,
+        /// revalidating age-dependent state against the current simulation time.
+        /// </summary>
+        IHuman Load(HumanBlueprint blueprint, EnginesSnapshot snapshot);
     }
 
     /// <summary>
@@ -164,7 +170,18 @@ namespace GameEngineTools.Characters.Hosting
             {
                 Goals = goal.State,
                 Schedule = schedule.State
-            });
+            }, _clock.Now.Date);
+
+            return human;
+        }
+
+        public IHuman Load(HumanBlueprint blueprint, EnginesSnapshot snapshot)
+        {
+            var human = (OrchestratedHuman)Create(blueprint);
+
+            // Restore persisted snapshot with current game time so age-dependent
+            // subsystems (cycle, testosterone) are revalidated at load time.
+            human.RestoreSnapshot(snapshot, _clock.Now.Date);
 
             return human;
         }

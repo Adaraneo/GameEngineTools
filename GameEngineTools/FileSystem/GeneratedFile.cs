@@ -139,8 +139,7 @@ namespace GameEngineTools.FileSystem
         {
             var data = ReadJson(ResolveFileUnderRoot(NPCDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile, Occupation: data.Occupation);
-            var person = _humanFactory.Create(blueprint);
-            person.RestoreSnapshot(data.Snapshot);
+            var person = _humanFactory.Load(blueprint, data.Snapshot);
 
             return new NPC
             {
@@ -161,8 +160,7 @@ namespace GameEngineTools.FileSystem
         {
             var data = ReadJson(ResolveFileUnderRoot(PlayerDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile, Occupation: data.Occupation);
-            var person = _humanFactory.Create(blueprint);
-            person.RestoreSnapshot(data.Snapshot);
+            var person = _humanFactory.Load(blueprint, data.Snapshot);
 
             return new PC
             {

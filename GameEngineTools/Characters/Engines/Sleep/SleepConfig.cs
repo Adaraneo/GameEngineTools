@@ -97,8 +97,19 @@ namespace GameEngineTools.Characters.Engines.Sleep
         double EmergencyEnergyThreshold,
         double ThirstSleepBlockThreshold,
         double HungerSleepBlockThreshold,
-        double NightmareStressThreshold
+        double NightmareStressThreshold,
+    /// <summary>
+    /// Hunger level above which sleep duration starts shortening.
+    /// Biological basis: ghrelin promotes wakefulness when energy stores are low.
+    /// Default: 70.
+    /// </summary>
+    double HungerSleepShorteningThreshold = 70.0,
 
+    /// <summary>
+    /// Maximum fractional reduction in sleep duration at Hunger = 100.
+    /// 0.5 means sleep is halved at maximum hunger. Default: 0.5.
+    /// </summary>
+    double HungerSleepShorteningMax = 0.5
     )
     {
         /// <summary>

@@ -68,7 +68,7 @@ namespace GameEngineTools.Characters.Core
         // Příjem externích podnětů (environment, jiné postavy)
         void ReceiveEvent(IDomainEvent @event);
 
-        void RestoreSnapshot(EnginesSnapshot snapshot);
+        void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default);
 
         /// <summary>
         /// Immediately processes all queued inbox events without advancing time.

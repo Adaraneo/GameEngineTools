@@ -665,6 +665,11 @@ namespace EngineTests
                 throw new NotImplementedException();
             }
 
+            public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default)
+            {
+                throw new NotImplementedException();
+            }
+
             #endregion IHuman
         }
 
