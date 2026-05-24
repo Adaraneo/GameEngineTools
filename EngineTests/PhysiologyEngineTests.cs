@@ -41,7 +41,7 @@ namespace EngineTests
         [TestInitialize]
         public void Setup()
         {
-            _now = new WDateTime(0);
+            _now = WDateTime.New(WDateOnly.New(116,1,1));
             _outbox = new EventCollector();
             _ctx = BuildContext();
         }
@@ -57,7 +57,7 @@ namespace EngineTests
         public void Handle_SleepEnded_PerfectQuality_ReducesSleepDebt()
         {
             // Arrange
-            var engine = BuildEngine(sleepDebtHours: 8);
+            var engine = BuildEngine(_now, sleepDebtHours: 8);
             var ended = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
             var debtBefore = engine.State.SleepDebtHours;
 
@@ -76,12 +76,12 @@ namespace EngineTests
         public void Handle_SleepEnded_ZeroQuality_ReducesDebtMinimally()
         {
             // Arrange
-            var engine = BuildEngine(sleepDebtHours: 8);
+            var engine = BuildEngine(_now, sleepDebtHours: 8);
             var fullEnded = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
             var badEnded = MakeSleepEnded(quality: 0, hoursSlept: 8, wasInterrupted: true);
 
-            var fullEngine = BuildEngine(sleepDebtHours: 8);
-            var badEngine = BuildEngine(sleepDebtHours: 8);
+            var fullEngine = BuildEngine(_now, sleepDebtHours: 8);
+            var badEngine = BuildEngine(_now, sleepDebtHours: 8);
 
             // Act
             fullEngine.Handle(fullEnded, _ctx, new EventCollector());
@@ -101,7 +101,7 @@ namespace EngineTests
         public void Handle_SleepEnded_DebtNeverGoesNegative()
         {
             // Arrange — malý dluh, velký spánek
-            var engine = BuildEngine(sleepDebtHours: 1);
+            var engine = BuildEngine(_now, sleepDebtHours: 1);
             var ended = MakeSleepEnded(quality: 100, hoursSlept: 12, wasInterrupted: false);
 
             // Act
@@ -119,8 +119,8 @@ namespace EngineTests
         public void Handle_SleepEnded_LongerSleep_ReducesMoreDebt()
         {
             // Arrange — stejná kvalita, různá délka
-            var shortEngine = BuildEngine(sleepDebtHours: 10);
-            var longEngine = BuildEngine(sleepDebtHours: 10);
+            var shortEngine = BuildEngine(_now, sleepDebtHours: 10);
+            var longEngine = BuildEngine(_now, sleepDebtHours: 10);
 
             var shortSleep = MakeSleepEnded(quality: 80, hoursSlept: 4, wasInterrupted: false);
             var longSleep = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
@@ -147,7 +147,7 @@ namespace EngineTests
         public void Handle_SleepEnded_GoodQuality_ReducesImmuneLoad()
         {
             // Arrange
-            var engine = BuildEngine(immuneLoad: 50);
+            var engine = BuildEngine(_now, immuneLoad: 50);
             var ended = MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false);
             var loadBefore = engine.State.ImmuneLoad;
 
@@ -166,7 +166,7 @@ namespace EngineTests
         public void Handle_SleepEnded_QualityAbove60_ReducesPain()
         {
             // Arrange
-            var engine = BuildEngine(pain: 30);
+            var engine = BuildEngine(_now, pain: 30);
             var ended = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
             var painBefore = engine.State.Pain;
 
@@ -185,7 +185,7 @@ namespace EngineTests
         public void Handle_SleepEnded_QualityBelow60_DoesNotReducePain()
         {
             // Arrange
-            var engine = BuildEngine(pain: 30);
+            var engine = BuildEngine(_now, pain: 30);
             var ended = MakeSleepEnded(quality: 30, hoursSlept: 2, wasInterrupted: true);
             var painBefore = engine.State.Pain;
 
@@ -204,7 +204,7 @@ namespace EngineTests
         [TestMethod]
         public void Ctor_MenstrualCycleEnabledForAgeLessThanInConfiguration_ReturnsNullCycle()
         {
-            var engine = BuildEngine(birthYear: 111, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 111, cycleEnabled: true);
 
             Assert.IsNull(engine.State.Cycle);
         }
@@ -212,7 +212,7 @@ namespace EngineTests
         [TestMethod]
         public void Ctor_MenstrualCycleEnabledForAgeGreaterThanInConfiguration_ReturnsNotNullCycle()
         {
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
 
             Assert.IsNotNull(engine.State.Cycle);
         }
@@ -220,7 +220,7 @@ namespace EngineTests
         [TestMethod]
         public void Ctor_MenstrualCycleDiabled_ReturnsNullCycle()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
 
             Assert.IsNull(engine.State.Cycle);
         }
@@ -237,7 +237,7 @@ namespace EngineTests
         public void AdvanceCycleDay_WithZeroRandom_CycleLengthEqualsMean()
         {
             // Arrange — cycle-enabled engine, start the cycle at day 1
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
             var ctx = BuildContext();
             var outbox = new EventCollector();
             var now = new WDateTime(0);
@@ -274,7 +274,7 @@ namespace EngineTests
         {
             // Use a random source that always returns 0 for the Box-Muller inputs
             // which produces the mean; verify the clamp by checking the wrap point.
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
             var ctx = BuildContext();
             var outbox = new EventCollector();
             var now = new WDateTime(0);
@@ -299,7 +299,7 @@ namespace EngineTests
         [TestMethod]
         public void AdvanceCycleDay_CycleLengthNeverExceeds35Days()
         {
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
             var ctx = BuildContext();
             var outbox = new EventCollector();
             var now = new WDateTime(0);
@@ -339,13 +339,13 @@ namespace EngineTests
             var outboxNon = new EventCollector();
 
             // Act — ovulation window with AlwaysConceiveRandom should conceive
-            var ovulEngineConceiving = BuildEngineWithCycle(ovulationWindowOpen: true, alwaysConceive: true);
+            var ovulEngineConceiving = BuildEngineWithCycle(_now, ovulationWindowOpen: true, alwaysConceive: true);
             var ctxConceiving = BuildContextForConception(SexBiology.Female, alwaysChance: true);
             var encounterOvul = MakeEncounter(ctxConceiving.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.None);
             ovulEngineConceiving.Handle(encounterOvul, ctxConceiving, outboxOvul);
 
             // Outside ovulation window with ZeroRandom should not conceive
-            var nonOvulEngineNot = BuildEngineWithCycle(ovulationWindowOpen: false, alwaysConceive: false);
+            var nonOvulEngineNot = BuildEngineWithCycle(_now, ovulationWindowOpen: false, alwaysConceive: false);
             var ctxNot = BuildContextForConception(SexBiology.Female, alwaysChance: false);
             var encounterNon = MakeEncounter(ctxNot.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.None);
             nonOvulEngineNot.Handle(encounterNon, ctxNot, outboxNon);
@@ -366,7 +366,7 @@ namespace EngineTests
         [TestMethod]
         public void ConceptionChance_HighContraception_PreventsConception()
         {
-            var engine = BuildEngineWithCycle(ovulationWindowOpen: true, alwaysConceive: false);
+            var engine = BuildEngineWithCycle(_now, ovulationWindowOpen: true, alwaysConceive: false);
             var ctx = BuildContextForConception(SexBiology.Female, alwaysChance: false);
             var outbox = new EventCollector();
             var encounter = MakeEncounter(ctx.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.High);
@@ -383,7 +383,7 @@ namespace EngineTests
         [TestMethod]
         public void ConceptionChance_MaleBiology_NeverConceives()
         {
-            var engine = BuildEngineWithCycle(ovulationWindowOpen: true, alwaysConceive: true);
+            var engine = BuildEngineWithCycle(_now, ovulationWindowOpen: true, alwaysConceive: true);
             var ctx = BuildContextForConception(SexBiology.Male, alwaysChance: true);
             var outbox = new EventCollector();
             var encounter = MakeEncounter(ctx.Id, ReproductiveIntent.TryingForChild, ContraceptionLevel.None);
@@ -404,7 +404,7 @@ namespace EngineTests
         [TestMethod]
         public void AdvancePregnancy_BeforeDiscoveryMinDays_NotDiscovered()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             var ctx = BuildContext();
             var outbox = new EventCollector();
 
@@ -433,7 +433,7 @@ namespace EngineTests
         [TestMethod]
         public void AdvancePregnancy_AfterDiscoveryMinDays_FlipsDiscoveredAndEmitsEvent()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             var ctx = BuildContext();
             var outbox = new EventCollector();
 
@@ -468,7 +468,7 @@ namespace EngineTests
         [TestMethod]
         public void AdvancePregnancy_OnDueDate_EmitsChildBornAndPausesCycle()
         {
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
             var ctx = BuildContext();
             var outbox = new EventCollector();
 
@@ -500,7 +500,7 @@ namespace EngineTests
         [TestMethod]
         public void AdvancePregnancy_OnDueDate_CyclePausedWithReducedLibido()
         {
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
             var ctx = BuildContext();
             var outbox = new EventCollector();
 
@@ -538,8 +538,8 @@ namespace EngineTests
         [TestMethod]
         public void Tick_ImmuneLoad_AboveThreshold_RaisesBodyTempDelta()
         {
-            var highImmuneEngine = BuildEngine(immuneLoad: 80, birthYear: 100, todayYear: 116);
-            var lowImmuneEngine = BuildEngine(immuneLoad: 10, birthYear: 100, todayYear: 116);
+            var highImmuneEngine = BuildEngine(_now, immuneLoad: 80, birthYear: 100);
+            var lowImmuneEngine = BuildEngine(_now, immuneLoad: 10, birthYear: 100);
             var ctx = BuildContext();
 
             // Start both at neutral temp
@@ -560,7 +560,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_ImmuneLoad_AtOrBelowThreshold_NoFeverDevelopment()
         {
-            var engine = BuildEngine(immuneLoad: 30);
+            var engine = BuildEngine(_now, immuneLoad: 30);
             engine.RestoreState(engine.State with { BodyTempDelta = 0 });
             var ctx = BuildContext();
 
@@ -579,7 +579,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Nutrition_CaloriesAndProteinDecayWhenNotEating()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with
             {
                 Nutrition = new NutritionState(Calories: 80, Protein: 80)
@@ -597,13 +597,13 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Nutrition_CaloriesAndProteinRestoredWhileEating()
         {
-            var eatingEngine = BuildEngine(hunger: 60);
+            var eatingEngine = BuildEngine(_now, hunger: 60);
             eatingEngine.RestoreState(eatingEngine.State with
             {
                 Nutrition = new NutritionState(Calories: 40, Protein: 40)
             });
 
-            var idleEngine = BuildEngine(hunger: 60);
+            var idleEngine = BuildEngine(_now, hunger: 60);
             idleEngine.RestoreState(idleEngine.State with
             {
                 Nutrition = new NutritionState(Calories: 40, Protein: 40)
@@ -621,13 +621,13 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Nutrition_IronRestoredDuringSleep()
         {
-            var sleepEngine = BuildEngine();
+            var sleepEngine = BuildEngine(_now);
             sleepEngine.RestoreState(sleepEngine.State with
             {
                 Nutrition = new NutritionState(Iron: 50)
             });
 
-            var idleEngine = BuildEngine();
+            var idleEngine = BuildEngine(_now);
             idleEngine.RestoreState(idleEngine.State with
             {
                 Nutrition = new NutritionState(Iron: 50)
@@ -647,7 +647,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Injury_AddsPainProportionalToSeverity()
         {
-            var engine = BuildEngine(pain: 0);
+            var engine = BuildEngine(_now, pain: 0);
             engine.RestoreState(engine.State with
             {
                 Pain = 0,
@@ -664,7 +664,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Injury_HealsOverDaysDuringRest()
         {
-            var engine = BuildEngine(pain: 0);
+            var engine = BuildEngine(_now, pain: 0);
             engine.RestoreState(engine.State with
             {
                 Injury = new InjuryState(Severity: 10, DaysSinceOnset: 0, Type: InjuryType.Wound)
@@ -680,7 +680,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Injury_EmitsInjuryHealedWhenSeverityReachesZero()
         {
-            var engine = BuildEngine(pain: 0);
+            var engine = BuildEngine(_now, pain: 0);
             engine.RestoreState(engine.State with
             {
                 Injury = new InjuryState(Severity: 2, DaysSinceOnset: 0, Type: InjuryType.Wound)
@@ -702,7 +702,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Postpartum_Immediate_EnforcesPainFloorAt70()
         {
-            var engine = BuildEngine(pain: 0);
+            var engine = BuildEngine(_now, pain: 0);
             engine.RestoreState(engine.State with
             {
                 Pain = 0,
@@ -719,7 +719,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Postpartum_Immediate_EnforcesEnergyCap30()
         {
-            var engine = BuildEngine(energy: 100);
+            var engine = BuildEngine(_now, energy: 100);
             engine.RestoreState(engine.State with
             {
                 Energy = 100,
@@ -736,7 +736,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Postpartum_FirstWeek_EnforcesPainFloorAt40()
         {
-            var engine = BuildEngine(pain: 0);
+            var engine = BuildEngine(_now, pain: 0);
             engine.RestoreState(engine.State with
             {
                 Pain = 0,
@@ -753,7 +753,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Postpartum_PhaseChangedEventEmittedAtTransition()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with
             {
                 Postpartum = new PostpartumState(DaysSinceBirth: 3, Phase: PostpartumPhase.Immediate)
@@ -778,7 +778,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Cortisol_HighAllostaticLoad_ElevatesAboveBaseline()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { AllostaticLoad = 80, CortisolLevel = 50 });
             // Hodina 8 = diurnální vrchol; přidáme ještě AlloWeight × 80 = +20
             var hour8 = new WDateTime(WTimeSpan.FromHours(8).Ticks);
@@ -796,8 +796,8 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Cortisol_DayTimePeak_HigherThanNightTrough()
         {
-            var enginePeak = BuildEngine();
-            var engineTrough = BuildEngine();
+            var enginePeak = BuildEngine(_now);
+            var engineTrough = BuildEngine(_now);
             // Obě instance se stejnou allostatickou zátěží 0 — čistě diurnální efekt
             enginePeak.RestoreState(enginePeak.State with { AllostaticLoad = 0, CortisolLevel = 50 });
             engineTrough.RestoreState(engineTrough.State with { AllostaticLoad = 0, CortisolLevel = 50 });
@@ -823,7 +823,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_CircadianPhaseShift_SleepAtWrongTime_AccumulatesShift()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { CircadianPhaseShiftHours = 0 });
             // Spí ve 4h ráno — přirozený spánek je v 22h; mismatch = 18h, protože cyklicky = min(18, 26-18)=8h
             var hour4 = new WDateTime(WTimeSpan.FromHours(4).Ticks);
@@ -841,7 +841,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_CircadianPhaseShift_Recovery_ConvergesBackToChronotype()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { CircadianPhaseShiftHours = 3.0 });
             var hour22 = new WDateTime(WTimeSpan.FromHours(22).Ticks);
             var ctx = BuildContextWithAction(null);
@@ -863,7 +863,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_RecoveryDebt_HighAlloLoad_Accumulates()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { AllostaticLoad = 80, RecoveryDebtHours = 0 });
             var ctx = BuildContextWithAction(null);
 
@@ -879,7 +879,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_RecoveryDebt_SleepAction_Decays()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { AllostaticLoad = 0, RecoveryDebtHours = 10.0 });
             var ctx = BuildContextWithAction(Sleep);
 
@@ -895,8 +895,8 @@ namespace EngineTests
         [TestMethod]
         public void Handle_SleepEnded_HighRecoveryDebt_ReducesEnergyRecovery()
         {
-            var freshEngine = BuildEngine(energy: 0);
-            var debtedEngine = BuildEngine(energy: 0);
+            var freshEngine = BuildEngine(_now, energy: 0);
+            var debtedEngine = BuildEngine(_now, energy: 0);
             freshEngine.RestoreState(freshEngine.State with { RecoveryDebtHours = 0 });
             debtedEngine.RestoreState(debtedEngine.State with { RecoveryDebtHours = 40 });
 
@@ -920,8 +920,8 @@ namespace EngineTests
         [TestMethod]
         public void Constructor_Testosterone_InitializedForMale_NullForFemale()
         {
-            var maleEngine = BuildEngineForBiology(SexBiology.Male);
-            var femaleEngine = BuildEngineForBiology(SexBiology.Female);
+            var maleEngine = BuildEngineForBiology(SexBiology.Male, _now);
+            var femaleEngine = BuildEngineForBiology(SexBiology.Female, _now);
 
             Assert.IsNotNull(maleEngine.State.Testosterone,
                 "Male biology musí mít inicializovaný TestosteroneState.");
@@ -935,7 +935,7 @@ namespace EngineTests
         [TestMethod]
         public void Tick_Testosterone_HighSleepDebt_SuppressesLevel()
         {
-            var maleEngine = BuildEngineForBiology(SexBiology.Male);
+            var maleEngine = BuildEngineForBiology(SexBiology.Male, _now);
             // Nastavit vysoký dluh; testosteron by měl být potlačen pod klidovou úroveň ~70
             maleEngine.RestoreState(maleEngine.State with
             {
@@ -973,7 +973,7 @@ namespace EngineTests
         [TestMethod]
         public void SleepInertia_SetAfterSleepEnded_DecaysOverTime()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             var ended = MakeSleepEnded(quality: 80, hoursSlept: 8, wasInterrupted: false);
             engine.Handle(ended, _ctx, _outbox);
 
@@ -993,8 +993,8 @@ namespace EngineTests
         [TestMethod]
         public void SleepInertia_PoorQuality_LongerThanGoodQuality()
         {
-            var poorEngine = BuildEngine();
-            var goodEngine = BuildEngine();
+            var poorEngine = BuildEngine(_now);
+            var goodEngine = BuildEngine(_now);
             poorEngine.Handle(MakeSleepEnded(quality: 0, hoursSlept: 8, wasInterrupted: true), _ctx, new EventCollector());
             goodEngine.Handle(MakeSleepEnded(quality: 100, hoursSlept: 8, wasInterrupted: false), _ctx, new EventCollector());
 
@@ -1014,7 +1014,7 @@ namespace EngineTests
         [TestMethod]
         public void SocialPain_RejectedInteraction_SpikesCortisolInPhysiology()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { CortisolLevel = 50 });
             var ctx = BuildContext();
 
@@ -1042,7 +1042,7 @@ namespace EngineTests
         [TestMethod]
         public void MenstrualCycle_LibidoPeak_AtOvulation_Higher_ThanAtMenses()
         {
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
             var ctx = BuildContextWithAction(null);
 
             // Ovulační den (den 14)
@@ -1050,7 +1050,7 @@ namespace EngineTests
             {
                 Cycle = engine.State.Cycle! with { DayInCycle = 14, Phase = CyclePhase.Ovulation }
             });
-            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            engine.Tick(_now, WTimeSpan.FromHours(24), ctx, new EventCollector());
             var libidoAtOvulation = engine.State.Cycle!.LibidoMod;
 
             // Menstruační den (den 2)
@@ -1058,7 +1058,7 @@ namespace EngineTests
             {
                 Cycle = engine.State.Cycle with { DayInCycle = 2, Phase = CyclePhase.Menses }
             });
-            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            engine.Tick(_now, WTimeSpan.FromHours(24), ctx, new EventCollector());
             var libidoAtMenses = engine.State.Cycle!.LibidoMod;
 
             Assert.IsTrue(libidoAtOvulation > libidoAtMenses,
@@ -1072,7 +1072,7 @@ namespace EngineTests
         [TestMethod]
         public void MenstrualCycle_PainSymptom_Smooth_AtPhaseTransitions()
         {
-            var engine = BuildEngine(birthYear: 101, cycleEnabled: true);
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
             var ctx = BuildContextWithAction(null);
 
             double GetPainAfterTick(int day, CyclePhase phase)
@@ -1082,7 +1082,7 @@ namespace EngineTests
                     Pain = 0,
                     Cycle = engine.State.Cycle! with { DayInCycle = day, Phase = phase }
                 });
-                engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+                engine.Tick(_now, WTimeSpan.FromHours(24), ctx, new EventCollector());
                 return engine.State.Pain;
             }
 
@@ -1103,7 +1103,7 @@ namespace EngineTests
         [TestMethod]
         public void SAM_InjuryReceived_SpikesAcuteArousal()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { AcuteArousalLevel = 0 });
             var ir = new InjuryReceived(_now, new HumanId(Guid.NewGuid()), 50, InjuryType.Wound);
 
@@ -1116,7 +1116,7 @@ namespace EngineTests
         [TestMethod]
         public void SAM_AcuteArousal_DecaysRapidly()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { AcuteArousalLevel = 80 });
             var ctx = BuildContextWithAction(null);
 
@@ -1134,7 +1134,7 @@ namespace EngineTests
         [TestMethod]
         public void PhysicalFatigue_WorkAccumulates_SleepDecays()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { PhysicalFatigueLevel = 0 });
 
             // Work → akumulace
@@ -1156,7 +1156,7 @@ namespace EngineTests
         [TestMethod]
         public void Glycemic_PostMealDip_ReducesBloodGlucose()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with
             {
                 Nutrition = new NutritionState(BloodGlucoseLevel: 90, PostMealHours: 1.5) // v dip okně
@@ -1176,8 +1176,8 @@ namespace EngineTests
         [TestMethod]
         public void Hypocortisolism_ExtremeAlloLoad_BluntsCortisolRise()
         {
-            var normalEngine = BuildEngine();
-            var extremeEngine = BuildEngine();
+            var normalEngine = BuildEngine(_now);
+            var extremeEngine = BuildEngine(_now);
 
             // Vysoké (70, těsně pod threshold 75) vs. extrémní (100, přes threshold) AlloLoad.
             // Při threshold=75 a declineRate=0.1:
@@ -1205,7 +1205,7 @@ namespace EngineTests
         [TestMethod]
         public void Postpartum_HormonalCrash_ActiveFirst7Days()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with
             {
                 Postpartum = new PostpartumState(0, PostpartumPhase.Immediate, HormonalCrashActive: true)
@@ -1218,7 +1218,7 @@ namespace EngineTests
         [TestMethod]
         public void Postpartum_HormonalCrash_DeactivatesAfter7Days()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             // Den 7 → FirstWeek, HormonalCrash by měl být deaktivován při přechodu na den 8+
             engine.RestoreState(engine.State with
             {
@@ -1240,7 +1240,7 @@ namespace EngineTests
         [TestMethod]
         public void ChronicPain_AccumulatesWhenPainAboveThreshold()
         {
-            var engine = BuildEngine(pain: 50); // Pain=50 > threshold 30
+            var engine = BuildEngine(_now, pain: 50); // Pain=50 > threshold 30
             engine.RestoreState(engine.State with { ChronicPainDays = 0 });
             var ctx = BuildContextWithAction(null);
 
@@ -1253,7 +1253,7 @@ namespace EngineTests
         [TestMethod]
         public void ChronicPain_DecreasesWhenPainDropsBelowThreshold()
         {
-            var engine = BuildEngine(pain: 5); // Pain=5 < threshold 30
+            var engine = BuildEngine(_now, pain: 5); // Pain=5 < threshold 30
             engine.RestoreState(engine.State with { ChronicPainDays = 5.0 });
             var ctx = BuildContextWithAction(null);
 
@@ -1270,7 +1270,7 @@ namespace EngineTests
         [TestMethod]
         public void SocialIsolation_HighNeedSocial_ElevatesCortisol()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with { CortisolLevel = 50 });
 
             // Vytvoříme kontext s vysokým NeedSocial (simulace izolace přes minulý snapshot)
@@ -1453,8 +1453,8 @@ namespace EngineTests
         [TestMethod]
         public void Altitude_AboveHypoxiaThreshold_IncreasesEnergyDecay()
         {
-            var seaEngine = BuildEngine(energy: 80);
-            var highAltEngine = BuildEngine(energy: 80);
+            var seaEngine = BuildEngine(_now, energy: 80);
+            var highAltEngine = BuildEngine(_now, energy: 80);
 
             // High altitude snapshot (3000m > threshold 2000m)
             var highAltSnapshot = new EnginesSnapshot(
@@ -1501,7 +1501,7 @@ namespace EngineTests
         [TestMethod]
         public void Altitude_AboveAMSThreshold_AddsPain()
         {
-            var engine = BuildEngine(pain: 0);
+            var engine = BuildEngine(_now, pain: 0);
             // AMS threshold = 4000m, Pain by měl přibývat
             var amsSnapshot = new EnginesSnapshot(
                 engine.State, new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral),
@@ -1537,7 +1537,7 @@ namespace EngineTests
         [TestMethod]
         public void Hair_GrowsAtConfiguredRate_PerTick()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             Assert.IsNotNull(engine.State.Aging, "Aging musí být inicializované.");
             var initialLen = engine.State.Aging!.HairLengthCm;
             var ctx = BuildContextWithAction(null);
@@ -1551,7 +1551,7 @@ namespace EngineTests
         [TestMethod]
         public void Hair_CutEvent_SetsNewLength()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with
             { Aging = engine.State.Aging! with { HairLengthCm = 30.0 } });
 
@@ -1698,7 +1698,7 @@ namespace EngineTests
         [TestMethod]
         public void HairDyed_ResetsGreyFraction()
         {
-            var engine = BuildEngine();
+            var engine = BuildEngine(_now);
             engine.RestoreState(engine.State with
             { Aging = engine.State.Aging! with { GreyFraction = 0.4 } });
 
@@ -1766,7 +1766,7 @@ namespace EngineTests
         #region Pomocné metody
 
         /// <summary>Sestaví engine pro konkrétní biologii (Male/Female) — pro testy pohlavně specifických metrik.</summary>
-        private static DefaultPhysiologyEngine BuildEngineForBiology(SexBiology biology)
+        private static DefaultPhysiologyEngine BuildEngineForBiology(SexBiology biology, WDateTime now)
         {
             var cfg = Options.Create(new PhysiologyConfig(
                 RestingMetabolicRate: 1600,
@@ -1779,11 +1779,12 @@ namespace EngineTests
                 cfg, cycleCfg, factory, new ZeroRandom(),
                 biology: biology,
                 birthDate: WDateOnly.New(100, 1, 1),
-                now: WDateOnly.New(116, 1, 1));
+                now: now.Date);
         }
 
         /// <summary>Sestaví engine s nastavenými počátečními hodnotami.</summary>
         private static DefaultPhysiologyEngine BuildEngine(
+            WDateTime now,
             double sleepDebtHours = 2,
             double energy = 70,
             double hunger = 25,
@@ -1791,7 +1792,6 @@ namespace EngineTests
             double pain = 5,
             double immuneLoad = 10,
             int birthYear = 100,
-            int todayYear = 116,
             bool cycleEnabled = false)
         {
             var cfg = Options.Create(new PhysiologyConfig(
@@ -1807,7 +1807,7 @@ namespace EngineTests
                 cfg, cycleCfg, factory, rng,
                 biology: SexBiology.Female,
                 birthDate: WDateOnly.New(birthYear, 1, 1),
-                now: WDateOnly.New(todayYear, 1, 1));
+                now: now.Date);
 
             engine.RestoreState(new PhysiologyState(
                 Energy: energy,
@@ -1907,6 +1907,7 @@ namespace EngineTests
         /// Uses a custom <see cref="IRandomSource"/> to control conception roll outcome.
         /// </summary>
         private static DefaultPhysiologyEngine BuildEngineWithCycle(
+            WDateTime now,
             bool ovulationWindowOpen,
             bool alwaysConceive = false)
         {
@@ -1923,7 +1924,7 @@ namespace EngineTests
                 cfg, cycleCfg, factory, rng,
                 biology: SexBiology.Female,
                 birthDate: WDateOnly.New(101, 1, 1),
-                now: WDateOnly.New(116, 1, 1));
+                now: now.Date);
 
             // Override the cycle to control the ovulation window precisely
             var phase = ovulationWindowOpen ? CyclePhase.Ovulation : CyclePhase.Follicular;
@@ -1935,7 +1936,7 @@ namespace EngineTests
                     OvulationWindow: ovulationWindowOpen,
                     SymptomPain: 0, SymptomBreastTender: 0, SymptomBloat: 0,
                     LibidoMod: 1.0,
-                    LastMensesStart: WDateOnly.New(116, 1, 1))
+                    LastMensesStart: now.Date)
             });
 
             return engine;

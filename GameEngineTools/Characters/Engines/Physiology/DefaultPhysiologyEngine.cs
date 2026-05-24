@@ -102,9 +102,33 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Cycle: initialCycle,
                 Nutrition: Config.EnableNutrition ? new NutritionState() : null,
                 Testosterone: initialTestosterone,
-                Aging: new PhysicalAgingState());
+                Aging: new PhysicalAgingState(AgeYears: now != default ? ComputeAgeYears(now) : 0));
 
             _mensesOn = initialCycle?.Phase == CyclePhase.Menses;
+        }
+
+        /// <summary>
+        /// Returns the character's age in whole years, correctly adjusted for birth month and day.
+        /// Used for discrete guards (menopause, cycle init, testosterone aging).
+        /// </summary>
+        private int ComputeAgeYears(WDateOnly today)
+        {
+            var age = today.Year - _birthDate.Year;
+            if (today.Month < _birthDate.Month ||
+                (today.Month == _birthDate.Month && today.Day < _birthDate.Day))
+                age--;
+            return Math.Max(0, age);
+        }
+
+        /// <summary>
+        /// Returns the character's fractional age in years for continuous growth calculations
+        /// (hair greying, wrinkles, sarcopenia). More precise than integer age.
+        /// </summary>
+        private double ComputeAgeYearsFractional(WDateOnly today)
+        {
+            // Approximate days elapsed since birth, divided by mean year length.
+            var days = today.DayIndex - _birthDate.DayIndex;
+            return Math.Max(0.0, days / 365.25);
         }
 
         /// <summary>
@@ -386,7 +410,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             // Věkové efekty
             {
-                var ageYears = now.Date.Year - _birthDate.Year;
+                var ageYears = ComputeAgeYears(now.Date);
 
                 // Menopauza: ženy ≥ MenopauseAge → cyklus trvale Paused
                 if (s.Cycle is { Phase: not CyclePhase.Paused } && ageYears >= Config.MenopauseAge)
@@ -410,8 +434,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Fyzické stárnutí — vlasy, vrásky, svalová hmota, kostní hustota
             if (s.Aging is { } aging)
             {
-                var ageYears = (double)(now.Date.Year - _birthDate.Year);
-                var ageYearsInt = Math.Max(0, now.Date.Year - _birthDate.Year);
+                var ageYears = ComputeAgeYearsFractional(now.Date);
+                var ageYearsInt = ComputeAgeYears(now.Date);
 
                 // Růst vlasů (~1,25 cm/měsíc reálně, ~0,00175 cm/hod v herním světě)
                 var newHairLen = Math.Min(120.0, aging.HairLengthCm + Config.HairGrowthCmPerHour * h);
@@ -1150,6 +1174,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// and by tests to set up specific initial conditions.
         /// </summary>
         /// <param name="state">The state to restore.</param>
-        public void RestoreState(PhysiologyState state) => State = state;
+        public void RestoreState(PhysiologyState state)
+        {
+            var ageYears = state.Aging?.AgeYears ?? 0;
+            if (state.Cycle is not null && ageYears < Config.MenstrualCycleBeginsInAge)
+                state = state with { Cycle = null };
+
+            State = state;
+        }
     }
 }
