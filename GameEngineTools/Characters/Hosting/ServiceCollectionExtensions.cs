@@ -377,7 +377,7 @@ namespace GameEngineTools.Characters.Hosting
 
         /// <summary>
         /// Registers the object interaction subsystem: policy and engine.
-        /// Requires <see cref="GameEngineTools.World.Objects.CsvWorldObjectProvider"/> and
+        /// Requires <see cref=""/> and
         /// <see cref="GameEngineTools.World.Location.ILocationService"/> to also be registered.
         /// </summary>
         public static IServiceCollection AddObjectInteractionEngine(this IServiceCollection services)

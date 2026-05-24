@@ -11,7 +11,6 @@ namespace GameEngineTools.World.Objects
 
     /// <summary>
     /// SQLite-backed implementation of <see cref="IMutableWorldObjectProvider"/>.
-    /// Production replacement for <see cref="CsvWorldObjectProvider"/>.
     /// </summary>
     /// <remarks>
     /// <para>

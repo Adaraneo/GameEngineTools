@@ -293,7 +293,14 @@ namespace EngineTests
             });
 
             services.AddSingleton<ILocationService, DefaultLocationService>();
-            services.AddSingleton<SqliteWorldDatabase>(_ => new SqliteWorldDatabase(":memory:"));
+            services.AddSingleton<SqliteWorldDatabase>(_ =>
+            {
+                var db = new SqliteWorldDatabase(":memory:");
+                // Schema must be applied explicitly for in-memory databases —
+                // production databases get this via GameEngineToolsRuntime.
+                WorldDatabaseSeeder.Initialize(db);
+                return db;
+            });
             services.AddSingleton<SqliteWorldObjectProvider>();
             services.AddSingleton<IMutableWorldObjectProvider>(
                 sp => sp.GetRequiredService<SqliteWorldObjectProvider>());

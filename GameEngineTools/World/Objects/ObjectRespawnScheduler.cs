@@ -17,9 +17,8 @@ namespace GameEngineTools.World.Objects
     /// Call <see cref="Tick"/> once per simulation step.
     /// </para>
     /// <para>
-    /// Depends on <see cref="IMutableWorldObjectProvider"/> rather than a concrete
-    /// provider so it works with both <see cref="CsvWorldObjectProvider"/> (tests/standalone)
-    /// and <see cref="SqliteWorldObjectProvider"/> (production).
+    /// Depends on <see cref="IMutableWorldObjectProvider"/>
+    /// and <see cref="SqliteWorldObjectProvider"/>.
     /// </para>
     /// </remarks>
     public sealed class ObjectRespawnScheduler

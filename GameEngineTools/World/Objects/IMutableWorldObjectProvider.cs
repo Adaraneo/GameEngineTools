@@ -12,8 +12,7 @@ namespace GameEngineTools.World.Objects
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Implementations include <see cref="CsvWorldObjectProvider"/> (Phase 1 — tests/standalone)
-    /// and <see cref="SqliteWorldObjectProvider"/> (Phase 1.5+ — production).
+    /// Implementation <see cref="SqliteWorldObjectProvider"/>
     /// </para>
     /// <para>
     /// <b>Why not put these on <see cref="IWorldObjectProvider"/>?</b><br/>

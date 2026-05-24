@@ -16,6 +16,7 @@ using GameEngineTools.FileSystem;
 using GameEngineTools.Narrative;
 using GameEngineTools.Universe;
 using GameEngineTools.World.Core.Astro;
+using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Movement;
 using GameEngineTools.World.Objects;
@@ -207,7 +208,8 @@ var diary = new List<NarrativeEntry>();
 
 var rng = new Random();
 
-var worldMap = WorldMapLoader.Load();
+var db = runtime.Services.GetRequiredService<SqliteWorldDatabase>();
+var worldMap = SqliteWorldMapLoader.Load(db);
 var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
 worldMap.RegisterAllLocations(locationService);
 var objectProvider = (SqliteWorldObjectProvider)runtime.Services.GetRequiredService<IMutableWorldObjectProvider>();

@@ -340,6 +340,7 @@ namespace EngineTests
         public void RemoveObject_UnknownObject_ReturnsFalse()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
 
             Assert.IsFalse(provider.RemoveObject("nowhere", "ghost_obj"));

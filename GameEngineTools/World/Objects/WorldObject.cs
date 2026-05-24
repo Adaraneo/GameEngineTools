@@ -115,7 +115,6 @@ namespace GameEngineTools.World.Objects
 
         /// <summary>
         /// Character currently holding this object, or <c>null</c> if it is not held.
-        /// Set by <see cref="CsvWorldObjectProvider.SetHeldBy"/> when a character picks up the object.
         /// </summary>
         public HumanId? HeldBy { get; init; } = null;
 

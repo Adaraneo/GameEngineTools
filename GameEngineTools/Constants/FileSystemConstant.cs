@@ -28,12 +28,6 @@ namespace GameEngineTools.Constants
             internal const string World = Root + @"World\";
 
             /// <summary>
-            /// Per-location object files. Each file is named {locationId}.csv
-            /// and loaded lazily on first access to that location.
-            /// </summary>
-            internal const string WorldObjects = World + @"Objects\";
-
-            /// <summary>
             /// Directory containing SQL script overrides (schema.sql, seed_data.sql).
             /// When files are present here, they take precedence over embedded resources.
             /// </summary>
@@ -101,12 +95,6 @@ namespace GameEngineTools.Constants
             /// Loaded once at startup; defines the adjacency graph used by <see cref="WorldMap"/>.
             /// </summary>
             public const string Connections = SourceDirectory.World + SourceFilename.Connections + Extension.SourceCsv;
-
-            /// <summary>
-            /// Directory containing per-location object files.
-            /// Each file is named <c>{locationId}.csv</c> and loaded lazily.
-            /// </summary>
-            public const string WorldObjectsDirectory = SourceDirectory.WorldObjects;
 
             /// <summary>
             /// Default path to the world SQLite database.
