@@ -19,9 +19,12 @@
     <IsPublishable>False</IsPublishable>
   </PropertyGroup>
 
-  <!--<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="call prebuild.bat $(OutDir)" />
-  </Target>-->
+  <ItemGroup>
+    <!-- SQL scripts embedded as fallback resources.
+       Disk overrides in SourceFiles\World\SQL\ take precedence at runtime. -->
+    <EmbeddedResource Include="World\Data\SQL\schema.sql" />
+    <EmbeddedResource Include="World\Data\SQL\seed_data.sql" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.14" />

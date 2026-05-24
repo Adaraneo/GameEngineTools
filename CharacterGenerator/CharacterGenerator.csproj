@@ -46,33 +46,6 @@
     <None Update="SourceFiles\Names\Surnames.csv">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="SourceFiles\World\Connections.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Locations.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Objects\castle_hall.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Objects\dungeon_cell.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Objects\forest.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Objects\forest_clearing.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Objects\herb_garden.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Objects\library.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="SourceFiles\World\Objects\tavern.csv">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="SourceFiles\World\world.db">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

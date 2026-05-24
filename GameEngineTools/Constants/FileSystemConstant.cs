@@ -32,6 +32,12 @@ namespace GameEngineTools.Constants
             /// and loaded lazily on first access to that location.
             /// </summary>
             internal const string WorldObjects = World + @"Objects\";
+
+            /// <summary>
+            /// Directory containing SQL script overrides (schema.sql, seed_data.sql).
+            /// When files are present here, they take precedence over embedded resources.
+            /// </summary>
+            internal const string WorldSql = World + @"SQL\";
         }
 
         #endregion Source directories
@@ -107,6 +113,13 @@ namespace GameEngineTools.Constants
             /// Created automatically on first run via <see cref="Data.WorldDatabaseSeeder"/>.
             /// </summary>
             public const string WorldDatabase = SourceDirectory.World + "world.db";
+
+            /// <summary>
+            /// Directory for optional SQL script overrides.
+            /// Files here take precedence over the embedded SQL resources in the assembly.
+            /// When absent, <see cref="SqlScriptLoader"/> falls back to embedded resources.
+            /// </summary>
+            public const string WorldSqlDirectory = SourceDirectory.WorldSql;
         }
 
         #endregion Source file paths

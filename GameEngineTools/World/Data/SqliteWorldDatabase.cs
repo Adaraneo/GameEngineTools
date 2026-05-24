@@ -63,7 +63,6 @@ namespace GameEngineTools.World.Data
             // WAL mode: multiple concurrent readers + one writer, no full-table locks.
             Execute("PRAGMA journal_mode=WAL;");
             Execute("PRAGMA foreign_keys=ON;");
-            Execute(WorldDatabaseSchema.CreateTables);
         }
 
         #endregion
@@ -436,6 +435,31 @@ namespace GameEngineTools.World.Data
                 cmd.Parameters.AddWithValue(name, value ?? DBNull.Value);
 
             return cmd;
+        }
+
+        /// <summary>
+        /// Executes a multi-statement SQL script against the database connection.
+        /// Used by <see cref="WorldDatabaseSeeder"/> to apply schema and seed data.
+        /// </summary>
+        /// <param name="sql">
+        /// Full SQL script content. May contain multiple statements separated by
+        /// semicolons and SQL comments (<c>--</c>).
+        /// </param>
+        /// <remarks>
+        /// Each statement is executed in sequence. If any statement fails, the
+        /// exception propagates immediately — no partial rollback.
+        /// For atomic multi-statement operations, wrap in a transaction externally.
+        /// </remarks>
+        public void ExecuteScript(string sql)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sql);
+
+            lock (_sync)
+            {
+                using var cmd = _connection.CreateCommand();
+                cmd.CommandText = sql;
+                cmd.ExecuteNonQuery();
+            }
         }
 
         #endregion

@@ -229,16 +229,17 @@ namespace GameEngineTools
             services.AddSingleton<ILocationService, DefaultLocationService>();
 
             #region TODO: REMOVE AFTER MIGRATION
-            services.AddSingleton<CsvWorldObjectProvider>();
-            services.AddSingleton<IWorldObjectProvider>(sp => sp.GetRequiredService<CsvWorldObjectProvider>());
+            //services.AddSingleton<CsvWorldObjectProvider>();
+            //services.AddSingleton<IWorldObjectProvider>(sp => sp.GetRequiredService<CsvWorldObjectProvider>());
 
             #endregion
 
             services.AddSingleton<SqliteWorldDatabase>(sp =>
             {
                 var db = new SqliteWorldDatabase(FileSystemConstant.SourceFilePath.WorldDatabase);
-                // Seed from CSV on first run (INSERT OR IGNORE = safe to call always)
-                WorldDatabaseSeeder.SeedFromDefaultPaths(db);
+                // Applies schema.sql (always) and seed_data.sql (when database is empty).
+                // Script resolution: disk override → embedded resource fallback.
+                WorldDatabaseSeeder.Initialize(db);
                 return db;
             });
             services.AddSingleton<SqliteWorldObjectProvider>();

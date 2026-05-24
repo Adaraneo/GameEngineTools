@@ -79,6 +79,15 @@ namespace EngineTests
                 RespawnMinutes = 0
             };
 
+        /// <summary>
+        /// Applies schema.sql to a fresh in-memory database.
+        /// Must be called before any other operation in tests that use :memory: databases,
+        /// because the SqliteWorldDatabase constructor no longer creates tables automatically —
+        /// that responsibility was moved to WorldDatabaseSeeder.Initialize().
+        /// </summary>
+        private static void SeedSchema(SqliteWorldDatabase db)
+            => WorldDatabaseSeeder.Initialize(db);
+
         #endregion
 
         #region AddObject → GetObjectsAt
@@ -87,6 +96,7 @@ namespace EngineTests
         public void AddObject_NewLocation_ObjectReturnedByGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "test_location");
 
@@ -101,6 +111,7 @@ namespace EngineTests
         public void AddObject_MultipleObjects_AllReturnedByGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "hall");
 
@@ -116,6 +127,7 @@ namespace EngineTests
         public void AddObject_DifferentLocations_ObjectsIsolatedByLocation()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "chapel");
             SeedLocation(db, "library");
@@ -136,6 +148,7 @@ namespace EngineTests
         public void AddObject_HeldObject_NotReturnedByGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "storeroom");
 
@@ -155,6 +168,7 @@ namespace EngineTests
         public void FindObject_ExistingObject_ReturnsIt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "herb_garden");
 
@@ -170,6 +184,7 @@ namespace EngineTests
         public void FindObject_UnknownId_ReturnsNull()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
 
             Assert.IsNull(provider.FindObject("does_not_exist"));
@@ -179,6 +194,7 @@ namespace EngineTests
         public void FindObject_ObjectAtDifferentLocation_StillFound()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "vault");
             SeedLocation(db, "market");
@@ -200,6 +216,7 @@ namespace EngineTests
         public void GetHeldBy_HolderCarriesObject_ObjectReturned()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "corridor");
 
@@ -216,6 +233,7 @@ namespace EngineTests
         public void GetHeldBy_NoObjectsHeld_ReturnsEmpty()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "dungeon");
 
@@ -231,6 +249,7 @@ namespace EngineTests
         public void GetHeldBy_ObjectsAcrossLocations_AllHeldObjectsReturned()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "tavern");
             SeedLocation(db, "alley");
@@ -254,6 +273,7 @@ namespace EngineTests
         public void ConsumeObject_ExistingObject_HiddenFromGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "kitchen");
 
@@ -270,6 +290,7 @@ namespace EngineTests
         public void RestoreObject_AfterConsume_ReappearsInGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "orchard");
 
@@ -286,6 +307,7 @@ namespace EngineTests
         public void ConsumeObject_UnknownObject_ReturnsFalse()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
 
             var result = provider.ConsumeObject("nowhere", "ghost_obj", new WDateTime(1));
@@ -301,6 +323,7 @@ namespace EngineTests
         public void RemoveObject_ExistingObject_DisappearsFromGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "cellar");
 
@@ -330,6 +353,7 @@ namespace EngineTests
         public void SetHeldBy_AssignHolder_HidesObjectFromGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "cave");
 
@@ -347,6 +371,7 @@ namespace EngineTests
         public void SetHeldBy_ClearHolder_ReappearsInGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "cave");
 
@@ -368,6 +393,7 @@ namespace EngineTests
         public void PhysicalTravel_RemoveFromOriginal_AddAtDrop_ObjectAppearsAtDropLocation()
         {
             using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
             var provider = new SqliteWorldObjectProvider(db);
             SeedLocation(db, "warehouse");
             SeedLocation(db, "market_square");
@@ -399,6 +425,8 @@ namespace EngineTests
             // Verify that two separate in-memory providers are fully isolated.
             using var dbA = new SqliteWorldDatabase(":memory:");
             using var dbB = new SqliteWorldDatabase(":memory:");
+            SeedSchema(dbA);
+            SeedSchema(dbB);
             var providerA = new SqliteWorldObjectProvider(dbA);
             var providerB = new SqliteWorldObjectProvider(dbB);
 
