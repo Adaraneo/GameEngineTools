@@ -155,6 +155,14 @@ namespace GameEngineTools.World.Objects
             return null;
         }
 
+        /// <summary>
+        /// Returns all region names currently registered in the world map.
+        /// Used by <see cref="Data.WorldDatabaseSeeder"/> to build the
+        /// location → region reverse lookup during database seeding.
+        /// </summary>
+        public IEnumerable<string> GetAllRegions()
+            => _regions.Keys;
+
         #endregion Region queries
 
         #region Runtime mutation

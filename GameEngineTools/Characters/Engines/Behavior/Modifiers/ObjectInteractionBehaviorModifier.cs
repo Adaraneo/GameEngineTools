@@ -27,9 +27,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// Optional concrete provider used to find held objects.
         /// <c>null</c> disables Drop candidate generation.
         /// </summary>
-        private readonly CsvWorldObjectProvider? _objectProvider;
+        private readonly IMutableWorldObjectProvider? _objectProvider;
 
-        public ObjectInteractionBehaviorModifier(CsvWorldObjectProvider? objectProvider = null)
+        public ObjectInteractionBehaviorModifier(IMutableWorldObjectProvider? objectProvider = null)
         {
             _objectProvider = objectProvider;
         }

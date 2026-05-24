@@ -19,10 +19,12 @@ namespace EngineTests
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Config;
+    using GameEngineTools.Constants;
     using GameEngineTools.FileSystem;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Calendars;
     using GameEngineTools.World.Core.Time;
+    using GameEngineTools.World.Data;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Movement;
     using GameEngineTools.World.Objects;
@@ -291,8 +293,15 @@ namespace EngineTests
             });
 
             services.AddSingleton<ILocationService, DefaultLocationService>();
-            services.AddSingleton<CsvWorldObjectProvider>();
-            services.AddSingleton<IWorldObjectProvider>(sp => sp.GetRequiredService<CsvWorldObjectProvider>());
+            services.AddSingleton<SqliteWorldDatabase>(_ => new SqliteWorldDatabase(":memory:"));
+            services.AddSingleton<SqliteWorldObjectProvider>();
+            services.AddSingleton<IMutableWorldObjectProvider>(
+                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+            services.AddSingleton<IWorldObjectProvider>(
+                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+            // Respawn scheduler — depends on IMutableWorldObjectProvider, not the concrete CSV class.
+            services.AddSingleton<ObjectRespawnScheduler>();
+
             services.AddObjectInteractionEngine();
 
             services.AddSingleton<DefaultMovementSpeedProvider>();

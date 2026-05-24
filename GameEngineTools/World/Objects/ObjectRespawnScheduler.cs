@@ -3,41 +3,85 @@
 
 namespace GameEngineTools.World.Objects
 {
+    using System;
+    using System.Linq;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Checks all consumed world objects each simulation tick and restores those whose
-    /// respawn timer has elapsed. Driven by the simulation loop (e.g. <c>SimulationScene</c>).
+    /// Checks all consumed world objects each simulation tick and restores those
+    /// whose respawn timer has elapsed.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Driven by the simulation loop (e.g. <c>SimulationScene</c>).
+    /// Call <see cref="Tick"/> once per simulation step.
+    /// </para>
+    /// <para>
+    /// Depends on <see cref="IMutableWorldObjectProvider"/> rather than a concrete
+    /// provider so it works with both <see cref="CsvWorldObjectProvider"/> (tests/standalone)
+    /// and <see cref="SqliteWorldObjectProvider"/> (production).
+    /// </para>
+    /// </remarks>
     public sealed class ObjectRespawnScheduler
     {
-        private readonly CsvWorldObjectProvider _provider;
+        #region Private state
 
-        public ObjectRespawnScheduler(CsvWorldObjectProvider provider)
+        /// <summary>
+        /// Mutable provider used to inspect consumed objects and restore them.
+        /// Requires <see cref="IMutableWorldObjectProvider.GetKnownLocationIds"/> and
+        /// <see cref="IMutableWorldObjectProvider.GetAllObjectsAt"/> — both are part
+        /// of the mutable contract, not the read-only <see cref="IWorldObjectProvider"/>.
+        /// </summary>
+        private readonly IMutableWorldObjectProvider _provider;
+
+        #endregion
+
+        #region Construction
+
+        /// <summary>
+        /// Initialises the scheduler with the mutable world object provider.
+        /// </summary>
+        /// <param name="provider">
+        /// The mutable provider. Injected as singleton — must be the same instance
+        /// used by the simulation engines.
+        /// </param>
+        public ObjectRespawnScheduler(IMutableWorldObjectProvider provider)
         {
+            ArgumentNullException.ThrowIfNull(provider);
             _provider = provider;
         }
 
+        #endregion
+
+        #region Public API
+
         /// <summary>
-        /// Inspect all consumed objects and restore any that have exceeded their
-        /// <see cref="WorldObject.RespawnMinutes"/> timer.
+        /// Inspects all consumed objects across all known locations and restores
+        /// any that have exceeded their <see cref="WorldObject.RespawnMinutes"/> timer.
         /// </summary>
+        /// <param name="now">Current simulation time used to evaluate elapsed duration.</param>
         public void Tick(WDateTime now)
         {
             foreach (var locationId in _provider.GetKnownLocationIds())
             {
-                // GetAllObjectsAt includes consumed objects
+                // GetAllObjectsAt includes consumed and held objects — required
+                // for respawn inspection. GetObjectsAt filters them out.
                 var all = _provider.GetAllObjectsAt(locationId).ToList();
+
                 foreach (var obj in all)
                 {
-                    if (obj.ConsumedAt is not null && obj.Respawns)
-                    {
-                        var elapsed = WDateTime.Difference(now, obj.ConsumedAt.Value).TotalMinutes;
-                        if (elapsed >= obj.RespawnMinutes)
-                            _provider.RestoreObject(locationId, obj.Id);
-                    }
+                    // Only process consumed objects that are configured to respawn.
+                    if (obj.ConsumedAt is null || !obj.Respawns)
+                        continue;
+
+                    var elapsed = WDateTime.Difference(now, obj.ConsumedAt.Value).TotalMinutes;
+
+                    if (elapsed >= obj.RespawnMinutes)
+                        _provider.RestoreObject(locationId, obj.Id);
                 }
             }
         }
+
+        #endregion
     }
 }

@@ -215,7 +215,7 @@ var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProv
 
 for (int index = 0; index < 35; index++)
 {
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"apple_{(index+1).ToString("N##")}", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.5)] });
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"apple_{(index+1).ToString("D2")}", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.5)] });
 }
 
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");

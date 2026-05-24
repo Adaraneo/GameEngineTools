@@ -1,22 +1,21 @@
-﻿// WorldDatabaseSchema.cs
+// WorldDatabaseSchema.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Data
 {
     /// <summary>
     /// SQL DDL statements for the world SQLite database.
-    /// Schema is created idempotently via IF NOT EXISTS guards.
+    /// All statements use IF NOT EXISTS guards and are safe to execute on every startup.
     /// </summary>
     internal static class WorldDatabaseSchema
     {
         /// <summary>
-        /// Full schema creation script. Safe to run on every startup —
-        /// tables and indexes are only created when absent.
+        /// Full schema creation script — idempotent, run on every application start.
         /// </summary>
         internal const string CreateTables = """
             PRAGMA foreign_keys = ON;
 
-            -- ── Locations ────────────────────────────────────────────────────
+            -- ── Locations ─────────────────────────────────────────────────────────
             CREATE TABLE IF NOT EXISTS Locations (
                 Id              TEXT PRIMARY KEY,
                 DisplayName     TEXT NOT NULL,
@@ -31,7 +30,7 @@ namespace GameEngineTools.World.Data
                 AllowsPickup    INTEGER NOT NULL DEFAULT 1
             );
 
-            -- ── Connections ───────────────────────────────────────────────────
+            -- ── Connections ───────────────────────────────────────────────────────
             CREATE TABLE IF NOT EXISTS Connections (
                 FromId          TEXT NOT NULL REFERENCES Locations(Id),
                 ToId            TEXT NOT NULL REFERENCES Locations(Id),
@@ -39,7 +38,9 @@ namespace GameEngineTools.World.Data
                 PRIMARY KEY (FromId, ToId)
             );
 
-            -- ── World Objects ─────────────────────────────────────────────────
+            -- ── World Objects ─────────────────────────────────────────────────────
+            -- HeldBy     NULL = not held; TEXT = holder HumanId GUID.
+            -- ConsumedAt NULL = available; INTEGER = WDateTime ticks of consumption.
             CREATE TABLE IF NOT EXISTS WorldObjects (
                 Id                TEXT PRIMARY KEY,
                 DisplayName       TEXT NOT NULL,
@@ -54,11 +55,11 @@ namespace GameEngineTools.World.Data
                 ItemKind          TEXT NOT NULL DEFAULT 'None',
                 Respawns          INTEGER NOT NULL DEFAULT 0,
                 RespawnMinutes    INTEGER NOT NULL DEFAULT 1440,
-                HeldBy            TEXT,      -- NULL = not held; TEXT = holder HumanId GUID
-                ConsumedAt        INTEGER    -- NULL = available; INTEGER = WDateTime ticks
+                HeldBy            TEXT    DEFAULT NULL,
+                ConsumedAt        INTEGER DEFAULT NULL
             );
 
-            -- ── Affordances ───────────────────────────────────────────────────
+            -- ── Affordances ───────────────────────────────────────────────────────
             CREATE TABLE IF NOT EXISTS Affordances (
                 ObjectId     TEXT NOT NULL REFERENCES WorldObjects(Id) ON DELETE CASCADE,
                 Type         TEXT NOT NULL,
@@ -66,31 +67,43 @@ namespace GameEngineTools.World.Data
                 PRIMARY KEY (ObjectId, Type)
             );
 
-            -- ── Nutritional Profiles ──────────────────────────────────────────
+            -- ── Nutritional Profiles ──────────────────────────────────────────────
             CREATE TABLE IF NOT EXISTS NutritionalProfiles (
                 ObjectId      TEXT PRIMARY KEY REFERENCES WorldObjects(Id) ON DELETE CASCADE,
-                CalorieGain   REAL,
-                ProteinGain   REAL,
-                IronGain      REAL,
-                VitaminDGain  REAL,
-                HydrationGain REAL
+                CalorieGain   REAL DEFAULT NULL,
+                ProteinGain   REAL DEFAULT NULL,
+                IronGain      REAL DEFAULT NULL,
+                VitaminDGain  REAL DEFAULT NULL,
+                HydrationGain REAL DEFAULT NULL
             );
 
-            -- ── Indexes ───────────────────────────────────────────────────────
-            CREATE INDEX IF NOT EXISTS idx_objects_location
-                ON WorldObjects(LocationId);
+            -- ── Indexes ───────────────────────────────────────────────────────────
 
+            -- Fast lookup of available objects at a given location (hot path — every tick).
+            CREATE INDEX IF NOT EXISTS idx_objects_location_available
+                ON WorldObjects(LocationId)
+                WHERE HeldBy IS NULL AND ConsumedAt IS NULL;
+
+            -- Category + availability filter for foraging queries (ContingencySearchEngine).
             CREATE INDEX IF NOT EXISTS idx_objects_category_available
                 ON WorldObjects(Category, IsAvailable)
                 WHERE HeldBy IS NULL AND ConsumedAt IS NULL;
 
+            -- Held-by lookup for inventory queries.
             CREATE INDEX IF NOT EXISTS idx_objects_heldby
                 ON WorldObjects(HeldBy)
                 WHERE HeldBy IS NOT NULL;
 
+            -- Consumed objects lookup for ObjectRespawnScheduler.
+            CREATE INDEX IF NOT EXISTS idx_objects_consumed
+                ON WorldObjects(ConsumedAt)
+                WHERE ConsumedAt IS NOT NULL;
+
+            -- Affordances by object (batch-loaded during EnrichWithAffordances).
             CREATE INDEX IF NOT EXISTS idx_affordances_object
                 ON Affordances(ObjectId);
 
+            -- Location type filter for WorldMap queries.
             CREATE INDEX IF NOT EXISTS idx_locations_type
                 ON Locations(Type);
             """;

@@ -16,12 +16,12 @@ namespace GameEngineTools.Characters.Engines.Objects
     /// </summary>
     public sealed class DefaultObjectInteractionEngine : IObjectInteractionEngine
     {
-        private readonly CsvWorldObjectProvider _objectProvider;
+        private readonly IMutableWorldObjectProvider _objectProvider;
         private readonly ILocationService _locations;
         private readonly IObjectInteractionPolicy _policy;
 
         public DefaultObjectInteractionEngine(
-            CsvWorldObjectProvider objectProvider,
+            IMutableWorldObjectProvider objectProvider,
             ILocationService locations,
             IObjectInteractionPolicy policy)
         {

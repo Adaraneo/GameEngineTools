@@ -1,4 +1,4 @@
-﻿// SqliteWorldDatabase.cs
+// SqliteWorldDatabase.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Data
@@ -6,29 +6,40 @@ namespace GameEngineTools.World.Data
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
-    using System.Globalization;
+    using System.Linq;
+    using Microsoft.Data.Sqlite;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
-    using Microsoft.Data.Sqlite;
 
     /// <summary>
     /// Low-level SQLite access layer for the world database.
-    /// Maintains a single persistent connection with WAL journal mode.
-    /// All public methods are thread-safe via an internal lock.
+    /// Maintains a single persistent connection with WAL journal mode for
+    /// concurrent read performance and single-writer safety.
     /// </summary>
     /// <remarks>
-    /// This class owns the <see cref="SqliteConnection"/> lifetime.
-    /// Register as a singleton and dispose via DI or application shutdown.
+    /// <para>
+    /// Register as a singleton and dispose via the application host lifetime.
+    /// All public methods are thread-safe via an internal synchronisation lock.
+    /// </para>
+    /// <para>
+    /// This class is an infrastructure detail — consume it only through
+    /// <see cref="SqliteWorldObjectProvider"/> and <see cref="SqliteWorldMapLoader"/>,
+    /// never directly from simulation engines.
+    /// </para>
     /// </remarks>
     public sealed class SqliteWorldDatabase : IDisposable
     {
         #region Private state
 
+        /// <summary>Persistent connection kept open for the application lifetime.</summary>
         private readonly SqliteConnection _connection;
+
+        /// <summary>Guards all query execution against concurrent access.</summary>
         private readonly object _sync = new();
+
         private bool _disposed;
 
         #endregion
@@ -36,11 +47,11 @@ namespace GameEngineTools.World.Data
         #region Construction
 
         /// <summary>
-        /// Opens a connection to the SQLite database at the given path
-        /// and initialises the schema if the database is new.
+        /// Opens a connection to the SQLite database at the given path and
+        /// initialises the schema if the database is new.
         /// </summary>
         /// <param name="databasePath">
-        /// Path to the <c>.db</c> file. Created automatically if absent.
+        /// Filesystem path to the <c>.db</c> file. Created automatically when absent.
         /// </param>
         public SqliteWorldDatabase(string databasePath)
         {
@@ -49,7 +60,7 @@ namespace GameEngineTools.World.Data
             _connection = new SqliteConnection($"Data Source={databasePath}");
             _connection.Open();
 
-            // WAL mode: multiple readers + one writer, no full-table locks.
+            // WAL mode: multiple concurrent readers + one writer, no full-table locks.
             Execute("PRAGMA journal_mode=WAL;");
             Execute("PRAGMA foreign_keys=ON;");
             Execute(WorldDatabaseSchema.CreateTables);
@@ -61,6 +72,7 @@ namespace GameEngineTools.World.Data
 
         /// <summary>
         /// Returns all available (not held, not consumed) objects at the given location.
+        /// This is the hot-path query — called every behavior tick for each character.
         /// </summary>
         public IReadOnlyList<WorldObject> GetObjectsAt(string locationId)
         {
@@ -76,15 +88,34 @@ namespace GameEngineTools.World.Data
                 """;
 
             lock (_sync)
-            {
-                var objects = ReadObjects(sql, ("@loc", locationId));
-                return EnrichWithAffordances(objects);
-            }
+                return EnrichWithAffordances(ReadObjects(sql, ("@loc", locationId)));
+        }
+
+        /// <summary>
+        /// Returns ALL objects at the given location — including held and consumed ones.
+        /// Used exclusively by <see cref="ObjectRespawnScheduler"/> to inspect respawn timers.
+        /// Unlike <see cref="GetObjectsAt"/>, this does not filter by availability.
+        /// </summary>
+        public IReadOnlyList<WorldObject> GetAllObjectsAt(string locationId)
+        {
+            // Selects two extra columns: HeldBy (13) and ConsumedAt (14).
+            const string sql = """
+                SELECT Id, DisplayName, Category, LocationId,
+                       HeatSignature, AmbientNoise, BlocksLineOfSight,
+                       IsAvailable, IsPickable, WeightGrams, ItemKind,
+                       Respawns, RespawnMinutes, HeldBy, ConsumedAt
+                FROM WorldObjects
+                WHERE LocationId = @loc
+                """;
+
+            lock (_sync)
+                return EnrichWithAffordances(ReadObjects(sql, ("@loc", locationId),
+                    includeRuntimeState: true));
         }
 
         /// <summary>
         /// Returns all objects across all locations, including held and consumed.
-        /// Used by foraging queries and diagnostics.
+        /// Used by foraging queries (<see cref="ContingencySearchEngine"/>) and diagnostics.
         /// </summary>
         public IReadOnlyList<WorldObject> GetAllObjects()
         {
@@ -97,15 +128,32 @@ namespace GameEngineTools.World.Data
                 """;
 
             lock (_sync)
+                return EnrichWithAffordances(ReadObjects(sql));
+        }
+
+        /// <summary>
+        /// Returns all distinct location IDs that have at least one registered object.
+        /// Used by <see cref="ObjectRespawnScheduler"/> to enumerate locations without
+        /// a full table scan.
+        /// </summary>
+        public IReadOnlyList<string> GetKnownLocationIds()
+        {
+            const string sql = "SELECT DISTINCT LocationId FROM WorldObjects";
+
+            lock (_sync)
             {
-                var objects = ReadObjects(sql);
-                return EnrichWithAffordances(objects);
+                var ids = new List<string>();
+                using var cmd = CreateCommand(sql);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    ids.Add(reader.GetString(0));
+                return ids;
             }
         }
 
         /// <summary>
-        /// Finds a single object by ID across all locations.
-        /// Returns <c>null</c> if not found.
+        /// Finds a single object by its unique ID across all locations.
+        /// Returns <c>null</c> if no object with the given ID exists.
         /// </summary>
         public WorldObject? FindObject(string objectId)
         {
@@ -120,14 +168,13 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
             {
-                var objects = ReadObjects(sql, ("@id", objectId));
-                if (objects.Count == 0) return null;
-                return EnrichWithAffordances(objects)[0];
+                var objects = EnrichWithAffordances(ReadObjects(sql, ("@id", objectId)));
+                return objects.Count == 0 ? null : objects[0];
             }
         }
 
         /// <summary>
-        /// Returns all objects currently held by the specified character.
+        /// Returns all objects currently held by the specified character, across all locations.
         /// </summary>
         public IReadOnlyList<WorldObject> GetHeldBy(HumanId holder)
         {
@@ -141,32 +188,30 @@ namespace GameEngineTools.World.Data
                 """;
 
             lock (_sync)
-            {
-                var objects = ReadObjects(sql, ("@holder", holder.Value.ToString()));
-                return EnrichWithAffordances(objects);
-            }
+                return EnrichWithAffordances(
+                    ReadObjects(sql, ("@holder", holder.Value.ToString())));
         }
 
         /// <summary>
-        /// Inserts or replaces a world object and its affordances and nutritional profile.
+        /// Inserts or replaces a world object together with its affordances and
+        /// nutritional profile. All three are written in a single transaction.
         /// </summary>
         public void AddObject(WorldObject obj)
         {
             lock (_sync)
             {
                 using var tx = _connection.BeginTransaction();
-
                 UpsertObject(obj);
                 DeleteAffordances(obj.Id);
                 InsertAffordances(obj.Id, obj.Affordances);
                 UpsertNutritionalProfile(obj.Id, obj.NutritionalProfile);
-
                 tx.Commit();
             }
         }
 
         /// <summary>
         /// Marks an object as consumed at the given simulation time.
+        /// The object will be hidden from <see cref="GetObjectsAt"/> until restored.
         /// </summary>
         public bool ConsumeObject(string locationId, string objectId, WDateTime now)
         {
@@ -178,13 +223,14 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
                 return ExecuteNonQuery(sql,
+                    // WDateTime stores time as WorldTicks — NOT .Ticks (which doesn't exist).
                     ("@ticks", now.WorldTicks),
-                    ("@id", objectId),
-                    ("@loc", locationId)) > 0;
+                    ("@id",    objectId),
+                    ("@loc",   locationId)) > 0;
         }
 
         /// <summary>
-        /// Clears the held and consumed state, making the object available again.
+        /// Clears held and consumed state, restoring the object to full availability.
         /// </summary>
         public bool RestoreObject(string locationId, string objectId)
         {
@@ -196,12 +242,13 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
                 return ExecuteNonQuery(sql,
-                    ("@id", objectId),
+                    ("@id",  objectId),
                     ("@loc", locationId)) > 0;
         }
 
         /// <summary>
-        /// Permanently deletes an object from the database.
+        /// Permanently deletes an object from the database (no respawn possible).
+        /// Cascades to <c>Affordances</c> and <c>NutritionalProfiles</c> via FK.
         /// </summary>
         public bool RemoveObject(string locationId, string objectId)
         {
@@ -212,12 +259,13 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
                 return ExecuteNonQuery(sql,
-                    ("@id", objectId),
+                    ("@id",  objectId),
                     ("@loc", locationId)) > 0;
         }
 
         /// <summary>
         /// Assigns or clears the character currently holding this object.
+        /// A held object is excluded from <see cref="GetObjectsAt"/>.
         /// </summary>
         public bool SetHeldBy(string locationId, string objectId, HumanId? holder)
         {
@@ -230,8 +278,8 @@ namespace GameEngineTools.World.Data
             lock (_sync)
                 return ExecuteNonQuery(sql,
                     ("@holder", (object?)holder?.Value.ToString() ?? DBNull.Value),
-                    ("@id", objectId),
-                    ("@loc", locationId)) > 0;
+                    ("@id",     objectId),
+                    ("@loc",    locationId)) > 0;
         }
 
         #endregion
@@ -239,7 +287,7 @@ namespace GameEngineTools.World.Data
         #region Location + Connection queries
 
         /// <summary>
-        /// Returns all registered location descriptors.
+        /// Returns all registered location descriptors together with their region name.
         /// </summary>
         public IReadOnlyList<(LocationDescriptor Descriptor, string Region)> GetAllLocations()
         {
@@ -260,16 +308,16 @@ namespace GameEngineTools.World.Data
                 while (reader.Read())
                 {
                     var descriptor = new LocationDescriptor(
-                        Id: reader.GetString(0),
-                        DisplayName: reader.GetString(1),
-                        Type: Enum.Parse<LocationType>(reader.GetString(2), ignoreCase: true),
-                        BaseNoise: reader.GetDouble(4),
+                        Id:             reader.GetString(0),
+                        DisplayName:    reader.GetString(1),
+                        Type:           Enum.Parse<LocationType>(reader.GetString(2), ignoreCase: true),
+                        BaseNoise:      reader.GetDouble(4),
                         NoisePerPerson: reader.GetDouble(5),
-                        Capacity: reader.GetInt32(6),
-                        AllowsPrivacy: reader.GetInt32(7) != 0,
-                        Terrain: Enum.Parse<TerrainType>(reader.GetString(8), ignoreCase: true),
-                        DangerLevel: reader.GetDouble(9),
-                        AllowsPickup: reader.GetInt32(10) != 0);
+                        Capacity:       reader.GetInt32(6),
+                        AllowsPrivacy:  reader.GetInt32(7) != 0,
+                        Terrain:        Enum.Parse<TerrainType>(reader.GetString(8), ignoreCase: true),
+                        DangerLevel:    reader.GetDouble(9),
+                        AllowsPickup:   reader.GetInt32(10) != 0);
 
                     results.Add((descriptor, reader.GetString(3)));
                 }
@@ -279,7 +327,7 @@ namespace GameEngineTools.World.Data
         }
 
         /// <summary>
-        /// Returns all connections in the world adjacency graph.
+        /// Returns all adjacency connections in the world graph.
         /// </summary>
         public IReadOnlyList<(string FromId, string ToId, double DistanceMeters)> GetAllConnections()
         {
@@ -304,7 +352,7 @@ namespace GameEngineTools.World.Data
         #region Seed helpers (used by WorldDatabaseSeeder)
 
         /// <summary>
-        /// Inserts a location row. Used during initial seeding from CSV.
+        /// Inserts a location row. Uses INSERT OR IGNORE — safe to call repeatedly.
         /// </summary>
         public void InsertLocation(LocationDescriptor d, string region)
         {
@@ -319,21 +367,21 @@ namespace GameEngineTools.World.Data
 
             lock (_sync)
                 ExecuteNonQuery(sql,
-                    ("@id", d.Id),
-                    ("@name", d.DisplayName),
-                    ("@type", d.Type.ToString()),
-                    ("@region", region),
-                    ("@noise", d.BaseNoise),
-                    ("@npp", d.NoisePerPerson),
-                    ("@cap", d.Capacity),
-                    ("@priv", d.AllowsPrivacy ? 1 : 0),
+                    ("@id",      d.Id),
+                    ("@name",    d.DisplayName),
+                    ("@type",    d.Type.ToString()),
+                    ("@region",  region),
+                    ("@noise",   d.BaseNoise),
+                    ("@npp",     d.NoisePerPerson),
+                    ("@cap",     d.Capacity),
+                    ("@priv",    d.AllowsPrivacy ? 1 : 0),
                     ("@terrain", d.Terrain.ToString()),
-                    ("@danger", d.DangerLevel),
-                    ("@pickup", d.AllowsPickup ? 1 : 0));
+                    ("@danger",  d.DangerLevel),
+                    ("@pickup",  d.AllowsPickup ? 1 : 0));
         }
 
         /// <summary>
-        /// Inserts a connection row. Used during initial seeding from CSV.
+        /// Inserts a connection row. Uses INSERT OR IGNORE — safe to call repeatedly.
         /// </summary>
         public void InsertConnection(string fromId, string toId, double distanceMeters)
         {
@@ -345,7 +393,7 @@ namespace GameEngineTools.World.Data
             lock (_sync)
                 ExecuteNonQuery(sql,
                     ("@from", fromId),
-                    ("@to", toId),
+                    ("@to",   toId),
                     ("@dist", distanceMeters));
         }
 
@@ -395,10 +443,18 @@ namespace GameEngineTools.World.Data
         #region Private helpers — object reading
 
         /// <summary>
-        /// Executes a WorldObjects SELECT and returns raw records (no affordances yet).
+        /// Executes a WorldObjects SELECT and returns raw records without affordances.
         /// </summary>
+        /// <param name="sql">SELECT statement targeting WorldObjects columns.</param>
+        /// <param name="parameters">Named query parameters.</param>
+        /// <param name="includeRuntimeState">
+        /// <c>true</c> when the SELECT includes columns 13 (HeldBy) and 14 (ConsumedAt).
+        /// Only <see cref="GetAllObjectsAt"/> passes <c>true</c> — standard queries
+        /// do not return these columns to avoid unnecessary data transfer.
+        /// </param>
         private List<WorldObject> ReadObjects(string sql,
-            params (string Name, object? Value)[] parameters)
+            (string Name, object? Value)[] parameters,
+            bool includeRuntimeState = false)
         {
             var results = new List<WorldObject>();
 
@@ -407,59 +463,85 @@ namespace GameEngineTools.World.Data
 
             while (reader.Read())
             {
-                results.Add(new WorldObject
+                var obj = new WorldObject
                 {
-                    Id = reader.GetString(0),
-                    DisplayName = reader.GetString(1),
-                    Category = Enum.Parse<WorldObjectCategory>(reader.GetString(2), ignoreCase: true),
-                    LocationId = reader.GetString(3),
-                    HeatSignature = reader.GetDouble(4),
-                    AmbientNoise = reader.GetDouble(5),
+                    Id                = reader.GetString(0),
+                    DisplayName       = reader.GetString(1),
+                    Category          = Enum.Parse<WorldObjectCategory>(reader.GetString(2), ignoreCase: true),
+                    LocationId        = reader.GetString(3),
+                    HeatSignature     = reader.GetDouble(4),
+                    AmbientNoise      = reader.GetDouble(5),
                     BlocksLineOfSight = reader.GetInt32(6) != 0,
-                    IsAvailable = reader.GetInt32(7) != 0,
-                    IsPickable = reader.GetInt32(8) != 0,
-                    WeightGrams = reader.GetInt32(9),
-                    ItemKind = Enum.Parse<PickupItemKind>(reader.GetString(10), ignoreCase: true),
-                    Respawns = reader.GetInt32(11) != 0,
-                    RespawnMinutes = reader.GetInt32(12),
-                    // Affordances and NutritionalProfile populated by EnrichWithAffordances()
-                });
+                    IsAvailable       = reader.GetInt32(7) != 0,
+                    IsPickable        = reader.GetInt32(8) != 0,
+                    WeightGrams       = reader.GetInt32(9),
+                    ItemKind          = Enum.Parse<PickupItemKind>(reader.GetString(10), ignoreCase: true),
+                    Respawns          = reader.GetInt32(11) != 0,
+                    RespawnMinutes    = reader.GetInt32(12),
+                };
+
+                if (includeRuntimeState)
+                {
+                    // Column 13 = HeldBy (nullable TEXT — stored as GUID string)
+                    // Column 14 = ConsumedAt (nullable INTEGER — stored as WorldTicks)
+                    var heldByText      = reader.IsDBNull(13) ? null : reader.GetString(13);
+                    var consumedAtTicks = reader.IsDBNull(14) ? (long?)null : reader.GetInt64(14);
+
+                    obj = obj with
+                    {
+                        // WDateTime is constructed directly from WorldTicks — no static FromTicks().
+                        HeldBy     = heldByText is null ? null : new HumanId(Guid.Parse(heldByText)),
+                        ConsumedAt = consumedAtTicks is null
+                            ? null
+                            : new WDateTime(consumedAtTicks.Value)
+                    };
+                }
+
+                results.Add(obj);
             }
 
             return results;
         }
 
+        // Convenience overloads to keep call sites clean.
+
+        private List<WorldObject> ReadObjects(string sql,
+            params (string Name, object? Value)[] parameters)
+            => ReadObjects(sql, parameters, includeRuntimeState: false);
+
+        private List<WorldObject> ReadObjects(string sql,
+            (string Name, object? Value) parameter,
+            bool includeRuntimeState = false)
+            => ReadObjects(sql, new[] { parameter }, includeRuntimeState);
+
         /// <summary>
-        /// Loads affordances and nutritional profiles for a batch of objects,
-        /// then returns enriched copies. Batched to avoid N+1 queries.
+        /// Loads affordances and nutritional profiles for a batch of objects in two
+        /// bulk queries (not N+1) and returns enriched copies.
         /// </summary>
         private IReadOnlyList<WorldObject> EnrichWithAffordances(List<WorldObject> objects)
         {
-            if (objects.Count == 0) return Array.Empty<WorldObject>();
+            if (objects.Count == 0)
+                return Array.Empty<WorldObject>();
 
-            // Build IN clause: (@p0, @p1, @p2, ...)
-            var ids = objects.Select(o => o.Id).ToList();
+            // Build a shared IN clause for both child queries.
+            var ids      = objects.Select(o => o.Id).ToList();
             var inClause = string.Join(", ", ids.Select((_, i) => $"@p{i}"));
-            var parameters = ids
-                .Select((id, i) => ($"@p{i}", (object?)id))
-                .ToArray();
+            var inParams = ids.Select((id, i) => ($"@p{i}", (object?)id)).ToArray();
 
-            // Load affordances for all objects in one query.
-            var affordanceMap = new Dictionary<string, ImmutableArray<WorldObjectAffordance>.Builder>(
+            // ── Load affordances in one query ─────────────────────────────────
+            var affordanceMap = ids.ToDictionary(
+                id => id,
+                _ => ImmutableArray.CreateBuilder<WorldObjectAffordance>(),
                 StringComparer.Ordinal);
-
-            foreach (var id in ids)
-                affordanceMap[id] = ImmutableArray.CreateBuilder<WorldObjectAffordance>();
 
             using (var cmd = CreateCommand(
                 $"SELECT ObjectId, Type, Satisfaction FROM Affordances WHERE ObjectId IN ({inClause})",
-                parameters))
+                inParams))
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    var objectId = reader.GetString(0);
-                    if (affordanceMap.TryGetValue(objectId, out var builder))
+                    if (affordanceMap.TryGetValue(reader.GetString(0), out var builder))
                     {
                         builder.Add(new WorldObjectAffordance(
                             Enum.Parse<AffordanceType>(reader.GetString(1), ignoreCase: true),
@@ -468,7 +550,7 @@ namespace GameEngineTools.World.Data
                 }
             }
 
-            // Load nutritional profiles.
+            // ── Load nutritional profiles in one query ────────────────────────
             var profileMap = new Dictionary<string, NutritionalProfile>(StringComparer.Ordinal);
 
             using (var cmd = CreateCommand(
@@ -477,27 +559,33 @@ namespace GameEngineTools.World.Data
                 FROM NutritionalProfiles
                 WHERE ObjectId IN ({inClause})
                 """,
-                parameters))
+                inParams))
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
                     profileMap[reader.GetString(0)] = new NutritionalProfile(
-                        CalorieGain: reader.IsDBNull(1) ? null : reader.GetDouble(1),
-                        ProteinGain: reader.IsDBNull(2) ? null : reader.GetDouble(2),
-                        IronGain: reader.IsDBNull(3) ? null : reader.GetDouble(3),
-                        VitaminDGain: reader.IsDBNull(4) ? null : reader.GetDouble(4),
+                        CalorieGain:   reader.IsDBNull(1) ? null : reader.GetDouble(1),
+                        ProteinGain:   reader.IsDBNull(2) ? null : reader.GetDouble(2),
+                        IronGain:      reader.IsDBNull(3) ? null : reader.GetDouble(3),
+                        VitaminDGain:  reader.IsDBNull(4) ? null : reader.GetDouble(4),
                         HydrationGain: reader.IsDBNull(5) ? null : reader.GetDouble(5));
                 }
             }
 
-            // Merge.
-            return objects.Select(o => o with
-            {
-                Affordances = affordanceMap[o.Id].ToImmutable(),
-                NutritionalProfile = profileMap.GetValueOrDefault(o.Id)
-            }).ToList();
+            // ── Merge results into enriched records ───────────────────────────
+            return objects
+                .Select(o => o with
+                {
+                    Affordances        = affordanceMap[o.Id].ToImmutable(),
+                    NutritionalProfile = profileMap.GetValueOrDefault(o.Id)
+                })
+                .ToList();
         }
+
+        #endregion
+
+        #region Private helpers — write operations
 
         private void UpsertObject(WorldObject obj)
         {
@@ -505,27 +593,28 @@ namespace GameEngineTools.World.Data
                 INSERT OR REPLACE INTO WorldObjects
                     (Id, DisplayName, Category, LocationId, HeatSignature, AmbientNoise,
                      BlocksLineOfSight, IsAvailable, IsPickable, WeightGrams, ItemKind,
-                     Respawns, RespawnMinutes)
+                     Respawns, RespawnMinutes, HeldBy)
                 VALUES
                     (@id, @name, @cat, @loc, @heat, @noise,
                      @blos, @avail, @pick, @weight, @kind,
-                     @resp, @respMin)
+                     @resp, @respMin, @heldBy)
                 """;
 
             ExecuteNonQuery(sql,
-                ("@id", obj.Id),
-                ("@name", obj.DisplayName),
-                ("@cat", obj.Category.ToString()),
-                ("@loc", obj.LocationId),
-                ("@heat", obj.HeatSignature),
-                ("@noise", obj.AmbientNoise),
-                ("@blos", obj.BlocksLineOfSight ? 1 : 0),
-                ("@avail", obj.IsAvailable ? 1 : 0),
-                ("@pick", obj.IsPickable ? 1 : 0),
-                ("@weight", obj.WeightGrams),
-                ("@kind", obj.ItemKind.ToString()),
-                ("@resp", obj.Respawns ? 1 : 0),
-                ("@respMin", obj.RespawnMinutes));
+                ("@id",      obj.Id),
+                ("@name",    obj.DisplayName),
+                ("@cat",     obj.Category.ToString()),
+                ("@loc",     obj.LocationId),
+                ("@heat",    obj.HeatSignature),
+                ("@noise",   obj.AmbientNoise),
+                ("@blos",    obj.BlocksLineOfSight ? 1 : 0),
+                ("@avail",   obj.IsAvailable ? 1 : 0),
+                ("@pick",    obj.IsPickable ? 1 : 0),
+                ("@weight",  obj.WeightGrams),
+                ("@kind",    obj.ItemKind.ToString()),
+                ("@resp",    obj.Respawns ? 1 : 0),
+                ("@respMin", obj.RespawnMinutes),
+                ("@heldBy", (object?)obj.HeldBy?.Value.ToString() ?? DBNull.Value));
         }
 
         private void DeleteAffordances(string objectId)
@@ -546,9 +635,9 @@ namespace GameEngineTools.World.Data
 
             foreach (var a in affordances)
                 ExecuteNonQuery(sql,
-                    ("@id", objectId),
+                    ("@id",   objectId),
                     ("@type", a.Type.ToString()),
-                    ("@sat", a.Satisfaction));
+                    ("@sat",  a.Satisfaction));
         }
 
         private void UpsertNutritionalProfile(string objectId, NutritionalProfile? profile)
@@ -563,11 +652,11 @@ namespace GameEngineTools.World.Data
                 """;
 
             ExecuteNonQuery(sql,
-                ("@id", objectId),
-                ("@cal", (object?)profile.CalorieGain ?? DBNull.Value),
-                ("@prot", (object?)profile.ProteinGain ?? DBNull.Value),
-                ("@iron", (object?)profile.IronGain ?? DBNull.Value),
-                ("@vitd", (object?)profile.VitaminDGain ?? DBNull.Value),
+                ("@id",    objectId),
+                ("@cal",   (object?)profile.CalorieGain   ?? DBNull.Value),
+                ("@prot",  (object?)profile.ProteinGain   ?? DBNull.Value),
+                ("@iron",  (object?)profile.IronGain      ?? DBNull.Value),
+                ("@vitd",  (object?)profile.VitaminDGain  ?? DBNull.Value),
                 ("@hydra", (object?)profile.HydrationGain ?? DBNull.Value));
         }
 

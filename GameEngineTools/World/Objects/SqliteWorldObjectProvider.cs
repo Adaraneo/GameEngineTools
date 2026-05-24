@@ -1,22 +1,35 @@
-﻿// SqliteWorldObjectProvider.cs
+// SqliteWorldObjectProvider.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Objects
 {
+    using System;
+    using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
     /// SQLite-backed implementation of <see cref="IMutableWorldObjectProvider"/>.
-    /// Replaces <see cref="CsvWorldObjectProvider"/> for production use.
-    /// All queries hit an indexed SQLite database — efficient for large worlds
-    /// and compatible with Unity's <c>Mono.Data.Sqlite</c> runtime.
+    /// Production replacement for <see cref="CsvWorldObjectProvider"/>.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// All queries are delegated to <see cref="SqliteWorldDatabase"/>, which owns
+    /// the connection lifetime and query execution. This class is a thin, stateless
+    /// adapter — register it as a singleton.
+    /// </para>
+    /// <para>
+    /// Compatible with Unity's <c>Mono.Data.Sqlite</c> runtime for Phase 2 integration.
+    /// Replace the <see cref="SqliteWorldDatabase"/> registration in DI and this class
+    /// continues to work without modification.
+    /// </para>
+    /// </remarks>
     public sealed class SqliteWorldObjectProvider : IMutableWorldObjectProvider
     {
         #region Private state
 
+        /// <summary>Shared database access layer. Injected as singleton.</summary>
         private readonly SqliteWorldDatabase _db;
 
         #endregion
@@ -24,9 +37,9 @@ namespace GameEngineTools.World.Objects
         #region Construction
 
         /// <summary>
-        /// Initialises the provider using the shared world database instance.
+        /// Initialises the provider with the shared world database instance.
         /// </summary>
-        /// <param name="db">The shared <see cref="SqliteWorldDatabase"/> singleton.</param>
+        /// <param name="db">Shared <see cref="SqliteWorldDatabase"/> singleton.</param>
         public SqliteWorldObjectProvider(SqliteWorldDatabase db)
         {
             ArgumentNullException.ThrowIfNull(db);
@@ -64,7 +77,7 @@ namespace GameEngineTools.World.Objects
 
         #endregion
 
-        #region IMutableWorldObjectProvider
+        #region IMutableWorldObjectProvider — mutations
 
         /// <inheritdoc/>
         public bool ConsumeObject(string locationId, string objectId, WDateTime now)
@@ -85,6 +98,21 @@ namespace GameEngineTools.World.Objects
         /// <inheritdoc/>
         public IEnumerable<WorldObject> GetHeldBy(HumanId holder)
             => _db.GetHeldBy(holder);
+
+        #endregion
+
+        #region IMutableWorldObjectProvider — respawn inspection
+
+        /// <inheritdoc/>
+        public IEnumerable<string> GetKnownLocationIds()
+            => _db.GetKnownLocationIds();
+
+        /// <inheritdoc/>
+        public IEnumerable<WorldObject> GetAllObjectsAt(string locationId)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
+            return _db.GetAllObjectsAt(locationId);
+        }
 
         #endregion
     }

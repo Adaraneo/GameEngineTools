@@ -42,13 +42,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// Optional provider of world objects at the character's current location.
         /// Populated at construction time; <c>null</c> means no object-affordance modulation.
         /// </summary>
-        private readonly IMutableWorldObjectProvider? _mutableObjectProvider;
-
-        /// <summary>
-        /// Concrete CSV provider reference used by <see cref="Modifiers.ObjectInteractionBehaviorModifier"/>
-        /// for Drop candidate generation (finding held objects). <c>null</c> when no CSV provider is wired.
-        /// </summary>
-        private readonly CsvWorldObjectProvider? _csvObjectProvider;
+        private readonly IMutableWorldObjectProvider? _objectProvider;
 
         /// <summary>
         /// Constraint gate that runs after all modifier engines and removes or suppresses
@@ -82,22 +76,20 @@ namespace GameEngineTools.Characters.Engines.Behavior
             /// character's current location.
             /// </summary>
             IMutableWorldObjectProvider? objectProvider = null,
-            IOptions<DailyScheduleConfig>? scheduleCfg = null,
-            CsvWorldObjectProvider? csvObjectProvider = null)
+            IOptions<DailyScheduleConfig>? scheduleCfg = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine(), new ContingencySearchEngine() };
-            _csvObjectProvider = csvObjectProvider;
-            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(_csvObjectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>()), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value) };
+            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(_objectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>()), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value) };
             _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine();
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());
             _developmentPolicy = developmentPolicy ?? new DefaultCharacterDevelopmentPolicy();
             _habitApplicabilityModulator = habitApplicabilityModulator ?? NoOpHabitApplicabilityModulator.Instance;
-            _mutableObjectProvider = objectProvider;
+            _objectProvider = objectProvider;
         }
 
         #endregion Construction
@@ -138,12 +130,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
             State = stateWithNeeds;
 
             IReadOnlyList<WorldObject>? availableObjects = null;
-            if (_mutableObjectProvider is not null)
+            if (_objectProvider is not null)
             {
                 var locationId = ctx.Snapshot.InteractionSurface.Location;
                 if (!string.IsNullOrEmpty(locationId))
                 {
-                    availableObjects = _mutableObjectProvider
+                    availableObjects = _objectProvider
                         .GetObjectsAt(locationId)
                         .Where(o => o.IsAvailable)
                         .ToList();
