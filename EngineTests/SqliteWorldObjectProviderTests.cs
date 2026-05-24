@@ -7,6 +7,7 @@ namespace EngineTests
     using System.Collections.Immutable;
     using System.Linq;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Constants;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
@@ -86,7 +87,10 @@ namespace EngineTests
         /// that responsibility was moved to WorldDatabaseSeeder.Initialize().
         /// </summary>
         private static void SeedSchema(SqliteWorldDatabase db)
-            => WorldDatabaseSeeder.Initialize(db);
+        {
+            var schemaSql = SqlScriptLoader.Load("schema.sql");
+            db.ExecuteScript(schemaSql);
+        }
 
         #endregion
 

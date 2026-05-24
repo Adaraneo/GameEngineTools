@@ -36,8 +36,11 @@ namespace GameEngineTools.World.Objects
     /// </summary>
     public enum AffordanceType
     {
-        /// <summary>Addresses hunger — food, drink.</summary>
+        /// <summary>Addresses hunger — food.</summary>
         Hunger,
+
+        /// <summary>Addresses thirst — water, ale, wine.</summary>
+        Thirst,
 
         /// <summary>Addresses fatigue — bed, chair, bench.</summary>
         Rest,

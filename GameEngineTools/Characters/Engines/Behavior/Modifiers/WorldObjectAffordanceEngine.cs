@@ -66,6 +66,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             = new Dictionary<AffordanceType, double>
             {
                 { AffordanceType.Hunger,       15.0 },   // food objects: high impact when starving
+                { AffordanceType.Thirst, 15.0 },
                 { AffordanceType.Rest,         12.0 },   // rest objects: strong pull when fatigued
                 { AffordanceType.Social,       10.0 },   // social objects: campfire, tavern table
                 { AffordanceType.Work,          9.0 },   // work objects: desk, workbench
@@ -167,6 +168,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             return type switch
             {
                 AffordanceType.Hunger => state.NeedFood / 100.0,
+                AffordanceType.Thirst => state.NeedWater / 100.0,
                 AffordanceType.Rest => state.NeedRest / 100.0,
                 AffordanceType.Social => state.NeedBelonging / 100.0,
                 AffordanceType.Work => state.NeedCompetence / 100.0,
@@ -221,6 +223,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             {
                 // ── Physiological ─────────────────────────────────────────────
                 { AffordanceType.Hunger,        new[] { Eat } },
+                { AffordanceType.Thirst, new[] {Drink} },
                 { AffordanceType.Rest,          new[] { MoveToRest, Idle } },
 
                 // ── Social ────────────────────────────────────────────────────

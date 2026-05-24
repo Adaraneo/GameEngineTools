@@ -57,9 +57,6 @@
     <None Update="SourceFiles\Names\Surnames.csv">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="SourceFiles\World\world.db">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
