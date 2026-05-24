@@ -212,7 +212,7 @@ var db = runtime.Services.GetRequiredService<SqliteWorldDatabase>();
 var worldMap = SqliteWorldMapLoader.Load(db);
 var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
 worldMap.RegisterAllLocations(locationService);
-var objectProvider = (SqliteWorldObjectProvider)runtime.Services.GetRequiredService<IMutableWorldObjectProvider>();
+var objectProvider = runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
 
 for (int index = 0; index < 35; index++)
@@ -262,6 +262,7 @@ var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().C
 var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider);
 var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider);
 
+var writeBuffer = runtime.Services.GetRequiredService<WorldObjectWriteBuffer>();
 var objectSnapshotCache = runtime.Services.GetRequiredService<WorldObjectSnapshotCache>();
 
 Console.ReadKey();
@@ -277,6 +278,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
     InternalSubstep = WTimeSpan.FromMinutes(5),
     NarrativeFormatter = new DefaultNarrativeFormatter(),
     ObjectSnapshotCache = objectSnapshotCache,
+    WriteBuffer = writeBuffer,
     DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
     ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService, new HashSet<HumanId>
     {
@@ -358,6 +360,7 @@ if (characters.Count > 0)
         UniverseConfig = universeOptions,
         SimulationDays = simulationDays,
         ObjectSnapshotCache = objectSnapshotCache,
+        WriteBuffer = writeBuffer,
         DefaultCharacterLod = CognitiveResolutionLevel.Background,
         InternalSubstep = WTimeSpan.FromMinutes(30),
         OnTick = (now, chars) =>

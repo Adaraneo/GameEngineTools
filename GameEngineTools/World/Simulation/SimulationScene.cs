@@ -174,9 +174,11 @@ namespace GameEngineTools.World.Simulation
             // instead of O(characters) queries. No-op when cache is not configured.
             if (_options.ObjectSnapshotCache is { } cache)
             {
+                _options.WriteBuffer?.Flush();
+
                 var activeLocations = chars
                     .Select(c => _options.LocationService?.GetLocation(c.Id))
-                    .OfType<string>(); // filters out nulls (unplaced characters)
+                    .OfType<string>();
 
                 cache.Refresh(activeLocations);
             }

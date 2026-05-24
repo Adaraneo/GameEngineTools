@@ -228,13 +228,6 @@ namespace GameEngineTools
 
             services.AddSingleton<ILocationService, DefaultLocationService>();
 
-            #region TODO: REMOVE AFTER MIGRATION
-
-            //services.AddSingleton<CsvWorldObjectProvider>();
-            //services.AddSingleton<IWorldObjectProvider>(sp => sp.GetRequiredService<CsvWorldObjectProvider>());
-
-            #endregion TODO: REMOVE AFTER MIGRATION
-
             services.AddSingleton<SqliteWorldDatabase>(sp =>
             {
                 var db = new SqliteWorldDatabase(FileSystemConstant.SourceFilePath.WorldDatabase);
@@ -244,14 +237,21 @@ namespace GameEngineTools
                 return db;
             });
             services.AddSingleton<SqliteWorldObjectProvider>();
+
+            // Write buffer — obalí provider, bufferuje mutace
+            services.AddSingleton<WorldObjectWriteBuffer>();
+
+            // IMutableWorldObjectProvider → WriteBuffer (místo přímého provideru)
             services.AddSingleton<IMutableWorldObjectProvider>(
-                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+                sp => sp.GetRequiredService<WorldObjectWriteBuffer>());
+
+            // Read cache stále obaluje přímý provider (ne buffer) — čte committovaná data
             services.AddSingleton<WorldObjectSnapshotCache>(sp =>
                 new WorldObjectSnapshotCache(sp.GetRequiredService<SqliteWorldObjectProvider>()));
 
             services.AddSingleton<IWorldObjectProvider>(
                 sp => sp.GetRequiredService<WorldObjectSnapshotCache>());
-            // Respawn scheduler — depends on IMutableWorldObjectProvider, not the concrete CSV class.
+
             services.AddSingleton<ObjectRespawnScheduler>();
 
             services.AddObjectInteractionEngine();

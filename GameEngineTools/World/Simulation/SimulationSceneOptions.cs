@@ -279,5 +279,13 @@ namespace GameEngineTools.World.Simulation
         /// from the cache automatically, without any further changes.
         /// </remarks>
         public WorldObjectSnapshotCache? ObjectSnapshotCache { get; init; }
+
+        /// <summary>
+        /// Optional write buffer for world object mutations.
+        /// When set, <see cref="SimulationScene"/> calls <see cref="WorldObjectWriteBuffer.Flush"/>
+        /// at the start of each substep before cache Refresh, batching all mutations
+        /// from the previous substep into a single SQLite transaction.
+        /// </summary>
+        public WorldObjectWriteBuffer? WriteBuffer { get; init; }
     }
 }

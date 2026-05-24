@@ -301,11 +301,25 @@ namespace EngineTests
                 return db;
             });
             services.AddSingleton<SqliteWorldObjectProvider>();
+            //services.AddSingleton<IMutableWorldObjectProvider>(
+            //    sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+            //services.AddSingleton<IWorldObjectProvider>(
+            //    sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+
+            // Write buffer — obalí provider, bufferuje mutace
+            services.AddSingleton<WorldObjectWriteBuffer>();
+
+            // IMutableWorldObjectProvider → WriteBuffer (místo přímého provideru)
             services.AddSingleton<IMutableWorldObjectProvider>(
-                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
+                sp => sp.GetRequiredService<WorldObjectWriteBuffer>());
+
+            // Read cache stále obaluje přímý provider (ne buffer) — čte committovaná data
+            services.AddSingleton<WorldObjectSnapshotCache>(sp =>
+                new WorldObjectSnapshotCache(sp.GetRequiredService<SqliteWorldObjectProvider>()));
+
             services.AddSingleton<IWorldObjectProvider>(
-                sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
-            // Respawn scheduler — depends on IMutableWorldObjectProvider, not the concrete CSV class.
+                sp => sp.GetRequiredService<WorldObjectSnapshotCache>());
+
             services.AddSingleton<ObjectRespawnScheduler>();
 
             services.AddObjectInteractionEngine();

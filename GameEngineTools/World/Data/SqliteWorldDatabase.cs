@@ -13,6 +13,7 @@ namespace GameEngineTools.World.Data
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Data.Sqlite;
+    using static GameEngineTools.World.Objects.WorldObjectWriteBuffer;
 
     /// <summary>
     /// Low-level SQLite access layer for the world database.
@@ -282,6 +283,77 @@ namespace GameEngineTools.World.Data
         }
 
         #endregion World Object queries
+
+        /// <summary>
+        /// Applies a batch of world object mutations in a single SQLite transaction.
+        /// Called by <see cref="WorldObjectWriteBuffer.Flush"/> at the end of each substep.
+        /// </summary>
+        /// <param name="mutations">
+        /// Mutations to apply. Last-write-wins per object is guaranteed by the caller
+        /// (<see cref="WorldObjectWriteBuffer"/> uses a dictionary keyed by object ID).
+        /// </param>
+        public void ApplyBatch(IReadOnlyList<WorldObjectWriteBuffer.PendingMutation> mutations)
+        {
+            if (mutations.Count == 0)
+                return;
+
+            const string consumeSql = """
+        UPDATE WorldObjects
+        SET ConsumedAt = @ticks
+        WHERE Id = @id AND LocationId = @loc
+        """;
+
+            const string restoreSql = """
+        UPDATE WorldObjects
+        SET HeldBy = NULL, ConsumedAt = NULL
+        WHERE Id = @id AND LocationId = @loc
+        """;
+
+            const string heldBySql = """
+        UPDATE WorldObjects
+        SET HeldBy = @holder
+        WHERE Id = @id AND LocationId = @loc
+        """;
+
+            const string removeSql = """
+        DELETE FROM WorldObjects
+        WHERE Id = @id AND LocationId = @loc
+        """;
+
+            lock (_sync)
+            {
+                using var tx = _connection.BeginTransaction();
+
+                foreach (var m in mutations)
+                {
+                    var sql = m.Kind switch
+                    {
+                        MutationKind.Consumed => consumeSql,
+                        MutationKind.Restored => restoreSql,
+                        MutationKind.HeldBy => heldBySql,
+                        MutationKind.Removed => removeSql,
+                        _ => throw new InvalidOperationException($"Unknown MutationKind: {m.Kind}")
+                    };
+
+                    using var cmd = _connection.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = sql;
+                    cmd.Parameters.AddWithValue("@id", m.ObjectId);
+                    cmd.Parameters.AddWithValue("@loc", m.LocationId);
+
+                    if (m.Kind == MutationKind.Consumed)
+                        cmd.Parameters.AddWithValue("@ticks", m.ConsumedAtTicks!.Value);
+
+                    if (m.Kind == MutationKind.HeldBy)
+                        cmd.Parameters.AddWithValue("@holder",
+                            m.HolderGuid is null ? (object)DBNull.Value : m.HolderGuid);
+
+                    cmd.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+        }
 
         #region Location + Connection queries
 
