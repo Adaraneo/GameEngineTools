@@ -35,5 +35,14 @@ public enum PickupItemKind
     Trinket,
 
     /// <summary>Currency.</summary>
-    Gold
+    Gold,
+
+    /// <summary>Protective armor piece.</summary>
+    Armor,
+
+    /// <summary>Clothes</summary>
+    Clothes,
+
+    /// <summary>Musical instrument or game piece — lute, dice, chess board.</summary>
+    Instrument,
 }
