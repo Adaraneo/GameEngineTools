@@ -293,9 +293,36 @@ namespace GameEngineTools.Characters.Engines.Physiology
         int MaxCycleLengthDays = 36,
         double PainBaseMultiplier = 1.0,
         double BloatBaseMultiplier = 1.0,
-        double BreastTenderMultiplier = 1.0)
+        double BreastTenderMultiplier = 1.0,
+        /// <summary>
+        /// Psychology stress level above which the HPA axis begins suppressing GnRH.
+        /// Based on: Fenster et al. (1999); Schliep et al. (2015) — work stress and anovulation.
+        /// Default 72 maps roughly to "chronic high stress" in the GET 0–100 scale.
+        /// </summary>
+        double AnovulatoryStressThreshold = 72.0,
+
+        /// <summary>
+        /// Sleep debt (hours) that contributes to HPA suppression load.
+        /// Above this value, sleep debt adds to the suppression accumulator.
+        /// Mechanism: sleep deprivation elevates cortisol, suppressing LH pulse frequency.
+        /// </summary>
+        double AnovulatorySleepDebtThresholdHours = 5.0,
+
+        /// <summary>
+        /// Number of consecutive game-days above suppression load threshold
+        /// required before the current cycle is marked anovulatory.
+        /// Prevents single-tick stress spikes from immediately suppressing ovulation.
+        /// </summary>
+        double AnovulatoryOnsetDays = 5.0,
+
+        /// <summary>
+        /// Number of consecutive game-days below suppression threshold
+        /// required to clear anovulatory suppression.
+        /// HPA axis recovery is slower than onset (asymmetric, like allostatic load).
+        /// </summary>
+        double AnovulatoryRecoveryDays = 3.0)
     {
-        public MenstrualCycleConfig() : this(30, 6.7, 5, 0.35, true, true, 12, 21, 36, 1.0, 1.0, 1.0) { }
+        public MenstrualCycleConfig() : this(30, 6.7, 5, 0.35, true, true, 12, 21, 36, 1.0, 1.0, 1.0, 72, 5, 5, 3) { }
     }
 
     public sealed record MenstrualCycleState(
@@ -317,7 +344,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Použita pro výpočet dynamického dne ovulace: ovulDay = CurrentCycleLength − LutealMeanDays.
         /// Default = MeanCycleLengthDays při inicializaci.
         /// </summary>
-        int CurrentCycleLength = 30);
+        int CurrentCycleLength = 30,
+        /// <summary>
+        /// Accumulated consecutive game-days under suppressive stress/sleep-debt load.
+        /// Counts up when load is above threshold, decays when load clears.
+        /// When this exceeds <see cref="MenstrualCycleConfig.AnovulatoryOnsetDays"/>,
+        /// <see cref="AnovulatoryCycleActive"/> is set to true.
+        /// </summary>
+        double StressSuppressionAccDays = 0.0,
+
+        /// <summary>
+        /// True when the current cycle will not produce an ovulation window.
+        /// Set when suppression accumulator crosses the onset threshold.
+        /// Cleared when the recovery accumulator crosses the recovery threshold.
+        /// </summary>
+        bool AnovulatoryCycleActive = false);
 
     /// <summary>Stav probíhajícího těhotenství postavy.</summary>
     public sealed record PregnancyState(
@@ -423,6 +464,22 @@ namespace GameEngineTools.Characters.Engines.Physiology
     public sealed record MensesEnded(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     public sealed record OvulationWindowOpened(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     public sealed record CycleDayAdvanced(WDateTime OccurredAt, HumanId Human, int DayInCycle, CyclePhase Phase) : IDomainEvent;
+
+    /// <summary>
+    /// Emitted when chronic stress or sleep debt suppresses ovulation for the current cycle.
+    /// Subscribers (NarrativeFormatter, Psychology) can react to prolonged stress as a
+    /// physiological consequence. The character does not consciously know this is happening.
+    /// </summary>
+    public sealed record CycleSuppressionStarted(
+        WDateTime OccurredAt,
+        HumanId Human,
+        /// <summary>Stress level at suppression onset.</summary>
+        double StressAtOnset) : IDomainEvent;
+
+    /// <summary>
+    /// Emitted when HPA suppression resolves and normal ovulation can resume next cycle.
+    /// </summary>
+    public sealed record CycleSuppressionLifted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     /// <summary>Událost — postava otěhotněla po reprodukčně relevantním setkání.</summary>
     public sealed record PregnancyStarted(WDateTime OccurredAt, HumanId Human, HumanId OtherParent, WDateOnly EstimatedDueDate) : IDomainEvent;
     /// <summary>Událost — těhotenství je pro postavu zjistitelné / zjištěné.</summary>

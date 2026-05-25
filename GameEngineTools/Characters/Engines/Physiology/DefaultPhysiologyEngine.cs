@@ -742,7 +742,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private PhysiologyState AdvanceCycleDay(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box)
         {
+            if (s.Cycle is null || s.Cycle.Phase == CyclePhase.Paused)
+                return s;
+
             var (day, phase, length, ovulDay) = CalculateCycleProgression(s.Cycle!);
+
+            s = s with { Cycle = UpdateSuppressionAccumulator(s, ctx, now, box) };
+
             s = EmitCycleProgressionEvents(s, now, ctx, box, day, phase, length, ovulDay);
             s = ApplyCycleSymptoms(s);
 
@@ -777,8 +783,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (_mensesOn && !isMenses) { box.Add(new MensesEnded(now, ctx.Id)); _mensesOn = false; }
 
             // Antikoncepce High/Moderate potlačuje ovulaci
+            // AnovulatoryCycleActive potlačuje ovulaci z důvodu HPA suprese.
             var contraceptionSuppressesOvul = s.CurrentContraception is ContraceptionLevel.High or ContraceptionLevel.Moderate;
-            var ovulWindow = phase == CyclePhase.Ovulation && !contraceptionSuppressesOvul;
+            var ovulWindow = phase == CyclePhase.Ovulation && !contraceptionSuppressesOvul && !s.Cycle!.AnovulatoryCycleActive;
             if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && !c.OvulationWindow)
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
 
@@ -1224,7 +1231,78 @@ namespace GameEngineTools.Characters.Engines.Physiology
 		        // All other affordance types are not physiology concerns.
 		        _ => s
 		    };
-		
-		#endregion Object affordance application
+
+        #endregion Object affordance application
+
+        #region Cycle — HPA suppression
+
+        /// <summary>
+        /// Updates the HPA-axis suppression accumulator based on current stress and sleep debt.
+        /// Called once per game-day during cycle progression.
+        /// </summary>
+        /// <remarks>
+        /// Biological mechanism: elevated cortisol (from chronic stress or sleep deprivation)
+        /// suppresses GnRH pulse frequency via the hypothalamic KNDy neuron network,
+        /// reducing LH amplitude below the threshold needed to trigger ovulation.
+        /// References: Fenster et al. (1999); Schliep et al. (2015, Human Reproduction).
+        /// </remarks>
+        /// <param name="s">Current physiology state — provides sleep debt.</param>
+        /// <param name="ctx">Character context — provides previous-tick stress via snapshot.</param>
+        /// <param name="now">Current in-world time for event timestamps.</param>
+        /// <param name="outbox">Collector for suppression events.</param>
+        /// <returns>Updated <see cref="MenstrualCycleState"/> with recalculated suppression fields.</returns>
+        private MenstrualCycleState UpdateSuppressionAccumulator(
+            PhysiologyState s,
+            IHumanContext ctx,
+            WDateTime now,
+            IEventCollector outbox)
+        {
+            var c = s.Cycle!;
+
+            // Read stress from the previous tick's snapshot (1-tick lag is intentional and acceptable
+            // for a slow-acting HPA mechanism that operates over days, not minutes).
+            var stress = ctx.Snapshot.Psychology.Stress;
+            var sleepDebt = s.SleepDebtHours;
+
+            // Suppression load: stress above threshold OR significant sleep debt both activate HPA suppression.
+            // Sleep debt contribution: each hour above threshold = 0.5 stress-equivalent points.
+            var sleepDebtContribution = Math.Max(0, sleepDebt - _cycleCfg.AnovulatorySleepDebtThresholdHours) * 0.5;
+            var effectiveLoad = stress + sleepDebtContribution;
+            var isSuppressive = effectiveLoad >= _cycleCfg.AnovulatoryStressThreshold;
+
+            var wasAnovulatory = c.AnovulatoryCycleActive;
+            double newAccDays;
+
+            if (isSuppressive)
+            {
+                // Accumulate: count up toward onset threshold.
+                newAccDays = c.StressSuppressionAccDays + 1.0;
+            }
+            else
+            {
+                // Recovery: decay faster (asymmetric — matches allostatic load recovery pattern).
+                newAccDays = Math.Max(0, c.StressSuppressionAccDays - 1.5);
+            }
+
+            // Determine new suppression flag.
+            var isNowAnovulatory = newAccDays >= _cycleCfg.AnovulatoryOnsetDays
+                                   || (wasAnovulatory && newAccDays > 0);
+            // ^ Keep suppression active until accumulator fully clears (hysteresis).
+
+            // Emit transition events.
+            if (!wasAnovulatory && isNowAnovulatory)
+                outbox.Add(new CycleSuppressionStarted(now, ctx.Id, stress));
+
+            if (wasAnovulatory && !isNowAnovulatory)
+                outbox.Add(new CycleSuppressionLifted(now, ctx.Id));
+
+            return c with
+            {
+                StressSuppressionAccDays = newAccDays,
+                AnovulatoryCycleActive = isNowAnovulatory
+            };
+        }
+
+        #endregion Cycle — HPA suppression
     }
 }

@@ -1763,6 +1763,100 @@ namespace EngineTests
 
         #endregion Batch 8 — kompletní aging
 
+        #region Anovulatory suppression — HPA axis
+
+        /// <summary>
+        /// A character under chronic high stress for more than AnovulatoryOnsetDays
+        /// must have AnovulatoryCycleActive = true and must NOT emit OvulationWindowOpened.
+        /// Biological basis: HPA cortisol suppresses GnRH → no LH surge → no ovulation.
+        /// </summary>
+        [TestMethod]
+        public void ChronicStress_AboveThreshold_SuppressesOvulationWindow()
+        {
+            // Arrange — cycle starts at day 1 (Menses), stress set to 80 (above threshold 72)
+            var cycleCfg = new MenstrualCycleConfig(
+                AnovulatoryStressThreshold: 72.0,
+                AnovulatoryOnsetDays: 5.0);
+
+            var engine = BuildEngineWithCycleConfig(cycleCfg, cycleDayStart: 1);
+
+            // Build a high-stress context (stress = 80, sleep debt = 0)
+            var ctx = BuildContextWithStress(stress: 80.0, sleepDebtHours: 0);
+            var allEvents = new List<IDomainEvent>();
+
+            // Act — tick 28 days; suppression should activate after day 5 and block ovulation
+            for (int i = 0; i < 28; i++)
+            {
+                var outbox = new EventCollector();
+                engine.Tick(_now + WTimeSpan.FromHours(i * 24), WTimeSpan.FromHours(24), ctx, outbox);
+                allEvents.AddRange(outbox.Drain());
+            }
+
+            // Assert — no ovulation window emitted
+            Assert.IsFalse(
+                allEvents.OfType<OvulationWindowOpened>().Any(),
+                "Chronic stress above threshold must suppress OvulationWindowOpened.");
+
+            // Assert — suppression event was emitted
+            Assert.IsTrue(
+                allEvents.OfType<CycleSuppressionStarted>().Any(),
+                "CycleSuppressionStarted must be emitted when accumulator crosses onset threshold.");
+
+            // Assert — state reflects suppression
+            Assert.IsTrue(
+                engine.State.Cycle!.AnovulatoryCycleActive,
+                "AnovulatoryCycleActive must be true after chronic high stress.");
+        }
+
+        /// <summary>
+        /// After suppression activates, returning to low stress for AnovulatoryRecoveryDays
+        /// must clear suppression and emit CycleSuppressionLifted.
+        /// </summary>
+        [TestMethod]
+        public void StressResolution_AfterSuppression_LiftsCycleSuppressionAndEmitsEvent()
+        {
+            // Arrange — start with active suppression pre-seeded via RestoreState
+            var cycleCfg = new MenstrualCycleConfig(
+                AnovulatoryStressThreshold: 72.0,
+                AnovulatoryOnsetDays: 5.0,
+                AnovulatoryRecoveryDays: 3.0);
+
+            var engine = BuildEngineWithCycleConfig(cycleCfg, cycleDayStart: 10);
+
+            // Inject pre-existing suppression state
+            engine.RestoreState(engine.State with
+            {
+                Cycle = engine.State.Cycle! with
+                {
+                    AnovulatoryCycleActive = true,
+                    StressSuppressionAccDays = 6.0  // above onset, fully suppressed
+                }
+            });
+
+            // Low-stress context (stress = 20, well below threshold)
+            var ctx = BuildContextWithStress(stress: 20.0, sleepDebtHours: 0);
+            var allEvents = new List<IDomainEvent>();
+
+            // Act — tick 5 days; accumulator should decay to 0 within AnovulatoryRecoveryDays
+            for (int i = 0; i < 5; i++)
+            {
+                var outbox = new EventCollector();
+                engine.Tick(_now + WTimeSpan.FromHours(i * 24), WTimeSpan.FromHours(24), ctx, outbox);
+                allEvents.AddRange(outbox.Drain());
+            }
+
+            // Assert — suppression was lifted
+            Assert.IsTrue(
+                allEvents.OfType<CycleSuppressionLifted>().Any(),
+                "CycleSuppressionLifted must be emitted after low-stress recovery period.");
+
+            Assert.IsFalse(
+                engine.State.Cycle!.AnovulatoryCycleActive,
+                "AnovulatoryCycleActive must be false after stress resolves.");
+        }
+
+        #endregion Anovulatory suppression — HPA axis
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine pro konkrétní biologii (Male/Female) — pro testy pohlavně specifických metrik.</summary>
@@ -1992,6 +2086,85 @@ namespace EngineTests
                 Intent: intent,
                 Contraception: contraception,
                 ReproductivePotential: true);
+
+        /// <summary>
+        /// Builds a minimal context with configurable stress and sleep debt.
+        /// Used for HPA suppression tests where only those two values matter.
+        /// </summary>
+        private static IHumanContext BuildContextWithStress(double stress, double sleepDebtHours)
+        {
+            var physio = new PhysiologyState(70, sleepDebtHours, 25, 20, 5, 10, 0, null);
+            var psych = new PsychologyState(0.1, 0.4, 0.5, stress, 10, DiscreteEmotion.Neutral);
+            var snapshot = new EnginesSnapshot(physio, psych,
+                new BehaviorState(40, 20, 15, 40, 50, 30, null),
+                new InteractionSurface(null, false, double.NaN, double.NaN, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
+                Personality = new Personality(
+                    new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                    AttachmentProfile.Secure,
+                    CommunicationStyle.Direct,
+                    new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                    Sociosexuality.Intermediate,
+                    Chronotype.Neutral),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        /// <summary>
+        /// Builds a <see cref="DefaultPhysiologyEngine"/> with a custom
+        /// <see cref="MenstrualCycleConfig"/> and a seeded cycle starting on the given day.
+        /// Used for HPA suppression tests that need to control suppression thresholds.
+        /// </summary>
+        /// <param name="cycleCfg">Custom cycle config — pass threshold overrides here.</param>
+        /// <param name="cycleDayStart">Day in cycle to seed (1 = first day of menses).</param>
+        private static DefaultPhysiologyEngine BuildEngineWithCycleConfig(
+            MenstrualCycleConfig cycleCfg,
+            int cycleDayStart = 1)
+        {
+            // PhysiologyConfig: cycle enabled, character is old enough (born year 100, today year 116 = age 16).
+            var cfg = Options.Create(new PhysiologyConfig(
+                RestingMetabolicRate: 1600,
+                MaxSleepDebtHours: 12,
+                EnableMenstrualCycle: true,
+                MenstrualCycleBeginsInAge: 12));
+
+            var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+
+            var engine = new DefaultPhysiologyEngine(
+                cfg,
+                Options.Create(cycleCfg),
+                factory,
+                new ZeroRandom(),
+                biology: SexBiology.Female,
+                birthDate: WDateOnly.New(100, 1, 1),
+                now: WDateOnly.New(116, 1, 1));
+
+            // Inject the requested cycle day via RestoreState — same pattern as BuildEngineWithCycle.
+            if (engine.State.Cycle is not null)
+            {
+                engine.RestoreState(engine.State with
+                {
+                    Cycle = engine.State.Cycle with
+                    {
+                        DayInCycle = cycleDayStart,
+                        AnovulatoryCycleActive = false,
+                        StressSuppressionAccDays = 0.0
+                    }
+                });
+            }
+
+            return engine;
+        }
 
         #endregion Pomocné metody
 
