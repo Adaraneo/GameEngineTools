@@ -112,6 +112,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             return affordance.Type switch
             {
                 AffordanceType.Hunger => snapshot.Physiology.Hunger,
+                AffordanceType.Thirst => snapshot.Physiology.Thirst,
                 AffordanceType.Rest => snapshot.Behavior.NeedRest,
                 AffordanceType.Social => snapshot.Behavior.NeedBelonging,
                 AffordanceType.Work => snapshot.Behavior.NeedCompetence,
