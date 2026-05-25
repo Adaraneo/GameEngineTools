@@ -12,6 +12,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using GameEngineTools.Characters.Engines.Objects;
 
     /// <summary>
     /// Default implementation of the psychology engine.
@@ -971,6 +972,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 case Characters.Engines.Interactions.NormViolationOccurred nv when nv.Actor == ctx.Id:
                     s = HandleNormViolation(nv, s, ctx, outbox);
                     break;
+
+                // Object affordance applied via UseInPlace (AffordanceApplicationService).
+                // Physiology handles Hunger/Thirst — Psychology owns the affective layer:
+                // MoodBoost, Warmth, Social, and StressRaise.
+                case Objects.ObjectAffordanceApplied oaa when oaa.Actor == ctx.Id:
+                    s = ApplyObjectAffordance(s, oaa, ctx);
+                    break;
             }
 
             State = s;
@@ -1101,5 +1109,61 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// </summary>
         /// <param name="state">The psychology state to restore.</param>
         public void RestoreState(PsychologyState state) => State = state;
+
+        #region Object affordance application
+
+        /// <summary>
+        /// Applies the psychological effect of a single object affordance event.
+        /// Hunger and Thirst are handled by <c>DefaultPhysiologyEngine</c> — this method
+        /// covers the affective layer only.
+        /// </summary>
+        /// <param name="s">Current psychology state.</param>
+        /// <param name="oaa">Affordance event carrying type and satisfaction [0..1].</param>
+        /// <param name="ctx">Character context — used for NeedBelonging scaling on Social.</param>
+        private PsychologyState ApplyObjectAffordance(
+            PsychologyState s,
+            Objects.ObjectAffordanceApplied oaa,
+            IHumanContext ctx)
+            => oaa.AffordanceType switch
+            {
+                // Pleasant environment — art, candles, flowers, nature sounds.
+                // Valence spike is immediate; MoodBaseline shift is small but persistent.
+                AffordanceType.MoodBoost => s with
+                {
+                    Valence      = Math.Clamp(s.Valence + oaa.Satisfaction * Config.AffordanceMoodBoostMaxValence, -1, 1),
+                    MoodBaseline = Math.Clamp(s.MoodBaseline + oaa.Satisfaction * Config.AffordanceMoodBoostMaxMoodBaseline, 0, 100)
+                },
+        
+                // Warmth relief — fireplace, hearth, forge.
+                // Cold stress is a physiological threat; warmth resolves the drive.
+                AffordanceType.Warmth => s with
+                {
+                    Stress = Math.Clamp(s.Stress - oaa.Satisfaction * Config.AffordanceWarmthMaxStressRelief, 0, 100)
+                },
+        
+                // Communal space — tavern table, campfire, chapel.
+                // Effect is need-scaled: lonely characters benefit more (Cacioppo 2008).
+                AffordanceType.Social => s with
+                {
+                    Valence = Math.Clamp(
+                        s.Valence + oaa.Satisfaction
+                                  * Config.AffordanceSocialMaxValence
+                                  * (ctx.Snapshot.Behavior.NeedBelonging / 100.0),
+                        -1, 1)
+                },
+        
+                // Hazard / threat — weapons, fire, intimidating objects.
+                // Stress spike is immediate; does not affect Valence directly
+                // (fear → high Stress → Valence drops naturally via Tick physio modulation).
+                AffordanceType.StressRaise => s with
+                {
+                    Stress = Math.Clamp(s.Stress + oaa.Satisfaction * Config.AffordanceStressRaiseMaxStress, 0, 100)
+                },
+        
+                // Hunger, Thirst, Rest, Work, Entertainment — not psychology concerns at this layer.
+                _ => s
+            };
+        
+            #endregion Object affordance application
     }
 }
