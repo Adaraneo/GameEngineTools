@@ -678,6 +678,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                 case ObjectDropped dropped when dropped.Actor == ctx.Id:
                     UpdateObjectLocationFact(dropped.ObjectId, dropped.AtLocationId, dropped.OccurredAt, confidence: 1.0, itemKind: PickupItemKind.None);
                     break;
+
+                case Interactions.NormViolationOccurred nv:
+                    HandleNormViolation(nv, ctx, outbox);
+                    break;
             }
         }
 
@@ -868,6 +872,62 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
+        private void HandleNormViolation(
+            Interactions.NormViolationOccurred nv,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            // Compute salience based on norm kind and violation score
+            var baseSalience = nv.ViolationScore * 0.8;
+
+            // Severity modulation by norm kind
+            var kindMult = nv.NormKind switch
+            {
+                Interactions.SocialNormKind.RitualContext => 1.3,
+                Interactions.SocialNormKind.Intimacy => 1.3,
+                Interactions.SocialNormKind.HarmCare => 1.3,
+                Interactions.SocialNormKind.Honesty => 1.3,
+                Interactions.SocialNormKind.Authority => 1.0,
+                Interactions.SocialNormKind.Reciprocity => 1.0,
+                Interactions.SocialNormKind.FamilyRole => 1.0,
+                _ => 0.7  // Greeting, PublicConduct
+            };
+
+            var salience = baseSalience * kindMult;
+
+            // Audience modulation
+            if (nv.HasAudience)
+                salience *= 1.15;
+
+            // Clamp to [0.6, 1.0] — norm violations are always significant
+            salience = Math.Clamp(salience, 0.6, 1.0);
+
+            // Emotional intensity slightly damped from salience
+            var emotionalIntensity = nv.ViolationScore * 0.85;
+
+            // Build what string with norm kind metadata
+            var what = $"NormViolation:{nv.NormKind}|from={nv.Actor.Value}|score={nv.ViolationScore:F2}|audience={nv.HasAudience}";
+
+            Encode(new EpisodicMemory(
+                Guid.NewGuid(),
+                nv.OccurredAt,
+                what,
+                Salience: salience,
+                EmotionalTag.Negative,
+                Strength: ComputeInitialStrength(salience, EmotionalTag.Negative),
+                OtherPerson: nv.Actor == ctx.Id ? null : nv.Actor,
+                PeakEmotion: EmotionalTag.Negative,
+                EndEmotion: ctx.Snapshot.Psychology.DominantEmotion switch
+                {
+                    Psychology.DiscreteEmotion.Shame => EmotionalTag.Negative,
+                    Psychology.DiscreteEmotion.Anger => EmotionalTag.Negative,
+                    Psychology.DiscreteEmotion.Sadness => EmotionalTag.Negative,
+                    Psychology.DiscreteEmotion.Fear => EmotionalTag.Negative,
+                    _ => EmotionalTag.Neutral
+                }),
+                ctx, outbox);
+        }
+
         /// Konsoliduje paměti po skončení spánku.
         ///
         /// Neurovědní základ: REM fáze spánku posiluje epizodické paměti s vysokou

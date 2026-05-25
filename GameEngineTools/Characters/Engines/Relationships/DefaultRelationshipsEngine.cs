@@ -723,6 +723,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                         break;
                     }
+
+                case Interactions.ObserverNormReaction onr:
+                    HandleObserverNormReaction(onr, self, ctx, outbox);
+                    break;
             }
         }
 
@@ -922,6 +926,136 @@ namespace GameEngineTools.Characters.Engines.Relationships
         }
 
         #endregion Tick — time decay
+
+        #region Observer norm reactions
+
+        private void HandleObserverNormReaction(
+            Interactions.ObserverNormReaction onr,
+            HumanId self,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            switch (onr.ReactionKind)
+            {
+                case Interactions.ObserverReactionKind.Anger:
+                    // Victim reacting to actor
+                    HandleAngerReaction(onr, self, ctx, outbox);
+                    break;
+
+                case Interactions.ObserverReactionKind.MoralOutrage:
+                    // Third-party observer reacting to actor
+                    HandleOutrageReaction(onr, self, ctx, outbox);
+                    break;
+
+                case Interactions.ObserverReactionKind.VicariousShame:
+                    // In-group member reacting to actor
+                    HandleVicariousShameReaction(onr, self, ctx, outbox);
+                    break;
+            }
+        }
+
+        private void HandleAngerReaction(
+            Interactions.ObserverNormReaction onr,
+            HumanId self,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            // Observer is the victim (observer == victim)
+            Upsert(self, onr.Actor, e =>
+            {
+                var scaledTrust = -10.0 * onr.ViolationScore;
+                var scaledRespect = -12.0 * onr.ViolationScore;
+                var scaledLike = -6.5 * onr.ViolationScore;
+                var residueDelta = 6.0 * onr.ViolationScore;
+
+                return e with
+                {
+                    Trust = Bump(e.Trust, scaledTrust),
+                    Respect = Bump(e.Respect, scaledRespect),
+                    Like = Bump(e.Like, scaledLike),
+                    TransgressionResidue = Math.Min(100, e.TransgressionResidue + residueDelta)
+                };
+            },
+            eventType: nameof(Interactions.ObserverNormReaction),
+            outcome: "anger",
+            detail: $"actor={onr.Actor.Value}, violationScore={onr.ViolationScore:F2}",
+            now: onr.OccurredAt);
+        }
+
+        private void HandleOutrageReaction(
+            Interactions.ObserverNormReaction onr,
+            HumanId self,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            // Third-party observer (observer != victim)
+            var n = ctx.Personality.BigFive.Neuroticism;
+            var neuMult = 1.0 + (n - 0.5) * 0.50;
+            neuMult = Math.Max(0.75, Math.Min(1.25, neuMult));
+
+            // Apply gossip scaling for third-party effect
+            const double outrageGossipScale = 0.40;
+
+            Upsert(self, onr.Actor, e =>
+            {
+                var scaledRespect = -8.0 * neuMult * outrageGossipScale * onr.ViolationScore;
+                var scaledTrust = -5.0 * neuMult * outrageGossipScale * onr.ViolationScore;
+                var scaledLike = -4.0 * neuMult * outrageGossipScale * onr.ViolationScore;
+                var residueDelta = 3.0 * outrageGossipScale * onr.ViolationScore;
+
+                return e with
+                {
+                    Respect = Bump(e.Respect, scaledRespect),
+                    Trust = Bump(e.Trust, scaledTrust),
+                    Like = Bump(e.Like, scaledLike),
+                    TransgressionResidue = Math.Min(100, e.TransgressionResidue + residueDelta)
+                };
+            },
+            eventType: nameof(Interactions.ObserverNormReaction),
+            outcome: "outrage",
+            detail: $"actor={onr.Actor.Value}, violationScore={onr.ViolationScore:F2}",
+            now: onr.OccurredAt);
+        }
+
+        private void HandleVicariousShameReaction(
+            Interactions.ObserverNormReaction onr,
+            HumanId self,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            // In-group member (observer shares identity with victim)
+            var attachment = ctx.Personality.Attachment;
+            var attachMult = 1.0 + (attachment.Anxiety - attachment.Avoidance) * 0.40;
+            attachMult = Math.Max(0.65, Math.Min(1.40, attachMult));
+
+            // Check if observer has high closeness toward victim to amplify damage
+            var closenessAmplifier = 1.0;
+            if (onr.Victim.HasValue && State.Edges.TryGetValue(onr.Victim.Value, out var victimEdge) && victimEdge.Closeness > 60)
+                closenessAmplifier = 1.20;
+
+            // Apply gossip scaling for in-group effect
+            var vicariousGossipScale = attachment.Avoidance > 0.60 ? 0.20 : 0.35;
+
+            Upsert(self, onr.Actor, e =>
+            {
+                var scaledLike = -5.5 * attachMult * closenessAmplifier * vicariousGossipScale * onr.ViolationScore;
+                var scaledRespect = -6.5 * attachMult * closenessAmplifier * vicariousGossipScale * onr.ViolationScore;
+                var residueDelta = 4.0 * closenessAmplifier * vicariousGossipScale * onr.ViolationScore;
+
+                return e with
+                {
+                    Like = Bump(e.Like, scaledLike),
+                    Respect = Bump(e.Respect, scaledRespect),
+                    TransgressionResidue = Math.Min(100, e.TransgressionResidue + residueDelta)
+                };
+            },
+            eventType: nameof(Interactions.ObserverNormReaction),
+            outcome: "vicariously-shamed",
+            detail: $"actor={onr.Actor.Value}, violationScore={onr.ViolationScore:F2}, victim={onr.Victim.Value}",
+            now: onr.OccurredAt);
+        }
+
+        #endregion Observer norm reactions
 
         #region RestoreState
 

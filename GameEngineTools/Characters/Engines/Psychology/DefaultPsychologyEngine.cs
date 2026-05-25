@@ -973,6 +973,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = HandleNormViolation(nv, s, ctx, outbox);
                     break;
 
+                case Characters.Engines.Interactions.ObserverNormReaction onr:
+                    s = HandleObserverNormReaction(onr, s, ctx, outbox);
+                    break;
+
                 // Object affordance applied via UseInPlace (AffordanceApplicationService).
                 // Physiology handles Hunger/Thirst — Psychology owns the affective layer:
                 // MoodBoost, Warmth, Social, and StressRaise.
@@ -1100,6 +1104,112 @@ namespace GameEngineTools.Characters.Engines.Psychology
             }
 
             return s;
+        }
+
+        private PsychologyState HandleObserverNormReaction(
+            Characters.Engines.Interactions.ObserverNormReaction onr,
+            PsychologyState s,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            if (onr.ViolationScore < Config.NormShameMinViolationScore)
+                return s;
+
+            var n = ctx.Personality.BigFive.Neuroticism;
+            var attachment = ctx.Personality.Attachment;
+
+            // Route by reaction kind with distinct VAD signatures
+            var (dv, da, dd, stressDelta) = onr.ReactionKind switch
+            {
+                Characters.Engines.Interactions.ObserverReactionKind.Anger =>
+                    ComputeAngerResponse(onr.ViolationScore, n),
+
+                Characters.Engines.Interactions.ObserverReactionKind.MoralOutrage =>
+                    ComputeOutrageResponse(onr.ViolationScore, n),
+
+                Characters.Engines.Interactions.ObserverReactionKind.VicariousShame =>
+                    ComputeVicariousShameResponse(onr.ViolationScore, attachment),
+
+                _ => (0.0, 0.0, 0.0, 0.0)
+            };
+
+            // Apply violation score scaling
+            dv *= onr.ViolationScore;
+            da *= onr.ViolationScore;
+            dd *= onr.ViolationScore;
+            stressDelta *= onr.ViolationScore;
+
+            s = s with
+            {
+                Valence = Math.Clamp(s.Valence + dv, -1.0, 1.0),
+                Arousal = Math.Clamp(s.Arousal + da, 0.0, 1.0),
+                Dominance = Math.Clamp(s.Dominance + dd, 0.0, 1.0),
+                Stress = Math.Clamp(s.Stress + stressDelta, 0.0, 100.0)
+            };
+
+            // Force emotion inference
+            var newEmotion = InferEmotion(s);
+            if (newEmotion != s.DominantEmotion)
+            {
+                s = s with { DominantEmotion = newEmotion };
+                outbox.Add(new EmotionShifted(onr.OccurredAt, ctx.Id, newEmotion, s.Valence, s.Arousal, s.Dominance));
+            }
+
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
+            {
+                _log.ObserverNormReactionRouted(
+                    ctx.Id.Value.ToString(),
+                    onr.ReactionKind.ToString(),
+                    onr.NormKind.ToString(),
+                    onr.ViolationScore);
+            }
+
+            return s;
+        }
+
+        private static (double deltaValence, double deltaArousal, double deltaDominance, double stressDelta)
+        ComputeAngerResponse(double violationScore, double neuroticism)
+        {
+            // Anger is approach-motivated: mild dominance drop (confrontational readiness)
+            // High neuroticism amplifies stress response
+            var dv = -0.40;  // -0.30 to -0.50 range
+            var da = +0.28;  // +0.20 to +0.35 range
+            var dd = -0.32;  // -0.25 to -0.40 range
+            var stressDelta = 7.0 + neuroticism * 3.0;  // 7–10 range
+
+            return (dv, da, dd, stressDelta);
+        }
+
+        private static (double deltaValence, double deltaArousal, double deltaDominance, double stressDelta)
+        ComputeOutrageResponse(double violationScore, double neuroticism)
+        {
+            // Moral outrage: strong condemnation, moderate arousal
+            // Neuroticism modulation: High-N amplifies × 1.25, Low-N dampens × 0.80
+            var neuMult = 1.0 + (neuroticism - 0.5) * 0.50;  // [0.75, 1.25]
+            neuMult = Math.Max(0.75, Math.Min(1.25, neuMult));
+
+            var dv = -0.45 * neuMult;  // -0.35 to -0.55 range
+            var da = +0.35 * neuMult;  // +0.25 to +0.45 range
+            var dd = -0.18;             // -0.10 to -0.25 range (moral authority, less confrontational)
+            var stressDelta = (5.0 + neuroticism * 3.0) * neuMult;  // 3–8 range
+
+            return (dv, da, dd, stressDelta);
+        }
+
+        private static (double deltaValence, double deltaArousal, double deltaDominance, double stressDelta)
+        ComputeVicariousShameResponse(double violationScore, Traits.AttachmentProfile attachment)
+        {
+            // Vicarious shame: empathetic response, group identity threatened
+            // Attachment modulation: Anxious amplifies × 1.40, Avoidant dampens × 0.65
+            var attachMult = 1.0 + (attachment.Anxiety - attachment.Avoidance) * 0.40;
+            attachMult = Math.Max(0.65, Math.Min(1.40, attachMult));
+
+            var dv = -0.32 * attachMult;  // -0.25 to -0.40 range
+            var da = +0.15 * attachMult;  // +0.10 to +0.20 range
+            var dd = -0.43 * attachMult;  // -0.35 to -0.50 range (group status threatened)
+            var stressDelta = (3.0 + attachment.Anxiety * 2.0) * attachMult;  // 2–5 range
+
+            return (dv, da, dd, stressDelta);
         }
 
         /// <summary>
