@@ -217,9 +217,40 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// Below this threshold the event is considered too minor to register emotionally.
         /// Default 0.25.
         /// </summary>
-        double NormShameMinViolationScore = 0.25)
+        double NormShameMinViolationScore = 0.25,
+        // ── Object affordance application ─────────────────────────────────────────
+        /// <summary>
+        /// Maximum Valence boost applied by a single MoodBoost affordance at full
+        /// satisfaction (1.0). Scales linearly — candles (0.25) → +0.025 Valence.
+        /// Range [0..2] on PAD scale maps to actual delta on [-1..+1].
+        /// </summary>
+        double AffordanceMoodBoostMaxValence = 0.10,
+
+        /// <summary>
+        /// Maximum MoodBaseline boost applied by a single MoodBoost affordance at full
+        /// satisfaction (1.0). Persistent effect; slower to recover than Valence.
+        /// </summary>
+        double AffordanceMoodBoostMaxMoodBaseline = 2.0,
+
+        /// <summary>
+        /// Maximum Stress reduction applied by a single Warmth affordance at full
+        /// satisfaction (1.0). Models cold-stress relief (Nakamura 2011).
+        /// </summary>
+        double AffordanceWarmthMaxStressRelief = 4.0,
+
+        /// <summary>
+        /// Maximum Valence boost from a Social affordance (communal spaces, campfire).
+        /// Scales by satisfaction × (NeedBelonging / 100) so lonely characters benefit more.
+        /// </summary>
+        double AffordanceSocialMaxValence = 0.08,
+
+        /// <summary>
+        /// Maximum Stress added by a single StressRaise affordance at full satisfaction (1.0).
+        /// Models threat/hazard presence — fire, weapons, intimidating environment.
+        /// </summary>
+        double AffordanceStressRaiseMaxStress = 12.0)
     {
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0) { }
     }
 
     public sealed record PsychologyState(
