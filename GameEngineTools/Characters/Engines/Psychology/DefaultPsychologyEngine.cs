@@ -12,7 +12,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
-    using GameEngineTools.Characters.Engines.Objects;
+    using GameEngineTools.World.Objects;
 
     /// <summary>
     /// Default implementation of the psychology engine.

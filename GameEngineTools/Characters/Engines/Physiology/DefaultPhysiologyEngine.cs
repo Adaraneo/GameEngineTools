@@ -14,7 +14,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using static ActionNames;
-	using GameEngineTools.Characters.Engines.Objects;
 
     /// <summary>
     /// Default implementation of the physiology engine.
