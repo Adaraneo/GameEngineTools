@@ -89,10 +89,9 @@ namespace EngineTests
         #endregion Private fields
 
         #region Setup
-
-        [TestInitialize]
-        public void Setup()
+        protected override void TestInit()
         {
+            base.TestInit();
             _fidelityOverrides.Clear();
             _locationService = new DefaultLocationService();
             _locationService.RegisterLocation(TestRoom);
@@ -340,14 +339,14 @@ namespace EngineTests
 
         #endregion Factory methods
 
-        #region SpyHuman
+    #region SpyHuman
 
-        /// <summary>
-        /// Minimal <see cref="IHuman"/> that records all received events
-        /// and exposes helpers for seeding relationship edges (used to simulate
-        /// what <see cref="DefaultRelationshipsEngine"/> would write to snapshot).
-        /// </summary>
-        private sealed class SpyHuman : IHuman
+    /// <summary>
+    /// Minimal <see cref="IHuman"/> that records all received events
+    /// and exposes helpers for seeding relationship edges (used to simulate
+    /// what <see cref="DefaultRelationshipsEngine"/> would write to snapshot).
+    /// </summary>
+    private sealed class SpyHuman : IHuman
         {
             #region Private state
 
