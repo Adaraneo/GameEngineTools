@@ -157,6 +157,60 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         break;
                     }
 
+                // ── One-way observation ──────────────────────────────────────────────────────
+                // Observer noticed Target without mutual acknowledgment.
+                // Seeds weaker one-sided edge: mere exposure only, no halo effect.
+                // Zajonc 1968: familiarity builds on the perceiver's side without reciprocity.
+                //
+                // Guard: any existing edge (bilateral meeting, family wiring) is stronger
+                //        than silent observation — never overwrite it.
+                //
+                // LastContactTime is intentionally NOT set (now: null) — one-way observation
+                // is not real contact; Navarro gap rule should not be reset.
+                case OneWayObservationFormed ow when ow.Observer == self:
+                    {
+                        if (State.Edges.ContainsKey(ow.Target))
+                            break;
+
+                        Upsert(self, ow.Target, e => e with
+                        {
+                            // Lerp 0.4 — weaker seed than mutual FirstImpressionFormed (0.7).
+                            // No halo effect on Trust or Closeness — no social signal has occurred yet.
+                            Like = Lerp(e.Like, ow.Like, 0.4),
+
+                            // Physical and aesthetic seeding — same normalisation as FirstImpressionFormed.
+                            // BasePhysical (max 40) → [0, 100] for PhysicalAttraction.
+                            // PreferenceMatch (max 35) → [0, 100] for AestheticAttraction.
+                            PhysicalAttraction = Lerp(e.PhysicalAttraction, ow.BasePhysical / 40.0 * 100.0, 0.4),
+                            AestheticAttraction = Lerp(e.AestheticAttraction, ow.PreferenceMatch / 35.0 * 100.0, 0.4),
+
+                            // Minimal closeness: saw them, nothing more.
+                            Closeness = Math.Max(e.Closeness, 3.0),
+
+                            // Mere exposure seeds slight familiarity [0 → 5].
+                            Familiarity = Math.Max(e.Familiarity, 5.0),
+
+                            // Carry target biology for orientation-aware downstream scoring.
+                            TargetBiology = ow.TargetBiology ?? e.TargetBiology,
+                        },
+                        eventType: nameof(OneWayObservationFormed),
+                        outcome: "observed",
+                        detail: $"target={ow.Target.Value}, like={ow.Like:F1}, attraction={ow.Attraction:F1}",
+                        now: null);   // ← intentionally null — not real contact
+
+                        using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
+                        {
+                            _log.RelOneWayObservation(
+                                self.Value.ToString(),
+                                ow.Observer.Value.ToString(),
+                                ow.Target.Value.ToString(),
+                                ow.Like,
+                                ow.Attraction);
+                        }
+
+                        break;
+                    }
+
                 // ── Micro-positive (smile, compliment, small help…) ──────────────────────
                 case MicroPositive mp:
                     Upsert(self, mp.B, e => e with

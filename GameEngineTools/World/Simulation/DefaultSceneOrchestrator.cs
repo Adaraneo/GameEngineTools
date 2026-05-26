@@ -293,47 +293,113 @@ namespace GameEngineTools.World.Simulation
                         var a = localChars[i];
                         var b = localChars[j];
 
-                        // Mutual perception required — both must notice each other.
-                        if (!perceivedBy[a.Id].Contains(b.Id)) continue;
-                        if (!perceivedBy[b.Id].Contains(a.Id)) continue;
+                        var aSeesB = perceivedBy[a.Id].Contains(b.Id);
+                        var bSeesA = perceivedBy[b.Id].Contains(a.Id);
 
-                        // Skip pairs that already share a relationship edge — already met.
-                        if (a.Snapshot.Relationships.Edges.ContainsKey(b.Id)) continue;
+                        // ── Mutual perception → bilateral FirstImpressionFormed ─────────────────
+                        // Both characters notice each other simultaneously.
+                        // Skip if the observing side already has an edge — avoids re-firing.
+                        if (aSeesB && bSeesA)
+                        {
+                            var aAlreadyKnowsB = a.Snapshot.Relationships.Edges.ContainsKey(b.Id);
+                            var bAlreadyKnowsA = b.Snapshot.Relationships.Edges.ContainsKey(a.Id);
 
-                        anyNewImpression = true;
+                            if (aAlreadyKnowsB && bAlreadyKnowsA)
+                                continue;
 
-                        var viewA = AppearanceProjector.Compute(
-                            a.PhysicalAppearance, a.Snapshot.Physiology, a.Biology, a.Snapshot.Physiology.Aging);
-                        var viewB = AppearanceProjector.Compute(
-                            b.PhysicalAppearance, b.Snapshot.Physiology, b.Biology, b.Snapshot.Physiology.Aging);
+                            anyNewImpression = true;
 
-                        // A sees B.
-                        var aResult = a.AttractionProfile is not null
-                            ? _attractionCalculator.Calculate(
-                                a.AttractionProfile, b.PhysicalAppearance, viewB, b.Biology,
-                                observerValence: a.Snapshot.Psychology.Valence,
-                                observerArousal: a.Snapshot.Psychology.Arousal,
-                                observerAgeYears: a.Age,
-                                targetAgeYears: b.Age)
-                            : AttractionResult.Neutral;
+                            var viewA = AppearanceProjector.Compute(
+                                a.PhysicalAppearance, a.Snapshot.Physiology, a.Biology, a.Snapshot.Physiology.Aging);
+                            var viewB = AppearanceProjector.Compute(
+                                b.PhysicalAppearance, b.Snapshot.Physiology, b.Biology, b.Snapshot.Physiology.Aging);
 
-                        // B sees A.
-                        var bResult = b.AttractionProfile is not null
-                            ? _attractionCalculator.Calculate(
-                                b.AttractionProfile, a.PhysicalAppearance, viewA, a.Biology,
-                                observerValence: b.Snapshot.Psychology.Valence,
-                                observerArousal: b.Snapshot.Psychology.Arousal,
-                                observerAgeYears: b.Age,
-                                targetAgeYears: a.Age)
-                            : AttractionResult.Neutral;
+                            // A sees B.
+                            var aResult = a.AttractionProfile is not null
+                                ? _attractionCalculator.Calculate(
+                                    a.AttractionProfile, b.PhysicalAppearance, viewB, b.Biology,
+                                    observerValence: a.Snapshot.Psychology.Valence,
+                                    observerArousal: a.Snapshot.Psychology.Arousal,
+                                    observerAgeYears: a.Age,
+                                    targetAgeYears: b.Age)
+                                : AttractionResult.Neutral;
 
-                        a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
-                            aResult.FirstImpressionLike, aResult.Score,
-                            aResult.BasePhysical, aResult.PreferenceMatch));
+                            // B sees A.
+                            var bResult = b.AttractionProfile is not null
+                                ? _attractionCalculator.Calculate(
+                                    b.AttractionProfile, a.PhysicalAppearance, viewA, a.Biology,
+                                    observerValence: b.Snapshot.Psychology.Valence,
+                                    observerArousal: b.Snapshot.Psychology.Arousal,
+                                    observerAgeYears: b.Age,
+                                    targetAgeYears: a.Age)
+                                : AttractionResult.Neutral;
 
-                        b.ReceiveEvent(new FirstImpressionFormed(now, b.Id, a.Id,
-                            bResult.FirstImpressionLike, bResult.Score,
-                            bResult.BasePhysical, bResult.PreferenceMatch));
+                            if (!aAlreadyKnowsB)
+                                a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
+                                    aResult.FirstImpressionLike, aResult.Score,
+                                    aResult.BasePhysical, aResult.PreferenceMatch));
+
+                            if (!bAlreadyKnowsA)
+                                b.ReceiveEvent(new FirstImpressionFormed(now, b.Id, a.Id,
+                                    bResult.FirstImpressionLike, bResult.Score,
+                                    bResult.BasePhysical, bResult.PreferenceMatch));
+
+                            continue;
+                        }
+
+                        // ── Asymmetric perception → one-sided OneWayObservationFormed ───────────
+                        // Only the perceiving side gets a weak edge — target is unaware.
+                        // anyNewImpression = true prevents false saturation caching:
+                        // next substep B might finally see A → bilateral must be allowed to fire.
+                        if (aSeesB && !a.Snapshot.Relationships.Edges.ContainsKey(b.Id))
+                        {
+                            anyNewImpression = true;
+
+                            var viewB = AppearanceProjector.Compute(
+                                b.PhysicalAppearance, b.Snapshot.Physiology, b.Biology, b.Snapshot.Physiology.Aging);
+
+                            var aResult = a.AttractionProfile is not null
+                                ? _attractionCalculator.Calculate(
+                                    a.AttractionProfile, b.PhysicalAppearance, viewB, b.Biology,
+                                    observerValence: a.Snapshot.Psychology.Valence,
+                                    observerArousal: a.Snapshot.Psychology.Arousal,
+                                    observerAgeYears: a.Age,
+                                    targetAgeYears: b.Age)
+                                : AttractionResult.Neutral;
+
+                            a.ReceiveEvent(new OneWayObservationFormed(
+                                now, a.Id, b.Id,
+                                Like: aResult.FirstImpressionLike,
+                                Attraction: aResult.Score,
+                                TargetBiology: b.Biology,
+                                BasePhysical: aResult.BasePhysical,
+                                PreferenceMatch: aResult.PreferenceMatch));
+                        }
+
+                        if (bSeesA && !b.Snapshot.Relationships.Edges.ContainsKey(a.Id))
+                        {
+                            anyNewImpression = true;
+
+                            var viewA = AppearanceProjector.Compute(
+                                a.PhysicalAppearance, a.Snapshot.Physiology, a.Biology, a.Snapshot.Physiology.Aging);
+
+                            var bResult = b.AttractionProfile is not null
+                                ? _attractionCalculator.Calculate(
+                                    b.AttractionProfile, a.PhysicalAppearance, viewA, a.Biology,
+                                    observerValence: b.Snapshot.Psychology.Valence,
+                                    observerArousal: b.Snapshot.Psychology.Arousal,
+                                    observerAgeYears: b.Age,
+                                    targetAgeYears: a.Age)
+                                : AttractionResult.Neutral;
+
+                            b.ReceiveEvent(new OneWayObservationFormed(
+                                now, b.Id, a.Id,
+                                Like: bResult.FirstImpressionLike,
+                                Attraction: bResult.Score,
+                                TargetBiology: a.Biology,
+                                BasePhysical: bResult.BasePhysical,
+                                PreferenceMatch: bResult.PreferenceMatch));
+                        }
                     }
                 }
 

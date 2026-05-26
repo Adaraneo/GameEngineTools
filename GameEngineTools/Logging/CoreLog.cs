@@ -900,6 +900,23 @@ namespace GameEngineTools.Logging
             double P,
             string Result);
 
+        /// <summary>
+        /// One-way observation — observer noticed target, target was unaware.
+        /// Seeds a weak one-sided edge on the observer only.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 2013,
+            Level = LogLevel.Debug,
+            Message = "[REL/ONEWAY] {HumanId} Jednostranné pozorování: {Observer} → {Target} " +
+                      "Like={Like:F1} Attraction={Attraction:F1}.")]
+        public static partial void RelOneWayObservation(
+            this ILogger logger,
+            string HumanId,
+            string Observer,
+            string Target,
+            double Like,
+            double Attraction);
+
         #endregion Relationships — vztahy
 
         #region DailySchedule — 1400–1499
