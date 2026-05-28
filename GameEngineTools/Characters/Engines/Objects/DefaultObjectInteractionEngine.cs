@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Objects
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using System.Linq;
 
     /// <summary>
     /// Resolves <see cref="ActionNames.InteractWithObject"/> actions committed by the Behavior engine.
@@ -102,16 +103,17 @@ namespace GameEngineTools.Characters.Engines.Objects
                         .ToList();
                     if (relevantAffordances.Count > 0)
                     {
-                        var affordanceTypes  = string.Join("+", relevantAffordances.Select(a => a.Type.ToString()));
+                        var affordanceTypes   = string.Join("+", relevantAffordances.Select(a => a.Type.ToString()));
                         var totalSatisfaction = relevantAffordances.Sum(a => a.Satisfaction);
-                        _logger.ObjectUsed(
-                            ctx.Id.ToString(),
-                            obj.Id,
-                            obj.DisplayName,
-                            data.LocationId,
-                            affordanceTypes,
-                            totalSatisfaction,
-                            wasConsumed);
+                        using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                            _logger.ObjectUsed(
+                                ctx.Id.ToString(),
+                                obj.Id,
+                                obj.DisplayName,
+                                data.LocationId,
+                                affordanceTypes,
+                                totalSatisfaction,
+                                wasConsumed);
                     }
                     break;
 
