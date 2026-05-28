@@ -253,5 +253,13 @@ namespace GameEngineTools.Characters.Core
         /// Daily schedule state for this character.
         /// <c>null</c> for characters created before this field existed (backward compatibility).
         /// </summary>
-        DailyScheduleState? Schedule = null);
+        DailyScheduleState? Schedule = null,
+
+        /// <summary>
+        /// Schwartz Basic Human Values profile for this character.
+        /// Generated once at creation by <see cref="GameEngineTools.Characters.Traits.ValuesProfileGenerator"/>.
+        /// <c>null</c> for characters created before this field existed (backward compatibility).
+        /// Read by <see cref="GameEngineTools.Characters.Engines.Behavior.Modifiers.ValuesBehaviorModifier"/>.
+        /// </summary>
+        GameEngineTools.Characters.Traits.ValuesProfile? Values = null);
 }

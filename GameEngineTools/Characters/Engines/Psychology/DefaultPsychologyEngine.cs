@@ -977,6 +977,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = HandleObserverNormReaction(onr, s, ctx, outbox);
                     break;
 
+                case ValueCongruenceViolated vcv when vcv.Actor == ctx.Id:
+                    s = HandleValueCongruenceViolated(vcv, s, ctx, outbox);
+                    break;
+
                 // Object affordance applied via UseInPlace (AffordanceApplicationService).
                 // Physiology handles Hunger/Thirst — Psychology owns the affective layer:
                 // MoodBoost, Warmth, Social, and StressRaise.
@@ -1014,6 +1018,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 DiscreteEmotion.Tenderness => cfg.EmotionDecayTenderness,
                 DiscreteEmotion.Anger => cfg.EmotionDecayAnger,
                 DiscreteEmotion.Shame => cfg.EmotionDecayShame,
+                DiscreteEmotion.Guilt => cfg.EmotionDecayGuilt,
                 DiscreteEmotion.Sadness => cfg.EmotionDecaySadness,
                 _ => 1.0
             };
@@ -1035,6 +1040,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Pride — pozitivní + vysoká dominance
             if (ps.Valence > 0.5 && ps.Dominance > 0.7)
                 return DiscreteEmotion.Pride;
+
+            // Guilt — negativní + střední dominance + zvýšený arousal (approach-motivated, reparativní)
+            // Klíčový rozdíl od Shame: vyšší Dominance (0.30–0.55) = postava není paralyzovaná, chce napravit.
+            // VAD: V<-0.35, D∈[0.25,0.55], A>0.35
+            // Zdroj: Tangney & Dearing (2002); Singh & Bhushan (2025, PMC12647085).
+            if (ps.Valence < -0.35 && ps.Dominance is >= 0.25 and <= 0.55 && ps.Arousal > 0.35 && ps.Stress < 50)
+                return DiscreteEmotion.Guilt;
 
             // Shame — negativní + nízká dominance + nízký stres (ne panic)
             if (ps.Valence < -0.3 && ps.Dominance < 0.3 && ps.Stress < 50)
@@ -1194,6 +1206,71 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var stressDelta = (5.0 + neuroticism * 3.0) * neuMult;  // 3–8 range
 
             return (dv, da, dd, stressDelta);
+        }
+
+        /// <summary>
+        /// Applies a Guilt spike when the character commits an action that violates their core values.
+        /// </summary>
+        /// <remarks>
+        /// VAD signature for Guilt (distinct from Shame on the Dominance axis):
+        /// <list type="bullet">
+        ///   <item>Valence: strongly negative (own moral failure).</item>
+        ///   <item>Arousal: elevated — Guilt is approach-motivated, not paralysing.</item>
+        ///   <item>Dominance: moderately low but distinctly above Shame — character retains agency to repair.</item>
+        /// </list>
+        /// Big Five coupling for Guilt (Muris et al. 2018, PMC5856863):
+        /// Agreeableness r≈.29 and Conscientiousness r≈.21 amplify guilt-proneness (moral traits, not affective).
+        /// Source: Tangney &amp; Dearing (2002); Frontiers in Psychology systematic review (2025, PMC12647085).
+        /// </remarks>
+        private PsychologyState HandleValueCongruenceViolated(
+            ValueCongruenceViolated vcv,
+            PsychologyState s,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            // Congruence is in [−1..0] when this handler fires (threshold was < 0).
+            var violationMagnitude = Math.Abs(vcv.Congruence);
+
+            var a = ctx.Personality.BigFive.Agreeableness;
+            var c = ctx.Personality.BigFive.Conscientiousness;
+
+            // Personality multiplier calibrated to Muris et al. (2018) effect sizes.
+            // Agreeableness and Conscientiousness are the guilt predictors (not Neuroticism).
+            var personalityMult = 1.0
+                + 0.29 * (a - 0.5)   // Agreeableness gain (r ≈ .29)
+                + 0.21 * (c - 0.5);  // Conscientiousness gain (r ≈ .21)
+            personalityMult = Math.Clamp(personalityMult, 0.40, 1.80);
+
+            // VAD deltas: V strongly negative, A elevated (approach), D moderately low.
+            var dv = Math.Clamp(-0.55 * violationMagnitude * personalityMult, -0.75, 0.0);
+            var da = Math.Clamp( 0.45 * violationMagnitude * personalityMult,  0.0,  0.70);
+            var dd = Math.Clamp(-0.20 * violationMagnitude * personalityMult, -0.45, 0.0);
+
+            s = s with
+            {
+                Valence   = Math.Clamp(s.Valence   + dv, -1.0, 1.0),
+                Arousal   = Math.Clamp(s.Arousal   + da,  0.0, 1.0),
+                Dominance = Math.Clamp(s.Dominance + dd,  0.0, 1.0)
+            };
+
+            var newEmotion = InferEmotion(s);
+            if (newEmotion != s.DominantEmotion)
+            {
+                s = s with { DominantEmotion = newEmotion };
+                outbox.Add(new EmotionShifted(vcv.OccurredAt, ctx.Id, newEmotion, s.Valence, s.Arousal, s.Dominance));
+            }
+
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
+            {
+                _log.GuiltSpikeApplied(
+                    ctx.Id.Value.ToString(),
+                    vcv.ActionName,
+                    vcv.DominantViolatedValue,
+                    vcv.Congruence,
+                    dv);
+            }
+
+            return s;
         }
 
         private static (double deltaValence, double deltaArousal, double deltaDominance, double stressDelta)

@@ -8,6 +8,7 @@ namespace GameEngineTools.World.Location
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.World.Data;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -18,6 +19,21 @@ namespace GameEngineTools.World.Location
     /// </summary>
     public sealed class DefaultLocationService : ILocationService
     {
+        private readonly ISocialNormProvider? _normProvider;
+
+        /// <summary>
+        /// Creates a location service without norm lookup.
+        /// Norm contexts will always be <c>null</c> in dispatched <see cref="ContextChanged"/> events.
+        /// </summary>
+        public DefaultLocationService() { }
+
+        /// <summary>
+        /// Creates a location service that resolves norm contexts from <paramref name="normProvider"/>.
+        /// </summary>
+        public DefaultLocationService(ISocialNormProvider normProvider)
+        {
+            _normProvider = normProvider;
+        }
         #region Public Methods
 
         /// <inheritdoc/>
@@ -115,6 +131,10 @@ namespace GameEngineTools.World.Location
                 var crowding = ComputeCrowding(desc, characterCount);
                 var privacy = desc.AllowsPrivacy && characterCount <= 2;
 
+                var normContext = desc.NormId is { } normId && _normProvider is not null
+                    ? _normProvider.GetNormContext(normId)
+                    : null;
+
                 character.ReceiveEvent(new ContextChanged(
                     OccurredAt: now,
                     Human: character.Id,
@@ -122,7 +142,8 @@ namespace GameEngineTools.World.Location
                     HasPrivacy: privacy,
                     Noise: noise,
                     Crowding: crowding,
-                    Kind: MapSurface(desc.Type)));
+                    Kind: MapSurface(desc.Type),
+                    NormContext: normContext));
 
                 _lastDispatchedLocation[character.Id] = locationId;
             }

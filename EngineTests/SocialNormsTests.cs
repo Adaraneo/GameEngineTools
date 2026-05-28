@@ -32,7 +32,7 @@ namespace EngineTests
         public void NormViolationMath_FuneralContext_HighScore()
         {
             // Arrange
-            var normContext = SocialNormContext.Funeral; // Severity=0.85, Enforcement=0.90
+            var normContext = FuneralContext(); // Severity=0.85, Enforcement=0.90
 
             // Act — 3 observers, public (no privacy)
             var score = NormViolationMath.ComputeViolationScore(normContext, hasPrivacy: false, observers: 3);
@@ -197,7 +197,7 @@ namespace EngineTests
                 "church", false, 0.1, 0.3, SurfaceKind.Social));
             funeralEngine.RestoreState(new InteractionSurface(
                 "church", false, 0.1, 0.3, SurfaceKind.Social,
-                NormContext: SocialNormContext.Funeral));
+                NormContext: FuneralContext()));
 
             var self = new HumanId(Guid.NewGuid());
             var proposer = new HumanId(Guid.NewGuid());
@@ -288,6 +288,9 @@ namespace EngineTests
         #endregion Test 10 — PsychologyEngine: NormViolationOccurred applies shame spike
 
         #region Pomocné metody
+
+        private static SocialNormContext FuneralContext()
+            => new(SocialNormKind.RitualContext, Severity: 0.85, EnforcementProbability: 0.90);
 
         private sealed class SeededRandom : IRandomSource
         {

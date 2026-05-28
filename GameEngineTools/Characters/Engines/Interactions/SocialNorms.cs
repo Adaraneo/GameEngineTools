@@ -99,8 +99,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
     /// <summary>
     /// Structured descriptor of the social norm context active on an interaction surface.
-    /// Replaces the single-scalar <c>Restrictiveness</c> proposed in the research plan,
-    /// based on Sznycer (2016): shame tracks <c>Severity × P(devaluation spreads)</c>.
+    /// Instances are loaded from the world database via <see cref="GameEngineTools.World.Data.ISocialNormProvider"/>
+    /// and passed through <see cref="ContextChanged"/> into <see cref="InteractionSurface"/>.
+    /// Based on Sznycer (2016): shame tracks <c>Severity × P(devaluation spreads)</c>.
     /// </summary>
     /// <param name="Kind">
     /// The category of norm that is active. Determines which emotional response channel fires
@@ -124,30 +125,5 @@ namespace GameEngineTools.Characters.Engines.Interactions
         SocialNormKind Kind,
         double Severity,
         double EnforcementProbability,
-        RelationalModel? RelationalModel = null)
-    {
-        // ── Factory helpers ──────────────────────────────────────────────────
-
-        /// <summary>
-        /// Returns a pre-configured context for a funeral or mourning situation.
-        /// High severity, high enforcement — any positive or playful act is strongly inappropriate.
-        /// </summary>
-        public static SocialNormContext Funeral =>
-            new(SocialNormKind.RitualContext, Severity: 0.85, EnforcementProbability: 0.90);
-
-        /// <summary>
-        /// Returns a context for a formal workplace setting.
-        /// Moderate severity; intimacy and very casual acts are inappropriate.
-        /// </summary>
-        public static SocialNormContext FormalWork =>
-            new(SocialNormKind.Authority, Severity: 0.55, EnforcementProbability: 0.70,
-                RelationalModel: Interactions.RelationalModel.AuthorityRanking);
-
-        /// <summary>
-        /// Returns a context for a casual social gathering.
-        /// Low severity; most acts are acceptable unless they cross intimacy boundaries.
-        /// </summary>
-        public static SocialNormContext CasualSocial =>
-            new(SocialNormKind.PublicConduct, Severity: 0.20, EnforcementProbability: 0.40);
-    }
+        RelationalModel? RelationalModel = null);
 }

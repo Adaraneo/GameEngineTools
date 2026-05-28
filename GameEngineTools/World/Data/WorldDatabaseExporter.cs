@@ -44,6 +44,7 @@ namespace GameEngineTools.World.Data
             var sb = new StringBuilder();
 
             AppendHeader(sb);
+            AppendSocialNorms(sb, db);
             AppendLocations(sb, db);
             AppendConnections(sb, db);
             AppendWorldObjects(sb, db);
@@ -65,6 +66,30 @@ namespace GameEngineTools.World.Data
             sb.AppendLine();
         }
 
+        private static void AppendSocialNorms(StringBuilder sb, SqliteWorldDatabase db)
+        {
+            var norms = db.GetAllSocialNorms();
+            if (norms.Count == 0) return;
+
+            sb.AppendLine("-- ── Social Norms ────────────────────────────────────────────────────────────");
+            sb.AppendLine();
+
+            foreach (var n in norms)
+            {
+                sb.AppendLine(
+                    $"INSERT OR IGNORE INTO SocialNorms " +
+                    $"(Id, DisplayName, Kind, Severity, EnforcementProbability, " +
+                    $"RelationalModel, CultureId, ValidFromYear, ValidToYear) VALUES " +
+                    $"({Str(n.Id)}, {Str(n.DisplayName)}, {Str(n.Kind)}, " +
+                    $"{R(n.Severity)}, {R(n.EnforcementProbability)}, " +
+                    $"{Str(n.RelationalModel)}, {Str(n.CultureId)}, " +
+                    $"{(n.ValidFromYear.HasValue ? n.ValidFromYear.Value.ToString() : "NULL")}, " +
+                    $"{(n.ValidToYear.HasValue ? n.ValidToYear.Value.ToString() : "NULL")});");
+            }
+
+            sb.AppendLine();
+        }
+
         private static void AppendLocations(StringBuilder sb, SqliteWorldDatabase db)
         {
             var locations = db.GetAllLocations();
@@ -78,11 +103,11 @@ namespace GameEngineTools.World.Data
                 sb.AppendLine(
                     $"INSERT OR IGNORE INTO Locations " +
                     $"(Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, " +
-                    $"Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup) VALUES " +
+                    $"Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId) VALUES " +
                     $"({Str(d.Id)}, {Str(d.DisplayName)}, {Str(d.Type.ToString())}, {Str(region)}, " +
                     $"{R(d.BaseNoise)}, {R(d.NoisePerPerson)}, " +
                     $"{d.Capacity}, {B(d.AllowsPrivacy)}, {Str(d.Terrain.ToString())}, " +
-                    $"{R(d.DangerLevel)}, {B(d.AllowsPickup)});");
+                    $"{R(d.DangerLevel)}, {B(d.AllowsPickup)}, {Str(d.NormId)});");
             }
 
             sb.AppendLine();

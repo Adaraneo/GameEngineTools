@@ -14,6 +14,24 @@ CREATE TABLE IF NOT EXISTS SchemaVersion (
     AppliedAt TEXT    NOT NULL  -- ISO-8601 UTC timestamp for diagnostics
 );
 
+-- ── Social Norms ──────────────────────────────────────────────────────────────
+-- Defines social norm contexts attachable to locations.
+-- Kind must match a valid SocialNormKind enum value (TEXT, case-insensitive parse).
+-- RelationalModel is optional — NULL means no relational model override.
+-- CultureId and ValidFromYear/ValidToYear are reserved for future cultural evolution.
+
+CREATE TABLE IF NOT EXISTS SocialNorms (
+    Id                      TEXT    PRIMARY KEY,
+    DisplayName             TEXT    NOT NULL,
+    Kind                    TEXT    NOT NULL,
+    Severity                REAL    NOT NULL CHECK (Severity BETWEEN 0.0 AND 1.0),
+    EnforcementProbability  REAL    NOT NULL CHECK (EnforcementProbability BETWEEN 0.0 AND 1.0),
+    RelationalModel         TEXT,
+    CultureId               TEXT,
+    ValidFromYear           INTEGER,
+    ValidToYear             INTEGER
+);
+
 -- ── Locations ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS Locations (
@@ -27,7 +45,8 @@ CREATE TABLE IF NOT EXISTS Locations (
     AllowsPrivacy   INTEGER NOT NULL DEFAULT 0,  -- 0 = false, 1 = true
     Terrain         TEXT    NOT NULL DEFAULT 'Indoor',
     DangerLevel     REAL    NOT NULL DEFAULT 0.0,
-    AllowsPickup    INTEGER NOT NULL DEFAULT 1   -- 0 = false, 1 = true
+    AllowsPickup    INTEGER NOT NULL DEFAULT 1,  -- 0 = false, 1 = true
+    NormId          TEXT    REFERENCES SocialNorms(Id)  -- nullable
 );
 
 -- ── Connections ───────────────────────────────────────────────────────────────

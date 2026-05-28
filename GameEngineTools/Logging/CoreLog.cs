@@ -708,6 +708,52 @@ namespace GameEngineTools.Logging
             string Reaction,
             double Score);
 
+        /// <summary>
+        /// Values profile generated for a new character at factory creation.
+        /// Logged at Debug — fires once per character lifetime.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1210,
+            Level = LogLevel.Debug,
+            Message = "[VALUES] {HumanId} ValuesProfile generated: benevolence={Benevolence:F2}, universalism={Universalism:F2}, achievement={Achievement:F2}, power={Power:F2}")]
+        public static partial void ValuesProfileGenerated(
+            this ILogger logger,
+            string HumanId,
+            double Benevolence,
+            double Universalism,
+            double Achievement,
+            double Power);
+
+        /// <summary>
+        /// Value congruence violation detected pre-selection — utility modified.
+        /// Logged at Debug to avoid noise in production runs.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1211,
+            Level = LogLevel.Debug,
+            Message = "[VALUES] {HumanId} Congruence violation: action={ActionName}, congruence={Congruence:F2}, utilityDelta={UtilityDelta:F2}")]
+        public static partial void ValueCongruenceViolationDetected(
+            this ILogger logger,
+            string HumanId,
+            string ActionName,
+            double Congruence,
+            double UtilityDelta);
+
+        /// <summary>
+        /// Guilt spike applied to actor's psychology after a value congruence violation.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1212,
+            Level = LogLevel.Information,
+            Message = "[VALUES] {HumanId} Guilt spike: action={ActionName}, violatedValue={ViolatedValue}, congruence={Congruence:F2}, deltaValence={DeltaValence:F2}")]
+        public static partial void GuiltSpikeApplied(
+            this ILogger logger,
+            string HumanId,
+            string ActionName,
+            string ViolatedValue,
+            double Congruence,
+            double DeltaValence);
+
         #endregion Behavior/Interaction — kontext
 
         #region Memory — epizodická paměť

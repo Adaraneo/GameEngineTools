@@ -185,6 +185,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// <summary>Valence decay multiplier when dominant emotion is Shame. Default 0.4.</summary>
         double EmotionDecayShame = 0.4,
 
+        /// <summary>
+        /// Valence decay multiplier when dominant emotion is Guilt. Default 0.5.
+        /// Faster than Shame (0.4) because guilt resolves via reparative action.
+        /// Guilt does NOT ruminate — unlike Shame, it does not predispose to depression.
+        /// Source: Orth, Berking &amp; Burkhardt (2006, <i>PSPB</i> 32:1608–1619).
+        /// </summary>
+        double EmotionDecayGuilt = 0.5,
+
         /// <summary>Valence decay multiplier when dominant emotion is Sadness. Default 0.06 ≈ ~120 h duration.</summary>
         double EmotionDecaySadness = 0.06,
 
@@ -264,7 +272,27 @@ namespace GameEngineTools.Characters.Engines.Psychology
         MotivationState? Motivations = null); // runtime need levels
 
     public enum DiscreteEmotion
-    { Neutral, Joy, Sadness, Anger, Fear, Disgust, Surprise, Tenderness, Pride, Shame }
+    {
+        Neutral,
+        Joy,
+        Sadness,
+        Anger,
+        Fear,
+        Disgust,
+        Surprise,
+        Tenderness,
+        Pride,
+        Shame,
+
+        /// <summary>
+        /// Guilt — behavior-focused, approach-motivated, reparative.
+        /// Triggered when an action violates the character's Benevolence or Universalism values.
+        /// VAD: V≈−0.55, A≈+0.45, D≈−0.20 (higher Dominance than Shame = approach vs. withdrawal).
+        /// Decay: 0.5 (faster than Shame's 0.4; resolves on reparative action).
+        /// Source: Tangney &amp; Dearing (2002); Singh &amp; Bhushan (2025, PMC12647085).
+        /// </summary>
+        Guilt
+    }
 
     public sealed record MotivationState(
         double NeedSocial = 50,        // 0..100; loneliness/connection driver

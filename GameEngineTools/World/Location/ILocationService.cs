@@ -64,7 +64,12 @@ namespace GameEngineTools.World.Location
         LocationType Type,
         TerrainType Terrain = TerrainType.Indoor,
         double DangerLevel = 0.0,
-        bool AllowsPickup = true);
+        bool AllowsPickup = true,
+        /// <summary>
+        /// Optional social norm context id referencing <c>SocialNorms.Id</c> in the world database.
+        /// <c>null</c> means no active norm constraint at this location.
+        /// </summary>
+        string? NormId = null);
 
     #endregion Location data types
 

@@ -12,8 +12,10 @@
 --                           the format shown in the examples below.
 --
 -- COLUMN ORDER:
+--   SocialNorms: Id, DisplayName, Kind, Severity, EnforcementProbability,
+--                RelationalModel, CultureId, ValidFromYear, ValidToYear
 --   Locations:  Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson,
---               Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup
+--               Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId
 --   Connections: FromId, ToId, DistanceMeters
 --   WorldObjects: Id, DisplayName, Category, LocationId, HeatSignature,
 --                 AmbientNoise, BlocksLineOfSight, IsAvailable, IsPickable,
@@ -22,31 +24,41 @@
 --   NutritionalProfiles: ObjectId, CalorieGain, ProteinGain, IronGain,
 --                        VitaminDGain, HydrationGain
 
+-- ── Social Norms ──────────────────────────────────────────────────────────────
+-- All norm contexts used in the world. Add new rows here — no C# changes needed.
+
+INSERT OR IGNORE INTO SocialNorms
+    (Id, DisplayName, Kind, Severity, EnforcementProbability, RelationalModel)
+VALUES
+    ('norm_funeral',       'Funeral / Mourning',      'RitualContext', 0.85, 0.90, NULL),
+    ('norm_formal_work',   'Formal Workplace',         'Authority',     0.55, 0.70, 'AuthorityRanking'),
+    ('norm_casual_social', 'Casual Social Gathering',  'PublicConduct', 0.20, 0.40, NULL);
+
 -- ── Locations ─────────────────────────────────────────────────────────────────
 
 INSERT OR IGNORE INTO Locations
     (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson,
-     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup)
+     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId)
 VALUES
-    ('castle_hall',     'Castle Hall',      'Social',  'Castle',  0.20, 0.05, 20, 0, 'Indoor',    0.0, 1),
-    ('library',         'Library',          'Private', 'Castle',  0.05, 0.02,  5, 1, 'Indoor',    0.0, 1),
-    ('courtyard',       'Courtyard',        'Public',  'Castle',  0.30, 0.04, 30, 0, 'Courtyard', 0.0, 1),
-    ('throne_room',     'Throne Room',      'Social',  'Castle',  0.10, 0.03, 15, 0, 'Indoor',    0.0, 1),
-    ('stables',         'Stables',          'Work',    'Castle',  0.40, 0.06, 10, 0, 'Indoor',    0.0, 1),
-    ('dungeon_entrance','Dungeon Entrance',  'Public',  'Castle',  0.05, 0.02, 10, 0, 'Indoor',    0.4, 0),
-    ('dungeon_cell',    'Dungeon Cell',      'Private', 'Castle',  0.02, 0.01,  2, 1, 'Indoor',    0.6, 1),
-    ('crypt',           'Ancient Crypt',     'Private', 'Castle',  0.01, 0.01,  4, 1, 'Indoor',    0.7, 0),
-    ('tavern',          'Tavern',            'Social',  'Village', 0.50, 0.08, 25, 0, 'Indoor',    0.0, 1),
-    ('market_square',   'Market Square',     'Public',  'Village', 0.60, 0.07, 50, 0, 'Courtyard', 0.0, 1),
-    ('blacksmith',      'Blacksmith',        'Work',    'Village', 0.70, 0.05,  8, 0, 'Indoor',    0.0, 1),
-    ('inn_room',        'Inn Room',          'Rest',    'Village', 0.05, 0.03,  3, 1, 'Indoor',    0.0, 1),
-    ('chapel',          'Chapel',            'Private', 'Village', 0.05, 0.01, 20, 0, 'Indoor',    0.0, 1),
-    ('herb_garden',     'Herb Garden',       'Work',    'Village', 0.05, 0.03,  8, 0, 'Courtyard', 0.0, 1),
-    ('abandoned_mill',  'Abandoned Mill',    'Work',    'Village', 0.05, 0.03,  6, 0, 'Indoor',    0.2, 1),
-    ('forest',          'Forest',            'Public',  'Forest',  0.05, 0.06,1000,1, 'Forest',    0.1, 1),
-    ('forest_clearing', 'Forest Clearing',   'Public',  'Wilds',   0.10, 0.05, 20, 0, 'Forest',    0.2, 1),
-    ('river_crossing',  'River Crossing',    'Public',  'Wilds',   0.15, 0.05, 10, 0, 'Water',     0.3, 0),
-    ('mountain_pass',   'Mountain Pass',     'Public',  'Wilds',   0.05, 0.02,  8, 0, 'Mountain',  0.5, 0);
+    ('castle_hall',     'Castle Hall',      'Social',  'Castle',  0.20, 0.05, 20, 0, 'Indoor',    0.0, 1, NULL),
+    ('library',         'Library',          'Private', 'Castle',  0.05, 0.02,  5, 1, 'Indoor',    0.0, 1, NULL),
+    ('courtyard',       'Courtyard',        'Public',  'Castle',  0.30, 0.04, 30, 0, 'Courtyard', 0.0, 1, NULL),
+    ('throne_room',     'Throne Room',      'Social',  'Castle',  0.10, 0.03, 15, 0, 'Indoor',    0.0, 1, NULL),
+    ('stables',         'Stables',          'Work',    'Castle',  0.40, 0.06, 10, 0, 'Indoor',    0.0, 1, NULL),
+    ('dungeon_entrance','Dungeon Entrance',  'Public',  'Castle',  0.05, 0.02, 10, 0, 'Indoor',    0.4, 0, NULL),
+    ('dungeon_cell',    'Dungeon Cell',      'Private', 'Castle',  0.02, 0.01,  2, 1, 'Indoor',    0.6, 1, NULL),
+    ('crypt',           'Ancient Crypt',     'Private', 'Castle',  0.01, 0.01,  4, 1, 'Indoor',    0.7, 0, NULL),
+    ('tavern',          'Tavern',            'Social',  'Village', 0.50, 0.08, 25, 0, 'Indoor',    0.0, 1, NULL),
+    ('market_square',   'Market Square',     'Public',  'Village', 0.60, 0.07, 50, 0, 'Courtyard', 0.0, 1, NULL),
+    ('blacksmith',      'Blacksmith',        'Work',    'Village', 0.70, 0.05,  8, 0, 'Indoor',    0.0, 1, NULL),
+    ('inn_room',        'Inn Room',          'Rest',    'Village', 0.05, 0.03,  3, 1, 'Indoor',    0.0, 1, NULL),
+    ('chapel',          'Chapel',            'Private', 'Village', 0.05, 0.01, 20, 0, 'Indoor',    0.0, 1, 'norm_funeral'),
+    ('herb_garden',     'Herb Garden',       'Work',    'Village', 0.05, 0.03,  8, 0, 'Courtyard', 0.0, 1, NULL),
+    ('abandoned_mill',  'Abandoned Mill',    'Work',    'Village', 0.05, 0.03,  6, 0, 'Indoor',    0.2, 1, NULL),
+    ('forest',          'Forest',            'Public',  'Forest',  0.05, 0.06,1000,1, 'Forest',    0.1, 1, NULL),
+    ('forest_clearing', 'Forest Clearing',   'Public',  'Wilds',   0.10, 0.05, 20, 0, 'Forest',    0.2, 1, NULL),
+    ('river_crossing',  'River Crossing',    'Public',  'Wilds',   0.15, 0.05, 10, 0, 'Water',     0.3, 0, NULL),
+    ('mountain_pass',   'Mountain Pass',     'Public',  'Wilds',   0.05, 0.02,  8, 0, 'Mountain',  0.5, 0, NULL);
 
 -- ── Connections ───────────────────────────────────────────────────────────────
 -- Doplň podle skutečné topologie svého světa.

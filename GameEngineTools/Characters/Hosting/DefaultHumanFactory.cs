@@ -17,6 +17,7 @@ namespace GameEngineTools.Characters.Hosting
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
@@ -67,7 +68,13 @@ namespace GameEngineTools.Characters.Hosting
         GeneticBlueprint GeneticBlueprint,
         AttractionProfile? AttractionProfile = null,
         int? Seed = null,
-        string? Occupation = null);
+        string? Occupation = null,
+        /// <summary>
+        /// Pre-generated Schwartz values profile for this character.
+        /// When <c>null</c>, <see cref="DefaultHumanFactory"/> generates one from <see cref="Personality"/>.
+        /// Nullable to support characters loaded from saves created before this sprint.
+        /// </summary>
+        GameEngineTools.Characters.Traits.ValuesProfile? ValuesProfile = null);
 
     /// <summary>
     /// Default implementation of <see cref="IHumanFactory"/>.
@@ -145,10 +152,23 @@ namespace GameEngineTools.Characters.Hosting
             // and location service are registered in the DI container.
             var objectInteraction = _sp.GetService<IObjectInteractionEngine>();
 
+            // Generate values profile from BigFive (Parks-Leduc et al. 2015 meta-analysis coefficients).
+            // Use the blueprint's pre-generated profile if provided (deterministic replays / saves).
+            var rngForValues = new System.Random(DeriveSeed(b.Id) ^ 0x56A1_CCFF);
+            var values = b.ValuesProfile ?? ValuesProfileGenerator.Generate(b.Personality.BigFive, rngForValues);
+
+            _loggerFactory.CreateLogger<DefaultHumanFactory>()
+                .ValuesProfileGenerated(
+                    b.Id.Value.ToString(),
+                    values.Benevolence,
+                    values.Universalism,
+                    values.Achievement,
+                    values.Power);
+
             // Initial snapshot — State is always valid immediately after factory creation
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
-                Goals: goal.State, Schedule: schedule.State);
+                Goals: goal.State, Schedule: schedule.State, Values: values);
 
             var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.GeneticBlueprint,
@@ -168,8 +188,9 @@ namespace GameEngineTools.Characters.Hosting
             // and persistence snapshots include goals and schedule from the moment of creation.
             human.RestoreSnapshot(human.Snapshot with
             {
-                Goals = goal.State,
-                Schedule = schedule.State
+                Goals    = goal.State,
+                Schedule = schedule.State,
+                Values   = values
             }, _clock.Now.Date);
 
             return human;

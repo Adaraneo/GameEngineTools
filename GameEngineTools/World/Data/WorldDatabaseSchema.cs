@@ -15,6 +15,19 @@ namespace GameEngineTools.World.Data
         internal const string CreateTables = """
             PRAGMA foreign_keys = ON;
 
+            -- ── Social Norms ──────────────────────────────────────────────────────
+            CREATE TABLE IF NOT EXISTS SocialNorms (
+                Id                      TEXT    PRIMARY KEY,
+                DisplayName             TEXT    NOT NULL,
+                Kind                    TEXT    NOT NULL,
+                Severity                REAL    NOT NULL CHECK (Severity BETWEEN 0.0 AND 1.0),
+                EnforcementProbability  REAL    NOT NULL CHECK (EnforcementProbability BETWEEN 0.0 AND 1.0),
+                RelationalModel         TEXT,
+                CultureId               TEXT,
+                ValidFromYear           INTEGER,
+                ValidToYear             INTEGER
+            );
+
             -- ── Locations ─────────────────────────────────────────────────────────
             CREATE TABLE IF NOT EXISTS Locations (
                 Id              TEXT PRIMARY KEY,
@@ -27,7 +40,8 @@ namespace GameEngineTools.World.Data
                 AllowsPrivacy   INTEGER NOT NULL DEFAULT 0,
                 Terrain         TEXT NOT NULL DEFAULT 'Indoor',
                 DangerLevel     REAL NOT NULL DEFAULT 0.0,
-                AllowsPickup    INTEGER NOT NULL DEFAULT 1
+                AllowsPickup    INTEGER NOT NULL DEFAULT 1,
+                NormId          TEXT    REFERENCES SocialNorms(Id)
             );
 
             -- ── Connections ───────────────────────────────────────────────────────

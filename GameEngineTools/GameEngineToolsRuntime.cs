@@ -226,8 +226,6 @@ namespace GameEngineTools
                 return HumanBlueprintSpec.Default(clock.Now.Date);
             });
 
-            services.AddSingleton<ILocationService, DefaultLocationService>();
-
             services.AddSingleton<SqliteWorldDatabase>(sp =>
             {
                 var db = new SqliteWorldDatabase(FileSystemConstant.SourceFilePath.WorldDatabase);
@@ -236,6 +234,11 @@ namespace GameEngineTools
                 WorldDatabaseSeeder.Initialize(db);
                 return db;
             });
+
+            services.AddSingleton<ISocialNormProvider, SqliteSocialNormProvider>();
+
+            services.AddSingleton<ILocationService>(sp =>
+                new DefaultLocationService(sp.GetRequiredService<ISocialNormProvider>()));
             services.AddSingleton<SqliteWorldObjectProvider>();
 
             // Write buffer — obalí provider, bufferuje mutace

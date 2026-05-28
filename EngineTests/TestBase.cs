@@ -291,7 +291,6 @@ namespace EngineTests
                 return HumanBlueprintSpec.Default(clock.Now.Date);
             });
 
-            services.AddSingleton<ILocationService, DefaultLocationService>();
             services.AddSingleton<SqliteWorldDatabase>(_ =>
             {
                 var db = new SqliteWorldDatabase(":memory:");
@@ -300,6 +299,11 @@ namespace EngineTests
                 WorldDatabaseSeeder.Initialize(db);
                 return db;
             });
+
+            services.AddSingleton<ISocialNormProvider, SqliteSocialNormProvider>();
+
+            services.AddSingleton<ILocationService>(sp =>
+                new DefaultLocationService(sp.GetRequiredService<ISocialNormProvider>()));
             services.AddSingleton<SqliteWorldObjectProvider>();
             //services.AddSingleton<IMutableWorldObjectProvider>(
             //    sp => sp.GetRequiredService<SqliteWorldObjectProvider>());

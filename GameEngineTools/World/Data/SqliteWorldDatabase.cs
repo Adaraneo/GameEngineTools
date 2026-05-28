@@ -16,6 +16,21 @@ namespace GameEngineTools.World.Data
     using static GameEngineTools.World.Objects.WorldObjectWriteBuffer;
 
     /// <summary>
+    /// Raw database row for a social norm — used by <see cref="SqliteWorldDatabase"/>
+    /// and <see cref="SqliteSocialNormProvider"/>.
+    /// </summary>
+    public sealed record SocialNormRow(
+        string Id,
+        string DisplayName,
+        string Kind,
+        double Severity,
+        double EnforcementProbability,
+        string? RelationalModel,
+        string? CultureId,
+        int? ValidFromYear,
+        int? ValidToYear);
+
+    /// <summary>
     /// Low-level SQLite access layer for the world database.
     /// Maintains a single persistent connection with WAL journal mode for
     /// concurrent read performance and single-writer safety.
@@ -365,7 +380,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Type, Region,
                        BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy,
-                       Terrain, DangerLevel, AllowsPickup
+                       Terrain, DangerLevel, AllowsPickup, NormId
                 FROM Locations
                 """;
 
@@ -388,7 +403,8 @@ namespace GameEngineTools.World.Data
                         AllowsPrivacy: reader.GetInt32(7) != 0,
                         Terrain: Enum.Parse<TerrainType>(reader.GetString(8), ignoreCase: true),
                         DangerLevel: reader.GetDouble(9),
-                        AllowsPickup: reader.GetInt32(10) != 0);
+                        AllowsPickup: reader.GetInt32(10) != 0,
+                        NormId: reader.IsDBNull(11) ? null : reader.GetString(11));
 
                     results.Add((descriptor, reader.GetString(3)));
                 }
@@ -420,6 +436,86 @@ namespace GameEngineTools.World.Data
 
         #endregion Location + Connection queries
 
+        #region Social Norm queries
+
+        /// <summary>
+        /// Inserts a social norm row. Uses INSERT OR IGNORE — safe to call repeatedly.
+        /// </summary>
+        public void InsertSocialNorm(SocialNormRow norm)
+        {
+            const string sql = """
+                INSERT OR IGNORE INTO SocialNorms
+                    (Id, DisplayName, Kind, Severity, EnforcementProbability,
+                     RelationalModel, CultureId, ValidFromYear, ValidToYear)
+                VALUES
+                    (@id, @name, @kind, @sev, @enf, @rm, @culture, @fromYear, @toYear)
+                """;
+            lock (_sync)
+                ExecuteNonQuery(sql,
+                    ("@id",       norm.Id),
+                    ("@name",     norm.DisplayName),
+                    ("@kind",     norm.Kind),
+                    ("@sev",      norm.Severity),
+                    ("@enf",      norm.EnforcementProbability),
+                    ("@rm",       (object?)norm.RelationalModel ?? DBNull.Value),
+                    ("@culture",  (object?)norm.CultureId ?? DBNull.Value),
+                    ("@fromYear", (object?)norm.ValidFromYear ?? DBNull.Value),
+                    ("@toYear",   (object?)norm.ValidToYear ?? DBNull.Value));
+        }
+
+        /// <summary>Returns all social norms in the database.</summary>
+        public IReadOnlyList<SocialNormRow> GetAllSocialNorms()
+        {
+            const string sql = """
+                SELECT Id, DisplayName, Kind, Severity, EnforcementProbability,
+                       RelationalModel, CultureId, ValidFromYear, ValidToYear
+                FROM SocialNorms
+                """;
+            lock (_sync)
+            {
+                var results = new List<SocialNormRow>();
+                using var cmd = CreateCommand(sql);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    results.Add(new SocialNormRow(
+                        Id:                     reader.GetString(0),
+                        DisplayName:            reader.GetString(1),
+                        Kind:                   reader.GetString(2),
+                        Severity:               reader.GetDouble(3),
+                        EnforcementProbability: reader.GetDouble(4),
+                        RelationalModel:        reader.IsDBNull(5) ? null : reader.GetString(5),
+                        CultureId:              reader.IsDBNull(6) ? null : reader.GetString(6),
+                        ValidFromYear:          reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                        ValidToYear:            reader.IsDBNull(8) ? null : reader.GetInt32(8)));
+                return results;
+            }
+        }
+
+        /// <summary>Returns a single social norm by id, or <c>null</c> if not found.</summary>
+        public SocialNormRow? GetSocialNorm(string id)
+        {
+            const string sql = """
+                SELECT Id, DisplayName, Kind, Severity, EnforcementProbability,
+                       RelationalModel, CultureId, ValidFromYear, ValidToYear
+                FROM SocialNorms WHERE Id = @id
+                """;
+            lock (_sync)
+            {
+                using var cmd = CreateCommand(sql, ("@id", id));
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read()) return null;
+                return new SocialNormRow(
+                    reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                    reader.GetDouble(3), reader.GetDouble(4),
+                    reader.IsDBNull(5) ? null : reader.GetString(5),
+                    reader.IsDBNull(6) ? null : reader.GetString(6),
+                    reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                    reader.IsDBNull(8) ? null : reader.GetInt32(8));
+            }
+        }
+
+        #endregion Social Norm queries
+
         #region Seed helpers (used by WorldDatabaseSeeder)
 
         /// <summary>
@@ -430,10 +526,10 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 INSERT OR IGNORE INTO Locations
                     (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson,
-                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup)
+                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId)
                 VALUES
                     (@id, @name, @type, @region, @noise, @npp,
-                     @cap, @priv, @terrain, @danger, @pickup)
+                     @cap, @priv, @terrain, @danger, @pickup, @normId)
                 """;
 
             lock (_sync)
@@ -448,7 +544,8 @@ namespace GameEngineTools.World.Data
                     ("@priv", d.AllowsPrivacy ? 1 : 0),
                     ("@terrain", d.Terrain.ToString()),
                     ("@danger", d.DangerLevel),
-                    ("@pickup", d.AllowsPickup ? 1 : 0));
+                    ("@pickup", d.AllowsPickup ? 1 : 0),
+                    ("@normId", (object?)d.NormId ?? DBNull.Value));
         }
 
         /// <summary>
