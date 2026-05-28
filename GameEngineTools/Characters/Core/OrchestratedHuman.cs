@@ -136,6 +136,12 @@ namespace GameEngineTools.Characters.Core
         // When zero, behavior runs every incoming Tick(dt).
         private readonly Hosting.IBehaviorCadencePolicy? _behaviorCadencePolicy;
 
+        /// <summary>
+        /// Tracks which body/mind channels are currently occupied and until when.
+        /// Volatile runtime state — not persisted in EnginesSnapshot.
+        /// </summary>
+        private readonly ActiveActionSlots _slots = new();
+
         private WTimeSpan _behaviorAccumulated;
 
         #endregion Private fields
@@ -290,6 +296,9 @@ namespace GameEngineTools.Characters.Core
                 return;
 
             _lastOutboxAccumulator.Clear();
+
+            // Release slots whose committed action duration has elapsed before processing new actions.
+            _slots.ExpireAll(now);
 
             // Phase A: deliver scheduled actions and all queued inbox events
             // against the previous (last completed) snapshot.
@@ -467,6 +476,15 @@ namespace GameEngineTools.Characters.Core
             if (_objectInteraction is not null) try { _objectInteraction.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] ObjectInteraction.Handle failed.", Id.Value); }
             try { _goal.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Goal.Handle failed.", Id.Value); }
             try { _schedule.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Schedule.Handle failed.", Id.Value); }
+
+            // Acquire action slots when this character commits an action.
+            // AcquireOrReplace: if the channel is already occupied, the new action wins —
+            // BehaviorEngine ran full arbitration and its decision is authoritative.
+            if (ev is ActionCommitted committed && committed.Human == Id)
+            {
+                var mask = ActionSlotMaskResolver.Get(committed.ActionName, committed.ObjectInteraction);
+                _slots.AcquireOrReplace(committed.ActionName, mask, committed.OccurredAt, committed.Duration);
+            }
         }
 
         private void Deliver(IEventCollector collector)

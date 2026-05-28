@@ -26,5 +26,27 @@ namespace GameEngineTools.Characters.Engines
         public const string MoveToDrink = "MoveTo:Drink";
 
         public const string InteractWithObject = "InteractWithObject";
+
+        #region Affordance-driven object interactions
+
+        /// <summary>Sit or rest at a bench, chair, or similar furniture. Slot: Posture only.</summary>
+        public const string UseObjectForRest = "UseObject:Rest";
+
+        /// <summary>Work at a workbench, desk, forge, or tool. Slots: Hands + Mind.</summary>
+        public const string UseObjectForWork = "UseObject:Work";
+
+        /// <summary>Play a lute, game board, or entertainment object. Slots: Hands + Mind.</summary>
+        public const string UseObjectForFun = "UseObject:Fun";
+
+        /// <summary>Stand near a fireplace, brazier, or warm spring. Slot: None (passive).</summary>
+        public const string UseObjectForWarmth = "UseObject:Warmth";
+
+        /// <summary>Observe a painting, garden, or pleasant ambient object. Slot: None (passive).</summary>
+        public const string UseObjectForMood = "UseObject:Mood";
+
+        /// <summary>Gather near a communal fireplace, fountain, or social anchor. Slot: None.</summary>
+        public const string GatherAtObject = "UseObject:Social";
+
+        #endregion Affordance-driven object interactions
     }
 }

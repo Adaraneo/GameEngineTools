@@ -30,8 +30,15 @@ namespace GameEngineTools.Characters.Engines.Behavior
         IReadOnlyList<string>? Tags = null,
         SocialTargetingData? SocialTargeting = null,
         /// <summary>
-        /// Present when <see cref="Name"/> == <see cref="ActionNames.InteractWithObject"/>.
+        /// Present when <see cref="Name"/> == <see cref="ActionNames.InteractWithObject"/>
+        /// or any affordance-driven object action (UseObject:Rest, UseObject:Work, …).
         /// Carries the target object ID, location, and intended interaction kind.
         /// </summary>
-        ObjectInteractionData? ObjectInteraction = null);
+        ObjectInteractionData? ObjectInteraction = null,
+        /// <summary>
+        /// Body/mind channels this action requires for the duration of its execution.
+        /// Two actions can run simultaneously only when their masks share no bits.
+        /// Defaults to <see cref="ActionSlotMask.None"/> — safe for movement and passive actions.
+        /// </summary>
+        ActionSlotMask SlotMask = ActionSlotMask.None);
 }

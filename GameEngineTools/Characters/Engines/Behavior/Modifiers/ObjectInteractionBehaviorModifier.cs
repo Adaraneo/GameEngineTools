@@ -45,6 +45,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 {
                     ObjectInteractionData? bestInteraction = null;
                     double bestUtility = 0.0;
+                    AffordanceType bestAffordanceType = AffordanceType.Hunger; // safe default, overwritten below
 
                     foreach (var affordance in obj.Affordances)
                     {
@@ -67,18 +68,29 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                         if (utility > bestUtility)
                         {
                             bestUtility = utility;
+                            bestAffordanceType = affordance.Type;
                             bestInteraction = new ObjectInteractionData(obj.Id, obj.LocationId, kind);
                         }
                     }
 
                     if (bestInteraction is not null)
                     {
+                        // Resolve a semantically specific action name and slot mask
+                        // from the affordance type that won the utility race.
+                        // Take/Drop keep the generic InteractWithObject name (handled separately).
+                        var actionName = bestInteraction.Kind == ObjectInteractionKind.UseInPlace
+                            ? ResolveActionName(bestAffordanceType)
+                            : ActionNames.InteractWithObject;
+
+                        var slotMask = ResolveSlotMask(bestAffordanceType, bestInteraction.Kind);
+
                         candidates.Add(new BehaviorCandidate(
-                            Name: ActionNames.InteractWithObject,
+                            Name: actionName,
                             Utility: bestUtility,
-                            Duration: WTimeSpan.FromMinutes(1),
-                            Domain: BehaviorDomain.Physiological,
-                            ObjectInteraction: bestInteraction));
+                            Duration: ResolveDefaultDuration(bestAffordanceType),
+                            Domain: ResolveDomain(bestAffordanceType),
+                            ObjectInteraction: bestInteraction,
+                            SlotMask: slotMask));
                     }
                 }
             }
@@ -104,6 +116,69 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                         ObjectInteractionKind.Drop)));
             }
         }
+
+        /// <summary>
+        /// Returns the specific action name for a UseInPlace interaction based on
+        /// the winning affordance type. This replaces the generic InteractWithObject
+        /// name so that BehaviorIntentMapper and ActionCategories can classify the action.
+        /// </summary>
+        private static string ResolveActionName(AffordanceType type) => type switch
+        {
+            AffordanceType.Rest          => ActionNames.UseObjectForRest,
+            AffordanceType.Work          => ActionNames.UseObjectForWork,
+            AffordanceType.Entertainment => ActionNames.UseObjectForFun,
+            AffordanceType.Warmth        => ActionNames.UseObjectForWarmth,
+            AffordanceType.MoodBoost     => ActionNames.UseObjectForMood,
+            AffordanceType.Social        => ActionNames.GatherAtObject,
+            // Hunger, Thirst, Ownership, StressRaise keep InteractWithObject
+            _                            => ActionNames.InteractWithObject,
+        };
+
+        /// <summary>
+        /// Returns the ActionSlotMask for a UseInPlace interaction based on
+        /// the winning affordance type.
+        /// </summary>
+        private static ActionSlotMask ResolveSlotMask(AffordanceType type, ObjectInteractionKind kind)
+        {
+            if (kind != ObjectInteractionKind.UseInPlace)
+                return ActionSlotMask.None;
+
+            return type switch
+            {
+                AffordanceType.Rest          => ActionSlotMask.Posture,
+                AffordanceType.Work          => ActionSlotMask.Hands | ActionSlotMask.Mind,
+                AffordanceType.Entertainment => ActionSlotMask.Hands | ActionSlotMask.Mind,
+                AffordanceType.Warmth        => ActionSlotMask.None,
+                AffordanceType.MoodBoost     => ActionSlotMask.None,
+                AffordanceType.Social        => ActionSlotMask.None,
+                _                            => ActionSlotMask.None,
+            };
+        }
+
+        /// <summary>
+        /// Returns a realistic default duration for each affordance-driven action.
+        /// Replaces the blanket WTimeSpan.FromMinutes(1) used previously.
+        /// </summary>
+        private static WTimeSpan ResolveDefaultDuration(AffordanceType type) => type switch
+        {
+            AffordanceType.Rest          => WTimeSpan.FromMinutes(30),
+            AffordanceType.Work          => WTimeSpan.FromHours(2),
+            AffordanceType.Entertainment => WTimeSpan.FromHours(1),
+            AffordanceType.Warmth        => WTimeSpan.FromMinutes(20),
+            AffordanceType.MoodBoost     => WTimeSpan.FromMinutes(15),
+            AffordanceType.Social        => WTimeSpan.FromMinutes(30),
+            _                            => WTimeSpan.FromMinutes(1),
+        };
+
+        /// <summary>
+        /// Returns the BehaviorDomain for the winning affordance type.
+        /// </summary>
+        private static BehaviorDomain ResolveDomain(AffordanceType type) => type switch
+        {
+            AffordanceType.Work          => BehaviorDomain.Competence,
+            AffordanceType.Social        => BehaviorDomain.Social,
+            _                            => BehaviorDomain.Physiological,
+        };
 
         private static double GetNeedScore(
             WorldObjectAffordance affordance,

@@ -14,9 +14,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
 
         internal static BehaviorIntentKind Resolve(string actionName) => actionName switch
         {
-            Work or Create or MoveToWork => BehaviorIntentKind.WorkSession,
-            MoveToRest => BehaviorIntentKind.RestSeeking,
-            ReachOut or MoveToSocial => BehaviorIntentKind.SocialSeeking,
+            Work or Create or MoveToWork or UseObjectForWork => BehaviorIntentKind.WorkSession,
+            MoveToRest or UseObjectForRest or UseObjectForWarmth => BehaviorIntentKind.RestSeeking,
+            ReachOut or MoveToSocial or GatherAtObject => BehaviorIntentKind.SocialSeeking,
             MoveToPrivate or InviteIntimacy => BehaviorIntentKind.PrivacySeeking,
             SelfCare => BehaviorIntentKind.SelfCare,
             MoveToPublic => BehaviorIntentKind.Exploration,

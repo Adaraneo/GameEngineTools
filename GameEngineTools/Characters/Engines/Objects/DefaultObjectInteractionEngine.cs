@@ -38,9 +38,10 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (committed.Human != ctx.Id)
                 return;
 
-            if (committed.ActionName != ActionNames.InteractWithObject)
-                return;
-
+            // Route on ObjectInteraction payload presence, not on a specific action name.
+            // This covers InteractWithObject AND all affordance-driven action names
+            // (UseObject:Rest, UseObject:Work, etc.) that ObjectInteractionBehaviorModifier
+            // now emits. The action name is informational only; the payload drives behaviour.
             var data = committed.ObjectInteraction;
             if (data is null)
                 return;

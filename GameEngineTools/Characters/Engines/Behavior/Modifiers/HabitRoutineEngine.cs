@@ -32,6 +32,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             { MoveToWork,    ActionCategory.Productive  },
             { MoveToRest,    ActionCategory.Rest        },
             { MoveToPublic,  ActionCategory.Social      },
+
+            // ── Affordance-driven object interactions ─────────────────────
+            { UseObjectForRest,   ActionCategory.Rest       },
+            { UseObjectForWarmth, ActionCategory.Rest       },
+            { UseObjectForWork,   ActionCategory.Productive },
+            { UseObjectForFun,    ActionCategory.Rest       },
+            { UseObjectForMood,   ActionCategory.Rest       },
+            { GatherAtObject,     ActionCategory.Social     },
         };
 
         #endregion Static data
