@@ -8,6 +8,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
     using GameEngineTools.World.Core.Astro;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
@@ -287,5 +288,13 @@ namespace GameEngineTools.World.Simulation
         /// from the previous substep into a single SQLite transaction.
         /// </summary>
         public WorldObjectWriteBuffer? WriteBuffer { get; init; }
+
+        /// <summary>
+        /// Optional object respawn scheduler.
+        /// When set, <see cref="SimulationScene"/> calls <see cref="ObjectRespawnScheduler.Tick"/>
+        /// once per substep after all characters have ticked, restoring consumed objects
+        /// whose respawn timer has elapsed and emitting EventId 1501 log entries.
+        /// </summary>
+        public ObjectRespawnScheduler? RespawnScheduler { get; init; }
     }
 }

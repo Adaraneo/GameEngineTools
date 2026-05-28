@@ -226,6 +226,11 @@ namespace GameEngineTools.World.Simulation
                 RouteOutcomes(character, chars);
             }
 
+            // ── Krok 2c: Respawn konzumovaných objektů ────────────────────────────
+            // Runs after all characters have ticked so that an object consumed in this
+            // step cannot be reclaimed by the same step.
+            _options.RespawnScheduler?.Tick(now);
+
             // --- Narrative scan ----
             if (_options.NarrativeFormatter is { } formatter && _options.OnNarrative is { } onNarrative)
             {

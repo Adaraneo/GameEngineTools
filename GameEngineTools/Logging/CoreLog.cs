@@ -1094,6 +1094,44 @@ namespace GameEngineTools.Logging
 
         #endregion Goals — 1300–1399
 
+        #region World Objects — 1500–1599
+
+        /// <summary>
+        /// Character used a world object in place — records what was consumed, what affordances fired, and total satisfaction.
+        /// Logged at Information so it appears in production runs alongside action decisions.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1500,
+            Level = LogLevel.Information,
+            Message = "[OBJ/USE] {HumanId} used {ObjectId} ({DisplayName}) at {LocationId}: affordances={Affordances} sat={Satisfaction:F2} consumed={WasConsumed}")]
+        public static partial void ObjectUsed(
+            this ILogger logger,
+            string HumanId,
+            string ObjectId,
+            string DisplayName,
+            string LocationId,
+            string Affordances,
+            double Satisfaction,
+            bool WasConsumed);
+
+        /// <summary>
+        /// A consumed world object was restored by the respawn scheduler.
+        /// Logged at Debug — fires once per object per respawn cycle.
+        /// No HumanId — this is a world-level event, not character-scoped.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1501,
+            Level = LogLevel.Debug,
+            Message = "[OBJ/RESPAWN] {ObjectId} ({DisplayName}) at {LocationId} respawned after {ElapsedMinutes:F0}min")]
+        public static partial void ObjectRespawned(
+            this ILogger logger,
+            string ObjectId,
+            string DisplayName,
+            string LocationId,
+            double ElapsedMinutes);
+
+        #endregion World Objects — 1500–1599
+
         #region Scheduler a infrastruktura
 
         /// <summary>Scheduler byl spuštěn.</summary>

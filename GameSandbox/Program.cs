@@ -214,11 +214,56 @@ var locationService = (DefaultLocationService)runtime.Services.GetRequiredServic
 worldMap.RegisterAllLocations(locationService);
 var objectProvider = runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
+var objectRespawner = runtime.Services.GetRequiredService<ObjectRespawnScheduler>();
 
+// ── Tavern (Village / Social) ─────────────────────────────────────────────────
+// 35 apples — primary food source for Village NPCs
 for (int index = 0; index < 35; index++)
-{
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"apple_{(index + 1).ToString("D2")}", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.5)] });
-}
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"apple_{(index + 1):D2}", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.5)] });
+// 20 beer mugs — drink for Village NPCs
+for (int index = 0; index < 20; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"beer_{(index + 1):D2}", DisplayName = "Džbán piva", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0.1, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 20, WeightGrams = 600, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.6)] });
+// 10 water jugs — also available in tavern
+for (int index = 0; index < 10; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_tavern_{(index + 1):D2}", DisplayName = "Džbán vody", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 30, WeightGrams = 500, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.8)] });
+
+// ── Market Square (Village / Public) ──────────────────────────────────────────
+for (int index = 0; index < 20; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"bread_market_{(index + 1):D2}", DisplayName = "Bochánek chleba", LocationId = "market_square", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 60, WeightGrams = 200, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.6)] });
+for (int index = 0; index < 10; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"well_market_{(index + 1):D2}", DisplayName = "Studniční voda", LocationId = "market_square", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 10, WeightGrams = 300, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.9)] });
+
+// ── Inn Room (Village / Rest) ─────────────────────────────────────────────────
+for (int index = 0; index < 5; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_inn_{(index + 1):D2}", DisplayName = "Konvice vody", LocationId = "inn_room", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 60, WeightGrams = 400, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.8)] });
+
+// ── Castle Hall (Castle / Social) ─────────────────────────────────────────────
+for (int index = 0; index < 15; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"bread_hall_{(index + 1):D2}", DisplayName = "Chléb", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 60, WeightGrams = 250, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.55)] });
+for (int index = 0; index < 10; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"meat_hall_{(index + 1):D2}", DisplayName = "Pečené maso", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0.2, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 120, WeightGrams = 350, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.8)] });
+for (int index = 0; index < 15; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"wine_hall_{(index + 1):D2}", DisplayName = "Pohár vína", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 45, WeightGrams = 350, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.65)] });
+for (int index = 0; index < 10; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_hall_{(index + 1):D2}", DisplayName = "Džbán vody", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 30, WeightGrams = 500, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.85)] });
+
+// ── Library (Castle / Private) ────────────────────────────────────────────────
+for (int index = 0; index < 5; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"fruit_library_{(index + 1):D2}", DisplayName = "Sušené ovoce", LocationId = "library", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 120, WeightGrams = 80, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.3)] });
+for (int index = 0; index < 5; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"tea_library_{(index + 1):D2}", DisplayName = "Šálek bylinkového čaje", LocationId = "library", AmbientNoise = 0, HeatSignature = 0.3, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 60, WeightGrams = 200, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.6), new WorldObjectAffordance(AffordanceType.MoodBoost, 0.15)] });
+
+// ── Courtyard (Castle / Public) ───────────────────────────────────────────────
+for (int index = 0; index < 15; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_courtyard_{(index + 1):D2}", DisplayName = "Voda ze studny", LocationId = "courtyard", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 10, WeightGrams = 300, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.9)] });
+
+// ── Throne Room (Castle / Social) ─────────────────────────────────────────────
+for (int index = 0; index < 8; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"wine_throne_{(index + 1):D2}", DisplayName = "Karafa vína", LocationId = "throne_room", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 90, WeightGrams = 700, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.7)] });
+
+// ── Stables (Castle / Work) ───────────────────────────────────────────────────
+for (int index = 0; index < 5; index++)
+    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_stables_{(index + 1):D2}", DisplayName = "Kbelík vody", LocationId = "stables", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 45, WeightGrams = 400, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.75)] });
 
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
@@ -279,6 +324,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
     NarrativeFormatter = new DefaultNarrativeFormatter(),
     ObjectSnapshotCache = objectSnapshotCache,
     WriteBuffer = writeBuffer,
+    RespawnScheduler = objectRespawner,
     DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
     ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService, new HashSet<HumanId>
     {
@@ -361,6 +407,7 @@ if (characters.Count > 0)
         SimulationDays = simulationDays,
         ObjectSnapshotCache = objectSnapshotCache,
         WriteBuffer = writeBuffer,
+        RespawnScheduler = objectRespawner,
         DefaultCharacterLod = CognitiveResolutionLevel.Background,
         InternalSubstep = WTimeSpan.FromMinutes(30),
         OnTick = (now, chars) =>

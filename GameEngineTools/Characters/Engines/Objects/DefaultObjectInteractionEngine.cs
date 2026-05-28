@@ -5,9 +5,11 @@ namespace GameEngineTools.Characters.Engines.Objects
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Resolves <see cref="ActionNames.InteractWithObject"/> actions committed by the Behavior engine.
@@ -19,15 +21,18 @@ namespace GameEngineTools.Characters.Engines.Objects
         private readonly IMutableWorldObjectProvider _objectProvider;
         private readonly ILocationService _locations;
         private readonly IObjectInteractionPolicy _policy;
+        private readonly ILogger<DefaultObjectInteractionEngine> _logger;
 
         public DefaultObjectInteractionEngine(
             IMutableWorldObjectProvider objectProvider,
             ILocationService locations,
-            IObjectInteractionPolicy policy)
+            IObjectInteractionPolicy policy,
+            ILogger<DefaultObjectInteractionEngine> logger)
         {
             _objectProvider = objectProvider;
             _locations = locations;
             _policy = policy;
+            _logger = logger;
         }
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
@@ -90,6 +95,24 @@ namespace GameEngineTools.Characters.Engines.Objects
                     if (wasConsumed)
                         _objectProvider.ConsumeObject(data.LocationId, data.ObjectId, committed.OccurredAt);
                     outbox.Add(new ObjectUsed(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId, wasConsumed));
+
+                    // Log object usage with affordance summary (EventId 1500)
+                    var relevantAffordances = obj.Affordances
+                        .Where(a => a.Type != AffordanceType.Ownership)
+                        .ToList();
+                    if (relevantAffordances.Count > 0)
+                    {
+                        var affordanceTypes  = string.Join("+", relevantAffordances.Select(a => a.Type.ToString()));
+                        var totalSatisfaction = relevantAffordances.Sum(a => a.Satisfaction);
+                        _logger.ObjectUsed(
+                            ctx.Id.ToString(),
+                            obj.Id,
+                            obj.DisplayName,
+                            data.LocationId,
+                            affordanceTypes,
+                            totalSatisfaction,
+                            wasConsumed);
+                    }
                     break;
 
                 case ObjectInteractionKind.Drop:

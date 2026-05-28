@@ -5,7 +5,9 @@ namespace GameEngineTools.World.Objects
 {
     using System;
     using System.Linq;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Checks all consumed world objects each simulation tick and restores those
@@ -32,6 +34,7 @@ namespace GameEngineTools.World.Objects
         /// of the mutable contract, not the read-only <see cref="IWorldObjectProvider"/>.
         /// </summary>
         private readonly IMutableWorldObjectProvider _provider;
+        private readonly ILogger<ObjectRespawnScheduler> _logger;
 
         #endregion Private state
 
@@ -44,10 +47,14 @@ namespace GameEngineTools.World.Objects
         /// The mutable provider. Injected as singleton — must be the same instance
         /// used by the simulation engines.
         /// </param>
-        public ObjectRespawnScheduler(IMutableWorldObjectProvider provider)
+        /// <param name="logger">Logger for object respawn events (EventId 1501).</param>
+        public ObjectRespawnScheduler(
+            IMutableWorldObjectProvider provider,
+            ILogger<ObjectRespawnScheduler> logger)
         {
             ArgumentNullException.ThrowIfNull(provider);
             _provider = provider;
+            _logger   = logger;
         }
 
         #endregion Construction
@@ -76,7 +83,10 @@ namespace GameEngineTools.World.Objects
                     var elapsed = WDateTime.Difference(now, obj.ConsumedAt.Value).TotalMinutes;
 
                     if (elapsed >= obj.RespawnMinutes)
+                    {
                         _provider.RestoreObject(locationId, obj.Id);
+                        _logger.ObjectRespawned(obj.Id, obj.DisplayName, locationId, elapsed);
+                    }
                 }
             }
         }
