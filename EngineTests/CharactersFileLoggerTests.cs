@@ -62,6 +62,33 @@ public sealed class CharactersFileLoggerTests
         Assert.AreEqual(relatedId, globalJson.RootElement.GetProperty("RelatedPersonId").GetGuid());
         Assert.AreEqual("loc-1", globalJson.RootElement.GetProperty("LocationId").GetString());
         Assert.AreEqual("42", globalJson.RootElement.GetProperty("TickKey").GetString());
+
+        // P1: numeric world tick + structured payload extracted from the message state.
+        Assert.AreEqual(123L, globalJson.RootElement.GetProperty("WorldTick").GetInt64());
+        var payload = globalJson.RootElement.GetProperty("Payload");
+        Assert.AreEqual("Walk", payload.GetProperty("Action").GetString());
+    }
+
+    [TestMethod]
+    public void StructuredPayload_PreservesValueTypes()
+    {
+        using var fixture = LoggerFixture.Create();
+        var logger = fixture.CreateLogger("Test.Category");
+
+        // Mixed value types: string, number, bool — each must keep its JSON type.
+        logger.LogInformation(new EventId(1500),
+            "Used {ObjectId} sat={Satisfaction} consumed={WasConsumed}",
+            "apple_03", 0.85, true);
+        fixture.FlushAll();
+
+        using var json = JsonDocument.Parse(ReadAllTextShared(Path.Combine(fixture.LogsRoot, "Characters.jsonl")));
+        var payload = json.RootElement.GetProperty("Payload");
+        Assert.AreEqual("apple_03", payload.GetProperty("ObjectId").GetString());
+        Assert.AreEqual(JsonValueKind.Number, payload.GetProperty("Satisfaction").ValueKind);
+        Assert.AreEqual(0.85, payload.GetProperty("Satisfaction").GetDouble(), 1e-9);
+        Assert.AreEqual(JsonValueKind.True, payload.GetProperty("WasConsumed").ValueKind);
+        // The synthetic format string must not leak into the payload.
+        Assert.IsFalse(payload.TryGetProperty("{OriginalFormat}", out _));
     }
 
     [TestMethod]
@@ -208,6 +235,7 @@ public sealed class CharactersFileLoggerTests
                     opt.LogsDirectoryPath = logsRoot;
                     opt.MinLevel = LogLevel.Trace;
                     opt.WorldTimeTextAccessor = () => "test-world";
+                    opt.WorldTicksAccessor = () => 123L;
                     configure?.Invoke(opt);
                 });
             });

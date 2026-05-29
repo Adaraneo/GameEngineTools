@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Text;
+using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Logging;
 
@@ -91,6 +92,7 @@ namespace GameEngineTools.Logging
             string category,
             EventId eventId,
             string message,
+            IReadOnlyDictionary<string, object?>? payload,
             Exception? ex,
             CharacterLogScope? scope)
         {
@@ -99,7 +101,7 @@ namespace GameEngineTools.Logging
                 return;
             }
 
-            var entry = BuildEntry(level, category, eventId, message, ex, scope);
+            var entry = BuildEntry(level, category, eventId, message, payload, ex, scope);
 
             lock (_writeLock)
             {
@@ -126,21 +128,27 @@ namespace GameEngineTools.Logging
             string category,
             EventId eventId,
             string message,
+            IReadOnlyDictionary<string, object?>? payload,
             Exception? ex,
             CharacterLogScope? scope)
         {
             var now = _opt.UseUtcTimestamps ? DateTimeOffset.UtcNow : DateTimeOffset.Now;
             var worldTimeText = _opt.WorldTimeTextAccessor?.Invoke() ?? WDateTime.Now.ToString();
+            // Safe fallback: WDateTime.Now throws until WWorld is configured (e.g. in unit tests).
+            var worldTick = _opt.WorldTicksAccessor?.Invoke()
+                            ?? (WWorld.IsConfigured ? WDateTime.Now.WorldTicks : 0L);
 
             return new CharactersLogEntry
             {
                 EventInstanceId = Interlocked.Increment(ref _nextEventInstanceId),
                 RealTimestamp = now,
                 WorldTimeText = worldTimeText,
+                WorldTick = worldTick,
                 Level = ShortLevel(level),
                 Category = category,
                 EventId = eventId.Id,
                 Message = message,
+                Payload = payload,
                 ExceptionType = ex?.GetType().FullName,
                 ExceptionMessage = ex?.Message,
                 StackTrace = ex?.StackTrace,

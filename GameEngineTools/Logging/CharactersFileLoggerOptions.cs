@@ -45,5 +45,12 @@ namespace GameEngineTools.Logging
         /// Volitelný accessor pro aktuální world time text zapisovaný do logů.
         /// </summary>
         public Func<string>? WorldTimeTextAccessor { get; set; }
+
+        /// <summary>
+        /// Volitelný accessor pro numerický world tick (<see cref="World.Utils.Time.WDateTime.WorldTicks"/>).
+        /// Slouží jako grouping klíč pro tick-store v readeru. Když není nastaven, použije se
+        /// bezpečný fallback (0, dokud není <c>WWorld</c> nakonfigurován).
+        /// </summary>
+        public Func<long>? WorldTicksAccessor { get; set; }
     }
 }

@@ -148,6 +148,7 @@ namespace GameEngineTools
                     opt.MinLevel = LogLevel.Debug;
                     opt.UseUtcTimestamps = true;
                     opt.WorldTimeTextAccessor = () => WDateTime.Now.ToString();
+                    opt.WorldTicksAccessor = () => WDateTime.Now.WorldTicks;
                     opt.WriteTextLogs = writeTextLogs;
                     opt.WriteJsonLines = writeJsonLines;
                 });

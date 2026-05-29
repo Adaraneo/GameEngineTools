@@ -47,6 +47,7 @@ namespace GameEngineTools.Logging
             }
 
             var message = formatter(state, exception);
+            var payload = ExtractPayload(state);
 
             CharacterLogScope? characterScope = null;
             _provider.Scopes?.ForEachScope((scopeObj, _) =>
@@ -57,7 +58,35 @@ namespace GameEngineTools.Logging
                 }
             }, (object?)null);
 
-            _provider.Write(logLevel, _category, eventId, message, exception, characterScope);
+            _provider.Write(logLevel, _category, eventId, message, payload, exception, characterScope);
+        }
+
+        /// <summary>
+        /// Projects a <c>[LoggerMessage]</c> / structured-logging state into a typed field map.
+        /// The generated state implements <see cref="IReadOnlyList{T}"/> of name/value pairs;
+        /// we keep every field (preserving its boxed type) except the synthetic format string,
+        /// so the JSONL companion carries structured data instead of only a formatted message.
+        /// </summary>
+        private static IReadOnlyDictionary<string, object?>? ExtractPayload<TState>(TState state)
+        {
+            if (state is not IReadOnlyList<KeyValuePair<string, object?>> fields || fields.Count == 0)
+            {
+                return null;
+            }
+
+            Dictionary<string, object?>? payload = null;
+            for (var i = 0; i < fields.Count; i++)
+            {
+                var field = fields[i];
+                if (field.Key == "{OriginalFormat}")
+                {
+                    continue;
+                }
+
+                (payload ??= new Dictionary<string, object?>(fields.Count))[field.Key] = field.Value;
+            }
+
+            return payload;
         }
 
         #endregion ILogger

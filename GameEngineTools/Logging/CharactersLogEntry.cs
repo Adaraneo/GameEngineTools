@@ -14,6 +14,12 @@ namespace GameEngineTools.Logging
 
         public string WorldTimeText { get; init; }
 
+        /// <summary>
+        /// Numeric world tick (<see cref="World.Utils.Time.WDateTime.WorldTicks"/>) at log time.
+        /// The grouping key for the v2 tick-store; survives without parsing <see cref="WorldTimeText"/>.
+        /// </summary>
+        public long WorldTick { get; init; }
+
         public string Level { get; init; }
 
         public string Category { get; init; }
@@ -45,5 +51,13 @@ namespace GameEngineTools.Logging
         public string? TickKey { get; init; }
 
         public bool IsScoped { get; init; }
+
+        /// <summary>
+        /// Structured event fields captured from the <c>[LoggerMessage]</c> state
+        /// (e.g. <c>{ "Action": "Eat", "Utility": 0.87 }</c>). Each field's JSON type
+        /// is preserved (number/bool/string) so consumers read it directly instead of
+        /// re-parsing <see cref="Message"/> with regexes. <c>null</c> for unstructured logs.
+        /// </summary>
+        public IReadOnlyDictionary<string, object?>? Payload { get; init; }
     }
 }
