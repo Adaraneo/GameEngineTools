@@ -33,7 +33,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 5000,
             Level = LogLevel.Information,
-            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1}")]
+            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1} Allostatic:{Allostatic:F1} Cortisol:{Cortisol:F1}")]
         public static partial void PhysiologySnapshot(
             this ILogger logger,
             string HumanId,
@@ -43,7 +43,9 @@ namespace GameEngineTools.Logging
             double Pain,
             double SleepDebt,
             double TempDelta,
-            double Immune);
+            double Immune,
+            double Allostatic,
+            double Cortisol);
 
         /// <summary>Aktuální fáze menstruačního cyklu postavy.</summary>
         [LoggerMessage(
@@ -126,7 +128,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 5100,
             Level = LogLevel.Information,
-            Message = "[PSYCH] {HumanId} Emotion:{Emotion} V:{Valence:+0.00;-0.00} A:{Arousal:F2} D:{Dominance:F2} Stress:{Stress:F1} CogLoad:{CogLoad:F1}")]
+            Message = "[PSYCH] {HumanId} Emotion:{Emotion} V:{Valence:+0.00;-0.00} A:{Arousal:F2} D:{Dominance:F2} Stress:{Stress:F1} CogLoad:{CogLoad:F1} Mood:{MoodBaseline:F1}")]
         public static partial void PsychologySnapshot(
             this ILogger logger,
             string HumanId,
@@ -135,7 +137,8 @@ namespace GameEngineTools.Logging
             double Arousal,
             double Dominance,
             double Stress,
-            double CogLoad);
+            double CogLoad,
+            double MoodBaseline);
 
         /// <summary>
         /// Psychologický dopad noční můry — stres vzrostl, valence klesla.

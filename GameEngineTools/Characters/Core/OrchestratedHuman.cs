@@ -620,7 +620,8 @@ namespace GameEngineTools.Characters.Core
                     Id.Value.ToString(),
                     s.Physiology.Energy, s.Physiology.Hunger, s.Physiology.Thirst,
                     s.Physiology.Pain, s.Physiology.SleepDebtHours,
-                    s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad);
+                    s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad,
+                    s.Physiology.AllostaticLoad, s.Physiology.CortisolLevel);
 
                 if (s.Physiology.Cycle is { } c)
                 {
@@ -631,7 +632,8 @@ namespace GameEngineTools.Characters.Core
                     Id.Value.ToString(),
                     s.Psychology.DominantEmotion.ToString(),
                     s.Psychology.Valence, s.Psychology.Arousal, s.Psychology.Dominance,
-                    s.Psychology.Stress, s.Psychology.CognitiveLoad);
+                    s.Psychology.Stress, s.Psychology.CognitiveLoad,
+                    s.Psychology.MoodBaseline);
 
                 var plan = s.Behavior.CurrentPlan;
                 _log.BehaviorSnapshot(
