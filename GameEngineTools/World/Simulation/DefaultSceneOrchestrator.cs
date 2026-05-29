@@ -115,6 +115,19 @@ namespace GameEngineTools.World.Simulation
 
         #endregion Private fields
 
+        #region Constants
+
+        /// <summary>
+        /// Minimum confidence [0–1] required for an <see cref="ObjectLocationFact"/>
+        /// to be used when routing a foraging character.
+        /// Facts below this threshold are treated as "forgotten" for navigation purposes.
+        /// Default 0.15 — a fact survives roughly 15 days from DirectWitnessConfidence (0.9)
+        /// before becoming too unreliable to route toward.
+        /// </summary>
+        private const double MinMemoryConfidence = 0.15;
+
+        #endregion Constants
+
         #region Constructor
 
         /// <summary>
@@ -448,7 +461,16 @@ namespace GameEngineTools.World.Simulation
                         ? WorldObjectCategory.Food
                         : WorldObjectCategory.Drink;
 
-                    var destination = FindLocationWithCategory(character, currentLocation, category);
+                    // Map category to PickupItemKind for memory lookup.
+                    var itemKind = category == WorldObjectCategory.Food
+                        ? PickupItemKind.Food
+                        : PickupItemKind.Drink;
+
+                    // Try memory-based routing first — character navigates where they remember seeing food.
+                    // Falls back to omniscient provider when memory is empty or all facts are stale.
+                    var destination =
+                        FindLocationWithCategoryViaMemory(character, currentLocation, itemKind)
+                        ?? FindLocationWithCategory(character, currentLocation, category);
 
                     if (destination is not null)
                     {
@@ -458,7 +480,7 @@ namespace GameEngineTools.World.Simulation
                     else
                     {
                         _log.LogDebug(
-                            "[MoveTo] {CharId} needs {Category} but no location with that object exists.",
+                            "[MoveTo] {CharId} needs {Category} but found no location via memory or provider.",
                             character.Id.Value, category);
                     }
 
@@ -594,6 +616,83 @@ namespace GameEngineTools.World.Simulation
             // Fallback: pick arbitrarily from all known locations with the required object.
             // Could be improved with distance scoring if WorldMap exposes path lengths.
             return candidateLocations.First();
+        }
+
+        /// <summary>
+        /// Attempts to route a foraging character to a location they remember
+        /// containing the required object category.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Reads <see cref="MemoryIndex.KnownObjects"/> from the character's snapshot.
+        /// Only facts with confidence above <see cref="MinMemoryConfidence"/> are considered —
+        /// stale or nearly-forgotten memories are ignored.
+        /// </para>
+        /// <para>
+        /// Prefers adjacent locations over distant ones (same adjacency logic as
+        /// <see cref="FindLocationWithCategory"/>). Returns <c>null</c> when the character
+        /// has no qualifying memory, signaling the caller to fall back to the global provider.
+        /// </para>
+        /// </remarks>
+        /// <param name="character">The character navigating toward food/drink.</param>
+        /// <param name="currentLocationId">Character's current location ID.</param>
+        /// <param name="itemKind">The kind of item being sought (Food or Drink).</param>
+        /// <returns>
+        /// The best remembered location ID, or <c>null</c> when memory is empty or
+        /// all facts are below the confidence threshold.
+        /// </returns>
+        private string? FindLocationWithCategoryViaMemory(
+            IHuman character,
+            string? currentLocationId,
+            PickupItemKind itemKind)
+        {
+            if (currentLocationId is null)
+                return null;
+
+            var knownObjects = character.Snapshot.Memory.KnownObjects;
+
+            if (knownObjects.Count == 0)
+                return null;
+
+            // Collect distinct locations where the character remembers seeing this kind of item,
+            // filtered by minimum confidence threshold to exclude nearly-forgotten facts.
+            var rememberedLocations = knownObjects
+                .Where(f => f.ItemKind == itemKind
+                         && f.Confidence >= MinMemoryConfidence
+                         && f.LocationId != currentLocationId)
+                .GroupBy(f => f.LocationId)
+                .Select(g => (
+                    LocationId: g.Key,
+                    BestConfidence: g.Max(f => f.Confidence)))
+                .ToList();
+
+            if (rememberedLocations.Count == 0)
+                return null;
+
+            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
+
+            // Prefer an adjacent location the character remembers — nearest + highest confidence.
+            var adjacentConnections = _worldMap.GetConnections(currentLocationId);
+
+            var adjacentMatch = adjacentConnections
+                .Where(conn => rememberedLocations.Any(r => r.LocationId == conn.TargetLocationId))
+                .Select(conn => (
+                    conn.TargetLocationId,
+                    TravelMinutes: TravelDurationComputer.ComputeMinutes(conn.DistanceMeters, speed),
+                    BestConfidence: rememberedLocations.First(r => r.LocationId == conn.TargetLocationId).BestConfidence))
+                .OrderBy(x => x.TravelMinutes)
+                .ThenByDescending(x => x.BestConfidence)
+                .Select(x => x.TargetLocationId)
+                .FirstOrDefault();
+
+            if (adjacentMatch is not null)
+                return adjacentMatch;
+
+            // Fallback within memory: non-adjacent remembered location with best confidence.
+            return rememberedLocations
+                .OrderByDescending(r => r.BestConfidence)
+                .Select(r => r.LocationId)
+                .First();
         }
 
         /// <summary>
