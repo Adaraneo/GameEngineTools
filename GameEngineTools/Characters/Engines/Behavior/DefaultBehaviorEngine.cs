@@ -29,6 +29,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
     {
         #region Private fields
 
+        /// <summary>
+        /// Minimum utility a secondary candidate must have to be committed.
+        /// Prevents trivially low-priority candidates (Idle ≈ 5) from being emitted.
+        /// </summary>
+        private const double MinSecondaryUtility = 10.0;
+
         private readonly ILogger _log;
         private readonly IReadOnlyList<IBehaviorNeedEngine> _needEngines;
         private readonly IReadOnlyList<IBehaviorModifierEngine> _modifierEngines;
@@ -212,6 +218,29 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     _log.MoveActionCommitted(ctx.Id.Value.ToString(), result.SelectedCandidate.Name, currentLocation, result.SelectedCandidate.Utility);
                 }
             }
+
+            // Secondary action — commit in parallel when a non-conflicting candidate is available.
+            var secondary = SelectSecondaryAction(candidates, result.SelectedCandidate, ctx.OccupiedSlots);
+            if (secondary is not null)
+            {
+                outbox.Add(new ActionCommitted(
+                    now, ctx.Id,
+                    secondary.Name, secondary.Duration,
+                    secondary.SocialTargeting?.TargetHuman,
+                    null, null,
+                    secondary.ObjectInteraction));
+
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultBehaviorEngine),
+                       tickKey: now.WorldTicks.ToString()))
+                {
+                    _log.BehaviorActionChosen(ctx.Id.Value.ToString(),
+                        secondary.Name, secondary.Utility, secondary.Duration.ToString());
+
+                    if (secondary.ObjectInteraction is { } soi)
+                        _log.ObjectInteractionCommitted(ctx.Id.Value.ToString(),
+                            soi.ObjectId, soi.Kind.ToString(), soi.LocationId, secondary.Utility);
+                }
+            }
         }
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
@@ -260,6 +289,39 @@ namespace GameEngineTools.Characters.Engines.Behavior
         {
             var stadium = _developmentPolicy.ResolveStadium(context.HumanContext, context.Now);
             candidates.RemoveAll(candidate => !_developmentPolicy.AllowsAction(stadium, candidate.Name));
+        }
+
+        /// <summary>
+        /// Returns the highest-utility candidate that can run in parallel with <paramref name="primary"/>.
+        /// </summary>
+        /// <remarks>
+        /// Excluded candidates:
+        /// <list type="bullet">
+        ///   <item>The primary candidate itself.</item>
+        ///   <item>Candidates with <see cref="SocialTargetingData"/> — they require the full
+        ///   interaction-proposal pipeline and cannot be committed without it.</item>
+        ///   <item>Candidates whose <see cref="BehaviorCandidate.SlotMask"/> is
+        ///   <see cref="ActionSlotMask.None"/> — passive ambient actions do not need an explicit
+        ///   secondary commit; their effects are modelled through the affordance modifier.</item>
+        ///   <item>Candidates whose slot mask conflicts with <paramref name="primary"/> or
+        ///   with <paramref name="alreadyOccupied"/> from prior ticks.</item>
+        ///   <item>Candidates below <see cref="MinSecondaryUtility"/>.</item>
+        /// </list>
+        /// </remarks>
+        internal static BehaviorCandidate? SelectSecondaryAction(
+            List<BehaviorCandidate> candidates,
+            BehaviorCandidate primary,
+            ActionSlotMask alreadyOccupied)
+        {
+            var combined = alreadyOccupied | primary.SlotMask;
+            return candidates
+                .Where(c => !ReferenceEquals(c, primary))
+                .Where(c => c.SocialTargeting is null)
+                .Where(c => c.SlotMask != ActionSlotMask.None)
+                .Where(c => (c.SlotMask & combined) == ActionSlotMask.None)
+                .Where(c => c.Utility >= MinSecondaryUtility)
+                .OrderByDescending(c => c.Utility)
+                .FirstOrDefault();
         }
 
         #endregion Cooldowns

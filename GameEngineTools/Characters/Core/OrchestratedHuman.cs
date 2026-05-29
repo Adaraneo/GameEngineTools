@@ -322,6 +322,8 @@ namespace GameEngineTools.Characters.Core
 
             if (behaviorDt > WTimeSpan.Zero)
             {
+                // Expose current slot occupancy to the behavior engine so it can gate secondary selection.
+                _ctx.OccupiedSlots = _slots.OccupiedMask;
                 _behavior.Tick(now, behaviorDt, _ctx, outbox);
             }
 

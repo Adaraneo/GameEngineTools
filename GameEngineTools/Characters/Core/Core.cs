@@ -165,6 +165,12 @@ namespace GameEngineTools.Characters.Core
 
         EnginesSnapshot Snapshot { get; }
 
+        /// <summary>
+        /// Combined bitmask of all body/mind channels currently occupied by non-expired actions.
+        /// Set by OrchestratedHuman before each behavior tick.
+        /// </summary>
+        ActionSlotMask OccupiedSlots { get; }
+
         IEventBus EventBus { get; }
         IScheduler Scheduler { get; }
         IRandomSource Random { get; }

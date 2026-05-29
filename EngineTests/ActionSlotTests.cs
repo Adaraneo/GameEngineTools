@@ -346,6 +346,138 @@ namespace EngineTests
         #endregion
 
         // ─────────────────────────────────────────────────────────────────────
+        #region SelectSecondaryAction — filter logic
+
+        /// <summary>
+        /// Sit (Posture) + Eat (Hands|Mouth) share no bits — Eat must be returned as secondary.
+        /// </summary>
+        [TestMethod]
+        public void SelectSecondaryAction_RestPlusEat_NoConflict_ReturnsEat()
+        {
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,       utility: 60);
+            var eat = MakeCandidate(ActionNames.Eat,              ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 40);
+
+            var result = DefaultBehaviorEngine.SelectSecondaryAction(
+                [sit, eat], primary: sit, alreadyOccupied: ActionSlotMask.None);
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ActionNames.Eat, result!.Name);
+        }
+
+        /// <summary>
+        /// Work (Hands|Mind) and Create (Hands|Mind) conflict — null must be returned.
+        /// </summary>
+        [TestMethod]
+        public void SelectSecondaryAction_ConflictingSlots_ReturnsNull()
+        {
+            var work   = MakeCandidate(ActionNames.Work,   ActionSlotMask.Hands | ActionSlotMask.Mind, utility: 70);
+            var create = MakeCandidate(ActionNames.Create, ActionSlotMask.Hands | ActionSlotMask.Mind, utility: 50);
+
+            var result = DefaultBehaviorEngine.SelectSecondaryAction(
+                [work, create], primary: work, alreadyOccupied: ActionSlotMask.None);
+
+            Assert.IsNull(result, "Conflicting Hands|Mind slot must produce null.");
+        }
+
+        /// <summary>
+        /// A candidate with SocialTargeting must be excluded from secondary selection —
+        /// ReachOut requires the full interaction-proposal pipeline.
+        /// </summary>
+        [TestMethod]
+        public void SelectSecondaryAction_SocialTargeting_Excluded()
+        {
+            var sit     = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
+            var reachOut = MakeCandidate(ActionNames.ReachOut,         ActionSlotMask.Mouth,  utility: 50,
+                socialTargeting: new SocialTargetingData(
+                    new HumanId(Guid.NewGuid()), SpeechAct.SmallTalk, 0.7, 0.8, 0.2));
+
+            var result = DefaultBehaviorEngine.SelectSecondaryAction(
+                [sit, reachOut], primary: sit, alreadyOccupied: ActionSlotMask.None);
+
+            Assert.IsNull(result, "Candidate with SocialTargeting must be excluded from secondary.");
+        }
+
+        /// <summary>
+        /// A candidate below MinSecondaryUtility (10) must not be selected.
+        /// </summary>
+        [TestMethod]
+        public void SelectSecondaryAction_BelowMinUtility_Excluded()
+        {
+            var sit  = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,                     utility: 60);
+            var low  = MakeCandidate(ActionNames.SelfCare,         ActionSlotMask.Hands,                       utility: 5);
+
+            var result = DefaultBehaviorEngine.SelectSecondaryAction(
+                [sit, low], primary: sit, alreadyOccupied: ActionSlotMask.None);
+
+            Assert.IsNull(result, "Candidate with utility 5 is below MinSecondaryUtility and must be excluded.");
+        }
+
+        /// <summary>
+        /// When alreadyOccupied from a prior tick includes Hands, a secondary candidate
+        /// that also needs Hands must be blocked.
+        /// </summary>
+        [TestMethod]
+        public void SelectSecondaryAction_AlreadyOccupiedFromPriorTick_BlocksConflictingSecondary()
+        {
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,       utility: 60);
+            var eat = MakeCandidate(ActionNames.Eat,              ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 40);
+
+            // Hands are already occupied from a prior tick (e.g., carrying something).
+            var result = DefaultBehaviorEngine.SelectSecondaryAction(
+                [sit, eat], primary: sit, alreadyOccupied: ActionSlotMask.Hands);
+
+            Assert.IsNull(result, "Eat (Hands|Mouth) must be blocked when Hands are already occupied.");
+        }
+
+        /// <summary>
+        /// When multiple non-conflicting candidates exist, the highest-utility one wins.
+        /// </summary>
+        [TestMethod]
+        public void SelectSecondaryAction_MultipleEligible_ReturnsHighestUtility()
+        {
+            var sit     = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,                     utility: 60);
+            var eat     = MakeCandidate(ActionNames.Eat,              ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 45);
+            var drink   = MakeCandidate(ActionNames.Drink,            ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 30);
+
+            var result = DefaultBehaviorEngine.SelectSecondaryAction(
+                [sit, eat, drink], primary: sit, alreadyOccupied: ActionSlotMask.None);
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ActionNames.Eat, result!.Name, "Eat (utility 45) must beat Drink (utility 30).");
+        }
+
+        /// <summary>
+        /// A candidate whose SlotMask is None must be excluded — passive ambient actions
+        /// don't need an explicit secondary commit.
+        /// </summary>
+        [TestMethod]
+        public void SelectSecondaryAction_PassiveCandidateNoneMask_Excluded()
+        {
+            var sit   = MakeCandidate(ActionNames.UseObjectForRest,   ActionSlotMask.Posture, utility: 60);
+            var warmth = MakeCandidate(ActionNames.UseObjectForWarmth, ActionSlotMask.None,   utility: 35);
+
+            var result = DefaultBehaviorEngine.SelectSecondaryAction(
+                [sit, warmth], primary: sit, alreadyOccupied: ActionSlotMask.None);
+
+            Assert.IsNull(result, "Candidate with SlotMask=None must be excluded from secondary selection.");
+        }
+
+        private static BehaviorCandidate MakeCandidate(
+            string name,
+            ActionSlotMask mask,
+            double utility,
+            SocialTargetingData? socialTargeting = null)
+            => new BehaviorCandidate(
+                Name:             name,
+                Utility:          utility,
+                Duration:         WTimeSpan.FromMinutes(30),
+                Domain:           BehaviorDomain.Physiological,
+                SlotMask:         mask,
+                SocialTargeting:  socialTargeting);
+
+        #endregion
+
+        // ─────────────────────────────────────────────────────────────────────
         #region Private factory helpers
 
         private static WorldObject MakeAffordanceObject(
