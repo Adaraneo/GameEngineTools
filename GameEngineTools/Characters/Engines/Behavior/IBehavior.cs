@@ -45,7 +45,27 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// ReachOut utility penalty per point of PerceivedDominance above 70 when Closeness &lt; 30.
         /// Dominant strangers trigger avoidance; close dominant figures do not (Cheng et al. 2013).
         /// </summary>
-        double DominanceAvoidancePenaltyPerPoint = 0.08)
+        double DominanceAvoidancePenaltyPerPoint = 0.08,
+    /// <summary>
+    /// Maximum habit utility multiplier applied to locomotion actions (<c>MoveTo:*</c>).
+    /// Intentionally lower than <see cref="HabitMaxUtilityMultiplier"/> because locomotion
+    /// is an instrumental action — it does not directly satisfy the social need, only positions
+    /// the character to do so. Capping it prevents the habit system from locking a character
+    /// into perpetual movement without ever reaching the terminal interaction (ReachOut).
+    /// </summary>
+    /// <remarks>
+    /// Design rationale: if <c>MoveTo:Social</c> accumulates a full-strength habit
+    /// (multiplier=0.18, flatBias=4.0), its utility can grow past <c>ReachOut</c>'s
+    /// theoretical ceiling and permanently block social interaction. A locomotion cap
+    /// of ~0.06 keeps movement habits meaningful without crowding out their goal.
+    /// </remarks>
+    double LocomotionHabitMultiplierCap = 0.06,
+
+    /// <summary>
+    /// Maximum flat habit bias added to locomotion actions (<c>MoveTo:*</c>).
+    /// See <see cref="LocomotionHabitMultiplierCap"/>.
+    /// </summary>
+    double LocomotionHabitFlatBiasCap = 1.0)
     {
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
     }
