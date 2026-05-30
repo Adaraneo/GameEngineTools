@@ -153,15 +153,54 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         double VitaminDMaxOutdoorRestorationPerHour = 6.0,
         // ── Natural mortality ─────────────────────────────────────────────────────
+        // All hourly-risk values are calibrated against a 9360-hour game year
+        // (VIWorld calendar: 10 months × 36 days × 26 hours). Annual probability of
+        // a contributor with hourly risk r is 1 − (1 − r)^9360.
         double MaxLifespanYears = 110.0,
         /// <summary>
-        /// Age at which Gompertz curve begins.
+        /// Age at which the Gompertz mortality curve begins to contribute.
         /// </summary>
-        double NaturalMortalityGompertzStart = 60.0,
-        double NaturalMortalityGompertzScale = 0.08,   // steepness of the exponential curve
-        double NaturalMortalityAlloWeight = 0.0008,    // AllostaticLoad contribution per point
-        double NaturalMortalityImmuneWeight = 0.0006,  // ImmuneLoad contribution per point
-        double NaturalMortalityMaxRiskPerHour = 0.002,
+        double NaturalMortalityGompertzStart = 35.0,
+        /// <summary>
+        /// Steepness of the age-mortality exponential. 0.085 ≈ risk doubling every ~8 years (human-like).
+        /// </summary>
+        double NaturalMortalityGompertzScale = 0.085,
+        /// <summary>
+        /// Hourly mortality risk at <see cref="NaturalMortalityGompertzStart"/>.
+        /// 1.3e-7/h ≈ 0.12 %/yr at the start age, rising to ~1 %/yr at 60 and ~5 %/yr at 80.
+        /// </summary>
+        double NaturalMortalityAgeBaseline = 1.3e-7,
+        /// <summary>AllostaticLoad point above which it contributes to mortality (chronic HPA burden).</summary>
+        double NaturalMortalityAlloThreshold = 80.0,
+        double NaturalMortalityAlloWeight = 1.0e-6,    // AllostaticLoad contribution per point above threshold
+        /// <summary>AllostaticLoad point above which an acute-decompensation spike multiplier applies.</summary>
+        double NaturalMortalityAlloSpikeThreshold = 90.0,
+        double NaturalMortalityAlloSpikeMultiplier = 10.0,
+        /// <summary>ImmuneLoad point above which it contributes to mortality (systemic infection).</summary>
+        double NaturalMortalityImmuneThreshold = 75.0,
+        double NaturalMortalityImmuneWeight = 4.0e-6,  // ImmuneLoad contribution per point above threshold
+        /// <summary>ImmuneLoad point above which an acute-sepsis spike multiplier applies.</summary>
+        double NaturalMortalityImmuneSpikeThreshold = 90.0,
+        double NaturalMortalityImmuneSpikeMultiplier = 8.0,
+        /// <summary>Hunger level at or above which starvation mortality applies.</summary>
+        double NaturalMortalityStarvationThreshold = 95.0,
+        /// <summary>Hourly risk from terminal hunger. 0.0013/h → median death ~3 weeks.</summary>
+        double NaturalMortalityStarvationRisk = 0.0013,
+        /// <summary>Thirst level at or above which dehydration mortality applies.</summary>
+        double NaturalMortalityDehydrationThreshold = 95.0,
+        /// <summary>Hourly risk from terminal thirst. 0.008/h → median death ~3.5 days.</summary>
+        double NaturalMortalityDehydrationRisk = 0.008,
+        /// <summary>Energy level at or below which exhaustion mortality can apply.</summary>
+        double NaturalMortalityExhaustionEnergyMax = 5.0,
+        /// <summary>Sleep-debt hours at or above which exhaustion mortality can apply.</summary>
+        double NaturalMortalityExhaustionSleepDebtMin = 48.0,
+        /// <summary>Hourly risk from extreme energy depletion with sustained sleep debt.</summary>
+        double NaturalMortalityExhaustionRisk = 0.001,
+        /// <summary>BoneDensity (0..1) below which fragility-fracture mortality applies.</summary>
+        double NaturalMortalityBoneFragilityThreshold = 0.25,
+        double NaturalMortalityBoneFragilityWeight = 0.0002,
+        double NaturalMortalitySarcopeniaWeight = 0.0001,
+        double NaturalMortalityMaxRiskPerHour = 0.01,
         // ── Object affordance application ─────────────────────────────────────────
         /// <summary>
         /// Maximum hunger reduction applied by a single <c>UseInPlace</c> object interaction
@@ -303,11 +342,28 @@ namespace GameEngineTools.Characters.Engines.Physiology
             VitaminDMaxOutdoorRestorationPerHour: 6.0,
             // ── Natural mortality ─────────────────────────────────────────────────────
             MaxLifespanYears: 110.0,
-            NaturalMortalityGompertzStart: 60.0,
-            NaturalMortalityGompertzScale: 0.08,
-            NaturalMortalityAlloWeight: 0.0008,
-            NaturalMortalityImmuneWeight: 0.0006,
-            NaturalMortalityMaxRiskPerHour: 0.002,
+            NaturalMortalityGompertzStart: 35.0,
+            NaturalMortalityGompertzScale: 0.085,
+            NaturalMortalityAgeBaseline: 1.3e-7,
+            NaturalMortalityAlloThreshold: 80.0,
+            NaturalMortalityAlloWeight: 1.0e-6,
+            NaturalMortalityAlloSpikeThreshold: 90.0,
+            NaturalMortalityAlloSpikeMultiplier: 10.0,
+            NaturalMortalityImmuneThreshold: 75.0,
+            NaturalMortalityImmuneWeight: 4.0e-6,
+            NaturalMortalityImmuneSpikeThreshold: 90.0,
+            NaturalMortalityImmuneSpikeMultiplier: 8.0,
+            NaturalMortalityStarvationThreshold: 95.0,
+            NaturalMortalityStarvationRisk: 0.0013,
+            NaturalMortalityDehydrationThreshold: 95.0,
+            NaturalMortalityDehydrationRisk: 0.008,
+            NaturalMortalityExhaustionEnergyMax: 5.0,
+            NaturalMortalityExhaustionSleepDebtMin: 48.0,
+            NaturalMortalityExhaustionRisk: 0.001,
+            NaturalMortalityBoneFragilityThreshold: 0.25,
+            NaturalMortalityBoneFragilityWeight: 0.0002,
+            NaturalMortalitySarcopeniaWeight: 0.0001,
+            NaturalMortalityMaxRiskPerHour: 0.01,
             // ── Object affordance ─────────────────────────────────────────────────────
             AffordanceHungerMaxDelta: 25.0,
             AffordanceThirstMaxDelta: 20.0

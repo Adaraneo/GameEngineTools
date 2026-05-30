@@ -549,7 +549,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     var tickRisk = 1.0 - Math.Pow(1.0 - risk, h);
                     if (ctx.Random.Chance(tickRisk))
                     {
-                        var cause = NaturalMortalityCalculator.ResolveCause(s, ageYears);
+                        var cause = NaturalMortalityCalculator.ResolveCause(s, ageYears, Config);
                         using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
                         {
                             _log.NaturalDeathOccurred(ctx.Id.Value.ToString(), cause.ToString(), ageYears, risk);
@@ -584,8 +584,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return _objectProvider.FindObject(interaction.ObjectId)?.NutritionalProfile;
         }
 
-        private static bool HasCriticalState(PhysiologyState s) =>
-            s.Energy < 2 || s.Hunger > 98 || s.AllostaticLoad > 95;
+        private bool HasCriticalState(PhysiologyState s) =>
+            s.Hunger >= Config.NaturalMortalityStarvationThreshold
+            || s.Thirst >= Config.NaturalMortalityDehydrationThreshold
+            || (s.Energy <= Config.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= Config.NaturalMortalityExhaustionSleepDebtMin)
+            || s.AllostaticLoad >= Config.NaturalMortalityAlloThreshold
+            || s.ImmuneLoad >= Config.NaturalMortalityImmuneThreshold;
 
         /// <summary>
         /// Reacts to discrete domain events by applying instantaneous state mutations.

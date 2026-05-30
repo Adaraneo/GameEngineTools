@@ -36,13 +36,19 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void ComputeHourlyRisk_OldWithHighLoad_RiskNearMaximum()
+        public void ComputeHourlyRisk_OldWithHighLoad_FarExceedsAgeOnlyRisk()
         {
-            var state = NominalState() with { AllostaticLoad = 95, ImmuneLoad = 80 };
-            var risk = NaturalMortalityCalculator.ComputeHourlyRisk(state, ageYears: 80, cfg: DefaultCfg);
+            var ageOnly = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState(), ageYears: 80, cfg: DefaultCfg);
+            var withLoad = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { AllostaticLoad = 95, ImmuneLoad = 80 }, ageYears: 80, cfg: DefaultCfg);
 
-            Assert.IsTrue(risk >= DefaultCfg.NaturalMortalityMaxRiskPerHour * 0.95,
-                $"80yo with extreme allostatic + immune load must reach near MaxRiskPerHour. Got {risk:F6}");
+            Assert.IsTrue(withLoad > ageOnly * 5,
+                $"80yo with high allostatic + immune load must carry far higher risk than age alone. age={ageOnly:E2}, load={withLoad:E2}");
+
+            var annual = 1.0 - Math.Pow(1.0 - withLoad, 9360);
+            Assert.IsTrue(annual > 0.30,
+                $"80yo with allo=95 + immune=80 must have >30% annual mortality. Got {annual:P1}");
         }
 
         [TestMethod]
@@ -57,20 +63,23 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void ComputeHourlyRisk_AllostaticLoadAbove90_DramaticSpike()
+        public void ComputeHourlyRisk_AllostaticLoad_SpikeAcceleratesAboveThreshold()
         {
-            // AlloLoad=92 (above 90 spike threshold) → raw contribution far exceeds MaxRisk → capped
-            // AlloLoad=72 (above 70 linear threshold) → small contribution, below cap
-            var stateHigh = NominalState() with { AllostaticLoad = 92 };
-            var stateLow = NominalState() with { AllostaticLoad = 72 };
+            // Below the allostatic threshold (80) → no contribution.
+            var below = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { AllostaticLoad = 72 }, ageYears: 30, cfg: DefaultCfg);
+            // Linear band (80–90).
+            var linear = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { AllostaticLoad = 88 }, ageYears: 30, cfg: DefaultCfg);
+            // Above the spike threshold (90) — acute decompensation.
+            var spiked = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { AllostaticLoad = 98 }, ageYears: 30, cfg: DefaultCfg);
 
-            var riskHigh = NaturalMortalityCalculator.ComputeHourlyRisk(stateHigh, ageYears: 30, cfg: DefaultCfg);
-            var riskLow = NaturalMortalityCalculator.ComputeHourlyRisk(stateLow, ageYears: 30, cfg: DefaultCfg);
-
-            Assert.AreEqual(DefaultCfg.NaturalMortalityMaxRiskPerHour, riskHigh, delta: 1e-10,
-                $"AlloLoad=92 must saturate MaxRiskPerHour ({DefaultCfg.NaturalMortalityMaxRiskPerHour}). Got {riskHigh:F6}");
-            Assert.IsTrue(riskLow < DefaultCfg.NaturalMortalityMaxRiskPerHour,
-                $"AlloLoad=72 must stay below MaxRiskPerHour. Got {riskLow:F6}");
+            Assert.AreEqual(0.0, below, delta: 1e-12,
+                $"AlloLoad below threshold must not contribute. Got {below:E2}");
+            Assert.IsTrue(linear > 0, $"AlloLoad in the linear band must contribute. Got {linear:E2}");
+            Assert.IsTrue(spiked - linear > linear - below,
+                $"Decompensation spike above 90 must accelerate risk faster than the linear band. below={below:E2}, linear={linear:E2}, spiked={spiked:E2}");
         }
 
         [TestMethod]
@@ -101,7 +110,7 @@ namespace EngineTests
         public void ResolveCause_HungerTerminal_ReturnsStarvation()
         {
             var state = NominalState() with { Hunger = 100, Thirst = 100 };
-            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30);
+            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30, DefaultCfg);
 
             Assert.AreEqual(DeathCause.Starvation, cause,
                 "Hunger=100 + Thirst=100 must resolve to Starvation.");
@@ -111,7 +120,7 @@ namespace EngineTests
         public void ResolveCause_ExhaustionTerminal_ReturnsExhaustion()
         {
             var state = NominalState() with { Energy = 0, SleepDebtHours = 60 };
-            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30);
+            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30, DefaultCfg);
 
             Assert.AreEqual(DeathCause.Exhaustion, cause,
                 "Energy=0 + SleepDebt=60h must resolve to Exhaustion.");
@@ -121,7 +130,7 @@ namespace EngineTests
         public void ResolveCause_SystemicOverload_ReturnsSystemicFailure()
         {
             var state = NominalState() with { AllostaticLoad = 100, ImmuneLoad = 90 };
-            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 40);
+            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 40, DefaultCfg);
 
             Assert.AreEqual(DeathCause.SystemicFailure, cause,
                 "AlloLoad=100 + ImmuneLoad=90 must resolve to SystemicFailure.");
@@ -131,7 +140,7 @@ namespace EngineTests
         public void ResolveCause_VeryOldOtherwiseHealthy_ReturnsOldAge()
         {
             var state = NominalState(); // nominal vitals, no extreme load
-            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 105);
+            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 105, DefaultCfg);
 
             Assert.AreEqual(DeathCause.OldAge, cause,
                 "Very old character with nominal vitals must resolve to OldAge.");
@@ -142,7 +151,7 @@ namespace EngineTests
         {
             // Both starvation AND exhaustion conditions true — Starvation has higher priority
             var state = NominalState() with { Hunger = 100, Thirst = 100, Energy = 0, SleepDebtHours = 60 };
-            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30);
+            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30, DefaultCfg);
 
             Assert.AreEqual(DeathCause.Starvation, cause,
                 "Starvation must take priority over Exhaustion when both conditions are met.");
@@ -206,6 +215,90 @@ namespace EngineTests
         }
 
         #endregion Section 3 — DefaultPhysiologyEngine integration
+
+        #region Section 4 — Calibration (annual mortality over a 9360-hour game year)
+
+        // VIWorld calendar: 10 months × 36 days × 26 hours.
+        private const int HoursPerGameYear = 10 * 36 * 26;
+        private const int HoursPerGameDay = 26;
+
+        private static double AnnualMortality(PhysiologyState s, int age) =>
+            1.0 - Math.Pow(1.0 - NaturalMortalityCalculator.ComputeHourlyRisk(s, age, DefaultCfg), HoursPerGameYear);
+
+        [TestMethod]
+        public void Calibration_AgeMortality_FollowsRealisticGompertz()
+        {
+            Assert.IsTrue(AnnualMortality(NominalState(), 30) < 0.005,
+                $"30yo annual mortality must be <0.5%. Got {AnnualMortality(NominalState(), 30):P3}");
+            Assert.IsTrue(AnnualMortality(NominalState(), 60) is > 0.003 and < 0.03,
+                $"60yo annual mortality must be ~1% (0.3–3%). Got {AnnualMortality(NominalState(), 60):P3}");
+            Assert.IsTrue(AnnualMortality(NominalState(), 80) is > 0.02 and < 0.12,
+                $"80yo annual mortality must be ~5% (2–12%). Got {AnnualMortality(NominalState(), 80):P3}");
+        }
+
+        [TestMethod]
+        public void Calibration_AgeMortality_RisesMonotonically()
+        {
+            var a50 = AnnualMortality(NominalState(), 50);
+            var a60 = AnnualMortality(NominalState(), 60);
+            var a70 = AnnualMortality(NominalState(), 70);
+            var a85 = AnnualMortality(NominalState(), 85);
+
+            Assert.IsTrue(a60 > a50 && a70 > a60 && a85 > a70,
+                $"Mortality must rise with age. 50={a50:P3} 60={a60:P3} 70={a70:P3} 85={a85:P3}");
+        }
+
+        [TestMethod]
+        public void Calibration_NoDeathCliff_55YearOldStaysLowRisk()
+        {
+            // Regression: the old curve started at 60 with ~61%/yr — a death cliff.
+            Assert.IsTrue(AnnualMortality(NominalState(), 55) < 0.01,
+                $"55yo annual mortality must stay <1% (no cliff). Got {AnnualMortality(NominalState(), 55):P3}");
+        }
+
+        [TestMethod]
+        public void Calibration_TerminalDehydration_KillsWithinDays()
+        {
+            var hourly = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { Thirst = 100 }, ageYears: 30, cfg: DefaultCfg);
+            var survive5Days = Math.Pow(1.0 - hourly, 5 * HoursPerGameDay);
+
+            Assert.IsTrue(survive5Days < 0.5,
+                $"Terminal thirst must kill >50% within 5 days. 5-day survival={survive5Days:P1}");
+        }
+
+        [TestMethod]
+        public void Calibration_TerminalStarvation_KillsSlowerThanDehydration()
+        {
+            var hunger = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { Hunger = 100 }, 30, DefaultCfg);
+            var thirst = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { Thirst = 100 }, 30, DefaultCfg);
+
+            Assert.IsTrue(hunger > 0, "Terminal hunger must contribute mortality.");
+            Assert.IsTrue(hunger < thirst,
+                $"Starvation (weeks) must be slower than dehydration (days). hunger={hunger:E2}, thirst={thirst:E2}");
+
+            var survive21Days = Math.Pow(1.0 - hunger, 21 * HoursPerGameDay);
+            Assert.IsTrue(survive21Days < 0.6,
+                $"Terminal hunger must kill the majority within ~3 weeks. 21-day survival={survive21Days:P1}");
+        }
+
+        [TestMethod]
+        public void Calibration_PureThirst_IsLethalWithoutHunger()
+        {
+            // Regression: the old model required Hunger>=95 AND Thirst>=95, so pure thirst never killed.
+            var pureThirst = NaturalMortalityCalculator.ComputeHourlyRisk(
+                NominalState() with { Thirst = 100, Hunger = 20 }, ageYears: 25, cfg: DefaultCfg);
+            Assert.IsTrue(pureThirst > 0,
+                $"Pure dehydration (thirst high, hunger low) must be lethal on its own. Got {pureThirst:E2}");
+
+            var cause = NaturalMortalityCalculator.ResolveCause(
+                NominalState() with { Thirst = 100, Hunger = 20 }, ageYears: 25, DefaultCfg);
+            Assert.AreEqual(DeathCause.Dehydration, cause, "Pure thirst death must resolve to Dehydration.");
+        }
+
+        #endregion Section 4 — Calibration
 
         #region Helpers
 

@@ -12,8 +12,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Health reached zero from damage.</summary>
         Combat,
 
-        /// <summary>Terminal hunger + thirst.</summary>
+        /// <summary>Terminal hunger (kills within weeks).</summary>
         Starvation,
+
+        /// <summary>Terminal thirst (kills within days).</summary>
+        Dehydration,
 
         /// <summary>Terminal energy depletion with extreme sleep debt.</summary>
         Exhaustion,

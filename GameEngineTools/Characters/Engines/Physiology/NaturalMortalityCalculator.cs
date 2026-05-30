@@ -22,56 +22,74 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             var risk = 0.0;
 
-            // Age: Gompertz curve — exponential rise past NaturalMortalityGompertzStart
+            // Age: Gompertz curve — exponential rise past NaturalMortalityGompertzStart.
             if (ageYears >= cfg.NaturalMortalityGompertzStart)
             {
                 var yearsAbove = ageYears - cfg.NaturalMortalityGompertzStart;
-                risk += 0.0001 * Math.Exp(cfg.NaturalMortalityGompertzScale * yearsAbove);
+                risk += cfg.NaturalMortalityAgeBaseline * Math.Exp(cfg.NaturalMortalityGompertzScale * yearsAbove);
             }
 
-            // AllostaticLoad: linear above 70; dramatic spike above 90
-            if (s.AllostaticLoad > 90)
-                risk += cfg.NaturalMortalityAlloWeight * (s.AllostaticLoad - 70) * 3.0;
-            else if (s.AllostaticLoad > 70)
-                risk += cfg.NaturalMortalityAlloWeight * (s.AllostaticLoad - 70);
+            // AllostaticLoad: chronic HPA burden — linear risk factor above the threshold,
+            // with an acute-decompensation spike above the spike threshold.
+            if (s.AllostaticLoad > cfg.NaturalMortalityAlloThreshold)
+            {
+                risk += cfg.NaturalMortalityAlloWeight * (s.AllostaticLoad - cfg.NaturalMortalityAlloThreshold);
+                if (s.AllostaticLoad > cfg.NaturalMortalityAlloSpikeThreshold)
+                    risk += cfg.NaturalMortalityAlloWeight * cfg.NaturalMortalityAlloSpikeMultiplier
+                            * (s.AllostaticLoad - cfg.NaturalMortalityAlloSpikeThreshold);
+            }
 
-            // ImmuneLoad: systemic failure above 75
-            if (s.ImmuneLoad > 75)
-                risk += cfg.NaturalMortalityImmuneWeight * (s.ImmuneLoad - 75);
+            // ImmuneLoad: systemic infection — same linear + acute-spike shape.
+            if (s.ImmuneLoad > cfg.NaturalMortalityImmuneThreshold)
+            {
+                risk += cfg.NaturalMortalityImmuneWeight * (s.ImmuneLoad - cfg.NaturalMortalityImmuneThreshold);
+                if (s.ImmuneLoad > cfg.NaturalMortalityImmuneSpikeThreshold)
+                    risk += cfg.NaturalMortalityImmuneWeight * cfg.NaturalMortalityImmuneSpikeMultiplier
+                            * (s.ImmuneLoad - cfg.NaturalMortalityImmuneSpikeThreshold);
+            }
 
-            // Starvation: terminal hunger + thirst → direct mortality contribution
-            if (s.Hunger >= 95 && s.Thirst >= 95)
-                risk += 0.0004;
+            // Dehydration: terminal thirst kills within days, independent of hunger.
+            if (s.Thirst >= cfg.NaturalMortalityDehydrationThreshold)
+                risk += cfg.NaturalMortalityDehydrationRisk;
 
-            // Exhaustion: extreme energy depletion with sleep debt
-            if (s.Energy < 5 && s.SleepDebtHours >= 48)
-                risk += 0.0005;
+            // Starvation: terminal hunger kills within weeks.
+            if (s.Hunger >= cfg.NaturalMortalityStarvationThreshold)
+                risk += cfg.NaturalMortalityStarvationRisk;
 
-            // BoneDensity: fragility fracture risk (osteoporotic mortality)
-            if (s.Aging is { BoneDensity: < 0.25 } bone)
-                risk += 0.0002 * (0.25 - bone.BoneDensity) / 0.25;
+            // Exhaustion: extreme energy depletion with sustained sleep debt.
+            if (s.Energy <= cfg.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= cfg.NaturalMortalityExhaustionSleepDebtMin)
+                risk += cfg.NaturalMortalityExhaustionRisk;
 
-            // MuscleMassFraction: sarcopenic frailty
+            // BoneDensity: fragility-fracture (osteoporotic) mortality.
+            if (s.Aging is { } bone && bone.BoneDensity < cfg.NaturalMortalityBoneFragilityThreshold)
+                risk += cfg.NaturalMortalityBoneFragilityWeight
+                        * (cfg.NaturalMortalityBoneFragilityThreshold - bone.BoneDensity) / cfg.NaturalMortalityBoneFragilityThreshold;
+
+            // MuscleMassFraction: sarcopenic frailty.
             if (s.Aging is { } a && a.MuscleMassFraction < cfg.SarcopeniaMuscleMin * 1.2)
-                risk += 0.0001 * (cfg.SarcopeniaMuscleMin * 1.2 - a.MuscleMassFraction);
+                risk += cfg.NaturalMortalitySarcopeniaWeight * (cfg.SarcopeniaMuscleMin * 1.2 - a.MuscleMassFraction);
 
             return Math.Clamp(risk, 0, cfg.NaturalMortalityMaxRiskPerHour);
         }
 
         /// <summary>
         /// Resolves the most appropriate <see cref="DeathCause"/> from the physiological state.
-        /// Priority order: <see cref="DeathCause.Starvation"/> → <see cref="DeathCause.Exhaustion"/>
-        /// → <see cref="DeathCause.SystemicFailure"/> → <see cref="DeathCause.OldAge"/>.
+        /// Priority order: <see cref="DeathCause.Starvation"/> → <see cref="DeathCause.Dehydration"/>
+        /// → <see cref="DeathCause.Exhaustion"/> → <see cref="DeathCause.SystemicFailure"/>
+        /// → <see cref="DeathCause.OldAge"/>.
         /// </summary>
-        internal static DeathCause ResolveCause(PhysiologyState s, int ageYears)
+        internal static DeathCause ResolveCause(PhysiologyState s, int ageYears, PhysiologyConfig cfg)
         {
-            if (s.Hunger >= 95 && s.Thirst >= 95)
+            if (s.Hunger >= cfg.NaturalMortalityStarvationThreshold)
                 return DeathCause.Starvation;
 
-            if (s.Energy < 2 && s.SleepDebtHours >= 48)
+            if (s.Thirst >= cfg.NaturalMortalityDehydrationThreshold)
+                return DeathCause.Dehydration;
+
+            if (s.Energy <= cfg.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= cfg.NaturalMortalityExhaustionSleepDebtMin)
                 return DeathCause.Exhaustion;
 
-            if (s.AllostaticLoad >= 90 || s.ImmuneLoad >= 85)
+            if (s.AllostaticLoad >= cfg.NaturalMortalityAlloThreshold || s.ImmuneLoad >= cfg.NaturalMortalityImmuneThreshold)
                 return DeathCause.SystemicFailure;
 
             return DeathCause.OldAge;
