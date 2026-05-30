@@ -621,11 +621,14 @@ namespace GameEngineTools.Characters.Core
                     s.Physiology.Energy, s.Physiology.Hunger, s.Physiology.Thirst,
                     s.Physiology.Pain, s.Physiology.SleepDebtHours,
                     s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad,
-                    s.Physiology.AllostaticLoad, s.Physiology.CortisolLevel);
+                    s.Physiology.AllostaticLoad, s.Physiology.CortisolLevel,
+                    s.Physiology.Testosterone?.Level ?? 0);
 
                 if (s.Physiology.Cycle is { } c)
                 {
-                    _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle);
+                    _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle,
+                        c.LibidoMod, c.OvulationWindow, c.SymptomPain, c.SymptomBloat,
+                        c.SymptomBreastTender, c.PmddActive);
                 }
 
                 _log.PsychologySnapshot(

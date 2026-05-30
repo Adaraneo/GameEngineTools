@@ -754,7 +754,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
             {
-                _log.PhysiologyCycle(ctx.Id.Value.ToString(), s.Cycle!.Phase.ToString(), s.Cycle.DayInCycle);
+                var cyc = s.Cycle!;
+                _log.PhysiologyCycle(ctx.Id.Value.ToString(), cyc.Phase.ToString(), cyc.DayInCycle,
+                    cyc.LibidoMod, cyc.OvulationWindow, cyc.SymptomPain, cyc.SymptomBloat,
+                    cyc.SymptomBreastTender, cyc.PmddActive);
             }
 
             return s;

@@ -33,7 +33,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 5000,
             Level = LogLevel.Information,
-            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1} Allostatic:{Allostatic:F1} Cortisol:{Cortisol:F1}")]
+            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1} Allostatic:{Allostatic:F1} Cortisol:{Cortisol:F1} Testo:{Testosterone:F1}")]
         public static partial void PhysiologySnapshot(
             this ILogger logger,
             string HumanId,
@@ -45,18 +45,25 @@ namespace GameEngineTools.Logging
             double TempDelta,
             double Immune,
             double Allostatic,
-            double Cortisol);
+            double Cortisol,
+            double Testosterone);
 
         /// <summary>Aktuální fáze menstruačního cyklu postavy.</summary>
         [LoggerMessage(
             EventId = 5001,
             Level = LogLevel.Debug,
-            Message = "[PHYSIO/CYCLE] {HumanId} Phase:{Phase} Day:{DayInCycle}")]
+            Message = "[PHYSIO/CYCLE] {HumanId} Phase:{Phase} Day:{DayInCycle} Libido:{Libido:F2} Ovul:{Ovulation} Pain:{Pain:F0} Bloat:{Bloat:F0} Tender:{Tender:F0} PMDD:{Pmdd}")]
         public static partial void PhysiologyCycle(
             this ILogger logger,
             string HumanId,
             string Phase,
-            int DayInCycle);
+            int DayInCycle,
+            double Libido,
+            bool Ovulation,
+            double Pain,
+            double Bloat,
+            double Tender,
+            bool Pmdd);
 
         [LoggerMessage(EventId = 5002,
             Level = LogLevel.Debug,
