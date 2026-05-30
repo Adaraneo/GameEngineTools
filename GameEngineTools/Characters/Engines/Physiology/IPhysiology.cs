@@ -35,6 +35,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double AllostaticLoadThresholdImmune = 60,
         double AllostaticLoadAccumRatePerHour = 0.5,
         double AllostaticLoadDecayRatePerHour = 0.1,
+        /// <summary>
+        /// Fraction of <see cref="AllostaticLoadDecayRatePerHour"/> applied during Idle.
+        /// Science: passive rest (TV, phone, lying around) has negligible effect on allostatic
+        /// load — the nervous system stays stress-adapted even without active demands.
+        /// Active recovery (SelfCare) is required for meaningful reduction.
+        /// Reference: McEwen 2006; reachlink.com allostatic load review 2026.
+        /// Default 0.05.
+        /// </summary>
+        double AllostaticLoadIdleDecayFactor = 0.05,
         // Kortizol (HPA osa)
         double CortisolDiurnalPeakHour = 8.0,
         double CortisolDiurnalAmplitude = 30.0,
@@ -167,7 +176,143 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         double AffordanceThirstMaxDelta = 20.0) // hard cap on hourly risk
     {
-        public PhysiologyConfig() : this(1600, 12, true, 12, 10, 0.3, 0.5, 0.03, 4.0, 21, 280, true, 1.0, 40.0, 20.0, 0.5, 2.0, 0.5, 5.0, 70, 70, 5, 50, 60, 0.5, 0.1, 8.0, 30.0, 0.25, 0.15, 0.0, 22.0, 0.08, 60.0, 0.2, 0.15, 0.05, true, 8.0, 0.20, 0.8, 1.5, 8.0, 200.0, 40.0, 25.0, 0.3, 5.0, 25.0, 5.0, 8.0, 50.0, 3.0, 8.0, 1.0, 2.0, 75.0, 0.1, 6.0, 50.0, 80.0, 0.8, 30.0, 0.5, 0.3, 17.0, 50, 40, 0.005, 60, 0.2, 25, 0.8, 2000.0, 4000.0, 0.3, 2.0, 0.00175, 30.0, 0.02, 0.0001, 25.0, 0.005, 70.0, 0.0005, 0.15, 0.00002, 25.0, 0.5, 0.001, 30.0, 0.005, 0.3, 30.0, 0.005, 2.5, 0.5, 50.0, 0.008, 0.3, 4.0, 6.0, 110.0, 60.0, 0.08, 0.0008, 0.0006, 0.002, 25.0, 20.0) { }
+        /// <summary>Parameterless constructor — all fields use their defaults.</summary>
+        public PhysiologyConfig() : this(
+            // ── Core metabolism ───────────────────────────────────────────────────────
+            RestingMetabolicRate: 1600,
+            MaxSleepDebtHours: 12,
+            EnableMenstrualCycle: true,
+            MenstrualCycleBeginsInAge: 12,
+            EnergyRecoveryPerSleepHour: 10.0,
+            PainPassiveRecoveryPerHour: 0.3,
+            PainSleepRecoveryPerHour: 0.5,
+            // ── Conception & pregnancy ────────────────────────────────────────────────
+            BaseConceptionChancePerEncounter: 0.03,
+            OvulationConceptionMultiplier: 4.0,
+            PregnancyDiscoveryMinDays: 21,
+            PregnancyTermDays: 280,
+            // ── Nutrition ─────────────────────────────────────────────────────────────
+            EnableNutrition: true,
+            NutritionDecayPerHour: 1.0,
+            CaloriesEatingGainPerHour: 40.0,
+            ProteinEatingGainPerHour: 20.0,
+            IronSleepRecoveryPerHour: 0.5,
+            // ── Injury ────────────────────────────────────────────────────────────────
+            InjuryRestRecoveryPerDay: 2.0,
+            InjuryActiveRecoveryPerDay: 0.5,
+            InjuryInfectionImmuneLoadPerDay: 5.0,
+            // ── Allostatic load ───────────────────────────────────────────────────────
+            AllostaticLoadThresholdHunger: 70,
+            AllostaticLoadThresholdThirst: 70,
+            AllostaticLoadThresholdSleepDebt: 12,   // CHANGED: 5 → 12 (1 bad night is not enough)
+            AllostaticLoadThresholdPain: 50,
+            AllostaticLoadThresholdImmune: 60,
+            AllostaticLoadAccumRatePerHour: 0.15, // CHANGED: 0.5 → 0.15 (slower accumulation)
+            AllostaticLoadDecayRatePerHour: 0.35, // CHANGED: 0.1 → 0.35 (meaningful recovery)
+            AllostaticLoadIdleDecayFactor: 0.05, // NEW: passive rest has negligible recovery (McEwen 2006)
+            // ── Cortisol (HPA axis) ───────────────────────────────────────────────────
+            CortisolDiurnalPeakHour: 8.0,
+            CortisolDiurnalAmplitude: 30.0,
+            CortisolAlloWeight: 0.25,
+            CortisolImmuneWeight: 0.15,
+            HypocortisolismAlloThreshold: 75.0,
+            HypocortisolismDeclineRate: 0.1,
+            SocialSupportCortisolBuffer: 6.0,
+            SocialSupportClosenessThreshold: 50.0,
+            SocialIsolationCortisolThreshold: 80.0,
+            SocialIsolationCortisolRatePerHour: 0.8,
+            // ── Circadian rhythm ─────────────────────────────────────────────────────
+            ChronotypeOffsetHours: 0.0,
+            NaturalSleepStartHour: 22.0,
+            CircadianPhaseRecoveryPerHour: 0.08,
+            CircadianTempAmplitude: 0.3,
+            CircadianTempPeakHour: 17.0,
+            // ── Recovery debt ─────────────────────────────────────────────────────────
+            RecoveryDebtAccumAlloThreshold: 60.0,
+            RecoveryDebtAccumRatePerHour: 0.2,
+            RecoveryDebtDecayPerSleepHour: 0.15,
+            RecoveryDebtDecayPerSelfCareHour: 0.05,
+            // ── Testosterone ──────────────────────────────────────────────────────────
+            EnableTestosteroneCycle: true,
+            TestosteronePeakHour: 8.0,
+            TestosteroneAlloSuppression: 0.20,
+            TestosteroneSleepDebtPenaltyPerHour: 0.8,
+            // ── Sleep inertia & arousal ───────────────────────────────────────────────
+            SleepInertiaMaxHours: 1.5,
+            SocialPainCortisolSpike: 8.0,
+            AcuteArousalDecayPerHour: 200.0,
+            InjuryAcuteArousalSpike: 40.0,
+            NightmareAcuteArousalSpike: 25.0,
+            StressSpikedAcuteArousalWeight: 0.3,
+            // ── Physical fatigue ──────────────────────────────────────────────────────
+            PhysicalFatigueAccumPerWorkHour: 5.0,
+            PhysicalFatigueDecayPerSleepHour: 25.0,
+            PhysicalFatigueDecayPerIdleHour: 5.0,
+            PhysicalFatigueSelfCareDecayBonus: 8.0,
+            // ── Blood glucose ─────────────────────────────────────────────────────────
+            BloodGlucoseEatingGain: 50.0,
+            BloodGlucoseBaseDecayPerHour: 3.0,
+            BloodGlucoseDipDecayBonus: 8.0,
+            BloodGlucoseDipStartHours: 1.0,
+            BloodGlucoseDipEndHours: 2.0,
+            // ── Chronic pain ──────────────────────────────────────────────────────────
+            ChronicPainAccumThreshold: 30.0,
+            ChronicPainDecayFactor: 0.5,
+            // ── Age effects ───────────────────────────────────────────────────────────
+            MenopauseAge: 50,
+            AgingEnergyRecoveryPenaltyStart: 40,
+            AgingEnergyRecoveryPenaltyPerYear: 0.005,
+            AgingImmuneBaselineStart: 60,
+            AgingImmuneBaselinePerYear: 0.2,
+            AgingTestosteronePenaltyStart: 25,
+            AgingTestosteronePenaltyPerYear: 0.8,
+            // ── Altitude ──────────────────────────────────────────────────────────────
+            AltitudeHypoxiaThreshold: 2000.0,
+            AltitudeAMSThreshold: 4000.0,
+            AltitudeEnergyDecayBonusPerKm: 0.3,
+            AltitudeAMSPainPerHour: 2.0,
+            // ── Physical aging — hair ─────────────────────────────────────────────────
+            HairGrowthCmPerHour: 0.00175,
+            HairGreyingAgeStart: 30.0,
+            HairGreyingRatePerYear: 0.02,
+            HairGreyingCortisolBoost: 0.0001,
+            HairLossAgeStartMale: 25.0,
+            HairLossRatePerYearMale: 0.005,
+            HairLossStressThreshold: 70.0,
+            HairLossStressRate: 0.0005,
+            HairLossPostpartumAmount: 0.15,
+            HairDensityRecoveryPerHour: 0.00002,
+            // ── Physical aging — skin & muscle ────────────────────────────────────────
+            WrinklingAgeStart: 25.0,
+            WrinklingRatePerYear: 0.5,
+            WrinklingCortisolBoost: 0.001,
+            SarcopeniaAgeStart: 30.0,
+            SarcopeniaRatePerYear: 0.005,
+            SarcopeniaMuscleMin: 0.3,
+            // ── Physical aging — bone ─────────────────────────────────────────────────
+            BoneDensityDeclineAgeStart: 30.0,
+            BoneDensityDeclinePerYear: 0.005,
+            BoneDensityMenopauseMultiplier: 2.5,
+            BoneFragilityInjuryMultiplier: 0.5,
+            // ── Sleep quality & aging ─────────────────────────────────────────────────
+            AgeSleepQualityThreshold: 50.0,
+            AgeSleepQualityPenaltyPerYear: 0.008,
+            // ── Vitamin D ─────────────────────────────────────────────────────────────
+            VitaminDSunThreshold: 0.3,
+            VitaminDRestorationPerHourPerIrradiance: 4.0,
+            VitaminDMaxOutdoorRestorationPerHour: 6.0,
+            // ── Natural mortality ─────────────────────────────────────────────────────
+            MaxLifespanYears: 110.0,
+            NaturalMortalityGompertzStart: 60.0,
+            NaturalMortalityGompertzScale: 0.08,
+            NaturalMortalityAlloWeight: 0.0008,
+            NaturalMortalityImmuneWeight: 0.0006,
+            NaturalMortalityMaxRiskPerHour: 0.002,
+            // ── Object affordance ─────────────────────────────────────────────────────
+            AffordanceHungerMaxDelta: 25.0,
+            AffordanceThirstMaxDelta: 20.0
+        )
+        { }
     }
 
     public sealed record PhysiologyState(

@@ -312,7 +312,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 if (s.SleepDebtHours > Config.AllostaticLoadThresholdSleepDebt) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
                 if (s.Pain > Config.AllostaticLoadThresholdPain) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
                 if (s.ImmuneLoad > Config.AllostaticLoadThresholdImmune) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
-                var alloDecay = action is Sleep or SelfCare ? Config.AllostaticLoadDecayRatePerHour * h : 0.0;
+
+                var alloDecay = action switch
+                {
+                    Sleep or SelfCare => Config.AllostaticLoadDecayRatePerHour * h,
+                    Idle => Config.AllostaticLoadDecayRatePerHour * Config.AllostaticLoadIdleDecayFactor * h,
+                    _ => 0
+                };
+
                 s = s with { AllostaticLoad = Math.Clamp(s.AllostaticLoad + alloAccum - alloDecay, 0, 100) };
             }
 
