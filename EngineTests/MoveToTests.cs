@@ -822,7 +822,8 @@ namespace EngineTests
             => new DefaultBehaviorEngine(
                 Options.Create(DefaultBehaviorCfg),
                 Options.Create(NoSleepCfg),
-                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new EngineTests.Utils.PermissiveDevelopmentPolicy());
 
         /// <summary>
         /// Builds a fully parameterised <see cref="IHumanContext"/> for MoveTo tests.

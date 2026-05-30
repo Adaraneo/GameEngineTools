@@ -430,7 +430,7 @@ namespace EngineTests
     public class BehaviorScenarioTests : TestBase
     {
         private static DefaultBehaviorEngine BuildBehaviorEngine(BehaviorConfig? config = null, SleepConfig? sleepConfig = null)
-            => new(Microsoft.Extensions.Options.Options.Create(config ?? new BehaviorConfig()), Microsoft.Extensions.Options.Options.Create(sleepConfig ?? new SleepConfig() with { SleepPromptThreshold = 95 }), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+            => new(Microsoft.Extensions.Options.Options.Create(config ?? new BehaviorConfig()), Microsoft.Extensions.Options.Options.Create(sleepConfig ?? new SleepConfig() with { SleepPromptThreshold = 95 }), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)), new EngineTests.Utils.PermissiveDevelopmentPolicy());
 
         private static PersonBeliefSet Beliefs(HumanId other, double warm = 0, double safe = 0, double rejecting = 0, double critical = 0, double reliable = 0)
         {

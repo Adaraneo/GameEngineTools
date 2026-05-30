@@ -36,7 +36,10 @@ namespace GameEngineTools.Characters.Core
         {
             if (context.Identity is null)
             {
-                return StadiumType.Adult;
+                throw new InvalidOperationException(
+                    $"Cannot resolve life stage for character {context.Id}: HumanContext.Identity is null. " +
+                    "Development gating (e.g. blocking Work/Create for children) silently degrades to Adult " +
+                    "when Identity is missing, so the context must carry a valid Identity with a BirthDate.");
             }
 
             var ageYears = AgeYears(context.Identity.BirthDate, now.Date);

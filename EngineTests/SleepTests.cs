@@ -571,7 +571,7 @@ namespace EngineTests
             var sleepOpts = Options.Create(DefaultSleepCfg);
             var logFactory = BuildLoggerFactory();
 
-            return new DefaultBehaviorEngine(behavOpts, sleepOpts, logFactory);
+            return new DefaultBehaviorEngine(behavOpts, sleepOpts, logFactory, new EngineTests.Utils.PermissiveDevelopmentPolicy());
         }
 
         /// <summary>
