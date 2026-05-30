@@ -26,6 +26,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
@@ -63,16 +64,54 @@ var perceptionPolicy = runtime.Services.GetRequiredService<IPerceptionFidelityPo
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
 manager.Characters.Add(player);
 
-var startNow = initTicks == defaultTicks ? WDateTime.New(player.Person.Identity.BirthDate.AddYears(14)) : new WDateTime(initTicks);
+var generatedBlankPeopleLogFiles = new DirectoryInfo(TFSC.gfiles).GetFiles().ToImmutableList();
+
+var ids = new Dictionary<string, Guid>();
+const string so = "significantOther";
+const string fr = "friend";
+const string frso = "friendSignificantOther";
+
+foreach (var file in generatedBlankPeopleLogFiles)
+{
+    using (var reader = new StreamReader(file.OpenRead()))
+    {
+        ids.Add(file.Name.Split("_")[1], Guid.Parse(reader.ReadLine()!));
+    }
+}
+
+var soid = ids.FirstOrDefault(npc => npc.Key == so).Value;
+var friendId = ids.FirstOrDefault(npc => npc.Key == fr).Value;
+var friendSOId = ids.FirstOrDefault(npc => npc.Key == frso).Value;
+
+var npcFiles = Directory.GetFiles(gf.NPCDirectory);
+
+var significantOther = gf.ImportNPC(new FileInfo(npcFiles.First(so => so.Contains(soid.ToString()))).Name);
+
+var friend = gf.ImportNPC(new FileInfo(npcFiles.First(fr => fr.Contains(friendId.ToString()))).Name);
+var friendSO = gf.ImportNPC(new FileInfo(npcFiles.First(fso => fso.Contains(friendSOId.ToString()))).Name);
+
+manager.Characters.AddRange([significantOther, friend, friendSO]);
+
+var playerPerson = player.Person;
+var significantOtherPerson = significantOther.Person;
+var friendPerson = friend.Person;
+var friendSOPerson = friendSO.Person;
+
+var minage = manager.Characters.Min(ch => ch.Person)!;
+
+var startNow = initTicks == defaultTicks ? WDateTime.New(minage.Identity.BirthDate.AddYears(14)) : new WDateTime(initTicks);
 
 clock.SetNow(startNow);
 
 Console.Title = startNow.Date.ToString();
 
-foreach (var filename in Directory.GetFiles(gf.NPCDirectory))
+foreach (var filename in npcFiles)
 {
     var character = gf.ImportNPC(new FileInfo(filename).Name);
-    if (character.Person.Identity.BirthDate > startNow.Date)
+    if (character.Person.Id.Value.Equals(soid) || character.Person.Id.Value.Equals(friendId) || character.Person.Id.Value.Equals(friendSOId))
+        continue;
+
+    if (character.Person.Identity.BirthDate > startNow.Date || character.Person.Age < 12)
         continue;
 
     manager.Characters.Add(character);
@@ -151,35 +190,6 @@ var universeOptions = configProvider.GetSection("World:Universe").Get<UniverseCo
         Console.WriteLine($"[World] Limiting: {string.Join(", ", hab.LimitingFactors)}");
     Console.ResetColor();
 }
-
-var generatedBlankPeopleLogFiles = new DirectoryInfo(TFSC.gfiles).GetFiles().ToImmutableList();
-
-var ids = new Dictionary<string, Guid>();
-const string so = "significantOther";
-const string fr = "friend";
-const string frso = "friendSignificantOther";
-
-foreach (var file in generatedBlankPeopleLogFiles)
-{
-    using (var reader = new StreamReader(file.OpenRead()))
-    {
-        ids.Add(file.Name.Split("_")[1], Guid.Parse(reader.ReadLine()!));
-    }
-}
-
-var soid = ids.FirstOrDefault(npc => npc.Key == so).Value;
-var friendId = ids.FirstOrDefault(npc => npc.Key == fr).Value;
-var friendSOId = ids.FirstOrDefault(npc => npc.Key == frso).Value;
-
-var significantOther = manager.Characters.First(character => character.Person.Id.Value.Equals(soid));
-
-var friend = manager.Characters.First(ch => ch.Person.Id.Value.Equals(friendId));
-var friendSO = manager.Characters.First(ch => ch.Person.Id.Value.Equals(friendSOId));
-
-var playerPerson = player.Person;
-var significantOtherPerson = significantOther.Person;
-var friendPerson = friend.Person;
-var friendSOPerson = friendSO.Person;
 
 Console.WriteLine("Before simulation starts:");
 

@@ -677,6 +677,18 @@ namespace GameEngineTools.Characters.Core
             return string.Join(" ", fname, this.Identity.LastName.Male);
         }
 
+        /// <summary>
+        /// Compares by the age.
+        /// </summary>
+        /// <param name="other"></param>
+        /// <returns></returns>
+        public int CompareTo(IHuman? other)
+        {
+            if (other is null) return 0;
+
+            return this.Age.CompareTo(other.Age);
+        }
+
         #endregion Object overrides
     }
 }

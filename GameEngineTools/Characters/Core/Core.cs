@@ -37,7 +37,7 @@ namespace GameEngineTools.Characters.Core
             => writer.WritePropertyName(value.Value.ToString());
     }
 
-    public interface IHuman
+    public interface IHuman : IComparable<IHuman>
     {
         HumanId Id { get; }
         Identity Identity { get; }
