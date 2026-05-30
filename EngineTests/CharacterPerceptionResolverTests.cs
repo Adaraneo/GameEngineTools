@@ -575,6 +575,11 @@ namespace EngineTests
             }
 
             public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default) => RestoreSnapshot(snapshot);
+
+            public int CompareTo(IHuman? other)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         #endregion Test doubles

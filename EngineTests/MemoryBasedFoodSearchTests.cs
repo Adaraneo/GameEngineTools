@@ -441,6 +441,11 @@ namespace EngineTests
             public void Tick(WDateTime now, WTimeSpan dt) { }
             public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default) => _snapshot = snapshot;
             public void FlushInbox() { }
+
+            public int CompareTo(IHuman? other)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         #endregion ForagingHuman

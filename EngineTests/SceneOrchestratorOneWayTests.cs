@@ -472,6 +472,11 @@ namespace EngineTests
                         surface.Kind)
                 };
             }
+
+            public int CompareTo(IHuman? other)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         #endregion SpyHuman

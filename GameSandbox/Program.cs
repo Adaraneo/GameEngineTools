@@ -234,7 +234,7 @@ for (int index = 0; index < 35; index++)
 for (int index = 0; index < 20; index++)
     objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"beer_{(index + 1):D2}", DisplayName = "Džbán piva", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0.1, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 20, WeightGrams = 600, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.6)], NutritionalProfile = new NutritionalProfile(CalorieGain: 28, ProteinGain: 3, IronGain: 2, VitaminDGain: 0, HydrationGain: 25) });
 // 10 water jugs — also available in tavern
-for (int index = 0; index < 10; index++)
+for (int index = 0; index < 100; index++)
     objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_tavern_{(index + 1):D2}", DisplayName = "Džbán vody", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 30, WeightGrams = 500, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.8)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
 
 // ── Market Square (Village / Public) ──────────────────────────────────────────
@@ -264,7 +264,7 @@ for (int index = 0; index < 5; index++)
     objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"tea_library_{(index + 1):D2}", DisplayName = "Šálek bylinkového čaje", LocationId = "library", AmbientNoise = 0, HeatSignature = 0.3, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 60, WeightGrams = 200, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.6), new WorldObjectAffordance(AffordanceType.MoodBoost, 0.15)], NutritionalProfile = new NutritionalProfile(CalorieGain: 3, ProteinGain: 0, IronGain: 3, VitaminDGain: 0, HydrationGain: 62) });
 
 // ── Courtyard (Castle / Public) ───────────────────────────────────────────────
-for (int index = 0; index < 15; index++)
+for (int index = 0; index < 250; index++)
     objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_courtyard_{(index + 1):D2}", DisplayName = "Voda ze studny", LocationId = "courtyard", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 10, WeightGrams = 300, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.9)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
 
 // ── Throne Room (Castle / Social) ─────────────────────────────────────────────

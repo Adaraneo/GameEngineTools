@@ -670,6 +670,11 @@ namespace EngineTests
                 throw new NotImplementedException();
             }
 
+            public int CompareTo(IHuman? other)
+            {
+                throw new NotImplementedException();
+            }
+
             #endregion IHuman
         }
 
