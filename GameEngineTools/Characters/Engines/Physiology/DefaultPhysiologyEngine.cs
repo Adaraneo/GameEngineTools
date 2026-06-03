@@ -131,6 +131,79 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return Math.Max(0.0, days / 365.25);
         }
 
+        #region Drift computation
+
+        /// <summary>
+        /// Computes the continuous physiological drift for a single tick as a pure
+        /// function of the current action, elapsed hours, and configuration.
+        /// </summary>
+        /// <remarks>
+        /// Single source of truth for baseline action-driven drift. Intentionally
+        /// <c>static</c> and side-effect free (no engine fields, no state mutation,
+        /// no events, no RNG) so it can be unit-tested exhaustively and can never be
+        /// accidentally duplicated in <see cref="Handle"/> — the cause of BUG-1/2/3.
+        /// State-dependent inputs (post-menopause immune factor, per-object hydration)
+        /// are passed in as parameters, keeping the decision logic in <see cref="Tick"/>.
+        /// </remarks>
+        /// <param name="action">Current plan name (see <see cref="ActionNames"/>), or null when idle.</param>
+        /// <param name="h">Elapsed game hours this tick (already sanitised by <c>SafeHours</c>).</param>
+        /// <param name="config">Drift rate configuration.</param>
+        /// <param name="hydrationGain">Per-object hydration gain for <c>Drink</c>, or null for the config default.</param>
+        /// <param name="immuneDecayFactor">Multiplier on immune recovery (e.g. 0.7 post-menopause); pass 1.0 for default.</param>
+        /// <returns>The additive deltas to apply to the physiological state this tick.</returns>
+        internal static PhysiologyDrift ComputeDrift(
+            string? action,
+            double h,
+            PhysiologyConfig config,
+            double? hydrationGain,
+            double immuneDecayFactor)
+        {
+            // Energy: depletes while awake, slower during self-care, untouched during sleep
+            // (sleep recovery is a one-time effect in Handle(SleepEnded), NOT here).
+            var energy = action switch
+            {
+                SelfCare => config.EnergyDriftSelfCarePerHour * h,
+                Sleep => 0.0,
+                _ => config.EnergyDriftAwakePerHour * h
+            };
+
+            // Hunger: rises while awake, slower during sleep, drops while eating.
+            var hunger = action switch
+            {
+                Eat => config.HungerEatingGainPerHour * h,
+                Sleep => config.HungerDriftSleepPerHour * h,
+                _ => config.HungerDriftAwakePerHour * h
+            };
+
+            // Thirst: same pattern. Drink uses the object's hydration value when supplied.
+            var thirst = action switch
+            {
+                Drink => -(hydrationGain ?? config.ThirstDrinkingGainPerHour) * h,
+                Sleep => config.ThirstDriftSleepPerHour * h,
+                _ => config.ThirstDriftAwakePerHour * h
+            };
+
+            // Pain: passive recovery always; sleep adds its bonus; self-care is strongest.
+            var pain = action switch
+            {
+                SelfCare => -config.PainSelfCareRecoveryPerHour * h,
+                Sleep => -(config.PainPassiveRecoveryPerHour + config.PainSleepRecoveryPerHour) * h,
+                _ => -config.PainPassiveRecoveryPerHour * h
+            };
+
+            // Immune load: recovers slowly by default, faster during self-care; the decay
+            // factor (<= 1.0) slows recovery for states such as post-menopause.
+            var immune = action switch
+            {
+                SelfCare => config.ImmuneDriftSelfCarePerHour * h * immuneDecayFactor,
+                _ => config.ImmuneDriftAwakePerHour * h * immuneDecayFactor
+            };
+
+            return new PhysiologyDrift(energy, hunger, thirst, pain, immune);
+        }
+
+        #endregion Drift computation
+
         /// <summary>
         /// Advances continuous physiological drift by one time step.
         /// Called each game tick to apply gradual changes to energy, hunger, thirst, pain,
@@ -153,44 +226,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
             var nutProfile = ResolveNutritionalProfile(ctx);
 
-            // Modifikátory driftu podle akce
-            var energyDelta = action switch
-            {
-                SelfCare => -0.5 * h,
-                Sleep => 0,
-                _ => -2 * h
-            };
-
-            var hungerDelta = action switch
-            {
-                Eat => -40 * h,
-                Sleep => 2.0 * h,
-                _ => 6 * h
-            };
-
-            var thirstDelta = action switch
-            {
-                Drink => -(nutProfile?.HydrationGain ?? 50) * h,
-                Sleep => 2.0 * h,
-                _ => 8 * h
-            };
-
-            var painDelta = action switch
-            {
-                SelfCare => -10 * h,
-                Sleep => -(Config.PainPassiveRecoveryPerHour + Config.PainSleepRecoveryPerHour) * h,
-                _ => -Config.PainPassiveRecoveryPerHour * h
-            };
-
-            // Post-menopauza: estrogen ztracen → imunitní recovery pomalejší (30 % zpomalení)
+            // Post-menopauza: estrogen ztracen → imunitní recovery pomalejší (30 % zpomalení).
+            // Tento state-driven faktor zůstává v Tick() a vstupuje do ComputeDrift jako parametr.
             var isPostMenopauseImmune = s.Cycle?.Phase == CyclePhase.Paused
                 && s.Pregnancy is null && (s.Aging?.AgeYears ?? 0) >= 45;
             var immuneDecayFactor = isPostMenopauseImmune ? 0.7 : 1.0;
-            var immuneDelta = action switch
-            {
-                SelfCare => -0.5 * h * immuneDecayFactor,
-                _ => -0.3 * h * immuneDecayFactor
-            };
+
+            // Single source of truth for action-driven drift (energy, hunger, thirst, pain, immune).
+            var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor);
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
             // Cirkadiánní tělesná teplota: sinusoidální vlna ±CircadianTempAmplitude (Waterhouse 2005)
@@ -206,11 +249,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             s = s with
             {
-                Energy = Clamp01p(s.Energy + energyDelta),
-                Hunger = Clamp01p(s.Hunger + hungerDelta),
-                Thirst = Clamp01p(s.Thirst + thirstDelta),
-                Pain = Clamp01p(s.Pain + painDelta),
-                ImmuneLoad = Clamp01p(s.ImmuneLoad + immuneDelta),
+                Energy = Clamp01p(s.Energy + drift.Energy),
+                Hunger = Clamp01p(s.Hunger + drift.Hunger),
+                Thirst = Clamp01p(s.Thirst + drift.Thirst),
+                Pain = Clamp01p(s.Pain + drift.Pain),
+                ImmuneLoad = Clamp01p(s.ImmuneLoad + drift.Immune),
                 BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, targetBodyTemp, 0.1 * h), -1.0, 3.5)
             };
 

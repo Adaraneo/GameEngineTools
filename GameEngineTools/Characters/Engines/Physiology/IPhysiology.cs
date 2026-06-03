@@ -213,7 +213,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Maximum thirst reduction applied by a single <c>UseInPlace</c> object interaction
         /// at full satisfaction (1.0).
         /// </summary>
-        double AffordanceThirstMaxDelta = 20.0) // hard cap on hourly risk
+        double AffordanceThirstMaxDelta = 20.0, // hard cap on hourly risk
+
+        // ── Baseline action-driven drift (abstract [0..100] scale, not physical units) ──
+        // Gameplay tuning knobs, not literature-derived constants. They live in config
+        // (like every other rate in this engine) so the awake/sleep/consume rates stay
+        // in one place and can be tuned per-scenario without recompiling.
+        double EnergyDriftAwakePerHour = -2.0,
+        double EnergyDriftSelfCarePerHour = -0.5,
+        double HungerDriftAwakePerHour = 6.0,
+        double HungerDriftSleepPerHour = 2.0,   // slowed metabolism during sleep
+        double HungerEatingGainPerHour = -40.0, // negative: eating reduces hunger
+        double ThirstDriftAwakePerHour = 8.0,
+        double ThirstDriftSleepPerHour = 2.0,
+        double ThirstDrinkingGainPerHour = 50.0, // magnitude; negated in ComputeDrift
+        double PainSelfCareRecoveryPerHour = 10.0,
+        double ImmuneDriftAwakePerHour = -0.3,
+        double ImmuneDriftSelfCarePerHour = -0.5)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
