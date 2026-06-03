@@ -1448,6 +1448,52 @@ namespace EngineTests
 
         #endregion Antikoncepce (ongoing stav)
 
+        #region Menstruační symptomy — oscilace
+
+        [TestMethod]
+        public void Cycle_Bloat_OscillatesAcrossCycleAndDoesNotAccumulate()
+        {
+            // Regrese: dřív se SymptomBloat jen přičítal (bez decaye/resetu) a saturoval na 100.
+            // Nově je to target-tracking → musí stoupnout v menstruaci a klesnout ve folikulární fázi.
+            var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25, cycleEnabled: true);
+            engine.RestoreState(engine.State with
+            {
+                Cycle = engine.State.Cycle! with
+                {
+                    DayInCycle = 1,
+                    Phase = CyclePhase.Menses,
+                    SymptomBloat = 0,
+                    SymptomBreastTender = 0
+                }
+            });
+            var ctx = BuildContextWithAction(null);
+
+            var bloatByDay = new List<double>();
+            for (var i = 0; i < 60; i++)
+            {
+                engine.Tick(new WDateTime(WTimeSpan.FromHours(24.0 * i).Ticks), WTimeSpan.FromHours(24), ctx, new EventCollector());
+                bloatByDay.Add(engine.State.Cycle!.SymptomBloat);
+            }
+
+            var max = bloatByDay.Max();
+            var min = bloatByDay.Min();
+
+            Assert.IsTrue(max > 25,
+                $"Bloat musí v menstruaci vystoupat na znatelnou úroveň. max={max:F1}");
+            Assert.IsTrue(min < 10,
+                $"Bloat musí ve folikulární fázi klesnout zpět k nule. min={min:F1}");
+            Assert.IsTrue(max < 90,
+                $"Bloat se nesmí kumulovat/saturovat na 100. max={max:F1}");
+
+            // Žádný vzestupný drift napříč cykly: vrchol v 1. a 2. cyklu musí být srovnatelný.
+            var cycle1Max = bloatByDay.Take(30).Max();
+            var cycle2Max = bloatByDay.Skip(30).Take(30).Max();
+            Assert.IsTrue(Math.Abs(cycle2Max - cycle1Max) < 15,
+                $"Vrchol bloatu nesmí mezi cykly růst. cyklus1={cycle1Max:F1}, cyklus2={cycle2Max:F1}");
+        }
+
+        #endregion Menstruační symptomy — oscilace
+
         #region Altitude
 
         [TestMethod]

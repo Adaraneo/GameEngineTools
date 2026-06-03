@@ -819,7 +819,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private PhysiologyState ApplyCycleSymptoms(PhysiologyState s)
         {
-            var (pain, bloat, tender, libido) = SymptomsFor(s.Cycle!, s.CurrentContraception);
+            var (pain, bloatTarget, tenderTarget, libido) = SymptomsFor(s.Cycle!, s.CurrentContraception);
             var day = (double)s.Cycle!.DayInCycle;
             var ovulDay = (double)Math.Max(_cycleCfg.MensesMeanDays + 2, s.Cycle.CurrentCycleLength - _cycleCfg.LutealMeanDays);
             var lutealFactor = Math.Max(0, (day - (ovulDay + 7)) / 7.0);
@@ -829,8 +829,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Pain = Clamp01p(s.Pain + pain),
                 Cycle = s.Cycle with
                 {
-                    SymptomBloat = Clamp01p(s.Cycle.SymptomBloat + bloat),
-                    SymptomBreastTender = Clamp01p(s.Cycle.SymptomBreastTender + tender),
+                    SymptomBloat = ApproachClamped(s.Cycle.SymptomBloat, bloatTarget, _cycleCfg.SymptomTrackingRatePerDay),
+                    SymptomBreastTender = ApproachClamped(s.Cycle.SymptomBreastTender, tenderTarget, _cycleCfg.SymptomTrackingRatePerDay),
                     LibidoMod = libido,
                     PmddActive = isPmddActive
                 }
@@ -1036,7 +1036,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         /// <param name="c">Current menstrual cycle state from which <c>Phase</c> is read.</param>
         /// <returns>
-        /// A tuple of (pain delta, bloat delta, breast-tenderness delta, libido multiplier):
+        /// A tuple of (pain delta, bloat <b>target</b>, breast-tenderness <b>target</b>, libido multiplier).
+        /// Pain is a per-day delta accumulated into the general Pain channel (which decays separately);
+        /// bloat and tenderness are absolute target levels (0..100) that the state relaxes toward in
+        /// <see cref="ApplyCycleSymptoms"/>, so they oscillate with the cycle instead of accumulating:
         /// <list type="bullet">
         ///   <item><description>
         ///     <b>Menses</b>: Pain +3, Bloat +2, Tenderness +2, LibidoMod 0.90.
@@ -1066,7 +1069,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Vědecký základ: estrogen/progesteron drift je plynulý, nikoli binární přepínač
         /// (reference: physiology-psychology.md).
         /// </summary>
-        private (double pain, double bloat, double tender, double libidoMod) SymptomsFor(
+        private (double pain, double bloatTarget, double tenderTarget, double libidoMod) SymptomsFor(
             MenstrualCycleState c,
             ContraceptionLevel contraception = ContraceptionLevel.Unspecified)
         {
@@ -1083,15 +1086,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var lutealPain = 1.5 * Math.Max(0, (day - (ovulDay + 7)) / 7.0);
             var rawPain = (mensesPain + lutealPain) * _cycleCfg.PainBaseMultiplier;
 
-            // Bloat: peak v menstruaci, mírně v luteálu
-            var mensesBloat = 2.5 * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
-            var lutealBloat = 0.8 * Math.Max(0, (day - (ovulDay + 7)) / 7.0);
-            var rawBloat = (mensesBloat + lutealBloat) * _cycleCfg.BloatBaseMultiplier;
+            // Bloat TARGET (0..100): Gaussův vrchol v menstruaci + pozdně-luteální (PMS) náběh.
+            // Vrací se cílová úroveň, ke které stav v ApplyCycleSymptoms relaxuje — nikoli přírůstek.
+            var mensesBloat = _cycleCfg.MensesBloatPeak * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
+            var lutealBloat = _cycleCfg.LutealBloatPeak * Math.Max(0, (day - (ovulDay + 7)) / 7.0);
+            var bloatTarget = (mensesBloat + lutealBloat) * _cycleCfg.BloatBaseMultiplier;
 
-            // Breast tenderness: dominantní v pozdní luteální fázi, mírně v menstruaci
-            var mensesTender = 2.0 * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
-            var lutealTender = 1.5 * Math.Max(0, (day - (ovulDay + 5)) / 7.0);
-            var rawTender = (mensesTender + lutealTender) * _cycleCfg.BreastTenderMultiplier;
+            // Breast tenderness TARGET (0..100): dominantní v pozdní luteální fázi, mírně v menstruaci.
+            var mensesTender = _cycleCfg.MensesBreastTenderPeak * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
+            var lutealTender = _cycleCfg.LutealBreastTenderPeak * Math.Max(0, (day - (ovulDay + 5)) / 7.0);
+            var tenderTarget = (mensesTender + lutealTender) * _cycleCfg.BreastTenderMultiplier;
 
             // LibidoMod: Gaussový vrchol v ovulaci, mírný propad v menstruaci, baseline 0.95
             var libidoBoost = 0.25 * Math.Exp(-Math.Pow(day - ovulDay, 2) / 8.0);
@@ -1110,10 +1114,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var lutealFactor = Math.Max(0, (day - (ovulDay + 7)) / 7.0);   // 0..1 v luteálu
             var pmddMultiplier = 1.0 + _cycleCfg.PmsRisk * lutealFactor * 1.5 * contraFactor;
             rawPain *= pmddMultiplier;
-            rawBloat *= pmddMultiplier;
-            rawTender *= pmddMultiplier;
+            bloatTarget *= pmddMultiplier;
+            tenderTarget *= pmddMultiplier;
 
-            return (rawPain, rawBloat, rawTender, libidoMod);
+            return (rawPain, bloatTarget, tenderTarget, libidoMod);
         }
 
         private static CyclePhase PhaseFor(int day, int length, int mensesDays, int ovulationDay)
@@ -1173,6 +1177,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
             (value < target) ? Math.Min(target, value + by) : Math.Max(target, value - by);
 
         private static double Clamp01p(double v) => Math.Max(0, Math.Min(100, v));
+
+        /// <summary>
+        /// Moves <paramref name="current"/> toward <paramref name="target"/> by a fraction
+        /// <paramref name="rate"/> (0..1) and clamps the result to [0, 100]. Used for cyclic
+        /// symptoms that must track a phase target (rise <i>and</i> fall) rather than accumulate.
+        /// </summary>
+        private static double ApproachClamped(double current, double target, double rate)
+            => Clamp01p(current + (target - current) * Math.Clamp(rate, 0.0, 1.0));
 
         /// <summary>
         /// Vypočítá novou hladinu vitaminu D: odečte diurnální ztrátu a — pokud je postava

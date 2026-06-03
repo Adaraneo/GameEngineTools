@@ -521,7 +521,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// required to clear anovulatory suppression.
         /// HPA axis recovery is slower than onset (asymmetric, like allostatic load).
         /// </summary>
-        double AnovulatoryRecoveryDays = 3.0)
+        double AnovulatoryRecoveryDays = 3.0,
+        /// <summary>Target bloat level (0..100) at the menstrual peak.</summary>
+        double MensesBloatPeak = 55.0,
+        /// <summary>Additional bloat target (0..100) ramping through the late luteal (PMS) phase.</summary>
+        double LutealBloatPeak = 30.0,
+        /// <summary>Target breast-tenderness level (0..100) during menstruation.</summary>
+        double MensesBreastTenderPeak = 35.0,
+        /// <summary>Target breast-tenderness level (0..100) at the late-luteal peak.</summary>
+        double LutealBreastTenderPeak = 55.0,
+        /// <summary>
+        /// Per-day relaxation rate (0..1) at which cyclic symptoms (bloat, breast tenderness)
+        /// track their phase target. Guarantees symptoms oscillate with the cycle and decay
+        /// back toward zero in the follicular phase instead of accumulating monotonically.
+        /// </summary>
+        double SymptomTrackingRatePerDay = 0.6)
     {
         public MenstrualCycleConfig() : this(30, 6.7, 5, 0.35, true, true, 12, 21, 36, 1.0, 1.0, 1.0, 72, 5, 5, 3) { }
     }
