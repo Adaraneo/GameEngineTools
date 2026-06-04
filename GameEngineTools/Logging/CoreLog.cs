@@ -764,6 +764,20 @@ namespace GameEngineTools.Logging
             double Congruence,
             double DeltaValence);
 
+        /// <summary>
+        /// A held value drifted from lived experience (R4 drift). Logged at Debug.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1213,
+            Level = LogLevel.Debug,
+            Message = "[VALUES] {HumanId} value drift: eroded={ErodedValue}, strengthened={StrengthenedValue}, delta={Delta:F3}")]
+        public static partial void ValueDrifted(
+            this ILogger logger,
+            string HumanId,
+            string ErodedValue,
+            string StrengthenedValue,
+            double Delta);
+
         #endregion Behavior/Interaction — kontext
 
         #region Memory — epizodická paměť

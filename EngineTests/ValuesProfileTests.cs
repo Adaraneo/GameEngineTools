@@ -12,6 +12,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -564,7 +565,7 @@ namespace EngineTests
                 new InteractionSurface(null, false, 0.1, 0.1, SurfaceKind.Social),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(new List<EpisodicMemory>()),
-                Values: values);
+                Values: ValuesState.FromBaseline(values));
 
             var ctx = new HumanContext
             {

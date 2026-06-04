@@ -7,13 +7,17 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Interests;
+    using GameEngineTools.Characters.Engines.LifeStage;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Schedule;
+    using GameEngineTools.Characters.Engines.SelfConcept;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
@@ -124,6 +128,9 @@ namespace GameEngineTools.Characters.Core
         private readonly ISemanticMemoryEngine _semanticMemory;
         private readonly IGoalEngine _goal;
         private readonly IDailyScheduleEngine _schedule;
+        private readonly IValuesEngine _values;
+        private readonly ISelfConceptEngine _selfConcept;
+        private readonly IInterestEngine _interests;
         private readonly IObjectInteractionEngine? _objectInteraction;
 
         // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
@@ -143,6 +150,10 @@ namespace GameEngineTools.Characters.Core
         private readonly ActiveActionSlots _slots = new();
 
         private WTimeSpan _behaviorAccumulated;
+
+        // Last observed life stage; used to emit LifeStageTransitionOccurred on change.
+        // Volatile runtime state (derivable from age) — not persisted in EnginesSnapshot.
+        private StadiumType? _lastStadium;
 
         #endregion Private fields
 
@@ -173,6 +184,9 @@ namespace GameEngineTools.Characters.Core
         /// <param name="semanticMemory">Semantic memory engine instance.</param>
         /// <param name="goal">Goal engine instance.</param>
         /// <param name="schedule">Daily schedule engine instance.</param>
+        /// <param name="values">Values drift engine instance.</param>
+        /// <param name="selfConcept">Self-concept engine instance.</param>
+        /// <param name="interests">Interest (RIASEC) drift engine instance.</param>
         /// <param name="objectInteraction">Optional object interaction engine. Wired between Interactions and Relationships in Phase B.</param>
         /// <param name="initialSnapshot">Initial engine snapshot (provided by the factory).</param>
         public OrchestratedHuman(
@@ -197,6 +211,9 @@ namespace GameEngineTools.Characters.Core
             ISemanticMemoryEngine semanticMemory,
             IGoalEngine goal,
             IDailyScheduleEngine schedule,
+            IValuesEngine values,
+            ISelfConceptEngine selfConcept,
+            IInterestEngine interests,
             // initial snapshot (from factory)
             EnginesSnapshot initialSnapshot,
             // optional behavior cadence override
@@ -226,6 +243,9 @@ namespace GameEngineTools.Characters.Core
             _semanticMemory = semanticMemory;
             _goal = goal;
             _schedule = schedule;
+            _values = values;
+            _selfConcept = selfConcept;
+            _interests = interests;
             _objectInteraction = objectInteraction;
 
             Snapshot = initialSnapshot;
@@ -311,6 +331,10 @@ namespace GameEngineTools.Characters.Core
             var outbox = new EventCollector();
             var behaviorDt = ConsumeBehaviorDelta(dt);
 
+            // Detect a life-stage boundary crossing and emit the transition for engines to react to
+            // (Phase C self-delivery). No scripted crisis — just a probabilistic reappraisal trigger.
+            DetectLifeStageTransition(now, outbox);
+
             // Physiology and psychology must advance first — behavior reads their current state.
             // This enforces the documented pipeline order: Physiology → Psychology → Behavior.
             _physio.Tick(now, dt, _ctx, outbox);
@@ -334,6 +358,9 @@ namespace GameEngineTools.Characters.Core
             _semanticMemory.Tick(now, dt, _ctx, outbox);
             _goal.Tick(now, dt, _ctx, outbox);
             _schedule.Tick(now, dt, _ctx, outbox);
+            _values.Tick(now, dt, _ctx, outbox);
+            _selfConcept.Tick(now, dt, _ctx, outbox);
+            _interests.Tick(now, dt, _ctx, outbox);
 
             // Final snapshot after all Phase B engines complete.
             RefreshSnapshot();
@@ -369,6 +396,12 @@ namespace GameEngineTools.Characters.Core
             _semanticMemory.RestoreState(snapshot.SemanticMemory ?? SemanticMemoryState.Empty);
             _goal.RestoreState(snapshot.Goals ?? GoalState.Empty);
             _schedule.RestoreState(snapshot.Schedule ?? DailyScheduleState.Empty);
+            if (snapshot.Values is not null)
+                _values.RestoreState(snapshot.Values);
+            if (snapshot.SelfConcept is not null)
+                _selfConcept.RestoreState(snapshot.SelfConcept);
+            if (snapshot.Interests is not null)
+                _interests.RestoreState(snapshot.Interests);
         }
 
         /// <inheritdoc/>
@@ -478,6 +511,9 @@ namespace GameEngineTools.Characters.Core
             if (_objectInteraction is not null) try { _objectInteraction.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] ObjectInteraction.Handle failed.", Id.Value); }
             try { _goal.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Goal.Handle failed.", Id.Value); }
             try { _schedule.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Schedule.Handle failed.", Id.Value); }
+            try { _values.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Values.Handle failed.", Id.Value); }
+            try { _selfConcept.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SelfConcept.Handle failed.", Id.Value); }
+            try { _interests.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Interests.Handle failed.", Id.Value); }
 
             // Acquire action slots when this character commits an action.
             // AcquireOrReplace: if the channel is already occupied, the new action wins —
@@ -543,6 +579,29 @@ namespace GameEngineTools.Characters.Core
         private void RefreshAppearance()
             => _projectedAppearance = Generation.AppearanceProjector.Project(_geneticBlueprint, Age);
 
+        private void DetectLifeStageTransition(WDateTime now, IEventCollector outbox)
+        {
+            var ageYears = AgeYearsAt(now);
+            var stadium = StadiumResolver.Resolve(Math.Max(0, ageYears));
+
+            if (_lastStadium is { } prev && prev != stadium)
+            {
+                outbox.Add(new LifeStageTransitionOccurred(now, Id, prev, stadium));
+            }
+
+            _lastStadium = stadium;
+        }
+
+        private int AgeYearsAt(WDateTime now)
+        {
+            var today = now.Date;
+            var birth = Identity.BirthDate;
+            var age = today.Year - birth.Year;
+            if (today.Month < birth.Month || (today.Month == birth.Month && today.Day < birth.Day))
+                age--;
+            return age;
+        }
+
         private void RefreshSnapshot()
         {
             RefreshAppearance();
@@ -559,7 +618,10 @@ namespace GameEngineTools.Characters.Core
                 AltitudeMeters: prev.AltitudeMeters,
                 Celestial: prev.Celestial,
                 Goals: _goal.State,
-                Schedule: _schedule.State);
+                Schedule: _schedule.State,
+                Values: _values.State,
+                SelfConcept: _selfConcept.State,
+                Interests: _interests.State);
 
             _ctx.Snapshot = Snapshot;
         }

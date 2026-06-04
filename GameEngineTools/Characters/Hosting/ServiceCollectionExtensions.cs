@@ -6,14 +6,18 @@ using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Goals;
 using GameEngineTools.Characters.Engines.Interactions;
+using GameEngineTools.Characters.Engines.Interests;
 using GameEngineTools.Characters.Engines.Memory;
 using GameEngineTools.Characters.Engines.Objects;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Psychology;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.Reputation;
 using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Engines.SemanticMemory;
+using GameEngineTools.Characters.Engines.SelfConcept;
 using GameEngineTools.Characters.Engines.Sleep;
+using GameEngineTools.Characters.Engines.Values;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Generation.Portraits;
 using GameEngineTools.Characters.Hosting.Defaults;
@@ -63,6 +67,21 @@ namespace GameEngineTools.Characters.Hosting
                 return registry;
             });
             services.TryAddTransient<IDailyScheduleEngine, DefaultDailyScheduleEngine>();
+            services.TryAddTransient<IValuesEngine, DefaultValuesEngine>();
+            services.TryAddTransient<ISelfConceptEngine, DefaultSelfConceptEngine>();
+            services.TryAddTransient<IInterestEngine, DefaultInterestEngine>();
+
+            // Scene-level reputation aggregate (singleton — shared across all characters in a world).
+            services.TryAddSingleton<CommunityReputationLedger>();
+
+            var valuesOb = services.AddOptions<ValuesConfig>();
+            valuesOb.BindConfiguration("Characters:Values");
+
+            var selfConceptOb = services.AddOptions<SelfConceptConfig>();
+            selfConceptOb.BindConfiguration("Characters:SelfConcept");
+
+            var interestsOb = services.AddOptions<InterestConfig>();
+            interestsOb.BindConfiguration("Characters:Interests");
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();
             lodOb.BindConfiguration("Characters:Lod");

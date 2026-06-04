@@ -7,13 +7,16 @@ namespace GameEngineTools.Characters.Hosting
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Interests;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Schedule;
+    using GameEngineTools.Characters.Engines.SelfConcept;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
@@ -147,6 +150,9 @@ namespace GameEngineTools.Characters.Hosting
             var semantic = _sp.GetRequiredService<ISemanticMemoryEngine>();
             var goal = _sp.GetRequiredService<IGoalEngine>();
             var schedule = _sp.GetRequiredService<IDailyScheduleEngine>();
+            var valuesEngine = _sp.GetRequiredService<IValuesEngine>();
+            var selfConcept = _sp.GetRequiredService<ISelfConceptEngine>();
+            var interestEngine = _sp.GetRequiredService<IInterestEngine>();
 
             // Object interaction engine is optional — only wired when both the world object provider
             // and location service are registered in the DI container.
@@ -154,27 +160,37 @@ namespace GameEngineTools.Characters.Hosting
 
             // Generate values profile from BigFive (Parks-Leduc et al. 2015 meta-analysis coefficients).
             // Use the blueprint's pre-generated profile if provided (deterministic replays / saves).
+            // The generated profile is the immutable Baseline; Current starts identical and drifts (R4 drift).
             var rngForValues = new System.Random(DeriveSeed(b.Id) ^ 0x56A1_CCFF);
-            var values = b.ValuesProfile ?? ValuesProfileGenerator.Generate(b.Personality.BigFive, rngForValues);
+            var valuesBaseline = b.ValuesProfile ?? ValuesProfileGenerator.Generate(b.Personality.BigFive, rngForValues);
+            var valuesState = ValuesState.FromBaseline(valuesBaseline);
+
+            // Generate RIASEC interest baseline (BigFive + sex + occupational exposure; Larson 2002, Su 2009).
+            var rngForInterests = new System.Random(DeriveSeed(b.Id) ^ 0x1A7E_5E57);
+            var interestBaseline = InterestProfileGenerator.Generate(
+                b.Personality.BigFive, b.Biology, b.Occupation, rngForInterests);
+            var interestState = InterestState.FromBaseline(interestBaseline);
 
             _loggerFactory.CreateLogger<DefaultHumanFactory>()
                 .ValuesProfileGenerated(
                     b.Id.Value.ToString(),
-                    values.Benevolence,
-                    values.Universalism,
-                    values.Achievement,
-                    values.Power);
+                    valuesBaseline.Benevolence,
+                    valuesBaseline.Universalism,
+                    valuesBaseline.Achievement,
+                    valuesBaseline.Power);
 
             // Initial snapshot — State is always valid immediately after factory creation
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
-                Goals: goal.State, Schedule: schedule.State, Values: values);
+                Goals: goal.State, Schedule: schedule.State, Values: valuesState,
+                SelfConcept: selfConcept.State, Interests: interestState);
 
             var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.GeneticBlueprint,
                 b.AttractionProfile,
                 bus, scheduler, rng, logger,
-                physio, psych, behav, inter, rel, mem, semantic, goal, schedule,
+                physio, psych, behav, inter, rel, mem, semantic, goal, schedule, valuesEngine, selfConcept,
+                interestEngine,
                 snapshot,
                 _behaviorCadencePolicy,
                 objectInteraction);
@@ -183,14 +199,22 @@ namespace GameEngineTools.Characters.Hosting
 
             schedule.SeedFromOccupation(b.Occupation, b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now, scheduler, b.Id);
 
+            valuesEngine.SeedFromBaseline(valuesBaseline);
+
+            selfConcept.SeedFromPersonality(b.Personality);
+
+            interestEngine.SeedFromBaseline(interestBaseline);
+
             // Propagate seeded states into the externally visible snapshot so that
             // code reading human.Snapshot before the first Tick() sees the correct state,
-            // and persistence snapshots include goals and schedule from the moment of creation.
+            // and persistence snapshots include goals, schedule, values, and self-concept from creation.
             human.RestoreSnapshot(human.Snapshot with
             {
-                Goals    = goal.State,
-                Schedule = schedule.State,
-                Values   = values
+                Goals       = goal.State,
+                Schedule    = schedule.State,
+                Values      = valuesState,
+                SelfConcept = selfConcept.State,
+                Interests   = interestState
             }, _clock.Now.Date);
 
             return human;

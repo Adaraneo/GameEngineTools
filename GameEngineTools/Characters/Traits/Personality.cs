@@ -14,7 +14,14 @@ namespace GameEngineTools.Characters.Traits
         /// Dual Control Model profile (Bancroft &amp; Janssen 2000).
         /// <c>null</c> = population average (SES=0.5, SIS1=0.5, SIS2=0.5) — backward compatible.
         /// </summary>
-        SexualResponsiveness? DualControl = null);
+        SexualResponsiveness? DualControl = null,
+
+        /// <summary>
+        /// Per-NPC Theory-of-Mind recursion ceiling (max levels of "I think that you think…").
+        /// Population mean ≈ 4, SD ≈ 1 (Kinderman 1998). Default 4 for backward compatibility;
+        /// sampled per character by the generator via <see cref="Engines.ToM.ToMMath.GenerateCeiling"/>.
+        /// </summary>
+        int ToMCeiling = 4);
 
     public sealed record BigFive(
         double Openness, double Conscientiousness, double Extraversion, double Agreeableness, double Neuroticism);

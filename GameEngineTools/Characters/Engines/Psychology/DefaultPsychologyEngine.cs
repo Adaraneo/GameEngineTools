@@ -987,9 +987,59 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 case Objects.ObjectAffordanceApplied oaa when oaa.Actor == ctx.Id:
                     s = ApplyObjectAffordance(s, oaa, ctx);
                     break;
+
+                case LifeStage.LifeStageTransitionOccurred lst when lst.Human == ctx.Id:
+                    s = HandleLifeStageTransition(lst, s, ctx, outbox);
+                    break;
+
+                case LifeStage.EmptyNestOccurred en when en.Human == ctx.Id:
+                    s = HandleEmptyNest(en, s, ctx);
+                    break;
             }
 
             State = s;
+        }
+
+        /// <summary>
+        /// Applies the affective consequence of a life-stage transition: a small mid-life mood dip,
+        /// plus a probabilistic (usually absent) life-evaluation episode. No scripted crisis.
+        /// </summary>
+        private PsychologyState HandleLifeStageTransition(
+            LifeStage.LifeStageTransitionOccurred e, PsychologyState s, IHumanContext ctx, IEventCollector outbox)
+        {
+            var dip = LifeStage.LifeStageMath.MidlifeMoodDip(e.From, e.To);
+            if (dip > 0)
+                s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - dip, 0, 100) };
+
+            var p = LifeStage.LifeStageMath.EvaluationEpisodeProbability(e.From, e.To);
+            if (ctx.Random.Chance(p))
+            {
+                // A reflective reappraisal window opens — mild, often non-negative. Modelled as a
+                // small stress bump (reflection), not a mood collapse. Downstream value reweighting
+                // is driven by subsequent behaviour, not forced here.
+                s = s with { Stress = Math.Clamp(s.Stress + 2.0, 0, 100) };
+                outbox.Add(new LifeStage.LifeEvaluationEpisodeStarted(e.OccurredAt, ctx.Id, e.From, e.To));
+            }
+
+            return s;
+        }
+
+        /// <summary>
+        /// Empty nest: a small POSITIVE shift for most; a transient negative for the minority with
+        /// a strong parenting identity (active ProtectFamily goal or high NeedCare).
+        /// </summary>
+        private PsychologyState HandleEmptyNest(LifeStage.EmptyNestOccurred e, PsychologyState s, IHumanContext ctx)
+        {
+            var strongParenting =
+                (ctx.Snapshot.Goals?.Active.Any(g => g.Kind == Goals.PersistentGoalKind.ProtectFamily) ?? false)
+                || (s.Motivations?.NeedCare ?? 0) > 70.0;
+
+            var shift = LifeStage.LifeStageMath.EmptyNestValenceShift(strongParenting);
+            return s with
+            {
+                Valence = Math.Clamp(s.Valence + shift, -1.0, 1.0),
+                MoodBaseline = Math.Clamp(s.MoodBaseline + shift * 10.0, 0, 100)
+            };
         }
 
         private static string ChooseManifestation(Traits.Personality p)

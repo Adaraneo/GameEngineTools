@@ -13,6 +13,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.Characters.Engines.ToM;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Objects;
@@ -451,11 +452,13 @@ namespace GameEngineTools.Characters.Engines.Memory
                             EndEmotion: ValenceToEmotionalTag(io.EndValence)),
                             ctx, outbox);
 
-                        // ToM: record knowledge that the other party performed a SelfDisclosure
+                        // ToM L1+L2: record knowledge that the other party performed a SelfDisclosure.
+                        // Both parties were present, so this is mutually known (common ground) — set L2.
                         if (io.Act == SpeechAct.SelfDisclosure && io.Accepted)
                         {
                             var otherId = io.From == ctx.Id ? io.To : io.From;
-                            RecordKnowledge(otherId, ctx.Id, "SelfDisclosure", FactSource.DirectWitness, io.OccurredAt);
+                            RecordKnowledge(otherId, ctx.Id, "SelfDisclosure", FactSource.DirectWitness, io.OccurredAt,
+                                sharedWith: otherId, outbox: outbox, selfId: ctx.Id);
                         }
                         break;
                     }
@@ -833,11 +836,15 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </summary>
         private void RecordKnowledge(
             HumanId subject, HumanId? objectId, string actionKind,
-            FactSource source, WDateTime now)
+            FactSource source, WDateTime now,
+            HumanId? sharedWith = null, IEventCollector? outbox = null, HumanId? selfId = null)
         {
             var confidence = source == FactSource.DirectWitness
                 ? Config.DirectWitnessConfidence
                 : Config.GossipConfidence;
+
+            // Level-2 ToM: a co-witness means this fact is common ground (mutually known).
+            var mutual = sharedWith is not null;
 
             // Merge with existing fact if same (subject, object, actionKind) — boost confidence
             var existing = State.Knowledge
@@ -853,7 +860,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                 updated[idx] = existing with
                 {
                     Confidence = Math.Min(1.0, Math.Max(existing.Confidence, confidence)),
-                    LearnedAt = now   // refresh timestamp
+                    LearnedAt = now,  // refresh timestamp
+                    IsMutuallyKnown = existing.IsMutuallyKnown || mutual,
+                    KnownSharedWith = mutual ? sharedWith : existing.KnownSharedWith
                 };
             }
             else
@@ -866,9 +875,17 @@ namespace GameEngineTools.Characters.Engines.Memory
                     Object: objectId,
                     ActionKind: actionKind,
                     Source: source,
-                    Confidence: confidence));
+                    Confidence: confidence,
+                    IsMutuallyKnown: mutual,
+                    KnownSharedWith: mutual ? sharedWith : null));
             }
             State = State with { Knowledge = updated };
+
+            if (mutual && outbox is not null && selfId is not null)
+            {
+                outbox.Add(new MutualKnowledgeFormed(
+                    now, selfId.Value, subject, sharedWith!.Value, actionKind));
+            }
         }
 
         /// <summary>

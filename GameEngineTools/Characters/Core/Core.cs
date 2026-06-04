@@ -262,10 +262,25 @@ namespace GameEngineTools.Characters.Core
         DailyScheduleState? Schedule = null,
 
         /// <summary>
-        /// Schwartz Basic Human Values profile for this character.
-        /// Generated once at creation by <see cref="GameEngineTools.Characters.Traits.ValuesProfileGenerator"/>.
+        /// Schwartz Basic Human Values state for this character: the drifting <c>Current</c>
+        /// profile plus the immutable <c>Baseline</c> seeded from BigFive at creation.
         /// <c>null</c> for characters created before this field existed (backward compatibility).
-        /// Read by <see cref="GameEngineTools.Characters.Engines.Behavior.Modifiers.ValuesBehaviorModifier"/>.
+        /// Read by <see cref="GameEngineTools.Characters.Engines.Behavior.Modifiers.ValuesBehaviorModifier"/>;
+        /// evolved by <see cref="GameEngineTools.Characters.Engines.Values.DefaultValuesEngine"/>.
         /// </summary>
-        GameEngineTools.Characters.Traits.ValuesProfile? Values = null);
+        GameEngineTools.Characters.Engines.Values.ValuesState? Values = null,
+
+        /// <summary>
+        /// The character's self-concept (perceived Big Five, ideal subset, self-esteem, discrepancy).
+        /// <c>null</c> for characters created before this field existed (backward compatibility).
+        /// Evolved by <see cref="GameEngineTools.Characters.Engines.SelfConcept.DefaultSelfConceptEngine"/>.
+        /// </summary>
+        GameEngineTools.Characters.Engines.SelfConcept.SelfConcept? SelfConcept = null,
+
+        /// <summary>
+        /// The character's RIASEC interest state (drifting Current + immutable Baseline).
+        /// <c>null</c> for characters created before this field existed (backward compatibility).
+        /// Evolved by <see cref="GameEngineTools.Characters.Engines.Interests.DefaultInterestEngine"/>.
+        /// </summary>
+        GameEngineTools.Characters.Engines.Interests.InterestState? Interests = null);
 }

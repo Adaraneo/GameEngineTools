@@ -11,7 +11,10 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.Interests;
     using GameEngineTools.Characters.Engines.Schedule;
+    using GameEngineTools.Characters.Engines.SelfConcept;
+    using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
@@ -1425,6 +1428,9 @@ namespace EngineTests
             var semanticMemory = ServiceProvider.GetRequiredService<ISemanticMemoryEngine>();
             var goal = ServiceProvider.GetRequiredService<IGoalEngine>();
             var schedule = ServiceProvider.GetRequiredService<IDailyScheduleEngine>();
+            var values = ServiceProvider.GetRequiredService<IValuesEngine>();
+            var selfConcept = ServiceProvider.GetRequiredService<ISelfConceptEngine>();
+            var interests = ServiceProvider.GetRequiredService<IInterestEngine>();
 
             var snapshot = new EnginesSnapshot(
                 physio.State,
@@ -1435,7 +1441,10 @@ namespace EngineTests
                 memory.State,
                 semanticMemory.State,
                 Goals: goal.State,
-                Schedule: schedule.State);
+                Schedule: schedule.State,
+                Values: values.State,
+                SelfConcept: selfConcept.State,
+                Interests: interests.State);
 
             return new OrchestratedHuman(
                 id,
@@ -1457,6 +1466,9 @@ namespace EngineTests
                 semanticMemory: semanticMemory,
                 goal: goal,
                 schedule: schedule,
+                values: values,
+                selfConcept: selfConcept,
+                interests: interests,
                 initialSnapshot: snapshot,
                 behaviorCadencePolicy: null);
         }

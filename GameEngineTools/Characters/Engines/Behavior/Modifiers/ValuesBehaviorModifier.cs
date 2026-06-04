@@ -77,7 +77,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         public void Modify(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
             // No values profile → character was created before this sprint; skip silently.
-            var values = context.HumanContext.Snapshot.Values;
+            // Read the drifting Current profile (R4 drift) — morality is keyed to who the
+            // character has become, not the BigFive-seeded Baseline.
+            var values = context.HumanContext.Snapshot.Values?.Current;
             if (values is null) return;
 
             var psych = context.HumanContext.Snapshot.Psychology;

@@ -119,7 +119,17 @@ namespace GameEngineTools.Characters.Engines.Memory
         HumanId? Object,
         string ActionKind,
         FactSource Source,
-        double Confidence);
+        double Confidence,
+
+        /// <summary>
+        /// Level-2 Theory of Mind: <c>true</c> when this character knows that
+        /// <see cref="KnownSharedWith"/> also holds this fact (common ground).
+        /// Backward-compatible append (defaults to first-order knowledge only).
+        /// </summary>
+        bool IsMutuallyKnown = false,
+
+        /// <summary>The other party with whom this fact is mutually known, when applicable.</summary>
+        HumanId? KnownSharedWith = null);
 
     public interface IMemoryEngine : IEngine<MemoryIndex, MemoryConfig>
     {
