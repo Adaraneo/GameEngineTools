@@ -431,7 +431,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 _log.RelEdgeUpdated(
                     self.Value.ToString(), self.Value.ToString(), other.Value.ToString(),
                     updated.Like, updated.Trust, updated.Closeness,
-                    updated.Comfort, updated.Respect, updated.Familiarity, updated.IntimateAffinity, updated.SexualInterest, updated.AestheticAttraction, updated.PhysicalAttraction);
+                    updated.Comfort, updated.Respect, updated.Familiarity, updated.IntimateAffinity, updated.SexualInterest, updated.AestheticAttraction, updated.PhysicalAttraction,
+                    updated.CommunalStrength, updated.ExchangeStrength, updated.TransgressionResidue,
+                    updated.ResponsiveDesireLevel, updated.PerceivedDominance, updated.PerceivedPrestige,
+                    updated.IsContemptuouslyDestroyed);
             }
 
             CheckMilestones(self, e, updated);

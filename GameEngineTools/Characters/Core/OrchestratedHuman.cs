@@ -684,7 +684,10 @@ namespace GameEngineTools.Characters.Core
                     s.Physiology.Pain, s.Physiology.SleepDebtHours,
                     s.Physiology.BodyTempDelta, s.Physiology.ImmuneLoad,
                     s.Physiology.AllostaticLoad, s.Physiology.CortisolLevel,
-                    s.Physiology.Testosterone?.Level ?? 0);
+                    s.Physiology.Testosterone?.Level ?? 0,
+                    s.Physiology.Nutrition?.Calories ?? 80, s.Physiology.Nutrition?.VitaminD ?? 80,
+                    s.Physiology.Nutrition?.Iron ?? 80, s.Physiology.Nutrition?.Protein ?? 80,
+                    s.Physiology.Nutrition?.BloodGlucoseLevel ?? 80);
 
                 if (s.Physiology.Cycle is { } c)
                 {
@@ -693,12 +696,15 @@ namespace GameEngineTools.Characters.Core
                         c.SymptomBreastTender, c.PmddActive);
                 }
 
+                var mot = s.Psychology.Motivations;
                 _log.PsychologySnapshot(
                     Id.Value.ToString(),
                     s.Psychology.DominantEmotion.ToString(),
                     s.Psychology.Valence, s.Psychology.Arousal, s.Psychology.Dominance,
                     s.Psychology.Stress, s.Psychology.CognitiveLoad,
-                    s.Psychology.MoodBaseline);
+                    s.Psychology.MoodBaseline,
+                    mot?.NeedSocial ?? 50, mot?.NeedIntimacy ?? 50, mot?.NeedAchievement ?? 50,
+                    mot?.NeedCare ?? 50, mot?.NeedSafety ?? 50, mot?.SicknessWithdraw ?? false);
 
                 var plan = s.Behavior.CurrentPlan;
                 _log.BehaviorSnapshot(

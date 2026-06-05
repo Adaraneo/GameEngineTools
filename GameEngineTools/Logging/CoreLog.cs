@@ -33,7 +33,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 5000,
             Level = LogLevel.Information,
-            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1} Allostatic:{Allostatic:F1} Cortisol:{Cortisol:F1} Testo:{Testosterone:F1}")]
+            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1} Allostatic:{Allostatic:F1} Cortisol:{Cortisol:F1} Testo:{Testosterone:F1} Cal:{Calories:F0} VitD:{VitaminD:F0} Iron:{Iron:F0} Prot:{Protein:F0} Gluc:{Glucose:F0}")]
         public static partial void PhysiologySnapshot(
             this ILogger logger,
             string HumanId,
@@ -46,7 +46,12 @@ namespace GameEngineTools.Logging
             double Immune,
             double Allostatic,
             double Cortisol,
-            double Testosterone);
+            double Testosterone,
+            double Calories,
+            double VitaminD,
+            double Iron,
+            double Protein,
+            double Glucose);
 
         /// <summary>Aktuální fáze menstruačního cyklu postavy.</summary>
         [LoggerMessage(
@@ -135,7 +140,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 5100,
             Level = LogLevel.Information,
-            Message = "[PSYCH] {HumanId} Emotion:{Emotion} V:{Valence:+0.00;-0.00} A:{Arousal:F2} D:{Dominance:F2} Stress:{Stress:F1} CogLoad:{CogLoad:F1} Mood:{MoodBaseline:F1}")]
+            Message = "[PSYCH] {HumanId} Emotion:{Emotion} V:{Valence:+0.00;-0.00} A:{Arousal:F2} D:{Dominance:F2} Stress:{Stress:F1} CogLoad:{CogLoad:F1} Mood:{MoodBaseline:F1} Social:{NeedSocial:F1} Intimacy:{NeedIntimacy:F1} Achieve:{NeedAchievement:F1} Care:{NeedCare:F1} Safety:{NeedSafety:F1} Sick:{SicknessWithdraw}")]
         public static partial void PsychologySnapshot(
             this ILogger logger,
             string HumanId,
@@ -145,7 +150,13 @@ namespace GameEngineTools.Logging
             double Dominance,
             double Stress,
             double CogLoad,
-            double MoodBaseline);
+            double MoodBaseline,
+            double NeedSocial,
+            double NeedIntimacy,
+            double NeedAchievement,
+            double NeedCare,
+            double NeedSafety,
+            bool SicknessWithdraw);
 
         /// <summary>
         /// Psychologický dopad noční můry — stres vzrostl, valence klesla.
@@ -874,7 +885,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 2005,
             Level = LogLevel.Debug,
-            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}, Familiarity={Familiarity:F1}, IntimateAffinity={IntimateAffinity:F1}, SexualInterest={Sexual:F1}, AestheticAttraction={Aesthetic:F1}, PhysicalAttraction={Physical:F1}")]
+            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}, Familiarity={Familiarity:F1}, IntimateAffinity={IntimateAffinity:F1}, SexualInterest={Sexual:F1}, AestheticAttraction={Aesthetic:F1}, PhysicalAttraction={Physical:F1}, Communal={Communal:F1}, Exchange={Exchange:F1}, Residue={Residue:F1}, Responsive={Responsive:F1}, Dominance={Dominance:F1}, Prestige={Prestige:F1}, Contempt={Contempt}")]
         public static partial void RelEdgeUpdated(
             this ILogger logger,
             string HumanId,
@@ -889,7 +900,14 @@ namespace GameEngineTools.Logging
             double IntimateAffinity,
             double Sexual,
             double Aesthetic,
-            double Physical);
+            double Physical,
+            double Communal,
+            double Exchange,
+            double Residue,
+            double Responsive,
+            double Dominance,
+            double Prestige,
+            bool Contempt);
 
         [LoggerMessage(
             EventId = 2006,
