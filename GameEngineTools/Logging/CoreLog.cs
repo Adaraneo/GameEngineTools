@@ -33,7 +33,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 5000,
             Level = LogLevel.Information,
-            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1} Allostatic:{Allostatic:F1} Cortisol:{Cortisol:F1} Testo:{Testosterone:F1} Cal:{Calories:F0} VitD:{VitaminD:F0} Iron:{Iron:F0} Prot:{Protein:F0} Gluc:{Glucose:F0}")]
+            Message = "[PHYSIO] {HumanId} Energy:{Energy:F1} Hunger:{Hunger:F2} Thirst:{Thirst:F2} Pain:{Pain:F1} SleepDebt:{SleepDebt:F1}h Temp:{TempDelta:+0.0;-0.0}°C Immune:{Immune:F1} Allostatic:{Allostatic:F1} Cortisol:{Cortisol:F1} Testo:{Testosterone:F1} Cal:{Calories:F0} VitD:{VitaminD:F0} Iron:{Iron:F0} Prot:{Protein:F0} Gluc:{Glucose:F0} Grey:{Grey:F2} Wrinkle:{Wrinkle:F0} Hair:{HairDensity:F2} Muscle:{Muscle:F2} Bone:{Bone:F2}")]
         public static partial void PhysiologySnapshot(
             this ILogger logger,
             string HumanId,
@@ -51,7 +51,12 @@ namespace GameEngineTools.Logging
             double VitaminD,
             double Iron,
             double Protein,
-            double Glucose);
+            double Glucose,
+            double Grey,
+            double Wrinkle,
+            double HairDensity,
+            double Muscle,
+            double Bone);
 
         /// <summary>Aktuální fáze menstruačního cyklu postavy.</summary>
         [LoggerMessage(
@@ -218,7 +223,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 5200,
             Level = LogLevel.Information,
-            Message = "[BEHAV] {HumanId} Plan:{Plan} Rest:{Rest:F1} Food:{Food:F1} Water:{Water:F1} Belonging:{Belonging:F1} Competence:{Competence:F1} Intimacy:{Intimacy:F1}")]
+            Message = "[BEHAV] {HumanId} Plan:{Plan} Rest:{Rest:F1} Food:{Food:F1} Water:{Water:F1} Belonging:{Belonging:F1} Competence:{Competence:F1} Intimacy:{Intimacy:F1} Intent:{IntentKind} IntentStr:{IntentStrength:F2} IntentCommit:{IntentCommitment}")]
         public static partial void BehaviorSnapshot(
             this ILogger logger,
             string HumanId,
@@ -228,7 +233,10 @@ namespace GameEngineTools.Logging
             double Water,
             double Belonging,
             double Competence,
-            double Intimacy);
+            double Intimacy,
+            string IntentKind,
+            double IntentStrength,
+            int IntentCommitment);
 
         /// <summary>Detail vybrané akce — utility skóre a timing.</summary>
         [LoggerMessage(

@@ -687,7 +687,10 @@ namespace GameEngineTools.Characters.Core
                     s.Physiology.Testosterone?.Level ?? 0,
                     s.Physiology.Nutrition?.Calories ?? 80, s.Physiology.Nutrition?.VitaminD ?? 80,
                     s.Physiology.Nutrition?.Iron ?? 80, s.Physiology.Nutrition?.Protein ?? 80,
-                    s.Physiology.Nutrition?.BloodGlucoseLevel ?? 80);
+                    s.Physiology.Nutrition?.BloodGlucoseLevel ?? 80,
+                    s.Physiology.Aging?.GreyFraction ?? 0, s.Physiology.Aging?.WrinkleScore ?? 0,
+                    s.Physiology.Aging?.HairDensity ?? 1, s.Physiology.Aging?.MuscleMassFraction ?? 1,
+                    s.Physiology.Aging?.BoneDensity ?? 1);
 
                 if (s.Physiology.Cycle is { } c)
                 {
@@ -707,11 +710,13 @@ namespace GameEngineTools.Characters.Core
                     mot?.NeedCare ?? 50, mot?.NeedSafety ?? 50, mot?.SicknessWithdraw ?? false);
 
                 var plan = s.Behavior.CurrentPlan;
+                var intent = s.Behavior.ActiveIntent;
                 _log.BehaviorSnapshot(
                     Id.Value.ToString(),
                     plan?.Name ?? "—",
                     s.Behavior.NeedRest, s.Behavior.NeedFood, s.Behavior.NeedWater,
-                    s.Behavior.NeedBelonging, s.Behavior.NeedCompetence, s.Behavior.NeedIntimacy);
+                    s.Behavior.NeedBelonging, s.Behavior.NeedCompetence, s.Behavior.NeedIntimacy,
+                    intent?.Kind.ToString() ?? "None", intent?.Strength ?? 0, intent?.Commitment ?? 0);
 
                 if (plan is not null)
                 {
