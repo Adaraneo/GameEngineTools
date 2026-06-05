@@ -223,6 +223,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var h = SafeHours(dt);
             var s = State;
 
+            // Dead characters do not drift — death is terminal. This also covers the
+            // combat path: once CharacterDied is handled in Phase A (Status → Dead),
+            // any remaining Phase B physiology tick is a no-op.
+            if (s.Status == StatusType.Dead)
+                return;
+
             var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
             var nutProfile = ResolveNutritionalProfile(ctx);
 
@@ -772,6 +778,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 case BreastfeedingChanged bc:
                     if (s.Postpartum is { } ppBf)
                         s = s with { Postpartum = ppBf with { IsBreastfeeding = bc.IsBreastfeeding } };
+                    break;
+
+                // Combat death routed in from CharacterBase.DecreaseHealth() via the inbox.
+                // Mirror it into the persisted state so the snapshot reflects death from any
+                // cause — not just the natural-mortality path in Tick().
+                case CharacterDied:
+                    s = s with { Status = StatusType.Dead };
                     break;
 
 				// Object affordance applied via UseInPlace (DefaultObjectInteractionEngine →

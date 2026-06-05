@@ -317,6 +317,12 @@ namespace GameEngineTools.Characters.Core
 
             _lastOutboxAccumulator.Clear();
 
+            // Death is terminal and persisted in the snapshot (PhysiologyState.Status).
+            // A dead character runs no engines and produces no events — it is effectively
+            // removed from the simulation while remaining in the roster for lookups.
+            if (Snapshot.Physiology.Status == StatusType.Dead)
+                return;
+
             // Release slots whose committed action duration has elapsed before processing new actions.
             _slots.ExpireAll(now);
 

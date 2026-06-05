@@ -3,6 +3,7 @@
 
 namespace EngineTests
 {
+    using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -10,8 +11,12 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Generation;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using System;
@@ -299,6 +304,90 @@ namespace EngineTests
         }
 
         #endregion Section 4 — Calibration
+
+        #region Section 5 — Death persisted in snapshot (Status)
+
+        [TestMethod]
+        public void Tick_NaturalDeath_PersistsStatusDeadInState()
+        {
+            var engine = BuildEngineWithAge(ageYears: 90);
+            var ctx = BuildContext(random: new AlwaysTrueRandom());
+            var now = WDateOnly.New(116, 1, 1).ToDateTime();
+
+            engine.Tick(now, WTimeSpan.FromHours(1), ctx, new EventCollector());
+
+            Assert.AreEqual(StatusType.Dead, engine.State.Status,
+                "Natural death must persist Status = Dead in PhysiologyState so it survives save/load.");
+        }
+
+        [TestMethod]
+        public void Handle_CombatDeath_PersistsStatusDeadInState()
+        {
+            // Combat death is routed in from CharacterBase.DecreaseHealth() via the inbox.
+            var engine = BuildEngineWithAge(ageYears: 30);
+            var ctx = BuildContext();
+            var combat = new CharacterDied(
+                WDateOnly.New(116, 1, 1).ToDateTime(), ctx.Id, DeathCause.Combat, FinalDamageTaken: 50.0);
+
+            engine.Handle(combat, ctx, new EventCollector());
+
+            Assert.AreEqual(StatusType.Dead, engine.State.Status,
+                "Handling a combat CharacterDied must mark the physiology state as Dead.");
+        }
+
+        [TestMethod]
+        public void Tick_AlreadyDead_IsNoOpAndEmitsNothing()
+        {
+            // A character already marked Dead must not drift nor re-roll mortality.
+            var engine = BuildEngineWithAge(ageYears: 90);
+            engine.RestoreState(engine.State with { Status = StatusType.Dead, Energy = 55 });
+            var ctx = BuildContext(random: new AlwaysTrueRandom());
+            var outbox = new EventCollector();
+            var now = WDateOnly.New(116, 1, 1).ToDateTime();
+
+            engine.Tick(now, WTimeSpan.FromHours(10), ctx, outbox);
+
+            Assert.AreEqual(55, engine.State.Energy, delta: 1e-9,
+                "Dead character must not undergo physiological drift.");
+            Assert.AreEqual(0, outbox.Drain().Count,
+                "Dead character must emit no events (no second CharacterDied).");
+            Assert.AreEqual(StatusType.Dead, engine.State.Status);
+        }
+
+        [TestMethod]
+        public void OrchestratedHuman_DeadCharacter_SkipsTickEntirely()
+        {
+            var generator = ServiceProvider.GetRequiredService<IHumanBlueprintGenerator>();
+            var factory = ServiceProvider.GetRequiredService<IHumanFactory>();
+            var now = ServiceProvider.GetRequiredService<IClock>().Now;
+
+            // Fix birth 30 years in the past so the birth-date guard cannot mask the death guard.
+            var birth = now.Date.AddYears(-30);
+            var human = factory.Create(generator.Generate(new HumanBlueprintRequest(
+                Sex: SexBiology.Female, MinBirthDate: birth, MaxBirthDate: birth, Seed: 1)));
+
+            // Persist death in the snapshot, exactly as natural mortality would.
+            human.RestoreSnapshot(human.Snapshot with
+            {
+                Physiology = human.Snapshot.Physiology with { Status = StatusType.Dead }
+            });
+
+            var energyBefore = human.Snapshot.Physiology.Energy;
+            var hungerBefore = human.Snapshot.Physiology.Hunger;
+
+            human.Tick(now, WTimeSpan.FromHours(10));
+
+            Assert.AreEqual(0, human.LastOutbox.Count,
+                "A dead character must run no engines and produce no events.");
+            Assert.AreEqual(energyBefore, human.Snapshot.Physiology.Energy, delta: 1e-9,
+                "A dead character must not drift (Energy unchanged).");
+            Assert.AreEqual(hungerBefore, human.Snapshot.Physiology.Hunger, delta: 1e-9,
+                "A dead character must not drift (Hunger unchanged).");
+            Assert.AreEqual(StatusType.Dead, human.Snapshot.Physiology.Status,
+                "Status must remain Dead across the skipped tick.");
+        }
+
+        #endregion Section 5 — Death persisted in snapshot (Status)
 
         #region Helpers
 

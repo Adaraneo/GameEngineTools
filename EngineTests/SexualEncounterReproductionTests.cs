@@ -203,13 +203,19 @@ namespace EngineTests
                 startOutbox);
             startOutbox.Drain();
 
+            // These multi-week catch-up ticks deliberately fast-forward the pregnancy. They are not
+            // meant to exercise natural mortality, but such long idle ticks max out Hunger/Thirst and
+            // AlwaysAcceptRandom (Chance(p) => p > 0) would then trigger a starvation death. Use a
+            // non-killing random for the ticks so the test isolates pregnancy term mechanics.
+            var tickCtx = AdultContext(female, SexBiology.Female, EmptyRelationships(), new ZeroRandom());
+
             var discoveryOutbox = new EventCollector();
-            engine.Tick(WDateTime.New(100, 1, 22), WTimeSpan.FromDays(21), ctx, discoveryOutbox);
+            engine.Tick(WDateTime.New(100, 1, 22), WTimeSpan.FromDays(21), tickCtx, discoveryOutbox);
             Assert.AreEqual(1, discoveryOutbox.Drain().OfType<PregnancyDiscovered>().Count());
             Assert.IsTrue(engine.State.Pregnancy?.Discovered);
 
             var birthOutbox = new EventCollector();
-            engine.Tick(WDateTime.New(100, 10, 11), WTimeSpan.FromDays(280), ctx, birthOutbox);
+            engine.Tick(WDateTime.New(100, 10, 11), WTimeSpan.FromDays(280), tickCtx, birthOutbox);
             var born = birthOutbox.Drain().OfType<ChildBorn>().Single();
             Assert.AreEqual(female, born.ParentA);
             Assert.AreEqual(male, born.ParentB);
