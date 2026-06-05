@@ -313,7 +313,8 @@ namespace EngineTests
                 speedProvider: new ConstantSpeedProvider(80.0),
                 rng: new Random(42),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
-                objectProvider: provider);
+                objectProvider: provider,
+                options: new SceneOrchestratorOptions());
 
         private ForagingHuman BuildForagingHuman(
             string currentLocation,

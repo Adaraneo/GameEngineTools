@@ -113,20 +113,10 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private readonly IWorldObjectProvider _objectProvider;
 
+        /// <summary>Tunable scalar parameters for this orchestrator instance.</summary>
+        private readonly SceneOrchestratorOptions _options;
+
         #endregion Private fields
-
-        #region Constants
-
-        /// <summary>
-        /// Minimum confidence [0–1] required for an <see cref="ObjectLocationFact"/>
-        /// to be used when routing a foraging character.
-        /// Facts below this threshold are treated as "forgotten" for navigation purposes.
-        /// Default 0.15 — a fact survives roughly 15 days from DirectWitnessConfidence (0.9)
-        /// before becoming too unreliable to route toward.
-        /// </summary>
-        private const double MinMemoryConfidence = 0.15;
-
-        #endregion Constants
 
         #region Constructor
 
@@ -147,6 +137,7 @@ namespace GameEngineTools.World.Simulation
         /// World object provider used to locate food and drink objects
         /// across the scene when routing <c>MoveTo:Food</c> and <c>MoveTo:Drink</c> actions.
         /// </param>
+        /// <param name="options">Tunable scalar parameters (defaults preserve legacy behavior).</param>
         public DefaultSceneOrchestrator(
             IAttractionCalculator attractionCalculator,
             ILocationService locationService,
@@ -157,7 +148,8 @@ namespace GameEngineTools.World.Simulation
             IMovementSpeedProvider speedProvider,
             Random rng,
             ILogger<DefaultSceneOrchestrator> log,
-            IWorldObjectProvider objectProvider)
+            IWorldObjectProvider objectProvider,
+            SceneOrchestratorOptions options)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -169,6 +161,7 @@ namespace GameEngineTools.World.Simulation
             _rng = rng;
             _log = log;
             _objectProvider = objectProvider;
+            _options = options;
         }
 
         #endregion Constructor
@@ -625,7 +618,7 @@ namespace GameEngineTools.World.Simulation
         /// <remarks>
         /// <para>
         /// Reads <see cref="MemoryIndex.KnownObjects"/> from the character's snapshot.
-        /// Only facts with confidence above <see cref="MinMemoryConfidence"/> are considered —
+        /// Only facts with confidence above <see cref="SceneOrchestratorOptions.MinMemoryConfidence"/> are considered —
         /// stale or nearly-forgotten memories are ignored.
         /// </para>
         /// <para>
@@ -658,7 +651,7 @@ namespace GameEngineTools.World.Simulation
             // filtered by minimum confidence threshold to exclude nearly-forgotten facts.
             var rememberedLocations = knownObjects
                 .Where(f => f.ItemKind == itemKind
-                         && f.Confidence >= MinMemoryConfidence
+                         && f.Confidence >= _options.MinMemoryConfidence
                          && f.LocationId != currentLocationId)
                 .GroupBy(f => f.LocationId)
                 .Select(g => (
@@ -781,7 +774,8 @@ namespace GameEngineTools.World.Simulation
                     ? SocialTargetMode.Intimacy
                     : SocialTargetMode.ReachOut;
 
-                var target = SemanticTargeting.ChooseTarget(character, candidates, targetMode);
+                var target = SemanticTargeting.ChooseTargetWeighted(
+                    character, candidates, targetMode, _rng, _options.ReachOutExplorationTemperature);
                 if (target is null)
                     continue;
 
@@ -841,7 +835,7 @@ namespace GameEngineTools.World.Simulation
                 // One random witness — only one MicroPositive per creative action per substep.
                 var witness = witnesses[_rng.Next(witnesses.Count)];
 
-                if (_rng.NextDouble() < 0.30)
+                if (_rng.NextDouble() < _options.OrganicMicroPositiveChance)
                 {
                     character.ReceiveEvent(new MicroPositive(
                         now, witness.Id, character.Id, MemoryMicroEventKinds.Validation));

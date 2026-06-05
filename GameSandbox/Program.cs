@@ -177,6 +177,7 @@ static void SetDaysForSimulation(ref long simulationDays, bool printInfo = true)
 var perceptionOptions = configProvider.GetSection("World:Perception").Get<CharacterPerceptionOptions>() ?? new CharacterPerceptionOptions();
 var astroOptions = configProvider.GetSection("World:Astro").Get<AstroConfig>() ?? new AstroConfig();
 var universeOptions = configProvider.GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
+var sceneOrchestratorOptions = configProvider.GetSection("SceneOrchestrator").Get<SceneOrchestratorOptions>() ?? new SceneOrchestratorOptions();
 
 // ── World habitability ────────────────────────────────────────────────────────
 {
@@ -314,8 +315,8 @@ foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
 Console.WriteLine("Press any key to continue...");
 
 var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>();
-var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider);
-var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider);
+var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
+var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
 
 var writeBuffer = runtime.Services.GetRequiredService<WorldObjectWriteBuffer>();
 var objectSnapshotCache = runtime.Services.GetRequiredService<WorldObjectSnapshotCache>();

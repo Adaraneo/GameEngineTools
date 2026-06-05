@@ -308,7 +308,8 @@ namespace EngineTests
                 speedProvider: new ConstantSpeedProvider(80.0),
                 rng: new Random(42),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
-                objectProvider: new EmptyWorldObjectProvider());
+                objectProvider: new EmptyWorldObjectProvider(),
+                options: new SceneOrchestratorOptions());
 
         /// <summary>
         /// Builds a <see cref="SpyHuman"/> with the given noise level in its

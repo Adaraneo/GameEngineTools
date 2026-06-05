@@ -106,6 +106,60 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 .FirstOrDefault();
         }
 
+        /// <summary>
+        /// Picks a target by softmax-sampling over the candidate scores instead of taking the
+        /// single best (<see cref="ChooseTarget"/>). Warm targets stay strongly preferred, but
+        /// neutral strangers get a non-zero chance — this breaks the deterministic argmax
+        /// monopoly that otherwise freezes a neutral-start population at a few bonded pairs.
+        /// </summary>
+        /// <param name="initiator">The initiator choosing whom to approach.</param>
+        /// <param name="candidates">Perceived, co-located candidates.</param>
+        /// <param name="mode">Reach-out vs intimacy targeting mode.</param>
+        /// <param name="rng">Random source for the weighted pick.</param>
+        /// <param name="temperature">
+        /// Softmax temperature. Lower → greedier (closer to <see cref="ChooseTarget"/>);
+        /// higher → more exploratory. Default 0.25 keeps a strong warm-target bias.
+        /// </param>
+        /// <returns>The chosen target, or <see langword="null"/> if no eligible candidate exists.</returns>
+        public static IHuman? ChooseTargetWeighted(
+            IHuman initiator,
+            IReadOnlyList<IHuman> candidates,
+            SocialTargetMode mode,
+            Random rng,
+            double temperature = 0.25)
+        {
+            // Score every candidate; a blocked target always scores 0 (see ScoreTarget),
+            // so the Score gate also covers PsychologicallyBlocked.
+            var scored = new List<(IHuman Human, double Weight)>(candidates.Count);
+            var totalWeight = 0.0;
+
+            foreach (var candidate in candidates)
+            {
+                var result = ScoreTarget(initiator, candidate, mode);
+                if (result.Score <= 0.0)
+                    continue;
+
+                // Softmax weight: temperature sharpens (low) or flattens (high) the score preference.
+                var weight = Math.Exp(result.Score / temperature);
+                scored.Add((candidate, weight));
+                totalWeight += weight;
+            }
+
+            if (scored.Count == 0)
+                return null;
+
+            // Weighted roulette pick over the surviving candidates.
+            var roll = rng.NextDouble() * totalWeight;
+            foreach (var (human, weight) in scored)
+            {
+                roll -= weight;
+                if (roll <= 0.0)
+                    return human;
+            }
+
+            return scored[^1].Human;   // floating-point safety net
+        }
+
         private static SocialTargetScore ScoreTarget(
             HumanId initiatorId,
             Sociosexuality sociosexuality,
