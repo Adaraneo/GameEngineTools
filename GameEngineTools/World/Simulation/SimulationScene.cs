@@ -208,6 +208,17 @@ namespace GameEngineTools.World.Simulation
             // proto je to správné místo pro detekci ReachOut a routování.
             _options.OnTick?.Invoke(now, chars);
 
+            #region Trying
+
+            {
+                var activeLocations = chars.Select(c => _options.LocationService?.GetLocation(c.Id)).OfType<string>();
+                _options.ObjectSnapshotCache?.Refresh(activeLocations);
+
+                _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
+            }
+
+            #endregion
+
             // ── Krok 2: Tick všech postav ──────────────────────────────────────────
             // All characters advance their state before any outcomes are routed.
             // Ensures outcome delivery is independent of character list order.

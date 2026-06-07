@@ -1201,5 +1201,33 @@ namespace GameEngineTools.Logging
         public static partial void SchedulerFailed(this ILogger logger, Exception ex);
 
         #endregion Scheduler a infrastruktura
+
+        [LoggerMessage(EventId = 10001, Level = LogLevel.Debug, Message = "[MoveTo] {CharId} needs {Category} but found no location via memory or provider.")]
+        public static partial void SceneMoveToFailed(this ILogger logger, string CharId, string Category);
+
+        [LoggerMessage(EventId = 10002, Level = LogLevel.Debug, Message = "[MoveTo] {CharId} requested {Type} but no suitable location exists. Current location: {CurrentLocation}.")]
+        public static partial void SceneMoveToRequested(this ILogger logger, string CharId, string Type, string CurrentLocation);
+
+        /// <summary>
+        /// A <c>ReachOut</c> action was routed by the scene orchestrator to a concrete target.
+        /// Captures the chosen speech act and the relationship context that drove the selection,
+        /// so the social-behaviour decision is recoverable in the LogReader (not just the
+        /// resulting interaction).
+        /// </summary>
+        [LoggerMessage(
+            EventId = 10003,
+            Level = LogLevel.Information,
+            Message = "[ReachOut] {CharId} -> {TargetId}: act={Act}, familiarity={Familiarity:F1}, trust={Trust:F1}, comfort={Comfort:F1}, closeness={Closeness:F1}, romantic={Romantic:F1}, privacy={HasPrivacy}")]
+        public static partial void SceneReachOutRouted(
+            this ILogger logger,
+            string CharId,
+            string TargetId,
+            string Act,
+            double Familiarity,
+            double Trust,
+            double Comfort,
+            double Closeness,
+            double Romantic,
+            bool HasPrivacy);
     }
 }

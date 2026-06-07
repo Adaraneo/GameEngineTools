@@ -698,7 +698,10 @@ namespace GameEngineTools.Characters.Core
                     s.Physiology.Aging?.HairDensity ?? 1, s.Physiology.Aging?.MuscleMassFraction ?? 1,
                     s.Physiology.Aging?.BoneDensity ?? 1);
 
-                if (s.Physiology.Cycle is { } c)
+                // Only log the cycle while it is active — logging Phase:Paused every tick for
+                // males/menopausal/pregnant characters is pure noise (and would draw spurious
+                // libido/symptom lines during pauses).
+                if (s.Physiology.Cycle is { Phase: not CyclePhase.Paused } c)
                 {
                     _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle,
                         c.LibidoMod, c.OvulationWindow, c.SymptomPain, c.SymptomBloat,

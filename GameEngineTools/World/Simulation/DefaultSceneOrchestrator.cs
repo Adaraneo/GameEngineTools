@@ -6,6 +6,7 @@ namespace GameEngineTools.World.Simulation
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Transactions;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Attraction;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -15,6 +16,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Movement;
     using GameEngineTools.World.Objects;
@@ -472,9 +474,13 @@ namespace GameEngineTools.World.Simulation
                     }
                     else
                     {
-                        _log.LogDebug(
-                            "[MoveTo] {CharId} needs {Category} but found no location via memory or provider.",
-                            character.Id.Value, category);
+                        using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
+                        {
+                            _log.SceneMoveToFailed(character.Id.Value.ToString(), category.ToString());
+                            //_log.LogDebug(
+                            //    "[MoveTo] {CharId} needs {Category} but found no location via memory or provider.",
+                            //    character.Id.Value, category);
+                        }
                     }
 
                     continue;
@@ -489,9 +495,11 @@ namespace GameEngineTools.World.Simulation
 
                 if (chosen is null)
                 {
-                    _log.LogDebug(
-                        "[MoveTo] {CharId} requested {Type} but no suitable location exists.",
-                        character.Id.Value, requestedType);
+                    using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
+                    {
+                        _log.SceneMoveToRequested(character.Id.Value.ToString(), requestedType.ToString(), currentLocation?? "<none>");
+                        Console.WriteLine("[MoveTo] {0} requested {1} but no suitable location exists. Current location: {2}.", character.Id.Value.ToString(), requestedType.ToString(), currentLocation ?? "<none>");
+                    }
                     continue;
                 }
 
@@ -781,13 +789,15 @@ namespace GameEngineTools.World.Simulation
 
                 var selection = ReachOutSpeechActSelector.SelectSpeechAct(character, target, now, _rng);
 
-                _log.LogDebug(
-                    "[ReachOut] {CharId} → {TargetId}: act={Act} familiarity={Fam:F1} trust={Trust:F1} " +
-                    "comfort={Comfort:F1} closeness={Closeness:F1} romantic={Romantic:F1} privacy={Privacy}",
-                    character.Id.Value, target.Id.Value, selection.Act,
-                    selection.Familiarity, selection.Trust, selection.Comfort,
-                    selection.Closeness, selection.RomanticInterest,
-                    selection.HasPrivacy ? "yes" : "no");
+                using (_log.BeginCharacterScope(
+                    character.Id.Value, "SceneOrchestrator",
+                    relatedPersonId: target.Id.Value, locationId: locationId))
+                {
+                    _log.SceneReachOutRouted(
+                        character.Id.Value.ToString(), target.Id.Value.ToString(), selection.Act.ToString(),
+                        selection.Familiarity, selection.Trust, selection.Comfort,
+                        selection.Closeness, selection.RomanticInterest, selection.HasPrivacy);
+                }
 
                 target.ReceiveEvent(new InteractionProposed(
                     now, character.Id, target.Id, selection.Act, null, character.Biology));

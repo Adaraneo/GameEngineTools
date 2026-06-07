@@ -5,6 +5,7 @@ using GameEngineTools;
 using GameEngineTools.Characters.Core;
 using GameEngineTools.Characters.Engines;
 using GameEngineTools.Characters.Engines.Attraction;
+using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Relationships;
 using GameEngineTools.Characters.Engines.Schedule;
@@ -285,18 +286,27 @@ var mainCharactersQuery = from mainCharacters in manager.Characters
 var mainCharactersPersonQuery = from mainCharacters in mainCharactersQuery
                                 select mainCharacters.Person;
 
-var locationQuery = from locations in mainCharactersPersonQuery
+var unknownLocationQuery = from locations in mainCharactersPersonQuery
                     where locations.Snapshot.InteractionSurface.Location == "Unknown"
                     select locations;
 
-foreach (var personToMove in locationQuery)
+var locationQuery = from locations in mainCharactersPersonQuery
+                    where locations.Snapshot.InteractionSurface.Location != "Unknown"
+                    select locations;
+
+foreach (var personToMove in unknownLocationQuery)
 {
     var homeLocationId = mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count)];
     locationService.MoveCharacter(personToMove.Id, homeLocationId);
     personToMove.SetHomeLocation(homeLocationId);
 }
 
-Console.WriteLine($"{nameof(mainCharactersPersonQuery)}: {mainCharactersPersonQuery.Count()}, {nameof(mainCharactersQuery)}: {mainCharactersQuery.Count()}, {nameof(locationQuery)}, {locationQuery.Count()}");
+foreach (var personToMove in locationQuery)
+{
+    locationService.MoveCharacter(personToMove.Id, personToMove.Snapshot.InteractionSurface.Location);
+}
+
+Console.WriteLine($"{nameof(mainCharactersPersonQuery)}: {mainCharactersPersonQuery.Count()}, {nameof(mainCharactersQuery)}: {mainCharactersQuery.Count()}, {nameof(unknownLocationQuery)}, {unknownLocationQuery.Count()}");
 
 foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
 {
@@ -379,6 +389,9 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
 };
 
 var mainCharactersScene = new SimulationScene(clock, mainCharactersSceneOpts, lodRuntime);
+
+AuditConsumableRouting(objectProvider, locationService);
+
 await mainCharactersScene.RunAsync();
 
 var characters = new List<IHuman>();
@@ -403,6 +416,10 @@ if (characters.Count > 0)
         if (character.Snapshot.InteractionSurface.Location == "Unknown")
         {
             locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
+        }
+        else
+        {
+            locationService.MoveCharacter(character.Id, character.Snapshot.InteractionSurface.Location);
         }
     }
 
@@ -431,6 +448,8 @@ if (characters.Count > 0)
         }
     }, lodRuntime);
 
+    AuditConsumableRouting(objectProvider, locationService);
+
     await otherCharactersScene.RunAsync();
 }
 
@@ -450,6 +469,7 @@ foreach (var entry in diary.OrderBy(e => e.OccurredAt))
 }
 
 await File.WriteAllTextAsync(gameTimePath, clock.Now.WorldTicks.ToString());
+
 gf.Export(player);
 gf.Export((NPC)significantOther);
 var others = manager.Characters.Where(npc => !npc.Equals(significantOther) && !npc.Equals(player)).ToList();
@@ -509,7 +529,7 @@ Console.ReadKey();
 
 static void AddDiaryEntry(StringBuilder stringBuilder, string entry)
 {
-    Console.WriteLine(entry);
+    //Console.WriteLine(entry);
     stringBuilder.AppendLine(entry);
 }
 
@@ -657,3 +677,221 @@ static void HandleChildBornEvents(
 }
 
 #endregion
+
+#region Diagnostics — consumable routing audit
+
+/// <summary>
+/// Audits whether <c>MoveTo:Food</c> / <c>MoveTo:Drink</c> routing can ever succeed,
+/// by reproducing the exact two filters used inside
+/// <see cref="DefaultSceneOrchestrator"/>.<c>FindLocationWithCategory</c>:
+/// <list type="number">
+///   <item><c>IsAvailable == true</c> (filter A)</item>
+///   <item>the object's <c>LocationId</c> is registered in <see cref="ILocationService"/>
+///         (otherwise <c>MoveCharacter</c> would throw)</item>
+/// </list>
+/// Prints Food and Drink side by side so the working category (Drink) can be
+/// compared against the broken one (Food).
+/// </summary>
+/// <param name="objectProvider">The same provider instance passed to the orchestrator.</param>
+/// <param name="locationService">The same location service the scene uses.</param>
+static void AuditConsumableRouting(
+    IWorldObjectProvider objectProvider,
+    ILocationService locationService)
+{
+    // Snapshot all objects once — GetAllObjects() bypasses the per-tick cache and
+    // hits the backing SQLite provider, exactly like FindLocationWithCategory does.
+    var allObjects = objectProvider.GetAllObjects().ToList();
+
+    Console.WriteLine();
+    Console.WriteLine("==== CONSUMABLE ROUTING AUDIT ====");
+    Console.WriteLine($"Total world objects seen by provider: {allObjects.Count}");
+
+    foreach (var category in new[] { WorldObjectCategory.Food, WorldObjectCategory.Drink })
+    {
+        var ofCategory = allObjects
+            .Where(o => o.Category == category)
+            .ToList();
+
+        // Reproduce filter A: only available objects are routable.
+        var available = ofCategory
+            .Where(o => o.IsAvailable)
+            .ToList();
+
+        // Distinct locations holding at least one AVAILABLE object of this category.
+        var availableLocations = available
+            .Select(o => o.LocationId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        // Reproduce filter B: a location is only a valid MoveCharacter target
+        // when it is registered (GetDescriptor returns non-null).
+        var registered = availableLocations
+            .Where(loc => locationService.GetDescriptor(loc) is not null)
+            .ToList();
+
+        var unregistered = availableLocations
+            .Where(loc => locationService.GetDescriptor(loc) is null)
+            .ToList();
+
+        Console.WriteLine();
+        Console.WriteLine($"--- {category} ---");
+        Console.WriteLine($"  rows in DB:                 {ofCategory.Count}");
+        Console.WriteLine($"  IsAvailable == true:        {available.Count}");
+        Console.WriteLine($"  held by someone (HeldBy):   {ofCategory.Count(o => o.HeldBy is not null)}");
+        Console.WriteLine($"  distinct available locations: {availableLocations.Count}");
+        Console.WriteLine($"    registered in LocationService:   {registered.Count}  [{string.Join(", ", registered)}]");
+        Console.WriteLine($"    NOT registered (MoveCharacter would throw): {unregistered.Count}  [{string.Join(", ", unregistered)}]");
+
+        // Verdict: routing can only ever succeed if at least one available object
+        // sits at a registered location.
+        var routable = registered.Count > 0;
+        Console.ForegroundColor = routable ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine($"  => MoveTo:{category} CAN resolve a destination: {routable}");
+        Console.ResetColor();
+    }
+
+    Console.WriteLine("==================================");
+    Console.WriteLine();
+
+    Console.WriteLine("Press any key to continue...");
+    Console.ReadKey();
+}
+
+#endregion Diagnostics — consumable routing audit
+
+#region Diagnostics — MoveTo outbox probe
+
+/// <summary>
+/// One-shot runtime probe placed in the scene's OnTick, BEFORE the orchestrator runs.
+/// Reveals whether an <see cref="ActionCommitted"/> for <c>MoveTo:Food</c> / <c>MoveTo:Drink</c>
+/// is actually present in <see cref="IHuman.LastOutbox"/> at the moment
+/// <see cref="DefaultSceneOrchestrator.OnTick"/> reads it — and whether the character's
+/// location changes across probes.
+/// </summary>
+/// <remarks>
+/// Splits the problem cleanly:
+/// <list type="bullet">
+///   <item>MoveTo IS in LastOutbox but location never changes → break is INSIDE RouteMoveTo
+///         (destination resolution or MoveCharacter).</item>
+///   <item>MoveTo is NEVER in LastOutbox here → break is a timing/outbox issue
+///         (the committed event is not visible to OnTick).</item>
+/// </list>
+/// </remarks>
+/// <param name="chars">Characters about to be processed by the orchestrator.</param>
+/// <param name="locations">Location service — used to read each character's current location.</param>
+/// <param name="objectProvider">Provider — used to check whether food is co-located.</param>
+static void ProbeMoveToOutbox(
+    IReadOnlyList<IHuman> chars,
+    ILocationService locations,
+    IWorldObjectProvider objectProvider)
+{
+    foreach (var character in chars)
+    {
+        // Find any committed MoveTo:* action sitting in the outbox right now.
+        var moveTo = character.LastOutbox
+            .OfType<ActionCommitted>()
+            .FirstOrDefault(a => a.ActionName.StartsWith("MoveTo:Food", StringComparison.OrdinalIgnoreCase));
+
+        if (moveTo is null)
+            continue; // Only log when the character is actually requesting a move.
+
+        var loc = locations.GetLocation(character.Id) ?? "<unplaced>";
+
+        // Does the current location already have an available object of the requested category?
+        var hasFoodHere = objectProvider.GetObjectsAt(loc)
+            .Any(o => o.Category == WorldObjectCategory.Food && o.IsAvailable);
+        var hasDrinkHere = objectProvider.GetObjectsAt(loc)
+            .Any(o => o.Category == WorldObjectCategory.Drink && o.IsAvailable);
+
+        Console.WriteLine(
+            "[PROBE] {0} outbox has '{1}' | currentLoc={2} | foodHere={3} drinkHere={4}",
+            character.Id.Value.ToString()[..8],
+            moveTo.ActionName,
+            loc,
+            hasFoodHere,
+            hasDrinkHere);
+    }
+}
+
+#endregion Diagnostics — MoveTo outbox probe
+
+#region Diagnostics — MoveTo:Food destination trace
+
+/// <summary>
+/// Wraps the orchestrator call to trace exactly where a <c>MoveTo:Food</c> request
+/// sends each character. Captures location before and after
+/// <see cref="DefaultSceneOrchestrator.OnTick"/>, prints the expected destination
+/// (replicating <c>FindLocationWithCategory</c>'s provider scan), and dumps the
+/// character's Food memory facts (what the memory-based router sees first).
+/// </summary>
+/// <param name="now">Current simulation time.</param>
+/// <param name="chars">Scene characters.</param>
+/// <param name="orchestrator">The orchestrator to invoke.</param>
+/// <param name="locations">Location service for before/after readings.</param>
+/// <param name="objectProvider">Provider — replicates the expected food destination.</param>
+static void TraceFoodMove(
+    WDateTime now,
+    IReadOnlyList<IHuman> chars,
+    DefaultSceneOrchestrator orchestrator,
+    ILocationService locations,
+    IWorldObjectProvider objectProvider)
+{
+    // 1) Capture pre-orchestrator location for every character that wants food.
+    var before = new Dictionary<HumanId, string>();
+    foreach (var character in chars)
+    {
+        var wantsFood = character.LastOutbox
+            .OfType<ActionCommitted>()
+            .Any(a => a.ActionName == ActionNames.MoveToFood);
+
+        if (wantsFood)
+            before[character.Id] = locations.GetLocation(character.Id) ?? "<none>";
+    }
+
+    // 2) Run the orchestrator (this is where RouteMoveTo executes).
+    orchestrator.OnTick(now, chars);
+
+    // 3) Report before -> after, the expected destination, and memory facts.
+    foreach (var (id, fromLoc) in before)
+    {
+        var afterLoc = locations.GetLocation(id) ?? "<none>";
+
+        // What FindLocationWithCategory SHOULD return: any available Food object
+        // at a location other than the current one (fallback path).
+        var expectedCandidates = objectProvider.GetAllObjects()
+            .Where(o => o.Category == WorldObjectCategory.Food
+                     && o.IsAvailable
+                     && o.LocationId != fromLoc)
+            .Select(o => o.LocationId)
+            .Distinct(StringComparer.Ordinal)
+            .Take(3)
+            .ToList();
+
+        // What the memory-based router sees: remembered Food facts.
+        var human = chars.First(c => c.Id == id);
+        var foodMemories = human.Snapshot.Memory.KnownObjects
+            .Where(f => f.ItemKind == PickupItemKind.Food)
+            .Select(f => $"{f.LocationId}(conf={f.Confidence:F2})")
+            .Take(5)
+            .ToList();
+
+        // What memory thinks is DRINK — to detect mis-tagging (Hypothesis A).
+        var drinkMemories = human.Snapshot.Memory.KnownObjects
+            .Where(f => f.ItemKind == PickupItemKind.Drink)
+            .Select(f => $"{f.LocationId}(conf={f.Confidence:F2})")
+            .Take(5)
+            .ToList();
+
+        Console.WriteLine(
+            "[FOODMOVE] {0} | {1} -> {2} (changed={3}) | expectedFoodDest=[{4}] | foodMem=[{5}] | drinkMem=[{6}]",
+            id.Value.ToString()[..8],
+            fromLoc,
+            afterLoc,
+            fromLoc != afterLoc,
+            string.Join(", ", expectedCandidates),
+            string.Join(", ", foodMemories),
+            string.Join(", ", drinkMemories));
+    }
+}
+
+#endregion Diagnostics — MoveTo:Food destination trace

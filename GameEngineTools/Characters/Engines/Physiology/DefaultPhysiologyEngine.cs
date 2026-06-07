@@ -819,13 +819,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             s = EmitCycleProgressionEvents(s, now, ctx, box, day, phase, length, ovulDay);
             s = ApplyCycleSymptoms(s);
 
-            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPhysiologyEngine)))
-            {
-                var cyc = s.Cycle!;
-                _log.PhysiologyCycle(ctx.Id.Value.ToString(), cyc.Phase.ToString(), cyc.DayInCycle,
-                    cyc.LibidoMod, cyc.OvulationWindow, cyc.SymptomPain, cyc.SymptomBloat,
-                    cyc.SymptomBreastTender, cyc.PmddActive);
-            }
+            // PhysiologyCycle (5001) is logged once per tick by OrchestratedHuman.LogState
+            // (alongside the 5000/5100/5200 snapshots). Logging it here too double-sourced it.
 
             return s;
         }
