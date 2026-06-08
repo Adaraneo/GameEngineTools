@@ -52,14 +52,19 @@ namespace GameEngineTools.Characters.Core
     {
         /// <summary>Stable unique identifier.</summary>
         HumanId Id { get; }
+
         /// <summary>Name and birth-date identity.</summary>
         Identity Identity { get; }
+
         /// <summary>Biological sex.</summary>
         SexBiology Biology { get; }   // Female/Male/Intersex etc.
+
         /// <summary>Big Five personality traits (slow-changing).</summary>
         Personality Personality { get; } // Trait modul (nemění se rychle)
+
         /// <summary>Psychological trait profile (attachment, values, sexual responsiveness, …).</summary>
         PsychologicalProfile PsychologyProfile { get; }
+
         /// <summary>Static physical appearance traits.</summary>
         PhysicalAppearance PhysicalAppearance { get; }
 
@@ -174,10 +179,13 @@ namespace GameEngineTools.Characters.Core
     {
         /// <summary>Female.</summary>
         Female,
+
         /// <summary>Male.</summary>
         Male,
+
         /// <summary>Intersex.</summary>
         Intersex,
+
         /// <summary>Unknown / unspecified.</summary>
         Unknown
     }
@@ -187,12 +195,16 @@ namespace GameEngineTools.Characters.Core
     {
         /// <summary>Woman.</summary>
         Woman,
+
         /// <summary>Man.</summary>
         Man,
+
         /// <summary>Nonbinary.</summary>
         Nonbinary,
+
         /// <summary>Another identity.</summary>
         Other,
+
         /// <summary>Unspecified.</summary>
         Unspecified
     }
@@ -207,6 +219,7 @@ namespace GameEngineTools.Characters.Core
     {
         /// <summary>Current engine state.</summary>
         TState State { get; }
+
         /// <summary>Engine configuration.</summary>
         TConfig Config { get; }
 
@@ -236,14 +249,19 @@ namespace GameEngineTools.Characters.Core
     {
         /// <summary>Character identifier.</summary>
         HumanId Id { get; }
+
         /// <summary>Name and birth-date identity.</summary>
         Identity Identity { get; }
+
         /// <summary>Biological sex.</summary>
         SexBiology Biology { get; }
+
         /// <summary>Big Five personality traits.</summary>
         Personality Personality { get; }
+
         /// <summary>Psychological trait profile.</summary>
         PsychologicalProfile PsychologyProfile { get; }
+
         /// <summary>Attraction-relevant traits, or <c>null</c>.</summary>
         AttractionProfile? AttractionProfile { get; }
 
@@ -258,10 +276,13 @@ namespace GameEngineTools.Characters.Core
 
         /// <summary>Event bus for publishing/subscribing to domain events.</summary>
         IEventBus EventBus { get; }
+
         /// <summary>Scheduler for deferred actions.</summary>
         IScheduler Scheduler { get; }
+
         /// <summary>Deterministic per-character random source.</summary>
         IRandomSource Random { get; }
+
         /// <summary>Logger.</summary>
         ILogger Logger { get; }
     }

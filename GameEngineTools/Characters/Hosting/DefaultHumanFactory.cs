@@ -210,11 +210,11 @@ namespace GameEngineTools.Characters.Hosting
             // and persistence snapshots include goals, schedule, values, and self-concept from creation.
             human.RestoreSnapshot(human.Snapshot with
             {
-                Goals       = goal.State,
-                Schedule    = schedule.State,
-                Values      = valuesState,
+                Goals = goal.State,
+                Schedule = schedule.State,
+                Values = valuesState,
                 SelfConcept = selfConcept.State,
-                Interests   = interestState
+                Interests = interestState
             }, _clock.Now.Date);
 
             return human;

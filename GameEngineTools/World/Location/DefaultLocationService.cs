@@ -25,7 +25,8 @@ namespace GameEngineTools.World.Location
         /// Creates a location service without norm lookup.
         /// Norm contexts will always be <c>null</c> in dispatched <see cref="ContextChanged"/> events.
         /// </summary>
-        public DefaultLocationService() { }
+        public DefaultLocationService()
+        { }
 
         /// <summary>
         /// Creates a location service that resolves norm contexts from <paramref name="normProvider"/>.
@@ -34,6 +35,7 @@ namespace GameEngineTools.World.Location
         {
             _normProvider = normProvider;
         }
+
         #region Public Methods
 
         /// <inheritdoc/>

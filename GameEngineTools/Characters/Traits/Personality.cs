@@ -48,10 +48,13 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Direct, explicit communication.</summary>
         Direct,
+
         /// <summary>Indirect, implicit communication.</summary>
         Indirect,
+
         /// <summary>High-context (meaning carried by context).</summary>
         HighContext,
+
         /// <summary>Low-context (meaning carried by explicit words).</summary>
         LowContext
     }
@@ -109,8 +112,10 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Morning type (lark).</summary>
         Lark,
+
         /// <summary>Neither strongly morning nor evening.</summary>
         Neutral,
+
         /// <summary>Evening type (owl).</summary>
         Owl
     }

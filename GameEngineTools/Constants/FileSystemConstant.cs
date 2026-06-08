@@ -144,8 +144,10 @@ namespace GameEngineTools.Constants
     {
         /// <summary>Generated NPCs directory.</summary>
         public const string Npc = FileSystemConstant.GeneratedDirectory.Npcs;
+
         /// <summary>Generated player directory.</summary>
         public const string Pc = FileSystemConstant.GeneratedDirectory.Player;
+
         /// <summary>Generated files root directory.</summary>
         public const string Root = FileSystemConstant.GeneratedDirectory.Root;
     }
@@ -157,8 +159,10 @@ namespace GameEngineTools.Constants
     {
         /// <summary>Root generated-files directory on the desktop.</summary>
         public static string gfiles = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\gfiles\";
+
         /// <summary>Generated NPCs directory.</summary>
         public static string NPCs = gfiles + @"NPCs\";
+
         /// <summary>Generated player directory.</summary>
         public static string player = gfiles + @"Player\";
     }

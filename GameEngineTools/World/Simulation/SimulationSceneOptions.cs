@@ -8,7 +8,6 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Narrative;
     using GameEngineTools.World.Core.Astro;
-    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;

@@ -89,14 +89,19 @@ namespace GameEngineTools.Characters.Engines.Interactions
     {
         /// <summary>Unknown / unspecified.</summary>
         Unknown = 0,
+
         /// <summary>Social space.</summary>
         Social,
+
         /// <summary>Private space.</summary>
         Private,
+
         /// <summary>Work space.</summary>
         Work,
+
         /// <summary>Resting space.</summary>
         Rest,
+
         /// <summary>Public space.</summary>
         Public
     }
@@ -193,10 +198,13 @@ namespace GameEngineTools.Characters.Engines.Interactions
     {
         /// <summary>Actively avoiding pregnancy.</summary>
         AvoidPregnancy = 0,
+
         /// <summary>Indifferent to the reproductive outcome.</summary>
         Indifferent = 1,
+
         /// <summary>Open to pregnancy if it happens.</summary>
         OpenToPregnancy = 2,
+
         /// <summary>Actively trying to conceive.</summary>
         TryingForChild = 3
     }
@@ -206,12 +214,16 @@ namespace GameEngineTools.Characters.Engines.Interactions
     {
         /// <summary>Not specified.</summary>
         Unspecified = 0,
+
         /// <summary>No contraception.</summary>
         None = 1,
+
         /// <summary>Low-effectiveness contraception.</summary>
         Low = 2,
+
         /// <summary>Moderate-effectiveness contraception.</summary>
         Moderate = 3,
+
         /// <summary>High-effectiveness contraception.</summary>
         High = 4
     }

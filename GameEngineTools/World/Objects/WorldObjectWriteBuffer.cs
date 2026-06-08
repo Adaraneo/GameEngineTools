@@ -106,7 +106,7 @@ namespace GameEngineTools.World.Objects
         public IEnumerable<WorldObject> GetAllObjectsAt(string locationId)
             => _provider.GetAllObjectsAt(locationId);
 
-        #endregion IMutableWorldObjectProvider — reads
+        #endregion IMutableWorldObjectProvider — reads (pass-through)
 
         #region IMutableWorldObjectProvider — buffered mutations
 

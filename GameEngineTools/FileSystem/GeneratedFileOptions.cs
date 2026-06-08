@@ -8,6 +8,7 @@ namespace GameEngineTools.FileSystem
     {
         /// <summary>Directory for generated NPC files.</summary>
         public string NPCDirectory { get; set; } = "data/npcs";
+
         /// <summary>Directory for generated player files.</summary>
         public string PlayerDirectory { get; set; } = "data/players";
     }

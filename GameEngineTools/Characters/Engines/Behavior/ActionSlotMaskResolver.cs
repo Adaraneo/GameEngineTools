@@ -21,38 +21,38 @@ namespace GameEngineTools.Characters.Engines.Behavior
             new Dictionary<string, ActionSlotMask>(StringComparer.OrdinalIgnoreCase)
             {
                 // ── Physiological ──────────────────────────────────────────────
-                [Eat]              = ActionSlotMask.Hands | ActionSlotMask.Mouth,
-                [Drink]            = ActionSlotMask.Hands | ActionSlotMask.Mouth,
-                [SelfCare]         = ActionSlotMask.Hands,
+                [Eat] = ActionSlotMask.Hands | ActionSlotMask.Mouth,
+                [Drink] = ActionSlotMask.Hands | ActionSlotMask.Mouth,
+                [SelfCare] = ActionSlotMask.Hands,
                 [ActionNames.Sleep] = ActionSlotMask.Posture | ActionSlotMask.Hands | ActionSlotMask.Mind,
 
                 // ── Work ───────────────────────────────────────────────────────
-                [Work]             = ActionSlotMask.Hands | ActionSlotMask.Mind,
-                [Create]           = ActionSlotMask.Hands | ActionSlotMask.Mind,
+                [Work] = ActionSlotMask.Hands | ActionSlotMask.Mind,
+                [Create] = ActionSlotMask.Hands | ActionSlotMask.Mind,
 
                 // ── Social ─────────────────────────────────────────────────────
-                [ReachOut]         = ActionSlotMask.Mouth,
-                [InviteIntimacy]   = ActionSlotMask.Mouth,
+                [ReachOut] = ActionSlotMask.Mouth,
+                [InviteIntimacy] = ActionSlotMask.Mouth,
 
                 // ── Movement ───────────────────────────────────────────────────
-                [MoveToSocial]     = ActionSlotMask.Posture,
-                [MoveToPrivate]    = ActionSlotMask.Posture,
-                [MoveToWork]       = ActionSlotMask.Posture,
-                [MoveToRest]       = ActionSlotMask.Posture,
-                [MoveToPublic]     = ActionSlotMask.Posture,
-                [MoveToFood]       = ActionSlotMask.Posture,
-                [MoveToDrink]      = ActionSlotMask.Posture,
+                [MoveToSocial] = ActionSlotMask.Posture,
+                [MoveToPrivate] = ActionSlotMask.Posture,
+                [MoveToWork] = ActionSlotMask.Posture,
+                [MoveToRest] = ActionSlotMask.Posture,
+                [MoveToPublic] = ActionSlotMask.Posture,
+                [MoveToFood] = ActionSlotMask.Posture,
+                [MoveToDrink] = ActionSlotMask.Posture,
 
                 // ── Affordance-driven object interactions ─────────────────────
-                [UseObjectForRest]   = ActionSlotMask.Posture,
-                [UseObjectForWork]   = ActionSlotMask.Hands | ActionSlotMask.Mind,
-                [UseObjectForFun]    = ActionSlotMask.Hands | ActionSlotMask.Mind,
+                [UseObjectForRest] = ActionSlotMask.Posture,
+                [UseObjectForWork] = ActionSlotMask.Hands | ActionSlotMask.Mind,
+                [UseObjectForFun] = ActionSlotMask.Hands | ActionSlotMask.Mind,
                 [UseObjectForWarmth] = ActionSlotMask.None,
-                [UseObjectForMood]   = ActionSlotMask.None,
-                [GatherAtObject]     = ActionSlotMask.None,
+                [UseObjectForMood] = ActionSlotMask.None,
+                [GatherAtObject] = ActionSlotMask.None,
 
                 // ── Idle ───────────────────────────────────────────────────────
-                [Idle]             = ActionSlotMask.None,
+                [Idle] = ActionSlotMask.None,
             };
 
         #endregion Lookup table
@@ -81,10 +81,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
             {
                 return objectInteraction.Kind switch
                 {
-                    ObjectInteractionKind.Take       => ActionSlotMask.Hands,
+                    ObjectInteractionKind.Take => ActionSlotMask.Hands,
                     ObjectInteractionKind.UseInPlace => ActionSlotMask.Posture,
-                    ObjectInteractionKind.Drop       => ActionSlotMask.Hands,
-                    _                                => ActionSlotMask.None,
+                    ObjectInteractionKind.Drop => ActionSlotMask.Hands,
+                    _ => ActionSlotMask.None,
                 };
             }
 

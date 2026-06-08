@@ -29,14 +29,19 @@ namespace GameEngineTools.Armory
         {
             /// <summary>One-handed sword.</summary>
             OneHandedSword,
+
             /// <summary>Two-handed sword.</summary>
             TwoHandedSword,
+
             /// <summary>One-handed axe.</summary>
             OneHandedAxe,
+
             /// <summary>Polearm.</summary>
             Polearm,
+
             /// <summary>Large two-handed axe.</summary>
             BigAxe,
+
             /// <summary>Dagger.</summary>
             Dagger
         }

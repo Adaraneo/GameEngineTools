@@ -47,10 +47,13 @@ namespace GameEngineTools.Characters.Engines.Memory
     {
         /// <summary>The target is generally safe to reach out to.</summary>
         SafeForReachOut = 0,
+
         /// <summary>The target tends to reject intimacy.</summary>
         RejectsIntimacy,
+
         /// <summary>Recent interactions with the target carried a social cost.</summary>
         RecentSocialCost,
+
         /// <summary>The target is warm toward casual contact.</summary>
         WarmForCasualContact
     }

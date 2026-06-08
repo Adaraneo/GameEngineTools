@@ -787,12 +787,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     s = s with { Status = StatusType.Dead };
                     break;
 
-				// Object affordance applied via UseInPlace (DefaultObjectInteractionEngine →
-				// AffordanceApplicationService). Hunger/Thirst reduction is proportional to
-				// the object's satisfaction value — roast beef (0.80) beats an apple (0.25).
-				case Objects.ObjectAffordanceApplied oaa when oaa.Actor == ctx.Id:
-				    s = ApplyObjectAffordance(s, oaa);
-				    break;
+                // Object affordance applied via UseInPlace (DefaultObjectInteractionEngine →
+                // AffordanceApplicationService). Hunger/Thirst reduction is proportional to
+                // the object's satisfaction value — roast beef (0.80) beats an apple (0.25).
+                case Objects.ObjectAffordanceApplied oaa when oaa.Actor == ctx.Id:
+                    s = ApplyObjectAffordance(s, oaa);
+                    break;
             }
 
             // SAM spiky mimo switch — NightmareTriggered a StressSpiked
@@ -1259,7 +1259,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return Clamp01p(current + net);
         }
 
-		/// <inheritdoc/>
+        /// <inheritdoc/>
         public void RestoreState(PhysiologyState state) => State = state;
 
         /// <summary>
@@ -1281,33 +1281,33 @@ namespace GameEngineTools.Characters.Engines.Physiology
             State = state;
         }
 
-		#region Object affordance application
-		
-		/// <summary>
-		/// Applies the physiological effect of a single object affordance event.
-		/// Only <see cref="AffordanceType.Hunger"/> and <see cref="AffordanceType.Thirst"/>
-		/// map to direct physiology changes. All other types (MoodBoost, Warmth, Social…)
-		/// belong to <c>DefaultPsychologyEngine</c>.
-		/// </summary>
-		/// <param name="s">Current physiology state.</param>
-		/// <param name="oaa">Affordance event carrying type and satisfaction [0..1].</param>
-		private PhysiologyState ApplyObjectAffordance(PhysiologyState s, Objects.ObjectAffordanceApplied oaa)
-		    => oaa.AffordanceType switch
-		    {
-		        // satisfaction=0.80 (roast) → Hunger -= 20; satisfaction=0.25 (apple) → Hunger -= 6.25
-		        AffordanceType.Hunger => s with
-		        {
-		            Hunger = Clamp01p(s.Hunger - oaa.Satisfaction * Config.AffordanceHungerMaxDelta)
-		        },
-		
-		        AffordanceType.Thirst => s with
-		        {
-		            Thirst = Clamp01p(s.Thirst - oaa.Satisfaction * Config.AffordanceThirstMaxDelta)
-		        },
-		
-		        // All other affordance types are not physiology concerns.
-		        _ => s
-		    };
+        #region Object affordance application
+
+        /// <summary>
+        /// Applies the physiological effect of a single object affordance event.
+        /// Only <see cref="AffordanceType.Hunger"/> and <see cref="AffordanceType.Thirst"/>
+        /// map to direct physiology changes. All other types (MoodBoost, Warmth, Social…)
+        /// belong to <c>DefaultPsychologyEngine</c>.
+        /// </summary>
+        /// <param name="s">Current physiology state.</param>
+        /// <param name="oaa">Affordance event carrying type and satisfaction [0..1].</param>
+        private PhysiologyState ApplyObjectAffordance(PhysiologyState s, Objects.ObjectAffordanceApplied oaa)
+            => oaa.AffordanceType switch
+            {
+                // satisfaction=0.80 (roast) → Hunger -= 20; satisfaction=0.25 (apple) → Hunger -= 6.25
+                AffordanceType.Hunger => s with
+                {
+                    Hunger = Clamp01p(s.Hunger - oaa.Satisfaction * Config.AffordanceHungerMaxDelta)
+                },
+
+                AffordanceType.Thirst => s with
+                {
+                    Thirst = Clamp01p(s.Thirst - oaa.Satisfaction * Config.AffordanceThirstMaxDelta)
+                },
+
+                // All other affordance types are not physiology concerns.
+                _ => s
+            };
 
         #endregion Object affordance application
 

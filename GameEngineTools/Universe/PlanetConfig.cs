@@ -209,16 +209,22 @@ public enum PlanetArchetype
 {
     /// <summary>Earth-like rocky terrestrial planet.</summary>
     RockyTerrestrial,
+
     /// <summary>Massive rocky planet (super-Earth).</summary>
     SuperEarth,
+
     /// <summary>Water-dominated ocean world.</summary>
     OceanWorld,
+
     /// <summary>Arid desert planet.</summary>
     DesertPlanet,
+
     /// <summary>Tidally-locked planet (one hemisphere always faces the star).</summary>
     TidalLocked,
+
     /// <summary>Gas giant.</summary>
     GasGiant,
+
     /// <summary>Ice giant.</summary>
     IceGiant,
 }

@@ -29,24 +29,34 @@ namespace GameEngineTools.Armory
         {
             /// <summary>Head.</summary>
             Head,
+
             /// <summary>Shoulders.</summary>
             Shoulders,
+
             /// <summary>Legs.</summary>
             Legs,
+
             /// <summary>Feet.</summary>
             Feets,
+
             /// <summary>Hands.</summary>
             Hands,
+
             /// <summary>Breasts.</summary>
             Breasts,
+
             /// <summary>Back.</summary>
             Back,
+
             /// <summary>Arms.</summary>
             Arms,
+
             /// <summary>Belly.</summary>
             Belly,
+
             /// <summary>Chest.</summary>
             Chest,
+
             /// <summary>Shield.</summary>
             Shield
         }

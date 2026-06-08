@@ -110,16 +110,16 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// <see cref="Modifiers.ValuesBehaviorModifier"/> emits a <c>ValueCongruenceViolated</c> event.
     /// </remarks>
     public sealed record ValueLoadVector(
-        double Benevolence   = 0,
-        double Universalism  = 0,
+        double Benevolence = 0,
+        double Universalism = 0,
         double SelfDirection = 0,
-        double Stimulation   = 0,
-        double Hedonism      = 0,
-        double Achievement   = 0,
-        double Power         = 0,
-        double Security      = 0,
-        double Conformity    = 0,
-        double Tradition     = 0)
+        double Stimulation = 0,
+        double Hedonism = 0,
+        double Achievement = 0,
+        double Power = 0,
+        double Security = 0,
+        double Conformity = 0,
+        double Tradition = 0)
     {
         /// <summary>Zero-loading vector (no value impact).</summary>
         public static ValueLoadVector Zero { get; } = new();
@@ -130,8 +130,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </summary>
         public bool HasNegativeLoading =>
             Benevolence < 0 || Universalism < 0 || SelfDirection < 0 || Stimulation < 0 ||
-            Hedonism < 0    || Achievement < 0  || Power < 0         || Security < 0    ||
-            Conformity < 0  || Tradition < 0;
+            Hedonism < 0 || Achievement < 0 || Power < 0 || Security < 0 ||
+            Conformity < 0 || Tradition < 0;
 
         /// <summary>
         /// Computes the congruence of this action with the given values profile.
@@ -146,16 +146,16 @@ namespace GameEngineTools.Characters.Engines.Behavior
         public double Congruence(ValuesProfile profile)
         {
             var dot =
-                Benevolence   * profile.Benevolence   +
-                Universalism  * profile.Universalism  +
+                Benevolence * profile.Benevolence +
+                Universalism * profile.Universalism +
                 SelfDirection * profile.SelfDirection +
-                Stimulation   * profile.Stimulation   +
-                Hedonism      * profile.Hedonism       +
-                Achievement   * profile.Achievement   +
-                Power         * profile.Power         +
-                Security      * profile.Security      +
-                Conformity    * profile.Conformity    +
-                Tradition     * profile.Tradition;
+                Stimulation * profile.Stimulation +
+                Hedonism * profile.Hedonism +
+                Achievement * profile.Achievement +
+                Power * profile.Power +
+                Security * profile.Security +
+                Conformity * profile.Conformity +
+                Tradition * profile.Tradition;
 
             // Normalise to [−1..+1] by dividing by the number of dimensions.
             return Math.Clamp(dot / 10.0, -1.0, 1.0);

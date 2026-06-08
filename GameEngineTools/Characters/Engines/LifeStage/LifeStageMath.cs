@@ -3,8 +3,6 @@
 
 namespace GameEngineTools.Characters.Engines.LifeStage
 {
-    using GameEngineTools.Characters.Core;
-
     /// <summary>
     /// Pure, stateless math for life-stage transition effects.
     /// </summary>

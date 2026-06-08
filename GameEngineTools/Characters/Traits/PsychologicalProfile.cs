@@ -8,14 +8,19 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Balanced, flexible coping.</summary>
         Balanced,
+
         /// <summary>Avoidant — disengages from stressors.</summary>
         Avoidant,
+
         /// <summary>Rationalizing — copes by reframing/justifying.</summary>
         Rationalizing,
+
         /// <summary>Humor — defuses stress with humour.</summary>
         Humor,
+
         /// <summary>Aggressive compensation — copes by asserting dominance.</summary>
         AggressiveCompensation,
+
         /// <summary>People-pleasing — copes by accommodating others.</summary>
         PeoplePleasing
     }

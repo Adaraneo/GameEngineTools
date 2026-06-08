@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Core
     {
         /// <summary>The canonical given name.</summary>
         public string Original { get; set; }
+
         /// <summary>Familiar / diminutive forms of the name.</summary>
         public string[] Familiar { get; set; }
     }

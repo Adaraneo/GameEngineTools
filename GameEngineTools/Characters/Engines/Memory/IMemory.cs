@@ -101,10 +101,13 @@ namespace GameEngineTools.Characters.Engines.Memory
     {
         /// <summary>Emotionally neutral.</summary>
         Neutral,
+
         /// <summary>Positive valence.</summary>
         Positive,
+
         /// <summary>Negative valence.</summary>
         Negative,
+
         /// <summary>Mixed positive and negative valence.</summary>
         Mixed
     }

@@ -9,10 +9,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Time;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
-    using GameEngineTools.World.Objects;
 
     /// <summary>
     /// Default implementation of the psychology engine.
@@ -1293,14 +1293,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
             // VAD deltas: V strongly negative, A elevated (approach), D moderately low.
             var dv = Math.Clamp(-0.55 * violationMagnitude * personalityMult, -0.75, 0.0);
-            var da = Math.Clamp( 0.45 * violationMagnitude * personalityMult,  0.0,  0.70);
+            var da = Math.Clamp(0.45 * violationMagnitude * personalityMult, 0.0, 0.70);
             var dd = Math.Clamp(-0.20 * violationMagnitude * personalityMult, -0.45, 0.0);
 
             s = s with
             {
-                Valence   = Math.Clamp(s.Valence   + dv, -1.0, 1.0),
-                Arousal   = Math.Clamp(s.Arousal   + da,  0.0, 1.0),
-                Dominance = Math.Clamp(s.Dominance + dd,  0.0, 1.0)
+                Valence = Math.Clamp(s.Valence + dv, -1.0, 1.0),
+                Arousal = Math.Clamp(s.Arousal + da, 0.0, 1.0),
+                Dominance = Math.Clamp(s.Dominance + dd, 0.0, 1.0)
             };
 
             var newEmotion = InferEmotion(s);
@@ -1367,17 +1367,17 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 // Valence spike is immediate; MoodBaseline shift is small but persistent.
                 AffordanceType.MoodBoost => s with
                 {
-                    Valence      = Math.Clamp(s.Valence + oaa.Satisfaction * Config.AffordanceMoodBoostMaxValence, -1, 1),
+                    Valence = Math.Clamp(s.Valence + oaa.Satisfaction * Config.AffordanceMoodBoostMaxValence, -1, 1),
                     MoodBaseline = Math.Clamp(s.MoodBaseline + oaa.Satisfaction * Config.AffordanceMoodBoostMaxMoodBaseline, 0, 100)
                 },
-        
+
                 // Warmth relief — fireplace, hearth, forge.
                 // Cold stress is a physiological threat; warmth resolves the drive.
                 AffordanceType.Warmth => s with
                 {
                     Stress = Math.Clamp(s.Stress - oaa.Satisfaction * Config.AffordanceWarmthMaxStressRelief, 0, 100)
                 },
-        
+
                 // Communal space — tavern table, campfire, chapel.
                 // Effect is need-scaled: lonely characters benefit more (Cacioppo 2008).
                 AffordanceType.Social => s with
@@ -1388,7 +1388,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                                   * (ctx.Snapshot.Behavior.NeedBelonging / 100.0),
                         -1, 1)
                 },
-        
+
                 // Hazard / threat — weapons, fire, intimidating objects.
                 // Stress spike is immediate; does not affect Valence directly
                 // (fear → high Stress → Valence drops naturally via Tick physio modulation).
@@ -1396,11 +1396,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 {
                     Stress = Math.Clamp(s.Stress + oaa.Satisfaction * Config.AffordanceStressRaiseMaxStress, 0, 100)
                 },
-        
+
                 // Hunger, Thirst, Rest, Work, Entertainment — not psychology concerns at this layer.
                 _ => s
             };
-        
-            #endregion Object affordance application
+
+        #endregion Object affordance application
     }
 }

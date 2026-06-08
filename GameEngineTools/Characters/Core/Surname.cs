@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Core
     {
         /// <summary>Male form of the surname.</summary>
         public string Male { get; set; }
+
         /// <summary>Female form of the surname.</summary>
         public string Female { get; set; }
     }

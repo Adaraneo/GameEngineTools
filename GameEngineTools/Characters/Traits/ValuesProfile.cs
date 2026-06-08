@@ -148,30 +148,30 @@ namespace GameEngineTools.Characters.Traits
             // Raw scores from regression equations (Parks-Leduc et al. 2015).
             // Formula: 0.5 + Σ(ρ_trait × (trait − 0.5)) + noise
             // The 0.5 baseline centres all values at the population midpoint.
-            double benevolence  = 0.5 + 0.61 * (a - 0.5);
+            double benevolence = 0.5 + 0.61 * (a - 0.5);
             double universalism = 0.5 + 0.39 * (a - 0.5) + 0.33 * (o - 0.5);
-            double selfDir      = 0.5 + 0.52 * (o - 0.5);
-            double stimulation  = 0.5 + 0.36 * (o - 0.5) + 0.36 * (e - 0.5);
-            double hedonism     = 0.5 + 0.20 * (e - 0.5) - 0.19 * (c - 0.5);
-            double achievement  = 0.5 + 0.31 * (e - 0.5) + 0.17 * (c - 0.5);
-            double power        = 0.5 + 0.31 * (e - 0.5) - 0.42 * (a - 0.5);
-            double security     = 0.5 + 0.37 * (c - 0.5) - 0.24 * (o - 0.5);
-            double conformity   = 0.5 + 0.27 * (c - 0.5) + 0.26 * (a - 0.5) - 0.27 * (o - 0.5);
-            double tradition    = 0.5 - 0.31 * (o - 0.5) + 0.22 * (a - 0.5);
+            double selfDir = 0.5 + 0.52 * (o - 0.5);
+            double stimulation = 0.5 + 0.36 * (o - 0.5) + 0.36 * (e - 0.5);
+            double hedonism = 0.5 + 0.20 * (e - 0.5) - 0.19 * (c - 0.5);
+            double achievement = 0.5 + 0.31 * (e - 0.5) + 0.17 * (c - 0.5);
+            double power = 0.5 + 0.31 * (e - 0.5) - 0.42 * (a - 0.5);
+            double security = 0.5 + 0.37 * (c - 0.5) - 0.24 * (o - 0.5);
+            double conformity = 0.5 + 0.27 * (c - 0.5) + 0.26 * (a - 0.5) - 0.27 * (o - 0.5);
+            double tradition = 0.5 - 0.31 * (o - 0.5) + 0.22 * (a - 0.5);
 
             // Add residual noise when a random source is provided.
             if (random is not null)
             {
-                benevolence  += SampleNoise(random);
+                benevolence += SampleNoise(random);
                 universalism += SampleNoise(random);
-                selfDir      += SampleNoise(random);
-                stimulation  += SampleNoise(random);
-                hedonism     += SampleNoise(random);
-                achievement  += SampleNoise(random);
-                power        += SampleNoise(random);
-                security     += SampleNoise(random);
-                conformity   += SampleNoise(random);
-                tradition    += SampleNoise(random);
+                selfDir += SampleNoise(random);
+                stimulation += SampleNoise(random);
+                hedonism += SampleNoise(random);
+                achievement += SampleNoise(random);
+                power += SampleNoise(random);
+                security += SampleNoise(random);
+                conformity += SampleNoise(random);
+                tradition += SampleNoise(random);
             }
 
             // Clamp before ipsatization to keep values in a valid range.
@@ -201,16 +201,16 @@ namespace GameEngineTools.Characters.Traits
                 ips[i] = Math.Clamp(raw[i] - mean + 0.5, 0, 1);
 
             return new ValuesProfile(
-                Benevolence:   ips[0],
-                Universalism:  ips[1],
+                Benevolence: ips[0],
+                Universalism: ips[1],
                 SelfDirection: ips[2],
-                Stimulation:   ips[3],
-                Hedonism:      ips[4],
-                Achievement:   ips[5],
-                Power:         ips[6],
-                Security:      ips[7],
-                Conformity:    ips[8],
-                Tradition:     ips[9]);
+                Stimulation: ips[3],
+                Hedonism: ips[4],
+                Achievement: ips[5],
+                Power: ips[6],
+                Security: ips[7],
+                Conformity: ips[8],
+                Tradition: ips[9]);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -224,7 +224,7 @@ namespace GameEngineTools.Characters.Traits
             // Box-Muller: two uniform samples → one standard normal.
             var u1 = 1.0 - rng.NextDouble();
             var u2 = 1.0 - rng.NextDouble();
-            var z  = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
+            var z = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
             return z * NoiseSigma;
         }
     }

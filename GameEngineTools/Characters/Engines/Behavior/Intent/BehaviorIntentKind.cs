@@ -10,16 +10,22 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
     {
         /// <summary>No active intent.</summary>
         None,
+
         /// <summary>Engaged in a work session.</summary>
         WorkSession,
+
         /// <summary>Seeking rest.</summary>
         RestSeeking,
+
         /// <summary>Seeking social contact.</summary>
         SocialSeeking,
+
         /// <summary>Seeking privacy.</summary>
         PrivacySeeking,
+
         /// <summary>Exploring / seeking novelty.</summary>
         Exploration,
+
         /// <summary>Engaged in self-care.</summary>
         SelfCare,
 

@@ -10,8 +10,10 @@ namespace GameEngineTools.Characters.Hosting
     {
         /// <summary>Full episodic memory ingestion.</summary>
         Full = 0,
+
         /// <summary>Reduced memory ingestion.</summary>
         Reduced = 1,
+
         /// <summary>Minimal memory ingestion.</summary>
         Minimal = 2
     }

@@ -124,14 +124,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// </summary>
         private static string ResolveActionName(AffordanceType type) => type switch
         {
-            AffordanceType.Rest          => ActionNames.UseObjectForRest,
-            AffordanceType.Work          => ActionNames.UseObjectForWork,
+            AffordanceType.Rest => ActionNames.UseObjectForRest,
+            AffordanceType.Work => ActionNames.UseObjectForWork,
             AffordanceType.Entertainment => ActionNames.UseObjectForFun,
-            AffordanceType.Warmth        => ActionNames.UseObjectForWarmth,
-            AffordanceType.MoodBoost     => ActionNames.UseObjectForMood,
-            AffordanceType.Social        => ActionNames.GatherAtObject,
+            AffordanceType.Warmth => ActionNames.UseObjectForWarmth,
+            AffordanceType.MoodBoost => ActionNames.UseObjectForMood,
+            AffordanceType.Social => ActionNames.GatherAtObject,
             // Hunger, Thirst, Ownership, StressRaise keep InteractWithObject
-            _                            => ActionNames.InteractWithObject,
+            _ => ActionNames.InteractWithObject,
         };
 
         /// <summary>
@@ -145,13 +145,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
             return type switch
             {
-                AffordanceType.Rest          => ActionSlotMask.Posture,
-                AffordanceType.Work          => ActionSlotMask.Hands | ActionSlotMask.Mind,
+                AffordanceType.Rest => ActionSlotMask.Posture,
+                AffordanceType.Work => ActionSlotMask.Hands | ActionSlotMask.Mind,
                 AffordanceType.Entertainment => ActionSlotMask.Hands | ActionSlotMask.Mind,
-                AffordanceType.Warmth        => ActionSlotMask.None,
-                AffordanceType.MoodBoost     => ActionSlotMask.None,
-                AffordanceType.Social        => ActionSlotMask.None,
-                _                            => ActionSlotMask.None,
+                AffordanceType.Warmth => ActionSlotMask.None,
+                AffordanceType.MoodBoost => ActionSlotMask.None,
+                AffordanceType.Social => ActionSlotMask.None,
+                _ => ActionSlotMask.None,
             };
         }
 
@@ -161,13 +161,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// </summary>
         private static WTimeSpan ResolveDefaultDuration(AffordanceType type) => type switch
         {
-            AffordanceType.Rest          => WTimeSpan.FromMinutes(30),
-            AffordanceType.Work          => WTimeSpan.FromHours(2),
+            AffordanceType.Rest => WTimeSpan.FromMinutes(30),
+            AffordanceType.Work => WTimeSpan.FromHours(2),
             AffordanceType.Entertainment => WTimeSpan.FromHours(1),
-            AffordanceType.Warmth        => WTimeSpan.FromMinutes(20),
-            AffordanceType.MoodBoost     => WTimeSpan.FromMinutes(15),
-            AffordanceType.Social        => WTimeSpan.FromMinutes(30),
-            _                            => WTimeSpan.FromMinutes(1),
+            AffordanceType.Warmth => WTimeSpan.FromMinutes(20),
+            AffordanceType.MoodBoost => WTimeSpan.FromMinutes(15),
+            AffordanceType.Social => WTimeSpan.FromMinutes(30),
+            _ => WTimeSpan.FromMinutes(1),
         };
 
         /// <summary>
@@ -175,9 +175,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// </summary>
         private static BehaviorDomain ResolveDomain(AffordanceType type) => type switch
         {
-            AffordanceType.Work          => BehaviorDomain.Competence,
-            AffordanceType.Social        => BehaviorDomain.Social,
-            _                            => BehaviorDomain.Physiological,
+            AffordanceType.Work => BehaviorDomain.Competence,
+            AffordanceType.Social => BehaviorDomain.Social,
+            _ => BehaviorDomain.Physiological,
         };
 
         private static double GetNeedScore(

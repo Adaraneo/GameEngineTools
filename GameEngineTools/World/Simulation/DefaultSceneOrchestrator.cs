@@ -6,7 +6,6 @@ namespace GameEngineTools.World.Simulation
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Transactions;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Attraction;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -497,7 +496,7 @@ namespace GameEngineTools.World.Simulation
                 {
                     using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
                     {
-                        _log.SceneMoveToRequested(character.Id.Value.ToString(), requestedType.ToString(), currentLocation?? "<none>");
+                        _log.SceneMoveToRequested(character.Id.Value.ToString(), requestedType.ToString(), currentLocation ?? "<none>");
                         Console.WriteLine("[MoveTo] {0} requested {1} but no suitable location exists. Current location: {2}.", character.Id.Value.ToString(), requestedType.ToString(), currentLocation ?? "<none>");
                     }
                     continue;

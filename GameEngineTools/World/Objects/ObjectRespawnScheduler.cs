@@ -34,6 +34,7 @@ namespace GameEngineTools.World.Objects
         /// of the mutable contract, not the read-only <see cref="IWorldObjectProvider"/>.
         /// </summary>
         private readonly IMutableWorldObjectProvider _provider;
+
         private readonly ILogger<ObjectRespawnScheduler> _logger;
 
         #endregion Private state
@@ -54,7 +55,7 @@ namespace GameEngineTools.World.Objects
         {
             ArgumentNullException.ThrowIfNull(provider);
             _provider = provider;
-            _logger   = logger;
+            _logger = logger;
         }
 
         #endregion Construction

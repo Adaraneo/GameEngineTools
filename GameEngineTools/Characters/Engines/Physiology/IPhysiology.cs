@@ -388,7 +388,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             AllostaticLoadAccumRatePerHour: 0.15, // CHANGED: 0.5 → 0.15 (slower accumulation)
             AllostaticLoadDecayRatePerHour: 0.35, // CHANGED: 0.1 → 0.35 (meaningful recovery)
             AllostaticLoadIdleDecayFactor: 0.05, // NEW: passive rest has negligible recovery (McEwen 2006)
-            // ── Cortisol (HPA axis) ───────────────────────────────────────────────────
+                                                 // ── Cortisol (HPA axis) ───────────────────────────────────────────────────
             CortisolDiurnalPeakHour: 8.0,
             CortisolDiurnalAmplitude: 30.0,
             CortisolAlloWeight: 0.25,
@@ -639,12 +639,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
     {
         /// <summary>Menstruation (bleeding) phase.</summary>
         Menses,
+
         /// <summary>Follicular phase — between menses and ovulation.</summary>
         Follicular,
+
         /// <summary>Ovulation window — peak fertility.</summary>
         Ovulation,
+
         /// <summary>Luteal phase — between ovulation and the next menses; PMS occurs late here.</summary>
         Luteal,
+
         /// <summary>Cycle paused (e.g. pregnancy or contraception).</summary>
         Paused
     }
@@ -825,8 +829,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
     {
         /// <summary>Soft-tissue sprain.</summary>
         Sprain,
+
         /// <summary>Infection (raises immune load over time).</summary>
         Infection,
+
         /// <summary>Open wound.</summary>
         Wound
     }
@@ -845,10 +851,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
     {
         /// <summary>Immediately after birth.</summary>
         Immediate,
+
         /// <summary>First week postpartum.</summary>
         FirstWeek,
+
         /// <summary>Through the six-week recovery period.</summary>
         SixWeeks,
+
         /// <summary>Full recovery reached.</summary>
         FullRecovery
     }

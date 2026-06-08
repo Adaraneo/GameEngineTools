@@ -217,7 +217,7 @@ namespace GameEngineTools.World.Simulation
                 _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
             }
 
-            #endregion
+            #endregion Trying
 
             // ── Krok 2: Tick všech postav ──────────────────────────────────────────
             // All characters advance their state before any outcomes are routed.

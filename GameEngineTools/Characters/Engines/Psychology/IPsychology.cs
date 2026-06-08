@@ -294,22 +294,31 @@ namespace GameEngineTools.Characters.Engines.Psychology
     {
         /// <summary>No salient emotion.</summary>
         Neutral,
+
         /// <summary>Joy / happiness.</summary>
         Joy,
+
         /// <summary>Sadness.</summary>
         Sadness,
+
         /// <summary>Anger (approach-motivated).</summary>
         Anger,
+
         /// <summary>Fear.</summary>
         Fear,
+
         /// <summary>Disgust.</summary>
         Disgust,
+
         /// <summary>Surprise.</summary>
         Surprise,
+
         /// <summary>Tenderness / affection.</summary>
         Tenderness,
+
         /// <summary>Pride.</summary>
         Pride,
+
         /// <summary>Shame — self-focused, withdrawal-motivated.</summary>
         Shame,
 

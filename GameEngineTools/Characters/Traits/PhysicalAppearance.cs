@@ -30,10 +30,13 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Petite frame.</summary>
         Petite,
+
         /// <summary>Medium frame.</summary>
         Medium,
+
         /// <summary>Large frame.</summary>
         Large,
+
         /// <summary>Strong/robust frame.</summary>
         Strong
     }
@@ -43,20 +46,28 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Very fair.</summary>
         VeryFair,
+
         /// <summary>Fair.</summary>
         Fair,
+
         /// <summary>Light.</summary>
         Light,
+
         /// <summary>Light-medium.</summary>
         LightMedium,
+
         /// <summary>Medium.</summary>
         Medium,
+
         /// <summary>Tan.</summary>
         Tan,
+
         /// <summary>Dark.</summary>
         Dark,
+
         /// <summary>Very dark.</summary>
         VeryDark,
+
         /// <summary>Olive.</summary>
         Olive
     }
@@ -66,14 +77,19 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Brown.</summary>
         Brown,
+
         /// <summary>Hazel.</summary>
         Hazel,
+
         /// <summary>Green.</summary>
         Green,
+
         /// <summary>Blue.</summary>
         Blue,
+
         /// <summary>Gray.</summary>
         Gray,
+
         /// <summary>Amber.</summary>
         Amber
     }
@@ -83,16 +99,22 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Black.</summary>
         Black,
+
         /// <summary>Dark brown.</summary>
         DarkBrown,
+
         /// <summary>Brown.</summary>
         Brown,
+
         /// <summary>Auburn.</summary>
         Auburn,
+
         /// <summary>Red.</summary>
         Red,
+
         /// <summary>Blond.</summary>
         Blond,
+
         /// <summary>Dark blond.</summary>
         DarkBlond
     }
@@ -102,10 +124,13 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Straight.</summary>
         Straight,
+
         /// <summary>Wavy.</summary>
         Wavy,
+
         /// <summary>Curly.</summary>
         Curly,
+
         /// <summary>Coily.</summary>
         Coily
     }
@@ -115,14 +140,19 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>Oval.</summary>
         Oval,
+
         /// <summary>Round.</summary>
         Round,
+
         /// <summary>Square.</summary>
         Square,
+
         /// <summary>Heart.</summary>
         Heart,
+
         /// <summary>Diamond.</summary>
         Diamond,
+
         /// <summary>Oblong.</summary>
         Oblong
     }
@@ -162,10 +192,13 @@ namespace GameEngineTools.Characters.Traits
     {
         /// <summary>No bloating.</summary>
         None,
+
         /// <summary>Light bloating.</summary>
         Light,
+
         /// <summary>Medium bloating.</summary>
         Medium,
+
         /// <summary>High bloating.</summary>
         High
     }

@@ -48,8 +48,10 @@ namespace GameEngineTools.World.Core.Time
 
         /// <summary>World ticks in one day.</summary>
         public long TicksPerDay => TicksPerHour * HoursPerDay;
+
         /// <summary>World ticks in one hour.</summary>
         public long TicksPerHour => TicksPerMinute * MinutesPerHour;
+
         /// <summary>World ticks in one minute.</summary>
         public long TicksPerMinute => TicksPerSecond * SecondsPerMinute;
     }

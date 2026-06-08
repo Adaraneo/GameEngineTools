@@ -61,11 +61,13 @@ namespace GameEngineTools.Characters.Engines.Reputation
                 case ThirdPartyObservationType.PositiveAct:
                     target = +1.0;
                     break;
+
                 case ThirdPartyObservationType.NegativeAct:
                 case ThirdPartyObservationType.Betrayal:
                     target = -1.0;
                     alpha = Math.Min(1.0, alpha * NegativityBias); // stern judging
                     break;
+
                 default:
                     return oldScore;
             }

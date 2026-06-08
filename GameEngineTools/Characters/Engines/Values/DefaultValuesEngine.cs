@@ -37,15 +37,16 @@ namespace GameEngineTools.Characters.Engines.Values
 
         // Canonical circular order (Schwartz 1992). opposite(i) = (i + 5) mod 10.
         private const int SelfDirection = 0;
-        private const int Stimulation   = 1;
-        private const int Hedonism      = 2;
-        private const int Achievement   = 3;
-        private const int Power         = 4;
-        private const int Security      = 5;
-        private const int Conformity    = 6;
-        private const int Tradition     = 7;
-        private const int Benevolence   = 8;
-        private const int Universalism  = 9;
+
+        private const int Stimulation = 1;
+        private const int Hedonism = 2;
+        private const int Achievement = 3;
+        private const int Power = 4;
+        private const int Security = 5;
+        private const int Conformity = 6;
+        private const int Tradition = 7;
+        private const int Benevolence = 8;
+        private const int Universalism = 9;
 
         private const int Dim = 10;
 
@@ -115,7 +116,7 @@ namespace GameEngineTools.Characters.Engines.Values
                 State = State with { Current = FromArray(cur) };
         }
 
-        #endregion IEngine — Tick
+        #endregion IEngine — Tick (regression to baseline)
 
         #region IEngine — Handle
 
@@ -232,11 +233,11 @@ namespace GameEngineTools.Characters.Engines.Values
 
             var left = (idx + Dim - 1) % Dim;
             var right = (idx + 1) % Dim;
-            arr[left]  = Math.Clamp(arr[left]  + delta * cfg.NeighborCouplingFactor, 0.0, 1.0);
+            arr[left] = Math.Clamp(arr[left] + delta * cfg.NeighborCouplingFactor, 0.0, 1.0);
             arr[right] = Math.Clamp(arr[right] + delta * cfg.NeighborCouplingFactor, 0.0, 1.0);
         }
 
-        #endregion Reinforcement math
+        #endregion Reinforcement math (testable)
 
         #region Helpers
 
@@ -292,44 +293,44 @@ namespace GameEngineTools.Characters.Engines.Values
         };
 
         private static ValuesProfile FromArray(double[] a) => new ValuesProfile(
-            Benevolence:   a[Benevolence],
-            Universalism:  a[Universalism],
+            Benevolence: a[Benevolence],
+            Universalism: a[Universalism],
             SelfDirection: a[SelfDirection],
-            Stimulation:   a[Stimulation],
-            Hedonism:      a[Hedonism],
-            Achievement:   a[Achievement],
-            Power:         a[Power],
-            Security:      a[Security],
-            Conformity:    a[Conformity],
-            Tradition:     a[Tradition]);
+            Stimulation: a[Stimulation],
+            Hedonism: a[Hedonism],
+            Achievement: a[Achievement],
+            Power: a[Power],
+            Security: a[Security],
+            Conformity: a[Conformity],
+            Tradition: a[Tradition]);
 
         private static int ParseValueName(string? name) => name switch
         {
             nameof(ValuesProfile.SelfDirection) => SelfDirection,
-            nameof(ValuesProfile.Stimulation)   => Stimulation,
-            nameof(ValuesProfile.Hedonism)      => Hedonism,
-            nameof(ValuesProfile.Achievement)   => Achievement,
-            nameof(ValuesProfile.Power)         => Power,
-            nameof(ValuesProfile.Security)      => Security,
-            nameof(ValuesProfile.Conformity)    => Conformity,
-            nameof(ValuesProfile.Tradition)     => Tradition,
-            nameof(ValuesProfile.Benevolence)   => Benevolence,
-            nameof(ValuesProfile.Universalism)  => Universalism,
+            nameof(ValuesProfile.Stimulation) => Stimulation,
+            nameof(ValuesProfile.Hedonism) => Hedonism,
+            nameof(ValuesProfile.Achievement) => Achievement,
+            nameof(ValuesProfile.Power) => Power,
+            nameof(ValuesProfile.Security) => Security,
+            nameof(ValuesProfile.Conformity) => Conformity,
+            nameof(ValuesProfile.Tradition) => Tradition,
+            nameof(ValuesProfile.Benevolence) => Benevolence,
+            nameof(ValuesProfile.Universalism) => Universalism,
             _ => -1
         };
 
         private static string ValueName(int idx) => idx switch
         {
             SelfDirection => nameof(ValuesProfile.SelfDirection),
-            Stimulation   => nameof(ValuesProfile.Stimulation),
-            Hedonism      => nameof(ValuesProfile.Hedonism),
-            Achievement   => nameof(ValuesProfile.Achievement),
-            Power         => nameof(ValuesProfile.Power),
-            Security      => nameof(ValuesProfile.Security),
-            Conformity    => nameof(ValuesProfile.Conformity),
-            Tradition     => nameof(ValuesProfile.Tradition),
-            Benevolence   => nameof(ValuesProfile.Benevolence),
-            Universalism  => nameof(ValuesProfile.Universalism),
+            Stimulation => nameof(ValuesProfile.Stimulation),
+            Hedonism => nameof(ValuesProfile.Hedonism),
+            Achievement => nameof(ValuesProfile.Achievement),
+            Power => nameof(ValuesProfile.Power),
+            Security => nameof(ValuesProfile.Security),
+            Conformity => nameof(ValuesProfile.Conformity),
+            Tradition => nameof(ValuesProfile.Tradition),
+            Benevolence => nameof(ValuesProfile.Benevolence),
+            Universalism => nameof(ValuesProfile.Universalism),
             _ => "Unknown"
         };
 

@@ -20,12 +20,12 @@ namespace GameEngineTools.Characters.Engines.Interests
     {
         #region Dimensions
 
-        private const int Realistic     = 0;
+        private const int Realistic = 0;
         private const int Investigative = 1;
-        private const int Artistic      = 2;
-        private const int Social        = 3;
-        private const int Enterprising  = 4;
-        private const int Conventional  = 5;
+        private const int Artistic = 2;
+        private const int Social = 3;
+        private const int Enterprising = 4;
+        private const int Conventional = 5;
         private const int Dim = 6;
 
         #endregion Dimensions
@@ -84,7 +84,7 @@ namespace GameEngineTools.Characters.Engines.Interests
             if (changed) State = State with { Current = FromArray(cur) };
         }
 
-        #endregion IEngine — Tick
+        #endregion IEngine — Tick (regression brake)
 
         #region IEngine — Handle
 

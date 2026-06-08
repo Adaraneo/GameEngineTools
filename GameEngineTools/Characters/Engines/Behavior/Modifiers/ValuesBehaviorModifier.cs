@@ -86,7 +86,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
             // Value-action gap: under high cognitive load or stress, values exert less influence.
             // Stress attenuation: linear falloff above 70 (Mieth et al. 2021).
-            var stressAttenuation  = psych.Stress > 70.0
+            var stressAttenuation = psych.Stress > 70.0
                 ? Math.Clamp(1.0 - (psych.Stress - 70.0) / 30.0, 0.20, 1.0)
                 : 1.0;
 
@@ -99,7 +99,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
             for (var i = 0; i < candidates.Count; i++)
             {
-                var c       = candidates[i];
+                var c = candidates[i];
                 var loading = ActionValueLoadings.Get(c.Name);
                 if (loading == ValueLoadVector.Zero) continue;
 
@@ -150,7 +150,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// </summary>
         private static string FindDominantViolatedValue(ValueLoadVector loading, ValuesProfile profile)
         {
-            var worst     = 0.0;
+            var worst = 0.0;
             var worstName = "Unknown";
 
             Check(loading.Benevolence * profile.Benevolence, nameof(ValuesProfile.Benevolence));
@@ -170,7 +170,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             {
                 if (weightedLoad < worst)
                 {
-                    worst     = weightedLoad;
+                    worst = weightedLoad;
                     worstName = name;
                 }
             }

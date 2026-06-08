@@ -12,14 +12,19 @@ namespace GameEngineTools
     {
         /// <summary>Single.</summary>
         Single,
+
         /// <summary>In a relationship.</summary>
         InRelationship,
+
         /// <summary>Engaged.</summary>
         Engaged,
+
         /// <summary>Married.</summary>
         Married,
+
         /// <summary>Divorced.</summary>
         Divorced,
+
         /// <summary>Widowed.</summary>
         Widowed
     }
@@ -31,14 +36,19 @@ namespace GameEngineTools
     {
         /// <summary>Baby.</summary>
         Baby,
+
         /// <summary>Child.</summary>
         Child,
+
         /// <summary>Teenager.</summary>
         Teenager,
+
         /// <summary>Adult.</summary>
         Adult,
+
         /// <summary>Middle-aged.</summary>
         MidAged,
+
         /// <summary>Old.</summary>
         Old
     };
@@ -48,8 +58,10 @@ namespace GameEngineTools
     {
         /// <summary>Not yet born.</summary>
         Unborn,
+
         /// <summary>Alive.</summary>
         Alive,
+
         /// <summary>Dead.</summary>
         Dead
     };
@@ -63,12 +75,16 @@ namespace GameEngineTools
     {
         /// <summary>Water.</summary>
         Water,
+
         /// <summary>Air.</summary>
         Air,
+
         /// <summary>Fire.</summary>
         Fire,
+
         /// <summary>Earth.</summary>
         Earth,
+
         /// <summary>Unknown / none.</summary>
         Unknown
     }

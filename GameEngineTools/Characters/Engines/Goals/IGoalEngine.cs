@@ -22,6 +22,7 @@ namespace GameEngineTools.Characters.Engines.Goals
 
         /// <summary>Existential — overcome past trauma.</summary>
         OvercomeTrauma,
+
         /// <summary>Existential — build a coherent identity.</summary>
         BuildIdentity,
 
@@ -48,6 +49,7 @@ namespace GameEngineTools.Characters.Engines.Goals
 
         /// <summary>Relational — repair a damaged relationship.</summary>
         RepairRelationship,
+
         /// <summary>Relational — seek revenge for a transgression.</summary>
         SeekRevenge
     }
@@ -57,8 +59,10 @@ namespace GameEngineTools.Characters.Engines.Goals
     {
         /// <summary>Seeded from the character's personality.</summary>
         Personality,
+
         /// <summary>Triggered by a domain event.</summary>
         Event,
+
         /// <summary>Injected by a script or external system.</summary>
         Scripted
     }
@@ -68,10 +72,13 @@ namespace GameEngineTools.Characters.Engines.Goals
     {
         /// <summary>Goal reached completion.</summary>
         Completed,
+
         /// <summary>Goal was abandoned (e.g. high frustration).</summary>
         Abandoned,
+
         /// <summary>Goal faded as salience decayed to zero.</summary>
         Faded,
+
         /// <summary>Goal was displaced by a higher-priority goal.</summary>
         Displaced
     }

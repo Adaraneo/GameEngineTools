@@ -452,15 +452,15 @@ namespace GameEngineTools.World.Data
                 """;
             lock (_sync)
                 ExecuteNonQuery(sql,
-                    ("@id",       norm.Id),
-                    ("@name",     norm.DisplayName),
-                    ("@kind",     norm.Kind),
-                    ("@sev",      norm.Severity),
-                    ("@enf",      norm.EnforcementProbability),
-                    ("@rm",       (object?)norm.RelationalModel ?? DBNull.Value),
-                    ("@culture",  (object?)norm.CultureId ?? DBNull.Value),
+                    ("@id", norm.Id),
+                    ("@name", norm.DisplayName),
+                    ("@kind", norm.Kind),
+                    ("@sev", norm.Severity),
+                    ("@enf", norm.EnforcementProbability),
+                    ("@rm", (object?)norm.RelationalModel ?? DBNull.Value),
+                    ("@culture", (object?)norm.CultureId ?? DBNull.Value),
                     ("@fromYear", (object?)norm.ValidFromYear ?? DBNull.Value),
-                    ("@toYear",   (object?)norm.ValidToYear ?? DBNull.Value));
+                    ("@toYear", (object?)norm.ValidToYear ?? DBNull.Value));
         }
 
         /// <summary>Returns all social norms in the database.</summary>
@@ -478,15 +478,15 @@ namespace GameEngineTools.World.Data
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     results.Add(new SocialNormRow(
-                        Id:                     reader.GetString(0),
-                        DisplayName:            reader.GetString(1),
-                        Kind:                   reader.GetString(2),
-                        Severity:               reader.GetDouble(3),
+                        Id: reader.GetString(0),
+                        DisplayName: reader.GetString(1),
+                        Kind: reader.GetString(2),
+                        Severity: reader.GetDouble(3),
                         EnforcementProbability: reader.GetDouble(4),
-                        RelationalModel:        reader.IsDBNull(5) ? null : reader.GetString(5),
-                        CultureId:              reader.IsDBNull(6) ? null : reader.GetString(6),
-                        ValidFromYear:          reader.IsDBNull(7) ? null : reader.GetInt32(7),
-                        ValidToYear:            reader.IsDBNull(8) ? null : reader.GetInt32(8)));
+                        RelationalModel: reader.IsDBNull(5) ? null : reader.GetString(5),
+                        CultureId: reader.IsDBNull(6) ? null : reader.GetString(6),
+                        ValidFromYear: reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                        ValidToYear: reader.IsDBNull(8) ? null : reader.GetInt32(8)));
                 return results;
             }
         }

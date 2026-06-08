@@ -13,10 +13,13 @@ namespace GameEngineTools.Characters.Engines.Behavior
     {
         /// <summary>Night-time band.</summary>
         Night,
+
         /// <summary>Morning band.</summary>
         Morning,
+
         /// <summary>Daytime band.</summary>
         Day,
+
         /// <summary>Evening band.</summary>
         Evening
     }
@@ -28,12 +31,16 @@ namespace GameEngineTools.Characters.Engines.Behavior
     {
         /// <summary>No dominant cue.</summary>
         Neutral,
+
         /// <summary>Driven by a bodily need (hunger, thirst, fatigue).</summary>
         BodyNeed,
+
         /// <summary>Driven by stress relief.</summary>
         StressRelief,
+
         /// <summary>Driven by a social need.</summary>
         SocialNeed,
+
         /// <summary>Driven by a competence need.</summary>
         CompetenceNeed
     }
@@ -45,8 +52,10 @@ namespace GameEngineTools.Characters.Engines.Behavior
     {
         /// <summary>No clear tendency.</summary>
         Neutral,
+
         /// <summary>Adaptive — reinforced by need-appropriate outcomes.</summary>
         Adaptive,
+
         /// <summary>Maladaptive coping — reinforced primarily by stress relief.</summary>
         MaladaptiveCoping
     }
