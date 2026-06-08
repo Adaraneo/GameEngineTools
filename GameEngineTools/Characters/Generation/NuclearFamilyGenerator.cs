@@ -34,7 +34,7 @@ namespace GameEngineTools.Characters.Generation
     /// <para>
     /// <b>Child appearance and stadium:</b><br/>
     /// Each child's <see cref="StadiumType"/> is derived from their <see cref="ChildSpec.BornOn"/>
-    /// relative to <paramref name="now"/> inside <see cref="IChildBlueprintGenerator"/>.
+    /// relative to the current game date inside <see cref="IChildBlueprintGenerator"/>.
     /// A child born 15 years ago gets <see cref="StadiumType.Teenager"/> proportions and personality;
     /// a child born 2 years ago gets <see cref="StadiumType.Baby"/> proportions. This is fully automatic.
     /// </para>

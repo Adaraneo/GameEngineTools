@@ -22,7 +22,7 @@ namespace GameEngineTools.World.Objects
     /// <b>How it works:</b>
     /// <list type="number">
     ///   <item>
-    ///     At the start of each substep, <see cref="SimulationScene"/> calls
+    ///     At the start of each substep, <see cref="GameEngineTools.World.Simulation.SimulationScene"/> calls
     ///     <see cref="Refresh"/> with the set of active location IDs.
     ///     This issues one <see cref="IWorldObjectProvider.GetObjectsAt"/> query
     ///     per <i>distinct location</i> — typically 2–5 queries regardless of character count.
@@ -46,7 +46,7 @@ namespace GameEngineTools.World.Objects
     /// at the substep boundary, not within it.
     /// </para>
     /// <para>
-    /// Register as a singleton in DI. <see cref="SimulationScene"/> holds a reference
+    /// Register as a singleton in DI. <see cref="GameEngineTools.World.Simulation.SimulationScene"/> holds a reference
     /// and calls <see cref="Refresh"/> once per <c>SimulateSingleStep</c>.
     /// </para>
     /// </remarks>
@@ -148,7 +148,7 @@ namespace GameEngineTools.World.Objects
         /// <inheritdoc/>
         /// <remarks>
         /// Bypasses the snapshot — required for mutation paths (Drop logic in
-        /// <see cref="DefaultObjectInteractionEngine"/>) where the exact object
+        /// <see cref="GameEngineTools.Characters.Engines.Objects.DefaultObjectInteractionEngine"/>) where the exact object
         /// state at the DB level is needed, not the tick-start snapshot.
         /// </remarks>
         public WorldObject? FindObject(string objectId)

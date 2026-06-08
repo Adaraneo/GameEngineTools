@@ -43,11 +43,6 @@ namespace GameEngineTools
         /// Inicializuje manager se všemi závislostmi přes DI.
         /// </summary>
         /// <param name="clock">Zdroj aktuálního herního času (pro RandomizePerson).</param>
-        /// <param name="wtctx">
-        /// Kontext světového času — nahrazuje odstraněný globální <c>WDateTime.Spec</c>.
-        /// Používá se pro dekompozici <see cref="WDateTime"/> a aritmetiku nad
-        /// <see cref="WDateOnly"/>.
-        /// </param>
         /// <param name="rngFactory">Factory pro generátory náhodných čísel.</param>
         /// <param name="opt">Konfigurační volby manageru (logy, adresáře).</param>
         /// <param name="log">Logger.</param>
@@ -87,7 +82,7 @@ namespace GameEngineTools
 
         /// <summary>
         /// Inicializuje manager — vyčistí stav a načte herní zdroje ze souborů.
-        /// Voláno automaticky přes <see cref="GameEngineToolsManagerInitializer"/> při startu hostu.
+        /// Voláno automaticky přes <c>GameEngineToolsManagerInitializer</c> při startu hostu.
         /// </summary>
         public void Initialize()
         {

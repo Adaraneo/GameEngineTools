@@ -9,8 +9,12 @@ namespace GameEngineTools.Extensions
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation.Portraits;
 
+    /// <summary>Debugging/diagnostic extension helpers for characters.</summary>
     public static class TestExtension
     {
+        /// <summary>Invokes the caster's magic against each target.</summary>
+        /// <param name="caster">The casting character.</param>
+        /// <param name="tagrets">The targets to affect.</param>
         public static void DoMagic(this CharacterBase caster, params object[] tagrets)
         {
             if (caster != null)
@@ -22,6 +26,10 @@ namespace GameEngineTools.Extensions
             }
         }
 
+        /// <summary>Builds a human-readable info dump for a character.</summary>
+        /// <param name="nppc">The character.</param>
+        /// <param name="basicInfo">When <c>true</c>, includes only identity basics; otherwise dumps the full snapshot.</param>
+        /// <param name="withDNA">When <c>true</c>, prepends the character id.</param>
         public static string PrintInfo(this CharacterBase nppc, bool basicInfo = true, bool withDNA = false)
         {
             var person = nppc.Person;
@@ -62,6 +70,10 @@ namespace GameEngineTools.Extensions
             return sb.ToString();
         }
 
+        /// <summary>Builds the portrait-generation prompt info for a character.</summary>
+        /// <param name="nppc">The character.</param>
+        /// <param name="builder">Portrait spec builder.</param>
+        /// <param name="formatter">Portrait prompt formatter.</param>
         public static string PrintPortraitInfo(this CharacterBase nppc, IPortraitSpecBuilder builder, IPortraitPromptFormatter formatter)
         {
             ArgumentNullException.ThrowIfNull(nppc);

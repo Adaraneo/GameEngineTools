@@ -18,7 +18,7 @@ namespace GameEngineTools.World.Objects
     /// <b>Why not put these on <see cref="IWorldObjectProvider"/>?</b><br/>
     /// <see cref="IWorldObjectProvider"/> is a read-only query contract consumed by simulation
     /// engines. Mutation methods belong to a separate interface so read-only consumers
-    /// (e.g. <see cref="ContingencySearchEngine"/>) do not need to know about mutations.
+    /// (e.g. <see cref="GameEngineTools.Characters.Engines.Behavior.Needs.ContingencySearchEngine"/>) do not need to know about mutations.
     /// </para>
     /// </remarks>
     public interface IMutableWorldObjectProvider : IWorldObjectProvider

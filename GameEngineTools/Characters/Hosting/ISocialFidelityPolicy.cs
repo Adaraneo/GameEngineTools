@@ -10,6 +10,8 @@ namespace GameEngineTools.Characters.Hosting
     /// </summary>
     public interface ISocialFidelityPolicy
     {
+        /// <summary>Returns the social fidelity tier for a character.</summary>
+        /// <param name="human">Character identifier.</param>
         SocialFidelityLevel GetLevel(HumanId human);
     }
 }

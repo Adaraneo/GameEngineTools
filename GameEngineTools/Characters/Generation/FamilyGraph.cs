@@ -28,7 +28,7 @@ namespace GameEngineTools.Characters.Generation
     /// <see cref="FamilyGraph"/> answers two classes of query efficiently:
     /// <list type="bullet">
     ///   <item>"Who are the members of the Ventifer family?" → <see cref="GetByName"/></item>
-    ///   <item>"Who are the parents / children / siblings of character X?" → <see cref="GetKin"/></item>
+    ///   <item>"Who are the parents / children / siblings of character X?" → <see cref="GetKin(GameEngineTools.Characters.Core.HumanId)"/></item>
     /// </list>
     /// </para>
     /// <para>
@@ -200,7 +200,7 @@ namespace GameEngineTools.Characters.Generation
         /// <para>
         /// For characters loaded from disk, every <see cref="RelationshipEdge"/> whose
         /// <c>KinRole</c> is not <see cref="KinRole.None"/> is replayed as a kin link.
-        /// This makes <see cref="GetKin"/> and <see cref="GetClanMembers"/> correct from
+        /// This makes <see cref="GetKin(GameEngineTools.Characters.Core.HumanId)"/> and <see cref="GetClanMembers"/> correct from
         /// the first tick without any additional setup in the caller.
         /// </para>
         /// <para>
@@ -244,6 +244,9 @@ namespace GameEngineTools.Characters.Generation
             }
         }
 
+        /// <summary>Registers <paramref name="relative"/> into the clan of <paramref name="clanMember"/>.</summary>
+        /// <param name="relative">The character joining the clan.</param>
+        /// <param name="clanMember">An existing member whose clan is joined.</param>
         public void RegisterToClan(IHuman relative, IHuman clanMember)
         {
             ArgumentNullException.ThrowIfNull(relative);

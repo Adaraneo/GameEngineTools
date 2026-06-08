@@ -11,7 +11,7 @@ namespace GameEngineTools.World.Location
 
     /// <summary>
     /// Broad category of a location — used by <see cref="ILocationService.GetLocationsByType"/>
-    /// and by <see cref="DefaultBehaviorEngine"/> when emitting <c>MoveTo:*</c> actions.
+    /// and by <see cref="GameEngineTools.Characters.Engines.Behavior.DefaultBehaviorEngine"/> when emitting <c>MoveTo:*</c> actions.
     /// </summary>
     public enum LocationType
     {
@@ -42,7 +42,7 @@ namespace GameEngineTools.World.Location
     /// Ambient noise level before any characters are present. Range [0, 1].
     /// A library might be 0.05; a smithy 0.7.
     /// </param>
-    /// <param name="NoisePer Person">
+    /// <param name="NoisePerPerson">
     /// How much each additional character raises noise. Range [0, 1].
     /// A large hall has small per-person contribution; a small room has large.
     /// </param>
@@ -88,7 +88,7 @@ namespace GameEngineTools.World.Location
     /// </para>
     /// <para>
     /// <b>Who calls this?</b><br/>
-    /// <see cref="SimulationScene"/> calls <see cref="DispatchContextEvents"/>
+    /// <see cref="GameEngineTools.World.Simulation.SimulationScene"/> calls <see cref="DispatchContextEvents"/>
     /// once per tick, before characters tick. This ensures every character
     /// has an up-to-date <see cref="InteractionSurface"/> before any
     /// <see cref="InteractionProposed"/> is evaluated.
@@ -147,6 +147,8 @@ namespace GameEngineTools.World.Location
         /// <param name="type">The location type to query.</param>
         IReadOnlyList<string> GetLocationsByType(LocationType type);
 
+        /// <summary>Returns the descriptor for a location id, or <c>null</c> if unknown.</summary>
+        /// <param name="locationId">The location id to resolve.</param>
         LocationDescriptor? GetDescriptor(string locationId);
     }
 

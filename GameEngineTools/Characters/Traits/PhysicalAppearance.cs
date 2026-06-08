@@ -6,7 +6,16 @@ namespace GameEngineTools.Characters.Traits
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
 
-    // --- Trait: stabilní rysy (genetika/morfologie) ---
+    /// <summary>
+    /// Stable physical-appearance traits (genetics/morphology). The runtime "current look" is
+    /// derived from this plus physiology via <see cref="AppearanceProjector"/>.
+    /// </summary>
+    /// <param name="Body">Body morphology (skeleton, soft tissue, proportions, posture).</param>
+    /// <param name="Face">Facial morphology.</param>
+    /// <param name="Surface">Skin/hair surface traits.</param>
+    /// <param name="Colors">Pigmentation traits (skin, eyes, hair).</param>
+    /// <param name="DistinctiveMarks">Optional distinctive marks (scars, tattoos, …).</param>
+    /// <param name="HairLengthCm">Baseline hair length in cm.</param>
     public sealed record PhysicalAppearance(
         BodyMorphology Body,
         FacialMorphology Face,
@@ -16,28 +25,120 @@ namespace GameEngineTools.Characters.Traits
         double HairLengthCm = 35.0)
     { }
 
+    /// <summary>Overall body frame size.</summary>
     public enum BodyFrame
-    { Petite, Medium, Large, Strong }
+    {
+        /// <summary>Petite frame.</summary>
+        Petite,
+        /// <summary>Medium frame.</summary>
+        Medium,
+        /// <summary>Large frame.</summary>
+        Large,
+        /// <summary>Strong/robust frame.</summary>
+        Strong
+    }
 
+    /// <summary>Skin tone category.</summary>
     public enum SkinTone
     {
-        VeryFair, Fair, Light, LightMedium, Medium, Tan, Dark, VeryDark,
+        /// <summary>Very fair.</summary>
+        VeryFair,
+        /// <summary>Fair.</summary>
+        Fair,
+        /// <summary>Light.</summary>
+        Light,
+        /// <summary>Light-medium.</summary>
+        LightMedium,
+        /// <summary>Medium.</summary>
+        Medium,
+        /// <summary>Tan.</summary>
+        Tan,
+        /// <summary>Dark.</summary>
+        Dark,
+        /// <summary>Very dark.</summary>
+        VeryDark,
+        /// <summary>Olive.</summary>
         Olive
     }
 
+    /// <summary>Eye colour.</summary>
     public enum EyeColor
-    { Brown, Hazel, Green, Blue, Gray, Amber }
+    {
+        /// <summary>Brown.</summary>
+        Brown,
+        /// <summary>Hazel.</summary>
+        Hazel,
+        /// <summary>Green.</summary>
+        Green,
+        /// <summary>Blue.</summary>
+        Blue,
+        /// <summary>Gray.</summary>
+        Gray,
+        /// <summary>Amber.</summary>
+        Amber
+    }
 
+    /// <summary>Natural hair colour.</summary>
     public enum HairColorNatural
-    { Black, DarkBrown, Brown, Auburn, Red, Blond, DarkBlond }
+    {
+        /// <summary>Black.</summary>
+        Black,
+        /// <summary>Dark brown.</summary>
+        DarkBrown,
+        /// <summary>Brown.</summary>
+        Brown,
+        /// <summary>Auburn.</summary>
+        Auburn,
+        /// <summary>Red.</summary>
+        Red,
+        /// <summary>Blond.</summary>
+        Blond,
+        /// <summary>Dark blond.</summary>
+        DarkBlond
+    }
 
+    /// <summary>Hair texture type.</summary>
     public enum HairType
-    { Straight, Wavy, Curly, Coily }
+    {
+        /// <summary>Straight.</summary>
+        Straight,
+        /// <summary>Wavy.</summary>
+        Wavy,
+        /// <summary>Curly.</summary>
+        Curly,
+        /// <summary>Coily.</summary>
+        Coily
+    }
 
+    /// <summary>Face shape.</summary>
     public enum FaceShape
-    { Oval, Round, Square, Heart, Diamond, Oblong }
+    {
+        /// <summary>Oval.</summary>
+        Oval,
+        /// <summary>Round.</summary>
+        Round,
+        /// <summary>Square.</summary>
+        Square,
+        /// <summary>Heart.</summary>
+        Heart,
+        /// <summary>Diamond.</summary>
+        Diamond,
+        /// <summary>Oblong.</summary>
+        Oblong
+    }
 
-    // --- Projekce: stavový „aktuální vzhled“ (odvozený) ---
+    /// <summary>
+    /// Derived "current look" projection — the appearance a character presents this tick,
+    /// computed from stable traits and the live physiological/aging state.
+    /// </summary>
+    /// <param name="WeightKg">Estimated body weight in kg.</param>
+    /// <param name="Bmi">Estimated body-mass index.</param>
+    /// <param name="BodyFatPct">Estimated body-fat percentage.</param>
+    /// <param name="HairLengthCm">Current hair length in cm.</param>
+    /// <param name="PostureScore">Posture/bearing quality, 0..100.</param>
+    /// <param name="SkinOiliness">Skin oiliness, 0..100.</param>
+    /// <param name="AcneLevel">Acne level, 0..100.</param>
+    /// <param name="Bloating">Current bloating level.</param>
     public sealed record AppearanceView(
         double WeightKg,
         double Bmi,
@@ -56,10 +157,23 @@ namespace GameEngineTools.Characters.Traits
         string? ClothingStyle = null,
         string? MakeupStyle = null);
 
+    /// <summary>Discrete water-retention / bloating level.</summary>
     public enum BloatingLevel
-    { None, Light, Medium, High }
+    {
+        /// <summary>No bloating.</summary>
+        None,
+        /// <summary>Light bloating.</summary>
+        Light,
+        /// <summary>Medium bloating.</summary>
+        Medium,
+        /// <summary>High bloating.</summary>
+        High
+    }
 
-    // --- Projekce: čistá funkce z trait + fyzia ---
+    /// <summary>
+    /// Pure projection from stable traits plus physiology to a derived <see cref="AppearanceView"/>.
+    /// Stateless and side-effect-free.
+    /// </summary>
     public static class AppearanceProjector
     {
         /// <summary>

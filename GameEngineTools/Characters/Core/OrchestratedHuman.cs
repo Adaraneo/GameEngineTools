@@ -661,6 +661,7 @@ namespace GameEngineTools.Characters.Core
                 Id);
         }
 
+        /// <inheritdoc/>
         public void SetLastName(IHuman partner)
         {
             if (_ctx.Snapshot.Relationships.Edges is not null)
@@ -748,6 +749,7 @@ namespace GameEngineTools.Characters.Core
         public override int GetHashCode()
             => Id.GetHashCode();
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             var fname = Identity.FirstName.Original;

@@ -8,6 +8,129 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.World.Utils.Time;
 
+    /// <summary>
+    /// Tuning constants for <see cref="IPhysiologyEngine"/>. Every rate, threshold and
+    /// multiplier the physiology pipeline uses lives here so scenarios can be retuned via
+    /// configuration without recompiling. Bound from <c>Characters:Physiology</c>.
+    /// </summary>
+    /// <param name="RestingMetabolicRate">Resting metabolic rate (kcal/day) used as the metabolic baseline.</param>
+    /// <param name="MaxSleepDebtHours">Upper bound on accumulated sleep-debt hours.</param>
+    /// <param name="EnableMenstrualCycle">When <c>true</c>, female characters run the menstrual-cycle module.</param>
+    /// <param name="MenstrualCycleBeginsInAge">Age (years) at which menarche begins.</param>
+    /// <param name="EnergyRecoveryPerSleepHour">Energy points restored per hour of sleep.</param>
+    /// <param name="PainPassiveRecoveryPerHour">Pain points decayed per hour while awake and idle.</param>
+    /// <param name="PainSleepRecoveryPerHour">Pain points decayed per hour of sleep.</param>
+    /// <param name="BaseConceptionChancePerEncounter">Base conception probability per reproductively-relevant encounter.</param>
+    /// <param name="OvulationConceptionMultiplier">Multiplier applied to conception chance during the ovulation window.</param>
+    /// <param name="PregnancyDiscoveryMinDays">Minimum days after conception before pregnancy can be discovered.</param>
+    /// <param name="PregnancyTermDays">Gestation length in days from conception to birth.</param>
+    /// <param name="EnableNutrition">When <c>true</c>, the nutrition sub-state (calories, vitamins, glucose) is tracked.</param>
+    /// <param name="NutritionDecayPerHour">Per-hour decay of nutrition stores while awake.</param>
+    /// <param name="CaloriesEatingGainPerHour">Calories restored per hour while eating.</param>
+    /// <param name="ProteinEatingGainPerHour">Protein restored per hour while eating.</param>
+    /// <param name="IronSleepRecoveryPerHour">Iron restored per hour of sleep (critical for post-menses recovery).</param>
+    /// <param name="InjuryRestRecoveryPerDay">Injury severity healed per day while resting.</param>
+    /// <param name="InjuryActiveRecoveryPerDay">Injury severity healed per day while active.</param>
+    /// <param name="InjuryInfectionImmuneLoadPerDay">Immune load added per day by an infected injury.</param>
+    /// <param name="AllostaticLoadThresholdHunger">Hunger level above which allostatic load accumulates.</param>
+    /// <param name="AllostaticLoadThresholdThirst">Thirst level above which allostatic load accumulates.</param>
+    /// <param name="AllostaticLoadThresholdSleepDebt">Sleep-debt hours above which allostatic load accumulates.</param>
+    /// <param name="AllostaticLoadThresholdPain">Pain level above which allostatic load accumulates.</param>
+    /// <param name="AllostaticLoadThresholdImmune">Immune load above which allostatic load accumulates.</param>
+    /// <param name="AllostaticLoadAccumRatePerHour">Allostatic load gained per hour while a threshold is breached.</param>
+    /// <param name="AllostaticLoadDecayRatePerHour">Allostatic load shed per hour during active recovery (sleep/self-care).</param>
+    /// <param name="CortisolDiurnalPeakHour">Hour of day at which the cortisol diurnal curve peaks.</param>
+    /// <param name="CortisolDiurnalAmplitude">Amplitude of the cortisol diurnal oscillation.</param>
+    /// <param name="CortisolAlloWeight">Weight of allostatic load on the cortisol baseline.</param>
+    /// <param name="CortisolImmuneWeight">Weight of immune activation on the cortisol baseline.</param>
+    /// <param name="ChronotypeOffsetHours">Stable circadian phase offset (positive = morning type, negative = night owl).</param>
+    /// <param name="NaturalSleepStartHour">Hour of day the character naturally falls asleep.</param>
+    /// <param name="CircadianPhaseRecoveryPerHour">Rate at which jet-lag phase disruption realigns per hour.</param>
+    /// <param name="RecoveryDebtAccumAlloThreshold">Allostatic load above which recovery debt accumulates.</param>
+    /// <param name="RecoveryDebtAccumRatePerHour">Recovery-debt hours gained per hour above the allostatic threshold.</param>
+    /// <param name="RecoveryDebtDecayPerSleepHour">Recovery-debt hours shed per hour of sleep.</param>
+    /// <param name="RecoveryDebtDecayPerSelfCareHour">Recovery-debt hours shed per hour of self-care.</param>
+    /// <param name="EnableTestosteroneCycle">When <c>true</c>, male characters run the testosterone cycle.</param>
+    /// <param name="TestosteronePeakHour">Hour of day the testosterone diurnal rhythm peaks.</param>
+    /// <param name="TestosteroneAlloSuppression">Fraction by which allostatic load suppresses testosterone.</param>
+    /// <param name="TestosteroneSleepDebtPenaltyPerHour">Testosterone reduction per hour of sleep debt.</param>
+    /// <param name="SleepInertiaMaxHours">Maximum sleep-inertia duration after waking.</param>
+    /// <param name="SocialPainCortisolSpike">Cortisol spike emitted on social rejection (HPA activation).</param>
+    /// <param name="AcuteArousalDecayPerHour">Per-hour decay of acute SAM arousal (fast adrenaline response).</param>
+    /// <param name="InjuryAcuteArousalSpike">Acute arousal spike on injury.</param>
+    /// <param name="NightmareAcuteArousalSpike">Acute arousal spike on a nightmare.</param>
+    /// <param name="StressSpikedAcuteArousalWeight">Weight converting a stress spike into acute arousal.</param>
+    /// <param name="PhysicalFatigueAccumPerWorkHour">Physical (muscular) fatigue gained per hour of work.</param>
+    /// <param name="PhysicalFatigueDecayPerSleepHour">Physical fatigue shed per hour of sleep.</param>
+    /// <param name="PhysicalFatigueDecayPerIdleHour">Physical fatigue shed per hour while idle.</param>
+    /// <param name="PhysicalFatigueSelfCareDecayBonus">Extra physical-fatigue decay per hour of self-care.</param>
+    /// <param name="BloodGlucoseEatingGain">Blood-glucose gain from eating.</param>
+    /// <param name="BloodGlucoseBaseDecayPerHour">Baseline blood-glucose decay per hour.</param>
+    /// <param name="BloodGlucoseDipDecayBonus">Extra glucose decay during the post-meal rebound dip.</param>
+    /// <param name="BloodGlucoseDipStartHours">Hours after a meal at which the glucose dip begins.</param>
+    /// <param name="BloodGlucoseDipEndHours">Hours after a meal at which the glucose dip ends.</param>
+    /// <param name="HypocortisolismAlloThreshold">Allostatic load above which the HPA axis downregulates (hypocortisolism paradox).</param>
+    /// <param name="HypocortisolismDeclineRate">Rate of cortisol decline once hypocortisolism sets in.</param>
+    /// <param name="SocialSupportCortisolBuffer">Cortisol reduction from sufficient social support (Eisenberger 2007).</param>
+    /// <param name="SocialSupportClosenessThreshold">Closeness level required to trigger the social-support buffer.</param>
+    /// <param name="SocialIsolationCortisolThreshold">Isolation duration/level above which cortisol rises (Cacioppo 2015).</param>
+    /// <param name="SocialIsolationCortisolRatePerHour">Cortisol gained per hour of chronic social isolation.</param>
+    /// <param name="ChronicPainAccumThreshold">Pain level above which chronic-pain days accumulate (Dantzer 2008).</param>
+    /// <param name="ChronicPainDecayFactor">Decay factor applied to accumulated chronic-pain days.</param>
+    /// <param name="CircadianTempAmplitude">Amplitude of the circadian body-temperature oscillation (Waterhouse 2005).</param>
+    /// <param name="CircadianTempPeakHour">Hour of day at which body temperature peaks.</param>
+    /// <param name="MenopauseAge">Age at which menopause occurs.</param>
+    /// <param name="AgingEnergyRecoveryPenaltyStart">Age at which energy-recovery aging penalty begins.</param>
+    /// <param name="AgingEnergyRecoveryPenaltyPerYear">Energy-recovery penalty accrued per year past the start age.</param>
+    /// <param name="AgingImmuneBaselineStart">Age at which the immune baseline begins to drift upward.</param>
+    /// <param name="AgingImmuneBaselinePerYear">Immune baseline increase per year past the start age.</param>
+    /// <param name="AgingTestosteronePenaltyStart">Age at which testosterone aging penalty begins.</param>
+    /// <param name="AgingTestosteronePenaltyPerYear">Testosterone penalty accrued per year past the start age.</param>
+    /// <param name="AltitudeHypoxiaThreshold">Altitude (m) above which hypoxia effects begin.</param>
+    /// <param name="AltitudeAMSThreshold">Altitude (m) above which acute mountain sickness occurs.</param>
+    /// <param name="AltitudeEnergyDecayBonusPerKm">Extra energy decay per km of altitude above the hypoxia threshold.</param>
+    /// <param name="AltitudeAMSPainPerHour">Pain gained per hour while above the AMS threshold.</param>
+    /// <param name="HairGrowthCmPerHour">Hair growth in cm per hour.</param>
+    /// <param name="HairGreyingAgeStart">Age at which hair greying begins.</param>
+    /// <param name="HairGreyingRatePerYear">Grey-fraction increase per year.</param>
+    /// <param name="HairGreyingCortisolBoost">Extra greying per unit of chronic cortisol.</param>
+    /// <param name="HairLossAgeStartMale">Age at which male androgenic hair loss begins.</param>
+    /// <param name="HairLossRatePerYearMale">Hair-density loss per year for males.</param>
+    /// <param name="HairLossStressThreshold">Stress level above which telogen-effluvium hair loss occurs.</param>
+    /// <param name="HairLossStressRate">Hair-density loss per unit time above the stress threshold.</param>
+    /// <param name="HairLossPostpartumAmount">Hair-density loss applied at postpartum onset.</param>
+    /// <param name="HairDensityRecoveryPerHour">Hair-density recovery per hour.</param>
+    /// <param name="WrinklingAgeStart">Age at which wrinkling begins.</param>
+    /// <param name="WrinklingRatePerYear">Wrinkle-score increase per year.</param>
+    /// <param name="WrinklingCortisolBoost">Extra wrinkling per unit of chronic cortisol.</param>
+    /// <param name="SarcopeniaAgeStart">Age at which muscle-mass decline (sarcopenia) begins.</param>
+    /// <param name="SarcopeniaRatePerYear">Muscle-mass fraction lost per year.</param>
+    /// <param name="SarcopeniaMuscleMin">Lower bound on muscle-mass fraction.</param>
+    /// <param name="BoneDensityDeclineAgeStart">Age at which bone-density decline begins.</param>
+    /// <param name="BoneDensityDeclinePerYear">Bone-density fraction lost per year.</param>
+    /// <param name="BoneDensityMenopauseMultiplier">Multiplier on bone-density decline after menopause.</param>
+    /// <param name="BoneFragilityInjuryMultiplier">Injury-severity amplification from low bone density.</param>
+    /// <param name="AgeSleepQualityThreshold">Age above which sleep quality declines.</param>
+    /// <param name="AgeSleepQualityPenaltyPerYear">Sleep-quality penalty accrued per year past the threshold.</param>
+    /// <param name="MaxLifespanYears">Hard upper bound on character lifespan in years.</param>
+    /// <param name="NaturalMortalityAlloWeight">Hourly mortality risk contribution per allostatic-load point above threshold.</param>
+    /// <param name="NaturalMortalityAlloSpikeMultiplier">Risk multiplier applied above the allostatic spike threshold.</param>
+    /// <param name="NaturalMortalityImmuneWeight">Hourly mortality risk contribution per immune-load point above threshold.</param>
+    /// <param name="NaturalMortalityImmuneSpikeMultiplier">Risk multiplier applied above the immune (sepsis) spike threshold.</param>
+    /// <param name="NaturalMortalityBoneFragilityWeight">Hourly mortality risk per unit of bone fragility below threshold.</param>
+    /// <param name="NaturalMortalitySarcopeniaWeight">Hourly mortality risk per unit of sarcopenia.</param>
+    /// <param name="NaturalMortalityMaxRiskPerHour">Hard cap on total hourly mortality risk.</param>
+    /// <param name="EnergyDriftAwakePerHour">Energy drift per hour while awake.</param>
+    /// <param name="EnergyDriftSelfCarePerHour">Energy drift per hour while doing self-care.</param>
+    /// <param name="HungerDriftAwakePerHour">Hunger drift per hour while awake.</param>
+    /// <param name="HungerDriftSleepPerHour">Hunger drift per hour while asleep (slowed metabolism).</param>
+    /// <param name="HungerEatingGainPerHour">Hunger change per hour while eating (negative = reduces hunger).</param>
+    /// <param name="ThirstDriftAwakePerHour">Thirst drift per hour while awake.</param>
+    /// <param name="ThirstDriftSleepPerHour">Thirst drift per hour while asleep.</param>
+    /// <param name="ThirstDrinkingGainPerHour">Thirst reduction magnitude per hour while drinking.</param>
+    /// <param name="PainSelfCareRecoveryPerHour">Pain reduced per hour of self-care.</param>
+    /// <param name="ImmuneDriftAwakePerHour">Immune-load drift per hour while awake.</param>
+    /// <param name="ImmuneDriftSelfCarePerHour">Immune-load drift per hour while doing self-care.</param>
     public sealed record PhysiologyConfig(
         double RestingMetabolicRate = 1600,
         double MaxSleepDebtHours = 12,
@@ -387,6 +510,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
         { }
     }
 
+    /// <summary>
+    /// Immutable per-tick physiological state of a character: core homeostatic levels plus
+    /// the HPA-axis, circadian, aging and reproductive sub-states. Persisted in the
+    /// <see cref="Characters.Core.EnginesSnapshot"/> and advanced each tick by the physiology engine.
+    /// </summary>
+    /// <param name="Energy">Available energy, 0..100.</param>
+    /// <param name="SleepDebtHours">Accumulated sleep debt in hours (≥ 0).</param>
+    /// <param name="Hunger">Hunger level, 0..100 (higher = hungrier).</param>
+    /// <param name="Thirst">Thirst level, 0..100 (higher = thirstier).</param>
+    /// <param name="Pain">Pain level, 0..100.</param>
+    /// <param name="ImmuneLoad">Immune activation / illness burden, 0..100.</param>
+    /// <param name="BodyTempDelta">Body-temperature deviation from baseline in °C.</param>
+    /// <param name="Cycle">Menstrual-cycle sub-state, or <c>null</c> for characters without a cycle.</param>
+    /// <param name="Pregnancy">Active pregnancy sub-state, or <c>null</c>.</param>
+    /// <param name="Nutrition">Nutrition sub-state (calories, vitamins, glucose), or <c>null</c>.</param>
+    /// <param name="Injury">Active injury sub-state, or <c>null</c>.</param>
+    /// <param name="Postpartum">Postpartum recovery sub-state, or <c>null</c>.</param>
     public sealed record PhysiologyState(
         double Energy,          // 0..100
         double SleepDebtHours,  // >= 0
@@ -475,6 +615,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         StatusType Status = StatusType.Alive);
 
+    /// <summary>
+    /// The physiology engine — first stage of the per-character tick pipeline. Advances
+    /// homeostatic levels, the HPA axis, circadian rhythm, reproductive cycles and aging.
+    /// </summary>
     public interface IPhysiologyEngine : IEngine<PhysiologyState, PhysiologyConfig>
     {
         /// <summary>
@@ -489,9 +633,35 @@ namespace GameEngineTools.Characters.Engines.Physiology
     }
 
     // --- Menstruační modul ---
-    public enum CyclePhase
-    { Menses, Follicular, Ovulation, Luteal, Paused /* např. těhotenství/antiko */ }
 
+    /// <summary>Phase of the menstrual cycle.</summary>
+    public enum CyclePhase
+    {
+        /// <summary>Menstruation (bleeding) phase.</summary>
+        Menses,
+        /// <summary>Follicular phase — between menses and ovulation.</summary>
+        Follicular,
+        /// <summary>Ovulation window — peak fertility.</summary>
+        Ovulation,
+        /// <summary>Luteal phase — between ovulation and the next menses; PMS occurs late here.</summary>
+        Luteal,
+        /// <summary>Cycle paused (e.g. pregnancy or contraception).</summary>
+        Paused
+    }
+
+    /// <summary>
+    /// Tuning constants for the menstrual-cycle module. Cycle lengths and variability are
+    /// calibrated against Bull et al. 2019; stress/sleep parameters govern HPA-mediated anovulation.
+    /// </summary>
+    /// <param name="MensesMeanDays">Mean duration of menstruation in days.</param>
+    /// <param name="PmsRisk">Probability (0..1) a character is PMS/PMDD-prone.</param>
+    /// <param name="EnableOvulationWindowEvents">When <c>true</c>, ovulation-window events are emitted.</param>
+    /// <param name="EnableSymptoms">When <c>true</c>, cyclic symptoms (pain, bloat, tenderness) are simulated.</param>
+    /// <param name="MinCycleLengthDays">Lower bound on sampled cycle length.</param>
+    /// <param name="MaxCycleLengthDays">Upper bound on sampled cycle length.</param>
+    /// <param name="PainBaseMultiplier">Base multiplier on cyclic pain symptoms.</param>
+    /// <param name="BloatBaseMultiplier">Base multiplier on cyclic bloat symptoms.</param>
+    /// <param name="BreastTenderMultiplier">Base multiplier on cyclic breast-tenderness symptoms.</param>
     public sealed record MenstrualCycleConfig(
         /// <summary>Bull et al. 2019 (n = 3 324 cyklů): průměr 30,3 dní.</summary>
         int MeanCycleLengthDays = 30,
@@ -553,9 +723,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         double SymptomTrackingRatePerDay = 0.6)
     {
+        /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public MenstrualCycleConfig() : this(30, 6.7, 5, 0.35, true, true, 12, 21, 36, 1.0, 1.0, 1.0, 72, 5, 5, 3) { }
     }
 
+    /// <summary>Runtime state of a character's menstrual cycle for the current tick.</summary>
+    /// <param name="Phase">Current cycle phase.</param>
+    /// <param name="DayInCycle">1-based day index within the current cycle.</param>
+    /// <param name="OvulationWindow">True while the character is in the fertile ovulation window.</param>
+    /// <param name="SymptomPain">Cyclic pain symptom level, 0..100.</param>
+    /// <param name="SymptomBreastTender">Cyclic breast-tenderness level, 0..100.</param>
+    /// <param name="SymptomBloat">Cyclic bloat level, 0..100.</param>
+    /// <param name="LibidoMod">Libido multiplier for the current phase (≈ 0.5..1.5).</param>
+    /// <param name="LastMensesStart">Date the most recent menstruation began.</param>
     public sealed record MenstrualCycleState(
         CyclePhase Phase,
         int DayInCycle,
@@ -592,6 +772,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         bool AnovulatoryCycleActive = false);
 
     /// <summary>Stav probíhajícího těhotenství postavy.</summary>
+    /// <param name="OtherParent">Identity of the other parent.</param>
+    /// <param name="ConceivedOn">Date of conception.</param>
+    /// <param name="EstimatedDueDate">Estimated due date.</param>
+    /// <param name="Discovered">Whether the pregnancy has been discovered by the character.</param>
+    /// <param name="DiscoveredOn">Date the pregnancy was discovered, or <c>null</c>.</param>
     public sealed record PregnancyState(
         HumanId OtherParent,
         WDateOnly ConceivedOn,
@@ -599,6 +784,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         bool Discovered = false,
         WDateOnly? DiscoveredOn = null);
 
+    /// <summary>Nutrition sub-state — dietary stores and blood glucose, each on a 0..100 scale.</summary>
+    /// <param name="Calories">Energy availability from food, 0..100.</param>
+    /// <param name="VitaminD">Vitamin D level from sun/diet exposure, 0..100.</param>
+    /// <param name="Iron">Iron level, 0..100 (critical for post-menses recovery).</param>
+    /// <param name="Protein">Protein level for muscle and tissue recovery, 0..100.</param>
     public sealed record NutritionState(
         double Calories = 80,           // 0..100; energy availability from food
         double VitaminD = 80,           // 0..100; sun/diet exposure
@@ -630,17 +820,42 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Thirst reduced per hour (for drink objects).</summary>
         double? HydrationGain = null);
 
+    /// <summary>Category of a physical injury.</summary>
     public enum InjuryType
-    { Sprain, Infection, Wound }
+    {
+        /// <summary>Soft-tissue sprain.</summary>
+        Sprain,
+        /// <summary>Infection (raises immune load over time).</summary>
+        Infection,
+        /// <summary>Open wound.</summary>
+        Wound
+    }
 
+    /// <summary>Active injury sub-state.</summary>
+    /// <param name="Severity">Current injury severity, 0..100.</param>
+    /// <param name="DaysSinceOnset">Days elapsed since the injury occurred.</param>
+    /// <param name="Type">Injury category.</param>
     public sealed record InjuryState(
         double Severity,        // 0..100; current injury severity
         int DaysSinceOnset,     // days since injury occurred
         InjuryType Type);
 
+    /// <summary>Stage of postpartum recovery.</summary>
     public enum PostpartumPhase
-    { Immediate, FirstWeek, SixWeeks, FullRecovery }
+    {
+        /// <summary>Immediately after birth.</summary>
+        Immediate,
+        /// <summary>First week postpartum.</summary>
+        FirstWeek,
+        /// <summary>Through the six-week recovery period.</summary>
+        SixWeeks,
+        /// <summary>Full recovery reached.</summary>
+        FullRecovery
+    }
 
+    /// <summary>Postpartum recovery sub-state.</summary>
+    /// <param name="DaysSinceBirth">Days elapsed since birth.</param>
+    /// <param name="Phase">Current postpartum phase.</param>
     public sealed record PostpartumState(
         int DaysSinceBirth,
         PostpartumPhase Phase,
@@ -662,6 +877,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// hodinách) a potlačení při chronickém stresu (HPA-HPG osa cross-talk) a spánkovém
     /// dluhu. Inicializován pouze pro <see cref="SexBiology.Male"/>.
     /// </summary>
+    /// <param name="Level">Testosterone level, 0..100 (60 ≈ average adult male).</param>
     public sealed record TestosteroneState(
         double Level = 60);  // 0..100; 60 = průměrný dospělý muž
 
@@ -691,9 +907,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double BoneDensity = 1.0);
 
     // Události
+
+    /// <summary>Event — menstruation began.</summary>
     public sealed record MensesStarted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
+    /// <summary>Event — menstruation ended.</summary>
     public sealed record MensesEnded(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
+    /// <summary>Event — the fertile ovulation window opened.</summary>
     public sealed record OvulationWindowOpened(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
+    /// <summary>Event — the cycle advanced to a new day/phase.</summary>
     public sealed record CycleDayAdvanced(WDateTime OccurredAt, HumanId Human, int DayInCycle, CyclePhase Phase) : IDomainEvent;
 
     /// <summary>

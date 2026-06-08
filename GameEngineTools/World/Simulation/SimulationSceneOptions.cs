@@ -86,8 +86,10 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         public WTimeSpan? InternalSubstep { get; init; }
 
+        /// <summary>Default LOD tier assigned to characters when no resolver is provided.</summary>
         public CognitiveResolutionLevel DefaultCharacterLod { get; init; } = CognitiveResolutionLevel.Nearby;
 
+        /// <summary>Optional per-character LOD resolver overriding <see cref="DefaultCharacterLod"/>.</summary>
         public Func<IHuman, CognitiveResolutionLevel>? ResolveCharacterLod { get; init; }
 
         #endregion Časování simulace

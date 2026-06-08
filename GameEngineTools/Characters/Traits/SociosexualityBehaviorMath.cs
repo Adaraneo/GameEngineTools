@@ -16,9 +16,14 @@ namespace GameEngineTools.Characters.Traits
     {
         #region Behavior scoring
 
+        /// <summary>Trait bias on the <c>InviteIntimacy</c> action, driven by SOI-R Desire.</summary>
         public static double InviteIntimacyTraitBias(Sociosexuality soi)
             => (soi.Desire - 0.5) * 2.0;
 
+        /// <summary>
+        /// Adjustment to the score of a candidate intimacy target, blending restricted vs.
+        /// unrestricted weightings by SOI-R Attitude.
+        /// </summary>
         public static double IntimacyTargetScoreAdjustment(
             Sociosexuality soi,
             RelationshipEdge? relationship,
@@ -51,6 +56,7 @@ namespace GameEngineTools.Characters.Traits
             return Lerp(restrictedVal, unrestrictedVal, soi.Attitude);
         }
 
+        /// <summary>Utility multiplier on the <c>InviteIntimacy</c> action, by SOI-R Desire and Attitude.</summary>
         public static double InviteIntimacyUtilityMultiplier(
             Sociosexuality soi,
             RelationshipEdge? relationship,
@@ -83,6 +89,7 @@ namespace GameEngineTools.Characters.Traits
             return Lerp(restrictedVal, unrestrictedVal, (soi.Desire + soi.Attitude) / 2.0);
         }
 
+        /// <summary>Returns <c>true</c> when SOI-R thresholds block initiating intimacy in this context.</summary>
         public static bool BlocksIntimacy(
             Sociosexuality soi,
             RelationshipEdge? relationship,
@@ -110,6 +117,7 @@ namespace GameEngineTools.Characters.Traits
 
         #region Interaction acceptance
 
+        /// <summary>Bias on accepting an intimacy invitation, by SOI-R Attitude and context.</summary>
         public static double InviteAcceptanceBias(
             Sociosexuality soi,
             RelationshipEdge? relationship,
@@ -142,6 +150,7 @@ namespace GameEngineTools.Characters.Traits
             return Lerp(restrictedVal, unrestrictedVal, soi.Attitude);
         }
 
+        /// <summary>Bias on accepting an intimate touch, by SOI-R Attitude and context.</summary>
         public static double IntimateTouchAcceptanceBias(
             Sociosexuality soi,
             RelationshipEdge? relationship,
@@ -157,6 +166,7 @@ namespace GameEngineTools.Characters.Traits
             return Lerp(restrictedVal, unrestrictedVal, soi.Attitude);
         }
 
+        /// <summary>Returns <c>true</c> when SOI-R thresholds block accepting intimate touch in this context.</summary>
         public static bool BlocksIntimateTouch(
             Sociosexuality soi,
             RelationshipEdge? relationship)
@@ -180,14 +190,17 @@ namespace GameEngineTools.Characters.Traits
 
         #region Relationship deltas
 
+        /// <summary>Multiplier on SexualInterest relationship deltas, by SOI-R Behavior and Desire.</summary>
         public static double SexualInterestDeltaMultiplier(Sociosexuality soi)
             => 0.65 + ((soi.Behavior + soi.Desire) / 2.0) * 0.70;
 
+        /// <summary>Multiplier on romantic-invite relationship deltas, by SOI-R Behavior.</summary>
         public static double RomanticInviteDeltaMultiplier(Sociosexuality soi)
             => soi.Behavior <= 0.5
                 ? Lerp(1.25, 1.0, soi.Behavior * 2.0)
                 : Lerp(1.0, 0.85, (soi.Behavior - 0.5) * 2.0);
 
+        /// <summary>Comfort relationship delta from an invite, by SOI-R Behavior.</summary>
         public static double ComfortInviteDelta(Sociosexuality soi)
             => soi.Behavior <= 0.5
                 ? Lerp(0.4, 0.0, soi.Behavior * 2.0)

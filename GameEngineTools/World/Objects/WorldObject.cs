@@ -45,7 +45,7 @@ namespace GameEngineTools.World.Objects
 
         /// <summary>
         /// ID of the location this object belongs to.
-        /// Must match a registered <see cref="LocationDescriptor.Id"/>.
+        /// Must match a registered <see cref="GameEngineTools.World.Location.LocationDescriptor.Id"/>.
         /// </summary>
         public required string LocationId { get; init; }
 
@@ -62,7 +62,7 @@ namespace GameEngineTools.World.Objects
 
         /// <summary>
         /// Noise emitted by this object. Range [0, 1].
-        /// Added on top of <see cref="LocationDescriptor.BaseNoise"/> when computing
+        /// Added on top of <see cref="GameEngineTools.World.Location.LocationDescriptor.BaseNoise"/> when computing
         /// the effective noise level of a location.
         /// </summary>
         public double AmbientNoise { get; init; } = 0.0;

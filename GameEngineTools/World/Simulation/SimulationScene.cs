@@ -27,7 +27,7 @@ namespace GameEngineTools.World.Simulation
     ///   <item>Správné pořadí tickování postav (v pořadí <see cref="SimulationSceneOptions.Characters"/>)</item>
     ///   <item>Automatické routování <see cref="InteractionOutcome"/> zpět k iniciátorovi</item>
     ///   <item>Zpracování sleep promptů dle strategie per-postava</item>
-    ///   <item>Posun herních hodin o <see cref="SimulationSceneOptions.ClockAdvance"/> každou iteraci</item>
+    ///   <item>Posun herních hodin o <c>SimulationSceneOptions.ClockAdvance</c> každou iteraci</item>
     /// </list>
     /// </para>
     /// <para>
@@ -130,7 +130,7 @@ namespace GameEngineTools.World.Simulation
 
         /// <summary>
         /// Spustí simulaci asynchronně.
-        /// Skončí po uplynutí <see cref="SimulationSceneOptions.SimulationYears"/>.
+        /// Skončí po uplynutí <c>SimulationSceneOptions.SimulationYears</c>.
         /// </summary>
         /// <returns>Dokončená task po skončení simulace.</returns>
         public Task RunAsync()

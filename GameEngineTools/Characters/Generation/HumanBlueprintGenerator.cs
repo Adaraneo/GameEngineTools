@@ -53,28 +53,6 @@ namespace GameEngineTools.Characters.Generation
         IReadOnlyDictionary<string, double>? OccupationWeights = null)
     {
         /// <summary>
-        /// Sestaví výchozí spec z aktuálního data ve světě.
-        /// Výchozí věkový rozsah je 0–100 let odvozených z délky roku v herním kalendáři.
-        /// </summary>
-        /// <param name="now">Aktuální datum ve světě (referenční bod pro výpočet věku).</param>
-        /// <param name="ctx">
-        /// Kontext světového času — potřebný pro délku roku v kalendáři.
-        /// Nahrazuje odstraněný globální <c>WDateTime.Spec</c>.
-        /// </param>
-        /// <param name="minAgeYears">Minimální věk v letech (výchozí 0).</param>
-        /// <param name="maxAgeYears">Maximální věk v letech (výchozí 100).</param>
-        /// <returns>Výchozí <see cref="HumanBlueprintSpec"/>.</returns>
-        /// <remarks>
-        /// Typické použití v DI registraci:
-        /// <code>
-        /// s.AddCharacterGeneration(sp =>
-        /// {
-        ///     var ctx = sp.GetRequiredService&lt;WorldTimeContext&gt;();
-        ///     return HumanBlueprintSpec.Default(ctx.GetDate(ctx.Now()), ctx);
-        /// });
-        /// </code>
-        /// </remarks>
-        /// <summary>
         /// Výchozí váhy povolání — hrubá distribuce středověké populace.
         /// Klíč <c>""</c> (<see cref="OccupationIds.None"/>) určuje pravděpodobnost
         /// postavy bez povolání.
@@ -93,6 +71,10 @@ namespace GameEngineTools.Characters.Generation
                 [OccupationIds.Laborer] = 0.15,
             };
 
+        /// <summary>Builds a default blueprint spec with a uniform age range over the given window.</summary>
+        /// <param name="now">Current game date (used to derive birth-date ranges).</param>
+        /// <param name="minAgeYears">Minimum generated age in years.</param>
+        /// <param name="maxAgeYears">Maximum generated age in years.</param>
         public static HumanBlueprintSpec Default(
             WDateOnly now,
             int minAgeYears = 0,

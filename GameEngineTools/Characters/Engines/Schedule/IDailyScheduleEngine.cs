@@ -124,7 +124,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
         /// <summary>
         /// Seeds initial schedule slots from the given occupation and personality,
         /// then immediately registers today's slots with <paramref name="scheduler"/>.
-        /// Call once from <see cref="IHumanFactory.Create"/> before the first tick.
+        /// Call once from <see cref="GameEngineTools.Characters.Hosting.IHumanFactory.Create"/> before the first tick.
         /// </summary>
         /// <param name="occupationId">
         /// Occupation ID looked up in <see cref="IOccupationRegistry"/>.

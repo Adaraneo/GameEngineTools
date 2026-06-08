@@ -37,6 +37,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// </summary>
         Pain,
 
+        /// <summary>External interruption (noise, another character, environment event).</summary>
         External
     }
 }

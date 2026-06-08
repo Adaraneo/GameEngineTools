@@ -67,6 +67,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// </summary>
     double LocomotionHabitFlatBiasCap = 1.0)
     {
+        /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
     }
 

@@ -3,6 +3,11 @@
 
 namespace GameEngineTools.Characters.Generation
 {
+    /// <summary>
+    /// Continuous latent vector describing body morphology, sampled during character
+    /// generation and projected into concrete <see cref="Traits.BodyMorphology"/> traits.
+    /// All components are normalised loadings.
+    /// </summary>
     public sealed record BodyLatent(
         double HeightCm,
         double HeightNorm,
@@ -18,6 +23,10 @@ namespace GameEngineTools.Characters.Generation
         double Aging,
         double SexDimorphism);
 
+    /// <summary>
+    /// Continuous latent vector describing facial morphology, sampled during character
+    /// generation and projected into concrete <see cref="Traits.FacialMorphology"/> traits.
+    /// </summary>
     public sealed record FaceLatent(
         double Robustness,
         double Softness,

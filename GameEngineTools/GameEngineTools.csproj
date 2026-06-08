@@ -9,6 +9,17 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Version>$(VersionPrefix)</Version>
     <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!--
+      CS1591 (missing XML comment on a public member) is intentionally NOT suppressed:
+      every public API surface is documented and this keeps it that way.
+      CS1587 / CS1573 are suppressed because this codebase documents record positional
+      parameters with inline /// <summary> comments (a deliberate, pervasive convention).
+      C# does not treat that placement as <param> documentation, so it warns on every such
+      comment. Suppressing these two families keeps the documentation build clean without
+      rewriting the inline-parameter style across the codebase.
+    -->
+    <NoWarn>$(NoWarn);CS1587;CS1573</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

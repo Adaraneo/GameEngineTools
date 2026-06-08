@@ -10,6 +10,8 @@ namespace GameEngineTools.Characters.Hosting
     /// </summary>
     public interface IPerceptionFidelityPolicy
     {
+        /// <summary>Returns the perception fidelity tier for a character.</summary>
+        /// <param name="human">Character identifier.</param>
         PerceptionFidelityLevel GetLevel(HumanId human);
     }
 }

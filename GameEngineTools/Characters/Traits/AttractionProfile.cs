@@ -10,7 +10,7 @@ namespace GameEngineTools.Characters.Traits
     /// <remarks>
     /// <para>
     /// This is a biological/developmental layer, deliberately kept separate from
-    /// <see cref="GameEngineTools.Characters.Core.Personality"/>, which models psychological traits.
+    /// <see cref="GameEngineTools.Characters.Traits.Personality"/>, which models psychological traits.
     /// Physical preferences are generated once and never change during simulation.
     /// </para>
     /// <para>

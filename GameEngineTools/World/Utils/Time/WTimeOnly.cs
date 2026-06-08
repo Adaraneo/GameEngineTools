@@ -136,7 +136,7 @@ namespace GameEngineTools.World.Utils.Time
         /// </summary>
         /// <remarks>
         /// Pro nejkratší vzdálenost s wraparoundem přes půlnoc použij
-        /// <see cref="GameEngineTools.World.Core.Time.WorldTimeContext.TimeDiff"/>.
+        /// <c>WorldTimeContext.TimeDiff</c>.
         /// </remarks>
         public WTimeSpan Diff(WTimeOnly other) => new(TicksOfDay - other.TicksOfDay);
 

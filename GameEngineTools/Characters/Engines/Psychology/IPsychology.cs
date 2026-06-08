@@ -6,6 +6,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
+    /// <summary>
+    /// Tuning constants for <see cref="IPsychologyEngine"/>. Governs PAD affect dynamics,
+    /// the stress/HPA model, cognitive load, circadian arousal, sickness behaviour, the
+    /// dual-control sexual model and per-emotion decay rates. Bound from <c>Characters:Psychology</c>.
+    /// </summary>
     public sealed record PsychologyConfig(
         double BaselineAffectVariance = 0.02,
         double StressRecoveryRatePerHour = 1.5,
@@ -258,9 +263,22 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// </summary>
         double AffordanceStressRaiseMaxStress = 12.0)
     {
+        /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0) { }
     }
 
+    /// <summary>
+    /// Continuous PAD emotional state plus derived scalars (stress, cognitive load, mood
+    /// baseline) and runtime motivations. Committed each tick by <see cref="IPsychologyEngine"/>.
+    /// </summary>
+    /// <param name="Valence">Pleasure dimension, −1..+1.</param>
+    /// <param name="Arousal">Activation dimension, 0..1.</param>
+    /// <param name="Dominance">Control dimension, 0..1.</param>
+    /// <param name="Stress">HPA-axis stress level, 0..100.</param>
+    /// <param name="CognitiveLoad">Cognitive load, 0..100.</param>
+    /// <param name="DominantEmotion">Discrete emotion inferred from the PAD state.</param>
+    /// <param name="MoodBaseline">Persistent underlying mood, 0..100 (neutral = 50).</param>
+    /// <param name="Motivations">Runtime motivation/need levels, or <c>null</c>.</param>
     public sealed record PsychologyState(
         double Valence,    // -1..+1
         double Arousal,    //  0..1
@@ -271,17 +289,28 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double MoodBaseline = 50.0,        // 0..100; persistent underlying mood, neutral=50
         MotivationState? Motivations = null); // runtime need levels
 
+    /// <summary>Discrete emotion inferred from the continuous PAD state.</summary>
     public enum DiscreteEmotion
     {
+        /// <summary>No salient emotion.</summary>
         Neutral,
+        /// <summary>Joy / happiness.</summary>
         Joy,
+        /// <summary>Sadness.</summary>
         Sadness,
+        /// <summary>Anger (approach-motivated).</summary>
         Anger,
+        /// <summary>Fear.</summary>
         Fear,
+        /// <summary>Disgust.</summary>
         Disgust,
+        /// <summary>Surprise.</summary>
         Surprise,
+        /// <summary>Tenderness / affection.</summary>
         Tenderness,
+        /// <summary>Pride.</summary>
         Pride,
+        /// <summary>Shame — self-focused, withdrawal-motivated.</summary>
         Shame,
 
         /// <summary>
@@ -294,6 +323,16 @@ namespace GameEngineTools.Characters.Engines.Psychology
         Guilt
     }
 
+    /// <summary>
+    /// Runtime motivational drive levels (each 0..100) plus the sickness-withdrawal flag.
+    /// Computed by Psychology and read by the Behavior engine's need engines.
+    /// </summary>
+    /// <param name="NeedSocial">Loneliness/connection driver, 0..100.</param>
+    /// <param name="NeedIntimacy">Sexual/romantic driver, 0..100.</param>
+    /// <param name="NeedAchievement">Accomplishment driver, 0..100.</param>
+    /// <param name="NeedCare">Nurturing driver (peaks postpartum), 0..100.</param>
+    /// <param name="NeedSafety">Security/predictability driver, 0..100.</param>
+    /// <param name="SicknessWithdraw">Immune-driven social-withdrawal flag.</param>
     public sealed record MotivationState(
         double NeedSocial = 50,        // 0..100; loneliness/connection driver
         double NeedIntimacy = 50,      // 0..100; sexual/romantic driver
@@ -302,12 +341,21 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double NeedSafety = 50,        // 0..100; security/predictability driver
         bool SicknessWithdraw = false); // sickness behavior: immune-driven social withdrawal
 
+    /// <summary>
+    /// The psychology engine — second stage of the tick pipeline. Computes PAD affect,
+    /// stress, cognitive load and motivations from the physiological state and events.
+    /// </summary>
     public interface IPsychologyEngine : IEngine<PsychologyState, PsychologyConfig>
     { }
 
     // Události
+
+    /// <summary>Event — the dominant emotion / PAD state shifted.</summary>
     public sealed record EmotionShifted(WDateTime OccurredAt, HumanId Human, DiscreteEmotion To, double Valence, double Arousal, double Dominance) : IDomainEvent;
+    /// <summary>Event — stress rose sharply.</summary>
     public sealed record StressSpiked(WDateTime OccurredAt, HumanId Human, double NewStress) : IDomainEvent;
+    /// <summary>Event — motivational drive levels changed.</summary>
     public sealed record MotivationChanged(WDateTime OccurredAt, HumanId Human, MotivationState Previous, MotivationState Next) : IDomainEvent;
+    /// <summary>Event — sustained high stress manifested as an observable behaviour.</summary>
     public sealed record StressManifested(WDateTime OccurredAt, HumanId Human, string Manifestation) : IDomainEvent;
 }

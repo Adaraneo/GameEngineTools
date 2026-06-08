@@ -8,8 +8,11 @@ namespace GameEngineTools.Characters.Hosting.Defaults
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
 
+    /// <summary>Factory for deterministic <see cref="IRandomSource"/> instances seeded per character.</summary>
     public interface IRandomSourceFactory
     {
+        /// <summary>Creates a random source for the given seed.</summary>
+        /// <param name="seed">Deterministic seed.</param>
         IRandomSource Create(int seed);
     }
 

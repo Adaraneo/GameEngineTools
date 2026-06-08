@@ -16,12 +16,12 @@ namespace GameEngineTools.World.Utils.Time
     /// <remarks>
     /// <para>
     /// <b>Ambient design.</b> Konverter nyní vyžaduje nakonfigurovaný <see cref="WWorld"/>
-    /// místo explicitně předaného <see cref="WorldTimeContext"/>. Díky tomu ho lze
+    /// místo explicitně předaného <c>WorldTimeContext</c>. Díky tomu ho lze
     /// použít přímo jako atribut <c>[JsonConverter(typeof(WDateTimeJsonConverter))]</c>
     /// na <see cref="WDateTime"/> bez DI.
     /// </para>
     /// <para>
-    /// Zpětná kompatibilita: konstruktor přijímající <see cref="WorldTimeContext"/>
+    /// Zpětná kompatibilita: konstruktor přijímající <c>WorldTimeContext</c>
     /// je zachován, ale ignoruje se — interně se vždy použije <see cref="WWorld.Spec"/>.
     /// </para>
     /// </remarks>

@@ -295,7 +295,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <summary>
         /// Vypočítá kvalitu spánku (0–100) na základě délky a průběhu.
         /// <br/>
-        /// Ideální spánek = <see cref="SleepConfig.BaseSleepHours"/> bez přerušení = 100.
+        /// Ideální spánek = <c>SleepConfig.BaseSleepHours</c> bez přerušení = 100.
         /// </summary>
         private double ComputeSleepQuality(bool wasInterrupted)
         {

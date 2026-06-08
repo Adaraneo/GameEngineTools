@@ -30,7 +30,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     ///   <item><b>Ebbinghausova křivka zapomínání</b> — exponenciální pokles síly paměti,
     ///         nikoli lineární. Čerstvé paměti se rozpadají rychleji než dobře zakotvené.</item>
     ///   <item><b>Konsolidace navázaná na spánek</b> — posílení nejsalientnějších epizod se
-    ///         triggeruje událostí <see cref="SleepEvents.SleepEnded"/>, nikoli uplynutím 24h.</item>
+    ///         triggeruje událostí <see cref="GameEngineTools.Characters.Engines.Sleep.SleepEnded"/>, nikoli uplynutím 24h.</item>
     ///   <item><b>Reinforcement (spacing effect)</b> — opakovaný zážitek stejného druhu nekreuje
     ///         duplicitní záznamy, ale posiluje stávající epizodu a aktualizuje její timestamp.</item>
     /// </list>
@@ -241,7 +241,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         ///   <item><see cref="MicroPositive"/> / <see cref="MicroNegative"/> — mikrointerakce.</item>
         ///   <item><see cref="RepairAttempt"/> — pokus o smíření.</item>
         ///   <item><see cref="NightmareTriggered"/> — noční můra (vysoká salience, negativní emoce).</item>
-        ///   <item><see cref="SleepEnded"/> — triggeruje konsolidaci paměti.</item>
+        ///   <item><see cref="GameEngineTools.Characters.Engines.Sleep.SleepEnded"/> — triggeruje konsolidaci paměti.</item>
         /// </list>
         /// </para>
         /// </remarks>
@@ -888,7 +888,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             }
         }
 
-        /// <summary>
+        /// <summary>Encodes a norm-violation episode, scaling salience by the violation score.</summary>
         private void HandleNormViolation(
             Interactions.NormViolationOccurred nv,
             IHumanContext ctx,
@@ -945,11 +945,13 @@ namespace GameEngineTools.Characters.Engines.Memory
                 ctx, outbox);
         }
 
+        /// <summary>
         /// Konsoliduje paměti po skončení spánku.
-        ///
+        /// <para>
         /// Neurovědní základ: REM fáze spánku posiluje epizodické paměti s vysokou
         /// salience — tedy zážitky, které byly emocionálně nebo situačně důležité.
         /// Implementace posiluje 10 epizod s nejvyšší salience o <see cref="MemoryConfig.SleepConsolidationBoost"/>.
+        /// </para>
         /// </summary>
         /// <param name="at">Čas konce spánku.</param>
         /// <param name="ctx">Kontext postavy.</param>
@@ -997,14 +999,12 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Určí salience (důležitost) epizody na základě typu akce.
-        /// Intimní a sociální akce mají vyšší salience — jsou emocionálně výraznější.
+        /// Proxy pro chronickou negativní náladu: počet dní od nejnovější negativní/mixed epizody.
+        /// Clamped na 30 dní — delší periody mají konstantní spirálové riziko.
         /// </summary>
-        /// <param name="actionName">Název akce z <see cref="ActionNames"/>.</param>
-        /// <param name="ctx">Kontext postavy (pro budoucí rozšíření).</param>
-        /// <returns>Hodnota salience v rozsahu 0.0–1.0.</returns>
-        // Proxy pro chronickou negativní náladu: počet dní od nejnovější negativní/mixed epizody.
-        // Clamped na 30 dní — delší periody mají konstantní spirálové riziko.
+        /// <param name="episodes">Epizodické paměti ke zhodnocení.</param>
+        /// <param name="now">Aktuální herní čas.</param>
+        /// <returns>Počet dní (0–30) od poslední negativní/mixed epizody.</returns>
         private static double ComputeDaysInNegativeMood(
             IReadOnlyList<EpisodicMemory> episodes, WDateTime now)
         {

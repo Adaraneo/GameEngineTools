@@ -75,11 +75,13 @@ namespace GameEngineTools.Logging
             double Tender,
             bool Pmdd);
 
+        /// <summary>Sleep ended — logs duration, quality, and remaining sleep debt after recovery.</summary>
         [LoggerMessage(EventId = 5002,
             Level = LogLevel.Debug,
             Message = "[PHYSIO/SLEEP] {HumanId} SleepEnded — délka: {Hours:F1}h, kvalita: {Quality:F0}, dluh po obnově: {Debt:F2}h.")]
         public static partial void PhysiologySleepEnded(this ILogger logger, string HumanId, double Hours, double Quality, double Debt);
 
+        /// <summary>Conception was evaluated after an encounter — logs chance, fertility window and result.</summary>
         [LoggerMessage(
             EventId = 5003,
             Level = LogLevel.Debug,
@@ -94,6 +96,7 @@ namespace GameEngineTools.Logging
             string Contraception,
             string Result);
 
+        /// <summary>Pregnancy started — logs the other parent and estimated due date.</summary>
         [LoggerMessage(
             EventId = 5004,
             Level = LogLevel.Information,
@@ -104,6 +107,7 @@ namespace GameEngineTools.Logging
             string OtherParent,
             string EstimatedDueDate);
 
+        /// <summary>Pregnancy was discovered by the character — logs days pregnant.</summary>
         [LoggerMessage(
             EventId = 5005,
             Level = LogLevel.Information,
@@ -114,6 +118,7 @@ namespace GameEngineTools.Logging
             string OtherParent,
             long DaysPregnant);
 
+        /// <summary>A child was born — logs the other parent, conception date and due date.</summary>
         [LoggerMessage(
             EventId = 5006,
             Level = LogLevel.Information,
@@ -181,6 +186,7 @@ namespace GameEngineTools.Logging
             double StressSpike,
             double ValencePenalty);
 
+        /// <summary>Poor-quality sleep raised stress.</summary>
         [LoggerMessage(
             EventId = 5102,
             Level = LogLevel.Debug,
@@ -323,6 +329,7 @@ namespace GameEngineTools.Logging
             string Action,
             double Hours);
 
+        /// <summary>A new behavioural intent was selected.</summary>
         [LoggerMessage(
             EventId = 1005,
             Level = LogLevel.Debug,
@@ -334,6 +341,7 @@ namespace GameEngineTools.Logging
             string Action,
             double Score);
 
+        /// <summary>The current intent was retained for another tick (hysteresis).</summary>
         [LoggerMessage(
             EventId = 1006,
             Level = LogLevel.Debug,
@@ -345,6 +353,7 @@ namespace GameEngineTools.Logging
             string Action,
             double Score);
 
+        /// <summary>The intent switched to a different direction.</summary>
         [LoggerMessage(
             EventId = 1007,
             Level = LogLevel.Debug,
@@ -356,6 +365,7 @@ namespace GameEngineTools.Logging
             string Action,
             double Score);
 
+        /// <summary>The current intent expired.</summary>
         [LoggerMessage(
             EventId = 1008,
             Level = LogLevel.Debug,
@@ -365,6 +375,7 @@ namespace GameEngineTools.Logging
             string HumanId,
             string IntentKind);
 
+        /// <summary>An emergency physiological need overrode the current intent.</summary>
         [LoggerMessage(
             EventId = 1009,
             Level = LogLevel.Debug,
@@ -376,6 +387,7 @@ namespace GameEngineTools.Logging
             string Action,
             double Score);
 
+        /// <summary>An intent bias was applied to a behaviour candidate.</summary>
         [LoggerMessage(
             EventId = 1010,
             Level = LogLevel.Debug,
@@ -386,6 +398,7 @@ namespace GameEngineTools.Logging
             string Action,
             double Bias);
 
+        /// <summary>A habit trace was reinforced (learned) for an action.</summary>
         [LoggerMessage(
             EventId = 1011,
             Level = LogLevel.Debug,
@@ -407,6 +420,7 @@ namespace GameEngineTools.Logging
             string Tendency,
             int RepetitionCount);
 
+        /// <summary>Habit traces decayed over elapsed time.</summary>
         [LoggerMessage(
             EventId = 1012,
             Level = LogLevel.Debug,
@@ -420,6 +434,7 @@ namespace GameEngineTools.Logging
             int AfterCount,
             int RemovedCount);
 
+        /// <summary>Excess habit traces were pruned to the configured maximum.</summary>
         [LoggerMessage(
             EventId = 1013,
             Level = LogLevel.Debug,
@@ -431,6 +446,7 @@ namespace GameEngineTools.Logging
             int AfterCount,
             int MaxTraces);
 
+        /// <summary>A learned-habit bias was applied to a candidate's utility.</summary>
         [LoggerMessage(
             EventId = 1014,
             Level = LogLevel.Debug,
@@ -593,6 +609,7 @@ namespace GameEngineTools.Logging
             double Penalty,
             int DeclineCount);
 
+        /// <summary>Critical exhaustion bypassed the sleep cooldown.</summary>
         [LoggerMessage(
             EventId = 1112,
             Level = LogLevel.Warning,
@@ -649,6 +666,7 @@ namespace GameEngineTools.Logging
             double P,
             string Result);
 
+        /// <summary>A sexual encounter was proposed — logs intent, reproductive potential and contraception.</summary>
         [LoggerMessage(EventId = 1203, Level = LogLevel.Information, Message = "[BEHAV/INTERACT] {HumanId} {From} -> {To}: {Intent}, {ReprPotential}, {Contraception}")]
         public static partial void SexualEncounterProposed(
             this ILogger logger,
@@ -917,6 +935,7 @@ namespace GameEngineTools.Logging
             double Prestige,
             bool Contempt);
 
+        /// <summary>Relationship decay was applied across the character's edges.</summary>
         [LoggerMessage(
             EventId = 2006,
             Level = LogLevel.Debug,
@@ -983,6 +1002,7 @@ namespace GameEngineTools.Logging
             this ILogger logger, string HumanId, string IntimateActor, string IntimateTarget,
             double OldResidue, double NewResidue);
 
+        /// <summary>A touch interaction outcome was decided — logs level, acceptance probability and result.</summary>
         [LoggerMessage(
             EventId = 1202,
             Level = LogLevel.Information,
@@ -1202,9 +1222,11 @@ namespace GameEngineTools.Logging
 
         #endregion Scheduler a infrastruktura
 
+        /// <summary>A MoveTo request found no location for the needed category via memory or provider.</summary>
         [LoggerMessage(EventId = 10001, Level = LogLevel.Debug, Message = "[MoveTo] {CharId} needs {Category} but found no location via memory or provider.")]
         public static partial void SceneMoveToFailed(this ILogger logger, string CharId, string Category);
 
+        /// <summary>A MoveTo of the given type was requested but no suitable location exists.</summary>
         [LoggerMessage(EventId = 10002, Level = LogLevel.Debug, Message = "[MoveTo] {CharId} requested {Type} but no suitable location exists. Current location: {CurrentLocation}.")]
         public static partial void SceneMoveToRequested(this ILogger logger, string CharId, string Type, string CurrentLocation);
 

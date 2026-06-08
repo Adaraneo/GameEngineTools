@@ -13,14 +13,17 @@ namespace GameEngineTools.Characters.Hosting
     {
         private readonly ConcurrentDictionary<HumanId, CognitiveResolutionLevel> _levels = new();
 
+        /// <inheritdoc/>
         public CognitiveResolutionLevel Get(HumanId id)
             => _levels.TryGetValue(id, out var level)
                 ? level
                 : CognitiveResolutionLevel.Nearby;
 
+        /// <inheritdoc/>
         public void Set(HumanId id, CognitiveResolutionLevel level)
             => _levels[id] = level;
 
+        /// <inheritdoc/>
         public void Clear(HumanId id)
             => _levels.TryRemove(id, out _);
     }

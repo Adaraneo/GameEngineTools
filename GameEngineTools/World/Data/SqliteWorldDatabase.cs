@@ -130,7 +130,7 @@ namespace GameEngineTools.World.Data
 
         /// <summary>
         /// Returns all objects across all locations, including held and consumed.
-        /// Used by foraging queries (<see cref="ContingencySearchEngine"/>) and diagnostics.
+        /// Used by foraging queries (<see cref="GameEngineTools.Characters.Engines.Behavior.Needs.ContingencySearchEngine"/>) and diagnostics.
         /// </summary>
         public IReadOnlyList<WorldObject> GetAllObjects()
         {

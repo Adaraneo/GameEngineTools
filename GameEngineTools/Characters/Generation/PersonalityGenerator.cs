@@ -16,6 +16,11 @@ namespace GameEngineTools.Characters.Generation;
 /// </summary>
 public interface IPersonalityGenerator
 {
+    /// <summary>Generates a <see cref="Personality"/>, optionally seeded and constrained.</summary>
+    /// <param name="seed">Optional RNG seed for deterministic generation.</param>
+    /// <param name="hints">Optional hard constraints on specific traits.</param>
+    /// <param name="spec">Optional generator spec (distributions, correlations, mappings).</param>
+    /// <returns>The generated personality.</returns>
     Personality Generate(int? seed = null, PersonalityHints? hints = null, PersonalitySpec? spec = null);
 }
 
@@ -75,6 +80,11 @@ public sealed record PersonalityHints(
     };
 }
 
+/// <summary>Distribution parameters for a single Big Five trait, all in [0..1] space.</summary>
+/// <param name="Mean">Target mean.</param>
+/// <param name="Dev">Target standard deviation.</param>
+/// <param name="Skew">Asymmetry of the distribution.</param>
+/// <param name="Concentration">Concentration factor (higher = tighter around the mean).</param>
 public sealed record TraitDistribution(
     double Mean,
     double Dev,
@@ -82,8 +92,11 @@ public sealed record TraitDistribution(
     double Concentration = 1.0
 )
 {
+    /// <summary><see cref="Mean"/> clamped to the open interval (0, 1).</summary>
     public double ClampedMean => Math.Clamp(Mean, 1e-6, 1.0 - 1e-6);
+    /// <summary><see cref="Dev"/> clamped to a small positive minimum.</summary>
     public double ClampedDev => Math.Max(Dev, 1e-6);
+    /// <summary><see cref="Concentration"/> clamped to a small positive minimum.</summary>
     public double ClampedConcentration => Math.Max(Concentration, 1e-6);
 }
 
@@ -112,6 +125,7 @@ public sealed record PersonalitySpec(
     MotivationMapping MotivationMap
 )
 {
+    /// <summary>Culturally-agnostic default spec with weak inter-trait correlations.</summary>
     public static PersonalitySpec Default
     {
         get
@@ -294,6 +308,7 @@ public sealed record MotivationMapping(
     double BiasSex, (double wO, double wC, double wE, double wA, double wN) WSex
 )
 {
+    /// <summary>Default Big Five → motivation mapping.</summary>
     public static MotivationMapping Default => new(
         BiasAff: 0.50, WAff: (wO: +0.10, wC: -0.05, wE: +0.25, wA: +0.20, wN: -0.05), // extraverze/agreeab.
         BiasAch: 0.50, WAch: (wO: 0.00, wC: +0.30, wE: +0.05, wA: +0.05, wN: -0.10), // conscientiousness
@@ -307,12 +322,19 @@ public sealed record MotivationMapping(
     );
 }
 
+/// <summary>
+/// Default <see cref="IPersonalityGenerator"/>: generates correlated Big Five traits via a
+/// Cholesky-decomposed correlation matrix, then derives the remaining personality components.
+/// </summary>
 public sealed class PersonalityGenerator : IPersonalityGenerator
 {
     private readonly IRandomSourceFactory _rngFactory;
 
+    /// <summary>Creates a generator using the given random-source factory.</summary>
+    /// <param name="rngFactory">Factory for deterministic random sources.</param>
     public PersonalityGenerator(IRandomSourceFactory rngFactory) => _rngFactory = rngFactory;
 
+    /// <inheritdoc/>
     public Personality Generate(int? seed = null, PersonalityHints? hints = null, PersonalitySpec? spec = null)
     {
         spec ??= PersonalitySpec.Default;

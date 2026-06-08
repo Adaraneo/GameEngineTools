@@ -204,7 +204,7 @@ namespace GameEngineTools.Characters.Generation
         /// </summary>
         /// <remarks>
         /// Call after <see cref="WireNewborn"/> once the grandparents are identified
-        /// via <see cref="FamilyGraph.GetKin"/> with <see cref="KinRole.Parent"/>.
+        /// via <see cref="FamilyGraph.GetKin(GameEngineTools.Characters.Core.HumanId, GameEngineTools.Characters.Engines.Relationships.KinRole)"/> with <see cref="KinRole.Parent"/>.
         /// </remarks>
         /// <param name="graph">Scene-level family registry to update.</param>
         /// <param name="grandparent">The grandparent character.</param>

@@ -121,7 +121,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// <remarks>
         /// Výsledný formát: <c>Relation:FirstImpression:{Positive|Neutral|Negative}|of={id}</c>
         /// </remarks>
-        /// <param name="like">Hodnota Like z <see cref="FirstImpressionFormed"/> (0–100).</param>
+        /// <param name="like">Hodnota Like z <see cref="GameEngineTools.Characters.Engines.Relationships.FirstImpressionFormed"/> (0–100).</param>
         /// <param name="of">ID postavy, na kterou dojem vznikl.</param>
         public static string FirstImpression(double like, Guid of)
         {

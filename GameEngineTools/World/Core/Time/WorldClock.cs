@@ -12,7 +12,7 @@ namespace GameEngineTools.World.Core.Time
     /// <remarks>
     /// <para>
     /// <b>Registruj jako <c>IWorldClock</c> singleton přes DI.</b>
-    /// <c>WorldTimeSpec</c> dostane ze stejného DI kontejneru jako <see cref="WorldTimeContext"/>
+    /// <c>WorldTimeSpec</c> dostane ze stejného DI kontejneru jako <c>WorldTimeContext</c>
     /// — obě sdílí jednu instanci.
     /// </para>
     /// <para>
@@ -58,9 +58,9 @@ namespace GameEngineTools.World.Core.Time
         #region Soukromá pole
 
         /// <summary>
-        /// Interní reference na spec — používá se pouze pro <see cref="TicksPerSecond"/>.
+        /// Interní reference na spec — používá se pouze pro <c>TicksPerSecond</c>.
         /// Není vystavena veřejně: spec je DI singleton dostupný přímo přes
-        /// <see cref="WorldTimeContext.Spec"/>.
+        /// <c>WorldTimeContext.Spec</c>.
         /// </summary>
         private readonly WorldTimeSpec _spec;
 
@@ -73,7 +73,7 @@ namespace GameEngineTools.World.Core.Time
         /// </summary>
         /// <param name="spec">
         /// Specifikace světového času. Musí být stejná instance jako ta registrovaná
-        /// do DI a použitá v <see cref="WorldTimeContext"/>.
+        /// do DI a použitá v <c>WorldTimeContext</c>.
         /// </param>
         /// <param name="earthEpochUnixTicks">
         /// Reálný čas kotvy ve 100 ns UNIX tickách (počítáno od 1970-01-01Z).

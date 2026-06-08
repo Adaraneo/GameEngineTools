@@ -11,6 +11,7 @@ namespace GameEngineTools.Characters.Hosting
         TimeSpan? NearbyBehaviorDecisionStep = null,
         TimeSpan? BackgroundBehaviorDecisionStep = null)
     {
+        /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public CognitiveResolutionLevelConfig() : this(null, null, null) { }
     }
 }

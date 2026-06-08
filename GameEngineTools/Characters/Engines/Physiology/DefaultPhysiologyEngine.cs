@@ -22,9 +22,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// discovery, and birth.
     /// </summary>
     /// <remarks>
-    /// Continuous drift is applied in <see cref=”Tick”/> proportional to elapsed game hours.
-    /// Discrete one-time effects (sleep recovery, sexual encounters) are applied in <see cref=”Handle”/>.
-    /// All state mutations produce a new <see cref=”PhysiologyState”/> record; the engine is
+    /// Continuous drift is applied in <see cref="Tick"/> proportional to elapsed game hours.
+    /// Discrete one-time effects (sleep recovery, sexual encounters) are applied in <see cref="Handle"/>.
+    /// All state mutations produce a new <see cref="PhysiologyState"/> record; the engine is
     /// functionally pure once the random source is fixed.
     /// </remarks>
     internal sealed class DefaultPhysiologyEngine : IPhysiologyEngine

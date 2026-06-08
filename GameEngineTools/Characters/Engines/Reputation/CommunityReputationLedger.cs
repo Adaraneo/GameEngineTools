@@ -22,6 +22,8 @@ namespace GameEngineTools.Characters.Engines.Reputation
         private readonly Dictionary<(HumanId Subject, string Location), CommunityReputation> _map = new();
         private readonly double _halfLife;
 
+        /// <summary>Creates a ledger with the given reputation decay half-life.</summary>
+        /// <param name="halfLifeInteractions">Number of interactions over which reputation weight halves.</param>
         public CommunityReputationLedger(double halfLifeInteractions = ReputationMath.DefaultHalfLifeInteractions)
             => _halfLife = halfLifeInteractions;
 

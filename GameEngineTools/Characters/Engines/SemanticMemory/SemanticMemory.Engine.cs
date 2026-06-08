@@ -8,7 +8,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
     /// <summary>
     /// Engine spravující sémantická přesvědčení postavy o ostatních lidech.
-    /// Odvozuje beliefs z epizodické paměti a aktualizuje je při každém <see cref="MemoryEncoded"/> eventu.
+    /// Odvozuje beliefs z epizodické paměti a aktualizuje je při každém <see cref="GameEngineTools.Characters.Engines.Memory.MemoryEncoded"/> eventu.
     /// </summary>
     public interface ISemanticMemoryEngine : IEngine<SemanticMemoryState, SemanticMemoryConfig>
     {

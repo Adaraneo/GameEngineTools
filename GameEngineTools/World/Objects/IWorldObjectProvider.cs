@@ -28,7 +28,7 @@ namespace GameEngineTools.World.Objects
         /// Returns all world objects currently present at the specified location.
         /// </summary>
         /// <param name="locationId">
-        /// The location identifier matching <see cref="LocationDescriptor.Id"/>.
+        /// The location identifier matching <see cref="GameEngineTools.World.Location.LocationDescriptor.Id"/>.
         /// </param>
         /// <returns>
         /// Enumerable of <see cref="WorldObject"/> instances at the location.

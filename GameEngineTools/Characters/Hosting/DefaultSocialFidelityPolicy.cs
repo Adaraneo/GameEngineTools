@@ -14,6 +14,9 @@ namespace GameEngineTools.Characters.Hosting
         private readonly CharacterFidelityConfig _cfg;
         private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
 
+        /// <summary>Creates the policy from fidelity config and the runtime LOD registry.</summary>
+        /// <param name="cfg">Per-tier fidelity configuration.</param>
+        /// <param name="lodRuntime">Runtime LOD registry.</param>
         public DefaultSocialFidelityPolicy(
             IOptions<CharacterFidelityConfig> cfg,
             ICognitiveResolutionLevelRuntime lodRuntime)
@@ -22,6 +25,7 @@ namespace GameEngineTools.Characters.Hosting
             _lodRuntime = lodRuntime;
         }
 
+        /// <inheritdoc/>
         public SocialFidelityLevel GetLevel(HumanId human)
             => _lodRuntime.Get(human) switch
             {

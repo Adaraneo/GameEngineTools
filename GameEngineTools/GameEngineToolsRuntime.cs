@@ -115,10 +115,6 @@ namespace GameEngineTools
         /// Sestaví DI kontejner, nakonfiguruje <see cref="WWorld"/> a inicializuje
         /// herní engine. Vrátí handle pro přístup ke službám za běhu.
         /// </summary>
-        /// <param name="startTime">
-        /// Volitelný počáteční čas světa. Pokud <c>null</c>, použije se
-        /// výchozí začátek roku 1.
-        /// </param>
         /// <param name="consoleLogs">Zapne konzolové logování v manageru.</param>
         /// <param name="logsRoot">Kořenový adresář pro logové soubory.</param>
         /// <param name="generatedFileOptions">Volitelná konfigurace adresářů pro generované soubory.</param>

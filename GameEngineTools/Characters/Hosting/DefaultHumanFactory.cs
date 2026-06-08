@@ -47,13 +47,13 @@ namespace GameEngineTools.Characters.Hosting
 
     /// <summary>
     /// Immutable description of a character used as input to <see cref="IHumanFactory"/>.
-    /// Generated once per character and persisted alongside <see cref="CharacterData"/>.
+    /// Generated once per character and persisted alongside <see cref="GameEngineTools.Characters.Persistence.CharacterData"/>.
     /// </summary>
     /// <param name="Id">Unique character identifier.</param>
     /// <param name="Identity">Name and birth date.</param>
     /// <param name="Biology">Biological sex.</param>
     /// <param name="Personality">Big Five + motivation weights.</param>
-    /// <param name="GeneticBlueprint">Immutable genetic traits — age effects are projected at runtime by <see cref="AppearanceProjector"/>.</param>
+    /// <param name="GeneticBlueprint">Immutable genetic traits — age effects are projected at runtime by <see cref="GameEngineTools.Characters.Traits.AppearanceProjector"/>.</param>
     /// <param name="AttractionProfile">
     /// Personal physical-preference profile used by <c>IAttractionCalculator</c>.
     /// Nullable for backwards compatibility with characters created before this field existed.
@@ -220,6 +220,10 @@ namespace GameEngineTools.Characters.Hosting
             return human;
         }
 
+        /// <summary>Creates a character from a blueprint and restores a persisted snapshot onto it.</summary>
+        /// <param name="blueprint">The character blueprint.</param>
+        /// <param name="snapshot">The persisted engine snapshot to restore.</param>
+        /// <returns>The restored character.</returns>
         public IHuman Load(HumanBlueprint blueprint, EnginesSnapshot snapshot)
         {
             var human = (OrchestratedHuman)Create(blueprint);

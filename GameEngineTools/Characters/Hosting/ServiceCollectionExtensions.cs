@@ -102,7 +102,7 @@ namespace GameEngineTools.Characters.Hosting
         /// <param name="services">DI kolekce.</param>
         /// <param name="humanBlueprintSpec">Specifikace blueprintu — váhy pohlaví, výchozí rozsah věku.</param>
         /// <remarks>
-        /// Pokud potřebuješ spec sestavit až po startu DI (např. z <see cref="WorldTimeContext"/>),
+        /// Pokud potřebuješ spec sestavit až po startu DI (např. z <c>WorldTimeContext</c>),
         /// použij overload <see cref="AddCharacterGeneration(IServiceCollection, Func{IServiceProvider, HumanBlueprintSpec})"/>.
         /// </remarks>
         public static IServiceCollection AddCharacterGeneration(
@@ -116,7 +116,7 @@ namespace GameEngineTools.Characters.Hosting
         /// <summary>
         /// Zaregistruje generátor postav s lazy factory pro <see cref="HumanBlueprintSpec"/>.
         /// Factory je vyhodnocena až při prvním resolve — v té době je DI kontejner plně sestaven,
-        /// takže může záviset na libovolném singletons (typicky <see cref="WorldTimeContext"/>).
+        /// takže může záviset na libovolném singletons (typicky <c>WorldTimeContext</c>).
         /// </summary>
         /// <param name="services">DI kolekce.</param>
         /// <param name="specFactory">
@@ -331,6 +331,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
+        /// <summary>Registrace implementace SemanticMemory engine + jeho konfigurace přes Options.</summary>
         public static IServiceCollection AddSemanticMemoryEngine<TImpl>(
             this IServiceCollection services,
             Action<SemanticMemoryConfig>? configure = null)
@@ -396,7 +397,7 @@ namespace GameEngineTools.Characters.Hosting
 
         /// <summary>
         /// Registers the object interaction subsystem: policy and engine.
-        /// Requires <see cref=""/> and
+        /// Requires a world-object provider and
         /// <see cref="GameEngineTools.World.Location.ILocationService"/> to also be registered.
         /// </summary>
         public static IServiceCollection AddObjectInteractionEngine(this IServiceCollection services)

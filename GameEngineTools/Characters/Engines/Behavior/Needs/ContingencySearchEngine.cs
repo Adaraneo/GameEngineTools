@@ -15,7 +15,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     /// <remarks>
     /// <para>
     /// This engine is the behavioral bridge between object scarcity and locomotion.
-    /// When <see cref="ObjectAffordanceGatingEngine"/> removes an <c>Eat</c> or <c>Drink</c>
+    /// When <see cref="GameEngineTools.Characters.Engines.Behavior.Modifiers.ObjectAffordanceGatingEngine"/> removes an <c>Eat</c> or <c>Drink</c>
     /// candidate (because the object is absent), this engine ensures the character does
     /// not simply idle — it generates a <c>MoveTo:Food</c> or <c>MoveTo:Drink</c> candidate
     /// that routes the character toward a location where the required object exists.

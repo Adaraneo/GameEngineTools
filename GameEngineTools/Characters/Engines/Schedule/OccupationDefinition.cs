@@ -25,13 +25,21 @@ namespace GameEngineTools.Characters.Engines.Schedule
         /// </remarks>
         public const string None = "";
 
+        /// <summary>Craftsperson occupation.</summary>
         public const string Craftsperson = "craftsperson";
+        /// <summary>Merchant occupation.</summary>
         public const string Merchant = "merchant";
+        /// <summary>Scholar occupation.</summary>
         public const string Scholar = "scholar";
+        /// <summary>Farmer occupation.</summary>
         public const string Farmer = "farmer";
+        /// <summary>Guard occupation.</summary>
         public const string Guard = "guard";
+        /// <summary>Healer occupation.</summary>
         public const string Healer = "healer";
+        /// <summary>Artist occupation.</summary>
         public const string Artist = "artist";
+        /// <summary>Laborer occupation.</summary>
         public const string Laborer = "laborer";
 
         /// <summary>All built-in non-empty occupation IDs.</summary>

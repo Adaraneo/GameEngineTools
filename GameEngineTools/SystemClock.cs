@@ -19,7 +19,7 @@ namespace GameEngineTools
     /// tedy 1 reálná sekunda = 1 světová sekunda.
     /// </para>
     /// <para>
-    /// <b>Proč <see cref="WorldTimeSpec"/> místo <see cref="WorldTimeContext"/>?</b><br/>
+    /// <b>Proč <see cref="WorldTimeSpec"/> místo <c>WorldTimeContext</c>?</b><br/>
     /// <c>WorldTimeContext</c> závisí na <c>IClock</c>, <c>IClock</c> by zpětně závisel
     /// na <c>WorldTimeContext</c> — kruhová závislost. <c>WorldTimeSpec</c> je čistý
     /// datový objekt bez závislostí, takže kruh nevzniká.
@@ -49,7 +49,7 @@ namespace GameEngineTools
         /// </param>
         /// <param name="spec">
         /// Specifikace světového času — potřebná pro výpočet posunu v <c>Timer_Elapsed</c>.
-        /// Nepoužíváme <see cref="WorldTimeContext"/> kvůli předejití kruhové závislosti.
+        /// Nepoužíváme <c>WorldTimeContext</c> kvůli předejití kruhové závislosti.
         /// </param>
         public SystemClock(IWorldClock worldClock, WorldTimeSpec spec)
         {

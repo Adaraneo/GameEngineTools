@@ -15,6 +15,9 @@ namespace GameEngineTools.Characters.Hosting
         private readonly CognitiveResolutionLevelConfig _cfg;
         private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
 
+        /// <summary>Creates the policy from cadence config and the runtime LOD registry.</summary>
+        /// <param name="cfg">Per-tier decision-cadence configuration.</param>
+        /// <param name="lodRuntime">Runtime LOD registry.</param>
         public DefaultBehaviorCadencePolicy(
             IOptions<CognitiveResolutionLevelConfig> cfg,
             ICognitiveResolutionLevelRuntime lodRuntime)
@@ -23,6 +26,7 @@ namespace GameEngineTools.Characters.Hosting
             _lodRuntime = lodRuntime;
         }
 
+        /// <inheritdoc/>
         public WTimeSpan? GetDecisionStep(IHuman human)
         {
             var ts = _lodRuntime.Get(human.Id) switch

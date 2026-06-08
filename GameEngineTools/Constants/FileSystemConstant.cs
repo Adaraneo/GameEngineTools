@@ -86,26 +86,26 @@ namespace GameEngineTools.Constants
 
             /// <summary>
             /// Path to Locations.csv.
-            /// Loaded once at startup; defines all <see cref="LocationDescriptor"/> records.
+            /// Loaded once at startup; defines all <see cref="GameEngineTools.World.Location.LocationDescriptor"/> records.
             /// </summary>
             public const string Locations = SourceDirectory.World + SourceFilename.Locations + Extension.SourceCsv;
 
             /// <summary>
             /// Path to Connections.csv.
-            /// Loaded once at startup; defines the adjacency graph used by <see cref="WorldMap"/>.
+            /// Loaded once at startup; defines the adjacency graph used by <see cref="GameEngineTools.World.Objects.WorldMap"/>.
             /// </summary>
             public const string Connections = SourceDirectory.World + SourceFilename.Connections + Extension.SourceCsv;
 
             /// <summary>
             /// Default path to the world SQLite database.
-            /// Created automatically on first run via <see cref="Data.WorldDatabaseSeeder"/>.
+            /// Created automatically on first run via <see cref="GameEngineTools.World.Data.WorldDatabaseSeeder"/>.
             /// </summary>
             public const string WorldDatabase = SourceDirectory.World + "world.db";
 
             /// <summary>
             /// Directory for optional SQL script overrides.
             /// Files here take precedence over the embedded SQL resources in the assembly.
-            /// When absent, <see cref="SqlScriptLoader"/> falls back to embedded resources.
+            /// When absent, <see cref="GameEngineTools.World.Data.SqlScriptLoader"/> falls back to embedded resources.
             /// </summary>
             public const string WorldSqlDirectory = SourceDirectory.WorldSql;
         }
@@ -142,8 +142,11 @@ namespace GameEngineTools.Constants
     /// <summary>For test purposes only!</summary>
     public static class FileSystemConstantsForTest
     {
+        /// <summary>Generated NPCs directory.</summary>
         public const string Npc = FileSystemConstant.GeneratedDirectory.Npcs;
+        /// <summary>Generated player directory.</summary>
         public const string Pc = FileSystemConstant.GeneratedDirectory.Player;
+        /// <summary>Generated files root directory.</summary>
         public const string Root = FileSystemConstant.GeneratedDirectory.Root;
     }
 
@@ -152,8 +155,11 @@ namespace GameEngineTools.Constants
     /// </summary>
     public static class TestFSConstatns
     {
+        /// <summary>Root generated-files directory on the desktop.</summary>
         public static string gfiles = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\gfiles\";
+        /// <summary>Generated NPCs directory.</summary>
         public static string NPCs = gfiles + @"NPCs\";
+        /// <summary>Generated player directory.</summary>
         public static string player = gfiles + @"Player\";
     }
 }

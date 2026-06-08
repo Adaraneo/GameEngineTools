@@ -34,10 +34,6 @@ namespace GameEngineTools.FileSystem
         /// Inicializuje instanci se všemi závislostmi.
         /// </summary>
         /// <param name="clock">Herní hodiny (pro budoucí timestampy v exportech).</param>
-        /// <param name="ctx">
-        /// Kontext světového času — potřebný pro JSON convertery <see cref="WDateTime"/>
-        /// a <see cref="WTimeSpan"/>. Nahrazuje odstraněný globální <c>WDateTime.Spec</c>.
-        /// </param>
         /// <param name="characterManager">Správce postav (pro hromadný export/import).</param>
         /// <param name="humanFactory">Factory pro rekonstrukci postav při importu.</param>
         /// <param name="options">Volitelná konfigurace adresářů pro export souborů.</param>

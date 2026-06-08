@@ -3,6 +3,17 @@
 
 namespace GameEngineTools.Characters.Traits
 {
+    /// <summary>
+    /// A character's stable personality trait bundle: Big Five, attachment, communication
+    /// style, motivation weights, sociosexuality, chronotype, and the dual-control sexual profile.
+    /// Pervasive across all engines.
+    /// </summary>
+    /// <param name="BigFive">Big Five (OCEAN) trait scores.</param>
+    /// <param name="Attachment">Two-dimensional attachment profile (anxiety, avoidance).</param>
+    /// <param name="Communication">Communication style.</param>
+    /// <param name="Motivation">Motivation weightings across drives.</param>
+    /// <param name="Sociosexuality">SOI-R sociosexual orientation.</param>
+    /// <param name="Chronotype">Circadian chronotype (lark/neutral/owl).</param>
     public sealed record Personality(
         BigFive BigFive,
         AttachmentProfile Attachment,
@@ -23,12 +34,38 @@ namespace GameEngineTools.Characters.Traits
         /// </summary>
         int ToMCeiling = 4);
 
+    /// <summary>Big Five (OCEAN) personality dimensions, each in [0–1].</summary>
+    /// <param name="Openness">Openness to experience.</param>
+    /// <param name="Conscientiousness">Conscientiousness.</param>
+    /// <param name="Extraversion">Extraversion.</param>
+    /// <param name="Agreeableness">Agreeableness.</param>
+    /// <param name="Neuroticism">Neuroticism.</param>
     public sealed record BigFive(
         double Openness, double Conscientiousness, double Extraversion, double Agreeableness, double Neuroticism);
 
+    /// <summary>Preferred communication style.</summary>
     public enum CommunicationStyle
-    { Direct, Indirect, HighContext, LowContext }
+    {
+        /// <summary>Direct, explicit communication.</summary>
+        Direct,
+        /// <summary>Indirect, implicit communication.</summary>
+        Indirect,
+        /// <summary>High-context (meaning carried by context).</summary>
+        HighContext,
+        /// <summary>Low-context (meaning carried by explicit words).</summary>
+        LowContext
+    }
 
+    /// <summary>Relative weighting of a character's motivational drives.</summary>
+    /// <param name="Affiliation">Drive for social connection.</param>
+    /// <param name="Achievement">Drive for accomplishment.</param>
+    /// <param name="Power">Drive for influence/control.</param>
+    /// <param name="Altruism">Drive to help others.</param>
+    /// <param name="Competence">Drive for mastery.</param>
+    /// <param name="Autonomy">Drive for independence.</param>
+    /// <param name="Curiosity">Drive to explore.</param>
+    /// <param name="Rest">Drive for rest/recovery.</param>
+    /// <param name="Sexuality">Sexual drive weighting.</param>
     public sealed record MotivationWeights(double Affiliation, double Achievement, double Power, double Altruism, double Competence, double Autonomy, double Curiosity, double Rest, double Sexuality);
 
     /// <summary>
@@ -67,6 +104,14 @@ namespace GameEngineTools.Characters.Traits
         public static readonly Sociosexuality Unrestricted = new(0.90, 0.90, 0.90);
     }
 
+    /// <summary>Circadian chronotype.</summary>
     public enum Chronotype
-    { Lark, Neutral, Owl }
+    {
+        /// <summary>Morning type (lark).</summary>
+        Lark,
+        /// <summary>Neither strongly morning nor evening.</summary>
+        Neutral,
+        /// <summary>Evening type (owl).</summary>
+        Owl
+    }
 }

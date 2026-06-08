@@ -16,35 +16,65 @@ namespace GameEngineTools.Characters.Engines.Goals
     public enum PersistentGoalKind
     {
         // Existential
+
+        /// <summary>Existential — search for meaning/purpose.</summary>
         FindMeaning,
 
+        /// <summary>Existential — overcome past trauma.</summary>
         OvercomeTrauma,
+        /// <summary>Existential — build a coherent identity.</summary>
         BuildIdentity,
 
         // Survival / Safety
+
+        /// <summary>Survival — protect family members.</summary>
         ProtectFamily,
 
+        /// <summary>Survival — escape immediate danger.</summary>
         EscapeDanger,
 
         // Career / Mastery
+
+        /// <summary>Career — master a craft or skill.</summary>
         MasterCraft,
 
+        /// <summary>Career — build social reputation.</summary>
         BuildReputation,
 
         // Relational
+
+        /// <summary>Relational — find a romantic partner.</summary>
         FindPartner,
 
+        /// <summary>Relational — repair a damaged relationship.</summary>
         RepairRelationship,
+        /// <summary>Relational — seek revenge for a transgression.</summary>
         SeekRevenge
     }
 
     /// <summary>How the goal was created.</summary>
     public enum GoalOrigin
-    { Personality, Event, Scripted }
+    {
+        /// <summary>Seeded from the character's personality.</summary>
+        Personality,
+        /// <summary>Triggered by a domain event.</summary>
+        Event,
+        /// <summary>Injected by a script or external system.</summary>
+        Scripted
+    }
 
     /// <summary>Why the goal was removed from the active list.</summary>
     public enum GoalResolution
-    { Completed, Abandoned, Faded, Displaced }
+    {
+        /// <summary>Goal reached completion.</summary>
+        Completed,
+        /// <summary>Goal was abandoned (e.g. high frustration).</summary>
+        Abandoned,
+        /// <summary>Goal faded as salience decayed to zero.</summary>
+        Faded,
+        /// <summary>Goal was displaced by a higher-priority goal.</summary>
+        Displaced
+    }
 
     #endregion Enums
 

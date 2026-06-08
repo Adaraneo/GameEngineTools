@@ -30,7 +30,7 @@ namespace GameEngineTools.Characters.Engines.Attraction
     /// <b>First impression like:</b>
     /// Derived from the halo effect — physical attraction biases initial liking.
     /// The observer's current emotional valence modulates the baseline.
-    /// Only meaningful when <paramref name="positiveInteractionCount"/> is 0.
+    /// Only meaningful when <c>positiveInteractionCount</c> is 0.
     /// </para>
     /// </remarks>
     public interface IAttractionCalculator

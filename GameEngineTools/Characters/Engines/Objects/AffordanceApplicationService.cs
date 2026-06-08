@@ -18,6 +18,14 @@ namespace GameEngineTools.Characters.Engines.Objects
     /// </remarks>
     public static class AffordanceApplicationService
     {
+        /// <summary>
+        /// Applies a used object's affordances by emitting <c>ObjectAffordanceApplied</c> events
+        /// for Physiology/Psychology to consume.
+        /// </summary>
+        /// <param name="obj">The object being used.</param>
+        /// <param name="ctx">Character context.</param>
+        /// <param name="outbox">Collector for emitted affordance events.</param>
+        /// <param name="now">Current game time.</param>
         public static void Apply(
             WorldObject obj,
             IHumanContext ctx,

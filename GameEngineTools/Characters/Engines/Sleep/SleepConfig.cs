@@ -10,7 +10,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
     /// </summary>
     /// <remarks>
     /// Herní den má 26 hodin — parametry jsou kalibrované pro tento rytmus.
-    /// Základní délka spánku (<see cref="BaseSleepHours"/>) odpovídá cca 30 % herního dne.
+    /// Základní délka spánku (<c>BaseSleepHours</c>) odpovídá cca 30 % herního dne.
     /// </remarks>
     public sealed record SleepConfig(
 

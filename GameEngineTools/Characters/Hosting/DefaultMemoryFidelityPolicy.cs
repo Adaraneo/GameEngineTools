@@ -26,6 +26,9 @@ namespace GameEngineTools.Characters.Hosting
 
         #region Constructor
 
+        /// <summary>Creates the policy from fidelity config and the runtime LOD registry.</summary>
+        /// <param name="cfg">Per-tier fidelity configuration.</param>
+        /// <param name="lodRuntime">Runtime LOD registry.</param>
         public DefaultMemoryFidelityPolicy(
             IOptions<CharacterFidelityConfig> cfg,
             ICognitiveResolutionLevelRuntime lodRuntime)
@@ -38,6 +41,7 @@ namespace GameEngineTools.Characters.Hosting
 
         #region IMemoryFidelityPolicy
 
+        /// <inheritdoc/>
         public MemoryFidelityLevel GetLevel(HumanId human)
             => _lodRuntime.Get(human) switch
             {
@@ -47,6 +51,7 @@ namespace GameEngineTools.Characters.Hosting
                 _ => MemoryFidelityLevel.Full
             };
 
+        /// <inheritdoc/>
         public bool ShouldStoreEvent(IHumanContext ctx, IDomainEvent @event)
             => GetLevel(ctx.Id) switch
             {

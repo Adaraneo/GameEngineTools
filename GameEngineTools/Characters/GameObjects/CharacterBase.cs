@@ -35,6 +35,7 @@ namespace GameEngineTools.Characters.GameObjects
             this.Person = person;
         }
 
+        /// <summary>Equipped armour set; setting it updates <see cref="Protection"/>.</summary>
         [JsonIgnore]
         public ArmorSet? Armor
         {
@@ -49,6 +50,7 @@ namespace GameEngineTools.Characters.GameObjects
             }
         }
 
+        /// <summary>Current health points.</summary>
         [JsonInclude]
         public double Health
         {
@@ -62,10 +64,13 @@ namespace GameEngineTools.Characters.GameObjects
             }
         }
 
+        /// <summary>Maximum health points.</summary>
         public double MaxHealth { get; init; }
 
+        /// <summary>The underlying simulated character.</summary>
         public IHuman Person { get; init; }
 
+        /// <summary>Total protection from the equipped armour.</summary>
         [JsonIgnore]
         public double Protection
         {
@@ -75,11 +80,14 @@ namespace GameEngineTools.Characters.GameObjects
             }
         }
 
+        /// <summary>Equipped weapon, if any.</summary>
         public Weapon? Weapon { get; set; }
 
+        /// <summary>Character age in game years (from <see cref="Person"/>).</summary>
         [JsonIgnore]
         public int Age => Person.Age;
 
+        /// <summary>Character life stage (from <see cref="Person"/>).</summary>
         [JsonIgnore]
         public StadiumType Stadium => Person.Stadium;
 
@@ -111,6 +119,8 @@ namespace GameEngineTools.Characters.GameObjects
             }
         }
 
+        /// <summary>Two characters are equal when they wrap the same <see cref="Person"/>.</summary>
+        /// <param name="other">The character to compare against.</param>
         public bool Equals(CharacterBase other)
         {
             if (other == null)
@@ -121,6 +131,7 @@ namespace GameEngineTools.Characters.GameObjects
             return this.Person.Equals(other.Person);
         }
 
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is CharacterBase other && Equals(other);
 
         /// <summary>
@@ -140,6 +151,7 @@ namespace GameEngineTools.Characters.GameObjects
             this.health = Math.Min(this.health + amount, MaxHealth);
         }
 
+        /// <inheritdoc/>
         public override int GetHashCode() => Person?.GetHashCode() ?? 0;
 
         /// <summary>
@@ -149,6 +161,7 @@ namespace GameEngineTools.Characters.GameObjects
         /// </summary>
         public bool IsDead { get; private set; }
 
+        /// <inheritdoc/>
         public override string? ToString()
         {
             if (Person is null) return base.ToString();

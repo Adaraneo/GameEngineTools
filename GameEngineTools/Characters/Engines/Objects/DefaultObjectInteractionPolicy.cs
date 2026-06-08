@@ -15,6 +15,7 @@ namespace GameEngineTools.Characters.Engines.Objects
     /// </summary>
     public sealed class DefaultObjectInteractionPolicy : IObjectInteractionPolicy
     {
+        /// <inheritdoc/>
         public ObjectInteractionPermission Evaluate(
             IHumanContext actor,
             WorldObject target,

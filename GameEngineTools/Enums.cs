@@ -7,25 +7,71 @@ namespace GameEngineTools
 
     #region Relationship ortogonal enums
 
+    /// <summary>Civil (relationship) status of a character.</summary>
     public enum CivilStatus
     {
-        Single, InRelationship, Engaged, Married, Divorced, Widowed
+        /// <summary>Single.</summary>
+        Single,
+        /// <summary>In a relationship.</summary>
+        InRelationship,
+        /// <summary>Engaged.</summary>
+        Engaged,
+        /// <summary>Married.</summary>
+        Married,
+        /// <summary>Divorced.</summary>
+        Divorced,
+        /// <summary>Widowed.</summary>
+        Widowed
     }
 
     #endregion Relationship ortogonal enums
 
+    /// <summary>Life stage of a character.</summary>
     public enum StadiumType
-    { Baby, Child, Teenager, Adult, MidAged, Old };
+    {
+        /// <summary>Baby.</summary>
+        Baby,
+        /// <summary>Child.</summary>
+        Child,
+        /// <summary>Teenager.</summary>
+        Teenager,
+        /// <summary>Adult.</summary>
+        Adult,
+        /// <summary>Middle-aged.</summary>
+        MidAged,
+        /// <summary>Old.</summary>
+        Old
+    };
 
+    /// <summary>Vital status of a character.</summary>
     public enum StatusType
-    { Unborn, Alive, Dead };
+    {
+        /// <summary>Not yet born.</summary>
+        Unborn,
+        /// <summary>Alive.</summary>
+        Alive,
+        /// <summary>Dead.</summary>
+        Dead
+    };
 
     #endregion Homo
 
     #region Magic
 
+    /// <summary>Elemental magic type.</summary>
     public enum MagicType
-    { Water, Air, Fire, Earth, Unknown }
+    {
+        /// <summary>Water.</summary>
+        Water,
+        /// <summary>Air.</summary>
+        Air,
+        /// <summary>Fire.</summary>
+        Fire,
+        /// <summary>Earth.</summary>
+        Earth,
+        /// <summary>Unknown / none.</summary>
+        Unknown
+    }
 
     #endregion Magic
 }

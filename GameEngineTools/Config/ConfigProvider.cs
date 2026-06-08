@@ -6,6 +6,7 @@ namespace GameEngineTools.Config
     using System;
     using Microsoft.Extensions.Configuration;
 
+    /// <summary>Lazily-built shared <see cref="IConfiguration"/> from the appsettings JSON files.</summary>
     public static class ConfigProvider
     {
         private static readonly Lazy<IConfiguration> lazyConfig = new(() =>
@@ -18,6 +19,7 @@ namespace GameEngineTools.Config
             return builder.Build();
         });
 
+        /// <summary>The shared configuration, built on first access.</summary>
         public static IConfiguration Configuration => lazyConfig.Value;
     }
 }

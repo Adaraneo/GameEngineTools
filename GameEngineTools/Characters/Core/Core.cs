@@ -21,29 +21,46 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
 
+    /// <summary>
+    /// <see cref="JsonConverter{T}"/> for <see cref="HumanId"/> — serializes the wrapped
+    /// <see cref="Guid"/> as a string and supports use as a dictionary key.
+    /// </summary>
     public sealed class HumanIdJsonConverter : JsonConverter<HumanId>
     {
+        /// <inheritdoc/>
         public override HumanId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             => new HumanId(Guid.Parse(reader.GetString()!));
 
+        /// <inheritdoc/>
         public override void Write(Utf8JsonWriter writer, HumanId value, JsonSerializerOptions options)
             => writer.WriteStringValue(value.Value.ToString());
 
-        // Tyhle dvě metody umožní použití jako klíč slovníku
+        /// <inheritdoc/>
         public override HumanId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             => new HumanId(Guid.Parse(reader.GetString()!));
 
+        /// <inheritdoc/>
         public override void WriteAsPropertyName(Utf8JsonWriter writer, HumanId value, JsonSerializerOptions options)
             => writer.WritePropertyName(value.Value.ToString());
     }
 
+    /// <summary>
+    /// Read-only contract for a simulated character: stable identity and traits, the current
+    /// engines snapshot, and the orchestration entry points (<see cref="Tick"/>, <see cref="ReceiveEvent"/>).
+    /// </summary>
     public interface IHuman : IComparable<IHuman>
     {
+        /// <summary>Stable unique identifier.</summary>
         HumanId Id { get; }
+        /// <summary>Name and birth-date identity.</summary>
         Identity Identity { get; }
+        /// <summary>Biological sex.</summary>
         SexBiology Biology { get; }   // Female/Male/Intersex etc.
+        /// <summary>Big Five personality traits (slow-changing).</summary>
         Personality Personality { get; } // Trait modul (nemění se rychle)
+        /// <summary>Psychological trait profile (attachment, values, sexual responsiveness, …).</summary>
         PsychologicalProfile PsychologyProfile { get; }
+        /// <summary>Static physical appearance traits.</summary>
         PhysicalAppearance PhysicalAppearance { get; }
 
         /// <summary>
@@ -51,23 +68,35 @@ namespace GameEngineTools.Characters.Core
         /// </summary>
         GeneticBlueprint? GeneticBlueprint => null;
 
+        /// <summary>Attraction-relevant traits, or <c>null</c> when not modelled.</summary>
         AttractionProfile? AttractionProfile { get; }
 
         // Přístup ke stavům (read-only snapshoty)
+
+        /// <summary>Read-only snapshot of all engine states.</summary>
         EnginesSnapshot Snapshot { get; }
 
+        /// <summary>Domain events emitted during the most recent tick.</summary>
         IReadOnlyList<IDomainEvent> LastOutbox { get; }
 
+        /// <summary>Current age in game years.</summary>
         int Age { get; }
 
+        /// <summary>Current life stage.</summary>
         StadiumType Stadium { get; }
 
-        // Orchestrace jednoho kroku simulace
+        /// <summary>Advances the character one simulation step.</summary>
+        /// <param name="now">Current game time.</param>
+        /// <param name="dt">Elapsed time since the previous tick.</param>
         void Tick(WDateTime now, WTimeSpan dt);
 
-        // Příjem externích podnětů (environment, jiné postavy)
+        /// <summary>Queues an external stimulus (from the environment or other characters) for delivery.</summary>
+        /// <param name="event">The incoming domain event.</param>
         void ReceiveEvent(IDomainEvent @event);
 
+        /// <summary>Restores a previously persisted snapshot.</summary>
+        /// <param name="snapshot">The snapshot to restore.</param>
+        /// <param name="today">Current game date, used to revalidate age-dependent subsystems.</param>
         void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default);
 
         /// <summary>
@@ -79,11 +108,12 @@ namespace GameEngineTools.Characters.Core
 
         /// <summary>
         /// Injektuje ambientní stav prostředí před tickem postavy.
-        /// Volá <see cref="SimulationScene"/> jednou za tick, před <c>Tick()</c>.
+        /// Volá <see cref="GameEngineTools.World.Simulation.SimulationScene"/> jednou za tick, před <c>Tick()</c>.
         /// Výchozí implementace je no-op — pro testovací stuby.
         /// </summary>
         void SetAmbientContext(double ambientTempC, CelestialContext? celestial) { }
 
+        /// <summary>Returns <c>true</c> when <paramref name="other"/> has the same <see cref="Id"/>.</summary>
         bool EqualsByIdentity(IHuman? other) => other is not null && Id == other.Id;
 
         /// <summary>
@@ -99,10 +129,17 @@ namespace GameEngineTools.Characters.Core
         /// </summary>
         void ChangeOccupation(string? newOccupationId) { }
 
+        /// <summary>Adopts <paramref name="partner"/>'s surname (e.g. on marriage). Default no-op.</summary>
         void SetLastName(IHuman partner) { }
     }
 
+    /// <summary>Stable unique identifier for a character, wrapping a <see cref="Guid"/>.</summary>
     public readonly record struct HumanId(Guid Value);
+
+    /// <summary>A character's name and birth date plus optional home-location and ancestry hints.</summary>
+    /// <param name="FirstName">Given name.</param>
+    /// <param name="LastName">Surname.</param>
+    /// <param name="BirthDate">Date of birth.</param>
     public sealed record Identity(Name FirstName, Surname LastName, WDateOnly BirthDate)
     {
         /// <summary>
@@ -132,37 +169,85 @@ namespace GameEngineTools.Characters.Core
         public string? AncestryHint { get; init; }
     }
 
+    /// <summary>Biological sex.</summary>
     public enum SexBiology
-    { Female, Male, Intersex, Unknown }
+    {
+        /// <summary>Female.</summary>
+        Female,
+        /// <summary>Male.</summary>
+        Male,
+        /// <summary>Intersex.</summary>
+        Intersex,
+        /// <summary>Unknown / unspecified.</summary>
+        Unknown
+    }
 
+    /// <summary>Gender identity.</summary>
     public enum GenderIdentity
-    { Woman, Man, Nonbinary, Other, Unspecified }
+    {
+        /// <summary>Woman.</summary>
+        Woman,
+        /// <summary>Man.</summary>
+        Man,
+        /// <summary>Nonbinary.</summary>
+        Nonbinary,
+        /// <summary>Another identity.</summary>
+        Other,
+        /// <summary>Unspecified.</summary>
+        Unspecified
+    }
 
-    // Společný kontrakt pro všechny enginy
+    /// <summary>
+    /// Common contract for all character engines: exposes immutable <see cref="State"/> and
+    /// <see cref="Config"/> and the deterministic tick/handle/restore lifecycle.
+    /// </summary>
+    /// <typeparam name="TState">The engine's state record type.</typeparam>
+    /// <typeparam name="TConfig">The engine's configuration record type.</typeparam>
     public interface IEngine<TState, TConfig>
     {
+        /// <summary>Current engine state.</summary>
         TState State { get; }
+        /// <summary>Engine configuration.</summary>
         TConfig Config { get; }
 
-        // Deterministický průchod na základě vstupů a času
+        /// <summary>Deterministically advances state from the given inputs and elapsed time.</summary>
+        /// <param name="now">Current game time.</param>
+        /// <param name="dt">Elapsed time since the previous tick.</param>
+        /// <param name="ctx">Read-only character context and services.</param>
+        /// <param name="outbox">Collector for events emitted this tick.</param>
         void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox);
 
-        // Reakce na doménové události (z jiných enginů / prostředí)
+        /// <summary>Reacts to a domain event from another engine or the environment.</summary>
+        /// <param name="event">The event to handle.</param>
+        /// <param name="ctx">Read-only character context and services.</param>
+        /// <param name="outbox">Collector for events emitted in response.</param>
         void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox);
 
+        /// <summary>Restores the engine to a previously persisted state.</summary>
+        /// <param name="state">The state to restore.</param>
         void RestoreState(TState state);
     }
 
-    // Kontext postavy, který enginy potřebují: pouze read-only rozhraní + služby
+    /// <summary>
+    /// Immutable per-tick context handed to every engine: read-only identity/traits, the
+    /// engines snapshot, occupied action slots, and the four shared services.
+    /// </summary>
     public interface IHumanContext
     {
+        /// <summary>Character identifier.</summary>
         HumanId Id { get; }
+        /// <summary>Name and birth-date identity.</summary>
         Identity Identity { get; }
+        /// <summary>Biological sex.</summary>
         SexBiology Biology { get; }
+        /// <summary>Big Five personality traits.</summary>
         Personality Personality { get; }
+        /// <summary>Psychological trait profile.</summary>
         PsychologicalProfile PsychologyProfile { get; }
+        /// <summary>Attraction-relevant traits, or <c>null</c>.</summary>
         AttractionProfile? AttractionProfile { get; }
 
+        /// <summary>Read-only snapshot of all engine states.</summary>
         EnginesSnapshot Snapshot { get; }
 
         /// <summary>
@@ -171,58 +256,114 @@ namespace GameEngineTools.Characters.Core
         /// </summary>
         ActionSlotMask OccupiedSlots { get; }
 
+        /// <summary>Event bus for publishing/subscribing to domain events.</summary>
         IEventBus EventBus { get; }
+        /// <summary>Scheduler for deferred actions.</summary>
         IScheduler Scheduler { get; }
+        /// <summary>Deterministic per-character random source.</summary>
         IRandomSource Random { get; }
+        /// <summary>Logger.</summary>
         ILogger Logger { get; }
     }
 
-    // Lehké rozhraní pro sběr událostí v rámci kroku (publikace až po Tick)
+    /// <summary>
+    /// Lightweight per-tick event collector. Engines add events during a tick; the
+    /// orchestrator drains and publishes them afterwards.
+    /// </summary>
     public interface IEventCollector
     {
+        /// <summary>Adds an event to the collector.</summary>
+        /// <param name="event">The event to add.</param>
         void Add(IDomainEvent @event);
 
+        /// <summary>Removes and returns all collected events.</summary>
         IReadOnlyList<IDomainEvent> Drain(); // použije orchestrátor
     }
 
-    // Event bus / plánování
+    /// <summary>Base contract for all domain events — every event carries the time it occurred.</summary>
     public interface IDomainEvent
-    { WDateTime OccurredAt { get; } }
+    {
+        /// <summary>Game time at which the event occurred.</summary>
+        WDateTime OccurredAt { get; }
+    }
 
+    /// <summary>In-process publish/subscribe event bus.</summary>
     public interface IEventBus
     {
+        /// <summary>Publishes an event to all subscribers.</summary>
+        /// <param name="event">The event to publish.</param>
         void Publish(IDomainEvent @event);
 
+        /// <summary>Subscribes a handler to events of type <typeparamref name="TEvent"/>.</summary>
+        /// <typeparam name="TEvent">Event type to subscribe to.</typeparam>
+        /// <param name="handler">Handler invoked for each matching event.</param>
+        /// <returns>A disposable that cancels the subscription.</returns>
         IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent;
     }
 
+    /// <summary>Schedules actions to run at or after a given game time.</summary>
     public interface IScheduler
     {
+        /// <summary>Schedules an action at an absolute game time.</summary>
+        /// <param name="when">When to run the action.</param>
+        /// <param name="action">The action to run.</param>
+        /// <param name="tag">Optional tag for grouping/cancellation.</param>
+        /// <returns>An identifier that can be used to cancel the action.</returns>
         ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null);
 
+        /// <summary>Schedules an action after a delay relative to <paramref name="now"/>.</summary>
+        /// <param name="now">Reference time.</param>
+        /// <param name="delay">Delay before the action runs.</param>
+        /// <param name="action">The action to run.</param>
+        /// <param name="tag">Optional tag for grouping/cancellation.</param>
+        /// <returns>An identifier that can be used to cancel the action.</returns>
         ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null);
 
+        /// <summary>Cancels a scheduled action.</summary>
+        /// <param name="id">Identifier of the action to cancel.</param>
+        /// <returns><c>true</c> if an action was cancelled.</returns>
         bool Cancel(ScheduledId id);
 
-        // Pull model pro orchestrátor, aby spouštěl akce v Ticku
+        /// <summary>Returns the actions due at or before <paramref name="now"/> (pull model).</summary>
+        /// <param name="now">Current game time.</param>
         IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now);
     }
 
+    /// <summary>Identifier for a scheduled action.</summary>
     public readonly record struct ScheduledId(Guid Value);
 
+    /// <summary>Delegate run by the scheduler when a scheduled action fires.</summary>
+    /// <param name="ctx">Character context and services.</param>
+    /// <param name="outbox">Collector for events emitted by the action.</param>
     public delegate void ScheduledAction(IHumanContext ctx, IEventCollector outbox);
 
-    // Deterministické RNG (per-postava seed)
+    /// <summary>Deterministic random source seeded per character.</summary>
     public interface IRandomSource
     {
+        /// <summary>Returns a random integer in [<paramref name="minInclusive"/>, <paramref name="maxExclusive"/>).</summary>
+        /// <param name="minInclusive">Inclusive lower bound.</param>
+        /// <param name="maxExclusive">Exclusive upper bound.</param>
         int Next(int minInclusive, int maxExclusive);
 
+        /// <summary>Returns a random double in [0, 1).</summary>
         double NextUnit(); // <0,1)
 
+        /// <summary>Returns <c>true</c> with probability <paramref name="p"/>.</summary>
+        /// <param name="p">Probability in [0, 1].</param>
         bool Chance(double p);
     }
 
-    // Sjednocený snapshot stavů (pro dotazy)
+    /// <summary>
+    /// Unified read-only snapshot of every engine's state plus ambient environment context.
+    /// Used for Phase-A event delivery and persistence.
+    /// </summary>
+    /// <param name="Physiology">Physiology engine state.</param>
+    /// <param name="Psychology">Psychology engine state.</param>
+    /// <param name="Behavior">Behavior engine state.</param>
+    /// <param name="InteractionSurface">Current interaction surface.</param>
+    /// <param name="Relationships">Relationship graph state.</param>
+    /// <param name="Memory">Episodic memory index.</param>
+    /// <param name="SemanticMemory">Semantic (belief) memory state, or <c>null</c>.</param>
     public sealed record EnginesSnapshot(
         PhysiologyState Physiology,
         PsychologyState Psychology,
@@ -245,7 +386,7 @@ namespace GameEngineTools.Characters.Core
         double AltitudeMeters = 0.0,
         /// <summary>
         /// Astronomický kontext pro aktuální tick — ozáření, délka dne, východ/západ Slunce,
-        /// sezóna a teplota prostředí. Nastaveno <see cref="SimulationScene"/> přes
+        /// sezóna a teplota prostředí. Nastaveno <see cref="GameEngineTools.World.Simulation.SimulationScene"/> přes
         /// <see cref="IHuman.SetAmbientContext"/> před tickem každé postavy.
         /// <c>null</c> pokud astronomická logika není nakonfigurována.
         /// </summary>

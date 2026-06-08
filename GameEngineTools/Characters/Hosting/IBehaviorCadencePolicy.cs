@@ -11,6 +11,8 @@ namespace GameEngineTools.Characters.Hosting
     /// </summary>
     public interface IBehaviorCadencePolicy
     {
+        /// <summary>Returns the minimum interval between behaviour decisions, or <c>null</c> for every tick.</summary>
+        /// <param name="human">The character.</param>
         WTimeSpan? GetDecisionStep(IHuman human);
     }
 }

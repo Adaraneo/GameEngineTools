@@ -25,7 +25,7 @@ namespace GameEngineTools.World.Simulation
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
-    /// Default social orchestration layer for <see cref="SimulationScene.OnTick"/>.
+    /// Default social orchestration layer for <c>SimulationScene.OnTick</c>.
     /// Encapsulates first-impression firing, NPC movement routing, reach-out routing,
     /// and organic micro-positive generation.
     /// </summary>

@@ -92,6 +92,7 @@ namespace GameEngineTools.World.Location
         public string? GetLocation(HumanId characterId)
             => _characterLocation.GetValueOrDefault(characterId);
 
+        /// <inheritdoc/>
         public LocationDescriptor? GetDescriptor(string locationId)
             => _descriptors.GetValueOrDefault(locationId);
 

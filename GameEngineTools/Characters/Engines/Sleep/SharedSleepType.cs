@@ -28,7 +28,10 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// </summary>
         Emergency,
 
+        /// <summary>Romantic shared sleep — intimate partners; supports closeness narrative.</summary>
         Romantic,
+
+        /// <summary>Protective shared sleep — one party watches over a vulnerable other.</summary>
         Protective
     }
 }

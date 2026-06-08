@@ -3,6 +3,7 @@
 
 namespace GameEngineTools.Config
 {
+    /// <summary>Startup configuration for the world clock and calendar (month lengths, time subdivisions, leap rules).</summary>
     public sealed class InitWorldClockConfig
     {
         /// <summary>

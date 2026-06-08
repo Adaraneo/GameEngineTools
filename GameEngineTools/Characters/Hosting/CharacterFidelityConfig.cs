@@ -17,6 +17,7 @@ namespace GameEngineTools.Characters.Hosting
         SocialFidelityLevel NearbySocial = SocialFidelityLevel.Full,
         SocialFidelityLevel BackgroundSocial = SocialFidelityLevel.Reduced)
     {
+        /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public CharacterFidelityConfig()
             : this(
                 MemoryFidelityLevel.Full,

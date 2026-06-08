@@ -44,6 +44,7 @@ namespace GameEngineTools.Narrative
     {
         private readonly CzechWordFormComposer _wordComposer;
 
+        /// <summary>Creates the formatter and initialises the Czech grammar services.</summary>
         public DefaultNarrativeFormatter()
         {
             _wordComposer = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())

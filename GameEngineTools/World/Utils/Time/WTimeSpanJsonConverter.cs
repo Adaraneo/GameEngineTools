@@ -16,7 +16,7 @@ namespace GameEngineTools.World.Utils.Time
     /// <remarks>
     /// <para>
     /// <b>Ambient design.</b> Interně používá <see cref="WWorld.Spec"/> místo
-    /// explicitně předaného <see cref="WorldTimeContext"/>.
+    /// explicitně předaného <c>WorldTimeContext</c>.
     /// Zpětně kompatibilní konstruktor je zachován ale ignoruje svůj parametr.
     /// </para>
     /// </remarks>

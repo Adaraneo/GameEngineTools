@@ -67,6 +67,20 @@ namespace GameEngineTools.World.Simulation
             Random rng)
             => SelectSpeechAct(edge, surface, rng, null, null, null, null);
 
+        /// <summary>
+        /// Selects a <see cref="SpeechAct"/> for a <c>ReachOut</c>, factoring in the relationship edge,
+        /// surface, semantic beliefs, recent episodes, and attraction context.
+        /// </summary>
+        /// <param name="edge">Directional relationship edge, or <c>null</c> for strangers.</param>
+        /// <param name="surface">Current interaction surface of the initiator.</param>
+        /// <param name="rng">Random source used for conservative weighted selection.</param>
+        /// <param name="semanticMemory">Initiator's semantic beliefs, or <c>null</c>.</param>
+        /// <param name="targetId">Target character id, or <c>null</c>.</param>
+        /// <param name="profile">Initiator's psychological profile, or <c>null</c>.</param>
+        /// <param name="episodes">Recent episodic memories about the target, or <c>null</c>.</param>
+        /// <param name="attractionProfile">Initiator's attraction profile, or <c>null</c>.</param>
+        /// <param name="targetBiology">Target's biological sex, or <c>null</c>.</param>
+        /// <returns>A decision containing the chosen act and the relationship context used.</returns>
         public static ReachOutSpeechActSelection SelectSpeechAct(
             RelationshipEdge? edge,
             InteractionSurface surface,

@@ -21,7 +21,7 @@ namespace GameEngineTools.Characters.Engines.Values
     /// reinforcement (Vecchione 2016: 4-year rank-order stability r ≈ 0.69).
     /// </para>
     /// <para>
-    /// <see cref="ValuesBehaviorModifier"/> and the Guilt channel read <see cref="Current"/>,
+    /// <see cref="GameEngineTools.Characters.Engines.Behavior.Modifiers.ValuesBehaviorModifier"/> and the Guilt channel read <see cref="Current"/>,
     /// never <see cref="Baseline"/> — so morality is keyed to who the character has become,
     /// not who they were born to be.
     /// </para>
