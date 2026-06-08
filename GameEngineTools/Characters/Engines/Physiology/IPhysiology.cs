@@ -172,7 +172,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double CortisolDiurnalAmplitude = 30.0,
         double CortisolAlloWeight = 0.25,
         double CortisolImmuneWeight = 0.15,
-        // Chronotyp + cirkadiánní fázový posun
+        // Chronotype + circadian phase shift
         double ChronotypeOffsetHours = 0.0,
         double NaturalSleepStartHour = 22.0,
         double CircadianPhaseRecoveryPerHour = 0.08,
@@ -181,47 +181,47 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double RecoveryDebtAccumRatePerHour = 0.2,
         double RecoveryDebtDecayPerSleepHour = 0.15,
         double RecoveryDebtDecayPerSelfCareHour = 0.05,
-        // Testosteron (mužský cyklus)
+        // Testosterone (male cycle)
         bool EnableTestosteroneCycle = true,
         double TestosteronePeakHour = 8.0,
         double TestosteroneAlloSuppression = 0.20,
         double TestosteroneSleepDebtPenaltyPerHour = 0.8,
         // Sleep Inertia
         double SleepInertiaMaxHours = 1.5,
-        // Sociální bolest (HPA aktivace při odmítnutí)
+        // Social pain (HPA activation on rejection)
         double SocialPainCortisolSpike = 8.0,
-        // SAM systém (Sympatho-Adrenomedullary — okamžitá sympatická odpověď)
+        // SAM system (Sympatho-Adrenomedullary — the immediate sympathetic response)
         double AcuteArousalDecayPerHour = 200.0,
         double InjuryAcuteArousalSpike = 40.0,
         double NightmareAcuteArousalSpike = 25.0,
         double StressSpikedAcuteArousalWeight = 0.3,
-        // Fyzická únava (svalová — odlišná od kognitivní SleepDebt)
+        // Physical fatigue (muscular — distinct from cognitive SleepDebt)
         double PhysicalFatigueAccumPerWorkHour = 5.0,
         double PhysicalFatigueDecayPerSleepHour = 25.0,
         double PhysicalFatigueDecayPerIdleHour = 5.0,
         double PhysicalFatigueSelfCareDecayBonus = 8.0,
-        // Glykemický stav
+        // Glycemic state
         double BloodGlucoseEatingGain = 50.0,
         double BloodGlucoseBaseDecayPerHour = 3.0,
         double BloodGlucoseDipDecayBonus = 8.0,
         double BloodGlucoseDipStartHours = 1.0,
         double BloodGlucoseDipEndHours = 2.0,
-        // Hypocortisolismus paradox (HPA downregulace při extrémním AlloLoad)
+        // Hypocortisolism paradox (HPA downregulation under extreme AlloLoad)
         double HypocortisolismAlloThreshold = 75.0,
         double HypocortisolismDeclineRate = 0.1,
-        // Sociální podpora jako kortizol buffer (Eisenberger 2007)
+        // Social support as a cortisol buffer (Eisenberger 2007)
         double SocialSupportCortisolBuffer = 6.0,
         double SocialSupportClosenessThreshold = 50.0,
-        // Chronická sociální izolace → kortizol (Cacioppo 2015)
+        // Chronic social isolation → cortisol (Cacioppo 2015)
         double SocialIsolationCortisolThreshold = 80.0,
         double SocialIsolationCortisolRatePerHour = 0.8,
-        // Chronická bolest (Dantzer 2008)
+        // Chronic pain (Dantzer 2008)
         double ChronicPainAccumThreshold = 30.0,
         double ChronicPainDecayFactor = 0.5,
-        // Cirkadiánní tělesná teplota (Waterhouse et al. 2005)
+        // Circadian body temperature (Waterhouse et al. 2005)
         double CircadianTempAmplitude = 0.3,
         double CircadianTempPeakHour = 17.0,
-        // Věkové efekty
+        // Age effects
         int MenopauseAge = 50,
         double AgingEnergyRecoveryPenaltyStart = 40,
         double AgingEnergyRecoveryPenaltyPerYear = 0.005,
@@ -234,7 +234,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double AltitudeAMSThreshold = 4000.0,
         double AltitudeEnergyDecayBonusPerKm = 0.3,
         double AltitudeAMSPainPerHour = 2.0,
-        // Fyzické stárnutí — vlasy, vrásky, svalová hmota
+        // Physical aging — hair, wrinkles, muscle mass
         double HairGrowthCmPerHour = 0.00175,
         double HairGreyingAgeStart = 30.0,
         double HairGreyingRatePerYear = 0.02,
@@ -251,28 +251,28 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double SarcopeniaAgeStart = 30.0,
         double SarcopeniaRatePerYear = 0.005,
         double SarcopeniaMuscleMin = 0.3,
-        // Kostní hustota + osteoporóza
+        // Bone density + osteoporosis
         double BoneDensityDeclineAgeStart = 30.0,
         double BoneDensityDeclinePerYear = 0.005,
         double BoneDensityMenopauseMultiplier = 2.5,
         double BoneFragilityInjuryMultiplier = 0.5,
-        // Spánek a věk
+        // Sleep and age
         double AgeSleepQualityThreshold = 50.0,
         double AgeSleepQualityPenaltyPerYear = 0.008,
-        // Sluneční světlo — restaurace vitaminu D
+        // Sunlight — vitamin D restoration
         /// <summary>
-        /// Minimální <c>IrradianceFactor</c> ze <see cref="CelestialContext"/>, při kterém
-        /// se vitamín D obnovuje (pod touto hodnotou záření nestačí ke kožní syntéze).
+        /// Minimum <c>IrradianceFactor</c> from <see cref="CelestialContext"/> at which
+        /// vitamin D is restored (below this value the radiation is insufficient for skin synthesis).
         /// </summary>
         double VitaminDSunThreshold = 0.3,
         /// <summary>
         /// Rychlost obnovy vitaminu D (0..100) na hodinu na jednotku <c>IrradianceFactor</c>
-        /// při pobytu venku (SurfaceKind.Public nebo Social).
+        /// while outdoors (SurfaceKind.Public or Social).
         /// </summary>
         double VitaminDRestorationPerHourPerIrradiance = 4.0,
         /// <summary>
-        /// Maximální obnova vitaminu D za hodinu bez ohledu na výši ozáření.
-        /// Chrání před nerealistickými hodnotami při velmi vysokém <c>IrradianceFactor</c>.
+        /// Maximum vitamin D restoration per hour regardless of irradiance level.
+        /// Guards against unrealistic values at very high <c>IrradianceFactor</c>.
         /// </summary>
         double VitaminDMaxOutdoorRestorationPerHour = 6.0,
         // ── Natural mortality ─────────────────────────────────────────────────────
@@ -541,70 +541,70 @@ namespace GameEngineTools.Characters.Engines.Physiology
         InjuryState? Injury = null,
         PostpartumState? Postpartum = null,
         /// <summary>
-        /// Kumulativní allostatická zátěž — proxy HPA osy. Roste při chronickém neglektu
-        /// potřeb (hlad, žízeň, spánkový dluh, bolest, imunitní aktivace). Klesá pouze při
-        /// spánku nebo self-care. Chronicky elevovaná hodnota odráží hyperaktivaci HPA osy
-        /// a predikuje zdravotní rizika (McEwen, 2000). 0..100.
+        /// Cumulative allostatic load — a proxy for the HPA axis. Rises under chronic neglect
+        /// of needs (hunger, thirst, sleep debt, pain, immune activation). Falls only during
+        /// sleep or self-care. A chronically elevated value reflects HPA-axis hyperactivation
+        /// and predicts health risks (McEwen, 2000). 0..100.
         /// </summary>
         double AllostaticLoad = 0,
         /// <summary>
-        /// Kortizolová hladina — explicitní výstup HPA osy. Sleduje diurnální křivku
-        /// s vrcholem ~1 h po probuzení (Cortisol Awakening Response). Chronicky elevován
-        /// allostatickou zátěží a imunitní aktivací. Zpětně zvyšuje stres a arousal
-        /// v Psychology. 0..100; klidový normál ≈ 50.
+        /// Cortisol level — an explicit output of the HPA axis. Follows a diurnal curve
+        /// peaking ~1 h after waking (the Cortisol Awakening Response). Chronically elevated
+        /// by allostatic load and immune activation. In turn raises stress and arousal
+        /// in Psychology. 0..100; resting normal ≈ 50.
         /// </summary>
         double CortisolLevel = 50,
         /// <summary>
-        /// Celkový efektivní posun cirkadiánního rytmu od průměru (hodiny). Kombinuje
-        /// stabilní chronotyp (<see cref="PhysiologyConfig.ChronotypeOffsetHours"/>) a
-        /// aktuální jet-lag narušení. Kladné = ranní ptáče, záporné = noční sova.
-        /// Psychology čte tuto hodnotu a posouvá Gaussovy arousal vrcholy. Rozsah −6..+6.
+        /// Total effective shift of the circadian rhythm from the mean (hours). Combines
+        /// the stable chronotype (<see cref="PhysiologyConfig.ChronotypeOffsetHours"/>) and
+        /// the current jet-lag disruption. Positive = morning lark, negative = night owl.
+        /// Psychology reads this value and shifts the Gaussian arousal peaks. Range −6..+6.
         /// </summary>
         double CircadianPhaseShiftHours = 0,
         /// <summary>
-        /// Fyzický deficit regenerace nad rámec prostého spánkového dluhu. Roste při
-        /// allostatické přetíženosti (AllostaticLoad &gt; threshold), klesá spánkem a
-        /// self-care. Snižuje efektivitu obnovy energie při SleepEnded. 0..72 h.
+        /// A physical recovery deficit beyond plain sleep debt. Rises under
+        /// allostatic overload (AllostaticLoad &gt; threshold), falls with sleep and
+        /// self-care. Reduces the efficiency of energy recovery on SleepEnded. 0..72 h.
         /// </summary>
         double RecoveryDebtHours = 0,
         /// <summary>
-        /// Stav mužského testosteronového cyklu; <c>null</c> pro ženské postavy.
-        /// Modeluje diurnální rytmus (vrchol ráno) a potlačení HPA-HPG cross-talkem
-        /// při chronickém stresu a spánkovém dluhu.
+        /// State of the male testosterone cycle; <c>null</c> for female characters.
+        /// Models the diurnal rhythm (peaking in the morning) and suppression via HPA-HPG cross-talk
+        /// under chronic stress and sleep debt.
         /// </summary>
         TestosteroneState? Testosterone = null,
         /// <summary>
-        /// Zbývající hodiny sleep inertia po probuzení. Adenosin není ihned vyčistěn —
-        /// prvních 1–2 h po SleepEnded je kognitivní výkon a arousal snížen (Borbély model).
-        /// Klesá lineárně v Tick(); nastaveno po každém SleepEnded. 0..2.
+        /// Remaining hours of sleep inertia after waking. Adenosine is not cleared immediately —
+        /// for the first 1–2 h after SleepEnded, cognitive performance and arousal are reduced (the Borbély model).
+        /// Decreases linearly in Tick(); set after each SleepEnded. 0..2.
         /// </summary>
         double SleepInertiaHours = 0,
         /// <summary>
-        /// Akutní SAM aktivace — Sympatho-Adrenomedullary odpověď (adrenalin/noradrenalin).
-        /// Trvá 5–15 minut (decay ~200/hod). Spikuje při fyzickém ohrožení, šoku, noční můře.
-        /// Odlišné od HPA/kortizolu (minuty vs. hodiny). 0..100.
+        /// Acute SAM activation — the Sympatho-Adrenomedullary response (adrenaline/noradrenaline).
+        /// Lasts 5–15 minutes (decay ~200/h). Spikes on physical threat, shock, or a nightmare.
+        /// Distinct from HPA/cortisol (minutes vs. hours). 0..100.
         /// </summary>
         double AcuteArousalLevel = 0,
         /// <summary>
-        /// Fyzická svalová únava — odlišná od kognitivní únavy (SleepDebt) a celkové energie.
-        /// Akumuluje se při fyzické práci (Work), klesá spánkem a odpočinkem.
-        /// Při mírné úrovni (20–70) = stres buffer (endorfiny). Při >70 = Valence↓. 0..100.
+        /// Physical muscular fatigue — distinct from cognitive fatigue (SleepDebt) and overall energy.
+        /// Accumulates during physical work (Work), falls with sleep and rest.
+        /// At a moderate level (20–70) = a stress buffer (endorphins). Above 70 = Valence↓. 0..100.
         /// </summary>
         double PhysicalFatigueLevel = 0,
         /// <summary>
-        /// Kumulativní počet dní s bolestí nad prahem (<see cref="PhysiologyConfig.ChronicPainAccumThreshold"/>).
-        /// Chronická bolest (&gt;7 dní) mění psychologický profil: depresivní symptomy,
-        /// trvalý Valence↓, erose MoodBaseline (Dantzer 2008; Eisenberger 2012).
+        /// Cumulative number of days with pain above the threshold (<see cref="PhysiologyConfig.ChronicPainAccumThreshold"/>).
+        /// Chronic pain (&gt;7 days) changes the psychological profile: depressive symptoms,
+        /// a persistent Valence↓, and erosion of MoodBaseline (Dantzer 2008; Eisenberger 2012).
         /// </summary>
         double ChronicPainDays = 0,
         /// <summary>
-        /// Aktuální antikoncepční ochrana. Nastavena eventem <see cref="ContraceptionChanged"/>.
-        /// Při &gt;= Moderate: potlačena ovulace a snížena závažnost PMDD.
+        /// Current contraceptive protection. Set by the <see cref="ContraceptionChanged"/> event.
+        /// At &gt;= Moderate: ovulation is suppressed and PMDD severity is reduced.
         /// </summary>
         ContraceptionLevel CurrentContraception = ContraceptionLevel.Unspecified,
         /// <summary>
-        /// Dynamický stav fyzického stárnutí (vlasy, vrásky, svalová hmota).
-        /// <c>null</c> = aging systém ještě nebyl inicializován; inicializace proběhne při prvním Tick().
+        /// Dynamic physical-aging state (hair, wrinkles, muscle mass).
+        /// <c>null</c> = the aging system has not yet been initialized; initialization happens on the first Tick().
         /// </summary>
         PhysicalAgingState? Aging = null,
         /// <summary>
@@ -632,7 +632,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         void RestoreState(PhysiologyState state, WDateOnly today);
     }
 
-    // --- Menstruační modul ---
+    // --- Menstrual module ---
 
     /// <summary>Phase of the menstrual cycle.</summary>
     public enum CyclePhase
@@ -667,17 +667,17 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// <param name="BloatBaseMultiplier">Base multiplier on cyclic bloat symptoms.</param>
     /// <param name="BreastTenderMultiplier">Base multiplier on cyclic breast-tenderness symptoms.</param>
     public sealed record MenstrualCycleConfig(
-        /// <summary>Bull et al. 2019 (n = 3 324 cyklů): průměr 30,3 dní.</summary>
+        /// <summary>Bull et al. 2019 (n = 3,324 cycles): mean 30.3 days.</summary>
         int MeanCycleLengthDays = 30,
-        /// <summary>Bull et al. 2019: SD 6,7 dní — folikulární fáze je hlavní zdroj variability.</summary>
+        /// <summary>Bull et al. 2019: SD 6.7 days — the follicular phase is the main source of variability.</summary>
         double VariabilityDaysStdDev = 6.7,
         int MensesMeanDays = 5,
         double PmsRisk = 0.35,
         bool EnableOvulationWindowEvents = true,
         bool EnableSymptoms = true,
         /// <summary>
-        /// Střední délka luteální fáze (Bull et al. 2019: průměr 11,7 dne, SD 2,8).
-        /// Engine z tohoto počítá dynamický den ovulace per-cyklus: ovulDay = length − LutealMeanDays.
+        /// Mean luteal-phase length (Bull et al. 2019: mean 11.7 days, SD 2.8).
+        /// From this the engine computes the dynamic ovulation day per cycle: ovulDay = length − LutealMeanDays.
         /// </summary>
         int LutealMeanDays = 12,
         int MinCycleLengthDays = 21,
@@ -750,14 +750,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double LibidoMod,           // multiplikátor 0.5..1.5
         WDateOnly LastMensesStart,
         /// <summary>
-        /// Aktivní PMDD epizoda — nastává v pozdní luteální fázi u postav s PmsRisk &gt; 0.3.
-        /// Způsobuje závažnější emocionální labilitu a vyšší Stress v Psychology.
+        /// Active PMDD episode — occurs in the late luteal phase for characters with PmsRisk &gt; 0.3.
+        /// Causes more severe emotional lability and higher Stress in Psychology.
         /// </summary>
         bool PmddActive = false,
         /// <summary>
-        /// Skutečná délka aktuálního cyklu (vzorkovaná z normálního rozdělení při každém resetu na den 1).
-        /// Použita pro výpočet dynamického dne ovulace: ovulDay = CurrentCycleLength − LutealMeanDays.
-        /// Default = MeanCycleLengthDays při inicializaci.
+        /// The actual length of the current cycle (sampled from a normal distribution on each reset to day 1).
+        /// Used to compute the dynamic ovulation day: ovulDay = CurrentCycleLength − LutealMeanDays.
+        /// Default = MeanCycleLengthDays at initialization.
         /// </summary>
         int CurrentCycleLength = 30,
         /// <summary>
@@ -775,7 +775,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         bool AnovulatoryCycleActive = false);
 
-    /// <summary>Stav probíhajícího těhotenství postavy.</summary>
+    /// <summary>State of the character's ongoing pregnancy.</summary>
     /// <param name="OtherParent">Identity of the other parent.</param>
     /// <param name="ConceivedOn">Date of conception.</param>
     /// <param name="EstimatedDueDate">Estimated due date.</param>
@@ -799,11 +799,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double Iron = 80,               // 0..100; critical for female recovery post-menses
         double Protein = 80,            // 0..100; muscle and tissue recovery
         /// <summary>
-        /// Hladina krevního cukru. Stoupá při jídle, klesá rebound dip 1–2 h po jídle.
-        /// Pod 35 = hypoglykémie: iritabilita, špatná koncentrace, CogLoad↑. 0..100.
+        /// Blood-sugar level. Rises when eating, with a rebound dip 1–2 h after a meal.
+        /// Below 35 = hypoglycemia: irritability, poor concentration, CogLoad↑. 0..100.
         /// </summary>
         double BloodGlucoseLevel = 80,
-        /// <summary>Hodiny od posledního jídla; reset při Eat; řídí glycemický dip okno.</summary>
+        /// <summary>Hours since the last meal; reset on Eat; controls the glycemic-dip window.</summary>
         double PostMealHours = 0);
 
     /// <summary>
@@ -869,53 +869,53 @@ namespace GameEngineTools.Characters.Engines.Physiology
         int DaysSinceBirth,
         PostpartumPhase Phase,
         /// <summary>
-        /// Aktivní hormonální crash po porodu (propad estrogenu/progesteronu v 24–48 h).
-        /// Způsobuje emocionální labilitu a zpomalené MoodBaseline recovery v Psychology.
-        /// Automaticky deaktivován po 7 dnech.
+        /// Active postpartum hormonal crash (a drop in estrogen/progesterone within 24–48 h).
+        /// Causes emotional lability and slowed MoodBaseline recovery in Psychology.
+        /// Automatically deactivated after 7 days.
         /// </summary>
         bool HormonalCrashActive = true,
         /// <summary>
-        /// Probíhající kojení — prodlužuje prolaktin-mediovanou supresi libida.
+        /// Ongoing breastfeeding — prolongs the prolactin-mediated suppression of libido.
         /// Nastaveno eventem <see cref="BreastfeedingChanged"/>.
-        /// Při aktivním kojení je LibidoMod snížen o dalších ~30 %.
+        /// While actively breastfeeding, LibidoMod is reduced by a further ~30%.
         /// </summary>
         bool IsBreastfeeding = false);
 
     /// <summary>
-    /// Stav mužského testosteronového cyklu. Modeluje diurnální rytmus (vrchol v ranních
-    /// hodinách) a potlačení při chronickém stresu (HPA-HPG osa cross-talk) a spánkovém
-    /// dluhu. Inicializován pouze pro <see cref="SexBiology.Male"/>.
+    /// State of the male testosterone cycle. Models the diurnal rhythm (peaking in the morning
+    /// hours) and suppression under chronic stress (HPA-HPG axis cross-talk) and sleep
+    /// debt. Initialized only for <see cref="SexBiology.Male"/>.
     /// </summary>
     /// <param name="Level">Testosterone level, 0..100 (60 ≈ average adult male).</param>
     public sealed record TestosteroneState(
         double Level = 60);  // 0..100; 60 = průměrný dospělý muž
 
     /// <summary>
-    /// Dynamický stav fyzického stárnutí — ukládá runtime fyzické změny postavy.
-    /// Součást <see cref="Characters.Core.EnginesSnapshot"/>; aktualizován v každém Tick().
-    /// Na rozdíl od statického traitu <see cref="Characters.Traits.PhysicalAppearance"/> (genetika),
-    /// tento record sleduje změny způsobené věkem, hormony, stresem a vnějšími událostmi.
+    /// Dynamic physical-aging state — stores the character's runtime physical changes.
+    /// Part of <see cref="Characters.Core.EnginesSnapshot"/>; updated on every Tick().
+    /// Unlike the static trait <see cref="Characters.Traits.PhysicalAppearance"/> (genetics),
+    /// this record tracks changes caused by age, hormones, stress and external events.
     /// </summary>
     public sealed record PhysicalAgingState(
-        /// <summary>Věk postavy v herních letech. Aktualizován DefaultPhysiologyEngine.Tick() z _birthDate.</summary>
+        /// <summary>Character age in game years. Updated by DefaultPhysiologyEngine.Tick() from _birthDate.</summary>
         int AgeYears = 0,
-        /// <summary>Aktuální délka vlasů (cm). Roste ~0,00175 cm/hod. HairCut eventem se nastavuje na novou hodnotu.</summary>
+        /// <summary>Current hair length (cm). Grows ~0.00175 cm/h. Set to a new value by the HairCut event.</summary>
         double HairLengthCm = 5.0,
-        /// <summary>Podíl šedivých vlasů (0..1). Roste s věkem (od ~30 let) a chronickým kortizolem.</summary>
+        /// <summary>Fraction of grey hair (0..1). Grows with age (from ~30 years) and chronic cortisol.</summary>
         double GreyFraction = 0.0,
-        /// <summary>Hustota/plnost vlasů (0..1). Klesá androgenní alopécií, stresovým telogen effluviem, postpartum.</summary>
+        /// <summary>Hair density/fullness (0..1). Falls with androgenic alopecia, stress-induced telogen effluvium, and postpartum.</summary>
         double HairDensity = 1.0,
-        /// <summary>Skóre vrásek (0..100). Roste s věkem po 25 letech a akceleruje chronickým kortizolem.</summary>
+        /// <summary>Wrinkle score (0..100). Grows with age after 25 and accelerates with chronic cortisol.</summary>
         double WrinkleScore = 0.0,
-        /// <summary>Podíl svalové hmoty (0..1). Klesá sarkopénií po 30. roce; min = SarcopeniaMuscleMin.</summary>
+        /// <summary>Muscle-mass fraction (0..1). Falls with sarcopenia after age 30; min = SarcopeniaMuscleMin.</summary>
         double MuscleMassFraction = 1.0,
         /// <summary>
-        /// Hustota kostní tkáně (0..1). Klesá postupně od 30 let; dramaticky po menopauze (bez estrogenu).
-        /// Nízká hustota → amplifikuje závažnost zranění (osteoporóza → fraktury).
+        /// Bone-tissue density (0..1). Falls gradually from age 30; dramatically after menopause (no estrogen).
+        /// Low density → amplifies injury severity (osteoporosis → fractures).
         /// </summary>
         double BoneDensity = 1.0);
 
-    // Události
+    // Events
 
     /// <summary>Event — menstruation began.</summary>
     public sealed record MensesStarted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
@@ -941,33 +941,33 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// Emitted when HPA suppression resolves and normal ovulation can resume next cycle.
     /// </summary>
     public sealed record CycleSuppressionLifted(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
-    /// <summary>Událost — postava otěhotněla po reprodukčně relevantním setkání.</summary>
+    /// <summary>Event — the character became pregnant after a reproductively relevant encounter.</summary>
     public sealed record PregnancyStarted(WDateTime OccurredAt, HumanId Human, HumanId OtherParent, WDateOnly EstimatedDueDate) : IDomainEvent;
-    /// <summary>Událost — těhotenství je pro postavu zjistitelné / zjištěné.</summary>
+    /// <summary>Event — the pregnancy is discoverable / discovered by the character.</summary>
     public sealed record PregnancyDiscovered(WDateTime OccurredAt, HumanId Human, HumanId OtherParent) : IDomainEvent;
-    /// <summary>Událost — těhotenství doběhlo do porodu; nevytváří novou postavu.</summary>
+    /// <summary>Event — the pregnancy reached birth; does not create a new character.</summary>
     public sealed record ChildBorn(WDateTime OccurredAt, HumanId ParentA, HumanId ParentB) : IDomainEvent;
-    /// <summary>Událost — postava obdržela zranění.</summary>
+    /// <summary>Event — the character sustained an injury.</summary>
     public sealed record InjuryReceived(WDateTime OccurredAt, HumanId Human, double Severity, InjuryType Type) : IDomainEvent;
-    /// <summary>Událost — zranění se zahojilo.</summary>
+    /// <summary>Event — the injury healed.</summary>
     public sealed record InjuryHealed(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
-    /// <summary>Událost — postava přešla do nové fáze šestinedělí.</summary>
+    /// <summary>Event — the character entered a new postpartum phase.</summary>
     public sealed record PostpartumPhaseChanged(WDateTime OccurredAt, HumanId Human, PostpartumPhase Phase) : IDomainEvent;
-    /// <summary>Událost — postava změnila antikoncepci.</summary>
+    /// <summary>Event — the character changed contraception.</summary>
     public sealed record ContraceptionChanged(WDateTime OccurredAt, HumanId Human, ContraceptionLevel Level) : IDomainEvent;
-    /// <summary>Událost — postava si ostříhala vlasy na zadanou délku.</summary>
+    /// <summary>Event — the character cut their hair to the given length.</summary>
     public sealed record HairCut(WDateTime OccurredAt, HumanId Human, double NewLengthCm) : IDomainEvent;
-    /// <summary>Událost — postava si obarvila vlasy (narrativní; resetuje šedivost pro zobrazení).</summary>
+    /// <summary>Event — the character dyed their hair (narrative; resets greyness for display).</summary>
     public sealed record HairDyed(WDateTime OccurredAt, HumanId Human) : IDomainEvent;
     /// <summary>
-    /// Událost — postava začala nebo ukončila kojení.
-    /// Kojení prodlužuje prolaktin-mediovanou supresi libida přibližně o 30 % po dobu trvání.
+    /// Event — the character started or stopped breastfeeding.
+    /// Breastfeeding prolongs the prolactin-mediated suppression of libido by about 30% for its duration.
     /// </summary>
     public sealed record BreastfeedingChanged(WDateTime OccurredAt, HumanId Human, bool IsBreastfeeding) : IDomainEvent;
 
     /// <summary>
-    /// Odvozené fyziologické vitální parametry — čisté funkce stávajících stavů.
-    /// Nejsou součástí simulačního loop; počítají se on-demand pro narrativu a UI.
+    /// Derived physiological vital signs — pure functions of the existing states.
+    /// Not part of the simulation loop; computed on demand for narrative and UI.
     /// </summary>
     public sealed record PhysiologicalVitals(
         int HeartRateBpm,           // 40..200 bpm
@@ -975,7 +975,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         int DiastolicBP,            // 60..120 mmHg
         double RespiratoryRate)     // 10..30 dechů/min
     {
-        /// <summary>Vypočítá vitální parametry z existujícího fyzio+psycho stavu.</summary>
+        /// <summary>Computes the vital signs from the existing physio+psycho state.</summary>
         public static PhysiologicalVitals Compute(PhysiologyState ph, PsychologyState ps)
         {
             var arousal = ps.Arousal;
@@ -984,18 +984,18 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var acuteSAM = ph.AcuteArousalLevel / 100.0;
             var physFatigue = ph.PhysicalFatigueLevel / 100.0;
 
-            // Srdeční tep: klidový 60 bpm + modulace arousal/SAM/fyzická zátěž/horečka
-            // Kardiovaskulární stárnutí: arteriální tuhost → BP ↑ ~0,5 mmHg/rok po 30
+            // Heart rate: resting 60 bpm + modulation by arousal/SAM/physical load/fever
+            // Cardiovascular aging: arterial stiffness → BP ↑ ~0.5 mmHg/year after 30
             var ageBPBonus = ph.Aging is { AgeYears: > 30 } agingBP ? (agingBP.AgeYears - 30) * 0.5 : 0.0;
 
             var hr = 60 + arousal * 50 + acuteSAM * 60 + physFatigue * 30 + stress * 15;
             if (ph.BodyTempDelta > 1.0) hr += ph.BodyTempDelta * 10;
 
-            // Krevní tlak: klidový 120/80 + stres/kortizol/SAM + věk
+            // Blood pressure: resting 120/80 + stress/cortisol/SAM + age
             var systolic = 120 + stress * 30 + cortisol * 15 + acuteSAM * 25 + ageBPBonus;
             var diastolic = 80 + stress * 15 + cortisol * 8 + acuteSAM * 12 + ageBPBonus * 0.4;
 
-            // Dechová frekvence: klidová 14 + arousal/SAM/stres
+            // Respiratory rate: resting 14 + arousal/SAM/stress
             var rr = 14 + arousal * 8 + acuteSAM * 10 + stress * 4;
 
             return new PhysiologicalVitals(

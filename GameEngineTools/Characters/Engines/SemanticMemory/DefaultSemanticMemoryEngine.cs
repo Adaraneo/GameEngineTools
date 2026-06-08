@@ -59,8 +59,8 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             foreach (var (other, set) in State.People)
             {
                 // ── Navarro 8× gap rule (Navarro et al. 2017) ──────────────────────────
-                // Pokud uplynulo déle než 8× průměrný meziinterakční interval,
-                // decay se znásobí NavarroDecayAccelerator (default 3×).
+                // If more than 8× the average inter-interaction interval has elapsed,
+                // decay is multiplied by NavarroDecayAccelerator (default 3×).
                 var closeness = edges.TryGetValue(other, out var edge) ? edge.Closeness : 30.0;
                 var expectedIntervalDays = closeness > 70.0 ? 3.0
                     : closeness > 40.0 ? 7.0
@@ -224,7 +224,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 aggregateWeight += directSupport * 0.35;
                 aggregateWeight = Math.Clamp(aggregateWeight, 0.0, 1.0);
 
-                // Avoidant attachment potlačuje EmotionallySafe belief
+                // Avoidant attachment suppresses the EmotionallySafe belief
                 if (group.Key == PersonBeliefKind.EmotionallySafe)
                 {
                     aggregateWeight *= safeDiscount;
@@ -268,10 +268,10 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         }
 
         /// <summary>
-        /// Mapuje AttachmentProfile (2D kontinuální model) na learning/contradiction/safeDiscount multiplikátory.
-        /// Anxiety  → hyperaktivace (rychlejší učení, vyšší contradikce)
-        /// Avoidance → deaktivace (pomalejší učení, potlačení EmotionallySafe)
-        /// Kombinace obou (Fearful) → nestabilní profil
+        /// Maps the AttachmentProfile (2D continuous model) onto learning/contradiction/safeDiscount multipliers.
+        /// Anxiety  → hyperactivation (faster learning, higher contradiction)
+        /// Avoidance → deactivation (slower learning, suppression of EmotionallySafe)
+        /// A combination of both (Fearful) → an unstable profile
         /// </summary>
         private (double learningMult, double contradictionMult, double safeDiscount)
             ComputeAttachmentMultipliers(AttachmentProfile profile)

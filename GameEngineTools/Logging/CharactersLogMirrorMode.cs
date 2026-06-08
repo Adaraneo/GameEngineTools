@@ -4,17 +4,17 @@
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Určuje, kam se zapisují character log události.
+    /// Determines where character log entries are written.
     /// </summary>
     public enum CharactersLogMirrorMode
     {
         /// <summary>
-        /// Všechny události se zapisují pouze do globálního logu.
+        /// All entries are written only to the global log.
         /// </summary>
         GlobalOnly,
 
         /// <summary>
-        /// Scoped události se zapisují do globálního logu i do per-person/per-subsystem mirroru.
+        /// Scoped entries are written to the global log and to the per-person/per-subsystem mirror.
         /// </summary>
         GlobalAndScoped
     }

@@ -4,36 +4,36 @@
 namespace GameEngineTools.Characters.Engines.Sleep
 {
     /// <summary>
-    /// Příčina přerušení spánku postavy.
-    /// Používá se v eventu <see cref="SleepInterrupted"/> pro rozlišení
-    /// externích a interních zdrojů přerušení.
+    /// Cause of an interruption to a character's sleep.
+    /// Used in the <see cref="SleepInterrupted"/> event to distinguish
+    /// external and internal sources of interruption.
     /// </summary>
     public enum InterruptCause
     {
         /// <summary>
-        /// Přerušení způsobené hráčem (manuální probuzení).
+        /// Interruption caused by the player (manual awakening).
         /// </summary>
         PlayerForced,
 
         /// <summary>
-        /// Přepadení nebo útok z vnějšku.
-        /// Postava se probouzí do bojového stavu.
+        /// An ambush or external attack.
+        /// The character wakes into a combat state.
         /// </summary>
         Ambush,
 
         /// <summary>
-        /// Noční můra — psychologické přerušení z REM fáze.
-        /// Postava se budí vystrašená, stres roste.
+        /// Nightmare — a psychological interruption from the REM phase.
+        /// The character wakes frightened; stress rises.
         /// </summary>
         Nightmare,
 
         /// <summary>
-        /// Hluk nebo rušivý podnět z prostředí (ne útok).
+        /// Noise or a disruptive environmental stimulus (not an attack).
         /// </summary>
         EnvironmentalNoise,
 
         /// <summary>
-        /// Fyzická bolest nebo zdravotní stav.
+        /// Physical pain or a medical condition.
         /// </summary>
         Pain,
 

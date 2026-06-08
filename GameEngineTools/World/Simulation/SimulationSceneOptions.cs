@@ -13,42 +13,41 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Konfigurace pro <see cref="SimulationScene"/>.
+    /// Configuration for <see cref="SimulationScene"/>.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Proč Options objekt místo konstruktorových parametrů?</b><br/>
-    /// S více postavami by konstruktor byl nepřehledný. Options objekt
-    /// dává každé hodnotě jméno a umožňuje přidávat nové vlastnosti
-    /// bez breaking change.
+    /// <b>Why an Options object instead of constructor parameters?</b><br/>
+    /// With many characters the constructor would be unwieldy. An Options object
+    /// gives every value a name and lets new properties be added without a breaking change.
     /// </para>
     /// <para>
-    /// <b>Zásadní rozdíl oproti starému <c>InteractionSceneOptions</c>:</b><br/>
-    /// Místo dvojice <c>Player / Npc</c> předáváš obecný seznam <see cref="Characters"/>.
-    /// Scéna neví nic o tom, kdo je hráč a kdo NPC — to je záležitost
-    /// volající vrstvy (Program.cs, Unity GameManager, …).
+    /// <b>Key difference from the old <c>InteractionSceneOptions</c>:</b><br/>
+    /// Instead of a <c>Player / Npc</c> pair you pass a generic list of <see cref="Characters"/>.
+    /// The scene knows nothing about who is the player and who is an NPC — that is the
+    /// concern of the calling layer (Program.cs, Unity GameManager, …).
     /// </para>
     /// <para>
-    /// <b>Routing ReachOut je záměrně na tobě</b> — scéna ho neřeší automaticky,
-    /// protože výběr targetu závisí na herní logice (lokace, záměr…).
-    /// Detekcí ReachOut v <see cref="OnTick"/> vidíš <c>LastOutbox</c>
-    /// z předchozího ticku a můžeš rozhodnout sám.
+    /// <b>ReachOut routing is deliberately up to you</b> — the scene does not handle it
+    /// automatically, because target selection depends on game logic (location, intent…).
+    /// By detecting ReachOut in <see cref="OnTick"/> you see the <c>LastOutbox</c>
+    /// from the previous tick and can decide yourself.
     /// </para>
     /// </remarks>
     public sealed class SimulationSceneOptions
     {
-        #region Účastníci
+        #region Participants
 
         /// <summary>
-        /// Všechny postavy účastnící se simulace.
+        /// All characters participating in the simulation.
         /// </summary>
         /// <remarks>
-        /// Pořadí určuje pořadí tickování — první v seznamu tickuje první.
-        /// Pokud máš hráče, konvencí je dát ho na index 0.
+        /// The order determines tick order — the first in the list ticks first.
+        /// If you have a player, the convention is to place it at index 0.
         /// </remarks>
         public IReadOnlyList<IHuman> Characters { get; init; } = Array.Empty<IHuman>();
 
-        #endregion Účastníci
+        #endregion Participants
 
         /// <summary>
         /// Optional location service. When provided, the scene calls
@@ -57,31 +56,31 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         public ILocationService? LocationService { get; init; }
 
-        #region Časování simulace
+        #region Simulation timing
 
         /// <summary>
-        /// Výchoží hodnota pro simulační dny.
+        /// Default value for the number of simulation days.
         /// </summary>
         public long SimulationDays { get; init; } = 20;
 
         /// <summary>
-        /// Délka jednoho vnějšího simulačního kroku — jak daleko se má svět ideálně posunout
-        /// v jedné iteraci hlavní smyčky.
-        /// Výchozí hodnota: <c>0.5 herní hodiny</c>.
+        /// Length of a single outer simulation step — how far the world should ideally advance
+        /// in one iteration of the main loop.
+        /// Default value: <c>0.5 game hours</c>.
         /// </summary>
         /// <remarks>
-        /// Pokud je nastaven <see cref="InternalSubstep"/>, scéna tento krok rozseká na jemnější
-        /// dílčí kroky kvůli nižší latenci mezi postavami a přesnějšímu časování.
+        /// When <see cref="InternalSubstep"/> is set, the scene splits this step into finer
+        /// sub-steps for lower inter-character latency and more accurate timing.
         /// </remarks>
         public WTimeSpan TickStep { get; init; } = WTimeSpan.FromHours(0.5);
 
         /// <summary>
-        /// Volitelný jemnější dílčí krok scény.
+        /// Optional finer sub-step for the scene.
         /// </summary>
         /// <remarks>
-        /// Pokud je menší než <see cref="TickStep"/>, scéna provede více interních kroků uvnitř
-        /// jednoho vnějšího ticku. To zmenšuje latenci interakcí a zpřesňuje plánování bez nutnosti
-        /// zmenšit hlavní <see cref="TickStep"/> pro celý sandbox.
+        /// If smaller than <see cref="TickStep"/>, the scene performs several internal steps within
+        /// a single outer tick. This reduces interaction latency and improves planning accuracy without
+        /// having to shrink the main <see cref="TickStep"/> for the whole sandbox.
         /// </remarks>
         public WTimeSpan? InternalSubstep { get; init; }
 
@@ -91,30 +90,30 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Optional per-character LOD resolver overriding <see cref="DefaultCharacterLod"/>.</summary>
         public Func<IHuman, CognitiveResolutionLevel>? ResolveCharacterLod { get; init; }
 
-        #endregion Časování simulace
+        #endregion Simulation timing
 
-        #region Scénář (callback)
+        #region Scenario (callback)
 
         /// <summary>
-        /// Callback volaný na <b>začátku každého ticku</b>, ještě před <c>Tick()</c> postav.
+        /// Callback invoked at the <b>start of every tick</b>, before the characters' <c>Tick()</c>.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Dvě role v jednom callbacku:
+        /// Two roles in one callback:
         /// <list type="number">
         ///   <item>
-        ///     <b>Scénář</b> — injekce naplánovaných událostí (den 2 → SmallTalk,
-        ///     den 16 → přesun do hradu…). Viz příklad níže.
+        ///     <b>Scenario</b> — injection of scheduled events (day 2 → SmallTalk,
+        ///     day 16 → move to the castle…). See the example below.
         ///   </item>
         ///   <item>
-        ///     <b>ReachOut routing</b> — v tomto okamžiku je <c>LastOutbox</c>
-        ///     každé postavy ještě z <em>předchozího</em> ticku, takže vidíš,
-        ///     kdo chce oslovit, a můžeš sám vybrat target.
+        ///     <b>ReachOut routing</b> — at this moment each character's <c>LastOutbox</c>
+        ///     is still from the <em>previous</em> tick, so you can see who wants to
+        ///     reach out and pick the target yourself.
         ///   </item>
         /// </list>
         /// </para>
         /// <para>
-        /// Signatura: <c>void OnTick(WDateTime now, IReadOnlyList&lt;IHuman&gt; characters)</c>
+        /// Signature: <c>void OnTick(WDateTime now, IReadOnlyList&lt;IHuman&gt; characters)</c>
         /// </para>
         /// <example>
         /// <code>
@@ -123,18 +122,18 @@ namespace GameEngineTools.World.Simulation
         ///     var player = chars[0];
         ///     var npc    = chars[1];
         ///
-        ///     // Naplánovaný scénář
+        ///     // Scheduled scenario
         ///     if (now.Day is 2 or 6 or 12)
-        ///         npc.ReceiveEvent(new InteractionProposed(now, player.Id, npc.Id, SpeechAct.SmallTalk, "Ahoj!"));
+        ///         npc.ReceiveEvent(new InteractionProposed(now, player.Id, npc.Id, SpeechAct.SmallTalk, "Hi!"));
         ///
-        ///     // ReachOut routing — kdo chce oslovit?
+        ///     // ReachOut routing — who wants to reach out?
         ///     foreach (var c in chars)
         ///     {
         ///         var reachOut = c.LastOutbox.OfType&lt;ActionCommitted&gt;()
         ///             .FirstOrDefault(a => a.ActionName == "ReachOut");
         ///         if (reachOut == null) continue;
         ///
-        ///         // Vyber target — třeba nejbližšího ve stejné lokaci
+        ///         // Pick a target — e.g. the nearest one in the same location
         ///         var target = chars
         ///             .Where(x => x.Id != c.Id
         ///                 &amp;&amp; x.Snapshot.InteractionSurface.Location == c.Snapshot.InteractionSurface.Location)
@@ -145,23 +144,23 @@ namespace GameEngineTools.World.Simulation
         /// }
         /// </code>
         /// </example>
-        /// <para>Pokud <c>null</c>, scéna simuluje pouze přirozené chování enginů.</para>
+        /// <para>If <c>null</c>, the scene simulates only the engines' natural behaviour.</para>
         /// </remarks>
         public Action<WDateTime, IReadOnlyList<IHuman>>? OnTick { get; init; }
 
-        #endregion Scénář (callback)
+        #endregion Scenario (callback)
 
-        #region Narativní výstup
+        #region Narrative output
 
         /// <summary>
-        /// Volitelný formatter pro převod doménových událostí na čitelný text.
+        /// Optional formatter that converts domain events into readable text.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Pokud <c>null</c>, narrative výstup je deaktivován — scéna simuluje normálně.
+        /// If <c>null</c>, narrative output is disabled — the scene simulates normally.
         /// </para>
         /// <para>
-        /// <b>Typické použití v GameSandbox:</b>
+        /// <b>Typical use in GameSandbox:</b>
         /// <code>
         /// NarrativeFormatter = new DefaultNarrativeFormatter(),
         /// ResolveCharacter   = id => new NarrativeCharacterInfo(
@@ -178,30 +177,30 @@ namespace GameEngineTools.World.Simulation
         public INarrativeFormatter? NarrativeFormatter { get; init; }
 
         /// <summary>
-        /// Resolver informací o postavách pro narativní formátování.
+        /// Resolver of character information for narrative formatting.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Scéna ti předá <see cref="HumanId"/>, ty vrátíš jméno a pohlaví.
-        /// Resolver je lambdou — nemusíš předávat celý seznam postav do Narrative namespace.
+        /// The scene passes you a <see cref="HumanId"/>; you return the name and sex.
+        /// The resolver is a lambda — you do not have to pass the whole character list into the Narrative namespace.
         /// </para>
         /// <para>
-        /// Pokud <c>null</c> a <see cref="NarrativeFormatter"/> je nastaven,
-        /// scéna použije výchozí fallback resolver (<c>HumanId.Value.ToString()</c>,
+        /// If <c>null</c> and <see cref="NarrativeFormatter"/> is set,
+        /// the scene uses a default fallback resolver (<c>HumanId.Value.ToString()</c>,
         /// <c>SexBiology.Unknown</c>).
         /// </para>
         /// </remarks>
         public Func<HumanId, NarrativeCharacterInfo>? ResolveCharacter { get; init; }
 
         /// <summary>
-        /// Callback volaný s každým vygenerovaným narativním záznamem.
+        /// Callback invoked for every generated narrative entry.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Signatura: <c>void OnNarrative(NarrativeEntry entry)</c>
+        /// Signature: <c>void OnNarrative(NarrativeEntry entry)</c>
         /// </para>
         /// <para>
-        /// Filtruj priority dle potřeby:
+        /// Filter by priority as needed:
         /// <code>
         /// OnNarrative = entry =>
         /// {
@@ -215,50 +214,50 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         public Action<NarrativeEntry>? OnNarrative { get; init; }
 
-        #endregion Narativní výstup
+        #endregion Narrative output
 
-        #region Astronomický kontext
+        #region Astronomical context
 
         /// <summary>
-        /// Volitelná konfigurace astronomické logiky (sluneční model).
-        /// Pokud nastavena, scéna před každým tickem postav vypočítá
-        /// <see cref="CelestialContext"/> a injektuje ho přes
+        /// Optional configuration of the astronomical logic (solar model).
+        /// When set, before every character tick the scene computes
+        /// <see cref="CelestialContext"/> and injects it via
         /// <see cref="IHuman.SetAmbientContext"/>.
         /// </summary>
         public AstroConfig? AstroConfig { get; init; }
 
         /// <summary>
-        /// Volitelná konfigurace planetárního systému (Phase 2).
-        /// Pokud nastavena společně s <see cref="AstroConfig"/>, scéna použije
-        /// Keplerovu mechaniku pro výpočet sezóny, teploty a gravitace.
+        /// Optional planetary-system configuration (Phase 2).
+        /// When set together with <see cref="AstroConfig"/>, the scene uses
+        /// Keplerian mechanics to compute season, temperature and gravity.
         /// </summary>
         public UniverseConfig? UniverseConfig { get; init; }
 
-        #endregion Astronomický kontext
+        #endregion Astronomical context
 
         #region Sleep handling
 
         /// <summary>
-        /// Handlery sleep promptů pro jednotlivé postavy.
+        /// Per-character sleep-prompt handlers.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Klíč: <see cref="HumanId"/> postavy.<br/>
-        /// Hodnota: callback <c>Func&lt;SleepPromptRequested, bool&gt;</c> —
-        /// vrátí <c>true</c> = jít spát, <c>false</c> = odmítnout.
+        /// Key: the character's <see cref="HumanId"/>.<br/>
+        /// Value: a <c>Func&lt;SleepPromptRequested, bool&gt;</c> callback —
+        /// returns <c>true</c> = go to sleep, <c>false</c> = decline.
         /// </para>
         /// <para>
-        /// <b>Default chování:</b> pokud postava v tomto slovníku není,
-        /// scéna automaticky potvrdí spánek (NPC chování).
+        /// <b>Default behaviour:</b> if a character is not in this dictionary,
+        /// the scene automatically confirms sleep (NPC behaviour).
         /// </para>
         /// <para>
-        /// Příklad — hráč s manuálním promptem:
+        /// Example — a player with a manual prompt:
         /// <code>
         /// SleepPromptHandlers = new Dictionary&lt;HumanId, Func&lt;SleepPromptRequested, bool&gt;&gt;
         /// {
         ///     [player.Id] = _ =>
         ///     {
-        ///         Console.WriteLine("[SPÁNEK] Jít spát? (A/n)");
+        ///         Console.WriteLine("[SLEEP] Go to sleep? (Y/n)");
         ///         return Console.ReadKey(true).Key != ConsoleKey.N;
         ///     }
         /// }

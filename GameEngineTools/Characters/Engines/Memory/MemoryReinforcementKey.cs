@@ -10,10 +10,10 @@ namespace GameEngineTools.Characters.Engines.Memory
     using static GameEngineTools.Characters.Engines.Memory.MemoryWhatParser;
 
     /// <summary>
-    /// Explicitní klíč pro reinforcement epizod.
+    /// Explicit key for episode reinforcement.
     ///
-    /// Neopírá se o syrový <c>What</c> string jako jediný zdroj pravdy,
-    /// ale o jeho strukturovaný význam.
+    /// It does not rely on the raw <c>What</c> string as the single source of truth,
+    /// but on its structured meaning.
     /// </summary>
     internal sealed record MemoryReinforcementKey(
         string Category,
@@ -23,12 +23,12 @@ namespace GameEngineTools.Characters.Engines.Memory
         string? Variant);
 
     /// <summary>
-    /// Builder reinforcement klíče z epizodické paměti.
+    /// Builder of the reinforcement key from episodic memory.
     /// </summary>
     internal static class MemoryReinforcementKeyBuilder
     {
         /// <summary>
-        /// Vytvoří reinforcement klíč z epizody.
+        /// Creates a reinforcement key from an episode.
         /// </summary>
         public static MemoryReinforcementKey From(EpisodicMemory episode)
         {
@@ -43,43 +43,43 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Určí jemnější variantu stejného typu epizody.
+        /// Determines a finer-grained variant of the same episode type.
         ///
-        /// Cíl:
-        /// - interakce stejného typu se stejnou osobou se mají reinforcementovat,
-        /// - ale různé mikroobsahy typu <c>help</c> vs. <c>support</c> se nemají slévat,
-        /// - spánek může reinforcementovat i při jiném počtu hodin, pokud je kvalitativně stejný.
+        /// Goal:
+        /// - interactions of the same type with the same person should reinforce each other,
+        /// - but different micro-contents such as <c>help</c> vs. <c>support</c> must not merge,
+        /// - sleep can reinforce even at a different number of hours, as long as it is qualitatively the same.
         /// </summary>
         private static string? BuildVariant(MemoryEpisodeDescriptor descriptor, string rawWhat)
         {
             if (descriptor.Category == "Interaction")
             {
-                // Interaction je dostatečně odlišená přes Category + Type + Outcome + OtherPerson.
+                // Interaction is sufficiently distinguished by Category + Type + Outcome + OtherPerson.
                 return null;
             }
 
             if (descriptor.Category == "Action")
             {
-                // Action:{ActionName} — Type už nese význam celé akce.
+                // Action:{ActionName} — Type already carries the meaning of the whole action.
                 return null;
             }
 
             if (descriptor.Category == "Relation" && descriptor.Type == "FirstImpression")
             {
-                // Outcome už rozlišuje Positive / Neutral / Negative, OtherPerson nese cíl dojmu.
+                // Outcome already distinguishes Positive / Neutral / Negative; OtherPerson carries the target of the impression.
                 return null;
             }
 
             if (descriptor.Category == "Relation" && descriptor.Type == "Repair")
             {
-                // Outcome + OtherPerson stačí.
+                // Outcome + OtherPerson is enough.
                 return null;
             }
 
             if (descriptor.Category == "Relation"
                 && (descriptor.Type == "MicroPositive" || descriptor.Type == "MicroNegative"))
             {
-                // Mikroobsah je významový rozdělovač a NESMÍ se slévat.
+                // The micro-content is a semantic separator and MUST NOT merge.
                 return descriptor.Parameters.TryGetValue("what", out var microWhat)
                     ? Normalize(microWhat)
                     : null;
@@ -87,8 +87,8 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             if (descriptor.Category == "Sleep" && descriptor.Type == "Ended")
             {
-                // Outcome už nese bucket kvality (High / Medium / Low / Poor).
-                // Hodiny nechceme používat jako reinforcement identitu.
+                // Outcome already carries the quality bucket (High / Medium / Low / Poor).
+                // We do not want to use hours as the reinforcement identity.
                 return null;
             }
 
@@ -99,18 +99,18 @@ namespace GameEngineTools.Characters.Engines.Memory
                     : null;
             }
 
-            // Fallback: canonical params bez závislosti na pořadí parametrů.
+            // Fallback: canonical params independent of parameter order.
             return CanonicalizeParameters(descriptor.Parameters);
         }
 
         /// <summary>
-        /// Znormalizuje textový token pro porovnávání v reinforcement klíči.
+        /// Normalizes a text token for comparison in the reinforcement key.
         /// </summary>
         private static string Normalize(string value)
             => value.Trim().ToLowerInvariant();
 
         /// <summary>
-        /// Stabilní fallback serializace parametrů bez závislosti na pořadí.
+        /// Stable fallback serialization of parameters independent of order.
         /// </summary>
         private static string? CanonicalizeParameters(IReadOnlyDictionary<string, string> parameters)
         {

@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Serializuje character log entries do kompaktní JSON Lines podoby.
+    /// Serialises character log entries into a compact JSON Lines form.
     /// </summary>
     internal static class CharactersJsonLogFormatter
     {

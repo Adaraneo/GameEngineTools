@@ -165,7 +165,7 @@ public static class HabitabilityCalculator
                         : eccentricity < 0.6 ? 0.4 : 0.1;
         double baseScore = oblScore * eccScore;
 
-        // Velký měsíc stabilizuje sklon osy → bonus ke klimatické stabilitě
+        // A large moon stabilizes axial tilt → a bonus to climate stability
         if (primaryMoon is { } moon)
         {
             var stab = MoonHabitabilityEffects.ObliquityStabilisationStrength(

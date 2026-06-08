@@ -29,16 +29,16 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace GameEngineTools.Characters.Hosting
 {
     /// <summary>
-    /// Extension metody pro <see cref="IServiceCollection"/> — registrace herních systémů do DI.
+    /// Extension methods for <see cref="IServiceCollection"/> — registering game systems into DI.
     /// </summary>
     public static class ServiceCollectionExtensions
     {
         #region Core
 
         /// <summary>
-        /// Zaregistruje jádro (EventBus, Scheduler, RNG factory, HumanFactory).
-        /// Defaulty jsou "in-memory" a dají se přepsat vlastními implementacemi dřív nebo
-        /// později v pipeline přes <c>TryAdd*</c> sémantiku.
+        /// Registers the core (EventBus, Scheduler, RNG factory, HumanFactory).
+        /// The defaults are "in-memory" and can be overridden with custom implementations earlier or
+        /// later in the pipeline via the <c>TryAdd*</c> semantics.
         /// </summary>
         public static IServiceCollection AddCharactersCore(this IServiceCollection services)
         {
@@ -97,13 +97,13 @@ namespace GameEngineTools.Characters.Hosting
         #region CharacterGeneration
 
         /// <summary>
-        /// Zaregistruje generátor postav s předem vytvořeným <see cref="HumanBlueprintSpec"/>.
+        /// Registers the character generator with a pre-created <see cref="HumanBlueprintSpec"/>.
         /// </summary>
         /// <param name="services">DI kolekce.</param>
-        /// <param name="humanBlueprintSpec">Specifikace blueprintu — váhy pohlaví, výchozí rozsah věku.</param>
+        /// <param name="humanBlueprintSpec">Blueprint specification — sex weights, default age range.</param>
         /// <remarks>
-        /// Pokud potřebuješ spec sestavit až po startu DI (např. z <c>WorldTimeContext</c>),
-        /// použij overload <see cref="AddCharacterGeneration(IServiceCollection, Func{IServiceProvider, HumanBlueprintSpec})"/>.
+        /// If you need to build the spec after DI starts (e.g. from <c>WorldTimeContext</c>),
+        /// use the <see cref="AddCharacterGeneration(IServiceCollection, Func{IServiceProvider, HumanBlueprintSpec})"/> overload.
         /// </remarks>
         public static IServiceCollection AddCharacterGeneration(
             this IServiceCollection services,
@@ -114,13 +114,13 @@ namespace GameEngineTools.Characters.Hosting
         }
 
         /// <summary>
-        /// Zaregistruje generátor postav s lazy factory pro <see cref="HumanBlueprintSpec"/>.
-        /// Factory je vyhodnocena až při prvním resolve — v té době je DI kontejner plně sestaven,
-        /// takže může záviset na libovolném singletons (typicky <c>WorldTimeContext</c>).
+        /// Registers the character generator with a lazy factory for <see cref="HumanBlueprintSpec"/>.
+        /// The factory is evaluated only on first resolve — by then the DI container is fully built,
+        /// so it can depend on any singletons (typically <c>WorldTimeContext</c>).
         /// </summary>
         /// <param name="services">DI kolekce.</param>
         /// <param name="specFactory">
-        /// Factory funkce pro sestavení <see cref="HumanBlueprintSpec"/> z DI provideru.
+        /// Factory function that builds a <see cref="HumanBlueprintSpec"/> from the DI provider.
         /// </param>
         /// <example>
         /// <code>
@@ -161,7 +161,7 @@ namespace GameEngineTools.Characters.Hosting
         }
 
         /// <summary>
-        /// Sdílená registrace generátorů — volaná oběma overloady <c>AddCharacterGeneration</c>.
+        /// Shared generator registration — called by both <c>AddCharacterGeneration</c> overloads.
         /// </summary>
         private static IServiceCollection AddCharacterGenerationCore(this IServiceCollection services)
         {
@@ -203,7 +203,7 @@ namespace GameEngineTools.Characters.Hosting
 
         #region Engine registrace
 
-        /// <summary>Registrace implementace Physiology engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the Physiology engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddPhysiologyEngine<TImpl>(
             this IServiceCollection services,
             Action<PhysiologyConfig>? configure = null)
@@ -223,7 +223,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Psychology engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the Psychology engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddPsychologyEngine<TImpl>(
             this IServiceCollection services,
             Action<PsychologyConfig>? configure = null)
@@ -244,8 +244,8 @@ namespace GameEngineTools.Characters.Hosting
         }
 
         /// <summary>
-        /// Registrace implementace Behavior engine + jeho konfigurace přes Options.
-        /// Zároveň registruje <see cref="SleepConfig"/>, která je potřebná pro
+        /// Registers the Behavior engine implementation + its configuration via Options.
+        /// It also registers <see cref="SleepConfig"/>, which is needed for
         /// <see cref="DefaultBehaviorEngine"/> a <see cref="DefaultSleepSession"/>.
         /// </summary>
         public static IServiceCollection AddBehaviorEngine<TImpl>(
@@ -271,7 +271,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Interactions engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the Interactions engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddInteractionEngine<TImpl>(
             this IServiceCollection services,
             Action<InteractionConfig>? configure = null)
@@ -291,7 +291,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Relationships engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the Relationships engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddRelationshipsEngine<TImpl>(
             this IServiceCollection services,
             Action<RelationshipsConfig>? configure = null)
@@ -311,7 +311,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Memory engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the Memory engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddMemoryEngine<TImpl>(
             this IServiceCollection services,
             Action<MemoryConfig>? configure = null)
@@ -331,7 +331,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace SemanticMemory engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the SemanticMemory engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddSemanticMemoryEngine<TImpl>(
             this IServiceCollection services,
             Action<SemanticMemoryConfig>? configure = null)
@@ -351,7 +351,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace DailySchedule engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the DailySchedule engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddDailyScheduleEngine<TImpl>(
             this IServiceCollection services,
             Action<DailyScheduleConfig>? configure = null)
@@ -371,7 +371,7 @@ namespace GameEngineTools.Characters.Hosting
             return services;
         }
 
-        /// <summary>Registrace implementace Goal engine + jeho konfigurace přes Options.</summary>
+        /// <summary>Registers the Goal engine implementation + its configuration via Options.</summary>
         public static IServiceCollection AddGoalEngine<TImpl>(
             this IServiceCollection services,
             Action<GoalConfig>? configure = null)
@@ -412,7 +412,7 @@ namespace GameEngineTools.Characters.Hosting
         #region Zkrácená registrace všeho najednou
 
         /// <summary>
-        /// Zkrácená registrace všech enginů najednou.
+        /// Shorthand registration of all engines at once.
         /// </summary>
         public static IServiceCollection AddCharacters<TPhysio, TPsych, TBehav, TInter, TRel, TMem, TSem, TGoal, TSchedule>(
             this IServiceCollection services,

@@ -14,24 +14,24 @@ namespace GameEngineTools.Characters.Engines.Interactions
     using Microsoft.Extensions.Options;
 
     /// <summary>
-    /// Výchozí implementace <see cref="IInteractionEngine"/>.
+    /// Default implementation of <see cref="IInteractionEngine"/>.
     /// </summary>
     /// <remarks>
-    /// Engine reaguje na dvě kategorie událostí:
+    /// The engine reacts to two categories of events:
     /// <list type="bullet">
     ///   <item>
-    ///     <see cref="ContextChanged"/> — aktualizuje prostředí interakce
-    ///     (lokace, soukromí, hluk, dav).
+    ///     <see cref="ContextChanged"/> — updates the interaction environment
+    ///     (location, privacy, noise, crowd).
     ///   </item>
     ///   <item>
-    ///     <see cref="InteractionProposed"/> — vyhodnotí pravděpodobnost přijetí
-    ///     na základě vztahů, psychiky a prostředí. Výsledkem je <see cref="InteractionOutcome"/>.
+    ///     <see cref="InteractionProposed"/> — evaluates the acceptance probability
+    ///     based on relationships, psychology and the environment. The result is an <see cref="InteractionOutcome"/>.
     ///   </item>
     /// </list>
     /// <para>
-    /// <b>Proč <c>Tick()</c> nic nedělá?</b><br/>
-    /// Interakce jsou reaktivní — spouštějí se vždy událostí (hráč nebo NPC iniciuje kontakt),
-    /// nikoli uplynutím času. Engine nemá co "tikat" sám od sebe.
+    /// <b>Why does <c>Tick()</c> do nothing?</b><br/>
+    /// Interactions are reactive — they are always triggered by an event (a player or NPC initiating contact),
+    /// not by the passage of time. The engine has nothing to "tick" on its own.
     /// </para>
     /// </remarks>
     internal sealed class DefaultInteractionEngine : IInteractionEngine
@@ -55,15 +55,15 @@ namespace GameEngineTools.Characters.Engines.Interactions
         #region Konstruktor
 
         /// <summary>
-        /// Vytvoří instanci <see cref="DefaultInteractionEngine"/>.
-        /// Počáteční stav prostředí je neutrální — neznámá lokace, střední hluk a dav.
+        /// Creates a <see cref="DefaultInteractionEngine"/> instance.
+        /// The initial environment state is neutral — unknown location, medium noise and crowd.
         /// </summary>
         public DefaultInteractionEngine(IOptions<InteractionConfig> cfg, ILoggerFactory loggerFactory)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultInteractionEngine>();
 
-            // Bezpečný výchozí stav — než hra nastaví reálný kontext přes ContextChanged
+            // Safe default state — until the game sets the real context via ContextChanged
             State = new InteractionSurface(Location: "Unknown", HasPrivacy: false, Noise: 0.5, Crowding: 0.5, Kind: SurfaceKind.Unknown);
         }
 
@@ -72,10 +72,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
         #region Tick
 
         /// <inheritdoc/>
-        /// <remarks>Interakce jsou čistě reaktivní — bez aktivního prostředí se nic neděje.</remarks>
+        /// <remarks>Interactions are purely reactive — without an active environment nothing happens.</remarks>
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
-            // Bez aktivního prostředí neděláme nic periodického.
+            // Without an active environment we do nothing periodic.
         }
 
         #endregion Tick
@@ -117,7 +117,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var comfort = edge?.Comfort ?? 0;
             var psych = ctx.Snapshot.Psychology;
 
-            // Pravděpodobnost přijení závisí silně na úrovni dotyku
+            // The acceptance probability depends strongly on the touch level
             var baseP = attempted.Level switch
             {
                 TouchLevel.Light => 0.5 + closeness * 0.005,
@@ -131,7 +131,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 baseP += SociosexualityBehaviorMath.IntimateTouchAcceptanceBias(ctx.Personality.Sociosexuality, edge, State.HasPrivacy);
             }
 
-            // Soukromí a psychika modulují
+            // Privacy and psychology modulate it
             baseP += State.HasPrivacy ? 0.05 : -0.05;
             baseP -= psych.Stress * 0.002;
             baseP += Math.Max(0, psych.Valence) * 0.05;
@@ -139,7 +139,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var pAcc = Math.Clamp(baseP, 0, 0.95);
             var accepted = ctx.Random.Chance(pAcc);
 
-            // Intimate bez dostatečné Closeness/Attraction vždy odmítnuto
+            // Intimate without sufficient Closeness/Attraction is always declined
             if (attempted.Level == TouchLevel.Intimate
                 && SociosexualityBehaviorMath.BlocksIntimateTouch(ctx.Personality.Sociosexuality, edge))
             {
@@ -160,8 +160,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
         }
 
         /// <summary>
-        /// Aktualizuje prostředí postavy na základě nové lokace / kontextu.
-        /// Hodnoty Noise a Crowding jsou clampovány na [0, 1].
+        /// Updates the character's environment based on a new location / context.
+        /// The Noise and Crowding values are clamped to [0, 1].
         /// </summary>
         private void HandleContextChanged(ContextChanged cc, IHumanContext ctx)
         {
@@ -185,19 +185,19 @@ namespace GameEngineTools.Characters.Engines.Interactions
         }
 
         /// <summary>
-        /// Vyhodnotí navrhovanou interakci a vyemituje <see cref="InteractionOutcome"/>.
+        /// Evaluates the proposed interaction and emits an <see cref="InteractionOutcome"/>.
         /// </summary>
         /// <remarks>
-        /// Pravděpodobnost přijetí závisí na:
+        /// The acceptance probability depends on:
         /// <list type="bullet">
-        ///   <item>Vztazích: Closeness, Comfort, Trust (čím blíž, tím ochotněji)</item>
-        ///   <item>Psychice: Valence (dobrá nálada otevírá), Stress (stres uzavírá)</item>
-        ///   <item>Prostředí: soukromí pomáhá, dav a hluk překáží</item>
-        ///   <item>Misattribution: stres způsobuje chybné čtení záměrů</item>
+        ///   <item>Relationships: Closeness, Comfort, Trust (the closer, the more willing)</item>
+        ///   <item>Psychology: Valence (a good mood opens up), Stress (stress closes off)</item>
+        ///   <item>Environment: privacy helps, a crowd and noise hinder</item>
+        ///   <item>Misattribution: stress causes misreading of intents</item>
         /// </list>
         /// <para>
-        /// <b>Důležité:</b> <see cref="SpeechAct"/> se přenáší beze změny do <see cref="InteractionOutcome"/>,
-        /// aby <c>RelationshipsEngine</c> věděl, jakou doménu aktualizovat.
+        /// <b>Important:</b> the <see cref="SpeechAct"/> is carried unchanged into the <see cref="InteractionOutcome"/>,
+        /// so the <c>RelationshipsEngine</c> knows which domain to update.
         /// </para>
         /// </remarks>
         private void HandleInteractionProposed(InteractionProposed p, IHumanContext ctx, IEventCollector outbox)
@@ -205,7 +205,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var rels = ctx.Snapshot.Relationships.Edges;
             rels.TryGetValue(p.From, out var edge);
 
-            // Vztahové vstupy — neznámý člověk dostane neutrální výchozí hodnoty
+            // Relationship inputs — an unknown person gets neutral default values
             var closeness = edge?.Closeness ?? 30;
             var comfort = edge?.Comfort ?? 30;
             var trust = edge?.Trust ?? 30;
@@ -214,9 +214,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
                 .ExpectedAcceptance(p.From, p.Act, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
 
-            // Základní pravděpodobnost přijetí — lineární kombinace vztahů a psychiky
-            // B4: Agreeableness moduluje ochotu přijmout — high-A postavy jsou přijímavější
-            // (+0.10 u plné Agreeableness, −0.10 u nulové); rozsah ±0.10 je konzervativní.
+            // Base acceptance probability — a linear combination of relationships and psychology
+            // B4: Agreeableness modulates willingness to accept — high-A characters are more receptive
+            // (+0.10 at full Agreeableness, −0.10 at zero); the ±0.10 range is conservative.
             var agreeablenessBias = (ctx.Personality.BigFive.Agreeableness - 0.5) * 0.20;
             var baseP = 0.30
                         + 0.0025 * closeness
@@ -245,7 +245,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     baseP += edge.ResponsiveDesireLevel / 500.0;  // max +0.16 at ResponsiveDesireLevel=80
             }
 
-            // Misattribution: vyšší stres + hluk → větší šance na špatné čtení záměru
+            // Misattribution: higher stress + noise → greater chance of misreading the intent
             // E2: noise degrades social signal quality (harder to read intent correctly).
             var noise = double.IsNaN(State.Noise) ? 0.0 : State.Noise;
             var misattrib = ComputeMisattributionPenalty(p.Act, psych.Stress, trust, comfort, State.HasPrivacy, noise);
@@ -312,7 +312,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     accepted ? "PŘIJATO" : "ODMÍTNUTO");
             }
 
-            // Přenášíme p.Act — RelationshipsEngine ho potřebuje pro DomainBreakdown
+            // We carry p.Act — the RelationshipsEngine needs it for DomainBreakdown
             var (peakVal, endVal) = ComputePeakEndValence(p.Act, accepted, misattrib);
             var outcome = new InteractionOutcome(
                 OccurredAt: p.OccurredAt,

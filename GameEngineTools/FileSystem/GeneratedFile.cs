@@ -15,7 +15,7 @@ namespace GameEngineTools.FileSystem
     using Microsoft.Extensions.Options;
 
     /// <summary>
-    /// Implementace <see cref="IGeneratedFile"/> — serializace a deserializace postav do/ze JSON souborů.
+    /// Implementation of <see cref="IGeneratedFile"/> — serialization and deserialization of characters to/from JSON files.
     /// </summary>
     public sealed class GeneratedFile : IGeneratedFile
     {
@@ -31,12 +31,12 @@ namespace GameEngineTools.FileSystem
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje instanci se všemi závislostmi.
+        /// Initializes the instance with all its dependencies.
         /// </summary>
-        /// <param name="clock">Herní hodiny (pro budoucí timestampy v exportech).</param>
-        /// <param name="characterManager">Správce postav (pro hromadný export/import).</param>
-        /// <param name="humanFactory">Factory pro rekonstrukci postav při importu.</param>
-        /// <param name="options">Volitelná konfigurace adresářů pro export souborů.</param>
+        /// <param name="clock">Game clock (for future timestamps in exports).</param>
+        /// <param name="characterManager">Character manager (for bulk export/import).</param>
+        /// <param name="humanFactory">Factory for reconstructing characters on import.</param>
+        /// <param name="options">Optional configuration of directories for exported files.</param>
         public GeneratedFile(
             IClock clock,
             IGameEngineToolsManager characterManager,
@@ -53,8 +53,8 @@ namespace GameEngineTools.FileSystem
                 PlayerDirectory = options.Value.PlayerDirectory;
             }
 
-            // _jsonOptions musí být v konstruktoru — convertery pro WDateTime a WTimeSpan
-            // vyžadují ctx, který nemáme k dispozici ve field initializeru
+            // _jsonOptions must be set in the constructor — the converters for WDateTime and WTimeSpan
+            // require a ctx that is not available in a field initializer
             _jsonOptions = new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -72,10 +72,10 @@ namespace GameEngineTools.FileSystem
 
         #region Vlastnosti
 
-        /// <summary>Adresář pro exportované NPC soubory.</summary>
+        /// <summary>Directory for exported NPC files.</summary>
         public string NPCDirectory { get; set; }
 
-        /// <summary>Adresář pro exportované hráčské soubory.</summary>
+        /// <summary>Directory for exported player files.</summary>
         public string PlayerDirectory { get; set; }
 
         #endregion Vlastnosti
@@ -83,10 +83,10 @@ namespace GameEngineTools.FileSystem
         #region Export
 
         /// <summary>
-        /// Exportuje hráčskou postavu do JSON souboru.
+        /// Exports a player character to a JSON file.
         /// </summary>
-        /// <param name="player">Hráčská postava k exportu.</param>
-        /// <returns>Název vytvořeného souboru.</returns>
+        /// <param name="player">The player character to export.</param>
+        /// <returns>The name of the created file.</returns>
         public string Export(PC player)
         {
             var filename = $"{player.Person.Id.Value}.json";
@@ -99,7 +99,7 @@ namespace GameEngineTools.FileSystem
         /// Exportuje NPC postavu do JSON souboru.
         /// </summary>
         /// <param name="npc">NPC postava k exportu.</param>
-        /// <returns>Název vytvořeného souboru.</returns>
+        /// <returns>The name of the created file.</returns>
         public string Export(NPC npc)
         {
             var filename = $"{npc.Person.Id.Value}.json";
@@ -109,9 +109,9 @@ namespace GameEngineTools.FileSystem
         }
 
         /// <summary>
-        /// Exportuje všechny postavy ze správce (první je hráč, zbytek NPC).
+        /// Exports all characters from the manager (the first is the player, the rest are NPCs).
         /// </summary>
-        /// <param name="pathToRootDirectory">Volitelný kořenový adresář.</param>
+        /// <param name="pathToRootDirectory">Optional root directory.</param>
         public void ExportNPPCs(string? pathToRootDirectory = null)
         {
             _ = new GenerateFileSystem(pathToRootDirectory);
@@ -129,8 +129,8 @@ namespace GameEngineTools.FileSystem
         /// <summary>
         /// Importuje NPC postavu ze JSON souboru.
         /// </summary>
-        /// <param name="filename">Název souboru v <see cref="NPCDirectory"/>.</param>
-        /// <returns>Rekonstruovaná NPC postava.</returns>
+        /// <param name="filename">File name in <see cref="NPCDirectory"/>.</param>
+        /// <returns>The reconstructed NPC character.</returns>
         public NPC ImportNPC(string filename)
         {
             var data = ReadJson(ResolveFileUnderRoot(NPCDirectory, filename));
@@ -148,10 +148,10 @@ namespace GameEngineTools.FileSystem
         }
 
         /// <summary>
-        /// Importuje hráčskou postavu ze JSON souboru.
+        /// Imports a player character from a JSON file.
         /// </summary>
-        /// <param name="filename">Název souboru v <see cref="PlayerDirectory"/>.</param>
-        /// <returns>Rekonstruovaná hráčská postava.</returns>
+        /// <param name="filename">File name in <see cref="PlayerDirectory"/>.</param>
+        /// <returns>The reconstructed player character.</returns>
         public PC ImportPC(string filename)
         {
             var data = ReadJson(ResolveFileUnderRoot(PlayerDirectory, filename));
@@ -169,9 +169,9 @@ namespace GameEngineTools.FileSystem
         }
 
         /// <summary>
-        /// Importuje všechny postavy ze souborů (první je hráč, zbytek NPC).
+        /// Imports all characters from files (the first is the player, the rest are NPCs).
         /// </summary>
-        /// <param name="pathToRootDirectory">Volitelný kořenový adresář.</param>
+        /// <param name="pathToRootDirectory">Optional root directory.</param>
         public void ImportNPPCs(string? pathToRootDirectory = null)
         {
             _characterManager.Characters.Clear();
@@ -187,7 +187,7 @@ namespace GameEngineTools.FileSystem
 
         #region Privátní pomocné metody
 
-        /// <summary>Sestaví <see cref="CharacterData"/> z libovolné herní postavy.</summary>
+        /// <summary>Builds a <see cref="CharacterData"/> from any game character.</summary>
         private static CharacterData BuildCharacterData(CharacterBase character) => new()
         {
             Id = character.Person.Id,
@@ -239,7 +239,7 @@ namespace GameEngineTools.FileSystem
             return fullPath;
         }
 
-        /// <summary>Zapíše data jako JSON do souboru.</summary>
+        /// <summary>Writes the data as JSON to a file.</summary>
         private void WriteJson(string path, CharacterData data)
         {
             var json = JsonSerializer.Serialize(data, _jsonOptions);
@@ -247,7 +247,7 @@ namespace GameEngineTools.FileSystem
             file.Write(json);
         }
 
-        /// <summary>Načte a deserializuje <see cref="CharacterData"/> ze souboru.</summary>
+        /// <summary>Loads and deserializes a <see cref="CharacterData"/> from a file.</summary>
         private CharacterData ReadJson(string path)
         {
             using var file = new StreamReader(File.OpenRead(path));

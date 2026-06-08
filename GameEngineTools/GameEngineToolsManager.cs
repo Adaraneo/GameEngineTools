@@ -19,8 +19,8 @@ namespace GameEngineTools
     using Microsoft.Extensions.Options;
 
     /// <summary>
-    /// Hlavní správce herního světa — inicializuje zdroje, spravuje postavy
-    /// a poskytuje factory metody pro generování nových postav.
+    /// Main game-world manager — initializes resources, manages characters
+    /// and provides factory methods for generating new characters.
     /// </summary>
     public sealed class GameEngineToolsManager : IGameEngineToolsManager
     {
@@ -40,11 +40,11 @@ namespace GameEngineTools
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje manager se všemi závislostmi přes DI.
+        /// Initializes the manager with all its dependencies via DI.
         /// </summary>
-        /// <param name="clock">Zdroj aktuálního herního času (pro RandomizePerson).</param>
-        /// <param name="rngFactory">Factory pro generátory náhodných čísel.</param>
-        /// <param name="opt">Konfigurační volby manageru (logy, adresáře).</param>
+        /// <param name="clock">Source of the current game time (for RandomizePerson).</param>
+        /// <param name="rngFactory">Factory for random-number generators.</param>
+        /// <param name="opt">Manager configuration options (logs, directories).</param>
         /// <param name="log">Logger.</param>
         /// <param name="serviceProvider">DI provider pro lazy-resolve factories.</param>
         public GameEngineToolsManager(
@@ -66,13 +66,13 @@ namespace GameEngineTools
         #region Veřejné vlastnosti
 
         /// <summary>
-        /// Všechny aktivní postavy ve světě (NPC i hráčské).
+        /// All active characters in the world (NPCs and players).
         /// </summary>
         public List<CharacterBase> Characters { get; } = new();
 
         /// <summary>
-        /// Obecné úložiště herních objektů indexované typem.
-        /// Primárně pro testovací účely.
+        /// General store of game objects indexed by type.
+        /// Primarily for testing purposes.
         /// </summary>
         public Dictionary<Type, object> Items { get; } = new();
 
@@ -81,8 +81,8 @@ namespace GameEngineTools
         #region Inicializace
 
         /// <summary>
-        /// Inicializuje manager — vyčistí stav a načte herní zdroje ze souborů.
-        /// Voláno automaticky přes <c>GameEngineToolsManagerInitializer</c> při startu hostu.
+        /// Initializes the manager — clears state and loads game resources from files.
+        /// Called automatically via <c>GameEngineToolsManagerInitializer</c> at host startup.
         /// </summary>
         public void Initialize()
         {
@@ -106,9 +106,9 @@ namespace GameEngineTools
         #region RandomizePerson
 
         /// <summary>
-        /// Vygeneruje náhodnou postavu s výchozími parametry blueprintu.
+        /// Generates a random character with the default blueprint parameters.
         /// </summary>
-        /// <returns>Nová náhodně vygenerovaná postava.</returns>
+        /// <returns>A newly randomly generated character.</returns>
         public IHuman RandomizePerson()
         {
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
@@ -117,15 +117,15 @@ namespace GameEngineTools
         }
 
         /// <summary>
-        /// Vygeneruje náhodnou postavu s věkem v zadaném rozsahu.
+        /// Generates a random character with an age in the given range.
         /// </summary>
-        /// <param name="maxAge">Maximální věk v letech.</param>
-        /// <param name="sexBiology">Pohlaví, pokud je nastaveno na null, vybere se náhodně.</param>
-        /// <param name="minAge">Minimální věk v letech (výchozí 0).</param>
-        /// <returns>Nová náhodně vygenerovaná postava.</returns>
+        /// <param name="maxAge">Maximum age in years.</param>
+        /// <param name="sexBiology">Sex; if null, it is chosen randomly.</param>
+        /// <param name="minAge">Minimum age in years (default 0).</param>
+        /// <returns>A newly randomly generated character.</returns>
         /// <remarks>
-        /// Datum narození se náhodně volí uvnitř okna odvozeného od aktuálního
-        /// herního času a zadaného věkového rozsahu.
+        /// The birth date is chosen randomly within a window derived from the current
+        /// game time and the given age range.
         /// </remarks>
         public IHuman RandomizePerson(int maxAge, SexBiology? sexBiology, int minAge = 0)
         {
@@ -137,7 +137,7 @@ namespace GameEngineTools
 
             var daysInMonth = WWorld.Spec.Calendar.DaysInMonth(year, rng.Next(1, monthsInYear));
 
-            // Datum = rok ± věk, náhodný měsíc a den v rozsahu aktuálního dne
+            // Date = year ± age, random month and day within the range of the current day
             var minBirth = WDateOnly.New(
                 year - maxAge,
                 rng.Next(1, monthsInYear),
@@ -159,11 +159,11 @@ namespace GameEngineTools
         }
 
         /// <summary>
-        /// Vygeneruje postavu jako potenciálního blízkého k zadanému hráči —
-        /// podobný věk a opačné pohlaví.
+        /// Generates a character as a potential close relation to the given player —
+        /// similar age and the opposite sex.
         /// </summary>
-        /// <param name="referenceCharacter">Hráčská/NPC postava jako reference pro věk a pohlaví.</param>
-        /// <returns>Nová náhodně vygenerovaná postava.</returns>
+        /// <param name="referenceCharacter">A player/NPC character used as a reference for age and sex.</param>
+        /// <returns>A newly randomly generated character.</returns>
         public IHuman RandomizePerson(CharacterBase referenceCharacter)
         {
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
@@ -183,7 +183,7 @@ namespace GameEngineTools
         #region Privátní pomocné metody
 
         /// <summary>
-        /// Načte herní zdroje (zbraně, brnění) ze souborů CSV.
+        /// Loads game resources (weapons, armour) from CSV files.
         /// </summary>
         private void LoadResources()
         {

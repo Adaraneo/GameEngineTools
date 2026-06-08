@@ -6,33 +6,33 @@ using Microsoft.Extensions.Logging;
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Konfigurační volby pro <see cref="CharactersFileLoggerProvider"/>.
+    /// Configuration options for <see cref="CharactersFileLoggerProvider"/>.
     /// </summary>
     public sealed class CharactersFileLoggerOptions
     {
         /// <summary>
-        /// Kořenový adresář pro log soubory.
-        /// Výchozí hodnota: <c>logs/Characters</c>.
+        /// Root directory for log files.
+        /// Default value: <c>logs/Characters</c>.
         /// </summary>
         public string LogsDirectoryPath { get; set; } = Path.Combine("logs", "Characters");
 
         /// <summary>
-        /// Minimální úroveň logování. Zprávy pod touto úrovní jsou zahozeny.
+        /// Minimum log level. Messages below this level are dropped.
         /// </summary>
         public LogLevel MinLevel { get; set; } = LogLevel.Information;
 
         /// <summary>
-        /// Pokud <c>true</c>, real-time timestamps jsou v UTC. Jinak lokální čas.
+        /// If <c>true</c>, real-time timestamps are in UTC; otherwise local time.
         /// </summary>
         public bool UseUtcTimestamps { get; set; } = true;
 
         /// <summary>
-        /// Režim mirroringu do per-person/per-subsystem souborů.
+        /// Mirroring mode into per-person/per-subsystem files.
         /// </summary>
         public CharactersLogMirrorMode MirrorMode { get; set; } = CharactersLogMirrorMode.GlobalAndScoped;
 
         /// <summary>
-        /// Zapne textové <c>.log</c> soubory.
+        /// Enables textual <c>.log</c> files.
         /// </summary>
         public bool WriteTextLogs { get; set; } = true;
 
@@ -42,14 +42,14 @@ namespace GameEngineTools.Logging
         public bool WriteJsonLines { get; set; } = true;
 
         /// <summary>
-        /// Volitelný accessor pro aktuální world time text zapisovaný do logů.
+        /// Optional accessor for the current world-time text written to the logs.
         /// </summary>
         public Func<string>? WorldTimeTextAccessor { get; set; }
 
         /// <summary>
-        /// Volitelný accessor pro numerický world tick (<see cref="World.Utils.Time.WDateTime.WorldTicks"/>).
-        /// Slouží jako grouping klíč pro tick-store v readeru. Když není nastaven, použije se
-        /// bezpečný fallback (0, dokud není <c>WWorld</c> nakonfigurován).
+        /// Optional accessor for the numeric world tick (<see cref="World.Utils.Time.WDateTime.WorldTicks"/>).
+        /// Used as the grouping key for the tick-store in the reader. When not set, a
+        /// safe fallback is used (0 until <c>WWorld</c> is configured).
         /// </summary>
         public Func<long>? WorldTicksAccessor { get; set; }
     }

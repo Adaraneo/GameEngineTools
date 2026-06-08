@@ -10,9 +10,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
     /// Konfigurace <see cref="IInteractionEngine"/>.
     /// </summary>
     /// <param name="MisattributionRateBase">
-    /// Základní pravděpodobnost špatné interpretace záměru.
-    /// Škáluje se stresem postavy: čím větší stres, tím více chybné čtení záměrů druhých.
-    /// Výchozí: 0.15.
+    /// Base probability of misinterpreting an intent.
+    /// Scales with the character's stress: the higher the stress, the more often others' intents are misread.
+    /// Default: 0.15.
     /// </param>
     public sealed record InteractionConfig(
         double MisattributionRateBase = 0.15,
@@ -23,11 +23,11 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// </summary>
         double NoiseAttributionAmplifier = 0.40)
     {
-        /// <summary>Bezparametrický konstruktor vyžadovaný Options patternem.</summary>
+        /// <summary>Parameterless constructor required by the Options pattern.</summary>
         public InteractionConfig() : this(0.15, 0.40) { }
     }
 
-    /// <summary>Událost — postava vstoupila do nového kontextu (lokace, soukromí, hluk, dav).</summary>
+    /// <summary>Event — the character entered a new context (location, privacy, noise, crowd).</summary>
     public sealed record ContextChanged(
         WDateTime OccurredAt,
         HumanId Human,
@@ -51,8 +51,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
         SocialNormContext? NormContext = null) : IDomainEvent;
 
     /// <summary>
-    /// Popis aktuálního prostředí interakce — co je "po ruce".
-    /// Ovlivňuje pravděpodobnost přijetí interakce.
+    /// Description of the current interaction environment — what is "at hand".
+    /// Affects the probability of an interaction being accepted.
     /// </summary>
     public sealed record InteractionSurface(
         string? Location,
@@ -106,57 +106,57 @@ namespace GameEngineTools.Characters.Engines.Interactions
         Public
     }
 
-    /// <summary>Rozhraní pro engine řídící sociální interakce.</summary>
+    /// <summary>Interface for the engine that drives social interactions.</summary>
     public interface IInteractionEngine : IEngine<InteractionSurface, InteractionConfig>
     { }
 
     /// <summary>
-    /// Typ řečového aktu — určuje charakter interakce a jaké domény vztahu ovlivní.
+    /// Type of speech act — determines the character of the interaction and which relationship domains it affects.
     /// </summary>
     public enum SpeechAct
     {
-        /// <summary>Nezávazný hovor — buduje Humor.</summary>
+        /// <summary>Casual chat — builds Humor.</summary>
         SmallTalk,
 
-        /// <summary>Otázka — projevuje zájem, buduje Intellect doménu.</summary>
+        /// <summary>A question — shows interest, builds the Intellect domain.</summary>
         Question,
 
-        /// <summary>Sebeodhalení — sdílení osobního — buduje Values a Closeness.</summary>
+        /// <summary>Self-disclosure — sharing something personal — builds Values and Closeness.</summary>
         SelfDisclosure,
 
-        /// <summary>Validace — potvrzení a podpora druhého — buduje Values a Comfort.</summary>
+        /// <summary>Validation — affirming and supporting the other — builds Values and Comfort.</summary>
         Validation,
 
-        /// <summary>Hranice — nastavení limitu v interakci.</summary>
+        /// <summary>Boundary — setting a limit in the interaction.</summary>
         Boundary,
 
-        /// <summary>Humor — vtip, odlehčení — silně buduje Humor doménu.</summary>
+        /// <summary>Humor — a joke, lightening the mood — strongly builds the Humor domain.</summary>
         Humor,
 
-        /// <summary>Meta — komentář o samotném vztahu nebo interakci — buduje Intellect.</summary>
+        /// <summary>Meta — commentary about the relationship or interaction itself — builds Intellect.</summary>
         Meta,
 
-        /// <summary>Pozvání — sociální iniciativa — jemně buduje Physical doménu.</summary>
+        /// <summary>Invite — social initiative — gently builds the Physical domain.</summary>
         Invite
     }
 
-    /// <summary>Úroveň fyzického kontaktu při <see cref="TouchAttempted"/>.</summary>
+    /// <summary>Level of physical contact in a <see cref="TouchAttempted"/>.</summary>
     public enum TouchLevel
     {
-        /// <summary>Žádný dotyk.</summary>
+        /// <summary>No touch.</summary>
         None,
 
-        /// <summary>Lehký dotyk (rameno, paže) — buduje Physical doménu.</summary>
+        /// <summary>Light touch (shoulder, arm) — builds the Physical domain.</summary>
         Light,
 
-        /// <summary>Přátelský dotyk (obejmutí) — silněji buduje Physical a Comfort.</summary>
+        /// <summary>Friendly touch (a hug) — builds Physical and Comfort more strongly.</summary>
         Friendly,
 
-        /// <summary>Intimní dotyk — vyžaduje vysokou Closeness a Attraction.</summary>
+        /// <summary>Intimate touch — requires high Closeness and Attraction.</summary>
         Intimate
     }
 
-    /// <summary>Událost — postava A navrhuje interakci postavě B.</summary>
+    /// <summary>Event — character A proposes an interaction to character B.</summary>
     public sealed record InteractionProposed(
         WDateTime OccurredAt,
         HumanId From,
@@ -166,7 +166,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         SexBiology? FromBiology = null,
         SexBiology? ToBiology = null) : IDomainEvent;
 
-    /// <summary>Událost — postava A se pokouší o fyzický kontakt s postavou B.</summary>
+    /// <summary>Event — character A attempts physical contact with character B.</summary>
     public sealed record TouchAttempted(
         WDateTime OccurredAt,
         HumanId From,
@@ -174,12 +174,12 @@ namespace GameEngineTools.Characters.Engines.Interactions
         TouchLevel Level) : IDomainEvent;
 
     /// <summary>
-    /// Událost — interakce byla vyhodnocena (přijata nebo odmítnuta).
+    /// Event — the interaction was evaluated (accepted or declined).
     /// </summary>
     /// <param name="Act">
-    /// Typ řečového aktu z původního <see cref="InteractionProposed"/>.
-    /// Přenášíme ho sem, aby <c>RelationshipsEngine</c> věděl, jakou doménu aktualizovat
-    /// bez nutnosti korelovat s původní událostí.
+    /// The speech-act type from the original <see cref="InteractionProposed"/>.
+    /// We carry it here so the <c>RelationshipsEngine</c> knows which domain to update
+    /// without having to correlate with the original event.
     /// </param>
     public sealed record InteractionOutcome(
         WDateTime OccurredAt,
@@ -193,7 +193,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         double? PeakValence = null,
         double? EndValence = null) : IDomainEvent;
 
-    /// <summary>Záměr vůči případnému těhotenství u abstraktního sexuálního setkání.</summary>
+    /// <summary>Intent regarding a potential pregnancy in an abstract sexual encounter.</summary>
     public enum ReproductiveIntent
     {
         /// <summary>Actively avoiding pregnancy.</summary>
@@ -209,7 +209,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         TryingForChild = 3
     }
 
-    /// <summary>Hrubá úroveň antikoncepční ochrany pro reprodukční výpočet.</summary>
+    /// <summary>Coarse level of contraceptive protection for the reproductive calculation.</summary>
     public enum ContraceptionLevel
     {
         /// <summary>Not specified.</summary>
@@ -228,7 +228,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         High = 4
     }
 
-    /// <summary>Událost — intimní setkání bylo navrženo po přijaté vztahové iniciativě.</summary>
+    /// <summary>Event — an intimate encounter was proposed after an accepted relational initiative.</summary>
     public sealed record SexualEncounterProposed(
         WDateTime OccurredAt,
         HumanId From,
@@ -239,7 +239,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         SexBiology? FromBiology = null,
         SexBiology? ToBiology = null) : IDomainEvent;
 
-    /// <summary>Událost — abstraktní intimní setkání bylo přijato nebo odmítnuto.</summary>
+    /// <summary>Event — an abstract intimate encounter was accepted or declined.</summary>
     public sealed record SexualEncounterOutcome(
         WDateTime OccurredAt,
         HumanId From,

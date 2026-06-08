@@ -58,8 +58,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                 IsSystem1: false);
         }
 
-        // System 1: kognitivní zátěž překračuje threshold — přeskočí episodický recall,
-        // zachová pouze reflection summaries odvozené ze semantic beliefs.
+        // System 1: cognitive load exceeds the threshold — skip episodic recall,
+        // keep only reflection summaries derived from semantic beliefs.
         private static DecisionWorkingSet BuildSystem1WorkingSet(
             MemoryIndex memory, MemoryRecallQuery query, WDateTime now)
         {
@@ -417,10 +417,10 @@ namespace GameEngineTools.Characters.Engines.Memory
                     || header.StartsWith("Interaction:Meta:Accepted", StringComparison.Ordinal));
         }
 
-        // Mood repair (low N) vs. negativní spirála (high N) — Bower 1981.
-        // Spiral detection: high N + chronicky negativní nálada → silnější negativní bias.
+        // Mood repair (low N) vs. negative spiral (high N) — Bower 1981.
+        // Spiral detection: high N + chronically negative mood → stronger negative bias.
         // Spiral risk formula (memory-cognition.md): N×0.5 + log(1 + daysInNegativeMood)×0.1
-        // Při dobré náladě není žádný bias bez ohledu na N.
+        // In a good mood there is no bias regardless of N.
         private static double ComputeNeuroticismMoodBias(
             EmotionalTag episodeEmotion, double currentValence, double neuroticism,
             double daysInNegativeMood = 0.0)
@@ -434,7 +434,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             var spiralRisk = neuroticism * 0.5 + Math.Log(1.0 + daysInNegativeMood) * 0.1;
             if (currentValence < -0.4 && spiralRisk > 0.6)
             {
-                // Spirála aktivní — výrazně silnější negativní bias, mood repair téměř nefunguje
+                // Spiral active — a markedly stronger negative bias; mood repair barely works
                 return isPositive ? -0.15 : isNegative ? +0.12 : 0.0;
             }
 

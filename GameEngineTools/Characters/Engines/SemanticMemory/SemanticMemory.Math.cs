@@ -11,14 +11,14 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
-    /// Matematické funkce sémantické paměti — predikce přijetí, scoring cílů a bias výpočty.
+    /// Mathematical functions of semantic memory — acceptance prediction, target scoring and bias calculations.
     /// </summary>
     public static class SemanticMemoryMath
     {
         /// <summary>
-        /// Predikuje pravděpodobnost přijetí sociálního přístupu na základě beliefs.
-        /// Zkrácený overload bez vztahového a psychologického kontextu.
-        /// Vrátí hodnotu v [0.05, 0.95].
+        /// Predicts the probability of a social approach being accepted based on beliefs.
+        /// A shortened overload without relationship or psychological context.
+        /// Returns a value in [0.05, 0.95].
         /// </summary>
         public static double ExpectedAcceptance(
             SemanticMemoryState? state,
@@ -27,8 +27,8 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             => ExpectedAcceptance(state, other, act, null, null, null);
 
         /// <summary>
-        /// Plná predikce přijetí — zahrnuje beliefs, vztahové metriky, psychologický profil
-        /// a trend posledních epizod. Vrátí hodnotu v [0.05, 0.95].
+        /// Full acceptance prediction — includes beliefs, relationship metrics, the psychological profile
+        /// and the trend of recent episodes. Returns a value in [0.05, 0.95].
         /// </summary>
         public static double ExpectedAcceptance(
             SemanticMemoryState? state,

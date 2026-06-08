@@ -18,34 +18,34 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Obecná simulační scéna pro libovolný počet postav.
+    /// A generic simulation scene for any number of characters.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Zodpovědnosti scény:</b>
+    /// <b>Scene responsibilities:</b>
     /// <list type="bullet">
-    ///   <item>Správné pořadí tickování postav (v pořadí <see cref="SimulationSceneOptions.Characters"/>)</item>
-    ///   <item>Automatické routování <see cref="InteractionOutcome"/> zpět k iniciátorovi</item>
-    ///   <item>Zpracování sleep promptů dle strategie per-postava</item>
-    ///   <item>Posun herních hodin o <c>SimulationSceneOptions.ClockAdvance</c> každou iteraci</item>
+    ///   <item>Correct character tick order (in the order of <see cref="SimulationSceneOptions.Characters"/>)</item>
+    ///   <item>Automatic routing of <see cref="InteractionOutcome"/> back to the initiator</item>
+    ///   <item>Handling sleep prompts per the per-character strategy</item>
+    ///   <item>Advancing the game clock by <c>SimulationSceneOptions.ClockAdvance</c> each iteration</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <b>Co scéna záměrně NEDĚLÁ:</b>
+    /// <b>What the scene deliberately does NOT do:</b>
     /// <list type="bullet">
-    ///   <item>Neřeší routing <c>ReachOut → InteractionProposed</c> — to je scénář volající vrstvy</item>
-    ///   <item>Neexportuje data, nevypisuje hlavičky — to patří do GameSandbox / Unity</item>
-    ///   <item>Nezná rozdíl mezi hráčem a NPC — všechny postavy jsou rovnocenné</item>
+    ///   <item>Does not handle <c>ReachOut → InteractionProposed</c> routing — that is the calling layer's scenario</item>
+    ///   <item>Does not export data or print headers — that belongs in GameSandbox / Unity</item>
+    ///   <item>Does not distinguish player from NPC — all characters are equal</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <b>Pořadí kroků v každé iteraci:</b>
+    /// <b>Order of steps in each iteration:</b>
     /// <code>
-    /// 1. OnTick callback      — scénář + ReachOut routing (vidí LastOutbox z předchozího ticku)
-    /// 2. Tick každé postavy   — enginy přepočítají stav
-    /// 3. Route outcomes       — InteractionOutcome → iniciátor dostane odpověď
+    /// 1. OnTick callback      — scenario + ReachOut routing (sees LastOutbox from the previous tick)
+    /// 2. Tick each character   — engines recompute state
+    /// 3. Route outcomes       — InteractionOutcome → the initiator receives a response
     /// 4. Sleep prompty        — per-postava dle SleepPromptHandlers
-    /// 5. ClockAdvance         — hodiny posunuty vpřed
+    /// 5. ClockAdvance         — the clock is advanced
     /// </code>
     /// </para>
     /// </remarks>
@@ -53,21 +53,21 @@ namespace GameEngineTools.World.Simulation
     {
         #region Privátní pole
 
-        /// <summary>Herní hodiny — vyžaduje <c>Advance()</c> pro posun simulačního času.</summary>
+        /// <summary>Game clock — requires <c>Advance()</c> to advance simulation time.</summary>
         private readonly SystemClock _clock;
 
-        /// <summary>Konfigurace scény předaná zvenku.</summary>
+        /// <summary>Scene configuration passed in from outside.</summary>
         private readonly SimulationSceneOptions _options;
 
         private readonly ICognitiveResolutionLevelRuntime _lodRuntime;
 
-        /// <summary>Null pokud astronomická logika není nakonfigurována.</summary>
+        /// <summary>Null if the astronomical logic is not configured.</summary>
         private readonly CelestialContextComputer? _celestialComputer;
 
-        /// <summary>Astronomy config — non-null právě když <see cref="_celestialComputer"/> není null.</summary>
+        /// <summary>Astronomy config — non-null exactly when <see cref="_celestialComputer"/> is non-null.</summary>
         private readonly AstroConfig? _astroConfig;
 
-        /// <summary>Phase 2 planetární objekty — null pokud <c>UniverseConfig</c> není nastaven.</summary>
+        /// <summary>Phase 2 planetary objects — null if <c>UniverseConfig</c> is not set.</summary>
         private readonly (StarPhysics Star, OrbitalElements Orbit, PlanetConfig Planet)? _universeObjects;
 
         /// <summary>Characters that have died and must no longer tick.</summary>
@@ -78,18 +78,18 @@ namespace GameEngineTools.World.Simulation
         #region Konstruktor
 
         /// <summary>
-        /// Vytvoří novou instanci <see cref="SimulationScene"/>.
+        /// Creates a new <see cref="SimulationScene"/> instance.
         /// </summary>
         /// <param name="clock">
-        /// Herní hodiny. Musí být <see cref="SystemClock"/> —
-        /// scéna potřebuje <c>Advance()</c> pro řízení simulačního času.
+        /// The game clock. Must be a <see cref="SystemClock"/> —
+        /// the scene needs <c>Advance()</c> to drive simulation time.
         /// </param>
-        /// <param name="options">Konfigurace scény — postavy, časování, handlery.</param>
+        /// <param name="options">Scene configuration — characters, timing, handlers.</param>
         /// <exception cref="ArgumentNullException">
         /// Pokud je <paramref name="clock"/> nebo <paramref name="options"/> null.
         /// </exception>
         /// <exception cref="ArgumentException">
-        /// Pokud <see cref="SimulationSceneOptions.Characters"/> je prázdný seznam.
+        /// If <see cref="SimulationSceneOptions.Characters"/> is an empty list.
         /// </exception>
         public SimulationScene(SystemClock clock, SimulationSceneOptions options, ICognitiveResolutionLevelRuntime characterLodRuntime)
         {
@@ -129,10 +129,10 @@ namespace GameEngineTools.World.Simulation
         #region Veřejné API
 
         /// <summary>
-        /// Spustí simulaci asynchronně.
-        /// Skončí po uplynutí <c>SimulationSceneOptions.SimulationYears</c>.
+        /// Starts the simulation asynchronously.
+        /// Ends after <c>SimulationSceneOptions.SimulationYears</c> has elapsed.
         /// </summary>
-        /// <returns>Dokončená task po skončení simulace.</returns>
+        /// <returns>A completed task once the simulation ends.</returns>
         public Task RunAsync()
             => SimulateAsync();
 
@@ -141,7 +141,7 @@ namespace GameEngineTools.World.Simulation
         #region Simulační smyčka
 
         /// <summary>
-        /// Hlavní simulační smyčka — iteruje dokud neuplyne nastavený počet herních let.
+        /// Main simulation loop — iterates until the configured number of game years has elapsed.
         /// </summary>
         private Task SimulateAsync()
         {
@@ -187,9 +187,9 @@ namespace GameEngineTools.World.Simulation
 
             var now = _clock.Now;
 
-            // ── Krok 0b: Astronomický kontext ──────────────────────────────────────
-            // Vypočítá CelestialContext jednou za tick a injektuje ho každé postavě
-            // před tickem — aby enginy viděly aktuální ozáření, teplotu a sezónu.
+            // ── Step 0b: Astronomical context ──────────────────────────────────────
+            // Computes the CelestialContext once per tick and injects it into each character
+            // before its tick — so the engines see the current irradiance, temperature and season.
             if (_celestialComputer is not null)
             {
                 var celestial = _universeObjects is { } u
@@ -203,9 +203,9 @@ namespace GameEngineTools.World.Simulation
             _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
 
             // ── Krok 1: OnTick callback ─────────────────────────────────────────────
-            // Zavolej scénář / ReachOut routing.
-            // POZOR: LastOutbox každé postavy je zde stále z PŘEDCHOZÍHO ticku —
-            // proto je to správné místo pro detekci ReachOut a routování.
+            // Invoke the scenario / ReachOut routing.
+            // NOTE: each character's LastOutbox is still from the PREVIOUS tick here —
+            // so this is the right place to detect ReachOut and route it.
             _options.OnTick?.Invoke(now, chars);
 
             #region Trying
@@ -219,7 +219,7 @@ namespace GameEngineTools.World.Simulation
 
             #endregion Trying
 
-            // ── Krok 2: Tick všech postav ──────────────────────────────────────────
+            // ── Step 2: Tick all characters ────────────────────────────────────────
             // All characters advance their state before any outcomes are routed.
             // Ensures outcome delivery is independent of character list order.
             foreach (var character in chars)
@@ -228,7 +228,7 @@ namespace GameEngineTools.World.Simulation
                 character.Tick(now, dt);
             }
 
-            // ── Krok 2b: Routování outcomes ───────────────────────────────────────
+            // ── Step 2b: Routing outcomes ─────────────────────────────────────────
             // Outcomes are enqueued into recipient inboxes and processed at the START
             // of their next tick (Phase A) — regardless of position in the character list.
             foreach (var character in chars)
@@ -237,7 +237,7 @@ namespace GameEngineTools.World.Simulation
                 RouteOutcomes(character, chars);
             }
 
-            // ── Krok 2c: Respawn konzumovaných objektů ────────────────────────────
+            // ── Step 2c: Respawn of consumed objects ──────────────────────────────
             // Runs after all characters have ticked so that an object consumed in this
             // step cannot be reclaimed by the same step.
             _options.RespawnScheduler?.Tick(now);
@@ -294,28 +294,28 @@ namespace GameEngineTools.World.Simulation
         #region Routování výstupů
 
         /// <summary>
-        /// Routuje <see cref="InteractionOutcome"/> z outboxu odesílatele
-        /// zpět k iniciátorovi interakce.
+        /// Routes an <see cref="InteractionOutcome"/> from the sender's outbox
+        /// back to the initiator of the interaction.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Proč routujeme outcome zpět k <c>From</c>?<br/>
+        /// Why do we route the outcome back to <c>From</c>?<br/>
         /// <c>InteractionEngine</c> postavy B zpracuje <c>InteractionProposed</c> od A
-        /// a vydá <c>InteractionOutcome</c> v outboxu B.
-        /// Aby A věděla, zda byla přijata nebo odmítnuta, musíme outcome doručit A.
+        /// and emits an <c>InteractionOutcome</c> in B's outbox.
+        /// For A to know whether it was accepted or declined, we must deliver the outcome to A.
         /// </para>
         /// <para>
-        /// <see cref="IHuman.ReceiveEvent"/> je synchronní enqueue —
-        /// A zpracuje outcome na začátku svého <em>příštího</em> ticku.
+        /// <see cref="IHuman.ReceiveEvent"/> is a synchronous enqueue —
+        /// A processes the outcome at the start of its <em>next</em> tick.
         /// </para>
         /// </remarks>
-        /// <param name="sender">Postava, jejíž outbox právě prohledáváme.</param>
-        /// <param name="all">Všechny postavy ve scéně pro lookup iniciátora.</param>
+        /// <param name="sender">The character whose outbox we are currently scanning.</param>
+        /// <param name="all">All characters in the scene, for initiator lookup.</param>
         private static void RouteOutcomes(IHuman sender, IReadOnlyList<IHuman> all)
         {
             foreach (var outcome in sender.LastOutbox.OfType<InteractionOutcome>())
             {
-                // Najdi iniciátora — toho kdo původně odeslal InteractionProposed
+                // Find the initiator — the one who originally sent InteractionProposed
                 var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
                 initiator?.ReceiveEvent(outcome);
             }
@@ -339,31 +339,31 @@ namespace GameEngineTools.World.Simulation
         #region Sleep handling
 
         /// <summary>
-        /// Zpracuje sleep prompt postavy dle nakonfigurované strategie.
+        /// Handles a character's sleep prompt per the configured strategy.
         /// </summary>
         /// <remarks>
         /// <para>
         /// Strategie dle <see cref="SimulationSceneOptions.SleepPromptHandlers"/>:
         /// <list type="bullet">
         ///   <item>
-        ///     Handler nalezen pro postavu → zavolá callback, výsledek (<c>bool</c>)
-        ///     rozhodne zda potvrdit nebo odmítnout.
+        ///     A handler found for the character → calls the callback; the result (<c>bool</c>)
+        ///     decides whether to confirm or decline.
         ///   </item>
         ///   <item>
-        ///     Handler nenalezen → automatické potvrzení (NPC default).
+        ///     No handler found → automatic confirmation (NPC default).
         ///   </item>
         /// </list>
         /// </para>
         /// </remarks>
-        /// <param name="now">Aktuální herní čas.</param>
-        /// <param name="character">Postava, jejíž outbox prohledáváme.</param>
+        /// <param name="now">Current game time.</param>
+        /// <param name="character">The character whose outbox we are scanning.</param>
         private void HandleSleepPrompt(WDateTime now, IHuman character)
         {
             var prompt = character.LastOutbox.OfType<SleepPromptRequested>().FirstOrDefault();
             if (prompt == null)
                 return;
 
-            // Zjisti, zda má tato postava vlastní handler
+            // Determine whether this character has its own handler
             var shouldSleep = true; // výchozí: auto-potvrdit (NPC chování)
 
             if (_options.SleepPromptHandlers != null
@@ -374,7 +374,7 @@ namespace GameEngineTools.World.Simulation
 
             if (shouldSleep)
             {
-                // Potvrď spánek — engine sám vypočítá délku na základě dluhu
+                // Confirm sleep — the engine computes the duration itself based on debt
                 character.ReceiveEvent(new SleepConfirmed(
                     OccurredAt: now,
                     Human: prompt.Human,
@@ -382,7 +382,7 @@ namespace GameEngineTools.World.Simulation
             }
             else
             {
-                // Odmítni spánek — engine zaloguje penalizaci
+                // Decline sleep — the engine logs the penalty
                 character.ReceiveEvent(new SleepDeclined(
                     OccurredAt: now,
                     Human: prompt.Human,

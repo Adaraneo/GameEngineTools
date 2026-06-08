@@ -8,23 +8,23 @@ using GameEngineTools.World.Core.Time;
 namespace GameEngineTools.World.Utils.Time
 {
     /// <summary>
-    /// Reprezentuje konkrétní okamžik v herním světě, uložený jako počet worldTicks
-    /// od světové epochy (1. den 1. měsíce 1. roku, 00:00:00).
+    /// Represents a specific instant in the game world, stored as the number of world ticks
+    /// since the world epoch (day 1 of month 1 of year 1, 00:00:00).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Ambient-spec design.</b> Chová se jako <see cref="DateTime"/> — properties
-    /// <see cref="Year"/>, <see cref="Month"/>, <see cref="Day"/> atd. fungují přímo
-    /// na hodnotě bez předávání kontextu. Vyžaduje nakonfigurovaný <see cref="WWorld"/>.
-    /// Čistá matematika (operátory, porovnávání) <see cref="WWorld"/> nevyžaduje.
+    /// <b>Ambient-spec design.</b> Behaves like <see cref="DateTime"/> — the properties
+    /// <see cref="Year"/>, <see cref="Month"/>, <see cref="Day"/> etc. work directly
+    /// on the value without passing a context. Requires <see cref="WWorld"/> to be configured.
+    /// Pure math (operators, comparisons) does not require <see cref="WWorld"/>.
     /// </para>
     /// <para>
-    /// Příklady:
+    /// Examples:
     /// <code>
-    /// // Aktuální čas
+    /// // Current time
     /// var now = WDateTime.Now;
     ///
-    /// // Vytvoření
+    /// // Creation
     /// var dt = WDateTime.New(1322, 7, 4, hour: 6);
     ///
     /// // Ambient properties
@@ -33,20 +33,20 @@ namespace GameEngineTools.World.Utils.Time
     /// int day   = dt.Day;     // 4
     /// int hour  = dt.Hour;    // 6
     ///
-    /// // Složky jako typy
+    /// // Components as types
     /// WDateOnly date = dt.Date;
     /// WTimeOnly time = dt.TimeOfDay;
     ///
-    /// // Čistá matematika — bez WWorld
+    /// // Pure math — without WWorld
     /// var later = dt + WTimeSpan.FromHours(2);
     /// var diff  = later - dt;
     /// bool past = dt &lt; WDateTime.Now;
     ///
-    /// // Kalendářní aritmetika
+    /// // Calendar arithmetic
     /// var nextMonth = dt.AddMonths(1);
     /// var nextYear  = dt.AddYears(1);
     ///
-    /// // Formátování
+    /// // Formatting
     /// string s = dt.ToString();  // "1322-07-04T06:00:00"
     /// </code>
     /// </para>
@@ -58,11 +58,11 @@ namespace GameEngineTools.World.Utils.Time
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje nový okamžik z přesného počtu worldTicks od světové epochy.
+        /// Initializes a new instant from an exact number of world ticks since the world epoch.
         /// </summary>
         /// <param name="worldTicks">
-        /// Počet worldTicks od světové epochy (0 = 1/1/1 00:00:00).
-        /// Záporná hodnota by reprezentovala čas před epochou — není podporována.
+        /// Number of world ticks since the world epoch (0 = 1/1/1 00:00:00).
+        /// A negative value would represent a time before the epoch — not supported.
         /// </param>
         public WDateTime(long worldTicks) => WorldTicks = worldTicks;
 
@@ -71,8 +71,8 @@ namespace GameEngineTools.World.Utils.Time
         #region Vlastnosti — raw data
 
         /// <summary>
-        /// Počet worldTicks od světové epochy (1/1/1 00:00:00).
-        /// Jediný zdroj pravdy.
+        /// Number of world ticks since the world epoch (1/1/1 00:00:00).
+        /// The single source of truth.
         /// </summary>
         public long WorldTicks { get; }
 
@@ -80,15 +80,15 @@ namespace GameEngineTools.World.Utils.Time
 
         #region Konstanty
 
-        /// <summary>Minimální reprezentovatelná hodnota — světová epocha (1/1/1 00:00:00).</summary>
+        /// <summary>Minimum representable value — the world epoch (1/1/1 00:00:00).</summary>
         public static WDateTime MinValue => new(0);
 
         #endregion Konstanty
 
         #region Ambient vlastnosti — složky data (vyžadují WWorld.Configure)
 
-        /// <summary>Rok tohoto okamžiku.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Year of this instant.</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Year
         {
             get
@@ -99,8 +99,8 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        /// <summary>Měsíc tohoto okamžiku (1-based).</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Month of this instant (1-based).</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Month
         {
             get
@@ -111,8 +111,8 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        /// <summary>Den v měsíci tohoto okamžiku (1-based).</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Day of month of this instant (1-based).</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Day
         {
             get
@@ -123,8 +123,8 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        /// <summary>Hodina tohoto okamžiku (0-based).</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Hour of this instant (0-based).</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Hour
         {
             get
@@ -135,8 +135,8 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        /// <summary>Minuta tohoto okamžiku (0-based).</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Minute of this instant (0-based).</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Minute
         {
             get
@@ -147,8 +147,8 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        /// <summary>Sekunda tohoto okamžiku (0-based).</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Second of this instant (0-based).</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Second
         {
             get
@@ -160,17 +160,17 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Datová složka tohoto okamžiku jako <see cref="WDateOnly"/>.
-        /// Časová složka je zahozena.
+        /// The date component of this instant as a <see cref="WDateOnly"/>.
+        /// The time component is discarded.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateOnly Date => new(WorldTicks / WWorld.Spec.TicksPerDay);
 
         /// <summary>
-        /// Časová složka tohoto okamžiku jako <see cref="WTimeOnly"/>.
-        /// Datová složka je zahozena.
+        /// The time component of this instant as a <see cref="WTimeOnly"/>.
+        /// The date component is discarded.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WTimeOnly TimeOfDay
         {
             get
@@ -183,9 +183,9 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Den v roce (1-based). Výpočet jde přes kalendář.
+        /// Day of the year (1-based). Computed through the calendar.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int DayOfYear
         {
             get
@@ -199,9 +199,9 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Maximální bezpečně reprezentovatelná hodnota — největší násobek TicksPerDay v long.
+        /// Maximum safely representable value — the largest multiple of TicksPerDay within a long.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public static WDateTime MaxValue
         {
             get
@@ -216,24 +216,24 @@ namespace GameEngineTools.World.Utils.Time
         #region Static factory a aktuální čas
 
         /// <summary>
-        /// Aktuální herní čas z <see cref="WWorld.Clock"/>.
+        /// Current game time from <see cref="WWorld.Clock"/>.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public static WDateTime Now => WWorld.Clock.Now;
 
         /// <summary>
-        /// Vytvoří okamžik ze všech časových složek.
-        /// Validuje každou složku vůči <see cref="WWorld.Spec"/> a jeho kalendáři.
+        /// Creates an instant from all time components.
+        /// Validates each component against <see cref="WWorld.Spec"/> and its calendar.
         /// </summary>
         /// <param name="year">Rok (≥ 1).</param>
-        /// <param name="month">Měsíc (1-based).</param>
-        /// <param name="day">Den v měsíci (1-based).</param>
-        /// <param name="hour">Hodina (0..HoursPerDay-1). Výchozí 0.</param>
-        /// <param name="minute">Minuta (0..MinutesPerHour-1). Výchozí 0.</param>
-        /// <param name="second">Sekunda (0..SecondsPerMinute-1). Výchozí 0.</param>
-        /// <param name="subTick">Subtiky (0..TicksPerSecond-1). Výchozí 0.</param>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Pokud složky překračují platný rozsah.</exception>
+        /// <param name="month">Month (1-based).</param>
+        /// <param name="day">Day of month (1-based).</param>
+        /// <param name="hour">Hour (0..HoursPerDay-1). Default 0.</param>
+        /// <param name="minute">Minute (0..MinutesPerHour-1). Default 0.</param>
+        /// <param name="second">Second (0..SecondsPerMinute-1). Default 0.</param>
+        /// <param name="subTick">Sub-ticks (0..TicksPerSecond-1). Default 0.</param>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">If the components exceed the valid range.</exception>
         public static WDateTime New(
             int year, int month, int day,
             int hour = 0, int minute = 0, int second = 0, long subTick = 0)
@@ -256,16 +256,16 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Sestaví okamžik z hotového data (zarovnáno na 00:00:00).
+        /// Builds an instant from an existing date (aligned to 00:00:00).
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public static WDateTime New(WDateOnly date)
             => new(checked(date.DayIndex * WWorld.Spec.TicksPerDay));
 
         /// <summary>
-        /// Sestaví okamžik z hotového data a hotového času dne.
+        /// Builds an instant from an existing date and an existing time of day.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public static WDateTime New(WDateOnly date, WTimeOnly time)
             => new(checked(date.DayIndex * WWorld.Spec.TicksPerDay + time.TicksOfDay));
 
@@ -274,63 +274,63 @@ namespace GameEngineTools.World.Utils.Time
         #region Aritmetika — čistá matematika (nevyžaduje WWorld)
 
         /// <summary>
-        /// Vrátí rozdíl dvou okamžiků jako <see cref="WTimeSpan"/>.
-        /// Ekvivalentní operátoru <c>a - b</c>.
+        /// Returns the difference of two instants as a <see cref="WTimeSpan"/>.
+        /// Equivalent to the <c>a - b</c> operator.
         /// </summary>
         public static WTimeSpan Difference(WDateTime a, WDateTime b) => new(a.WorldTicks - b.WorldTicks);
 
-        /// <summary>Posune okamžik o zadaný interval dopředu.</summary>
+        /// <summary>Moves the instant forward by the given interval.</summary>
         public static WDateTime operator +(WDateTime t, WTimeSpan d) => new(t.WorldTicks + d.Ticks);
 
         /// <inheritdoc cref="operator +(WDateTime, WTimeSpan)"/>
         public static WDateTime operator +(WTimeSpan d, WDateTime t) => new(t.WorldTicks + d.Ticks);
 
-        /// <summary>Posune okamžik o zadaný počet worldTicks dopředu.</summary>
+        /// <summary>Moves the instant forward by the given number of world ticks.</summary>
         public static WDateTime operator +(WDateTime t, long ticks) => new(t.WorldTicks + ticks);
 
         /// <inheritdoc cref="operator +(WDateTime, long)"/>
         public static WDateTime operator +(long ticks, WDateTime t) => new(t.WorldTicks + ticks);
 
-        /// <summary>Posune okamžik o zadaný interval dozadu.</summary>
+        /// <summary>Moves the instant backward by the given interval.</summary>
         public static WDateTime operator -(WDateTime t, WTimeSpan d) => new(t.WorldTicks - d.Ticks);
 
-        /// <summary>Posune okamžik o zadaný počet worldTicks dozadu.</summary>
+        /// <summary>Moves the instant backward by the given number of world ticks.</summary>
         public static WDateTime operator -(WDateTime t, long ticks) => new(t.WorldTicks - ticks);
 
-        /// <summary>Vrátí rozdíl dvou okamžiků jako <see cref="WTimeSpan"/>.</summary>
+        /// <summary>Returns the difference of two instants as a <see cref="WTimeSpan"/>.</summary>
         public static WTimeSpan operator -(WDateTime a, WDateTime b) => new(a.WorldTicks - b.WorldTicks);
 
-        /// <summary>Posune okamžik o jeden worldTick dopředu.</summary>
+        /// <summary>Moves the instant forward by one world tick.</summary>
         public static WDateTime operator ++(WDateTime t) => new(t.WorldTicks + 1);
 
-        /// <summary>Posune okamžik o jeden worldTick dozadu.</summary>
+        /// <summary>Moves the instant backward by one world tick.</summary>
         public static WDateTime operator --(WDateTime t) => new(t.WorldTicks - 1);
 
         #endregion Aritmetika — čistá matematika (nevyžaduje WWorld)
 
         #region Ambient aritmetika — Add* a With* (vyžadují WWorld.Configure)
 
-        /// <summary>Přičte dny k okamžiku.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Adds days to the instant.</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime AddDays(long days) => new(WorldTicks + days * WWorld.Spec.TicksPerDay);
 
-        /// <summary>Přičte hodiny k okamžiku.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Adds hours to the instant.</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime AddHours(long hours) => new(WorldTicks + hours * WWorld.Spec.TicksPerHour);
 
-        /// <summary>Přičte minuty k okamžiku.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Adds minutes to the instant.</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime AddMinutes(long minutes) => new(WorldTicks + minutes * WWorld.Spec.TicksPerMinute);
 
-        /// <summary>Přičte sekundy k okamžiku.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Adds seconds to the instant.</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime AddSeconds(long seconds) => new(WorldTicks + seconds * WWorld.Spec.TicksPerSecond);
 
         /// <summary>
-        /// Přičte zadaný počet měsíců. Zachová časovou složku dne.
-        /// Den je oříznut pokud výsledný měsíc má méně dní (clamp).
+        /// Adds the given number of months. Preserves the time-of-day component.
+        /// The day is clamped if the resulting month has fewer days.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime AddMonths(int months)
         {
             var spec = WWorld.Spec;
@@ -351,10 +351,10 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Přičte zadaný počet let. Zachová časovou složku dne.
-        /// Den je oříznut pokud cílový rok má v daném měsíci méně dní.
+        /// Adds the given number of years. Preserves the time-of-day component.
+        /// The day is clamped if the target year has fewer days in the given month.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime AddYears(int years)
         {
             var spec = WWorld.Spec;
@@ -371,13 +371,13 @@ namespace GameEngineTools.World.Utils.Time
             return new WDateTime(cal.DaysFromDate(y, m, d) * tpd + tod);
         }
 
-        /// <summary>Vrátí okamžik se zachovaným časem dne, ale novým datem.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Returns the instant with the time of day kept but a new date.</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime WithDate(WDateOnly date)
             => WDateTime.New(date, TimeOfDay);
 
-        /// <summary>Vrátí okamžik se zachovaným datem, ale novým časem dne.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Returns the instant with the date kept but a new time of day.</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateTime WithTime(WTimeOnly time)
             => WDateTime.New(Date, time);
 
@@ -385,22 +385,22 @@ namespace GameEngineTools.World.Utils.Time
 
         #region Porovnávací operátory
 
-        /// <summary>Vrátí <c>true</c> pokud oba okamžiky nastávají ve stejný worldTick.</summary>
+        /// <summary>Returns <c>true</c> if both instants occur on the same world tick.</summary>
         public static bool operator ==(WDateTime a, WDateTime b) => a.WorldTicks == b.WorldTicks;
 
-        /// <summary>Vrátí <c>true</c> pokud okamžiky nastávají v různý worldTick.</summary>
+        /// <summary>Returns <c>true</c> if the instants occur on different world ticks.</summary>
         public static bool operator !=(WDateTime a, WDateTime b) => a.WorldTicks != b.WorldTicks;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve než <paramref name="b"/>.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is earlier than <paramref name="b"/>.</summary>
         public static bool operator <(WDateTime a, WDateTime b) => a.WorldTicks < b.WorldTicks;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejný okamžik.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is earlier than or at the same instant.</summary>
         public static bool operator <=(WDateTime a, WDateTime b) => a.WorldTicks <= b.WorldTicks;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po <paramref name="b"/>.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is later than <paramref name="b"/>.</summary>
         public static bool operator >(WDateTime a, WDateTime b) => a.WorldTicks > b.WorldTicks;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po nebo ve stejný okamžik jako <paramref name="b"/>.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is later than or at the same instant as <paramref name="b"/>.</summary>
         public static bool operator >=(WDateTime a, WDateTime b) => a.WorldTicks >= b.WorldTicks;
 
         #endregion Porovnávací operátory
@@ -408,29 +408,29 @@ namespace GameEngineTools.World.Utils.Time
         #region Parsování (static — vyžadují WWorld.Configure)
 
         /// <summary>
-        /// Parsuje okamžik ze řetězce ve formátu <c>YYYY-MM-DDTHH:MM:SS[.frac]</c>.
-        /// Akceptuje mezeru místo <c>T</c> a volitelný suffix <c>Z</c>.
+        /// Parses an instant from a string in the format <c>YYYY-MM-DDTHH:MM:SS[.frac]</c>.
+        /// Accepts a space instead of <c>T</c> and an optional <c>Z</c> suffix.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
-        /// <exception cref="FormatException">Neplatný formát nebo datum neexistuje v kalendáři.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
+        /// <exception cref="FormatException">Invalid format, or the date does not exist in the calendar.</exception>
         public static WDateTime Parse(string text)
             => TryParse(text.AsSpan(), out var v)
                 ? v
                 : throw new FormatException($"Neplatný WDateTime: '{text}'.");
 
         /// <summary>
-        /// Pokusí se parsovat okamžik ze řetězce.
+        /// Attempts to parse an instant from a string.
         /// </summary>
-        /// <param name="text">Řetězec k parsování.</param>
-        /// <param name="value">Výstupní okamžik; <c>default</c> při neúspěchu.</param>
-        /// <returns><c>true</c> pokud parsování uspělo.</returns>
+        /// <param name="text">The string to parse.</param>
+        /// <param name="value">The output instant; <c>default</c> on failure.</param>
+        /// <returns><c>true</c> if parsing succeeded.</returns>
         public static bool TryParse(string? text, out WDateTime value)
             => string.IsNullOrWhiteSpace(text)
                 ? (value = default) == default && false
                 : TryParse(text.AsSpan(), out value);
 
         /// <summary>
-        /// Pokusí se parsovat okamžik ze span znaků (bez alokace stringu).
+        /// Attempts to parse an instant from a character span (without allocating a string).
         /// </summary>
         public static bool TryParse(ReadOnlySpan<char> input, out WDateTime value)
         {
@@ -444,10 +444,10 @@ namespace GameEngineTools.World.Utils.Time
             var s = input.Slice(start, end - start);
             if (s.Length == 0) return false;
 
-            // Volitelný suffix Z/z (UTC marker pro Zemi — ignorujeme)
+            // Optional Z/z suffix (UTC marker for Earth — ignored)
             if (s[^1] == 'Z' || s[^1] == 'z') s = s[..^1];
 
-            // Rozdělit na datum a čas podle T nebo mezery
+            // Split into date and time on T or a space
             int iT = s.IndexOf('T'), iSP = s.IndexOf(' ');
             int sep = (iT >= 0 && iSP >= 0) ? Math.Min(iT, iSP) : Math.Max(iT, iSP);
 
@@ -499,7 +499,7 @@ namespace GameEngineTools.World.Utils.Time
                 }
             }
 
-            // Sestavení
+            // Assembly
             long days;
             try { days = spec.Calendar.DaysFromDate(year, month, day); }
             catch { return false; }
@@ -535,8 +535,8 @@ namespace GameEngineTools.World.Utils.Time
         #region Formátování
 
         /// <summary>
-        /// Vrátí okamžik jako čitelný řetězec ve formátu <c>YYYY-MM-DDTHH:MM:SS</c>.
-        /// Vyžaduje nakonfigurovaný <see cref="WWorld"/>. Fallback na WorldTicks pokud není.
+        /// Returns the instant as a readable string in the format <c>YYYY-MM-DDTHH:MM:SS</c>.
+        /// Requires <see cref="WWorld"/> to be configured. Falls back to WorldTicks otherwise.
         /// </summary>
         public override string ToString()
         {
@@ -566,7 +566,7 @@ namespace GameEngineTools.World.Utils.Time
 
         #region Privátní pomocné metody
 
-        /// <summary>Parsuje int ze span — pouze číslice, žádné znaménko.</summary>
+        /// <summary>Parses an int from a span — digits only, no sign.</summary>
         private static bool SpanParseInt(ReadOnlySpan<char> sp, int min, int max, out int v)
         {
             long acc = 0;
@@ -581,7 +581,7 @@ namespace GameEngineTools.World.Utils.Time
             return v >= min && v <= max;
         }
 
-        /// <summary>Parsuje long ze span — pouze číslice, žádné znaménko.</summary>
+        /// <summary>Parses a long from a span — digits only, no sign.</summary>
         private static bool SpanParseInt64(ReadOnlySpan<char> sp, long min, long max, out long v)
         {
             long acc = 0;
@@ -596,11 +596,11 @@ namespace GameEngineTools.World.Utils.Time
             return v >= min && v <= max;
         }
 
-        /// <summary>Vrátí 10^n (bez BCL Math.Pow — pracujeme s int).</summary>
+        /// <summary>Returns 10^n (without BCL Math.Pow — integer arithmetic).</summary>
         private static long Pow10(int n)
         { long p = 1; for (int i = 0; i < n; i++) p *= 10; return p; }
 
-        /// <summary>Zapíše číslo jako přesně 2 číslice (s nulou vlevo).</summary>
+        /// <summary>Writes a number as exactly 2 digits (zero-padded).</summary>
         private static void Append2(StringBuilder sb, int v)
         {
             sb.Append((char)('0' + v / 10));
@@ -608,8 +608,8 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Zapíše rok jako alespoň 4 číslice. Roky nad 9999 se vypíší celé
-        /// — žádné tiché oříznutí.
+        /// Writes the year as at least 4 digits. Years above 9999 are written in full
+        /// — no silent truncation.
         /// </summary>
         private static void Append4(StringBuilder sb, int v)
         {

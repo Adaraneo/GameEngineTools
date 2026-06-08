@@ -18,26 +18,26 @@ namespace GameEngineTools.Narrative
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
-    /// Výchozí implementace <see cref="INarrativeFormatter"/> v češtině.
+    /// Default <see cref="INarrativeFormatter"/> implementation producing Czech text.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Pokrývá tyto kategorie událostí:
+    /// Covers these event categories:
     /// <list type="bullet">
-    ///   <item><b>Sociální</b> — <see cref="FirstImpressionFormed"/>, <see cref="InteractionOutcome"/>,
+    ///   <item><b>Social</b> — <see cref="FirstImpressionFormed"/>, <see cref="InteractionOutcome"/>,
     ///     <see cref="MicroPositive"/>, <see cref="MicroNegative"/>, <see cref="RepairAttempt"/>,
     ///     <see cref="SharedSleepBegan"/></item>
-    ///   <item><b>Chování</b> — <see cref="ActionCommitted"/></item>
-    ///   <item><b>Spánek</b> — <see cref="SleepEnded"/>, <see cref="NightmareTriggered"/>,
+    ///   <item><b>Behaviour</b> — <see cref="ActionCommitted"/></item>
+    ///   <item><b>Sleep</b> — <see cref="SleepEnded"/>, <see cref="NightmareTriggered"/>,
     ///     <see cref="SleepInterrupted"/></item>
-    ///   <item><b>Paměť</b> — <see cref="MemoryEncoded"/> (jen pokud má <c>Kind</c>),
+    ///   <item><b>Memory</b> — <see cref="MemoryEncoded"/> (only when it has a <c>Kind</c>),
     ///     <see cref="MemoryConsolidated"/></item>
     /// </list>
     /// </para>
     /// <para>
-    /// Záměrně ignoruje: <c>SleepPhaseChanged</c> (debug info), <c>ActionProposed</c>
-    /// (jen návrh — výsledek je <c>ActionCommitted</c>), <c>DreamOccurred</c>
-    /// (herní vrstva si ho zpracuje po svém).
+    /// Deliberately ignores: <c>SleepPhaseChanged</c> (debug info), <c>ActionProposed</c>
+    /// (just a proposal — the result is <c>ActionCommitted</c>), <c>DreamOccurred</c>
+    /// (the game layer handles it on its own).
     /// </para>
     /// </remarks>
     public sealed class DefaultNarrativeFormatter : INarrativeFormatter
@@ -56,14 +56,14 @@ namespace GameEngineTools.Narrative
 
         /// <inheritdoc/>
         /// <remarks>
-        /// Hlavní vstupní bod — pattern matching na konkrétní typ eventu.
-        /// Každá větev deleguje na privátní metodu pro přehlednost.
+        /// Main entry point — pattern matching on the concrete event type.
+        /// Each branch delegates to a private method for clarity.
         /// </remarks>
         public NarrativeEntry? Format(IDomainEvent ev, Func<HumanId, NarrativeCharacterInfo> resolveCharacter)
         {
             return ev switch
             {
-                // ── Sociální interakce ────────────────────────────────────────────
+                // ── Social interactions ────────────────────────────────────────────
                 FirstImpressionFormed fi => FormatFirstImpression(fi, resolveCharacter),
                 InteractionOutcome io => FormatInteractionOutcome(io, resolveCharacter),
                 MicroPositive mp => FormatMicroPositive(mp, resolveCharacter),
@@ -71,25 +71,25 @@ namespace GameEngineTools.Narrative
                 RepairAttempt ra => FormatRepairAttempt(ra, resolveCharacter),
                 SharedSleepBegan ssb => FormatSharedSleepBegan(ssb, resolveCharacter),
 
-                // ── Chování (Behavior) ────────────────────────────────────────────
+                // ── Behaviour ────────────────────────────────────────────
                 ActionCommitted ac => FormatActionCommitted(ac, resolveCharacter),
 
-                // ── Spánek ────────────────────────────────────────────────────────
+                // ── Sleep ────────────────────────────────────────────────────────
                 SleepEnded se => FormatSleepEnded(se, resolveCharacter),
                 NightmareTriggered nt => FormatNightmare(nt, resolveCharacter),
                 SleepInterrupted si => FormatSleepInterrupted(si, resolveCharacter),
 
-                // ── Paměť ─────────────────────────────────────────────────────────
-                // Property pattern: zpracujeme jen pokud Kind není null.
-                // Proč? MemoryEncoded bez Kind je narativně slepý — máme jen GUID.
+                // ── Memory ─────────────────────────────────────────────────────────
+                // Property pattern: handle only when Kind is not null.
+                // Why? MemoryEncoded without a Kind is narratively blind — we only have a GUID.
                 MemoryEncoded { What: not null } me => FormatMemoryEncoded(me, resolveCharacter),
                 MemoryConsolidated mc => FormatMemoryConsolidated(mc, resolveCharacter),
 
-                // ── Záměrně ignorované eventy ─────────────────────────────────────
-                // SleepPhaseChanged  → debug info, ne příběh
-                // ActionProposed     → jen návrh; výsledek je ActionCommitted
-                // DreamOccurred      → herní vrstva si ho zpracuje po svém (vlastní hook)
-                // MemoryRecalled     → interní; postava si vzpomněla, ale hráč to nevidí přímo
+                // ── Deliberately ignored events ─────────────────────────────────────
+                // SleepPhaseChanged  → debug info, not story
+                // ActionProposed     → just a proposal; the result is ActionCommitted
+                // DreamOccurred      → the game layer handles it on its own (custom hook)
+                // MemoryRecalled     → internal; the character remembered, but the player does not see it directly
                 _ => null
             };
         }
@@ -97,13 +97,13 @@ namespace GameEngineTools.Narrative
         #endregion Veřejné API — Format
 
         // ══════════════════════════════════════════════════════════════════════════
-        // Sociální události
+        // Social events
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Sociální — FormatFirstImpression
 
         /// <summary>
-        /// První dojem — postava A potkala B a zformovala si o ní názor.
+        /// First impression — character A met B and formed an opinion of them.
         /// </summary>
         private NarrativeEntry FormatFirstImpression(
             FirstImpressionFormed fi,
@@ -112,7 +112,7 @@ namespace GameEngineTools.Narrative
             var a = resolve(fi.A);
             var b = resolve(fi.B);
 
-            // Interpretujeme číslo Like do srozumitelného textu
+            // Interpret the Like number into understandable text
             var likeText = fi.Like switch
             {
                 >= 70 => "kladný dojem",
@@ -131,18 +131,18 @@ namespace GameEngineTools.Narrative
         #region Sociální — FormatInteractionOutcome
 
         /// <summary>
-        /// Výsledek interakce — postava A oslovila B, B přijala nebo odmítla.
+        /// Interaction outcome — character A reached out to B; B accepted or declined.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Proč je Subject = <c>io.From</c> (iniciátor)?<br/>
-        /// Iniciátor je aktér děje. "Anna oslovila Petra" — hrdinka je Anna, ne Petr.
+        /// Why is Subject = <c>io.From</c> (the initiator)?<br/>
+        /// The initiator is the actor of the event. "Anna oslovila Petra" — the heroine is Anna, not Petr.
         /// </para>
         /// <para>
         /// Kde se tento event vyskytuje?<br/>
-        /// V <c>LastOutbox</c> postavy B (příjemce), protože B generuje outcome.
-        /// <c>SimulationScene.RouteOutcomes()</c> ho doručí zpět A,
-        /// ale v narativu ho zachytíme z B's outboxu — proto výchozí zpracování je zde správné.
+        /// In the <c>LastOutbox</c> of character B (the recipient), because B generates the outcome.
+        /// <c>SimulationScene.RouteOutcomes()</c> delivers it back to A,
+        /// but in the narrative we capture it from B's outbox — so the default handling here is correct.
         /// </para>
         /// </remarks>
         private NarrativeEntry FormatInteractionOutcome(
@@ -152,7 +152,7 @@ namespace GameEngineTools.Narrative
             var initiator = resolve(io.From);
             var recipient = resolve(io.To);
 
-            // Překlad SpeechAct do přirozeného jazyka (objekt věty)
+            // Translate the SpeechAct into natural language (the sentence object)
             var actText = io.Act switch
             {
                 SpeechAct.SmallTalk => "nezávazný hovor",
@@ -166,7 +166,7 @@ namespace GameEngineTools.Narrative
                 _ => "interakci"
             };
 
-            // Reakce příjemce — přijal/odmítl s gramatickým rodem
+            // Recipient's reaction — accepted/declined with grammatical gender
             var reactionText = io.Accepted
                 ? $"{recipient.Name} {Conj(recipient, "přijal", "přijala")} {actText}."
                 : $"{recipient.Name} {Conj(recipient, "odmítl", "odmítla")} {actText}.";
@@ -174,7 +174,7 @@ namespace GameEngineTools.Narrative
             var text = $"{initiator.Name} {Conj(initiator, "nabídl", "nabídla")} " +
                        $"{Decl(recipient, Grammar.Core.Enums.Case.Dative)} {actText}. {reactionText}";
 
-            // Odmítnutí je narativně stejně zajímavé jako přijetí — oba jsou Medium
+            // A rejection is narratively as interesting as acceptance — both are Medium
             return new NarrativeEntry(io.OccurredAt, io.From, text, NarrativePriority.Medium);
         }
 
@@ -183,7 +183,7 @@ namespace GameEngineTools.Narrative
         #region Sociální — FormatMicroPositive / FormatMicroNegative
 
         /// <summary>
-        /// Mikromoment — postava A udělala radost postavě B (pohlazení, kompliment…).
+        /// Micro-moment — character A pleased character B (a caress, a compliment…).
         /// </summary>
         private NarrativeEntry FormatMicroPositive(
             MicroPositive mp,
@@ -197,7 +197,7 @@ namespace GameEngineTools.Narrative
         }
 
         /// <summary>
-        /// Mikromoment — postava A (neúmyslně) zranila city postavy B.
+        /// Micro-moment — character A (unintentionally) hurt character B's feelings.
         /// </summary>
         private NarrativeEntry FormatMicroNegative(
             MicroNegative mn,
@@ -215,7 +215,7 @@ namespace GameEngineTools.Narrative
         #region Sociální — FormatRepairAttempt
 
         /// <summary>
-        /// Pokus o smíření — A se pokusil/a o nápravu vztahu s B.
+        /// Repair attempt — A tried to mend the relationship with B.
         /// </summary>
         private NarrativeEntry FormatRepairAttempt(
             RepairAttempt ra,
@@ -229,7 +229,7 @@ namespace GameEngineTools.Narrative
                 : $"{a.Name} {Conj(a, "se pokusil", "se pokusila")} o smír s {Decl(b, Grammar.Core.Enums.Case.Instrumental)}, " +
                   $"ale {b.Name} {Conj(b, "odmítl", "odmítla")}.";
 
-            // Smíření nebo odmítnutí smíru — vždy High (vztahový zlom)
+            // Reconciliation or its rejection — always High (a relationship turning point)
             return new NarrativeEntry(ra.OccurredAt, ra.A, text, NarrativePriority.High);
         }
 
@@ -238,7 +238,7 @@ namespace GameEngineTools.Narrative
         #region Sociální — FormatSharedSleepBegan
 
         /// <summary>
-        /// Dvě postavy začaly spát společně — romanticky, přátelsky nebo z nutnosti.
+        /// Two characters began sleeping together — romantically, as friends, or out of necessity.
         /// </summary>
         private static NarrativeEntry FormatSharedSleepBegan(
             SharedSleepBegan ssb,
@@ -247,7 +247,7 @@ namespace GameEngineTools.Narrative
             var who = resolve(ssb.Who);
             var companion = resolve(ssb.Companion);
 
-            // Kontext sdíleného spánku — převeď enum na přirozený jazyk
+            // Shared-sleep context — convert the enum into natural language
             var typeText = ssb.Type switch
             {
                 SharedSleepType.Romantic => "romanticky",
@@ -256,7 +256,7 @@ namespace GameEngineTools.Narrative
                 _ => "spolu"
             };
 
-            // "usnuli" — mužský rod plurálu pro smíšenou dvojici (gramaticky korektní)
+            // "usnuli" — masculine plural for a mixed pair (grammatically correct)
             var text = $"{who.Name} a {companion.Name} usnuli {typeText}.";
             return new NarrativeEntry(ssb.OccurredAt, ssb.Who, text, NarrativePriority.High);
         }
@@ -264,19 +264,19 @@ namespace GameEngineTools.Narrative
         #endregion Sociální — FormatSharedSleepBegan
 
         // ══════════════════════════════════════════════════════════════════════════
-        // Chování (Behavior)
+        // Behaviour
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Chování — FormatActionCommitted
 
         /// <summary>
-        /// Postava se rozhodla pro akci — "šel spát", "šla se najíst"…
+        /// The character chose an action — "šel spát", "šla se najíst"…
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <b>Proč null pro neznámé akce?</b><br/>
-        /// Neznámá akce nemá smysluplný narativní překlad. Raději ticho než nesmysl.
-        /// Přidáš novou akci → přidáš větev switch.
+        /// <b>Why null for unknown actions?</b><br/>
+        /// An unknown action has no meaningful narrative translation. Silence is better than nonsense.
+        /// Add a new action → add a switch branch.
         /// </para>
         /// </remarks>
         private static NarrativeEntry? FormatActionCommitted(
@@ -285,7 +285,7 @@ namespace GameEngineTools.Narrative
         {
             var actor = resolve(ac.Human);
 
-            // Každá akce → (věta, priorita). Null text = ignorujeme.
+            // Each action → (sentence, priority). Null text = ignored.
             var (text, priority) = ac.ActionName switch
             {
                 Sleep => ($"{actor.Name} {Conj(actor, "šel", "šla")} spát.",
@@ -306,7 +306,7 @@ namespace GameEngineTools.Narrative
                 InviteIntimacy => ($"{actor.Name} {Conj(actor, "projevil", "projevila")} zájem o intimitu.",
                                    NarrativePriority.High),
 
-                // Neznámá akce — ticho je lepší než nesmyslný text
+                // Unknown action — silence is better than nonsensical text
                 _ => (null!, NarrativePriority.Low)
             };
 
@@ -316,13 +316,13 @@ namespace GameEngineTools.Narrative
         #endregion Chování — FormatActionCommitted
 
         // ══════════════════════════════════════════════════════════════════════════
-        // Spánek
+        // Sleep
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Spánek — FormatSleepEnded
 
         /// <summary>
-        /// Spánek skončil — postava se probudila s danou kvalitou a délkou odpočinku.
+        /// Sleep ended — the character woke up with the given quality and rest duration.
         /// </summary>
         private static NarrativeEntry FormatSleepEnded(
             SleepEnded se,
@@ -330,7 +330,7 @@ namespace GameEngineTools.Narrative
         {
             var actor = resolve(se.Human);
 
-            // Kvalita spánku interpretovaná jako pocit při probuzení
+            // Sleep quality interpreted as how it felt on waking
             var qualityText = se.Quality switch
             {
                 >= 80 => Conj(actor, "osvěžen", "osvěžena"),
@@ -354,7 +354,7 @@ namespace GameEngineTools.Narrative
         #region Spánek — FormatNightmare
 
         /// <summary>
-        /// Noční můra — zlomový moment spánkového cyklu, zvyšuje stres.
+        /// Nightmare — a turning point in the sleep cycle that raises stress.
         /// </summary>
         private static NarrativeEntry FormatNightmare(
             NightmareTriggered nt,
@@ -362,7 +362,7 @@ namespace GameEngineTools.Narrative
         {
             var actor = resolve(nt.Human);
 
-            // Kontextová informace — vyšší stres → pravděpodobnější důvod noční můry
+            // Contextual info — higher stress → a more likely cause of the nightmare
             var stressContext = nt.StressAtSleepStart switch
             {
                 >= 70 => "Vysoký stres před usnutím se projevil.",
@@ -379,7 +379,7 @@ namespace GameEngineTools.Narrative
         #region Spánek — FormatSleepInterrupted
 
         /// <summary>
-        /// Spánek byl přerušen — přepadení, bolest nebo vnější vyrušení.
+        /// Sleep was interrupted — an ambush, pain, or external disturbance.
         /// </summary>
         private NarrativeEntry FormatSleepInterrupted(
             SleepInterrupted si,
@@ -387,8 +387,8 @@ namespace GameEngineTools.Narrative
         {
             var actor = resolve(si.Human);
 
-            // Příčina přerušení — přeložíme enum do věty
-            // Poznámka: gramatický rod je v minulém pasivním tvaru ("byl přerušen" / "byla přerušena")
+            // Interruption cause — translate the enum into a sentence
+            // Note: grammatical gender is in the past passive form ("byl přerušen" / "byla přerušena")
             var causeText = si.Cause switch
             {
                 InterruptCause.Ambush => Conj(actor, "byl přepaden", "byla přepadena"),
@@ -407,17 +407,17 @@ namespace GameEngineTools.Narrative
         #endregion Spánek — FormatSleepInterrupted
 
         // ══════════════════════════════════════════════════════════════════════════
-        // Paměť
+        // Memory
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Paměť — FormatMemoryEncoded
 
         /// <summary>
-        /// Postava si zapamatovala nový zážitek (nebo posílila existující).
+        /// The character memorised a new experience (or reinforced an existing one).
         /// </summary>
         /// <remarks>
-        /// Volá se jen pokud <see cref="MemoryEncoded.What"/> není null —
-        /// zajistí to pattern matching v <see cref="Format"/>.
+        /// Called only when <see cref="MemoryEncoded.What"/> is not null —
+        /// ensured by the pattern matching in <see cref="Format"/>.
         /// </remarks>
         private NarrativeEntry FormatMemoryEncoded(
             MemoryEncoded me,
@@ -425,10 +425,10 @@ namespace GameEngineTools.Narrative
         {
             var actor = resolve(me.Human);
 
-            // ── Parsuj hlavičku — zjisti co za událost to je ──────────────────────
+            // ── Parse the header — determine what kind of event it is ──────────────────────
             var header = MemoryWhatParser.GetHeader(me.What);
 
-            // ── Přelož schema na větu ─────────────────────────────────────────────
+            // ── Translate the schema into a sentence ─────────────────────────────────────────────
             var memoryText = header switch
             {
                 // Interaction:SmallTalk:Accepted|from=a3f2c1|to=b7e9a2
@@ -453,13 +453,13 @@ namespace GameEngineTools.Narrative
                 // Action:Sleep, Action:Eat...
                 var h when h.StartsWith("Action:") => FormatActionMemory(me.What, actor),
 
-                // Neznámý formát — fallback, ticho je lepší než nesmysl
+                // Unknown format — fallback; silence is better than nonsense
                 _ => null
             };
 
             if (memoryText is null) return null!;
 
-            // Síla vzpomínky — kontextová informace pro hráče
+            // Memory strength — contextual info for the player
             var strengthHint = me.Strength switch
             {
                 >= 0.8 => " (silná vzpomínka)",
@@ -486,7 +486,7 @@ namespace GameEngineTools.Narrative
             var act = parts[1];                           // "Humor"
             var outcome = parts[2];                           // "Accepted" / "Rejected"
 
-            // Přelož act na čitelný text
+            // Translate the act into readable text
             var actText = act switch
             {
                 "SmallTalk" => "nezávazný hovor",
@@ -570,8 +570,8 @@ namespace GameEngineTools.Narrative
             {
                 "ReachOut" => $"{Conj("hledat", VerbAspect.Perfective, Tense.Past, VerbClass.Class5, actor.IsFemale)} společnost",
                 "InviteIntimacy" => $"{Conj("projevit", VerbAspect.Perfective, Tense.Past, VerbClass.Class4, actor.IsFemale)} zájem o intimitu",
-                // Rutinní akce (Eat, Drink, Sleep, SelfCare) — nízká narativní hodnota
-                // → null = ticho, do deníku vzpomínek je nevypíšeme
+                // Routine actions (Eat, Drink, Sleep, SelfCare) — low narrative value
+                // → null = silence; we do not write them into the memory journal
                 _ => null
             };
         }
@@ -604,7 +604,7 @@ namespace GameEngineTools.Narrative
 
             var inst = fromPerson is null ? DeclString(somebody, Grammar.Core.Enums.Case.Instrumental) : Decl(fromPerson, Grammar.Core.Enums.Case.Instrumental);
 
-            // Pokud máme konkrétní popis události, použijeme ho — jinak generický fallback
+            // If we have a concrete event description, use it — otherwise a generic fallback
             return positive
                 ? whatParam is not null
                     ? $"příjemný moment s {inst}: {whatParam}"
@@ -621,7 +621,7 @@ namespace GameEngineTools.Narrative
         #region Paměť — FormatMemoryConsolidated
 
         /// <summary>
-        /// Konsolidace paměti po spánku — spánek posílil N vzpomínek.
+        /// Memory consolidation after sleep — sleep reinforced N memories.
         /// </summary>
         private NarrativeEntry FormatMemoryConsolidated(
             MemoryConsolidated mc,
@@ -629,7 +629,7 @@ namespace GameEngineTools.Narrative
         {
             var actor = resolve(mc.Human);
 
-            // Plurál — "vzpomínku" vs. "vzpomínky" (gramatika číslovek v češtině)
+            // Plural — "vzpomínku" vs. "vzpomínky" (Czech numeral grammar)
             var countText = mc.Count switch
             {
                 1 => $"1 {DeclString("vzpomínka", Case.Accusative, Number.Singular, WordCategory.Noun, Gender.Feminine, "žena")}",
@@ -646,18 +646,18 @@ namespace GameEngineTools.Narrative
         #endregion Paměť — FormatMemoryConsolidated
 
         // ══════════════════════════════════════════════════════════════════════════
-        // Privátní pomocné metody — gramatika
+        // Private helper methods — grammar
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Pomocné — gramatika
 
         /// <summary>
-        /// Vybere správný tvar slovesa podle gramatického rodu postavy.
+        /// Selects the correct verb form based on the character's grammatical gender.
         /// </summary>
         /// <param name="actor">Postava — zdroj rodu.</param>
-        /// <param name="male">Tvar pro mužský rod (např. "šel", "přijal").</param>
-        /// <param name="female">Tvar pro ženský rod (např. "šla", "přijala").</param>
-        /// <returns>Správný tvar slovesa.</returns>
+        /// <param name="male">Form for masculine gender (e.g. "šel", "přijal").</param>
+        /// <param name="female">Form for feminine gender (e.g. "šla", "přijala").</param>
+        /// <returns>The correct verb form.</returns>
         /// <example>
         /// <code>
         /// // "Anna šla spát." vs. "Petr šel spát."

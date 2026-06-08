@@ -178,11 +178,11 @@ namespace GameEngineTools.Characters.Traits
         double SkinOiliness,       // 0..100
         double AcneLevel,          // 0..100
         BloatingLevel Bloating,    // None/Light/Medium/High
-        /// <summary>Podíl šedivých vlasů (0..1); z PhysicalAgingState.GreyFraction.</summary>
+        /// <summary>Fraction of grey hair (0..1); from PhysicalAgingState.GreyFraction.</summary>
         double GreyFraction = 0.0,
-        /// <summary>Hustota/plnost vlasů (0..1); z PhysicalAgingState.HairDensity.</summary>
+        /// <summary>Hair density/fullness (0..1); from PhysicalAgingState.HairDensity.</summary>
         double HairDensity = 1.0,
-        /// <summary>Skóre vrásek (0..100); z PhysicalAgingState.WrinkleScore.</summary>
+        /// <summary>Wrinkle score (0..100); from PhysicalAgingState.WrinkleScore.</summary>
         double WrinkleScore = 0.0,
         string? ClothingStyle = null,
         string? MakeupStyle = null);
@@ -210,8 +210,8 @@ namespace GameEngineTools.Characters.Traits
     public static class AppearanceProjector
     {
         /// <summary>
-        /// Vypočti aktuální vzhled z traitu a snapshotu fyziologie.
-        /// Neprovádí side-effecty; můžeš ukládat výsledný <see cref="AppearanceView"/>.
+        /// Computes the current appearance from the trait and the physiology snapshot.
+        /// Has no side effects; you can store the resulting <see cref="AppearanceView"/>.
         /// </summary>
         public static AppearanceView Compute(
             PhysicalAppearance trait,
@@ -219,9 +219,9 @@ namespace GameEngineTools.Characters.Traits
             SexBiology biology,
             PhysicalAgingState? aging = null)
         {
-            // Hmotnost je mimo sim – očekává se, že si ji buď držíš extra, nebo aproximujeme ze 2 indexů:
-            // Energy (dlouhodobě) a ImmuneLoad (krátkodobě zhorší vzhled pleti).
-            // Tady volíme rozumné defaulty; můžeš je nahradit vlastní evidencí hmotnosti.
+            // Weight is outside the sim – it is expected you track it separately, or we approximate it from 2 indices:
+            // Energy (long-term) and ImmuneLoad (short-term, worsens skin appearance).
+            // Here we pick reasonable defaults; you can replace them with your own weight tracking.
             var baselineBmi = BaselineBmiFor(trait.Body, biology);
             var morphologyBmi = 18.5 + trait.Body.SoftTissue.Adiposity * 8.0 + trait.Body.SoftTissue.Muscularity * 2.2;
             var bmiJitter = (50 - physio.Energy) * 0.003; // nízká energie → mírně horší BMI proxy
@@ -234,14 +234,14 @@ namespace GameEngineTools.Characters.Traits
                 8,
                 45);
 
-            // Vzhled pleti (velmi hrubě): žlázy + zánět ↔ ImmuneLoad, hormonální vlivy z cyklu přes SymptomBloat.
+            // Skin appearance (very roughly): glands + inflammation ↔ ImmuneLoad, hormonal effects from the cycle via SymptomBloat.
             var oil = Math.Clamp(18 + physio.ImmuneLoad * 0.55 + (1.0 - trait.Surface.SkinThickness) * 12.0, 0, 100);
             var acne = Math.Clamp(
                 8 + physio.ImmuneLoad * 0.65 + physio.BodyTempDelta * 5 + (1.0 - trait.Surface.SkinSmoothness) * 18.0,
                 0,
                 100);
 
-            // Nadmutí (bloat) – PMS/menses/luteální fáze zvyšují retenci vody
+            // Bloat – PMS/menses/luteal phase increases water retention
             var bloat = BloatingLevel.None;
             if (physio.Cycle is { } c)
             {
@@ -251,7 +251,7 @@ namespace GameEngineTools.Characters.Traits
                     CyclePhase.Luteal => BloatingLevel.Light,
                     _ => BloatingLevel.None
                 };
-                // Pokud máš v State už symptom bloat 0..100, přemapuj:
+                // If the State already has a bloat symptom 0..100, remap it:
                 if (c.SymptomBloat >= 66)
                 {
                     bloat = BloatingLevel.High;
@@ -262,13 +262,13 @@ namespace GameEngineTools.Characters.Traits
                 }
             }
 
-            // Držení těla a kvalita „vzhledu“ klesá s únavou/bolestí
+            // Posture and overall "look" quality decline with fatigue/pain
             var posture = Math.Clamp(
                 trait.Body.Posture.PostureUprightness * 100.0 - physio.SleepDebtHours * 5 - physio.Pain * 0.4,
                 0,
                 100);
 
-            // Vlasy: runtime aging state přepíše statický trait
+            // Hair: the runtime aging state overrides the static trait
             var hairLen = Math.Clamp(aging?.HairLengthCm ?? trait.HairLengthCm, 0.0, 120.0);
             var greyFrac = Math.Clamp(aging?.GreyFraction ?? 0.0, 0, 1);
             var hairDens = Math.Clamp(aging?.HairDensity ?? 1.0, 0, 1);
@@ -299,7 +299,7 @@ namespace GameEngineTools.Characters.Traits
 
         private static double BodyFatFor(double bmi, SexBiology biology)
         {
-            // Deurenbergův odhad BF% ~ BMI + 0.23*age - 5.4 - 10.8*sex (sex=1 muži) – věk nemáme, použijeme baseline.
+            // Deurenberg's BF% estimate ~ BMI + 0.23*age - 5.4 - 10.8*sex (sex=1 male) – we lack age, so we use a baseline.
             var sexAdj = (biology == SexBiology.Male) ? -10.8 : 0.0;
             var baseEst = bmi - 5.4 + sexAdj; // zjednodušení bez věku
             return baseEst;

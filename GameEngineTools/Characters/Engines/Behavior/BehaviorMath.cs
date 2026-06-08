@@ -65,7 +65,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         {
             if (rs.Edges is null || rs.Edges.Count == 0) return 50;
 
-            // Nejsilnější vztah má největší váhu (quality over quantity)
+            // The strongest relationship has the greatest weight (quality over quantity)
             var sorted = rs.Edges.Values
                 .Select(e => e.Closeness)
                 .OrderByDescending(c => c)
@@ -75,7 +75,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             double totalWeight = 0;
             for (int i = 0; i < sorted.Count; i++)
             {
-                // Exponenciálně klesající váhy: 1.0, 0.5, 0.25, 0.125...
+                // Exponentially decreasing weights: 1.0, 0.5, 0.25, 0.125...
                 var weight = Math.Pow(0.5, i);
                 weightedSum += sorted[i] * weight;
                 totalWeight += weight;

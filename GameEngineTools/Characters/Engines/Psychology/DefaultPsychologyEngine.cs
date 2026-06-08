@@ -93,17 +93,17 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var ph = ctx.Snapshot.Physiology;
             var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
 
-            // Vagální tonus (přes Neuroticism): High N = nižší HRV = pomalejší stress recovery
-            // Empiricky: Neuroticism negativně koreluje s vagálním tónem
+            // Vagal tone (via Neuroticism): high N = lower HRV = slower stress recovery
+            // Empirically: Neuroticism is negatively correlated with vagal tone
             var vagalTone = 1.0 - ctx.Personality.BigFive.Neuroticism * 0.5;  // 0.5..1.0
 
             // Neuroticism moduluje rychlost AKUMULACE stresu (HPA osa vulnerabilita).
-            // Empiricky: max ~1.7× rozdíl mezi nízkým a vysokým N (Sutin et al. 2013;
-            // Bibbey et al. 2015 — HPA reactivity); nikoli 3×.
+            // Empirically: a max ~1.7× difference between low and high N (Sutin et al. 2013;
+            // Bibbey et al. 2015 — HPA reactivity); not 3×.
             var stressGrowthMult = 0.65 + ctx.Personality.BigFive.Neuroticism * 1.05;  // [0.65, 1.70]
 
-            // Stresová vulnerabilita v noci (McEwen 1998): kortizol moduluje HPA resilience
-            // Nízký kortizol (noc) → stres klesá pomaleji; Vysoký (ráno) → rychleji
+            // Stress vulnerability at night (McEwen 1998): cortisol modulates HPA resilience
+            // Low cortisol (night) → stress falls more slowly; high (morning) → faster
             var circadianVulnerability = Math.Clamp(
                 ph.CortisolLevel / Config.CircadianVulnerabilityScale,
                 Config.CircadianVulnerabilityMin, 2.0);
@@ -120,7 +120,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 emotionDecayMult *= Math.Max(0.01, ruminationBlock);
             }
 
-            // Základní drift: stres klesá k baseline (modulován vagálním tónem + cirkadiánní vulnerabilitou)
+            // Base drift: stress falls toward baseline (modulated by vagal tone + circadian vulnerability)
             s = s with
             {
                 Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * vagalTone * circadianVulnerability * h),
@@ -129,22 +129,22 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)
             };
 
-            // Hyperalgezie: imunitní zátěž zesiluje bolestivý signál (Dantzer 2007)
+            // Hyperalgesia: immune load amplifies the pain signal (Dantzer 2007)
             var painAmp = ph.ImmuneLoad > Config.HyperalgesiaImmuneThreshold
                 ? 1.0 + (ph.ImmuneLoad - Config.HyperalgesiaImmuneThreshold) / 60.0 * Config.HyperalgesiaMaxMultiplier
                 : 1.0;
 
-            // Fyzio modulace (Pain efekty škálovány hyperalgezií)
+            // Physiological modulation (Pain effects scaled by hyperalgesia)
             s = s with
             {
                 Valence = Clampm1p1(s.Valence - 0.001 * ph.Hunger * h - 0.003 * ph.Pain * painAmp * h + 0.0015 * ph.Energy * h),
-                // stressGrowthMult: High Neuroticism → HPA osa reaguje silněji na stejné stresory
+                // stressGrowthMult: high Neuroticism → the HPA axis reacts more strongly to the same stressors
                 Stress = Clamp01p(s.Stress + (0.15 * Math.Min(8, ph.SleepDebtHours) * h + 0.05 * ph.Pain * painAmp * h) * stressGrowthMult),
                 Arousal = Clamp01(s.Arousal + 0.001 * ph.Thirst * h - 0.001 * ph.Energy * h),
                 Dominance = Clamp01(s.Dominance - 0.0005 * ph.Pain * painAmp * h - 0.01 * Math.Max(0, ph.BodyTempDelta - 1.5) * h)
             };
 
-            // Nutriční dopady — nízké železo snižuje valenci; nízký vitamín D tlumí náladu
+            // Nutritional impacts — low iron lowers valence; low vitamin D dampens mood
             if (ph.Nutrition is { } nutrition)
             {
                 if (nutrition.Iron < 30)
@@ -153,7 +153,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - (20 - nutrition.VitaminD) * Config.LowVitaminDMoodPenaltyPerHour / 20.0 * h, 0, 100) };
             }
 
-            // Sickness behavior — imunitní zátěž → sociální stažení + anhedonie + letargie (Dantzer 2007)
+            // Sickness behavior — immune load → social withdrawal + anhedonia + lethargy (Dantzer 2007)
             if (s.Motivations is { } sicknessMotiv)
             {
                 var shouldWithdraw = ph.ImmuneLoad > 50;
@@ -165,7 +165,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
 
                 // Anhedonie (Dantzer): IL-1β inhibuje nucleus accumbens →
-                // letargie (Arousal↓) a brain fog (CogLoad↑) při aktivní nemoci
+                // lethargy (Arousal↓) and brain fog (CogLoad↑) during active illness
                 if (shouldWithdraw)
                 {
                     s = s with
@@ -176,7 +176,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
-            // CognitiveLoad — odvozuje se z fyziologických stressorů
+            // CognitiveLoad — derived from physiological stressors
             {
                 var feverThreshold = 1.5;
                 var feverDegrees = Math.Max(0, ph.BodyTempDelta - feverThreshold);
@@ -196,12 +196,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                 if (feverDegrees > 0)
                     s = s with { Arousal = Clamp01(s.Arousal - feverDegrees * Config.FeverArousalSuppressPerDegree * h) };
-                // Vysoká horečka (> 2.5°C) posouvá náladu k negativní valenci (zmatenost)
+                // High fever (> 2.5°C) shifts mood toward negative valence (confusion)
                 if (ph.BodyTempDelta > 2.5)
                     s = s with { Valence = Clampm1p1(s.Valence - 0.02 * h) };
             }
 
-            // Allostatická zátěž — zvyšuje CogLoad a snižuje valenci
+            // Allostatic load — raises CogLoad and lowers valence
             var alloLoad = ph.AllostaticLoad;
             if (alloLoad > 0)
             {
@@ -212,12 +212,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Kortizol → stres a arousal (HPA over-activation); modulován Neuroticism growth mult
+            // Cortisol → stress and arousal (HPA over-activation); modulated by the Neuroticism growth mult
             if (ph.CortisolLevel > 70)
                 s = s with { Stress = Clamp01p(s.Stress + (ph.CortisolLevel - 70) * Config.CortisolStressWeight * h * stressGrowthMult) };
             s = s with { Arousal = Clamp01(s.Arousal + (ph.CortisolLevel - 50) * Config.CortisolArousalWeight * h) };
 
-            // Sleep Inertia — kognitivní zpomalení a tlumení arousalu po probuzení (Borbély)
+            // Sleep inertia — cognitive slowing and dampened arousal after waking (Borbély)
             if (ph.SleepInertiaHours > 0)
             {
                 var inertiaSeverity = ph.SleepInertiaHours / Config.SleepInertiaMaxHours; // 0..1
@@ -228,8 +228,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Hangry neutrální bias — hlad misattribuovaný k negativitě v neutrálním kontextu
-            // (MacCormack & Lindquist, 2019: interoceptivní signál hladu → hostile attribution bias)
+            // Hangry neutral bias — hunger misattributed to negativity in a neutral context
+            // (MacCormack & Lindquist, 2019: the interoceptive hunger signal → hostile attribution bias)
             if (ph.Hunger > Config.HangryNeutralBiasThreshold
                 && Math.Abs(s.Valence) < Config.HangryNeutralContextWindow)
             {
@@ -237,7 +237,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 s = s with { Valence = Clampm1p1(s.Valence - hungerExcess * Config.HangryNeutralBiasStrength * h) };
             }
 
-            // Testosteron → NeedIntimacy a stresová resilience (jen muži)
+            // Testosterone → NeedIntimacy and stress resilience (men only)
             if (ph.Testosterone is { } testo && s.Motivations is { } motiv)
             {
                 if (testo.Level > 65)
@@ -250,13 +250,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         outbox.Add(new MotivationChanged(now, ctx.Id, motiv, next));
                     }
                 }
-                // Stress resilience: vyšší testosteron zpomaluje akumulaci stresu
+                // Stress resilience: higher testosterone slows stress accumulation
                 if (testo.Level > 50)
                     s = s with { Stress = Math.Max(0, s.Stress - (testo.Level - 50) * Config.TestosteroneStressResilienceWeight * h) };
             }
 
             // Wanting vs. Liking: stres amplifikuje wanting/craving (Berridge 2025)
-            // Liking suppression již pokryta anhedonií; chybějící část: dopaminergní wanting pod stresem
+            // Liking suppression is already covered by anhedonia; the missing part: dopaminergic wanting under stress
             if (s.Stress > Config.WantingStressThreshold && s.Motivations is { } wantingMotiv)
             {
                 var stressExcess = (s.Stress - Config.WantingStressThreshold) / 40.0;
@@ -383,7 +383,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
-            // SAM systém → PAD (Sympatho-Adrenomedullary: okamžitá sympatická aktivace)
+            // SAM system → PAD (Sympatho-Adrenomedullary: immediate sympathetic activation)
             if (ph.AcuteArousalLevel > 0)
             {
                 var samContrib = ph.AcuteArousalLevel / 100.0 * Config.AcuteArousalPsychWeight;
@@ -394,7 +394,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Fyzická únava → PAD: přetížení = Valence↓; mírná exerce = stress buffer (Stubbs 2017)
+            // Physical fatigue → PAD: overload = Valence↓; mild exertion = a stress buffer (Stubbs 2017)
             if (ph.PhysicalFatigueLevel > Config.PhysicalFatigueHighThreshold)
             {
                 var excess = (ph.PhysicalFatigueLevel - Config.PhysicalFatigueHighThreshold) / 30.0;
@@ -406,11 +406,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
             }
             else if (ph.PhysicalFatigueLevel > Config.PhysicalFatigueMildThreshold)
             {
-                // Mírná fyzická aktivita = endorfiny → snižuje stres
+                // Mild physical activity = endorphins → lowers stress
                 s = s with { Stress = Math.Max(0, s.Stress - Config.PhysicalFatigueStressReliefWeight * h) };
             }
 
-            // Glykemický stav: hypoglykémie → iritabilita + CogLoad↑
+            // Glycemic state: hypoglycemia → irritability + CogLoad↑
             if (ph.Nutrition is { } glycemicNut && glycemicNut.BloodGlucoseLevel < Config.HypoglycemiaThreshold)
             {
                 var hypSeverity = (Config.HypoglycemiaThreshold - glycemicNut.BloodGlucoseLevel) / Config.HypoglycemiaThreshold;
@@ -421,14 +421,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Dehydratace → kognitivní deficit (Masento 2014): 2% ztráta tělesné vody = zhoršená pracovní paměť
+            // Dehydration → cognitive deficit (Masento 2014): a 2% loss of body water = impaired working memory
             if (ph.Thirst > Config.DehydrationCogLoadThreshold)
             {
                 var dehydSeverity = (ph.Thirst - Config.DehydrationCogLoadThreshold) / 50.0;
                 s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + dehydSeverity * Config.DehydrationCogLoadBonus * h) };
             }
 
-            // Chronická bolest → depresivní profil (Dantzer 2008): po 7+ dnech s bolestí → Valence↓, MoodBaseline erose
+            // Chronic pain → depressive profile (Dantzer 2008): after 7+ days of pain → Valence↓, MoodBaseline erosion
             if (ph.ChronicPainDays > Config.ChronicPainOnsetDays)
             {
                 var chronicity = Math.Min(ph.ChronicPainDays / 30.0, 1.0); // nasycení za 30 dní
@@ -439,11 +439,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Yerkes-Dodson: optimální kortizolové pásmo mírně zlepšuje kognici (Lupien 2007)
+            // Yerkes-Dodson: an optimal cortisol band slightly improves cognition (Lupien 2007)
             if (ph.CortisolLevel >= Config.CortisolOptimalLow && ph.CortisolLevel <= Config.CortisolOptimalHigh)
                 s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad - Config.CortisolOptimalCogBonus * h) };
 
-            // PMDD: závažnější psychologické efekty v luteální fázi u postav s vysokým PmsRisk
+            // PMDD: more severe psychological effects in the luteal phase for characters with high PmsRisk
             if (ph.Cycle?.PmddActive == true)
             {
                 s = s with
@@ -453,7 +453,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Postpartum hormonální crash: estrogen/progesteron propad → emocionální labilita
+            // Postpartum hormonal crash: estrogen/progesterone drop → emotional lability
             if (ph.Postpartum?.HormonalCrashActive == true)
             {
                 var labilityNoise = RandomSym() * Config.PostpartumCrashValenceLability;
@@ -464,7 +464,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Ambientní teplota → PAD (Anderson 2002, General Aggression Model)
+            // Ambient temperature → PAD (Anderson 2002, the General Aggression Model)
             {
                 var ambientTemp = ctx.Snapshot.AmbientTemperature;
                 if (ambientTemp > Config.AmbientTempHeatThreshold)
@@ -478,7 +478,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
                 else if (ambientTemp < Config.AmbientTempColdThreshold && s.Motivations is { } coldMotiv)
                 {
-                    // Mírný chlad → affiliativní hledání tepla/blízkosti (Fay & Maner 2012)
+                    // Mild cold → affiliative seeking of warmth/closeness (Fay & Maner 2012)
                     var coldFactor = (Config.AmbientTempColdThreshold - ambientTemp) / 10.0;
                     var next = coldMotiv with
                     { NeedSocial = Math.Min(100, coldMotiv.NeedSocial + coldFactor * Config.AmbientTempColdSocialBonus * h) };
@@ -490,22 +490,22 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
-            // Kognitivní stárnutí + percepce (Salthouse 2009; Gates & Cooper 1991)
+            // Cognitive aging + perception (Salthouse 2009; Gates & Cooper 1991)
             if (ph.Aging is { AgeYears: > 0 } ageState)
             {
-                // Kognitivní stárnutí: pracovní paměť a rychlost zpracování klesají po 60
+                // Cognitive aging: working memory and processing speed decline after 60
                 if (ageState.AgeYears > Config.CognitivAgingThreshold)
                 {
                     var cogDecline = (ageState.AgeYears - Config.CognitivAgingThreshold)
                                     * Config.CognitiveAgingCogLoadPerYear * h / (365.25 * 24);
                     s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + cogDecline) };
                 }
-                // Presbyopie/presbyakusis: percepční obtíže zvyšují kognitivní zátěž po 50
+                // Presbyopia/presbycusis: perceptual difficulties raise cognitive load after 50
                 if (ageState.AgeYears > Config.PerceptualAgingThreshold)
                     s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + Config.PerceptualAgingCogLoadPerHour * h) };
             }
 
-            // Post-menopauza: estrogen deficience → MoodBaseline erose (serotonin↓, vliv na náladu)
+            // Post-menopause: estrogen deficiency → MoodBaseline erosion (serotonin↓, affecting mood)
             {
                 var isPostMenopausal = ph.Cycle?.Phase == CyclePhase.Paused
                                     && ph.Pregnancy is null
@@ -514,7 +514,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - Config.PostMenopauseMoodBaselinePenaltyPerHour * h, 0, 100) };
             }
 
-            // Altitude → kognitivní deficit (hypoxie mozku)
+            // Altitude → cognitive deficit (brain hypoxia)
             {
                 var alt = ctx.Snapshot.AltitudeMeters;
                 if (alt > Config.AltitudeCogLoadThreshold)
@@ -524,13 +524,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
-            // MoodBaseline — pomalý drift směrem k neutrálu (50), potlačený vysokým stresem
+            // MoodBaseline — a slow drift toward neutral (50), suppressed by high stress
             {
                 var moodRecovery = Config.MoodBaselineRecoveryPerHour;
                 if (s.Stress > Config.MoodBaselineHighStressThreshold) moodRecovery *= 0.1;
                 moodRecovery *= 1.0 + ctx.Personality.BigFive.Agreeableness * Config.MoodBaselineAgreeablenessBonus;
                 var alloMoodDampFactor = 1.0 - alloLoad / 200.0;
-                // Serotonin IDO pathway (Dantzer 2007): chronická imunita tlumí MoodBaseline recovery
+                // Serotonin IDO pathway (Dantzer 2007): chronic immune activation dampens MoodBaseline recovery
                 var serotoninFactor = ph.ImmuneLoad > Config.SerotoninSuppressionImmuneThreshold
                     ? Config.SerotoninMoodRecoveryDampening
                     : 1.0;
@@ -538,7 +538,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * alloMoodDampFactor * h), 0, 100) };
             }
 
-            // Cirkadiánní rytmus — dvě Gaussovy křivky (ráno + večer) s poobědovým poklesem.
+            // Circadian rhythm — two Gaussian curves (morning + evening) with an afternoon dip.
             // Vrcholy jsou posunuty o CircadianPhaseShiftHours (chronotyp + jet-lag) z Physiology.
             if (Config.EnableCircadianRhythm)
             {
@@ -552,7 +552,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 s = s with { Arousal = Clamp01(s.Arousal + delta) };
             }
 
-            // Stresová manifestace — sleduj jak dlouho je stres povýšen nad threshold
+            // Stress manifestation — track how long stress has been elevated above the threshold
             if (s.Stress > Config.StressManifestationThreshold)
             {
                 _stressAbove70Since ??= now;
@@ -568,13 +568,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 _stressAbove70Since = null;
             }
 
-            // Ovulace – jemné zvýšení arousal/valence
+            // Ovulation – a slight rise in arousal/valence
             if (ph.Cycle?.OvulationWindow == true)
             {
                 s = s with { Arousal = Clamp01(s.Arousal + 0.03), Valence = Clampm1p1(s.Valence + 0.02) };
             }
 
-            // Náhodná denní variabilita
+            // Random daily variability
             var noise = (Config.BaselineAffectVariance <= 0) ? 0.0 : (RandomSym() * Config.BaselineAffectVariance);
             s = s with { Valence = Clampm1p1(s.Valence + noise) };
 
@@ -674,7 +674,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                     if (io.Accepted)
                     {
-                        // Anhedonie při sickness: pozitivní interakce méně uspokojuje (Dantzer 2007)
+                        // Anhedonia during sickness: positive interactions are less satisfying (Dantzer 2007)
                         var anhedoniaMult = (ph.ImmuneLoad > Config.SicknessAnhedoniaImmuneThreshold)
                             ? Config.SicknessAnhedoniaRewardBlunting : 1.0;
                         var prevMotivAcc = s.Motivations ?? new MotivationState();
@@ -786,7 +786,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     break;
 
                 case Characters.Engines.Physiology.PregnancyStarted:
-                    // Hormonální nástup (skrytý) — jemná labilita
+                    // Hormonal onset (hidden) — slight lability
                     s = s with
                     {
                         Arousal = Math.Clamp(s.Arousal + 0.04, 0, 1),
@@ -838,13 +838,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     };
                     if (s.Motivations != prevMotivCb)
                         outbox.Add(new MotivationChanged(cb.OccurredAt, ctx.Id, prevMotivCb, s.Motivations!));
-                    // Postpartum hormonální crash: radost z porodu + hormonální labilita koexistují
+                    // Postpartum hormonal crash: joy of birth + hormonal lability coexist
                     if (ph.Postpartum?.HormonalCrashActive == true)
                         s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - 5.0, 0, 100) };
                     break;
 
                 case Characters.Engines.Memory.MemoryRecalled mr:
-                    // Pokud epizoda existuje a je pozitivní, jemně přeladíme valenci
+                    // If the episode exists and is positive, we gently retune the valence
                     var ep = ctx.Snapshot.Memory.Episodes.Where(e => e.Id == mr.EpisodeId).FirstOrDefault();
                     if (ep is not null)
                     {
@@ -852,23 +852,23 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     }
                     break;
 
-                // --- Konec spánkové session ---
-                // Kvalita spánku ovlivňuje valenci a stres — závisí na Config.SleepQualityAffectWeight
-                // a na osobnostním rysu Neuroticism (citlivější osobnosti reagují silněji).
+                // --- End of the sleep session ---
+                // Sleep quality affects valence and stress — depends on Config.SleepQualityAffectWeight
+                // and on the Neuroticism personality trait (more sensitive personalities react more strongly).
                 case Sleep.SleepEnded se:
                     {
                         var weight = Config.SleepQualityAffectWeight;          // 0–1, z appsettings
                         var neuroticism = ctx.Personality.BigFive.Neuroticism;       // 0–1
                         var sensitivityMod = 1.0 + neuroticism * 0.5;                // neurotici reagují až 1.5×
 
-                        // Kvalita 0–100 → normalizujeme na -1..+1 (50 = neutrální bod)
+                        // Quality 0–100 → normalized to -1..+1 (50 = the neutral point)
                         var qualityNorm = (se.Quality - 50.0) / 50.0;               // -1 = hrozný, +1 = perfektní
 
-                        // Valence: dobrý spánek zlepší náladu, špatný zhorší
+                        // Valence: good sleep improves mood, bad sleep worsens it
                         var valenceDelta = qualityNorm * weight * 0.15 * sensitivityMod;
                         s = s with { Valence = Math.Clamp(s.Valence + valenceDelta, -1, 1) };
 
-                        // Stres: přerušený nebo nekvalitní spánek přidá stres
+                        // Stress: interrupted or poor-quality sleep adds stress
                         if (se.WasInterrupted || se.Quality < 40)
                         {
                             var stressDelta = (1.0 - se.Quality / 100.0) * 10.0 * sensitivityMod;
@@ -884,7 +884,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         }
                         else
                         {
-                            // Dobrý spánek snižuje stres navíc k průběžnému driftu v Tick()
+                            // Good sleep reduces stress in addition to the continuous drift in Tick()
                             var stressRelief = (se.Quality / 100.0) * 5.0;
                             var moodGain = se.Quality > 70 ? 2.0 : 0.0;
                             s = s with
@@ -894,7 +894,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             };
                         }
 
-                        // Publikuj StressSpiked pokud stres přesáhl threshold (ostatní enginy mohou reagovat)
+                        // Publish StressSpiked if stress crossed the threshold (other engines may react)
                         if (s.Stress > 70 && State.Stress <= 70)
                             outbox.Add(new StressSpiked(se.OccurredAt, ctx.Id, s.Stress));
 
@@ -945,8 +945,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         break;
                     }
 
-                // --- Noční můra ---
-                // Přímý stresový spike + negativní valence; intenzita závisí na Neuroticism.
+                // --- Nightmare ---
+                // A direct stress spike + negative valence; the intensity depends on Neuroticism.
                 case Sleep.NightmareTriggered nm:
                     {
                         var neuroticism = ctx.Personality.BigFive.Neuroticism;
@@ -1079,34 +1079,34 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// </summary>
         private static DiscreteEmotion InferEmotion(PsychologyState ps)
         {
-            // High stress — Dominance rozlišuje strach vs. hněv (PAD model)
+            // High stress — Dominance distinguishes fear vs. anger (PAD model)
             if (ps.Stress > 70)
                 return ps.Dominance < 0.4 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
 
-            // Surprise — náhlý arousal spike bez jasné valence
+            // Surprise — a sudden arousal spike without clear valence
             if (ps.Arousal > 0.85 && ps.Valence is > -0.2 and < 0.2)
                 return DiscreteEmotion.Surprise;
 
-            // Pride — pozitivní + vysoká dominance
+            // Pride — positive + high dominance
             if (ps.Valence > 0.5 && ps.Dominance > 0.7)
                 return DiscreteEmotion.Pride;
 
-            // Guilt — negativní + střední dominance + zvýšený arousal (approach-motivated, reparativní)
-            // Klíčový rozdíl od Shame: vyšší Dominance (0.30–0.55) = postava není paralyzovaná, chce napravit.
+            // Guilt — negative + medium dominance + elevated arousal (approach-motivated, reparative)
+            // Key difference from Shame: higher Dominance (0.30–0.55) = the character is not paralyzed and wants to make amends.
             // VAD: V<-0.35, D∈[0.25,0.55], A>0.35
             // Zdroj: Tangney & Dearing (2002); Singh & Bhushan (2025, PMC12647085).
             if (ps.Valence < -0.35 && ps.Dominance is >= 0.25 and <= 0.55 && ps.Arousal > 0.35 && ps.Stress < 50)
                 return DiscreteEmotion.Guilt;
 
-            // Shame — negativní + nízká dominance + nízký stres (ne panic)
+            // Shame — negative + low dominance + low stress (not panic)
             if (ps.Valence < -0.3 && ps.Dominance < 0.3 && ps.Stress < 50)
                 return DiscreteEmotion.Shame;
 
-            // Tenderness — pozitivní + klidný + submisivní (péče)
+            // Tenderness — positive + calm + submissive (caregiving)
             if (ps.Valence > 0.3 && ps.Arousal < 0.4 && ps.Dominance < 0.45)
                 return DiscreteEmotion.Tenderness;
 
-            // Disgust — negativní + nízký arousal + střední dominance
+            // Disgust — negative + low arousal + medium dominance
             if (ps.Valence < -0.4 && ps.Arousal < 0.4)
                 return DiscreteEmotion.Disgust;
 

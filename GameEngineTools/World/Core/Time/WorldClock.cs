@@ -6,19 +6,19 @@ using System.Runtime.InteropServices;
 namespace GameEngineTools.World.Core.Time
 {
     /// <summary>
-    /// Lineární mapování reálného času (Earth UNIX ticks = 100 ns od 1970-01-01Z)
-    /// na světový čas (worldTicks podle <see cref="WorldTimeSpec"/>).
+    /// Linear mapping of real time (Earth UNIX ticks = 100 ns since 1970-01-01Z)
+    /// to world time (world ticks per <see cref="WorldTimeSpec"/>).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Registruj jako <c>IWorldClock</c> singleton přes DI.</b>
-    /// <c>WorldTimeSpec</c> dostane ze stejného DI kontejneru jako <c>WorldTimeContext</c>
-    /// — obě sdílí jednu instanci.
+    /// <b>Register as an <c>IWorldClock</c> singleton via DI.</b>
+    /// It receives the <c>WorldTimeSpec</c> from the same DI container as <c>WorldTimeContext</c>
+    /// — both share a single instance.
     /// </para>
     /// <para>
-    /// Příklad registrace:
+    /// Registration example:
     /// <code>
-    /// services.AddSingleton&lt;WorldTimeSpec&gt;(...);          // nejdřív spec
+    /// services.AddSingleton&lt;WorldTimeSpec&gt;(...);          // the spec first
     /// services.AddSingleton&lt;IWorldClock&gt;(sp =>
     /// {
     ///     var spec      = sp.GetRequiredService&lt;WorldTimeSpec&gt;();
@@ -58,8 +58,8 @@ namespace GameEngineTools.World.Core.Time
         #region Soukromá pole
 
         /// <summary>
-        /// Interní reference na spec — používá se pouze pro <c>TicksPerSecond</c>.
-        /// Není vystavena veřejně: spec je DI singleton dostupný přímo přes
+        /// Internal reference to the spec — used only for <c>TicksPerSecond</c>.
+        /// Not exposed publicly: the spec is a DI singleton available directly via
         /// <c>WorldTimeContext.Spec</c>.
         /// </summary>
         private readonly WorldTimeSpec _spec;
@@ -69,22 +69,22 @@ namespace GameEngineTools.World.Core.Time
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje hodiny se zadaným zakotvením v reálném čase.
+        /// Initializes the clock with the given real-time anchor.
         /// </summary>
         /// <param name="spec">
-        /// Specifikace světového času. Musí být stejná instance jako ta registrovaná
-        /// do DI a použitá v <c>WorldTimeContext</c>.
+        /// World-time specification. Must be the same instance as the one registered
+        /// in DI and used in <c>WorldTimeContext</c>.
         /// </param>
         /// <param name="earthEpochUnixTicks">
-        /// Reálný čas kotvy ve 100 ns UNIX tickách (počítáno od 1970-01-01Z).
+        /// Real anchor time in 100 ns UNIX ticks (counted from 1970-01-01Z).
         /// </param>
         /// <param name="worldEpochTicks">
-        /// Světové ticky odpovídající okamžiku <paramref name="earthEpochUnixTicks"/>.
-        /// Určuje "nultý bod" mapování Earth → World.
+        /// World ticks corresponding to the instant <paramref name="earthEpochUnixTicks"/>.
+        /// Defines the "zero point" of the Earth → World mapping.
         /// </param>
         /// <param name="timeScale">
-        /// Rychlost světového času vůči reálnému.
-        /// <c>1.0</c> = real-time, <c>2.0</c> = dvojnásobná rychlost.
+        /// Speed of world time relative to real time.
+        /// <c>1.0</c> = real-time, <c>2.0</c> = double speed.
         /// </param>
         public WorldClock(WorldTimeSpec spec, long earthEpochUnixTicks, long worldEpochTicks, double timeScale = 1.0)
         {
@@ -106,13 +106,13 @@ namespace GameEngineTools.World.Core.Time
         #region Vlastnosti (veřejné)
 
         /// <summary>
-        /// Reálný čas kotvy ve 100 ns UNIX tickách.
-        /// Referencí pro mapování Earth ↔ World.
+        /// Real anchor time in 100 ns UNIX ticks.
+        /// Reference point for the Earth ↔ World mapping.
         /// </summary>
         public long EarthEpochUnixTicks { get; }
 
         /// <summary>
-        /// Světové ticky odpovídající <see cref="EarthEpochUnixTicks"/>.
+        /// World ticks corresponding to <see cref="EarthEpochUnixTicks"/>.
         /// </summary>
         public long WorldEpochTicks { get; }
 
@@ -121,25 +121,25 @@ namespace GameEngineTools.World.Core.Time
         #region Factory metody (statické)
 
         /// <summary>
-        /// Vytvoří hodiny zakotvené tak, aby v reálném čase <paramref name="earthAnchorUnixTicks"/>
-        /// byl světový čas roven <paramref name="worldEpochTicks"/>.
+        /// Creates a clock anchored so that at real time <paramref name="earthAnchorUnixTicks"/>
+        /// the world time equals <paramref name="worldEpochTicks"/>.
         /// </summary>
-        /// <param name="spec">Specifikace světového času.</param>
-        /// <param name="earthAnchorUnixTicks">Reálný kotevní čas (100 ns UNIX ticky).</param>
-        /// <param name="worldEpochTicks">Světové ticky odpovídající kotvě.</param>
-        /// <param name="timeScale">Rychlost světového času (výchozí 1.0 = real-time).</param>
+        /// <param name="spec">World-time specification.</param>
+        /// <param name="earthAnchorUnixTicks">Real anchor time (100 ns UNIX ticks).</param>
+        /// <param name="worldEpochTicks">World ticks corresponding to the anchor.</param>
+        /// <param name="timeScale">Speed of world time (default 1.0 = real-time).</param>
         public static WorldClock AlignAt(WorldTimeSpec spec, long earthAnchorUnixTicks, long worldEpochTicks, double timeScale = 1.0)
             => new(spec, earthAnchorUnixTicks, worldEpochTicks, timeScale);
 
         /// <summary>
-        /// Vytvoří hodiny zakotvené na aktuální reálný čas tak, aby "teď" ve světě
-        /// odpovídalo <paramref name="worldEpochTicks"/>.
+        /// Creates a clock anchored to the current real time so that "now" in the world
+        /// corresponds to <paramref name="worldEpochTicks"/>.
         /// </summary>
-        /// <param name="spec">Specifikace světového času.</param>
-        /// <param name="worldEpochTicks">Světové ticky představující "teď".</param>
-        /// <param name="timeScale">Rychlost světového času (výchozí 1.0 = real-time).</param>
+        /// <param name="spec">World-time specification.</param>
+        /// <param name="worldEpochTicks">World ticks representing "now".</param>
+        /// <param name="timeScale">Speed of world time (default 1.0 = real-time).</param>
         /// <remarks>
-        /// Typické použití při startu hry:
+        /// Typical use at game start:
         /// <code>
         /// var clock = WorldClock.AlignNow(spec, beginningWorldTicks, timescale: 1.0);
         /// </code>
@@ -160,23 +160,23 @@ namespace GameEngineTools.World.Core.Time
         #region Konverze Earth ↔ World
 
         /// <summary>
-        /// Převede reálný čas (100 ns UNIX ticky) na světové ticky.
+        /// Converts real time (100 ns UNIX ticks) into world ticks.
         /// </summary>
-        /// <param name="earthUnixTicks">Reálný čas v 100 ns UNIX tickách.</param>
-        /// <returns>Odpovídající světové ticky.</returns>
+        /// <param name="earthUnixTicks">Real time in 100 ns UNIX ticks.</param>
+        /// <returns>The corresponding world ticks.</returns>
         public long EarthToWorldTicks(long earthUnixTicks)
         {
-            // Delta reálného času v 100 ns → převod na sekundy → škálování → světové ticky
+            // Real-time delta in 100 ns → convert to seconds → scale → world ticks
             long deltaUnix = earthUnixTicks - EarthEpochUnixTicks;
             double deltaWorldSeconds = (deltaUnix / 10_000_000.0) * TimeScale;
             return WorldEpochTicks + (long)(deltaWorldSeconds * _spec.TicksPerSecond);
         }
 
         /// <summary>
-        /// Převede světové ticky zpět na reálný čas (100 ns UNIX ticky).
+        /// Converts world ticks back into real time (100 ns UNIX ticks).
         /// </summary>
-        /// <param name="worldTicks">Světové ticky k převodu.</param>
-        /// <returns>Odpovídající reálný čas v 100 ns UNIX tickách.</returns>
+        /// <param name="worldTicks">The world ticks to convert.</param>
+        /// <returns>The corresponding real time in 100 ns UNIX ticks.</returns>
         public long WorldToEarthUnixTicks(long worldTicks)
         {
             long deltaWorldTicks = worldTicks - WorldEpochTicks;
@@ -190,11 +190,11 @@ namespace GameEngineTools.World.Core.Time
         #region Systémový čas (statický)
 
         /// <summary>
-        /// Vrátí aktuální systémový čas jako 100 ns UNIX ticky (od 1970-01-01Z).
+        /// Returns the current system time as 100 ns UNIX ticks (since 1970-01-01Z).
         /// Funguje na Windows i Linuxu/macOS (POSIX).
         /// </summary>
         /// <exception cref="PlatformNotSupportedException">
-        /// Pokud platforma nepodporuje ani jeden ze způsobů čtení systémového času.
+        /// If the platform supports neither way of reading the system time.
         /// </exception>
         public static long SystemUnixTicks()
         {
@@ -225,7 +225,7 @@ namespace GameEngineTools.World.Core.Time
         #region Privátní pomocné metody
 
         /// <summary>
-        /// Převede Windows FILETIME (100 ns od 1601-01-01) na UNIX ticky (100 ns od 1970-01-01).
+        /// Converts Windows FILETIME (100 ns since 1601-01-01) into UNIX ticks (100 ns since 1970-01-01).
         /// </summary>
         private static long FileTimeToUnixTicks(FILETIME ft)
             => (((long)ft.dwHighDateTime << 32) | ft.dwLowDateTime) - WindowsEpochFileTimeTicks;

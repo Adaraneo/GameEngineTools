@@ -96,12 +96,12 @@ public record PlanetConfig
     #region Moon and ring system
 
     /// <summary>
-    /// Volitelný primární měsíc — nejhmotnější těleso na oběžné dráze planety.
-    /// <c>null</c> = planeta bez měsíce.
+    /// Optional primary moon — the most massive body orbiting the planet.
+    /// <c>null</c> = a planet with no moon.
     /// </summary>
     public (MoonPhysics Physics, MoonOrbit Orbit)? PrimaryMoon { get; init; }
 
-    /// <summary>Volitelný prstencový systém. <c>null</c> = žádné prstence.</summary>
+    /// <summary>Optional ring system. <c>null</c> = no rings.</summary>
     public RingSystem? Rings { get; init; }
 
     #endregion Moon and ring system

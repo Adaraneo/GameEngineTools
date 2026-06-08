@@ -4,39 +4,39 @@
 namespace GameEngineTools.Characters.Engines.Sleep
 {
     /// <summary>
-    /// Konfigurace spánkového subsystému.
-    /// Řídí thresholdy pro prompt, penalizace za odmítnutí,
-    /// délky fází a rizikové pravděpodobnosti.
+    /// Configuration of the sleep subsystem.
+    /// Controls the prompt thresholds, decline penalties,
+    /// phase durations and risk probabilities.
     /// </summary>
     /// <remarks>
-    /// Herní den má 26 hodin — parametry jsou kalibrované pro tento rytmus.
-    /// Základní délka spánku (<c>BaseSleepHours</c>) odpovídá cca 30 % herního dne.
+    /// The game day has 26 hours — the parameters are calibrated for this rhythm.
+    /// The base sleep length (<c>BaseSleepHours</c>) corresponds to about 30% of the game day.
     /// </remarks>
     public sealed record SleepConfig(
 
     #region Prompt a odmítnutí
 
         /// <summary>
-        /// Minimální hodnota <c>NeedRest</c> (0–100), při které BehaviorEngine
-        /// vyšle <see cref="SleepEvents.SleepPromptRequested"/>.
+        /// Minimum <c>NeedRest</c> (0–100) at which the BehaviorEngine
+        /// emits <see cref="SleepEvents.SleepPromptRequested"/>.
         /// </summary>
         double SleepPromptThreshold,
 
         /// <summary>
-        /// Počet hodin, po které BehaviorEngine počká po odmítnutí spánku
-        /// před novým promptem. Každé další odmítnutí periodu zkracuje.
+        /// Number of hours the BehaviorEngine waits after a sleep is declined
+        /// before a new prompt. Each further decline shortens the period.
         /// </summary>
         double SleepGraceHours,
 
         /// <summary>
-        /// Maximální počet odmítnutí, po jejichž překročení se grace perioda
-        /// přestane zkracovat a penalizace dosáhne maxima.
+        /// Maximum number of declines after which the grace period
+        /// stops shortening and the penalty reaches its maximum.
         /// </summary>
         int MaxDeclineCount,
 
         /// <summary>
-        /// Přírůstek stresu za každou herní hodinu po expiraci grace periody
-        /// (po odmítnutém promptu). Roste s počtem odmítnutí.
+        /// Stress increment per game hour after the grace period expires
+        /// (after a declined prompt). Grows with the number of declines.
         /// </summary>
         double DeclinePenaltyStressPerHour,
 
@@ -45,23 +45,23 @@ namespace GameEngineTools.Characters.Engines.Sleep
     #region Délky fází (v herních hodinách)
 
         /// <summary>
-        /// Délka fáze <see cref="SleepPhase.Falling"/> v hodinách.
+        /// Duration of the <see cref="SleepPhase.Falling"/> phase in hours.
         /// </summary>
         double FallingDurationHours,
 
         /// <summary>
-        /// Délka jednoho průchodu fází <see cref="SleepPhase.Light"/> v hodinách.
+        /// Duration of one pass through the <see cref="SleepPhase.Light"/> phase in hours.
         /// </summary>
         double LightDurationHours,
 
         /// <summary>
-        /// Délka fáze <see cref="SleepPhase.Deep"/> v hodinách.
+        /// Duration of the <see cref="SleepPhase.Deep"/> phase in hours.
         /// </summary>
         double DeepDurationHours,
 
         /// <summary>
-        /// Délka fáze <see cref="SleepPhase.Rem"/> v hodinách.
-        /// Narrative eventy (sny, noční můry) jsou generovány v průběhu této fáze.
+        /// Duration of the <see cref="SleepPhase.Rem"/> phase in hours.
+        /// Narrative events (dreams, nightmares) are generated during this phase.
         /// </summary>
         double RemDurationHours,
 
@@ -70,24 +70,24 @@ namespace GameEngineTools.Characters.Engines.Sleep
     #region Rizika
 
         /// <summary>
-        /// Základní pravděpodobnost přepadení za každou hodinu spánku (0–1).
-        /// Modifikována fází spánku a přítomností společníka.
+        /// Base ambush probability per hour of sleep (0–1).
+        /// Modified by the sleep phase and the presence of a companion.
         /// </summary>
         double AmbushBaseChancePerHour,
 
         /// <summary>
-        /// Multiplikátor rizika přepadení, pokud spí postava se společníkem v táboře.
-        /// Hodnota pod 1.0 snižuje riziko (společník hlídá).
+        /// Ambush-risk multiplier when the character sleeps with a companion in a camp.
+        /// A value below 1.0 lowers the risk (the companion keeps watch).
         /// </summary>
         double CompanionGuardModifier,
 
         /// <summary>
-        /// Pravděpodobnost noční můry v průběhu REM fáze, pokud je stres > 50.
+        /// Nightmare probability during the REM phase when stress > 50.
         /// </summary>
         double NightmareChanceHighStress,
 
         /// <summary>
-        /// Pravděpodobnost noční můry v průběhu REM fáze při normálním stresu.
+        /// Nightmare probability during the REM phase under normal stress.
         /// </summary>
         double NightmareChanceNormal,
 
@@ -113,7 +113,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
     )
     {
         /// <summary>
-        /// Výchozí konfigurace kalibrovaná pro 26hodinový herní den.
+        /// Default configuration calibrated for the 26-hour game day.
         /// </summary>
         public SleepConfig() : this(
             SleepPromptThreshold: 70.0,

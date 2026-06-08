@@ -12,48 +12,48 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
-    /// Záměr sociálního přístupu — určuje, jaký SpeechAct se použije a jak přísné
-    /// jsou podmínky psychologického blokování.
+    /// Social-approach intent — determines which SpeechAct is used and how strict
+    /// the psychological-blocking conditions are.
     /// </summary>
     public enum SocialTargetMode
     {
-        /// <summary>Nezávazný sociální kontakt (SmallTalk). Nikdy není psychologicky blokován.</summary>
+        /// <summary>Casual social contact (SmallTalk). Never psychologically blocked.</summary>
         ReachOut,
 
-        /// <summary>Otevření se vulnerabilitě (SelfDisclosure). Blokováno při nízkém EmotionallySafe.</summary>
+        /// <summary>Opening up to vulnerability (SelfDisclosure). Blocked when EmotionallySafe is low.</summary>
         Vulnerability,
 
-        /// <summary>Intimní přístupu (Invite). Blokováno sociosexualitou a orientací.</summary>
+        /// <summary>Intimate approach (Invite). Blocked by sociosexuality and orientation.</summary>
         Intimacy
     }
 
     /// <summary>
-    /// Výsledek ohodnocení jednoho kandidáta pro sociální přístupu.
-    /// Obsahuje skóre, predikci přijetí a diagnostická pole.
+    /// Result of evaluating a single candidate for social approach.
+    /// Contains the score, the acceptance prediction and diagnostic fields.
     /// </summary>
     public sealed record SocialTargetScore(
         HumanId Target,
-        /// <summary>Celkové skóre vhodnosti cíle [0.0–1.0]. 0.0 pokud je psychologicky blokován.</summary>
+        /// <summary>Overall target-suitability score [0.0–1.0]. 0.0 if psychologically blocked.</summary>
         double Score,
-        /// <summary>Predikovaná pravděpodobnost přijetí přístupu [0.05–0.95].</summary>
+        /// <summary>Predicted probability of the approach being accepted [0.05–0.95].</summary>
         double ExpectedAcceptance,
-        /// <summary>SpeechAct použitý při hodnocení.</summary>
+        /// <summary>The SpeechAct used during evaluation.</summary>
         SpeechAct EvaluatedAct,
-        /// <summary>Míra bezpečnosti pro vulnerability [0.0–1.0].</summary>
+        /// <summary>Degree of safety for vulnerability [0.0–1.0].</summary>
         double VulnerabilitySafety,
-        /// <summary>Odhadované riziko odmítnutí [0.0–1.0].</summary>
+        /// <summary>Estimated risk of rejection [0.0–1.0].</summary>
         double RejectionRisk,
         bool PsychologicallyBlocked = false,
         string? Reason = null);
 
     /// <summary>
-    /// Statický scoring subsystém pro výběr a seřazení sociálních cílů
-    /// na základě sémantické paměti, vztahů a psychologického profilu.
+    /// Static scoring subsystem for selecting and ranking social targets
+    /// based on semantic memory, relationships and the psychological profile.
     /// </summary>
     public static class SemanticTargeting
     {
         /// <summary>
-        /// Ohodnotí jednoho kandidáta z pohledu initiator → target.
+        /// Evaluates a single candidate from the initiator → target perspective.
         /// </summary>
         public static SocialTargetScore ScoreTarget(
             IHuman initiator,
@@ -62,7 +62,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.AttractionProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target.Id, mode, target.Biology);
 
         /// <summary>
-        /// Ohodnotí jednoho kandidáta z pohledu initiator (context) → target (id).
+        /// Evaluates a single candidate from the initiator (context) → target (id) perspective.
         /// </summary>
         public static SocialTargetScore ScoreTarget(
             IHumanContext initiator,
@@ -71,8 +71,8 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             => ScoreTarget(initiator.Id, initiator.Personality.Sociosexuality, initiator.PsychologyProfile, initiator.AttractionProfile, initiator.Snapshot.Relationships, initiator.Snapshot.Memory, initiator.Snapshot.SemanticMemory, target, mode, null);
 
         /// <summary>
-        /// Seřadí kandidáty dle skóre sestupně. Vrací nejvýše <paramref name="take"/> výsledků.
-        /// Deterministické — tie-break podle <see cref="HumanId.Value"/>.
+        /// Sorts candidates by score descending. Returns at most <paramref name="take"/> results.
+        /// Deterministic — ties broken by <see cref="HumanId.Value"/>.
         /// </summary>
         public static IReadOnlyList<SocialTargetScore> RankTargets(
             IHumanContext initiator,
@@ -91,7 +91,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         }
 
         /// <summary>
-        /// Vybere nejlepšího kandidáta dle skóre. Vrátí <see langword="null"/> pokud je seznam prázdný.
+        /// Selects the best candidate by score. Returns <see langword="null"/> if the list is empty.
         /// </summary>
         public static IHuman? ChooseTarget(
             IHuman initiator,

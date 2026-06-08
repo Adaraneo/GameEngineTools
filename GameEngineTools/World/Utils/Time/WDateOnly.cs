@@ -7,34 +7,34 @@ using GameEngineTools.World.Core.Time;
 namespace GameEngineTools.World.Utils.Time
 {
     /// <summary>
-    /// Reprezentuje datum bez časové složky, uložené jako počet dní od světové epochy
-    /// (0 = 1. den 1. měsíce 1. roku).
+    /// Represents a date without a time component, stored as the number of days since the world epoch
+    /// (0 = day 1 of month 1 of year 1).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Čistý datový typ + ambient properties.</b>
-    /// Jediným zdrojem pravdy je <see cref="DayIndex"/>.
+    /// <b>Pure data type + ambient properties.</b>
+    /// The single source of truth is <see cref="DayIndex"/>.
     /// Properties jako <see cref="Year"/>, <see cref="Month"/>, <see cref="Day"/>
-    /// a metody jako <see cref="AddMonths"/> vyžadují nakonfigurovaný <see cref="WWorld"/>.
+    /// and methods such as <see cref="AddMonths"/> require <see cref="WWorld"/> to be configured.
     /// </para>
     /// <para>
-    /// Příklady:
+    /// Examples:
     /// <code>
-    /// // Factory (vyžaduje WWorld.Configure)
+    /// // Factory (requires WWorld.Configure)
     /// var date = WDateOnly.New(1322, 7, 4);
     /// var today = WDateOnly.Today;
     ///
-    /// // Ambient properties (vyžadují WWorld.Configure)
+    /// // Ambient properties (require WWorld.Configure)
     /// int year  = date.Year;    // 1322
     /// int month = date.Month;   // 7
     /// int day   = date.Day;     // 4
     ///
-    /// // Čistá matematika — nevyžaduje WWorld
+    /// // Pure math — does not require WWorld
     /// var tomorrow = date.AddDays(1);
     /// long left    = date.DaysUntil(deadline);
     /// bool past    = date &lt; today;
     ///
-    /// // Kalendářní operace (vyžadují WWorld.Configure)
+    /// // Calendar operations (require WWorld.Configure)
     /// var nextMonth = date.AddMonths(1);
     /// var nextYear  = date.AddYears(1);
     /// var asDateTime = date.ToDateTime();   // 1322-07-04T00:00:00
@@ -47,10 +47,10 @@ namespace GameEngineTools.World.Utils.Time
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje nové datum z 0-based indexu dne od světové epochy.
+        /// Initializes a new date from a 0-based day index since the world epoch.
         /// </summary>
-        /// <param name="dayIndex">Počet dní od světové epochy (0 = 1/1/1). Nesmí být záporný.</param>
-        /// <exception cref="ArgumentOutOfRangeException">Pokud je <paramref name="dayIndex"/> záporný.</exception>
+        /// <param name="dayIndex">Number of days since the world epoch (0 = 1/1/1). Must not be negative.</param>
+        /// <exception cref="ArgumentOutOfRangeException">If <paramref name="dayIndex"/> is negative.</exception>
         [JsonConstructor]
         public WDateOnly(long dayIndex)
         {
@@ -64,7 +64,7 @@ namespace GameEngineTools.World.Utils.Time
         #region Vlastnosti — raw data
 
         /// <summary>
-        /// Počet dní od světové epochy (0-based). Jediný zdroj pravdy.
+        /// Number of days since the world epoch (0-based). The single source of truth.
         /// </summary>
         public long DayIndex { get; }
 
@@ -73,7 +73,7 @@ namespace GameEngineTools.World.Utils.Time
         #region Ambient vlastnosti — složky data (vyžadují WWorld.Configure)
 
         /// <summary>Rok tohoto data.</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Year
         {
             get
@@ -83,8 +83,8 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        /// <summary>Měsíc tohoto data (1-based).</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Month of this date (1-based).</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Month
         {
             get
@@ -94,8 +94,8 @@ namespace GameEngineTools.World.Utils.Time
             }
         }
 
-        /// <summary>Den v měsíci tohoto data (1-based).</summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <summary>Day of month of this date (1-based).</summary>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public int Day
         {
             get
@@ -110,21 +110,21 @@ namespace GameEngineTools.World.Utils.Time
         #region Static factory
 
         /// <summary>
-        /// Vytvoří datum ze složek (rok, měsíc, den).
-        /// Validace probíhá přes <see cref="WWorld.Spec"/> kalendář.
+        /// Creates a date from its components (year, month, day).
+        /// Validation goes through the <see cref="WWorld.Spec"/> calendar.
         /// </summary>
         /// <param name="year">Rok (≥ 1).</param>
-        /// <param name="month">Měsíc (1-based).</param>
-        /// <param name="day">Den v měsíci (1-based).</param>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Pokud složky netvoří platné datum v kalendáři.</exception>
+        /// <param name="month">Month (1-based).</param>
+        /// <param name="day">Day of month (1-based).</param>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">If the components do not form a valid date in the calendar.</exception>
         public static WDateOnly New(int year, int month, int day)
             => new(WWorld.Spec.Calendar.DaysFromDate(year, month, day));
 
         /// <summary>
-        /// Dnešní datum v herním světě (extrahováno z <see cref="WWorld.Clock"/>).
+        /// Today's date in the game world (extracted from <see cref="WWorld.Clock"/>).
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public static WDateOnly Today => new(WWorld.Clock.Now.WorldTicks / WWorld.Spec.TicksPerDay);
 
         #endregion Static factory
@@ -132,16 +132,16 @@ namespace GameEngineTools.World.Utils.Time
         #region Aritmetika — čistá matematika (nevyžaduje WWorld)
 
         /// <summary>
-        /// Přičte zadaný počet dní k datu.
-        /// Čistá matematika — nevyžaduje <see cref="WWorld"/>.
+        /// Adds the given number of days to the date.
+        /// Pure math — does not require <see cref="WWorld"/>.
         /// </summary>
-        /// <param name="days">Počet dní (může být záporný pro posun zpět).</param>
-        /// <exception cref="OverflowException">Pokud výsledek přeteče <c>long</c>.</exception>
+        /// <param name="days">Number of days (may be negative to move backward).</param>
+        /// <exception cref="OverflowException">If the result overflows <c>long</c>.</exception>
         public WDateOnly AddDays(long days) => new(checked(DayIndex + days));
 
         /// <summary>
-        /// Vrátí počet dní mezi tímto datem a <paramref name="other"/>.
-        /// Kladný výsledek = <paramref name="other"/> je v budoucnosti.
+        /// Returns the number of days between this date and <paramref name="other"/>.
+        /// A positive result means <paramref name="other"/> is in the future.
         /// </summary>
         public long DaysUntil(WDateOnly other) => other.DayIndex - DayIndex;
 
@@ -150,14 +150,14 @@ namespace GameEngineTools.World.Utils.Time
         #region Kalendářní aritmetika (vyžadují WWorld.Configure)
 
         /// <summary>
-        /// Přičte zadaný počet měsíců k datu.
-        /// Správně pracuje s libovolným počtem měsíců v roce dle aktivního kalendáře.
+        /// Adds the given number of months to the date.
+        /// Works correctly with any number of months per year per the active calendar.
         /// </summary>
-        /// <param name="months">Počet měsíců (může být záporný).</param>
+        /// <param name="months">Number of months (may be negative).</param>
         /// <returns>
-        /// Nové datum. Pokud výsledný měsíc má méně dní, je den oříznut na poslední platný den (clamp).
+        /// The new date. If the resulting month has fewer days, the day is clamped to the last valid day.
         /// </returns>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateOnly AddMonths(int months)
         {
             var spec = WWorld.Spec;
@@ -175,11 +175,11 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Přičte zadaný počet let k datu.
-        /// Den je oříznut pokud cílový rok má v daném měsíci méně dní.
+        /// Adds the given number of years to the date.
+        /// The day is clamped if the target year has fewer days in the given month.
         /// </summary>
-        /// <param name="years">Počet let (může být záporný).</param>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <param name="years">Number of years (may be negative).</param>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public WDateOnly AddYears(int years)
         {
             var cal = WWorld.Spec.Calendar;
@@ -193,10 +193,10 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <summary>
-        /// Převede datum na <see cref="WDateTime"/> zarovnaný na 00:00:00.
+        /// Converts the date to a <see cref="WDateTime"/> aligned to 00:00:00.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
-        /// <exception cref="OverflowException">Pokud výsledek přeteče <c>long</c>.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
+        /// <exception cref="OverflowException">If the result overflows <c>long</c>.</exception>
         public WDateTime ToDateTime()
             => new(checked(DayIndex * WWorld.Spec.TicksPerDay));
 
@@ -204,22 +204,22 @@ namespace GameEngineTools.World.Utils.Time
 
         #region Porovnávací operátory
 
-        /// <summary>Vrátí <c>true</c> pokud obě data reprezentují stejný den.</summary>
+        /// <summary>Returns <c>true</c> if both dates represent the same day.</summary>
         public static bool operator ==(WDateOnly a, WDateOnly b) => a.DayIndex == b.DayIndex;
 
-        /// <summary>Vrátí <c>true</c> pokud data reprezentují různé dny.</summary>
+        /// <summary>Returns <c>true</c> if the dates represent different days.</summary>
         public static bool operator !=(WDateOnly a, WDateOnly b) => a.DayIndex != b.DayIndex;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve než <paramref name="b"/>.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is earlier than <paramref name="b"/>.</summary>
         public static bool operator <(WDateOnly a, WDateOnly b) => a.DayIndex < b.DayIndex;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> dříve nebo ve stejný den jako <paramref name="b"/>.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is earlier than or on the same day as <paramref name="b"/>.</summary>
         public static bool operator <=(WDateOnly a, WDateOnly b) => a.DayIndex <= b.DayIndex;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po <paramref name="b"/>.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is later than <paramref name="b"/>.</summary>
         public static bool operator >(WDateOnly a, WDateOnly b) => a.DayIndex > b.DayIndex;
 
-        /// <summary>Vrátí <c>true</c> pokud je <paramref name="a"/> po nebo ve stejný den jako <paramref name="b"/>.</summary>
+        /// <summary>Returns <c>true</c> if <paramref name="a"/> is later than or on the same day as <paramref name="b"/>.</summary>
         public static bool operator >=(WDateOnly a, WDateOnly b) => a.DayIndex >= b.DayIndex;
 
         #endregion Porovnávací operátory
@@ -243,8 +243,8 @@ namespace GameEngineTools.World.Utils.Time
         #region Formátování
 
         /// <summary>
-        /// Vrátí datum jako čitelný řetězec ve formátu <c>YYYY-MM-DD</c>.
-        /// Vyžaduje nakonfigurovaný <see cref="WWorld"/>. Fallback na DayIndex pokud není.
+        /// Returns the date as a readable string in the format <c>YYYY-MM-DD</c>.
+        /// Requires <see cref="WWorld"/> to be configured. Falls back to DayIndex otherwise.
         /// </summary>
         public override string ToString()
         {

@@ -13,13 +13,13 @@ namespace GameEngineTools.Characters.Engines.Memory
         #region Relation
 
         /// <summary>
-        /// Vytvoří canonical <c>What</c> pro relation micro-positive event.
+        /// Creates the canonical <c>What</c> for a relationship micro-positive event.
         /// </summary>
         public static string RelationMicroPositive(string kind, HumanId? from = null, HumanId? to = null)
             => BuildRelationMicro("MicroPositive", NormalizeMicroKind(kind), from, to);
 
         /// <summary>
-        /// Vytvoří canonical <c>What</c> pro relation micro-negative event.
+        /// Creates the canonical <c>What</c> for a relationship micro-negative event.
         /// </summary>
         public static string RelationMicroNegative(string kind, HumanId? from = null, HumanId? to = null)
             => BuildRelationMicro("MicroNegative", NormalizeMicroKind(kind), from, to);

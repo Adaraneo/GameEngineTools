@@ -4,34 +4,34 @@
 namespace GameEngineTools.World.Core.Astro;
 
 /// <summary>
-/// Nastavení sluneční hvězdy a lokace pozorovatele pro výpočty
-/// <see cref="CelestialContextComputer"/>. Vázáno z konfigurace
-/// pod klíčem <c>World:Astro</c>.
+/// Settings for the host star and observer location used by
+/// <see cref="CelestialContextComputer"/> calculations. Bound from configuration
+/// under the <c>World:Astro</c> key.
 /// </summary>
 public sealed record AstroConfig(
-    /// <summary>Parametry sluneční hvězdy a oběžné dráhy.</summary>
+    /// <summary>Parameters of the host star and orbit.</summary>
     SunParamsConfig Sun = null!,
-    /// <summary>Zeměpisná šířka výchozí lokace světa (°). Ovlivňuje délku dne a intenzitu ozáření.</summary>
+    /// <summary>Latitude of the world's default location (°). Affects day length and irradiance intensity.</summary>
     double LatitudeDeg = 50.0,
-    /// <summary>Zeměpisná délka výchozí lokace světa (°).</summary>
+    /// <summary>Longitude of the world's default location (°).</summary>
     double LongitudeDeg = 15.0,
-    /// <summary>Průměrná roční teplota prostředí (°C).</summary>
+    /// <summary>Mean annual ambient temperature (°C).</summary>
     double BaseTemperatureCelsius = 11.0,
-    /// <summary>Poloamplituda sezónního teplotního výkyvu (°C). Léto = +amplituda, zima = −amplituda.</summary>
+    /// <summary>Half-amplitude of the seasonal temperature swing (°C). Summer = +amplitude, winter = −amplitude.</summary>
     double SeasonalAmplitudeCelsius = 9.0,
     /// <summary>
-    /// Fáze jarní rovnodennosti jako zlomek roku [0, 1).
-    /// <c>0.0</c> = jarní rovnodennost na 1. den roku.
+    /// Vernal-equinox phase as a fraction of the year [0, 1).
+    /// <c>0.0</c> = vernal equinox on the first day of the year.
     /// </summary>
     double VernalPhase = 0.0)
 {
-    /// <summary>Výchozí instance s hodnotami blízkými Zemi.</summary>
+    /// <summary>Default instance with Earth-like values.</summary>
     public AstroConfig() : this(new SunParamsConfig()) { }
 }
 
 /// <summary>
-/// Serializovatelný zástupce <see cref="SunParams"/> pro IOptions binding.
-/// Převod na <see cref="SunParams"/> provede <see cref="CelestialContextComputer"/>.
+/// Serializable stand-in for <see cref="SunParams"/> for IOptions binding.
+/// Conversion to <see cref="SunParams"/> is performed by <see cref="CelestialContextComputer"/>.
 /// </summary>
 public sealed record SunParamsConfig(
     double AxialTiltDeg = 23.44,
@@ -43,10 +43,10 @@ public sealed record SunParamsConfig(
     double TwilightNauticalDeg = 12.0,
     double TwilightAstronomicalDeg = 18.0)
 {
-    /// <summary>Výchozí instance s hodnotami přibližně odpovídajícími Zemi.</summary>
+    /// <summary>Default instance with approximately Earth-like values.</summary>
     public SunParamsConfig() : this(23.44) { }
 
-    /// <summary>Převede config record na <see cref="SunParams"/> struct.</summary>
+    /// <summary>Converts the config record into a <see cref="SunParams"/> struct.</summary>
     public SunParams ToSunParams() => new(
         AxialTiltDeg,
         Eccentricity,

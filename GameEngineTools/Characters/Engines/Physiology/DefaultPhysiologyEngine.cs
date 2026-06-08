@@ -232,8 +232,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var action = ctx.Snapshot.Behavior.CurrentPlan?.Name;
             var nutProfile = ResolveNutritionalProfile(ctx);
 
-            // Post-menopauza: estrogen ztracen → imunitní recovery pomalejší (30 % zpomalení).
-            // Tento state-driven faktor zůstává v Tick() a vstupuje do ComputeDrift jako parametr.
+            // Post-menopause: estrogen lost → slower immune recovery (30% slowdown).
+            // This state-driven factor stays in Tick() and enters ComputeDrift as a parameter.
             var isPostMenopauseImmune = s.Cycle?.Phase == CyclePhase.Paused
                 && s.Pregnancy is null && (s.Aging?.AgeYears ?? 0) >= 45;
             var immuneDecayFactor = isPostMenopauseImmune ? 0.7 : 1.0;
@@ -242,9 +242,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor);
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
-            // Cirkadiánní tělesná teplota: sinusoidální vlna ±CircadianTempAmplitude (Waterhouse 2005)
+            // Circadian body temperature: a sinusoidal wave ±CircadianTempAmplitude (Waterhouse 2005)
             var hoursOfDayT = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-            // Peak ukotvíme na SolarNoon+5h pokud máme astronomický kontext (Waterhouse: tělesná teplota ~5h po poledni)
+            // Anchor the peak at SolarNoon+5h when we have an astronomical context (Waterhouse: body temperature ~5h after noon)
             var circTempPeakHour = ctx.Snapshot.Celestial is { } celT && !double.IsNaN(celT.SolarNoonHour)
                 ? celT.SolarNoonHour + 5.0
                 : Config.CircadianTempPeakHour;
@@ -263,14 +263,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, targetBodyTemp, 0.1 * h), -1.0, 3.5)
             };
 
-            // Nutriční drift — Calories/Protein klesají, jsou doplňovány jídlem;
-            // Iron se obnovuje spánkem; VitaminD pomalu klesá
+            // Nutrition drift — Calories/Protein decline and are replenished by eating;
+            // Iron is restored by sleep; VitaminD declines slowly
             if (s.Nutrition is { } nut)
             {
                 var caloriesDelta = action == Eat ? (nutProfile?.CalorieGain ?? Config.CaloriesEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
                 var proteinDelta = action == Eat ? (nutProfile?.ProteinGain ?? Config.ProteinEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
                 var ironDelta = action == Sleep ? Config.IronSleepRecoveryPerHour * h : -Config.NutritionDecayPerHour * h * 0.3;
-                // Glykemický stav: spike při jídle, rebound dip 1–2h po jídle
+                // Glycemic state: a spike when eating, a rebound dip 1–2 h after a meal
                 var glucoseDelta = action == Eat ? Config.BloodGlucoseEatingGain * h : 0.0;
                 var postMealHours = action == Eat ? 0.0 : nut.PostMealHours + h;
                 var inDipWindow = postMealHours > Config.BloodGlucoseDipStartHours
@@ -292,7 +292,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 };
             }
 
-            // Zranění — přidání bolesti a postupné hojení (1× za 24h)
+            // Injury — adds pain and heals gradually (once per 24 h)
             if (s.Injury is { } inj)
             {
                 s = s with { Pain = Clamp01p(s.Pain + inj.Severity * 0.05 * h) };
@@ -318,7 +318,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             }
 
-            // Šestinedělí — minimální bolest a maximální energie podle fáze
+            // Postpartum — minimal pain and maximum energy depending on the phase
             if (s.Postpartum is not null)
             {
                 var (painFloor, energyCap) = s.Postpartum.Phase switch
@@ -353,7 +353,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             }
 
-            // Allostatická zátěž — kumuluje se při chronickém neglektu potřeb
+            // Allostatic load — accumulates under chronic neglect of needs
             {
                 var alloAccum = 0.0;
                 if (s.Hunger > Config.AllostaticLoadThresholdHunger) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
@@ -372,16 +372,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { AllostaticLoad = Math.Clamp(s.AllostaticLoad + alloAccum - alloDecay, 0, 100) };
             }
 
-            // Sleep Inertia — lineární decay po probuzení
+            // Sleep inertia — linear decay after waking
             if (s.SleepInertiaHours > 0)
                 s = s with { SleepInertiaHours = Math.Max(0, s.SleepInertiaHours - h) };
 
-            // SAM systém — velmi rychlý decay (Sympatho-Adrenomedullary, adrenalin/noradrenalin)
+            // SAM system — very fast decay (Sympatho-Adrenomedullary, adrenaline/noradrenaline)
             if (s.AcuteArousalLevel > 0)
                 s = s with { AcuteArousalLevel = Math.Max(0, s.AcuteArousalLevel - Config.AcuteArousalDecayPerHour * h) };
 
-            // Fyzická únava — akumulace při Work, decay při odpočinku/spánku
-            // Sarkopenie: méně svalové hmoty = Work fatigue se akumuluje rychleji
+            // Physical fatigue — accumulation during Work, decay during rest/sleep
+            // Sarcopenia: less muscle mass = Work fatigue accumulates faster
             {
                 var muscleFactor = s.Aging?.MuscleMassFraction ?? 1.0;
                 var gravityFactor = ctx.Snapshot.Celestial?.SurfaceGravityVsEarth ?? 1.0;
@@ -396,34 +396,34 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { PhysicalFatigueLevel = Math.Clamp(s.PhysicalFatigueLevel + fatigueDelta, 0, 100) };
             }
 
-            // Chronická bolest — kumulativní counter (Dantzer 2008)
+            // Chronic pain — a cumulative counter (Dantzer 2008)
             if (s.Pain > Config.ChronicPainAccumThreshold)
                 s = s with { ChronicPainDays = s.ChronicPainDays + h / 24.0 };
             else
                 s = s with { ChronicPainDays = Math.Max(0, s.ChronicPainDays - h / (24.0 * Config.ChronicPainDecayFactor * 2)) };
 
-            // Kortizol — diurnální křivka (HPA osa) + chronický stres + imunitní elevace
+            // Cortisol — diurnal curve (HPA axis) + chronic stress + immune elevation
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-                // CAR (Cortisol Awakening Response) ukotvíme na SunriseHour+2h (světelný signál nastavuje peak)
+                // Anchor CAR (the Cortisol Awakening Response) at SunriseHour+2h (the light signal sets the peak)
                 var cortisolPeakHour = ctx.Snapshot.Celestial is { } celC && !double.IsNaN(celC.SunriseHour)
                     ? celC.SunriseHour + 2.0
                     : Config.CortisolDiurnalPeakHour;
                 var diurnal = Config.CortisolDiurnalAmplitude
                               * Math.Exp(-Math.Pow(hoursOfDay - cortisolPeakHour, 2) / 8.0);
-                // Hypocortisolismus paradox (Fries 2005): při extrémním AlloLoad HPA downreguluje
+                // Hypocortisolism paradox (Fries 2005): under extreme AlloLoad the HPA axis downregulates
                 var alloComponent = s.AllostaticLoad < Config.HypocortisolismAlloThreshold
                     ? s.AllostaticLoad * Config.CortisolAlloWeight
                     : Math.Max(0, Config.HypocortisolismAlloThreshold * Config.CortisolAlloWeight
                                - (s.AllostaticLoad - Config.HypocortisolismAlloThreshold) * Config.HypocortisolismDeclineRate);
                 var immuneComponent = Math.Max(0, s.ImmuneLoad - 40) * Config.CortisolImmuneWeight;
                 var targetCortisol = Math.Clamp(50 + diurnal + alloComponent + immuneComponent, 0, 100);
-                // Rychleji nahoru (CAR), pomaleji dolů — biologicky věrné
+                // Faster up (CAR), slower down — biologically faithful
                 var cortRate = targetCortisol > s.CortisolLevel ? 20.0 * h : 8.0 * h;
                 s = s with { CortisolLevel = Math.Clamp(Approach(s.CortisolLevel, targetCortisol, cortRate), 0, 100) };
             }
 
-            // Cirkadiánní fázový posun — social jet-lag model
+            // Circadian phase shift — the social jet-lag model
             {
                 var hoursPerDay = (double)WWorld.Spec.HoursPerDay;
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
@@ -439,7 +439,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                             s.CircadianPhaseShiftHours + (mismatch - 2.0) * 0.05 * h, -6, 6)
                         };
                 }
-                // Pomalé zotavení k chronotypu (tělo se resynchronizuje ~1 h/den)
+                // Slow recovery toward the chronotype (the body resynchronizes ~1 h/day)
                 s = s with
                 {
                     CircadianPhaseShiftHours = Approach(
@@ -447,7 +447,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 };
             }
 
-            // Recovery Debt — fyzický deficit regenerace nad rámec spánkového dluhu
+            // Recovery debt — a physical recovery deficit beyond sleep debt
             {
                 if (s.AllostaticLoad > Config.RecoveryDebtAccumAlloThreshold)
                     s = s with
@@ -464,15 +464,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { RecoveryDebtHours = Math.Max(0, s.RecoveryDebtHours - debtDecay) };
             }
 
-            // Věkové efekty
+            // Age effects
             {
                 var ageYears = ComputeAgeYears(now.Date);
 
-                // Menopauza: ženy ≥ MenopauseAge → cyklus trvale Paused
+                // Menopause: women ≥ MenopauseAge → cycle permanently Paused
                 if (s.Cycle is { Phase: not CyclePhase.Paused } && ageYears >= Config.MenopauseAge)
                     s = s with { Cycle = s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 1.0 } };
 
-                // Stárnutí testosteronu u mužů (~1 %/rok po 25)
+                // Testosterone aging in men (~1%/year after 25)
                 if (s.Testosterone is { } ageTesto && ageYears > Config.AgingTestosteronePenaltyStart)
                 {
                     var agePenalty = (ageYears - Config.AgingTestosteronePenaltyStart) * Config.AgingTestosteronePenaltyPerYear;
@@ -487,16 +487,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             }
 
-            // Fyzické stárnutí — vlasy, vrásky, svalová hmota, kostní hustota
+            // Physical aging — hair, wrinkles, muscle mass, bone density
             if (s.Aging is { } aging)
             {
                 var ageYears = ComputeAgeYearsFractional(now.Date);
                 var ageYearsInt = ComputeAgeYears(now.Date);
 
-                // Růst vlasů (~1,25 cm/měsíc reálně, ~0,00175 cm/hod v herním světě)
+                // Hair growth (~1.25 cm/month in reality, ~0.00175 cm/h in the game world)
                 var newHairLen = Math.Min(120.0, aging.HairLengthCm + Config.HairGrowthCmPerHour * h);
 
-                // Šedivění: věk + kortizol akcelerátor
+                // Greying: age + cortisol accelerator
                 var greying = 0.0;
                 if (ageYears > Config.HairGreyingAgeStart)
                 {
@@ -504,7 +504,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     greying += s.CortisolLevel * Config.HairGreyingCortisolBoost * h;
                 }
 
-                // Hustota vlasů: androgenní alopécie (muži) + stres
+                // Hair density: androgenic alopecia (men) + stress
                 var densityChange = 0.0;
                 if (s.Testosterone is { } _ && ageYears > Config.HairLossAgeStartMale)
                     densityChange -= (ageYears - Config.HairLossAgeStartMale) * Config.HairLossRatePerYearMale * h / (365.25 * 24);
@@ -513,7 +513,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 else
                     densityChange += Config.HairDensityRecoveryPerHour * h;
 
-                // Vrásky: věk + kortizol
+                // Wrinkles: age + cortisol
                 var wrinkles = 0.0;
                 if (ageYears > Config.WrinklingAgeStart)
                 {
@@ -521,12 +521,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     wrinkles += s.CortisolLevel * Config.WrinklingCortisolBoost * h;
                 }
 
-                // Sarkopenie: pokles svalové hmoty po 30. roce
+                // Sarcopenia: decline in muscle mass after age 30
                 var muscleChange = ageYears > Config.SarcopeniaAgeStart
                     ? -(ageYears - Config.SarcopeniaAgeStart) * Config.SarcopeniaRatePerYear * h / (365.25 * 24)
                     : 0.0;
 
-                // Kostní hustota: stárnutí + post-menopauza
+                // Bone density: aging + post-menopause
                 var isPostMenoForBone = s.Cycle?.Phase == CyclePhase.Paused
                     && s.Pregnancy is null && ageYears >= Config.MenopauseAge;
                 var boneDeclineRate = ageYears > Config.BoneDensityDeclineAgeStart
@@ -562,7 +562,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             }
 
-            // Chronická sociální izolace → kortizol (Cacioppo 2015)
+            // Chronic social isolation → cortisol (Cacioppo 2015)
             {
                 var needSocial = ctx.Snapshot.Psychology?.Motivations?.NeedSocial ?? 50;
                 if (needSocial > Config.SocialIsolationCortisolThreshold)
@@ -572,7 +572,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 }
             }
 
-            // Testosteron — diurnální rytmus + HPA-HPG cross-talk + spánkový dluh (jen muži)
+            // Testosterone — diurnal rhythm + HPA-HPG cross-talk + sleep debt (men only)
             if (s.Testosterone is { } testo)
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
@@ -664,15 +664,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             switch (@event)
             {
-                // --- Konec spánkové session ---
-                // Průběžný drift (energie, hlad, žízeň) probíhá v Tick() přes CurrentPlan.Name == "Sleep".
-                // Zde aplikujeme jednorázový souhrnný efekt na základě kvality a délky spánku.
+                // --- End of the sleep session ---
+                // Continuous drift (energy, hunger, thirst) happens in Tick() via CurrentPlan.Name == "Sleep".
+                // Here we apply a one-time aggregate effect based on the quality and duration of sleep.
                 case Sleep.SleepEnded se:
                     {
                         var h = Math.Max(0, se.TotalHoursSlept);
                         var rawQuality = se.Quality / 100.0;
 
-                        // Věkový faktor na kvalitu spánku: méně deep sleep po 50 → horší efektivní kvalita
+                        // Age factor on sleep quality: less deep sleep after 50 → worse effective quality
                         var sleepAgeYears = se.OccurredAt.Date.Year - _birthDate.Year;
                         var ageQualityFactor = sleepAgeYears > Config.AgeSleepQualityThreshold
                             ? Math.Max(0.5, 1.0 - (sleepAgeYears - Config.AgeSleepQualityThreshold) * Config.AgeSleepQualityPenaltyPerYear)
@@ -683,31 +683,31 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         var maxRecovery = remainingDept * 0.55; // Max 55 % za jednu noc
                         var actualRecovery = Math.Min(maxRecovery, h * 0.9 * qualityFactor);
 
-                        // Recovery Debt zpomaluje obnovu energie (min. 30 % účinnosti)
+                        // Recovery debt slows energy recovery (min. 30% efficiency)
                         var recoveryFactor = Math.Max(0.3, 1.0 - s.RecoveryDebtHours / 48.0);
-                        // Věkový faktor: energie se obnovuje pomaleji po 40. roce
+                        // Age factor: energy recovers more slowly after age 40
                         var ageFactor = sleepAgeYears > Config.AgingEnergyRecoveryPenaltyStart
                             ? Math.Max(0.3, 1.0 - (sleepAgeYears - Config.AgingEnergyRecoveryPenaltyStart) * Config.AgingEnergyRecoveryPenaltyPerYear)
                             : 1.0;
-                        // Sleep Inertia: horší kvalita = delší inertia (quality=100 → 0.75h; quality=0 → 1.5h)
+                        // Sleep inertia: worse quality = longer inertia (quality=100 → 0.75h; quality=0 → 1.5h)
                         var inertiaHours = Config.SleepInertiaMaxHours * (1.0 - se.Quality / 100.0 * 0.5);
 
                         s = s with
                         {
-                            // Spánkový dluh: maximální splacení závisí na kvalitě
+                            // Sleep debt: the maximum repayment depends on quality
                             SleepDebtHours = Math.Max(0, remainingDept - actualRecovery),
 
-                            // Imunitní systém: regenerace hlubokého spánku
+                            // Immune system: deep-sleep regeneration
                             ImmuneLoad = Clamp01p(s.ImmuneLoad - 3.0 * qualityFactor),
 
                             Pain = rawQuality >= 0.40
                                 ? Clamp01p(s.Pain - 5.0 * qualityFactor)
                                 : s.Pain,
 
-                            // Energie se obnoví spánkem; při recovery debt a věku je obnova snížena
+                            // Energy is restored by sleep; recovery is reduced under recovery debt and age
                             Energy = Clamp01p(s.Energy + h * Config.EnergyRecoveryPerSleepHour * qualityFactor * recoveryFactor * ageFactor),
 
-                            // Sleep inertia — kognitivní setrvačnost po probuzení
+                            // Sleep inertia — cognitive sluggishness after waking
                             SleepInertiaHours = inertiaHours
                         };
 
@@ -725,7 +725,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                 case InjuryReceived ir:
                     {
-                        // Bone fragility: nízká hustota kostí → vyšší efektivní závažnost zranění
+                        // Bone fragility: low bone density → higher effective injury severity
                         var boneFactor = s.Aging is { BoneDensity: < 1.0 } bone
                             ? 1.0 + (1.0 - bone.BoneDensity) * Config.BoneFragilityInjuryMultiplier
                             : 1.0;
@@ -738,7 +738,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         break;
                     }
 
-                // Sociální bolest = fyzická bolest (Eisenberger et al., 2003) — odmítnutí aktivuje HPA osu
+                // Social pain = physical pain (Eisenberger et al., 2003) — rejection activates the HPA axis
                 case InteractionOutcome io when io.From == ctx.Id && !io.Accepted:
                     {
                         var n = ctx.Personality.BigFive.Neuroticism;
@@ -747,8 +747,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         break;
                     }
 
-                // Sociální podpora jako kortizol buffer (Eisenberger 2007):
-                // přijatá interakce od blízkého člověka tlumí HPA aktivitu
+                // Social support as a cortisol buffer (Eisenberger 2007):
+                // an accepted interaction from a close person dampens HPA activity
                 case InteractionOutcome io when io.To == ctx.Id && io.Accepted:
                     {
                         ctx.Snapshot.Relationships.Edges.TryGetValue(io.From, out var edge);
@@ -829,8 +829,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             var length = Math.Max(_cycleCfg.MinCycleLengthDays, Math.Min(_cycleCfg.MaxCycleLengthDays,
                 _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
-            // Ovulace = délka cyklu − střední luteální fáze (Bull 2019: luteální ~11,7 dní, SD 2,8).
-            // Folikulární fáze je hlavní zdroj variability — ovulDay se mění každý cyklus.
+            // Ovulation = cycle length − mean luteal phase (Bull 2019: luteal ~11.7 days, SD 2.8).
+            // The follicular phase is the main source of variability — ovulDay changes every cycle.
             var ovulDay = Math.Max(_cycleCfg.MensesMeanDays + 2, length - _cycleCfg.LutealMeanDays);
             var day = c.DayInCycle + 1;
             if (day > length) day = 1;
@@ -847,14 +847,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (!_mensesOn && isMenses) { box.Add(new MensesStarted(now, ctx.Id)); _mensesOn = true; }
             if (_mensesOn && !isMenses) { box.Add(new MensesEnded(now, ctx.Id)); _mensesOn = false; }
 
-            // Antikoncepce High/Moderate potlačuje ovulaci
-            // AnovulatoryCycleActive potlačuje ovulaci z důvodu HPA suprese.
+            // High/Moderate contraception suppresses ovulation
+            // AnovulatoryCycleActive suppresses ovulation due to HPA suppression.
             var contraceptionSuppressesOvul = s.CurrentContraception is ContraceptionLevel.High or ContraceptionLevel.Moderate;
             var ovulWindow = phase == CyclePhase.Ovulation && !contraceptionSuppressesOvul && !s.Cycle!.AnovulatoryCycleActive;
             if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && !c.OvulationWindow)
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
 
-            // Při resetu na den 1 uložit skutečnou délku tohoto cyklu (ovulDay se pak počítá z ní).
+            // On reset to day 1, store the actual length of this cycle (ovulDay is then computed from it).
             var currentLength = day == 1 ? length : c.CurrentCycleLength;
 
             var next = c with
@@ -891,7 +891,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private PhysiologyState AdvancePregnancy(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector outbox, PregnancyState pregnancy)
         {
             var daysPregnant = pregnancy.ConceivedOn.DaysUntil(now.Date);
-            // LibidoMod per trimestr (Basson 2006 review): 1. tri ↓ (nevolnost/únava), 2. tri ↑, 3. tri ↓↓
+            // LibidoMod per trimester (Basson 2006 review): 1st tri ↓ (nausea/fatigue), 2nd tri ↑, 3rd tri ↓↓
             var pregnancyLibidoMod = daysPregnant < 93 ? 0.5 : daysPregnant < 186 ? 0.8 : 0.4;
 
             if (!pregnancy.Discovered && daysPregnant >= Config.PregnancyDiscoveryMinDays)
@@ -960,8 +960,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (newPhase != pp.Phase)
                 outbox.Add(new PostpartumPhaseChanged(now, ctx.Id, newPhase));
 
-            // Postpartum LibidoMod: prolaktin-mediovaná suprese klesá za ~6 měsíců (0.3 → 1.0).
-            // Kojení prodlužuje supresi přes prolaktin → násobení 0.7.
+            // Postpartum LibidoMod: the prolactin-mediated suppression eases over ~6 months (0.3 → 1.0).
+            // Breastfeeding prolongs the suppression via prolactin → multiply by 0.7.
             var postpartumLibidoMod = Math.Clamp(0.3 + (days / 180.0) * 0.7, 0.3, 1.0);
             if (pp.IsBreastfeeding) postpartumLibidoMod = Math.Max(0.3, postpartumLibidoMod * 0.7);
             if (s.Cycle?.Phase == CyclePhase.Paused)
@@ -976,7 +976,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 };
             }
 
-            // Hormonal crash deaktivovat po 7 dnech (progesteron/estrogen crash fáze končí)
+            // Deactivate the hormonal crash after 7 days (the progesterone/estrogen crash phase ends)
             var hormonalCrash = days <= 7;
             return s with { Postpartum = pp with { DaysSinceBirth = days, Phase = newPhase, HormonalCrashActive = hormonalCrash } };
         }
@@ -1115,9 +1115,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </list>
         /// </returns>
         /// <summary>
-        /// Sinusoidální model symptomů menstruačního cyklu (náhrada phase-step konstanty).
-        /// Výpočet je kontinuální funkcí dne v cyklu — Gaussovy křivky pro menzes a luteální fázi.
-        /// Vědecký základ: estrogen/progesteron drift je plynulý, nikoli binární přepínač
+        /// Sinusoidal model of menstrual-cycle symptoms (replacing the phase-step constants).
+        /// The calculation is a continuous function of the day in the cycle — Gaussian curves for menses and the luteal phase.
+        /// Scientific basis: the estrogen/progesterone drift is smooth, not a binary switch
         /// (reference: physiology-psychology.md).
         /// </summary>
         private (double pain, double bloatTarget, double tenderTarget, double libidoMod) SymptomsFor(
@@ -1128,33 +1128,33 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 return (0.0, 0.0, 0.0, 1.0);
 
             var day = (double)c.DayInCycle;
-            // Ovulační den pro tento cyklus — dynamický per-cyklus (uložen v CurrentCycleLength).
+            // Ovulation day for this cycle — dynamic per cycle (stored in CurrentCycleLength).
             var ovulDay = (double)Math.Max(_cycleCfg.MensesMeanDays + 2, c.CurrentCycleLength - _cycleCfg.LutealMeanDays);
             var mensesMid = _cycleCfg.MensesMeanDays / 2.0;
 
-            // Bolest: Gaussový spike v menstruaci + luteální eskalace
+            // Pain: a Gaussian spike during menses + luteal escalation
             var mensesPain = 4.0 * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
             var lutealPain = 1.5 * Math.Max(0, (day - (ovulDay + 7)) / 7.0);
             var rawPain = (mensesPain + lutealPain) * _cycleCfg.PainBaseMultiplier;
 
-            // Bloat TARGET (0..100): Gaussův vrchol v menstruaci + pozdně-luteální (PMS) náběh.
-            // Vrací se cílová úroveň, ke které stav v ApplyCycleSymptoms relaxuje — nikoli přírůstek.
+            // Bloat TARGET (0..100): a Gaussian peak during menses + a late-luteal (PMS) ramp.
+            // Returns the target level the state relaxes toward in ApplyCycleSymptoms — not an increment.
             var mensesBloat = _cycleCfg.MensesBloatPeak * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
             var lutealBloat = _cycleCfg.LutealBloatPeak * Math.Max(0, (day - (ovulDay + 7)) / 7.0);
             var bloatTarget = (mensesBloat + lutealBloat) * _cycleCfg.BloatBaseMultiplier;
 
-            // Breast tenderness TARGET (0..100): dominantní v pozdní luteální fázi, mírně v menstruaci.
+            // Breast tenderness TARGET (0..100): dominant in the late luteal phase, mild during menses.
             var mensesTender = _cycleCfg.MensesBreastTenderPeak * Math.Exp(-Math.Pow(day - mensesMid, 2) / (2 * mensesMid));
             var lutealTender = _cycleCfg.LutealBreastTenderPeak * Math.Max(0, (day - (ovulDay + 5)) / 7.0);
             var tenderTarget = (mensesTender + lutealTender) * _cycleCfg.BreastTenderMultiplier;
 
-            // LibidoMod: Gaussový vrchol v ovulaci, mírný propad v menstruaci, baseline 0.95
+            // LibidoMod: a Gaussian peak at ovulation, a mild dip during menses, baseline 0.95
             var libidoBoost = 0.25 * Math.Exp(-Math.Pow(day - ovulDay, 2) / 8.0);
             var mensesDip = -0.10 * Math.Exp(-Math.Pow(day - mensesMid, 2) / 4.0);
             var libidoMod = Math.Clamp(0.95 + libidoBoost + mensesDip, 0.80, 1.20);
 
-            // PMDD amplifikátor — luteální symptomy závažnější u postav s PmsRisk > 0.3
-            // Antikoncepce (High/Moderate) snižuje závažnost PMS/PMDD
+            // PMDD amplifier — luteal symptoms are more severe for characters with PmsRisk > 0.3
+            // Contraception (High/Moderate) reduces PMS/PMDD severity
             var contraFactor = contraception switch
             {
                 ContraceptionLevel.High => 0.2,
@@ -1193,7 +1193,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private static MenstrualCycleState SeedCycle(MenstrualCycleConfig cfg, IRandomSource rng, WDateOnly now)
         {
-            // Vzorkuj délku tohoto inicializačního cyklu ze stejného rozdělení jako za běhu.
+            // Sample the length of this initialization cycle from the same distribution as at runtime.
             var cycleLength = Math.Max(cfg.MinCycleLengthDays, Math.Min(cfg.MaxCycleLengthDays,
                 cfg.MeanCycleLengthDays + (int)Math.Round(Normal(rng, 0, cfg.VariabilityDaysStdDev))));
             var ovulDay = Math.Max(cfg.MensesMeanDays + 2, cycleLength - cfg.LutealMeanDays);
@@ -1201,7 +1201,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             day = Math.Clamp(day, 1, cfg.MaxCycleLengthDays);
             var phase = PhaseFor(day, cycleLength, cfg.MensesMeanDays, ovulDay);
 
-            // Zpětný odhad, kdy začala menstruace
+            // Back-estimate when menstruation began
             var lastMensesStart = now.AddDays(-(day - 1));
             return new MenstrualCycleState(
                 Phase: phase,
@@ -1238,8 +1238,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             => Clamp01p(current + (target - current) * Math.Clamp(rate, 0.0, 1.0));
 
         /// <summary>
-        /// Vypočítá novou hladinu vitaminu D: odečte diurnální ztrátu a — pokud je postava
-        /// venku za dostatečného ozáření — přidá sluneční restauraci.
+        /// Computes the new vitamin D level: subtracts the diurnal loss and — if the character
+        /// is outdoors under sufficient irradiance — adds solar restoration.
         /// </summary>
         private double ComputeVitaminD(double current, double h, CelestialContext? celestial, SurfaceKind surface)
         {

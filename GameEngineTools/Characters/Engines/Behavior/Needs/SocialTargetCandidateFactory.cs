@@ -78,7 +78,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 target.RejectionRisk,
                 target.ExpectedAcceptance);
 
-            // DCM SIS2: kontextová suprese (crowding, pozorovatelé) přes VulnerabilitySafety proxy
+            // DCM SIS2: contextual suppression (crowding, observers) via the VulnerabilitySafety proxy
             var dcmContextMult = DualControlBehaviorMath.ContextSuppressionMultiplier(
                 context.HumanContext.Personality.DualControl,
                 target.VulnerabilitySafety);

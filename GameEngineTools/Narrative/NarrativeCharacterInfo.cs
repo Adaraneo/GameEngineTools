@@ -6,23 +6,23 @@ namespace GameEngineTools.Narrative
     using GameEngineTools.Characters.Core;
 
     /// <summary>
-    /// Základní informace o postavě pro formátování narativu.
+    /// Basic character information for narrative formatting.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Proč nepoužíváme jen <c>string</c> jméno?</b><br/>
-    /// Čeština vyžaduje gramatický rod pro správné skloňování sloves —
-    /// "šel" vs. "šla", "přijal" vs. "přijala". Bez pohlaví bychom museli
-    /// buď psát ošklivé "šel/a", nebo ignorovat gramatiku.
+    /// <b>Why don't we use just a <c>string</c> name?</b><br/>
+    /// Czech requires grammatical gender for correct verb inflection —
+    /// "šel" vs. "šla", "přijal" vs. "přijala". Without the sex we would have to
+    /// either write the ugly "šel/a", or ignore grammar.
     /// </para>
     /// </remarks>
-    /// <param name="Name">Jméno postavy zobrazené v narativu (např. "Anna", "Petr").</param>
-    /// <param name="Biology">Biologické pohlaví — pro správné skloňování v češtině.</param>
+    /// <param name="Name">Character name shown in the narrative (e.g. "Anna", "Petr").</param>
+    /// <param name="Biology">Biological sex — for correct inflection in Czech.</param>
     public sealed record NarrativeCharacterInfo(string Name, SexBiology Biology)
     {
         /// <summary>
-        /// Vrátí <c>true</c> pokud je postava ženského pohlaví.
-        /// Používá se interně pro volbu gramatického rodu ve větách.
+        /// Returns <c>true</c> if the character is female.
+        /// Used internally to choose the grammatical gender in sentences.
         /// </summary>
         public bool IsFemale => Biology == SexBiology.Female;
     }

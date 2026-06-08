@@ -4,7 +4,7 @@
 namespace GameEngineTools.Characters.Engines.Memory
 {
     /// <summary>
-    /// Canonical tokeny pro mikro-události v relation paměti.
+    /// Canonical tokens for micro-events in relationship memory.
     /// </summary>
     public static class MemoryMicroEventKinds
     {

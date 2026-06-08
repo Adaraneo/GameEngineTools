@@ -7,47 +7,47 @@ namespace GameEngineTools.Characters.Engines.Sleep
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Kontrakt pro spánkovou session jedné postavy.
-    /// Session vzniká při <see cref="SleepConfirmed"/> a zaniká při <see cref="SleepEnded"/>.
+    /// Contract for a single character's sleep session.
+    /// The session is created on <see cref="SleepConfirmed"/> and destroyed on <see cref="SleepEnded"/>.
     /// </summary>
     /// <remarks>
-    /// Session je oddělená od <see cref="IEngine{TState,TConfig}"/> záměrně —
-    /// spánek má vlastní životní cyklus (Begin → Tick → End/Interrupt),
-    /// který neodpovídá průběžnému tickování ostatních enginů.
+    /// The session is deliberately separate from <see cref="IEngine{TState,TConfig}"/> —
+    /// sleep has its own life cycle (Begin → Tick → End/Interrupt),
+    /// which does not match the continuous ticking of the other engines.
     /// <br/><br/>
-    /// BehaviorEngine drží referenci na aktivní session a předává jí tick,
-    /// dokud <see cref="IsActive"/> vrací <c>true</c>.
+    /// The BehaviorEngine holds a reference to the active session and forwards ticks to it
+    /// while <see cref="IsActive"/> returns <c>true</c>.
     /// </remarks>
     public interface ISleepSession
     {
         #region Stav
 
         /// <summary>
-        /// Aktuální fáze spánkového cyklu.
+        /// Current phase of the sleep cycle.
         /// </summary>
         SleepPhase CurrentPhase { get; }
 
         /// <summary>
-        /// True pokud session stále běží (postava spí).
-        /// False znamená, že session skončila — buď přirozeně nebo přerušením.
+        /// True if the session is still running (the character is asleep).
+        /// False means the session has ended — either naturally or by interruption.
         /// </summary>
         bool IsActive { get; }
 
         /// <summary>
-        /// Plánovaný čas probuzení.
-        /// Může být dřívější než skutečný konec, pokud dojde k přerušení.
+        /// Planned wake-up time.
+        /// May be earlier than the actual end if an interruption occurs.
         /// </summary>
         WDateTime PlannedWakeUp { get; }
 
         /// <summary>
-        /// Volitelný společník sdíleného spánku.
-        /// <c>null</c> pokud postava spí sama.
+        /// Optional companion for shared sleep.
+        /// <c>null</c> if the character sleeps alone.
         /// </summary>
         HumanId? Companion { get; }
 
         /// <summary>
-        /// Celkový počet hodin, které postava v této session prospala.
-        /// Průběžně roste s každým tickem.
+        /// Total number of hours the character has slept in this session.
+        /// Grows continuously with each tick.
         /// </summary>
         double HoursSlept { get; }
 
@@ -56,16 +56,16 @@ namespace GameEngineTools.Characters.Engines.Sleep
         #region Lifecycle
 
         /// <summary>
-        /// Zahájí spánkovou session.
-        /// Přepne fázi na <see cref="SleepPhase.Falling"/> a publikuje
-        /// <see cref="SleepPhaseChanged"/> a volitelně <see cref="SharedSleepBegan"/>.
+        /// Begins the sleep session.
+        /// Switches the phase to <see cref="SleepPhase.Falling"/> and publishes
+        /// <see cref="SleepPhaseChanged"/> and optionally <see cref="SharedSleepBegan"/>.
         /// </summary>
-        /// <param name="now">Aktuální herní čas.</param>
-        /// <param name="plannedWakeUp">Plánovaný čas probuzení.</param>
+        /// <param name="now">Current game time.</param>
+        /// <param name="plannedWakeUp">Planned wake-up time.</param>
         /// <param name="ctx">Kontext postavy.</param>
-        /// <param name="outbox">Sběrač eventů pro tento tick.</param>
-        /// <param name="companion">Volitelný společník sdíleného spánku.</param>
-        /// <param name="sharedType">Typ sdíleného spánku — musí být vyplněn pokud je <paramref name="companion"/> != null.</param>
+        /// <param name="outbox">Event collector for this tick.</param>
+        /// <param name="companion">Optional companion for shared sleep.</param>
+        /// <param name="sharedType">The shared-sleep type — must be set if <paramref name="companion"/> != null.</param>
         void Begin(
             WDateTime now,
             WDateTime plannedWakeUp,
@@ -75,26 +75,26 @@ namespace GameEngineTools.Characters.Engines.Sleep
             SharedSleepType? sharedType = null);
 
         /// <summary>
-        /// Průběžný tick — posouvá čas v session, přepíná fáze,
-        /// generuje rizikové a narrative eventy.
-        /// Pokud session skončí přirozeně, nastaví <see cref="IsActive"/> na <c>false</c>
+        /// Continuous tick — advances time in the session, switches phases,
+        /// and generates risk and narrative events.
+        /// If the session ends naturally, sets <see cref="IsActive"/> to <c>false</c>
         /// a publikuje <see cref="SleepEnded"/>.
         /// </summary>
-        /// <param name="now">Aktuální herní čas.</param>
-        /// <param name="dt">Délka uplynulého herního intervalu.</param>
+        /// <param name="now">Current game time.</param>
+        /// <param name="dt">Length of the elapsed game interval.</param>
         /// <param name="ctx">Kontext postavy.</param>
-        /// <param name="outbox">Sběrač eventů pro tento tick.</param>
+        /// <param name="outbox">Event collector for this tick.</param>
         void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox);
 
         /// <summary>
-        /// Přeruší spánek před plánovaným koncem.
+        /// Interrupts the sleep before its planned end.
         /// Publikuje <see cref="SleepInterrupted"/> a <see cref="SleepEnded"/>,
-        /// nastaví <see cref="IsActive"/> na <c>false</c>.
+        /// sets <see cref="IsActive"/> to <c>false</c>.
         /// </summary>
-        /// <param name="now">Aktuální herní čas přerušení.</param>
-        /// <param name="cause">Příčina přerušení.</param>
+        /// <param name="now">Game time of the interruption.</param>
+        /// <param name="cause">Cause of the interruption.</param>
         /// <param name="ctx">Kontext postavy.</param>
-        /// <param name="outbox">Sběrač eventů pro tento tick.</param>
+        /// <param name="outbox">Event collector for this tick.</param>
         void Interrupt(WDateTime now, InterruptCause cause, IHumanContext ctx, IEventCollector outbox);
 
         #endregion Lifecycle

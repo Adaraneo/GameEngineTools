@@ -17,8 +17,8 @@ namespace GameEngineTools.Characters.Generation
     // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Vstupní parametry pro generování blueprintu jedné postavy.
-    /// Všechna pole jsou volitelná — pokud nejsou zadána, použijí se výchozí
+    /// Input parameters for generating a single character's blueprint.
+    /// All fields are optional — if not provided, the default
     /// hodnoty z <see cref="HumanBlueprintSpec"/>.
     /// </summary>
     public sealed record HumanBlueprintRequest(
@@ -29,15 +29,15 @@ namespace GameEngineTools.Characters.Generation
         PersonalitySpec? PersonalitySpec = null,
         int? Seed = null,
         /// <summary>
-        /// Explicitně zadané povolání (ID z <see cref="OccupationIds"/> nebo vlastní).
-        /// Pokud je <c>null</c>, povolání se vybere losem z
-        /// <see cref="HumanBlueprintSpec.OccupationWeights"/> s přihlédnutím k věkové skupině.
+        /// An explicitly specified occupation (an ID from <see cref="OccupationIds"/> or a custom one).
+        /// If <c>null</c>, the occupation is drawn at random from
+        /// <see cref="HumanBlueprintSpec.OccupationWeights"/>, taking the age group into account.
         /// </summary>
         string? Occupation = null);
 
     /// <summary>
-    /// Specifikace generátoru postav — váhy pohlaví, věkový rozsah a váhy povolání.
-    /// Registruj do DI jako singleton přes
+    /// Character-generator specification — sex weights, age range and occupation weights.
+    /// Register into DI as a singleton via
     /// <see cref="ServiceCollectionExtensions.AddCharacterGeneration(Microsoft.Extensions.DependencyInjection.IServiceCollection, Func{IServiceProvider, HumanBlueprintSpec})"/>.
     /// </summary>
     public sealed record HumanBlueprintSpec(
@@ -45,17 +45,17 @@ namespace GameEngineTools.Characters.Generation
         WDateOnly DefaultMinBirthDate,
         WDateOnly DefaultMaxBirthDate,
         /// <summary>
-        /// Váhy povolání použité při generování, pokud <see cref="HumanBlueprintRequest.Occupation"/>
-        /// není explicitně zadáno. Klíče jsou occupation ID (viz <see cref="OccupationIds"/>);
-        /// prázdný řetězec nebo <see cref="OccupationIds.None"/> znamená žádné povolání.
-        /// Hodnoty nemusí dávat dohromady 1 — generátor je normalizuje.
+        /// Occupation weights used during generation when <see cref="HumanBlueprintRequest.Occupation"/>
+        /// is not specified explicitly. The keys are occupation IDs (see <see cref="OccupationIds"/>);
+        /// an empty string or <see cref="OccupationIds.None"/> means no occupation.
+        /// The values need not sum to 1 — the generator normalizes them.
         /// </summary>
         IReadOnlyDictionary<string, double>? OccupationWeights = null)
     {
         /// <summary>
-        /// Výchozí váhy povolání — hrubá distribuce středověké populace.
-        /// Klíč <c>""</c> (<see cref="OccupationIds.None"/>) určuje pravděpodobnost
-        /// postavy bez povolání.
+        /// Default occupation weights — a rough distribution of a medieval population.
+        /// The key <c>""</c> (<see cref="OccupationIds.None"/>) sets the probability
+        /// of a character with no occupation.
         /// </summary>
         public static IReadOnlyDictionary<string, double> DefaultOccupationWeights { get; } =
             new Dictionary<string, double>
@@ -91,8 +91,8 @@ namespace GameEngineTools.Characters.Generation
             }
             catch (ArgumentOutOfRangeException)
             {
-                // Datum by šlo před epochu — zarovnáme na 30 dní dozadu od "teď"
-                // TODO: nahradit lunárním výpočtem
+                // The date would fall before the epoch — align it to 30 days back from "now"
+                // TODO: replace with a lunar calculation
                 minBirth = new WDateOnly(now.DayIndex - 30);
             }
 
@@ -109,26 +109,26 @@ namespace GameEngineTools.Characters.Generation
     //  Interfaces
     // ─────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Generátor blueprintů postav.</summary>
+    /// <summary>Generator of character blueprints.</summary>
     public interface IHumanBlueprintGenerator
     {
         /// <summary>
-        /// Vygeneruje blueprint postavy podle volitelného requestu.
-        /// Pokud request není zadán, použijí se výchozí hodnoty ze spec.
+        /// Generates a character blueprint according to an optional request.
+        /// If no request is provided, the defaults from the spec are used.
         /// </summary>
-        /// <param name="request">Volitelné parametry generování (pohlaví, věk, seed…).</param>
+        /// <param name="request">Optional generation parameters (sex, age, seed…).</param>
         HumanBlueprint Generate(HumanBlueprintRequest? request = null);
     }
 
-    /// <summary>Generátor identit postav (jméno, příjmení, datum narození).</summary>
+    /// <summary>Generator of character identities (first name, surname, birth date).</summary>
     public interface IIdentityGenerator
     {
         /// <summary>
         /// Vygeneruje identitu postavy.
         /// </summary>
-        /// <param name="sex">Pohlaví (ovlivňuje výběr jména).</param>
-        /// <param name="birthDate">Datum narození.</param>
-        /// <param name="rng">Zdroj náhodných čísel.</param>
+        /// <param name="sex">Sex (affects name selection).</param>
+        /// <param name="birthDate">Birth date.</param>
+        /// <param name="rng">Random-number source.</param>
         Identity Generate(SexBiology sex, WDateOnly birthDate, IRandomSource rng);
     }
 
@@ -137,7 +137,7 @@ namespace GameEngineTools.Characters.Generation
     // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Jednoduchý generátor identit — náhodně vybírá z předem načtených seznamů jmen a příjmení.
+    /// A simple identity generator — randomly picks from preloaded lists of first names and surnames.
     /// </summary>
     public sealed class SimpleIdentityGenerator : IIdentityGenerator
     {
@@ -152,11 +152,11 @@ namespace GameEngineTools.Characters.Generation
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje generátor se seznamy jmen a příjmení.
+        /// Initializes the generator with the lists of first names and surnames.
         /// </summary>
-        /// <param name="femaleNames">Ženská jména.</param>
-        /// <param name="maleNames">Mužská jména.</param>
-        /// <param name="surnames">Příjmení (s mužskou a ženskou variantou).</param>
+        /// <param name="femaleNames">Female first names.</param>
+        /// <param name="maleNames">Male first names.</param>
+        /// <param name="surnames">Surnames (with male and female variants).</param>
         public SimpleIdentityGenerator(Name[] femaleNames, Name[] maleNames, Surname[] surnames)
         {
             _femaleNames = femaleNames;
@@ -198,7 +198,7 @@ namespace GameEngineTools.Characters.Generation
     // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Generátor blueprintů postav. Kombinuje identity, osobnost a vzhled
+    /// Generator of character blueprints. Combines identity, personality and appearance
     /// do jednoho <see cref="HumanBlueprint"/>.
     /// </summary>
     public sealed class HumanBlueprintGenerator : IHumanBlueprintGenerator
@@ -217,7 +217,7 @@ namespace GameEngineTools.Characters.Generation
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje generátor se všemi potřebnými závislostmi.
+        /// Initializes the generator with all required dependencies.
         /// </summary>
         public HumanBlueprintGenerator(
             IRandomSourceFactory rngFactory,
@@ -333,27 +333,27 @@ namespace GameEngineTools.Characters.Generation
         }
 
         /// <summary>
-        /// Vybere povolání váhovým losem s přihlédnutím k věkové skupině postavy.
-        /// Vrátí <c>null</c> (= žádné povolání) pro mladé postavy a
-        /// při výběru prázdného klíče <c>""</c> (<see cref="OccupationIds.None"/>).
+        /// Selects an occupation by a weighted draw, taking the character's age group into account.
+        /// Returns <c>null</c> (= no occupation) for young characters and
+        /// when the empty key <c>""</c> (<see cref="OccupationIds.None"/>) is drawn.
         /// </summary>
         /// <remarks>
-        /// Stadium modifikátory:
+        /// Life-stage modifiers:
         /// <list type="bullet">
-        ///   <item><b>Baby / Child / Teenager</b> — vždy null (nelze pracovat).</item>
-        ///   <item><b>Adult</b> — plná distribuce dle vah.</item>
-        ///   <item><b>MidAged</b> — built-in fyzické práce mají poloviční váhu.</item>
-        ///   <item><b>Old</b> — z built-in povolání povolena jen sedavá + null; ostatní built-in zeroed.</item>
+        ///   <item><b>Baby / Child / Teenager</b> — always null (cannot work).</item>
+        ///   <item><b>Adult</b> — the full distribution per the weights.</item>
+        ///   <item><b>MidAged</b> — built-in physical jobs have half weight.</item>
+        ///   <item><b>Old</b> — of the built-in occupations only sedentary ones + null are allowed; the rest are zeroed.</item>
         /// </list>
-        /// Neznámá (custom) povolání nejsou modifikována stadiem — odpovědnost vývojáře.
+        /// Unknown (custom) occupations are not modified by life stage — that is the developer's responsibility.
         /// </remarks>
         private static string? PickOccupation(IReadOnlyDictionary<string, double> weights, IRandomSource rng, StadiumType stadium)
         {
-            // Mladé postavy nepracují
+            // Young characters do not work
             if (stadium is StadiumType.Baby or StadiumType.Child or StadiumType.Teenager)
                 return null;
 
-            // Sestavíme efektivní váhy s stadium modifikátory
+            // Build the effective weights with life-stage modifiers
             var effective = new List<(string id, double weight)>(weights.Count);
             foreach (var (id, w) in weights)
             {
@@ -366,10 +366,10 @@ namespace GameEngineTools.Characters.Generation
                 }
                 else if (stadium == StadiumType.Old)
                 {
-                    // Pro built-in povolání: pouze sedavá a "none" (prázdný řetězec)
+                    // For built-in occupations: only sedentary ones and "none" (empty string)
                     if (OccupationIds.All.Contains(id) && !OccupationIds.SedentaryOccupations.Contains(id))
                         effectiveWeight = 0.0;
-                    // Custom (neznámá) povolání nejsou modifikována
+                    // Custom (unknown) occupations are not modified
                 }
 
                 if (effectiveWeight > 0.0)
@@ -394,7 +394,7 @@ namespace GameEngineTools.Characters.Generation
         }
 
         /// <summary>
-        /// Deterministický seed z Guidu — stabilní, ale rozumně rozptýlený.
+        /// Deterministic seed from the Guid — stable but reasonably dispersed.
         /// </summary>
         private static int DeriveSeedFromId(HumanId id)
         {

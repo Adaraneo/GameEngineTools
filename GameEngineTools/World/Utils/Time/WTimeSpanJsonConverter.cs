@@ -10,21 +10,21 @@ namespace GameEngineTools.World.Utils.Time
 
     /// <summary>
     /// JSON konverter pro <see cref="WTimeSpan"/>.
-    /// Serializuje vždy jako raw <c>int64</c> ticky — kompaktní a bezeztrátové.
-    /// Deserializuje z čísla nebo stringu (<c>ticky</c> nebo <c>[-]d.hh:mm:ss[.sub]</c>).
+    /// Always serializes as raw <c>int64</c> ticks — compact and lossless.
+    /// Deserializes from a number or string (<c>ticks</c> or <c>[-]d.hh:mm:ss[.sub]</c>).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Ambient design.</b> Interně používá <see cref="WWorld.Spec"/> místo
-    /// explicitně předaného <c>WorldTimeContext</c>.
-    /// Zpětně kompatibilní konstruktor je zachován ale ignoruje svůj parametr.
+    /// <b>Ambient design.</b> Internally uses <see cref="WWorld.Spec"/> instead of
+    /// an explicitly passed <c>WorldTimeContext</c>.
+    /// The backward-compatible constructor is kept but ignores its parameter.
     /// </para>
     /// </remarks>
     public sealed class WTimeSpanJsonConverter : JsonConverter<WTimeSpan>
     {
         #region Konstrukce
 
-        /// <summary>Inicializuje konverter — vyžaduje nakonfigurovaný <see cref="WWorld"/>.</summary>
+        /// <summary>Initializes the converter — requires <see cref="WWorld"/> to be configured.</summary>
         public WTimeSpanJsonConverter()
         { }
 
@@ -33,7 +33,7 @@ namespace GameEngineTools.World.Utils.Time
         #region JsonConverter<WTimeSpan>
 
         /// <inheritdoc/>
-        /// <exception cref="JsonException">Pokud token není číslo ani string nebo hodnotu nelze naparsovat.</exception>
+        /// <exception cref="JsonException">If the token is neither a number nor a string, or the value cannot be parsed.</exception>
         public override WTimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             switch (reader.TokenType)
@@ -48,7 +48,7 @@ namespace GameEngineTools.World.Utils.Time
                         if (string.IsNullOrWhiteSpace(s))
                             throw new JsonException("WTimeSpan: prázdný řetězec.");
 
-                        // Zkus čisté číslo (ticky)
+                        // Try a plain number (ticks)
                         if (long.TryParse(s, out var asTicks))
                             return new WTimeSpan(asTicks);
 
@@ -65,7 +65,7 @@ namespace GameEngineTools.World.Utils.Time
         }
 
         /// <inheritdoc/>
-        /// <remarks>Serializuje jako raw int64 — kompaktní a round-trip bezeztrátové.</remarks>
+        /// <remarks>Serializes as raw int64 — compact and lossless round-trip.</remarks>
         public override void Write(Utf8JsonWriter writer, WTimeSpan value, JsonSerializerOptions options)
             => writer.WriteNumberValue(value.Ticks);
 
@@ -74,8 +74,8 @@ namespace GameEngineTools.World.Utils.Time
         #region Privátní parsování
 
         /// <summary>
-        /// Parsuje string ve formátu <c>[-]d.hh:mm:ss[.sub]</c> nebo <c>[-]hh:mm:ss[.sub]</c>.
-        /// Složky validuje vůči <see cref="WWorld.Spec"/>.
+        /// Parses a string in the format <c>[-]d.hh:mm:ss[.sub]</c> or <c>[-]hh:mm:ss[.sub]</c>.
+        /// Validates the components against <see cref="WWorld.Spec"/>.
         /// </summary>
         private static bool TryParseGeneral(string s, out WTimeSpan span)
         {
@@ -85,7 +85,7 @@ namespace GameEngineTools.World.Utils.Time
             int sign = 1;
             if (s.StartsWith("-", StringComparison.Ordinal)) { sign = -1; s = s[1..]; }
 
-            // Rozděl na [dny] . [rest]
+            // Split into [days] . [rest]
             string[] partsD = s.Split('.', 2);
             long days = 0;
             string rest;
@@ -115,7 +115,7 @@ namespace GameEngineTools.World.Utils.Time
                 if (!long.TryParse(secSub[1], out subticks)) return false;
             }
 
-            // Validace vůči WWorld.Spec
+            // Validate against WWorld.Spec
             var spec = WWorld.Spec;
             if (hh < 0 || hh >= spec.HoursPerDay) return false;
             if (mm < 0 || mm >= spec.MinutesPerHour) return false;

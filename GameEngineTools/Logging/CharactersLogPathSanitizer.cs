@@ -4,7 +4,7 @@
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Sanitizuje názvy subsystemů před použitím v názvu souboru.
+    /// Sanitises subsystem names before using them in a file name.
     /// </summary>
     internal static class CharactersLogPathSanitizer
     {

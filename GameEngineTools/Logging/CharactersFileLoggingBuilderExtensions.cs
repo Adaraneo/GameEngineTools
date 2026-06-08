@@ -12,7 +12,7 @@ namespace GameEngineTools.Logging
     public static class CharactersFileLoggingBuilderExtensions
     {
         /// <summary>
-        /// Přidá character file logger do logging pipeline.
+        /// Adds the character file logger to the logging pipeline.
         /// </summary>
         public static ILoggingBuilder AddCharactersFile(
             this ILoggingBuilder builder,

@@ -36,7 +36,7 @@ namespace GameEngineTools.Extensions
             var identity = person.Identity;
             var sb = new StringBuilder();
 
-            // --- Základní info ---
+            // --- Basic info ---
             var firstName = identity.FirstName;
             var surname = person.Biology == SexBiology.Female
                 ? identity.LastName.Female
@@ -107,21 +107,21 @@ namespace GameEngineTools.Extensions
             var pad = new string(' ', indent * 2);
             var type = obj.GetType();
 
-            // Primitivy, string, enum, Guid — rovnou vypíšeme
+            // Primitives, string, enum, Guid — print directly
             if (type.IsPrimitive || type.IsEnum || obj is string || obj is Guid || obj is Type)
             {
                 sb.AppendLine($"{pad}{obj}");
                 return;
             }
 
-            // ✅ Tvoje W-typy mají hezký ToString() — použijeme ho
+            // W-types have a nice ToString() — use it
             if (type.Namespace == "GameEngineTools.World.Utils.Time")
             {
                 sb.AppendLine($"{pad}{obj}");
                 return;
             }
 
-            // Cyklus pro referenční typy
+            // Loop for reference types
             if (!type.IsValueType)
             {
                 visited ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
@@ -155,7 +155,7 @@ namespace GameEngineTools.Extensions
                 return;
             }
 
-            // Record / komplexní objekt
+            // Record / complex object
             foreach (var prop in type.GetProperties())
             {
                 if (prop.GetIndexParameters().Length > 0 ||

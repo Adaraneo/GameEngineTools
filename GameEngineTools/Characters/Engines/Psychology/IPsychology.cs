@@ -39,9 +39,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
         // Testosteron → psychika
         double TestosteroneIntimacyWeight = 0.3,
         double TestosteroneStressResilienceWeight = 0.008,
-        // Sleep Inertia (musí souhlasit s PhysiologyConfig.SleepInertiaMaxHours pro správné normování)
+        // Sleep inertia (must match PhysiologyConfig.SleepInertiaMaxHours for correct normalization)
         double SleepInertiaMaxHours = 1.5,
-        // Hangry neutrální bias (MacCormack 2019)
+        // Hangry neutral bias (MacCormack 2019)
         double HangryNeutralBiasThreshold = 70.0,
         double HangryNeutralBiasStrength = 0.015,
         double HangryNeutralContextWindow = 0.25,
@@ -50,15 +50,15 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double SicknessAnhedoniaRewardBlunting = 0.5,
         double SicknessLethargyArousalPenalty = 0.008,
         double SicknessBrainFogCogLoadBonus = 3.0,
-        // SAM systém → PAD
+        // SAM system → PAD
         double AcuteArousalPsychWeight = 0.6,
-        // Fyzická únava → PAD
+        // Physical fatigue → PAD
         double PhysicalFatigueHighThreshold = 70.0,
         double PhysicalFatigueMildThreshold = 20.0,
         double PhysicalFatigueValencePenalty = 0.0008,
         double PhysicalFatigueArousalPenalty = 0.005,
         double PhysicalFatigueStressReliefWeight = 0.5,
-        // Glykemický stav — hypoglykémie
+        // Glycemic state — hypoglycemia
         double HypoglycemiaThreshold = 35.0,
         double HypoglycemiaValencePenalty = 0.003,
         double HypoglycemiaCogLoadBonus = 4.0,
@@ -66,39 +66,39 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double CortisolOptimalLow = 55.0,
         double CortisolOptimalHigh = 75.0,
         double CortisolOptimalCogBonus = 1.0,
-        // PMDD (PmsRisk amplifikátor)
+        // PMDD (PmsRisk amplifier)
         double PmddValencePenaltyPerHour = 0.002,
         double PmddStressBonus = 0.5,
         // Postpartum hormonal crash
         double PostpartumCrashValenceLability = 0.05,
         double PostpartumCrashMoodBaselinePenalty = 0.3,
-        // Ambientní teplota → PAD (Anderson 2002)
+        // Ambient temperature → PAD (Anderson 2002)
         double AmbientTempHeatThreshold = 27.0,
         double AmbientTempColdThreshold = 15.0,
         double AmbientTempHeatValencePenalty = 0.008,
         double AmbientTempHeatArousalBonus = 0.005,
         double AmbientTempColdSocialBonus = 1.0,
-        // Dehydratace → kognitivní deficit (Masento 2014)
+        // Dehydration → cognitive deficit (Masento 2014)
         double DehydrationCogLoadThreshold = 50.0,
         double DehydrationCogLoadBonus = 3.0,
-        // Hyperalgezie při nemoci (Dantzer 2007)
+        // Hyperalgesia during illness (Dantzer 2007)
         double HyperalgesiaImmuneThreshold = 40.0,
         double HyperalgesiaMaxMultiplier = 0.5,
-        // Chronická bolest → depresivní profil (Dantzer 2008)
+        // Chronic pain → depressive profile (Dantzer 2008)
         double ChronicPainOnsetDays = 7.0,
         double ChronicPainValencePenaltyPerDay = 0.002,
         double ChronicPainMoodBaselinePenaltyPerDay = 0.05,
-        // Stresová vulnerabilita v noci (McEwen 1998) — kortizol moduluje stress recovery
+        // Stress vulnerability at night (McEwen 1998) — cortisol modulates stress recovery
         double CircadianVulnerabilityMin = 0.3,
         double CircadianVulnerabilityScale = 50.0,
-        // Serotonin IDO pathway (Dantzer 2007) — chronická imunita tlumí MoodBaseline recovery
+        // Serotonin IDO pathway (Dantzer 2007) — chronic immune activation dampens MoodBaseline recovery
         double SerotoninSuppressionImmuneThreshold = 60.0,
         double SerotoninMoodRecoveryDampening = 0.3,
         // Wanting vs. Liking — stres amplifikuje wanting/craving (Berridge 2025)
         double WantingStressThreshold = 60.0,
         double WantingNeedIntimacyBoostPerHour = 0.4,
         double WantingNeedSocialBoostPerHour = 0.2,
-        // Altitude — kognitivní deficit při hypoxii
+        // Altitude — cognitive deficit under hypoxia
         double AltitudeCogLoadThreshold = 2500.0,
         double AltitudeCogLoadBonusPerKm = 2.0,
         // ── Dual Control Model (Bancroft & Janssen 2000) ───────────────────────
@@ -150,12 +150,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// (Glass &amp; Singer 1972). Default 0.4 → 60 % reduction at home.
         /// </summary>
         double HomeNoiseStressMultiplier = 0.4,
-        // Kognitivní stárnutí + percepce (Salthouse 2009; Gates & Cooper 1991)
+        // Cognitive aging + perception (Salthouse 2009; Gates & Cooper 1991)
         double CognitivAgingThreshold = 60.0,
         double CognitiveAgingCogLoadPerYear = 0.3,
         double PerceptualAgingThreshold = 50.0,
         double PerceptualAgingCogLoadPerHour = 0.005,
-        // Post-menopauza — estrogen deficience → nálada
+        // Post-menopause — estrogen deficiency → mood
         double PostMenopauseMoodBaselinePenaltyPerHour = 0.002,
         // --- Per-emotion PAD valence decay multipliers (Verduyn & Lavrijsen 2015) ---
         // Multiplier < 1 = emotion lingers longer; multiplier > 1 = fades quickly.
@@ -357,7 +357,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     public interface IPsychologyEngine : IEngine<PsychologyState, PsychologyConfig>
     { }
 
-    // Události
+    // Events
 
     /// <summary>Event — the dominant emotion / PAD state shifted.</summary>
     public sealed record EmotionShifted(WDateTime OccurredAt, HumanId Human, DiscreteEmotion To, double Valence, double Arousal, double Dominance) : IDomainEvent;

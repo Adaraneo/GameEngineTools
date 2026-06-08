@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Helpery pro centralizované vytváření character log scopů.
+    /// Helpers for centrally creating character log scopes.
     /// </summary>
     public static class CharacterLoggingExtensions
     {

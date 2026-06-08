@@ -4,27 +4,27 @@
 namespace GameEngineTools.Characters.Engines.Sleep
 {
     /// <summary>
-    /// Typ sdíleného spánku — určuje kontext, ve kterém postava spí s někým dalším.
-    /// Ovlivňuje rizikový profil (hlídání) i narrative příležitosti (rozhovor, sdílený sen).
+    /// Type of shared sleep — defines the context in which the character sleeps with someone else.
+    /// Affects the risk profile (keeping watch) and narrative opportunities (conversation, shared dream).
     /// </summary>
     public enum SharedSleepType
     {
         /// <summary>
-        /// Tábor pod širým nebem — společník hlídá na střídačku.
-        /// Snižuje riziko přepadení (<see cref="SleepConfig.CompanionGuardModifier"/>).
+        /// Open-air camp — the companion keeps watch in turns.
+        /// Lowers ambush risk (<see cref="SleepConfig.CompanionGuardModifier"/>).
         /// </summary>
         Camp,
 
         /// <summary>
-        /// Sdílená postel nebo místnost — intimní kontext.
-        /// Umožňuje relationship narrative eventy (noční rozhovor, sdílený sen).
-        /// Hlídací bonus je nižší než u tábora.
+        /// A shared bed or room — an intimate context.
+        /// Enables relationship narrative events (a night conversation, a shared dream).
+        /// The watch bonus is lower than for a camp.
         /// </summary>
         Bed,
 
         /// <summary>
-        /// Nouzový úkryt — spánek ve stresu (skrývání, útěk, nebezpečí).
-        /// Zvyšuje stres, zkracuje deep fázi, žádný hlídací bonus.
+        /// Emergency shelter — sleeping under stress (hiding, fleeing, danger).
+        /// Raises stress, shortens the deep phase, with no watch bonus.
         /// </summary>
         Emergency,
 

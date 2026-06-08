@@ -4,27 +4,27 @@
 namespace GameEngineTools.World.Core.Time
 {
     /// <summary>
-    /// Statický ambient kontext světového času.
+    /// Static ambient context of world time.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Configure-once pattern.</b> Nastavíš jednou při startu hry — pak se
-    /// všechny W-typy (<see cref="GameEngineTools.World.Utils.Time.WDateTime"/>,
-    /// <see cref="GameEngineTools.World.Utils.Time.WDateOnly"/>, atd.) chovají
-    /// jako <see cref="DateTime"/>. Žádné předávání contextu přes parametry.
+    /// <b>Configure-once pattern.</b> Set once at game start — after that
+    /// all W-types (<see cref="GameEngineTools.World.Utils.Time.WDateTime"/>,
+    /// <see cref="GameEngineTools.World.Utils.Time.WDateOnly"/>, etc.) behave
+    /// like <see cref="DateTime"/>. No passing of context through parameters.
     /// </para>
     /// <para>
-    /// Je to stejný vzor jako <c>TimeZoneInfo.Local</c> nebo
-    /// <c>CultureInfo.CurrentCulture</c> — legitimní pro aplikaci kde je
-    /// jeden svět a jedna spec, která se nikdy nezmění za běhu.
+    /// This is the same pattern as <c>TimeZoneInfo.Local</c> or
+    /// <c>CultureInfo.CurrentCulture</c> — legitimate for an application where there is
+    /// a single world and a single spec that never changes at runtime.
     /// </para>
     /// <para>
-    /// Příklad použití:
+    /// Usage example:
     /// <code>
-    /// // Jednou při startu (v GameEngineToolsRuntime):
+    /// // Once at startup (in GameEngineToolsRuntime):
     /// WWorld.Configure(spec, clock);
     ///
-    /// // Pak kdekoliv bez předávání parametrů:
+    /// // Then anywhere without passing parameters:
     /// var now  = WDateTime.Now;
     /// var dt   = WDateTime.New(1324, 1, 1, hour: 6);
     /// int year = dt.Year;
@@ -46,28 +46,28 @@ namespace GameEngineTools.World.Core.Time
         #region Veřejné vlastnosti
 
         /// <summary>
-        /// Specifikace světového kalendáře platná pro aktuální hru.
+        /// World-calendar specification valid for the current game.
         /// </summary>
         /// <exception cref="InvalidOperationException">
-        /// Pokud <see cref="Configure"/> nebyl zavolán před prvním použitím.
+        /// If <see cref="Configure"/> was not called before first use.
         /// </exception>
         public static WorldTimeSpec Spec
             => _spec ?? throw new InvalidOperationException(
                 "WWorld není nakonfigurován. Zavolej WWorld.Configure(spec, clock) před použitím W-typů.");
 
         /// <summary>
-        /// Herní hodiny — zdroj aktuálního herního času.
+        /// Game clock — the source of the current game time.
         /// </summary>
         /// <exception cref="InvalidOperationException">
-        /// Pokud <see cref="Configure"/> nebyl zavolán před prvním použitím.
+        /// If <see cref="Configure"/> was not called before first use.
         /// </exception>
         public static IClock Clock
             => _clock ?? throw new InvalidOperationException(
                 "WWorld není nakonfigurován. Zavolej WWorld.Configure(spec, clock) před použitím W-typů.");
 
         /// <summary>
-        /// Vrátí <c>true</c> pokud byl <see cref="Configure"/> již zavolán.
-        /// Používá se pro bezpečný fallback v <c>ToString()</c> metod W-typů.
+        /// Returns <c>true</c> if <see cref="Configure"/> has already been called.
+        /// Used for a safe fallback in the <c>ToString()</c> methods of the W-types.
         /// </summary>
         public static bool IsConfigured => _spec != null && _clock != null;
 
@@ -76,23 +76,23 @@ namespace GameEngineTools.World.Core.Time
         #region Konfigurace
 
         /// <summary>
-        /// Nastaví světovou specifikaci a herní hodiny.
+        /// Sets the world specification and the game clock.
         /// </summary>
         /// <param name="spec">
-        /// Specifikace světového kalendáře — kalendář, délka dne, ticky za sekundu.
+        /// World-calendar specification — calendar, day length, ticks per second.
         /// </param>
         /// <param name="clock">
-        /// Herní hodiny — vrací aktuální herní čas z game-loop,
-        /// NE real-time mapování (<see cref="IWorldClock"/>).
+        /// Game clock — returns the current game time from the game loop,
+        /// NOT a real-time mapping (<see cref="IWorldClock"/>).
         /// </param>
         /// <remarks>
         /// <para>
-        /// Volej jednou při startu hry — typicky v <c>GameEngineToolsRuntime.StartAsync</c>
+        /// Call once at game start — typically in <c>GameEngineToolsRuntime.StartAsync</c>
         /// nebo v <c>TestBase.InitializeServicesAndGetProvider</c>.
         /// </para>
         /// <para>
-        /// Druhé volání <see cref="Configure"/> je povoleno (přepíše předchozí hodnoty).
-        /// V produkčním kódu to normálně nenastane — useful pro testy.
+        /// A second call to <see cref="Configure"/> is allowed (it overwrites previous values).
+        /// This normally does not happen in production code — useful for tests.
         /// </para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">
@@ -111,12 +111,12 @@ namespace GameEngineTools.World.Core.Time
         #region Testovací utility
 
         /// <summary>
-        /// Resetuje ambient stav na nenakonfigurovaný stav.
+        /// Resets the ambient state to an unconfigured state.
         /// </summary>
         /// <remarks>
-        /// <b>Nevolej v produkčním kódu.</b>
-        /// Používej v <c>[TestCleanup]</c> pro izolaci testů — každý test by měl
-        /// začínat čistým slate a volat <see cref="Configure"/> v <c>[TestInitialize]</c>.
+        /// <b>Do not call in production code.</b>
+        /// Use it in <c>[TestCleanup]</c> for test isolation — each test should
+        /// start with a clean slate and call <see cref="Configure"/> in <c>[TestInitialize]</c>.
         /// </remarks>
         internal static void Reset()
         {

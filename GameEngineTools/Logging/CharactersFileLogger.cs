@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// ILogger implementace delegující character file output na provider.
+    /// ILogger implementation that delegates character file output to the provider.
     /// </summary>
     internal sealed class CharactersFileLogger : ILogger
     {

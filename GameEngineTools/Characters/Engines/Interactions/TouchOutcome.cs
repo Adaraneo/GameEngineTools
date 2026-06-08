@@ -7,7 +7,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Výsledek pokusu o fyzický kontakt.
+    /// Outcome of an attempted physical contact.
     /// </summary>
     public sealed record TouchOutcome(
         WDateTime OccurredAt,

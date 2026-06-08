@@ -7,30 +7,30 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Druh sémantického přesvědčení o osobě.
-    /// Každý kind odpovídá jedné dimenzi subjektivního modelu toho, jak se druhý člověk chová.
+    /// Kind of semantic belief about a person.
+    /// Each kind corresponds to one dimension of the subjective model of how another person behaves.
     /// </summary>
     public enum PersonBeliefKind
     {
-        /// <summary>Osoba opakovaně odmítá kontakt nebo interakci. Blokuje sociální přiblížení.</summary>
+        /// <summary>The person repeatedly refuses contact or interaction. Blocks social approach.</summary>
         Rejecting,
 
-        /// <summary>Osoba přijímá vulnerability bez odsuzování. Podmínka pro SelfDisclosure/Meta/Invite.</summary>
+        /// <summary>The person accepts vulnerability without judgment. A precondition for SelfDisclosure/Meta/Invite.</summary>
         EmotionallySafe,
 
-        /// <summary>Osoba dodržuje sliby, pomáhá a opravuje škody. Základ důvěry.</summary>
+        /// <summary>The person keeps promises, helps and repairs harm. The basis of trust.</summary>
         Reliable,
 
-        /// <summary>Osoba reaguje s teplem a pozitivitou. Zvyšuje baseline pro veškerý kontakt.</summary>
+        /// <summary>The person responds with warmth and positivity. Raises the baseline for all contact.</summary>
         Warm,
 
-        /// <summary>Osoba kritizuje, zanedbává nebo přehlíží. Potlačuje vulnerability.</summary>
+        /// <summary>The person criticizes, neglects or ignores. Suppresses vulnerability.</summary>
         Critical
     }
 
     /// <summary>
-    /// Přímá evidence pro konkrétní belief kind — dodaná z interakčního nebo vztahového enginu.
-    /// Doplňuje pattern inference z epizodické paměti.
+    /// Direct evidence for a specific belief kind — supplied by the interaction or relationship engine.
+    /// Complements pattern inference from episodic memory.
     /// </summary>
     public sealed record PersonBeliefEvidence(
         HumanId Other,
@@ -39,33 +39,33 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         string Source);
 
     /// <summary>
-    /// Jedno přesvědčení o konkrétní osobě v jedné dimenzi (<see cref="Kind"/>).
-    /// Strength roste s evidencí, klesá přirozeným decay a contradikčním tlakem.
-    /// Stability zpomaluje decay a zvyšuje resistenci vůči novým signálům.
+    /// A single belief about a specific person along one dimension (<see cref="Kind"/>).
+    /// Strength grows with evidence and falls through natural decay and contradiction pressure.
+    /// Stability slows decay and increases resistance to new signals.
     /// </summary>
     public sealed record PersonBelief(
         HumanId Other,
         PersonBeliefKind Kind,
-        /// <summary>Aktuální síla přesvědčení [0.0–1.0].</summary>
+        /// <summary>Current belief strength [0.0–1.0].</summary>
         double Strength,
-        /// <summary>Stabilita — jak obtížně se přesvědčení mění [0.0–0.95].</summary>
+        /// <summary>Stability — how hard the belief is to change [0.0–0.95].</summary>
         double Stability,
-        /// <summary>Celkový počet evidencí, které toto přesvědčení podpořily.</summary>
+        /// <summary>Total number of pieces of evidence that supported this belief.</summary>
         int EvidenceCount,
-        /// <summary>Čas poslední aktualizace — proxy pro last contact s danou osobou.</summary>
+        /// <summary>Time of the last update — a proxy for last contact with the person.</summary>
         WDateTime LastUpdatedAt,
-        /// <summary>Zdroj poslední aktualizace (pro diagnostiku).</summary>
+        /// <summary>Source of the last update (for diagnostics).</summary>
         string? LastEvidenceSource = null);
 
     /// <summary>
-    /// Kolekce všech přesvědčení o jedné konkrétní osobě.
+    /// A collection of all beliefs about one specific person.
     /// </summary>
     public sealed record PersonBeliefSet(
         HumanId Other,
         IReadOnlyDictionary<PersonBeliefKind, PersonBelief> Beliefs)
     {
         /// <summary>
-        /// Vrátí Strength pro daný <paramref name="kind"/>, nebo 0.0 pokud belief neexistuje.
+        /// Returns the Strength for the given <paramref name="kind"/>, or 0.0 if the belief does not exist.
         /// </summary>
         public double StrengthOf(PersonBeliefKind kind)
             => Beliefs.TryGetValue(kind, out var belief) ? belief.Strength : 0.0;

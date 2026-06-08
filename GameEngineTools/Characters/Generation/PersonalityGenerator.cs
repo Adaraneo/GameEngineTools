@@ -9,10 +9,10 @@ using GameEngineTools.Characters.Traits;
 namespace GameEngineTools.Characters.Generation;
 
 /// <summary>
-/// Ne-lokalizovaný, parametrický generátor Personality (BigFive + ostatní složky).
-/// - Deterministický se seedem, jinak náhodný.
-/// - Umí jemné korelace mezi BigFive a odvozuje MotivationWeights z rysů.
-/// - Nepoužívá žádné reálné distribuce; čísla jsou kulturně agnostická.
+/// Non-localized, parametric generator of Personality (Big Five + the other components).
+/// - Deterministic with a seed, otherwise random.
+/// - Supports subtle correlations between Big Five and derives MotivationWeights from the traits.
+/// - Uses no real-world distributions; the numbers are culturally agnostic.
 /// </summary>
 public interface IPersonalityGenerator
 {
@@ -25,7 +25,7 @@ public interface IPersonalityGenerator
 }
 
 /// <summary>
-/// Volitelné fixy/omezení.
+/// Optional fixed values / constraints.
 /// </summary>
 public sealed record PersonalityHints(
     double? Openness = null,
@@ -101,8 +101,8 @@ public sealed record TraitDistribution(
 }
 
 /// <summary>
-/// Parametry generátoru – střed, rozptyl a korelace BigFive + mapování na motivace.
-/// Vše v [0..1].
+/// Generator parameters – mean, spread and correlations of Big Five + mapping onto motivations.
+/// All in [0..1].
 /// </summary>
 public sealed record PersonalitySpec(
     // BigFive baselines
@@ -112,7 +112,7 @@ public sealed record PersonalitySpec(
     TraitDistribution A,
     TraitDistribution N,
 
-    // Korelace mezi rysy (sym. 5x5, diag = 1). Hodnoty -1..1. Slabé defaulty.
+    // Correlations between traits (symmetric 5x5, diagonal = 1). Values -1..1. Weak defaults.
     double[,] Corr,
 
     // Volby mimo BigFive
@@ -121,7 +121,7 @@ public sealed record PersonalitySpec(
     (double Lark, double Neutral, double Owl) ChronotypeWeights,
     (double Restricted, double Intermediate, double Unrestricted) SociosexualityWeights,
 
-    // Mapování BigFive -> MotivationWeights (lineární mix)
+    // Mapping Big Five -> MotivationWeights (linear mix)
     MotivationMapping MotivationMap
 )
 {
@@ -292,11 +292,11 @@ public sealed record PersonalitySpec(
 }
 
 /// <summary>
-/// Jak se BigFive promítají do MotivationWeights.
-/// Každý výstup = bias + wO*O + wC*C + wE*E + wA*A + wN*N, následně normalizace do [0..1].
+/// How the Big Five map onto MotivationWeights.
+/// Each output = bias + wO*O + wC*C + wE*E + wA*A + wN*N, then normalized into [0..1].
 /// </summary>
 public sealed record MotivationMapping(
-    // pořadí: Affiliation, Achievement, Power, Altruism, Competence, Autonomy, Curiosity, Rest, Sexuality
+    // order: Affiliation, Achievement, Power, Altruism, Competence, Autonomy, Curiosity, Rest, Sexuality
     double BiasAff, (double wO, double wC, double wE, double wA, double wN) WAff,
     double BiasAch, (double wO, double wC, double wE, double wA, double wN) WAch,
     double BiasPow, (double wO, double wC, double wE, double wA, double wN) WPow,
@@ -341,7 +341,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         hints ??= new PersonalityHints();
         var rng = _rngFactory.Create(seed ?? Environment.TickCount);
 
-        // 1) vygeneruj korelované BigFive
+        // 1) generate correlated Big Five
         var (O, C, E, A, N) = GenerateBigFive(rng, spec);
 
         // 2) aplikuj hinty (fixy); clamp do [0..1]
@@ -370,7 +370,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             N = Clamp01(n);
         }
 
-        // 3) ostatní volby – losování z vah nebo hint fix
+        // 3) other choices – weighted draw or a hint override
         var attach = hints.Attachment ?? PickWeighted(
             (AttachmentProfile.Secure, spec.AttachmentWeights.Secure),
             (AttachmentProfile.Preoccupied, spec.AttachmentWeights.Anxious),
@@ -402,7 +402,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             socio = socio with { Behavior = Math.Min(socio.Behavior, behaviorMax) };
         }
 
-        // 4) motivace z BigFive (lineární mix + clamp do [0..1])
+        // 4) motivations from Big Five (linear mix + clamp into [0..1])
         var m = spec.MotivationMap;
         double Mix(double bias, (double wO, double wC, double wE, double wA, double wN) w)
             => Clamp01(bias + w.wO * O + w.wC * C + w.wE * E + w.wA * A + w.wN * N);
@@ -419,7 +419,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             Sexuality: Mix(m.BiasSex, m.WSex)
         );
 
-        // 5) poskládej Personality
+        // 5) assemble Personality
         var bigFive = new BigFive(O, C, E, A, N);
         var tomCeiling = ToMMath.GenerateCeiling(rng);
         return new Personality(bigFive, attach, comm, motivation, socio, chrono, SexualResponsiveness.Default, tomCeiling);
@@ -482,7 +482,7 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             throw new ArgumentException("Correlation matrix must be square.");
         }
 
-        // kontrola symetrie + diagonály
+        // check symmetry + diagonal
         for (int i = 0; i < n; i++)
         {
             if (Math.Abs(corr[i, i] - 1.0) > 1e-8)
@@ -633,12 +633,12 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
 
         sigma /= p.ClampedConcentration;
 
-        // ochrana proti přehnanému roztahování
+        // guard against excessive stretching
         sigma = Math.Clamp(sigma, 0.05, 3.0);
 
         var x = mu + sigma * latent;
 
-        // lehká asymetrie v latentním prostoru
+        // slight asymmetry in the latent space
         if (Math.Abs(p.Skew) > 1e-9)
         {
             x += p.Skew * 0.35 * (latent * latent - 1.0);

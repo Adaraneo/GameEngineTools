@@ -8,21 +8,21 @@ namespace GameEngineTools.World.Core.Astro
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Model pohybu Slunce — výpočet pozice, východu/západu, soumraků a ozáření
+    /// Model of the Sun's motion — computes position, sunrise/sunset, twilights and irradiance
     /// pro libovolnou planetu definovanou <see cref="SunParams"/>.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Všechny výpočty jsou škálované na délku roku a dne v herním kalendáři
-    /// (<see cref="WWorld.Spec"/>), takže fungují pro libovolný svět — nejen Zemi.
+    /// All calculations are scaled to the length of the year and day in the game calendar
+    /// (<see cref="WWorld.Spec"/>), so they work for any world — not just Earth.
     /// </para>
     /// <para>
-    /// <b>Ambient design.</b> Třída nevyžaduje <c>WorldTimeContext</c> v konstruktoru —
-    /// interně přistupuje přímo na <see cref="WWorld.Spec"/>, které musí být nakonfigurováno
-    /// před prvním voláním libovolné metody.
+    /// <b>Ambient design.</b> The class does not require a <c>WorldTimeContext</c> in its constructor —
+    /// internally it accesses <see cref="WWorld.Spec"/> directly, which must be configured
+    /// before the first call to any method.
     /// </para>
     /// <para>
-    /// Registruj jako singleton přes DI nebo vytvoř přímo:
+    /// Register as a singleton via DI or create directly:
     /// <code>
     /// services.AddSingleton&lt;SunModel&gt;();
     /// // nebo
@@ -42,7 +42,7 @@ namespace GameEngineTools.World.Core.Astro
 
         /// <summary>
         /// Inicializuje model slunce.
-        /// Vyžaduje nakonfigurovaný <see cref="WWorld"/> před prvním voláním metod.
+        /// Requires <see cref="WWorld"/> to be configured before the first method call.
         /// </summary>
         public SunModel()
         { }
@@ -52,21 +52,21 @@ namespace GameEngineTools.World.Core.Astro
         #region Veřejné metody — ozáření
 
         /// <summary>
-        /// Vrátí relativní ozáření (0..∞) ~ cos(zenit) / r² pro aktuální polohu a okamžik.
+        /// Returns the relative irradiance (0..∞) ~ cos(zenith) / r² for the current location and instant.
         /// </summary>
-        /// <param name="instant">Okamžik výpočtu.</param>
-        /// <param name="latitudeDeg">Zeměpisná šířka v stupních (−90..90).</param>
-        /// <param name="longitudeDeg">Zeměpisná délka v stupních (−180..180).</param>
-        /// <param name="p">Parametry hvězdy (excentricita, sklon osy, fáze…).</param>
+        /// <param name="instant">The instant to compute for.</param>
+        /// <param name="latitudeDeg">Latitude in degrees (−90..90).</param>
+        /// <param name="longitudeDeg">Longitude in degrees (−180..180).</param>
+        /// <param name="p">Star parameters (eccentricity, axial tilt, phase…).</param>
         /// <param name="vernalPhase">
-        /// Fáze jarní rovnodennosti jako zlomek roku (výchozí <c>0.0</c>).
-        /// Posunutí umožňuje určit, ve kterou část roku připadá jaro.
+        /// Vernal-equinox phase as a fraction of the year (default <c>0.0</c>).
+        /// The offset lets you choose which part of the year spring falls in.
         /// </param>
         /// <returns>
-        /// Bezrozměrný faktor ozáření. <c>0</c> = noc nebo polární noc,
-        /// <c>1</c> = kolmé záření v normální vzdálenosti, <c>&gt;1</c> = přímé záření v perihéliu.
+        /// Dimensionless irradiance factor. <c>0</c> = night or polar night,
+        /// <c>1</c> = perpendicular radiation at normal distance, <c>&gt;1</c> = direct radiation at perihelion.
         /// </returns>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public double IrradianceFactor(
             WDateTime instant,
             double latitudeDeg,
@@ -87,20 +87,20 @@ namespace GameEngineTools.World.Core.Astro
         #region Veřejné metody — sluneční den
 
         /// <summary>
-        /// Vrátí sluneční poledne, východ, západ a délku dne (v hodinách světového dne)
-        /// pro dané datum, zeměpisnou polohu a parametry hvězdy.
+        /// Returns solar noon, sunrise, sunset and day length (in world-day hours)
+        /// for the given date, geographic location and star parameters.
         /// </summary>
-        /// <param name="date">Datum výpočtu (čas v rámci dne je ignorován).</param>
-        /// <param name="latitudeDeg">Zeměpisná šířka v stupních.</param>
-        /// <param name="longitudeDeg">Zeměpisná délka v stupních.</param>
-        /// <param name="p">Parametry hvězdy.</param>
-        /// <param name="vernalPhase">Fáze jarní rovnodennosti (výchozí <c>0.0</c>).</param>
+        /// <param name="date">The date to compute for (the time within the day is ignored).</param>
+        /// <param name="latitudeDeg">Latitude in degrees.</param>
+        /// <param name="longitudeDeg">Longitude in degrees.</param>
+        /// <param name="p">Star parameters.</param>
+        /// <param name="vernalPhase">Vernal-equinox phase (default <c>0.0</c>).</param>
         /// <returns>
         /// Tuple (solarNoonHour, sunriseHour, sunsetHour, daylightHours) —
         /// hodiny jsou v rozsahu 0..HoursPerDay.
-        /// <c>sunriseHour</c> a <c>sunsetHour</c> jsou <c>double.NaN</c> při polární noci.
+        /// <c>sunriseHour</c> and <c>sunsetHour</c> are <c>double.NaN</c> during polar night.
         /// </returns>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public (double solarNoonHour, double sunriseHour, double sunsetHour, double daylightHours)
             SolarDay(
                 WDateTime date,
@@ -138,20 +138,20 @@ namespace GameEngineTools.World.Core.Astro
         #region Veřejné metody — sluneční pozice
 
         /// <summary>
-        /// Vrátí azimut, výšku a deklinaci Slunce pro konkrétní okamžik a polohu.
-        /// Všechny hodnoty jsou ve stupních (°).
+        /// Returns the Sun's azimuth, altitude and declination for a specific instant and location.
+        /// All values are in degrees (°).
         /// </summary>
-        /// <param name="instant">Okamžik výpočtu.</param>
-        /// <param name="latitudeDeg">Zeměpisná šířka v stupních.</param>
-        /// <param name="longitudeDeg">Zeměpisná délka v stupních.</param>
-        /// <param name="p">Parametry hvězdy.</param>
-        /// <param name="vernalPhase">Fáze jarní rovnodennosti (výchozí <c>0.0</c>).</param>
+        /// <param name="instant">The instant to compute for.</param>
+        /// <param name="latitudeDeg">Latitude in degrees.</param>
+        /// <param name="longitudeDeg">Longitude in degrees.</param>
+        /// <param name="p">Star parameters.</param>
+        /// <param name="vernalPhase">Vernal-equinox phase (default <c>0.0</c>).</param>
         /// <returns>
         /// Tuple (azimuthDeg, altitudeDeg, declinationDeg).
-        /// Azimut: 0° = sever, 90° = východ, 180° = jih, 270° = západ.
-        /// Výška: záporná = pod obzorem.
+        /// Azimuth: 0° = north, 90° = east, 180° = south, 270° = west.
+        /// Altitude: negative = below the horizon.
         /// </returns>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public (double azimuthDeg, double altitudeDeg, double declinationDeg)
             SolarPosition(
                 WDateTime instant,
@@ -188,20 +188,20 @@ namespace GameEngineTools.World.Core.Astro
         #region Veřejné metody — soumraky
 
         /// <summary>
-        /// Vrátí časy úsvitu a soumraku (civil, nautical, astronomical) pro dané datum a polohu.
+        /// Returns dawn and dusk times (civil, nautical, astronomical) for the given date and location.
         /// </summary>
-        /// <param name="date">Datum výpočtu.</param>
-        /// <param name="latitudeDeg">Zeměpisná šířka v stupních.</param>
-        /// <param name="longitudeDeg">Zeměpisná délka v stupních.</param>
-        /// <param name="p">Parametry hvězdy.</param>
-        /// <param name="vernalPhase">Fáze jarní rovnodennosti (výchozí <c>0.0</c>).</param>
+        /// <param name="date">The date to compute for.</param>
+        /// <param name="latitudeDeg">Latitude in degrees.</param>
+        /// <param name="longitudeDeg">Longitude in degrees.</param>
+        /// <param name="p">Star parameters.</param>
+        /// <param name="vernalPhase">Vernal-equinox phase (default <c>0.0</c>).</param>
         /// <returns>
-        /// Tuple s časy (hodiny světového dne, 0..HoursPerDay):
+        /// A tuple of times (world-day hours, 0..HoursPerDay):
         /// <c>civilDawn</c>, <c>sunrise</c>, <c>solarNoon</c>, <c>sunset</c>, <c>civilDusk</c>,
         /// <c>nauticalDawn</c>, <c>nauticalDusk</c>, <c>astroDawn</c>, <c>astroDusk</c>.
-        /// Hodnota <c>double.NaN</c> = polární noc nebo polární den (daný práh nenastane).
+        /// A value of <c>double.NaN</c> = polar night or polar day (the given threshold is never reached).
         /// </returns>
-        /// <exception cref="InvalidOperationException">Pokud WWorld není nakonfigurován.</exception>
+        /// <exception cref="InvalidOperationException">If WWorld is not configured.</exception>
         public (double civilDawn, double sunrise, double solarNoon, double sunset, double civilDusk,
                 double nauticalDawn, double nauticalDusk,
                 double astroDawn, double astroDusk)
@@ -216,7 +216,7 @@ namespace GameEngineTools.World.Core.Astro
             var (noon, sunrise, sunset, _) = SolarDay(date, latitudeDeg, longitudeDeg, in p, vernalPhase);
             var (delta, eotFrac, _, _) = SolarDeclinationEOT(date, in p, vernalPhase);
 
-            // Lokální pomocná funkce — vypočítá úsvit/soumrak pro libovolný prah výšky
+            // Local helper function — computes dawn/dusk for an arbitrary altitude threshold
             (double dawn, double dusk) Edge(double h0)
             {
                 var H0 = HourAngleForAltitude(latitudeDeg, delta, h0, out bool pd, out bool pn);
@@ -241,12 +241,12 @@ namespace GameEngineTools.World.Core.Astro
         #region Privátní výpočetní metody
 
         /// <summary>
-        /// Vrátí deklinaci (°), rovnici času (frakce dne), ekliptickou délku (°)
-        /// a relativní vzdálenost od hvězdy (AU) pro daný okamžik.
+        /// Returns declination (°), the equation of time (fraction of a day), ecliptic longitude (°)
+        /// and the relative distance from the star (AU) for the given instant.
         /// </summary>
-        /// <param name="t">Okamžik výpočtu.</param>
-        /// <param name="p">Parametry hvězdy.</param>
-        /// <param name="vernalPhase">Fáze jarní rovnodennosti jako zlomek roku.</param>
+        /// <param name="t">The instant to compute for.</param>
+        /// <param name="p">Star parameters.</param>
+        /// <param name="vernalPhase">Vernal-equinox phase as a fraction of the year.</param>
         private static (double deltaDeg, double eotFracOfDay, double lambdaDeg, double rAu)
             SolarDeclinationEOT(WDateTime t, in SunParams p, double vernalPhase)
         {
@@ -259,17 +259,17 @@ namespace GameEngineTools.World.Core.Astro
             double phase = (doy / Y + vernalPhase) * TwoPi;
             double M = (doy / Y + p.PeriapsisPhase) * TwoPi;
 
-            // Rovnice středu — eliptická korekce na skutečnou polohu
+            // Equation of the centre — elliptical correction to the true position
             double C = 2 * p.Eccentricity * Math.Sin(M)
                           + 1.25 * p.Eccentricity * p.Eccentricity * Math.Sin(2 * M);
             double lambda = WrapAngle(phase + C);
 
-            // Deklinace ze sklonu osy a ekliptické délky
+            // Declination from axial tilt and ecliptic longitude
             double eps = DegToRad(p.AxialTiltDeg);
             double sinDelta = Math.Sin(eps) * Math.Sin(lambda);
             double delta = RadToDeg(Math.Asin(sinDelta));
 
-            // Rovnice času (Spencer/Fourier aproximace)
+            // Equation of time (Spencer/Fourier approximation)
             double yv = Math.Tan(eps / 2.0); yv *= yv;
             double L0 = phase;
             double eotRad =
@@ -286,7 +286,7 @@ namespace GameEngineTools.World.Core.Astro
         }
 
         /// <summary>
-        /// Vrátí frakci aktuálního dne (0..1) z worldTicků.
+        /// Returns the fraction of the current day (0..1) from world ticks.
         /// </summary>
         private static double FractionOfDay(long worldTicks, WorldTimeSpec spec)
         {
@@ -296,25 +296,25 @@ namespace GameEngineTools.World.Core.Astro
         }
 
         /// <summary>
-        /// Převede hodinový úhel (hodiny světového dne) na radiány.
+        /// Converts an hour angle (world-day hours) into radians.
         /// </summary>
         private static double HoursToAngle(double hours, int hoursPerDay)
             => hours / hoursPerDay * TwoPi;
 
         /// <summary>
-        /// Převede hodinový úhel v radiánech na hodiny světového dne.
+        /// Converts an hour angle in radians into world-day hours.
         /// </summary>
         private static double AngleToHours(double angleRad, int hoursPerDay)
             => angleRad / TwoPi * hoursPerDay;
 
         /// <summary>
-        /// Převede zeměpisnou délku na posun v hodinách světového dne.
+        /// Converts longitude into an offset in world-day hours.
         /// </summary>
         private static double LongitudeHours(double longitudeDeg, int hoursPerDay)
             => longitudeDeg / 360.0 * hoursPerDay;
 
         /// <summary>
-        /// Zabalí hodiny do rozsahu [0, HoursPerDay) — wraparound přes půlnoc.
+        /// Wraps hours into the range [0, HoursPerDay) — wraparound across midnight.
         /// </summary>
         private static double WrapHours(double h, int hoursPerDay)
         {
@@ -324,14 +324,14 @@ namespace GameEngineTools.World.Core.Astro
         }
 
         /// <summary>
-        /// Vypočítá hodinový úhel H0 pro daný práh výšky Slunce nad obzorem.
+        /// Computes the hour angle H0 for a given threshold of the Sun's altitude above the horizon.
         /// </summary>
-        /// <param name="latDeg">Zeměpisná šířka v stupních.</param>
-        /// <param name="declDeg">Deklinace Slunce v stupních.</param>
-        /// <param name="h0Deg">Práh výšky Slunce v stupních (záporný = pod obzorem).</param>
-        /// <param name="polarDay"><c>true</c> pokud Slunce v daný den nezapadá.</param>
-        /// <param name="polarNight"><c>true</c> pokud Slunce v daný den nevychází.</param>
-        /// <returns>Hodinový úhel v radiánech, nebo <c>0</c> při polárním dni/noci.</returns>
+        /// <param name="latDeg">Latitude in degrees.</param>
+        /// <param name="declDeg">The Sun's declination in degrees.</param>
+        /// <param name="h0Deg">The Sun's altitude threshold in degrees (negative = below the horizon).</param>
+        /// <param name="polarDay"><c>true</c> if the Sun does not set on the given day.</param>
+        /// <param name="polarNight"><c>true</c> if the Sun does not rise on the given day.</param>
+        /// <returns>The hour angle in radians, or <c>0</c> during polar day/night.</returns>
         private static double HourAngleForAltitude(
             double latDeg, double declDeg, double h0Deg,
             out bool polarDay, out bool polarNight)
@@ -349,7 +349,7 @@ namespace GameEngineTools.World.Core.Astro
             return Math.Acos(Math.Clamp(cosH0, -1, 1));
         }
 
-        /// <summary>Zabalí úhel v radiánech do rozsahu [0, 2π).</summary>
+        /// <summary>Wraps an angle in radians into the range [0, 2π).</summary>
         private static double WrapAngle(double a)
         {
             a %= TwoPi;
@@ -357,10 +357,10 @@ namespace GameEngineTools.World.Core.Astro
             return a;
         }
 
-        /// <summary>Převede stupně na radiány.</summary>
+        /// <summary>Converts degrees to radians.</summary>
         private static double DegToRad(double deg) => deg * Math.PI / 180.0;
 
-        /// <summary>Převede radiány na stupně.</summary>
+        /// <summary>Converts radians to degrees.</summary>
         private static double RadToDeg(double rad) => rad * 180.0 / Math.PI;
 
         #endregion Privátní výpočetní metody

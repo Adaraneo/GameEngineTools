@@ -6,40 +6,40 @@ using System.Diagnostics.CodeAnalysis;
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Diagnostic scope identifikující postavu, subsystem a volitelná korelační metadata.
+    /// Diagnostic scope identifying the character, subsystem and optional correlation metadata.
     /// </summary>
     /// <remarks>
-    /// Logger provider extrahuje scope přímou typovou kontrolou. Scope popisuje diagnostický kontext,
-    /// ne doménový stav postavy.
+    /// The logger provider extracts the scope via a direct type check. The scope describes the diagnostic context,
+    /// not the character's domain state.
     /// </remarks>
     public readonly record struct CharacterLogScope
     {
         /// <summary>ID postavy pro per-person routing.</summary>
         public required Guid PersonId { get; init; }
 
-        /// <summary>Název subsystemu pro per-subsystem routing.</summary>
+        /// <summary>Subsystem name for per-subsystem routing.</summary>
         public required string Subsystem { get; init; }
 
-        /// <summary>Volitelné korelační ID širší operace.</summary>
+        /// <summary>Optional correlation id of a broader operation.</summary>
         public string? CorrelationId { get; init; }
 
-        /// <summary>Volitelné ID interakce.</summary>
+        /// <summary>Optional interaction id.</summary>
         public string? InteractionId { get; init; }
 
-        /// <summary>Volitelné ID rozhodnutí.</summary>
+        /// <summary>Optional decision id.</summary>
         public string? DecisionId { get; init; }
 
-        /// <summary>Volitelná související postava.</summary>
+        /// <summary>Optional related character.</summary>
         public Guid? RelatedPersonId { get; init; }
 
-        /// <summary>Volitelné ID lokace.</summary>
+        /// <summary>Optional location id.</summary>
         public string? LocationId { get; init; }
 
-        /// <summary>Volitelný klíč/tick simulace.</summary>
+        /// <summary>Optional simulation tick/key.</summary>
         public string? TickKey { get; init; }
 
         /// <summary>
-        /// Vytvoří základní character scope pro danou postavu a subsystem.
+        /// Creates a basic character scope for the given character and subsystem.
         /// </summary>
         [SetsRequiredMembers]
         public CharacterLogScope(Guid personId, string subsystem)

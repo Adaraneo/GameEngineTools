@@ -76,7 +76,7 @@ namespace GameEngineTools.Characters.Core
         /// <summary>Attraction-relevant traits, or <c>null</c> when not modelled.</summary>
         AttractionProfile? AttractionProfile { get; }
 
-        // Přístup ke stavům (read-only snapshoty)
+        // Access to state (read-only snapshots)
 
         /// <summary>Read-only snapshot of all engine states.</summary>
         EnginesSnapshot Snapshot { get; }
@@ -112,9 +112,9 @@ namespace GameEngineTools.Characters.Core
         void FlushInbox();
 
         /// <summary>
-        /// Injektuje ambientní stav prostředí před tickem postavy.
-        /// Volá <see cref="GameEngineTools.World.Simulation.SimulationScene"/> jednou za tick, před <c>Tick()</c>.
-        /// Výchozí implementace je no-op — pro testovací stuby.
+        /// Injects the ambient environment state before the character's tick.
+        /// Called by <see cref="GameEngineTools.World.Simulation.SimulationScene"/> once per tick, before <c>Tick()</c>.
+        /// The default implementation is a no-op — for test stubs.
         /// </summary>
         void SetAmbientContext(double ambientTempC, CelestialContext? celestial) { }
 
@@ -394,22 +394,22 @@ namespace GameEngineTools.Characters.Core
         MemoryIndex Memory,
         SemanticMemoryState? SemanticMemory = null,
         /// <summary>
-        /// Teplota prostředí v místě postavy (°C). Nastaveno simulační vrstvou per-tick
-        /// z <c>LocationDescriptor</c>. Výchozí 20 °C = neutrální interiér.
-        /// Čteno Psychology enginem (vedro → agrese, mírný chlad → afiliace).
+        /// Ambient temperature at the character's location (°C). Set by the simulation layer per tick
+        /// from <c>LocationDescriptor</c>. Default 20 °C = neutral indoors.
+        /// Read by the Psychology engine (heat → aggression, mild cold → affiliation).
         /// </summary>
         double AmbientTemperature = 20.0,
         /// <summary>
-        /// Nadmořská výška v místě postavy (m). Nastaveno simulační vrstvou per-tick.
+        /// Altitude at the character's location (m). Set by the simulation layer per tick.
         /// &gt;2000 m → hypoxie (Energy↓, CogLoad↑). &gt;4000 m → AMS (Pain↑).
-        /// Výchozí 0 = hladina moře.
+        /// Default 0 = sea level.
         /// </summary>
         double AltitudeMeters = 0.0,
         /// <summary>
-        /// Astronomický kontext pro aktuální tick — ozáření, délka dne, východ/západ Slunce,
-        /// sezóna a teplota prostředí. Nastaveno <see cref="GameEngineTools.World.Simulation.SimulationScene"/> přes
-        /// <see cref="IHuman.SetAmbientContext"/> před tickem každé postavy.
-        /// <c>null</c> pokud astronomická logika není nakonfigurována.
+        /// Astronomical context for the current tick — irradiance, day length, sunrise/sunset,
+        /// season and ambient temperature. Set by <see cref="GameEngineTools.World.Simulation.SimulationScene"/> via
+        /// <see cref="IHuman.SetAmbientContext"/> before each character's tick.
+        /// <c>null</c> if the astronomical logic is not configured.
         /// </summary>
         CelestialContext? Celestial = null,
         /// <summary>

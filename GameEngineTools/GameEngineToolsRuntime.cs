@@ -31,34 +31,34 @@ using Microsoft.Extensions.Options;
 namespace GameEngineTools
 {
     /// <summary>
-    /// Entry point pro spuštění herního enginu.
-    /// Sestavuje DI kontejner přes <see cref="ServiceCollection"/> a inicializuje
-    /// všechny registrované služby bez overhead <c>IHost</c> / <c>IHostedService</c> pumpy.
+    /// Entry point for starting the game engine.
+    /// Builds the DI container via <see cref="ServiceCollection"/> and initializes
+    /// all registered services without the overhead of the <c>IHost</c> / <c>IHostedService</c> machinery.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Proč bez IHost?</b><br/>
-    /// <c>Microsoft.Extensions.Hosting.IHost</c> přidává:
+    /// <b>Why without IHost?</b><br/>
+    /// <c>Microsoft.Extensions.Hosting.IHost</c> adds:
     /// <list type="bullet">
-    ///   <item>Graceful shutdown signály (<c>IHostApplicationLifetime</c>)</item>
+    ///   <item>Graceful-shutdown signals (<c>IHostApplicationLifetime</c>)</item>
     ///   <item>Environment detection (Development / Production)</item>
-    ///   <item>Background service pumpu pro web / worker scénáře</item>
+    ///   <item>A background-service pump for web / worker scenarios</item>
     /// </list>
-    /// V herní smyčce (Unity / standalone) žádnou z těchto věcí nepotřebujeme.
-    /// Stačí nám <see cref="ServiceCollection"/> + ruční zavolání <c>Initialize()</c>
-    /// na manageru — přesně to, co dělal host interně.
+    /// In a game loop (Unity / standalone) we need none of these.
+    /// A <see cref="ServiceCollection"/> plus a manual call to <c>Initialize()</c>
+    /// on the manager is enough — exactly what the host did internally.
     /// </para>
     /// <para>
-    /// <b>Závislostní graf DI registrací:</b>
+    /// <b>Dependency graph of the DI registrations:</b>
     /// </para>
     /// <code>
     /// InitWorldClockConfig  (z appsettings.json)
     ///       ↓
-    /// WorldTimeSpec         (singleton — kalendář + jednotky)
+    /// WorldTimeSpec         (singleton — calendar + units)
     ///       ↓
-    /// IWorldClock           (singleton — mapování Earth ↔ World)
+    /// IWorldClock           (singleton — Earth ↔ World mapping)
     ///       ↓
-    /// IClock / SystemClock  (singleton — herní smyčka, bere WorldTimeSpec přímo)
+    /// IClock / SystemClock  (singleton — game loop, takes WorldTimeSpec directly)
     ///       ↓
     /// WorldTimeContext      (singleton — legacy wrapper)
     ///       ↓
@@ -70,11 +70,11 @@ namespace GameEngineTools
         #region LoadSpec
 
         /// <summary>
-        /// Načte <see cref="WorldTimeSpec"/> z konfigurace — bez spouštění DI kontejneru.
+        /// Loads the <see cref="WorldTimeSpec"/> from configuration — without starting the DI container.
         /// </summary>
         /// <remarks>
-        /// Použij tehdy, když potřebuješ sestavit <see cref="WDateTime"/> (nebo vypočítat tiky)
-        /// <b>před</b> voláním <see cref="StartAsync"/> — typicky při načítání uloženého stavu hry.
+        /// Use it when you need to build a <see cref="WDateTime"/> (or compute ticks)
+        /// <b>before</b> calling <see cref="StartAsync"/> — typically when loading a saved game state.
         /// <code>
         /// var spec   = GameEngineToolsRuntime.LoadSpec();
         /// long ticks = long.TryParse(saved, out var t) ? t
@@ -82,13 +82,13 @@ namespace GameEngineTools
         ///
         /// await using var runtime = await GameEngineToolsRuntime.StartAsync(new WDateTime(ticks));
         /// </code>
-        /// Runtime interně volá stejný kód — spec je zaručeně identický s tím v DI.
+        /// The runtime calls the same code internally — the spec is guaranteed identical to the one in DI.
         /// </remarks>
-        /// <returns>Plně sestavená <see cref="WorldTimeSpec"/> z aktuální konfigurace.</returns>
+        /// <returns>A fully built <see cref="WorldTimeSpec"/> from the current configuration.</returns>
         public static WorldTimeSpec LoadSpec()
         {
-            // Načteme konfiguraci stejným způsobem jako StartAsync,
-            // aby spec byl zaručeně identický — žádné duplicitní hodnoty.
+            // Load the configuration the same way as StartAsync,
+            // so the spec is guaranteed identical — no duplicated values.
             var cfg = ConfigProvider.Configuration;
             var worldType = cfg.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             var opts = new InitWorldClockConfig();
@@ -112,15 +112,15 @@ namespace GameEngineTools
         #region StartAsync
 
         /// <summary>
-        /// Sestaví DI kontejner, nakonfiguruje <see cref="WWorld"/> a inicializuje
-        /// herní engine. Vrátí handle pro přístup ke službám za běhu.
+        /// Builds the DI container, configures <see cref="WWorld"/> and initializes
+        /// the game engine. Returns a handle for accessing services at runtime.
         /// </summary>
-        /// <param name="consoleLogs">Zapne konzolové logování v manageru.</param>
-        /// <param name="logsRoot">Kořenový adresář pro logové soubory.</param>
-        /// <param name="generatedFileOptions">Volitelná konfigurace adresářů pro generované soubory.</param>
+        /// <param name="consoleLogs">Enables console logging in the manager.</param>
+        /// <param name="logsRoot">Root directory for log files.</param>
+        /// <param name="generatedFileOptions">Optional configuration of directories for generated files.</param>
         /// <returns>
-        /// <see cref="GameEngineToolsRuntimeHandle"/> — handle na běžící runtime.
-        /// Dispose zastaví všechny služby a uvolní DI kontejner.
+        /// <see cref="GameEngineToolsRuntimeHandle"/> — a handle to the running runtime.
+        /// Dispose stops all services and releases the DI container.
         /// </returns>
         public static async Task<GameEngineToolsRuntimeHandle> StartAsync(
             bool consoleLogs = false,
@@ -178,7 +178,7 @@ namespace GameEngineTools
                     calendar);
             });
 
-            // ── IWorldClock — mapování Earth time → World time ─────────────────
+            // ── IWorldClock — Earth time → World time mapping ─────────────────
             services.AddSingleton<IWorldClock>(sp =>
             {
                 var wSpec = sp.GetRequiredService<WorldTimeSpec>();
@@ -238,14 +238,14 @@ namespace GameEngineTools
                 new DefaultLocationService(sp.GetRequiredService<ISocialNormProvider>()));
             services.AddSingleton<SqliteWorldObjectProvider>();
 
-            // Write buffer — obalí provider, bufferuje mutace
+            // Write buffer — wraps the provider, buffers mutations
             services.AddSingleton<WorldObjectWriteBuffer>();
 
-            // IMutableWorldObjectProvider → WriteBuffer (místo přímého provideru)
+            // IMutableWorldObjectProvider → WriteBuffer (instead of the direct provider)
             services.AddSingleton<IMutableWorldObjectProvider>(
                 sp => sp.GetRequiredService<WorldObjectWriteBuffer>());
 
-            // Read cache stále obaluje přímý provider (ne buffer) — čte committovaná data
+            // The read cache still wraps the direct provider (not the buffer) — it reads committed data
             services.AddSingleton<WorldObjectSnapshotCache>(sp =>
                 new WorldObjectSnapshotCache(sp.GetRequiredService<SqliteWorldObjectProvider>()));
 
@@ -269,7 +269,7 @@ namespace GameEngineTools
                 opt.LogsRoot = logsRoot;
             });
 
-            // ── Sestavení DI kontejneru ───────────────────────────────────────
+            // ── Building the DI container ─────────────────────────────────────
             var provider = services.BuildServiceProvider();
 
             // ── WWorld.Configure — ambient konfigurace pro W-typy ─────────────
@@ -288,16 +288,16 @@ namespace GameEngineTools
     }
 
     /// <summary>
-    /// Handle na běžící runtime. Drží <see cref="IServiceProvider"/> a zpřístupňuje
-    /// klíčové služby pro herní smyčku.
+    /// A handle to the running runtime. Holds the <see cref="IServiceProvider"/> and exposes
+    /// the key services for the game loop.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Implementuje <see cref="IAsyncDisposable"/> — dispose zastaví subscribery
-    /// a uvolní DI kontejner (a všechny <see cref="IDisposable"/> singletony v něm).
+    /// Implements <see cref="IAsyncDisposable"/> — dispose stops the subscribers
+    /// and releases the DI container (and all <see cref="IDisposable"/> singletons in it).
     /// </para>
     /// <para>
-    /// Doporučené použití:
+    /// Recommended usage:
     /// <code>
     /// await using var runtime = await GameEngineToolsRuntime.StartAsync();
     /// var manager = runtime.GameEngineToolsManager;
@@ -309,9 +309,9 @@ namespace GameEngineTools
         #region Soukromá pole
 
         /// <summary>
-        /// DI provider sestavený v <see cref="GameEngineToolsRuntime.StartAsync"/>.
-        /// Uložíme ho jako <see cref="ServiceProvider"/> (konkrétní typ), protože
-        /// potřebujeme <see cref="ServiceProvider.DisposeAsync"/> — <see cref="IServiceProvider"/>
+        /// The DI provider built in <see cref="GameEngineToolsRuntime.StartAsync"/>.
+        /// We store it as a <see cref="ServiceProvider"/> (the concrete type) because
+        /// we need <see cref="ServiceProvider.DisposeAsync"/> — <see cref="IServiceProvider"/>
         /// tento interface neimplementuje.
         /// </summary>
         private readonly ServiceProvider _provider;
@@ -321,9 +321,9 @@ namespace GameEngineTools
         #region Konstrukce
 
         /// <summary>
-        /// Interní konstruktor — volá ho pouze <see cref="GameEngineToolsRuntime.StartAsync"/>.
+        /// Internal constructor — called only by <see cref="GameEngineToolsRuntime.StartAsync"/>.
         /// </summary>
-        /// <param name="provider">Plně sestavený DI kontejner.</param>
+        /// <param name="provider">The fully built DI container.</param>
         internal GameEngineToolsRuntimeHandle(ServiceProvider provider)
             => _provider = provider;
 
@@ -332,20 +332,20 @@ namespace GameEngineTools
         #region Veřejné vlastnosti
 
         /// <summary>
-        /// Herní hodiny — aktuální čas, možnost pozastavit / přepnout rychlost.
+        /// The game clock — current time, with the ability to pause / change speed.
         /// </summary>
         public IClock Clock
             => _provider.GetRequiredService<IClock>();
 
         /// <summary>
-        /// Hlavní správce postav a herního světa.
+        /// The main manager of characters and the game world.
         /// </summary>
         public IGameEngineToolsManager GameEngineToolsManager
             => _provider.GetRequiredService<IGameEngineToolsManager>();
 
         /// <summary>
-        /// DI provider pro přímý resolve libovolné služby.
-        /// Používej výjimečně — preferuj typované vlastnosti výše.
+        /// DI provider for directly resolving any service.
+        /// Use sparingly — prefer the typed properties above.
         /// </summary>
         public IServiceProvider Services => _provider;
 
@@ -354,9 +354,9 @@ namespace GameEngineTools
         #region IAsyncDisposable
 
         /// <summary>
-        /// Uvolní DI kontejner a všechny <see cref="IDisposable"/> / <see cref="IAsyncDisposable"/>
-        /// singletony v něm registrované. Žádné hosted services k zastavení — to bylo
-        /// odstraněno spolu s <c>IHost</c>.
+        /// Releases the DI container and all <see cref="IDisposable"/> / <see cref="IAsyncDisposable"/>
+        /// singletons registered in it. No hosted services to stop — that was
+        /// removed along with <c>IHost</c>.
         /// </summary>
         public async ValueTask DisposeAsync()
         {

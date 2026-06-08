@@ -13,8 +13,8 @@ namespace GameEngineTools.Logging
     /// File logger provider pro character logy.
     /// </summary>
     /// <remarks>
-    /// Zachovává topologii globálního logu a volitelného per-person/per-subsystem mirroru.
-    /// Textové logy zůstávají čitelné pro člověka, JSONL companion soubory jsou určené pro resolver.
+    /// Preserves the topology of the global log and the optional per-person/per-subsystem mirror.
+    /// Text logs stay human-readable; the JSONL companion files are intended for the resolver.
     /// </remarks>
     internal sealed class CharactersFileLoggerProvider : ILoggerProvider, ISupportExternalScope, ICharactersLogControl
     {

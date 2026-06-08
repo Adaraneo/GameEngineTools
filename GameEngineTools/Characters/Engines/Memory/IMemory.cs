@@ -207,7 +207,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         double ConfidenceAbout(HumanId subject, string actionKind, HumanId? objectId = null);
     }
 
-    // Události
+    // Events
 
     /// <summary>Event — a new episodic memory was encoded.</summary>
     public sealed record MemoryEncoded(

@@ -4,43 +4,43 @@
 namespace GameEngineTools.Characters.Engines.Sleep
 {
     /// <summary>
-    /// Fáze spánkového cyklu postavy.
-    /// Každá fáze má jiný rizikový profil a jiné narrative příležitosti.
+    /// Phase of the character's sleep cycle.
+    /// Each phase has a different risk profile and different narrative opportunities.
     /// </summary>
     /// <remarks>
-    /// Průchod fázemi: <see cref="Falling"/> → <see cref="Light"/> → <see cref="Deep"/> → <see cref="Rem"/> → <see cref="Light"/> → ...
-    /// Postava se probouzí vždy z fáze <see cref="Light"/>.
+    /// Phase progression: <see cref="Falling"/> → <see cref="Light"/> → <see cref="Deep"/> → <see cref="Rem"/> → <see cref="Light"/> → ...
+    /// The character always wakes from the <see cref="Light"/> phase.
     /// </remarks>
     public enum SleepPhase
     {
         /// <summary>
-        /// Usínání — přechod mezi bdělostí a spánkem.
-        /// Postava je snadno přerušitelná, sny ani obnova neprobíhají.
+        /// Falling asleep — the transition between wakefulness and sleep.
+        /// The character is easily interrupted; no dreams or recovery occur.
         /// </summary>
         Falling,
 
         /// <summary>
-        /// Lehký spánek — povrchní, přerušitelný (hluk, útok).
-        /// Obnova energie probíhá pomalu.
+        /// Light sleep — shallow, interruptible (noise, attack).
+        /// Energy recovery proceeds slowly.
         /// </summary>
         Light,
 
         /// <summary>
-        /// Hluboký spánek — těžko přerušitelný, maximální fyzická obnova.
-        /// Riziko přepadení je nízké (postava slyší méně), ale probuzení je těžší.
+        /// Deep sleep — hard to interrupt, with maximum physical recovery.
+        /// Ambush risk is low (the character hears less), but waking is harder.
         /// </summary>
         Deep,
 
         /// <summary>
-        /// REM fáze — fáze snů a psychologické obnovy.
-        /// Zde se generují narrative eventy (sny, noční můry).
-        /// Fyzické riziko přepadení je nejnižší, psychologické riziko (můry) nejvyšší.
+        /// REM phase — the phase of dreams and psychological recovery.
+        /// Narrative events (dreams, nightmares) are generated here.
+        /// Physical ambush risk is lowest; psychological risk (nightmares) is highest.
         /// </summary>
         Rem,
 
         /// <summary>
-        /// Probouzení — přechod ze spánku do bdělosti.
-        /// Postava ještě není plně akceschopná.
+        /// Waking — the transition from sleep to wakefulness.
+        /// The character is not yet fully capable of acting.
         /// </summary>
         Waking
     }

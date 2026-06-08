@@ -9,24 +9,24 @@ namespace GameEngineTools.Characters.Traits
     /// Behavioral weights derived from the Dual Control Model (Bancroft &amp; Janssen 2000).
     /// </summary>
     /// <remarks>
-    /// DCM modeluje sexuální odezvu jako rovnováhu excitačního systému (SES) a dvou
-    /// nezávislých inhibičních systémů (SIS1: výkonová úzkost, SIS2: kontextové riziko).
-    /// Tato třída překládá profil <see cref="SexualResponsiveness"/> do bias/multiplier hodnot
-    /// kompatibilních s behavior enginem (AddBias / Multiply pattern).
+    /// The DCM models sexual response as a balance of the excitation system (SES) and two
+    /// independent inhibition systems (SIS1: performance anxiety, SIS2: contextual risk).
+    /// This class translates the <see cref="SexualResponsiveness"/> profile into bias/multiplier values
+    /// compatible with the behavior engine (AddBias / Multiply pattern).
     /// </remarks>
     public static class DualControlBehaviorMath
     {
         /// <summary>
-        /// SIS1 efekt: suprese InviteIntimacy při zvýšeném stresu.
-        /// Osoby s vysokým SIS1 jsou silně inhibovány při HPA aktivaci (výkonová úzkost).
-        /// Vrací multiplikátor [0,3 .. 1,0] — 1,0 = žádná suprese.
+        /// SIS1 effect: suppression of InviteIntimacy under elevated stress.
+        /// People with high SIS1 are strongly inhibited during HPA activation (performance anxiety).
+        /// Returns a multiplier [0.3 .. 1.0] — 1.0 = no suppression.
         /// </summary>
-        /// <param name="dcm">DCM profil; null = populační průměr (SIS1 = 0,5).</param>
-        /// <param name="stressNormalized">Aktuální stres [0..1] (Stress / 100).</param>
+        /// <param name="dcm">DCM profile; null = population average (SIS1 = 0.5).</param>
+        /// <param name="stressNormalized">Current stress [0..1] (Stress / 100).</param>
         public static double StressSuppressionMultiplier(SexualResponsiveness? dcm, double stressNormalized)
         {
             var sis1 = dcm?.SIS1 ?? 0.5;
-            // Práh kde začíná suprese: nízký SIS1 (0) → stress > 0,8; vysoký SIS1 (1) → stress > 0,3
+            // Threshold where suppression begins: low SIS1 (0) → stress > 0.8; high SIS1 (1) → stress > 0.3
             var threshold = 0.8 - sis1 * 0.5;
             if (stressNormalized <= threshold) return 1.0;
             var supression = (stressNormalized - threshold) / 0.4 * sis1;
@@ -34,19 +34,19 @@ namespace GameEngineTools.Characters.Traits
         }
 
         /// <summary>
-        /// SIS2 efekt: suprese InviteIntimacy v rizikovém kontextu (crowding, přítomnost pozorovatelů).
-        /// Osoby s vysokým SIS2 jsou silně inhibovány při percipovaném sociálním riziku.
-        /// Vrací multiplikátor [0,2 .. 1,0].
+        /// SIS2 effect: suppression of InviteIntimacy in a risky context (crowding, presence of observers).
+        /// People with high SIS2 are strongly inhibited under perceived social risk.
+        /// Returns a multiplier [0.2 .. 1.0].
         /// </summary>
-        /// <param name="dcm">DCM profil; null = populační průměr (SIS2 = 0,5).</param>
+        /// <param name="dcm">DCM profile; null = population average (SIS2 = 0.5).</param>
         /// <param name="vulnerabilitySafety">
-        /// Míra kontextové bezpečnosti [0..1] — 1,0 = plné soukromí bez pozorovatelů.
-        /// Odpovídá <c>SocialTargetScore.VulnerabilitySafety</c>.
+        /// Degree of contextual safety [0..1] — 1.0 = full privacy with no observers.
+        /// Corresponds to <c>SocialTargetScore.VulnerabilitySafety</c>.
         /// </param>
         public static double ContextSuppressionMultiplier(SexualResponsiveness? dcm, double vulnerabilitySafety)
         {
             var sis2 = dcm?.SIS2 ?? 0.5;
-            // Bezpečnost < threshold → suprese; threshold klesá s nižším SIS2
+            // Safety < threshold → suppression; the threshold decreases with lower SIS2
             var threshold = 0.2 + sis2 * 0.6;  // 0,2 (nízký SIS2) .. 0,8 (vysoký SIS2)
             var contextRisk = 1.0 - vulnerabilitySafety;
             if (contextRisk <= 1.0 - threshold) return 1.0;
@@ -55,15 +55,15 @@ namespace GameEngineTools.Characters.Traits
         }
 
         /// <summary>
-        /// SES efekt: bias InviteIntimacy na základě excitační citlivosti.
-        /// Vrací aditivní bias [-2,0 .. +2,0] (symetrický kolem SES = 0,5).
+        /// SES effect: biases InviteIntimacy based on excitatory sensitivity.
+        /// Returns an additive bias [-2.0 .. +2.0] (symmetric around SES = 0.5).
         /// </summary>
-        /// <param name="dcm">DCM profil; null = populační průměr → bias 0.</param>
+        /// <param name="dcm">DCM profile; null = population average → bias 0.</param>
         public static double ExcitationBias(SexualResponsiveness? dcm)
             => ((dcm?.SES ?? 0.5) - 0.5) * 4.0;
 
         /// <summary>
-        /// Kombinovaný multiplikátor SIS1 × SIS2 pro InviteIntimacy utility.
+        /// Combined SIS1 × SIS2 multiplier for InviteIntimacy utility.
         /// </summary>
         public static double CombinedSuppressionMultiplier(
             SexualResponsiveness? dcm,

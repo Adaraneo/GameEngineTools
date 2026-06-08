@@ -4,29 +4,29 @@
 namespace GameEngineTools.Narrative
 {
     /// <summary>
-    /// Priorita narativního záznamu — určuje, jak důležitá událost je pro hráče.
+    /// Priority of a narrative entry — determines how important the event is to the player.
     /// </summary>
     /// <remarks>
-    /// Používáš ji k filtrování: zobrazit jen <see cref="High"/> a <see cref="Medium"/>
-    /// v herním UI, <see cref="Low"/> pouze v debug deníku.
+    /// Used for filtering: show only <see cref="High"/> and <see cref="Medium"/>
+    /// in the game UI, and <see cref="Low"/> only in the debug journal.
     /// </remarks>
     public enum NarrativePriority
     {
         /// <summary>
-        /// Každodenní rutina — jídlo, spánek, odpočinek, self-care.
-        /// Zobrazuj pouze v podrobném deníkovém módu.
+        /// Everyday routine — eating, sleeping, resting, self-care.
+        /// Show only in detailed journal mode.
         /// </summary>
         Low,
 
         /// <summary>
-        /// Sociální nebo emocionálně zajímavá událost.
-        /// Vhodné pro herní UI (dialog box, plovoucí zpráva, zápis do deníku).
+        /// A socially or emotionally interesting event.
+        /// Suitable for the game UI (dialog box, floating message, journal entry).
         /// </summary>
         Medium,
 
         /// <summary>
-        /// Zlomový moment — první dojem, odmítnutí intimity, noční můra, smíření.
-        /// Zaslouží zvýraznění, animaci, nebo notifikaci.
+        /// A pivotal moment — first impression, intimacy rejection, nightmare, reconciliation.
+        /// Deserves highlighting, animation, or a notification.
         /// </summary>
         High
     }

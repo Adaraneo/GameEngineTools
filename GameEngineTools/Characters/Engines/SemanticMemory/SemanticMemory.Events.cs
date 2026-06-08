@@ -7,19 +7,19 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Emitováno kdykoliv se aktualizuje přesvědčení postavy o jiné osobě.
-    /// Konzumuje BehaviorEngine, targeting subsystém a logování.
+    /// Emitted whenever the character's belief about another person is updated.
+    /// Consumed by the BehaviorEngine, the targeting subsystem and logging.
     /// </summary>
     public sealed record SemanticBeliefUpdated(
         WDateTime OccurredAt,
-        /// <summary>Postava, jejíž přesvědčení se aktualizovalo.</summary>
+        /// <summary>The character whose belief was updated.</summary>
         HumanId Human,
-        /// <summary>Osoba, o které se přesvědčení aktualizovalo.</summary>
+        /// <summary>The person the belief is about.</summary>
         HumanId Other,
-        /// <summary>Druh přesvědčení, které se změnilo.</summary>
+        /// <summary>The kind of belief that changed.</summary>
         PersonBeliefKind Kind,
-        /// <summary>Nová hodnota Strength po aktualizaci [0.0–1.0].</summary>
+        /// <summary>The new Strength value after the update [0.0–1.0].</summary>
         double Strength,
-        /// <summary>Celkový počet evidencí pro tento belief kind.</summary>
+        /// <summary>Total number of pieces of evidence for this belief kind.</summary>
         int EvidenceCount) : IDomainEvent;
 }

@@ -4,11 +4,11 @@
 namespace GameEngineTools.World.Core.Astro
 {
     /// <summary>
-    /// Neměnná sada parametrů popisující hvězdu a oběžnou dráhu planety kolem ní.
-    /// Použij ji pro libovolný svět — nejen Zemi.
+    /// An immutable set of parameters describing a star and the planet's orbit around it.
+    /// Use it for any world — not just Earth.
     /// </summary>
     /// <remarks>
-    /// Všechny úhlové hodnoty jsou ve stupních (°). Příklad pro Zemi:
+    /// All angular values are in degrees (°). Example for Earth:
     /// <code>
     /// var earth = new SunParams(axialTiltDeg: 23.44);
     /// </code>
@@ -18,54 +18,54 @@ namespace GameEngineTools.World.Core.Astro
         #region Vlastnosti
 
         /// <summary>
-        /// Sklon rotační osy planety ve stupních (°).
-        /// Řídí střídání ročních období — 0° = žádná roční období, 23.44° = Země.
+        /// Axial tilt of the planet in degrees (°).
+        /// Drives the cycle of seasons — 0° = no seasons, 23.44° = Earth.
         /// </summary>
         public readonly double AxialTiltDeg;
 
         /// <summary>
-        /// Excentricita eliptické dráhy planety (bezrozměrná, 0..0.5).
-        /// <c>0</c> = kruhová dráha, <c>0.0167</c> = Země, <c>0.2</c> = výrazně eliptická.
-        /// Hodnoty nad 0.5 jsou oříznuty v konstruktoru.
+        /// Eccentricity of the planet's elliptical orbit (dimensionless, 0..0.5).
+        /// <c>0</c> = circular orbit, <c>0.0167</c> = Earth, <c>0.2</c> = strongly elliptical.
+        /// Values above 0.5 are clamped in the constructor.
         /// </summary>
         public readonly double Eccentricity;
 
         /// <summary>
-        /// Fáze perihélia (nejbližší bod k hvězdě) jako zlomek roku v rozsahu [0, 1).
-        /// <c>0.0</c> = perihélium je na začátku roku (1. den 1. měsíce).
+        /// Phase of perihelion (the closest point to the star) as a fraction of the year in [0, 1).
+        /// <c>0.0</c> = perihelion at the start of the year (day 1 of month 1).
         /// Hodnoty mimo rozsah jsou automaticky zabaleny (wrap).
         /// </summary>
         public readonly double PeriapsisPhase;
 
         /// <summary>
-        /// Atmosférická refrakce světla při východu/západu Slunce ve stupních (°).
-        /// Způsobuje, že Slunce je viditelné i mírně pod geometrickým obzorem.
-        /// Výchozí hodnota pro Zemi: <c>0.566</c>°.
+        /// Atmospheric refraction of light at sunrise/sunset in degrees (°).
+        /// Causes the Sun to be visible even slightly below the geometric horizon.
+        /// Default value for Earth: <c>0.566</c>°.
         /// </summary>
         public readonly double RefractionDeg;
 
         /// <summary>
-        /// Zdánlivý poloměr slunečního kotouče ve stupních (°).
-        /// Ovlivňuje přesný okamžik úplného východu/západu Slunce.
-        /// Výchozí hodnota pro Zemi: <c>0.266</c>°.
+        /// Apparent radius of the solar disc in degrees (°).
+        /// Affects the exact moment of full sunrise/sunset.
+        /// Default value for Earth: <c>0.266</c>°.
         /// </summary>
         public readonly double ApparentRadiusDeg;
 
         /// <summary>
-        /// Hloubka Slunce pod obzorem pro civilní soumrak (°).
-        /// Výchozí <c>6</c>° — stále světlo bez umělého osvětlení.
+        /// Depth of the Sun below the horizon for civil twilight (°).
+        /// Default <c>6</c>° — still light without artificial illumination.
         /// </summary>
         public readonly double TwilightCivilDeg;
 
         /// <summary>
-        /// Hloubka Slunce pod obzorem pro nautický soumrak (°).
-        /// Výchozí <c>12</c>° — horizont ještě viditelný pro navigaci.
+        /// Depth of the Sun below the horizon for nautical twilight (°).
+        /// Default <c>12</c>° — the horizon is still visible for navigation.
         /// </summary>
         public readonly double TwilightNauticalDeg;
 
         /// <summary>
-        /// Hloubka Slunce pod obzorem pro astronomický soumrak (°).
-        /// Výchozí <c>18</c>° — úplná tma, ideální pro pozorování hvězd.
+        /// Depth of the Sun below the horizon for astronomical twilight (°).
+        /// Default <c>18</c>° — full darkness, ideal for stargazing.
         /// </summary>
         public readonly double TwilightAstronomicalDeg;
 
@@ -74,10 +74,10 @@ namespace GameEngineTools.World.Core.Astro
         #region Odvozené vlastnosti
 
         /// <summary>
-        /// Výška Slunce nad obzorem při standardním východu/západu ve stupních (°).
-        /// Záporná hodnota — Slunce je při svém východu/západu ještě mírně pod geometrickým obzorem
-        /// kvůli atmosférické refrakci a zdánlivému poloměru kotouče.
-        /// Na Zemi odpovídá standardním <c>−0.833°</c>.
+        /// The Sun's altitude above the horizon at standard sunrise/sunset in degrees (°).
+        /// Negative value — at sunrise/sunset the Sun is still slightly below the geometric horizon
+        /// because of atmospheric refraction and the apparent radius of the disc.
+        /// On Earth this corresponds to the standard <c>−0.833°</c>.
         /// </summary>
         public double H0DegSunrise => -(RefractionDeg + ApparentRadiusDeg);
 
@@ -86,26 +86,26 @@ namespace GameEngineTools.World.Core.Astro
         #region Konstrukce
 
         /// <summary>
-        /// Inicializuje parametry hvězdy. Zadej pouze <paramref name="axialTiltDeg"/> —
-        /// ostatní hodnoty odpovídají přibližně Zemi a jsou vhodné jako výchozí bod
-        /// pro fiktivní světy.
+        /// Initialises the star parameters. Specify only <paramref name="axialTiltDeg"/> —
+        /// the other values approximate Earth and serve as a good starting point
+        /// for fictional worlds.
         /// </summary>
         /// <param name="axialTiltDeg">
-        /// Sklon rotační osy planety ve stupních. Povinný parametr — přímo řídí sílu ročních období.
+        /// Axial tilt of the planet in degrees. Required parameter — directly controls the strength of the seasons.
         /// </param>
         /// <param name="eccentricity">
-        /// Excentricita dráhy (0..0.5). Výchozí <c>0.0167</c> (Země).
-        /// Hodnoty nad 0.5 jsou oříznuty.
+        /// Orbital eccentricity (0..0.5). Default <c>0.0167</c> (Earth).
+        /// Values above 0.5 are clamped.
         /// </param>
         /// <param name="periapsisPhase">
-        /// Fáze perihélia jako zlomek roku [0, 1). Výchozí <c>0.0</c>.
+        /// Phase of perihelion as a fraction of the year [0, 1). Default <c>0.0</c>.
         /// Hodnoty mimo rozsah jsou zabaleny (wrap).
         /// </param>
-        /// <param name="refractionDeg">Atmosférická refrakce ve stupních. Výchozí <c>0.566</c>.</param>
-        /// <param name="apparentRadiusDeg">Zdánlivý poloměr kotouče ve stupních. Výchozí <c>0.266</c>.</param>
-        /// <param name="twilightCivilDeg">Práh civilního soumraku. Výchozí <c>6</c>°.</param>
-        /// <param name="twilightNauticalDeg">Práh nautického soumraku. Výchozí <c>12</c>°.</param>
-        /// <param name="twilightAstronomicalDeg">Práh astronomického soumraku. Výchozí <c>18</c>°.</param>
+        /// <param name="refractionDeg">Atmospheric refraction in degrees. Default <c>0.566</c>.</param>
+        /// <param name="apparentRadiusDeg">Apparent disc radius in degrees. Default <c>0.266</c>.</param>
+        /// <param name="twilightCivilDeg">Civil-twilight threshold. Default <c>6</c>°.</param>
+        /// <param name="twilightNauticalDeg">Nautical-twilight threshold. Default <c>12</c>°.</param>
+        /// <param name="twilightAstronomicalDeg">Astronomical-twilight threshold. Default <c>18</c>°.</param>
         public SunParams(
             double axialTiltDeg,
             double eccentricity = 0.0167,

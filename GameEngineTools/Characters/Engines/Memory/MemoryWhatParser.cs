@@ -1,42 +1,42 @@
 // MemoryWhatParser.cs
 // Copyright (c) 50PSoftware
 //
-// Pomocný parser pro What schema v EpisodicMemory.
+// Helper parser for the What schema in EpisodicMemory.
 //
-// Schema formát: {Kategorie}:{Typ}:{Výsledek}|{klíč}={hodnota}|{klíč}={hodnota}
-// Příklad:       Interaction:SmallTalk:Accepted|from=a3f2c1d0|to=b7e9a2f1
+// Schema format: {Category}:{Type}:{Outcome}|{key}={value}|{key}={value}
+// Example:       Interaction:SmallTalk:Accepted|from=a3f2c1d0|to=b7e9a2f1
 //
 // Pravidla schematu:
-//   · Hlavička (před prvním |) je vždy přítomna — Kategorie:Typ nebo Kategorie:Typ:Výsledek
-//   · Parametry (za |) jsou volitelné — klíč=hodnota páry oddělené |
-//   · HumanId se zkracuje na prvních 8 znaků N-formátu (bez pomlček) — čitelné, unikátní pro logy
-//   · What je deterministický klíč pro reinforcement v Encode() — NESMÍ obsahovat timestamp
+//   · The header (before the first |) is always present — Category:Type or Category:Type:Outcome
+//   · Parameters (after |) are optional — key=value pairs separated by |
+//   · HumanId is shortened to the first 8 chars of the N-format (no dashes) — readable, unique for logs
+//   · What is a deterministic key for reinforcement in Encode() — MUST NOT contain a timestamp
 
 namespace GameEngineTools.Characters.Engines.Memory
 {
     using System;
 
     /// <summary>
-    /// Statická pomocná třída pro sestavování a parsování <c>What</c> řetězce
+    /// Static helper class for building and parsing the <c>What</c> string
     /// v <see cref="EpisodicMemory"/>.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Proč samostatná třída, ne metody přímo v enginu?</b><br/>
-    /// SRP — parser je zodpovědný za formát, engine za logiku kódování.
-    /// Navíc je parser testovatelný izolovaně bez závislosti na celém enginu.
+    /// <b>Why a separate class rather than methods directly in the engine?</b><br/>
+    /// SRP — the parser is responsible for the format, the engine for the encoding logic.
+    /// It also makes the parser testable in isolation without depending on the whole engine.
     /// </para>
     /// <para>
-    /// <b>Dual purpose <c>What</c> řetězce:</b>
+    /// <b>Dual purpose of the <c>What</c> string:</b>
     /// <list type="number">
     ///   <item>
-    ///     <b>Reinforcement klíč</b> — <see cref="DefaultMemoryEngine.Encode"/> hledá existující
-    ///     epizodu se stejným <c>What</c>. Pokud ji najde, posílí ji místo vytvoření nové.
-    ///     Proto musí být <c>What</c> deterministický pro stejný typ události se stejnými aktéry.
+    ///     <b>Reinforcement key</b> — <see cref="DefaultMemoryEngine.Encode"/> looks for an existing
+    ///     episode with the same <c>What</c>. If it finds one, it reinforces it instead of creating a new one.
+    ///     Therefore <c>What</c> must be deterministic for the same event type with the same actors.
     ///   </item>
     ///   <item>
-    ///     <b>Narativní zdroj</b> — <c>DefaultNarrativeFormatter</c> parsuje parametry
-    ///     a překládá je na čitelnou větu. HumanId se překládá přes resolver na jméno.
+    ///     <b>Narrative source</b> — <c>DefaultNarrativeFormatter</c> parses the parameters
+    ///     and translates them into a readable sentence. HumanId is resolved to a name via the resolver.
     ///   </item>
     /// </list>
     /// </para>
@@ -44,49 +44,49 @@ namespace GameEngineTools.Characters.Engines.Memory
     internal static class MemoryWhatParser
     {
         // ══════════════════════════════════════════════════════════════════════════
-        // Sestavení What řetězce
+        // Building the What string
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Build — sestavení What
 
         /// <summary>
-        /// Sestaví <c>What</c> pro interakci (SpeechAct mezi dvěma postavami).
+        /// Builds the <c>What</c> for an interaction (a SpeechAct between two characters).
         /// </summary>
         /// <remarks>
-        /// Výsledný formát: <c>Interaction:{Act}:{Accepted|Rejected}|from={id}|to={id}</c>
+        /// Resulting format: <c>Interaction:{Act}:{Accepted|Rejected}|from={id}|to={id}</c>
         /// </remarks>
-        /// <param name="act">Typ řečového aktu (SmallTalk, Humor…).</param>
-        /// <param name="accepted">Zda byla interakce přijata.</param>
-        /// <param name="from">ID iniciátora.</param>
-        /// <param name="to">ID příjemce.</param>
+        /// <param name="act">The speech-act type (SmallTalk, Humor…).</param>
+        /// <param name="accepted">Whether the interaction was accepted.</param>
+        /// <param name="from">Initiator id.</param>
+        /// <param name="to">Recipient id.</param>
         public static string Interaction(string act, bool accepted, Guid from, Guid to)
             => $"Interaction:{act}:{(accepted ? "Accepted" : "Rejected")}" +
                $"|from={Full(from)}|to={Full(to)}";
 
         /// <summary>
-        /// Sestaví <c>What</c> pro provedenou akci (vlastní akce postavy).
+        /// Builds the <c>What</c> for a performed action (the character's own action).
         /// </summary>
         /// <remarks>
-        /// Výsledný formát: <c>Action:{ActionName}</c><br/>
-        /// Žádné parametry — postava si pamatuje vlastní akci, ne cizí aktéry.
+        /// Resulting format: <c>Action:{ActionName}</c><br/>
+        /// No parameters — the character remembers its own action, not other actors.
         /// </remarks>
-        /// <param name="actionName">Název akce z <see cref="ActionNames"/>.</param>
+        /// <param name="actionName">Action name from <see cref="ActionNames"/>.</param>
         public static string Action(string actionName)
             => $"Action:{actionName}";
 
         /// <summary>
-        /// Sestaví <c>What</c> pro ukončení spánku.
+        /// Builds the <c>What</c> for the end of sleep.
         /// </summary>
         /// <remarks>
-        /// Výsledný formát: <c>Sleep:Ended:{High|Medium|Low|Poor}|hours={h:F1}</c><br/>
-        /// Kvalita spánku je diskretizována — ne přesné číslo (to by bránilo reinforcement).
+        /// Resulting format: <c>Sleep:Ended:{High|Medium|Low|Poor}|hours={h:F1}</c><br/>
+        /// Sleep quality is discretized — not an exact number (which would prevent reinforcement).
         /// </remarks>
-        /// <param name="quality">Kvalita spánku 0–100.</param>
-        /// <param name="totalHours">Délka spánku v hodinách.</param>
+        /// <param name="quality">Sleep quality 0–100.</param>
+        /// <param name="totalHours">Sleep duration in hours.</param>
         public static string SleepEnded(double quality, double totalHours)
         {
-            // Diskretizace kvality — přesné číslo by bránilo reinforcement
-            // (každou noc trochu jiná kvalita → nikdy by se stejný What neopakoval)
+            // Quality discretization — an exact number would prevent reinforcement
+            // (slightly different quality each night → the same What would never recur)
             var qualityBucket = quality switch
             {
                 >= 80 => "High",
@@ -98,12 +98,12 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Sestaví <c>What</c> pro noční můru.
+        /// Builds the <c>What</c> for a nightmare.
         /// </summary>
         /// <remarks>
-        /// Výsledný formát: <c>Sleep:Nightmare|stress={High|Medium|Low}</c>
+        /// Resulting format: <c>Sleep:Nightmare|stress={High|Medium|Low}</c>
         /// </remarks>
-        /// <param name="stressAtSleep">Hodnota stresu v okamžiku usnutí (0–100).</param>
+        /// <param name="stressAtSleep">Stress level at the moment of falling asleep (0–100).</param>
         public static string Nightmare(double stressAtSleep)
         {
             var stressBucket = stressAtSleep switch
@@ -116,10 +116,10 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Sestaví <c>What</c> pro první dojem z nové postavy.
+        /// Builds the <c>What</c> for a first impression of a new character.
         /// </summary>
         /// <remarks>
-        /// Výsledný formát: <c>Relation:FirstImpression:{Positive|Neutral|Negative}|of={id}</c>
+        /// Resulting format: <c>Relation:FirstImpression:{Positive|Neutral|Negative}|of={id}</c>
         /// </remarks>
         /// <param name="like">Hodnota Like z <see cref="GameEngineTools.Characters.Engines.Relationships.FirstImpressionFormed"/> (0–100).</param>
         /// <param name="of">ID postavy, na kterou dojem vznikl.</param>
@@ -135,10 +135,10 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Sestaví <c>What</c> pro pokus o smíření.
+        /// Builds the <c>What</c> for a repair attempt.
         /// </summary>
         /// <remarks>
-        /// Výsledný formát: <c>Relation:Repair:{Accepted|Rejected}|with={id}</c>
+        /// Resulting format: <c>Relation:Repair:{Accepted|Rejected}|with={id}</c>
         /// </remarks>
         public static string RepairAttempt(bool accepted, Guid with)
             => $"Relation:Repair:{(accepted ? "Accepted" : "Rejected")}|with={Full(with)}";
@@ -146,16 +146,16 @@ namespace GameEngineTools.Characters.Engines.Memory
         #endregion Build — sestavení What
 
         // ══════════════════════════════════════════════════════════════════════════
-        // Parsování What řetězce
+        // Parsing the What string
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Parse — čtení What
 
         /// <summary>
-        /// Vrátí hlavičku <c>What</c> řetězce — část před prvním <c>|</c>.
+        /// Returns the header of the <c>What</c> string — the part before the first <c>|</c>.
         /// </summary>
-        /// <param name="what">Kompletní <c>What</c> řetězec.</param>
-        /// <returns>Hlavička, např. <c>"Interaction:SmallTalk:Accepted"</c>.</returns>
+        /// <param name="what">The complete <c>What</c> string.</param>
+        /// <returns>The header, e.g. <c>"Interaction:SmallTalk:Accepted"</c>.</returns>
         public static string GetHeader(string what)
         {
             var idx = what.IndexOf('|');
@@ -163,10 +163,10 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Vrátí hodnotu pojmenovaného parametru z <c>What</c> řetězce.
+        /// Returns the value of a named parameter from the <c>What</c> string.
         /// </summary>
-        /// <param name="what">Kompletní <c>What</c> řetězec.</param>
-        /// <param name="key">Název parametru (např. <c>"from"</c>, <c>"to"</c>).</param>
+        /// <param name="what">The complete <c>What</c> string.</param>
+        /// <param name="key">Parameter name (e.g. <c>"from"</c>, <c>"to"</c>).</param>
         /// <returns>Hodnota parametru, nebo <c>null</c> pokud parametr neexistuje.</returns>
         /// <example>
         /// <code>
@@ -177,7 +177,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// </example>
         public static string? GetParam(string what, string key)
         {
-            // Přeskočíme hlavičku (část před prvním |) a iterujeme přes parametry
+            // Skip the header (the part before the first |) and iterate over the parameters
             var parts = what.AsSpan();
             var firstPipe = parts.IndexOf('|');
             if (firstPipe < 0) return null;
@@ -186,11 +186,11 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             while (remaining.Length > 0)
             {
-                // Najdi další | nebo konec řetězce
+                // Find the next | or the end of the string
                 var next = remaining.IndexOf('|');
                 var segment = next < 0 ? remaining : remaining[..next];
 
-                // Rozděl na klíč=hodnota
+                // Split into key=value
                 var eq = segment.IndexOf('=');
                 if (eq > 0)
                 {
@@ -226,8 +226,8 @@ namespace GameEngineTools.Characters.Engines.Memory
             PerceivedMemoryTone PerceivedTone);
 
         /// <summary>
-        /// Naparsuje <c>What</c> a <c>PerceivedWhat</c> do strukturovaného deskriptoru,
-        /// aby nad ním šly stavět semantické inference bez křehkého <c>Contains(...)</c>.
+        /// Parses <c>What</c> and <c>PerceivedWhat</c> into a structured descriptor,
+        /// so semantic inference can be built on it without fragile <c>Contains(...)</c> calls.
         /// </summary>
         public static MemoryEpisodeDescriptor ParseDescriptor(string? what, string? perceivedWhat)
         {
@@ -262,8 +262,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Vrátí canonical token mikro-události z parametru <c>what</c>.
-        /// Pokud parametr není přítomen nebo je prázdný, vrátí <see langword="null" />.
+        /// Returns the canonical micro-event token from the <c>what</c> parameter.
+        /// If the parameter is absent or empty, returns <see langword="null" />.
         /// </summary>
         public static string? GetMicroEventKind(MemoryEpisodeDescriptor descriptor)
         {
@@ -281,7 +281,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         }
 
         /// <summary>
-        /// Naparsuje část za hlavičkou na mapu parametrů <c>key=value</c>.
+        /// Parses the part after the header into a map of <c>key=value</c> parameters.
         /// </summary>
         private static IReadOnlyDictionary<string, string> ParseParams(string what)
         {
@@ -313,13 +313,13 @@ namespace GameEngineTools.Characters.Engines.Memory
         #endregion Percieved Memory
 
         // ══════════════════════════════════════════════════════════════════════════
-        // Privátní pomocné metody
+        // Private helper methods
         // ══════════════════════════════════════════════════════════════════════════
 
         #region Privátní — Full ID
 
         /// <summary>
-        /// Vrátí Guid ve stringu.
+        /// Returns the Guid as a string.
         /// </summary>
         private static string Full(Guid id)
             => id.ToString("N");

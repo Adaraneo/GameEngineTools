@@ -376,7 +376,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         detail: $"act={io.Act}, self={(io.From == self ? "initiator" : "recipient")}, from={io.From.Value}, to={io.To.Value}",
                         now: io.OccurredAt);
 
-                        // Žárlivost: pozorovatelé svědkové intimního aktu dostávají IntimateAct signal.
+                        // Jealousy: observers who witness an intimate act receive an IntimateAct signal.
                         if (io.Act == SpeechAct.Invite && ctx.Snapshot.InteractionSurface.Observers is { Count: > 0 })
                         {
                             EmitThirdPartyEvents(io.OccurredAt, self, io.From, io.To,
@@ -591,9 +591,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             }
                         }
 
-                        // Žárlivost — IntimateAct u osoby, k níž má pozorovatel romantický/sexuální zájem.
-                        // Robustní sex difference ve forced-choice formátu (Buss et al. 1992, 48 zemí).
-                        // Distribuce se překrývají → individální variance přes AttachmentAnxiety a SOI.
+                        // Jealousy — an IntimateAct involving a person the observer has romantic/sexual interest in.
+                        // A robust sex difference in the forced-choice format (Buss et al. 1992, 48 countries).
+                        // The distributions overlap → individual variance via AttachmentAnxiety and SOI.
                         if (tpa.Type == ThirdPartyObservationType.IntimateAct
                             && State.Edges.TryGetValue(tpa.Actor, out var actorEdge))
                         {
@@ -602,7 +602,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             {
                                 var anxiety = ctx.Personality.Attachment.Anxiety;
                                 var soiAttitude = ctx.Personality.Sociosexuality.Attitude;
-                                // Muži: mírně vyšší sexuální žárlivost (forced-choice d ~ 0,3; slabé v Likert)
+                                // Men: slightly higher sexual jealousy (forced-choice d ~ 0.3; weak on Likert scales)
                                 var sexualBias = ctx.Biology == SexBiology.Male ? 1.2 : 1.0;
                                 var jealousyBase = Math.Clamp(intimacyInterest / 100.0, 0, 1);
                                 var jealousyIntensity = jealousyBase * sexualBias

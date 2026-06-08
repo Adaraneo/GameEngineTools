@@ -4,7 +4,7 @@
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Normalizovaný model character log události používaný pro textový i JSONL výstup.
+    /// Normalised character-log entry model used for both textual and JSONL output.
     /// </summary>
     internal sealed class CharactersLogEntry
     {

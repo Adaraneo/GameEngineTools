@@ -7,39 +7,39 @@ namespace GameEngineTools.Narrative
     using GameEngineTools.Characters.Core;
 
     /// <summary>
-    /// Rozhraní pro formátování doménových událostí na čitelný narativní text.
+    /// Interface for formatting domain events into readable narrative text.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Proč interface, ne statická třída?</b><br/>
-    /// Testovatelnost — v testech <c>SimulationScene</c> si mockuješ formatter
-    /// a ověřuješ, že byl zavolán se správnými argumenty.<br/>
-    /// Rozšiřitelnost — v budoucnu přidáš <c>EnglishNarrativeFormatter</c>,
-    /// <c>DebugNarrativeFormatter</c> nebo AI-generovaný formatter — beze změny SimulationScene.
+    /// <b>Why an interface, not a static class?</b><br/>
+    /// Testability — in tests of <c>SimulationScene</c> you mock the formatter
+    /// and verify it was called with the correct arguments.<br/>
+    /// Extensibility — in the future you can add an <c>EnglishNarrativeFormatter</c>,
+    /// <c>DebugNarrativeFormatter</c> or an AI-generated formatter — without changing SimulationScene.
     /// </para>
     /// <para>
-    /// <b>Návratová hodnota <c>null</c>:</b><br/>
-    /// Formatter vrací <c>null</c> pro eventy, které nejsou narativně zajímavé
-    /// (např. <c>SleepPhaseChanged</c> — debugovací info, ne příběh).
-    /// Volající layer null výstupy ignoruje.
+    /// <b>Return value <c>null</c>:</b><br/>
+    /// The formatter returns <c>null</c> for events that are not narratively interesting
+    /// (e.g. <c>SleepPhaseChanged</c> — debug info, not story).
+    /// The calling layer ignores null outputs.
     /// </para>
     /// <para>
-    /// <b>Proč <see cref="NarrativeCharacterInfo"/> místo pouhého <c>string</c>?</b><br/>
-    /// Viz dokumentaci záznamu — kvůli gramatickému rodu v češtině.
+    /// <b>Why <see cref="NarrativeCharacterInfo"/> instead of a plain <c>string</c>?</b><br/>
+    /// See the record's documentation — because of grammatical gender in Czech.
     /// </para>
     /// </remarks>
     public interface INarrativeFormatter
     {
         /// <summary>
-        /// Zformátuje doménový event na čitelný narativní záznam.
+        /// Formats a domain event into a readable narrative entry.
         /// </summary>
-        /// <param name="ev">Doménový event k formátování.</param>
+        /// <param name="ev">The domain event to format.</param>
         /// <param name="resolveCharacter">
-        /// Funkce pro překlad <see cref="HumanId"/> na informace o postavě.
-        /// Formatter ji volá pro každou postavu zmíněnou v eventu.
+        /// Function that translates a <see cref="HumanId"/> into character information.
+        /// The formatter calls it for every character mentioned in the event.
         /// </param>
         /// <returns>
-        /// Narativní záznam, nebo <c>null</c> pokud event není zajímavý pro narativ.
+        /// The narrative entry, or <c>null</c> if the event is not narratively interesting.
         /// </returns>
         NarrativeEntry? Format(IDomainEvent ev, Func<HumanId, NarrativeCharacterInfo> resolveCharacter);
     }

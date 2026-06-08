@@ -10,37 +10,37 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
-    /// Immutable snapshot sémantické paměti — přesvědčení postavy o všech lidech, které zná.
+    /// Immutable snapshot of semantic memory — the character's beliefs about everyone it knows.
     /// </summary>
     public sealed record SemanticMemoryState(
         IReadOnlyDictionary<HumanId, PersonBeliefSet> People)
     {
-        /// <summary>Prázdný stav pro nové postavy bez jakýchkoli přesvědčení.</summary>
+        /// <summary>Empty state for new characters with no beliefs.</summary>
         public static SemanticMemoryState Empty { get; } =
             new(new Dictionary<HumanId, PersonBeliefSet>());
 
         /// <summary>
-        /// Vrátí BeliefSet pro danou osobu, nebo <see langword="null"/> pokud postava osobu nezná.
+        /// Returns the BeliefSet for the given person, or <see langword="null"/> if the character does not know them.
         /// </summary>
         public PersonBeliefSet? GetBeliefs(HumanId other)
             => People.TryGetValue(other, out var beliefs) ? beliefs : null;
 
         /// <summary>
-        /// Vrátí Strength daného belief kind pro osobu, nebo 0.0 pokud belief neexistuje.
+        /// Returns the Strength of the given belief kind for the person, or 0.0 if the belief does not exist.
         /// </summary>
         public double GetStrength(HumanId other, PersonBeliefKind kind)
             => GetBeliefs(other)?.StrengthOf(kind) ?? 0.0;
 
         /// <summary>
-        /// Predikuje pravděpodobnost přijetí sociálního přístupu danou osobou.
-        /// Zkrácený overload bez kontextu vztahu a psychologického profilu.
+        /// Predicts the probability that a social approach is accepted by the given person.
+        /// A shortened overload without relationship context or psychological profile.
         /// </summary>
         public double ExpectedAcceptance(HumanId other, SpeechAct act)
             => SemanticMemoryMath.ExpectedAcceptance(this, other, act);
 
         /// <summary>
-        /// Predikuje pravděpodobnost přijetí sociálního přístupu s plným kontextem.
-        /// Zahrnuje vztahové metriky, psychologický profil a trend posledních epizod.
+        /// Predicts the probability that a social approach is accepted, with full context.
+        /// Includes relationship metrics, the psychological profile and the trend of recent episodes.
         /// </summary>
         public double ExpectedAcceptance(
             HumanId other,

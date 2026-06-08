@@ -57,14 +57,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             BehaviorCandidateEditor.Add(candidates, MoveToPrivate, noiseStress);
             BehaviorCandidateEditor.Add(candidates, MoveToRest, restLoss * 0.75 + noiseStress * 0.5 - context.State.NeedRest);
 
-            // Sezónní a světelná modulace — letní slunce táhne ven, zima/tma tlačí dovnitř
+            // Seasonal and light modulation — summer sun pulls outdoors, winter/darkness pushes indoors
             ApplySeasonalAffordance(context, candidates);
         }
 
         /// <summary>
-        /// Moduluje kandidátské utility na základě astronomického kontextu (sezóna, ozáření).
-        /// Letní poledne → bonus pro pohyb do sociálních a veřejných prostorů.
-        /// Zimní tma → zvýšená motivace pro odpočinek a soukromí.
+        /// Modulates candidate utilities based on the astronomical context (season, irradiance).
+        /// Summer noon → bonus for moving to social and public spaces.
+        /// Winter darkness → increased motivation for rest and privacy.
         /// </summary>
         private static void ApplySeasonalAffordance(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
@@ -72,18 +72,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             if (celestial is null)
                 return;
 
-            // Letní bonus: lineární peak při SeasonFraction=0.25 (letní slunovrat), 0 při zimě (0.75)
-            // Kombinuje se s aktuálním ozářením (bez denního světla efekt není)
+            // Summer bonus: linear peak at SeasonFraction=0.25 (summer solstice), 0 in winter (0.75)
+            // Combined with current irradiance (no effect without daylight)
             var summerFactor = Math.Max(0.0, 1.0 - Math.Abs(celestial.SeasonFraction - 0.25) * 4.0);
             var outdoorBonus = celestial.IrradianceFactor * summerFactor * 8.0;
 
             BehaviorCandidateEditor.Add(candidates, MoveToSocial, outdoorBonus * 0.6);
             BehaviorCandidateEditor.Add(candidates, MoveToPublic, outdoorBonus * 0.4);
 
-            // Tmavý tlak: noční čas × krátký den (zimní noci jsou nejsilnější)
+            // Darkness pressure: night time × short day (winter nights are strongest)
             var hoursPerDay = context.HumanContext.Snapshot.Celestial?.DaylightHours is { } dl
                 ? dl : 12.0;
-            var shortDayFactor = Math.Max(0.0, 0.5 - hoursPerDay / 48.0); // max při 0 h, 0 při 24 h
+            var shortDayFactor = Math.Max(0.0, 0.5 - hoursPerDay / 48.0); // max at 0 h, 0 at 24 h
             var darknessPressure = (1.0 - celestial.IrradianceFactor) * shortDayFactor * 10.0;
 
             BehaviorCandidateEditor.Add(candidates, MoveToRest, darknessPressure * 0.5);

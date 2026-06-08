@@ -10,8 +10,8 @@ namespace GameEngineTools.World.Core.Calendars
     public sealed class FixedMonthsCalendar : IWorldCalendar
     {
         private readonly Func<int, int> _leapExtraDays;
-        private readonly int[] _months;                // např. {36,36,36,36,36,36,36,36,36,36} (10×36)
-                                                       // vrací počet přestupných "epagomenálních" dní v daném roce
+        private readonly int[] _months;                // e.g. {36,36,36,36,36,36,36,36,36,36} (10×36)
+                                                       // returns the number of leap ("epagomenal") days in the given year
 
         /// <summary>Creates a calendar from fixed month lengths and a leap-day function.</summary>
         /// <param name="months">Length of each month (the array length is the months-per-year).</param>

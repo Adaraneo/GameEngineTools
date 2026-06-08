@@ -4,12 +4,12 @@
 namespace GameEngineTools.Logging
 {
     /// <summary>
-    /// Řídicí rozhraní pro explicitní flush character file logů.
+    /// Control interface for explicitly flushing character file logs.
     /// </summary>
     public interface ICharactersLogControl
     {
         /// <summary>
-        /// Vyflushuje všechny otevřené character log writery.
+        /// Flushes all open character log writers.
         /// </summary>
         void FlushAll();
     }

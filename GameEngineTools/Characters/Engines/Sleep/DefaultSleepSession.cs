@@ -10,13 +10,13 @@ namespace GameEngineTools.Characters.Engines.Sleep
     using Microsoft.Extensions.Logging;
 
     /// <summary>
-    /// Výchozí implementace spánkové session.
-    /// Řídí průchod fázemi, generuje rizikové a narrative eventy.
+    /// Default implementation of a sleep session.
+    /// Drives the progression through phases and generates risk and narrative events.
     /// </summary>
     /// <remarks>
-    /// Session se vytváří jako nová instance pro každý spánek —
-    /// není registrována v DI kontejneru jako singleton.
-    /// Vytváří ji <c>DefaultBehaviorEngine</c> při zpracování <see cref="SleepConfirmed"/>.
+    /// A session is created as a new instance for each sleep —
+    /// it is not registered in the DI container as a singleton.
+    /// It is created by <c>DefaultBehaviorEngine</c> when handling <see cref="SleepConfirmed"/>.
     /// </remarks>
     internal sealed class DefaultSleepSession : ISleepSession
     {
@@ -26,16 +26,16 @@ namespace GameEngineTools.Characters.Engines.Sleep
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
 
-        /// <summary>Čas, kdy session začala (= čas usnutí).</summary>
+        /// <summary>Time the session began (= the time of falling asleep).</summary>
         private WDateTime _sleepStart;
 
-        /// <summary>Čas, kdy aktuální fáze začala.</summary>
+        /// <summary>Time the current phase began.</summary>
         private WDateTime _phaseStart;
 
-        /// <summary>Hodnota stresu v okamžiku usnutí — ovlivňuje pravděpodobnost noční můry.</summary>
+        /// <summary>Stress level at the moment of falling asleep — affects the nightmare probability.</summary>
         private double _stressAtSleepStart;
 
-        /// <summary>True pokud byl v průběhu REM fáze již vygenerován dream event.</summary>
+        /// <summary>True if a dream event has already been generated during the REM phase.</summary>
         private bool _dreamFiredThisRem;
 
         #endregion Privátní pole
@@ -62,11 +62,11 @@ namespace GameEngineTools.Characters.Engines.Sleep
         #region Konstruktor
 
         /// <summary>
-        /// Vytvoří instanci session. Volej <see cref="Begin"/> pro zahájení.
+        /// Creates the session instance. Call <see cref="Begin"/> to start it.
         /// </summary>
-        /// <param name="cfg">Konfigurace spánkového subsystému.</param>
+        /// <param name="cfg">Configuration of the sleep subsystem.</param>
         /// <param name="loggerFactory">Factory pro logger.</param>
-        /// <param name="rng">Deterministický generátor náhodných čísel postavy.</param>
+        /// <param name="rng">The character's deterministic random-number generator.</param>
         public DefaultSleepSession(SleepConfig cfg, ILoggerFactory loggerFactory, IRandomSource rng)
         {
             _cfg = cfg;
@@ -98,7 +98,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
             EnterPhase(SleepPhase.Falling, now, ctx, outbox);
 
-            // Sdílený spánek — publikuj kontext
+            // Shared sleep — publish the context
             if (companion.HasValue && sharedType.HasValue)
             {
                 outbox.Add(new SharedSleepBegan(now, ctx.Id, companion.Value, sharedType.Value));
@@ -124,17 +124,17 @@ namespace GameEngineTools.Characters.Engines.Sleep
             var h = Math.Max(0, dt.TotalHours);
             HoursSlept += h;
 
-            // Přirozené probuzení — čas vypršel
+            // Natural awakening — the time has elapsed
             if (now >= PlannedWakeUp)
             {
                 EndSession(now, wasInterrupted: false, ctx, outbox);
                 return;
             }
 
-            // Rizikový check pro aktuální fázi
+            // Risk check for the current phase
             CheckAmbush(now, h, ctx, outbox);
 
-            // Fázový průchod
+            // Phase progression
             var timeInPhase = now - _phaseStart;
             switch (CurrentPhase)
             {
@@ -154,7 +154,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
                     break;
 
                 case SleepPhase.Rem:
-                    // Narrative: dream a nightmare — každý jen jednou za REM cyklus
+                    // Narrative: dream and nightmare — each only once per REM cycle
                     FireRemEvents(now, ctx, outbox);
 
                     if (timeInPhase.TotalHours >= _cfg.RemDurationHours)
@@ -165,7 +165,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
                     break;
 
                 case SleepPhase.Waking:
-                    // Fáze probouzení — session skončí v příštím Ticku nebo hned
+                    // Waking phase — the session ends on the next Tick or immediately
                     EndSession(now, wasInterrupted: false, ctx, outbox);
                     break;
             }
@@ -190,7 +190,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
         #region Privátní pomocné metody
 
         /// <summary>
-        /// Přejde do zadané fáze a publikuje <see cref="SleepPhaseChanged"/>.
+        /// Transitions to the given phase and publishes <see cref="SleepPhaseChanged"/>.
         /// </summary>
         private void EnterPhase(SleepPhase phase, WDateTime now, IHumanContext ctx, IEventCollector outbox)
         {
@@ -204,13 +204,13 @@ namespace GameEngineTools.Characters.Engines.Sleep
         }
 
         /// <summary>
-        /// Zkontroluje pravděpodobnost přepadení pro aktuální tick.
-        /// Riziko je modulováno fází spánku a přítomností společníka.
+        /// Checks the ambush probability for the current tick.
+        /// The risk is modulated by the sleep phase and the presence of a companion.
         /// </summary>
         private void CheckAmbush(WDateTime now, double h, IHumanContext ctx, IEventCollector outbox)
         {
-            // Deep fáze snižuje riziko přepadení (postava slyší méně, ale útok je těžší)
-            // REM fáze — postava je v klidu, ale těžko reaguje
+            // The deep phase lowers ambush risk (the character hears less, but an attack is harder)
+            // REM phase — the character is at rest but reacts poorly
             var phaseModifier = CurrentPhase switch
             {
                 SleepPhase.Falling => 1.2,  // snadno přepadnutelný, ještě nespí
@@ -236,14 +236,14 @@ namespace GameEngineTools.Characters.Engines.Sleep
         }
 
         /// <summary>
-        /// Generuje narrative eventy v průběhu REM fáze (sen nebo noční můra).
-        /// Každý event je vygenerován nejvýše jednou za jeden REM průchod.
+        /// Generates narrative events during the REM phase (a dream or a nightmare).
+        /// Each event is generated at most once per REM pass.
         /// </summary>
         private void FireRemEvents(WDateTime now, IHumanContext ctx, IEventCollector outbox)
         {
             if (_dreamFiredThisRem) return;
 
-            // Pravděpodobnost noční můry závisí na stresu v okamžiku usnutí
+            // The nightmare probability depends on the stress at the moment of falling asleep
             var nightmareChance = _stressAtSleepStart > _cfg.NightmareStressThreshold
                 ? _cfg.NightmareChanceHighStress
                 : _cfg.NightmareChanceNormal;
@@ -260,7 +260,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             }
             else
             {
-                // Deterministický seed ze seedy postavy + času — aby sny byly konzistentní
+                // Deterministic seed from the character's seed + time — so dreams are consistent
                 var dreamSeed = ctx.Random.Next(0, int.MaxValue);
                 outbox.Add(new DreamOccurred(now, ctx.Id, dreamSeed));
                 using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepSession)))
@@ -273,10 +273,10 @@ namespace GameEngineTools.Characters.Engines.Sleep
         }
 
         /// <summary>
-        /// Ukončí session, vypočítá kvalitu spánku a publikuje <see cref="SleepEnded"/>.
+        /// Ends the session, computes the sleep quality and publishes <see cref="SleepEnded"/>.
         /// </summary>
-        /// <param name="now">Aktuální herní čas.</param>
-        /// <param name="wasInterrupted">True pokud byl spánek přerušen.</param>
+        /// <param name="now">Current game time.</param>
+        /// <param name="wasInterrupted">True if the sleep was interrupted.</param>
         private void EndSession(WDateTime now, bool wasInterrupted, IHumanContext ctx, IEventCollector outbox)
         {
             IsActive = false;
@@ -293,14 +293,14 @@ namespace GameEngineTools.Characters.Engines.Sleep
         }
 
         /// <summary>
-        /// Vypočítá kvalitu spánku (0–100) na základě délky a průběhu.
+        /// Computes the sleep quality (0–100) based on duration and course.
         /// <br/>
-        /// Ideální spánek = <c>SleepConfig.BaseSleepHours</c> bez přerušení = 100.
+        /// Ideal sleep = <c>SleepConfig.BaseSleepHours</c> without interruption = 100.
         /// </summary>
         private double ComputeSleepQuality(bool wasInterrupted)
         {
-            // Základ: poměr prospané doby k ideální délce
-            // Ideál je v BehaviorConfig.BaseSleepHours (předáváme přes plannedWakeUp délku)
+            // Base: ratio of time slept to the ideal duration
+            // The ideal is in BehaviorConfig.BaseSleepHours (passed via the plannedWakeUp duration)
             var plannedHours = (PlannedWakeUp - _sleepStart).TotalHours;
             var completionRatio = plannedHours > 0
                 ? Math.Min(1.0, HoursSlept / plannedHours)
@@ -308,7 +308,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
             var quality = completionRatio * 100.0;
 
-            // Penalizace za přerušení — záleží na tom, v jaké fázi k přerušení došlo
+            // Penalty for interruption — depends on which phase the interruption occurred in
             if (wasInterrupted)
             {
                 quality *= CurrentPhase switch
