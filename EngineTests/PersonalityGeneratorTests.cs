@@ -342,9 +342,73 @@ namespace EngineTests
 
         #endregion SociosexualityBehaviorMax in isolation
 
+        // ── Region: DCM (SexualResponsiveness) generation ─────────────────────────
+
+        #region DCM — per-NPC generation + minor guard
+
+        /// <summary>
+        /// Adults must receive a per-NPC DCM profile (no hint), so each facet varies across
+        /// seeds — confirming it is no longer the constant <see cref="SexualResponsiveness.Default"/>.
+        /// </summary>
+        [TestMethod]
+        public void Generate_Adults_ProduceVaryingDCM()
+        {
+            // Arrange
+            var spec = PersonalitySpec.ForStadium(StadiumType.Adult);
+
+            // Act
+            var profiles = Enumerable.Range(0, 50)
+                .Select(seed => _sut.Generate(seed: seed, spec: spec).DualControl!)
+                .ToList();
+
+            // Assert — distributional property: each facet has non-zero spread.
+            Assert.IsTrue(StdDev(profiles.Select(p => p.SES)) > 0.0, "Adult SES must vary across seeds.");
+            Assert.IsTrue(StdDev(profiles.Select(p => p.SIS1)) > 0.0, "Adult SIS1 must vary across seeds.");
+            Assert.IsTrue(StdDev(profiles.Select(p => p.SIS2)) > 0.0, "Adult SIS2 must vary across seeds.");
+        }
+
+        /// <summary>
+        /// Minors (Baby / Child / Teenager) must always receive the neutral
+        /// <see cref="SexualResponsiveness.Default"/> — no generated sexual-excitation variation.
+        /// Hard invariant; must never regress.
+        /// </summary>
+        [DataTestMethod]
+        [DataRow(StadiumType.Baby)]
+        [DataRow(StadiumType.Child)]
+        [DataRow(StadiumType.Teenager)]
+        public void Generate_Minor_GetsDefaultDCM(StadiumType stadium)
+        {
+            // Arrange
+            var hints = PersonalityHints.ForStadium(stadium);
+
+            // Act — multiple seeds to prove the guard holds regardless of RNG outcome.
+            foreach (var seed in new[] { 0, 1, 42, 999 })
+            {
+                var dcm = _sut.Generate(seed: seed, hints: hints).DualControl!;
+
+                // Assert
+                Assert.AreEqual(SexualResponsiveness.Default.SES, dcm.SES, delta: 0.0001,
+                    $"{stadium} (seed {seed}): SES must be Default.");
+                Assert.AreEqual(SexualResponsiveness.Default.SIS1, dcm.SIS1, delta: 0.0001,
+                    $"{stadium} (seed {seed}): SIS1 must be Default.");
+                Assert.AreEqual(SexualResponsiveness.Default.SIS2, dcm.SIS2, delta: 0.0001,
+                    $"{stadium} (seed {seed}): SIS2 must be Default.");
+            }
+        }
+
+        #endregion DCM — per-NPC generation + minor guard
+
         // ── Private helpers ───────────────────────────────────────────────────────
 
         #region Private helpers
+
+        /// <summary>Population standard deviation of a sequence.</summary>
+        private static double StdDev(IEnumerable<double> values)
+        {
+            var list = values.ToList();
+            var mean = list.Average();
+            return Math.Sqrt(list.Select(v => (v - mean) * (v - mean)).Average());
+        }
 
         /// <summary>
         /// Minimal <see cref="IRandomSourceFactory"/> that always creates a

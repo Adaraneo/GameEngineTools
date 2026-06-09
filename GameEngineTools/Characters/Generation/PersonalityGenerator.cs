@@ -42,7 +42,14 @@ public sealed record PersonalityHints(
     /// Allows Attitude and Desire to vary freely while hard-capping experiential history.
     /// Takes effect only when <see cref="Sociosexuality"/> is <c>null</c> (per-facet cap mode).
     /// </summary>
-    double? SociosexualityBehaviorMax = null
+    double? SociosexualityBehaviorMax = null,
+
+    /// <summary>
+    /// When set, fixes the DCM profile instead of sampling it. Used by
+    /// <see cref="ForStadium"/> to route minors to <see cref="SexualResponsiveness.Default"/>
+    /// (no generated sexual-excitation variation below adulthood).
+    /// </summary>
+    SexualResponsiveness? SexualResponsiveness = null
 )
 {
     /// <summary>
@@ -62,18 +69,21 @@ public sealed record PersonalityHints(
         // Baby — no sexual dimension at all, direct communication only
         StadiumType.Baby => new PersonalityHints(
             Sociosexuality: Characters.Traits.Sociosexuality.Restricted,
-            Communication: CommunicationStyle.Direct),  // babies are very direct :)
+            Communication: CommunicationStyle.Direct,    // babies are very direct :)
+            SexualResponsiveness: SexualResponsiveness.Default),
 
         // Child — no sexual dimension, attachment style still forming (Secure bias)
         StadiumType.Child => new PersonalityHints(
-            Sociosexuality: Characters.Traits.Sociosexuality.Restricted),
+            Sociosexuality: Characters.Traits.Sociosexuality.Restricted,
+            SexualResponsiveness: SexualResponsiveness.Default),
 
         // Teenager — Attitude and Desire generated freely up to Intermediate (0.50),
         // but Behavior is hard-capped at 0.25: a teenager simply has not had time
         // to accumulate a high-casualty history (SOI-R Behavior = past partner count).
         StadiumType.Teenager => new PersonalityHints(
             Sociosexuality: Characters.Traits.Sociosexuality.Intermediate,
-            SociosexualityBehaviorMax: 0.25),
+            SociosexualityBehaviorMax: 0.25,
+            SexualResponsiveness: SexualResponsiveness.Default),
 
         // Adult, MidAged, Old — no hard constraints
         _ => new PersonalityHints()
@@ -422,7 +432,12 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // 5) assemble Personality
         var bigFive = new BigFive(O, C, E, A, N);
         var tomCeiling = ToMMath.GenerateCeiling(rng);
-        return new Personality(bigFive, attach, comm, motivation, socio, chrono, SexualResponsiveness.Default, tomCeiling);
+
+        // DCM: fixed by hint (minors → Default) or sampled per-NPC from Big Five priors + noise.
+        var dcm = hints.SexualResponsiveness
+            ?? DualControlMath.Generate(rng, O, C, E, N, socio);
+
+        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling);
     }
 
     private static (double O, double C, double E, double A, double N) GenerateBigFive(IRandomSource rng, PersonalitySpec spec)
