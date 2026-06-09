@@ -202,22 +202,19 @@ namespace GameEngineTools.World.Simulation
 
             _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
 
-            // ── Krok 1: OnTick callback ─────────────────────────────────────────────
-            // Invoke the scenario / ReachOut routing.
+            // ── Step 1: OnTick callback (scenario + ReachOut / movement routing) ──────────
             // NOTE: each character's LastOutbox is still from the PREVIOUS tick here —
-            // so this is the right place to detect ReachOut and route it.
+            // this is the correct place to detect ReachOut and route movement.
+            // Snapshot locations first so we can tell whom RouteMoveTo relocates during OnTick.
+            var locationsBeforeMovement = SnapshotLocations(chars);
             _options.OnTick?.Invoke(now, chars);
 
-            #region Trying
-
-            {
-                var activeLocations = chars.Select(c => _options.LocationService?.GetLocation(c.Id)).OfType<string>();
-                _options.ObjectSnapshotCache?.Refresh(activeLocations);
-
-                _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);
-            }
-
-            #endregion Trying
+            // ── Step 1b: Post-movement perception refresh ─────────────────────────────────
+            // RouteMoveTo (inside OnTick) may relocate a character AFTER the pre-tick cache
+            // refresh and context dispatch have already run. Re-sync perception so a character
+            // that just arrived (e.g. at food) perceives it THIS substep and can act on arrival,
+            // instead of re-issuing another MoveTo and looping forever.
+            RefreshPerceptionAfterMovement(now, startTime, chars, locationsBeforeMovement);
 
             // ── Step 2: Tick all characters ────────────────────────────────────────
             // All characters advance their state before any outcomes are routed.
@@ -401,6 +398,86 @@ namespace GameEngineTools.World.Simulation
                 var lod = _options.ResolveCharacterLod?.Invoke(c) ?? _options.DefaultCharacterLod;
                 _lodRuntime.Set(c.Id, lod);
             }
+        }
+
+        /// <summary>
+        /// Captures the current location id of every character, so movement performed during
+        /// the <see cref="SimulationSceneOptions.OnTick"/> callback can be detected afterwards.
+        /// </summary>
+        /// <param name="chars">Characters to snapshot.</param>
+        /// <returns>Map of character id to location id (<c>null</c> when the character is unplaced).</returns>
+        private Dictionary<HumanId, string?> SnapshotLocations(IReadOnlyList<IHuman> chars)
+        {
+            var map = new Dictionary<HumanId, string?>(chars.Count);
+            foreach (var c in chars)
+                map[c.Id] = _options.LocationService?.GetLocation(c.Id);
+
+            return map;
+        }
+
+        /// <summary>
+        /// Re-synchronises perception with the world after movement routing has run inside
+        /// <see cref="SimulationSceneOptions.OnTick"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Why this exists:</b> the movement router (<c>RouteMoveTo</c>) relocates characters
+        /// during <c>OnTick</c> — after the pre-tick object-cache refresh and context dispatch
+        /// have already happened. Without this step a relocated character would still perceive
+        /// its OLD location for one more substep and re-issue a <c>MoveTo</c> instead of acting
+        /// on arrival. Because movement recurs every substep, the character never settles — in
+        /// the worst case it reaches food repeatedly yet starves, never committing <c>Eat</c>.
+        /// </para>
+        /// <para>
+        /// <b>Guarded:</b> the cache re-query and re-dispatch run only when at least one character
+        /// actually changed location. When nobody moved, the pre-movement refresh/dispatch is still
+        /// valid and both operations are skipped (avoids a redundant SQLite round-trip per substep).
+        /// </para>
+        /// </remarks>
+        /// <param name="now">Current simulation time.</param>
+        /// <param name="startTime">Simulation start — forces a full dispatch on the very first tick.</param>
+        /// <param name="chars">All characters in the scene.</param>
+        /// <param name="locationsBeforeMovement">Locations captured immediately before <c>OnTick</c> ran.</param>
+        private void RefreshPerceptionAfterMovement(
+            WDateTime now,
+            WDateTime startTime,
+            IReadOnlyList<IHuman> chars,
+            IReadOnlyDictionary<HumanId, string?> locationsBeforeMovement)
+        {
+            if (_options.LocationService is not { } locationService)
+                return;
+
+            // Detect whether movement routing relocated anyone during the OnTick callback.
+            var anyMoved = false;
+            foreach (var c in chars)
+            {
+                var before = locationsBeforeMovement.GetValueOrDefault(c.Id);
+                var after = locationService.GetLocation(c.Id);
+                if (!string.Equals(before, after, StringComparison.Ordinal))
+                {
+                    anyMoved = true;
+                    break;
+                }
+            }
+
+            // Nobody moved → pre-movement cache refresh and context dispatch are still correct.
+            if (!anyMoved)
+                return;
+
+            // Rebuild the object snapshot for the post-movement locations so relocated characters
+            // read the objects actually present where they now stand.
+            if (_options.ObjectSnapshotCache is { } cache)
+            {
+                var activeLocations = chars
+                    .Select(c => locationService.GetLocation(c.Id))
+                    .OfType<string>();
+
+                cache.Refresh(activeLocations);
+            }
+
+            // Re-dispatch context so relocated characters perceive their new location before Tick().
+            // DispatchContextEvents only emits to characters whose location actually changed.
+            locationService.DispatchContextEvents(now, chars, forceAll: now == startTime);
         }
 
         #endregion Private Helpers
