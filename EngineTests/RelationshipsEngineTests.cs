@@ -1384,6 +1384,205 @@ namespace EngineTests
 
         #endregion A2 — Halo efekt seeding testy
 
+        #region Investment model (Rusbult) testy
+
+        [TestMethod]
+        public void ParameterlessConfig_MirrorsInvestmentModelDefaults()
+        {
+            // The parameterless ctor (DI options binding) must stay in sync with the positional defaults.
+            var cfg = new RelationshipsConfig();
+            Assert.AreEqual(45.0, cfg.ComparisonLevelBaseline, 0.0001);
+            Assert.AreEqual(0.6, cfg.CommitmentInvestmentWeight, 0.0001);
+            Assert.AreEqual(0.5, cfg.CommitmentAlternativeWeight, 0.0001);
+            Assert.AreEqual(0.08, cfg.CommitmentDriftPerDay, 0.0001);
+            Assert.AreEqual(0.02, cfg.InvestmentGrowthPerDay, 0.0001);
+            Assert.AreEqual(30.0, cfg.RomanticEdgeIntimacyThreshold, 0.0001);
+            Assert.AreEqual(0.6, cfg.CommitmentDecayResistance, 0.0001);
+        }
+
+        [TestMethod]
+        public void NewEdge_HasZeroInvestmentModelFields()
+        {
+            // A freshly created edge must start with neutral investment-model state.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, _outbox);
+
+            var edge = engine.State.Edges[other];
+            Assert.AreEqual(0.0, edge.Commitment, 0.0001, "Commitment should start at 0");
+            Assert.AreEqual(0.0, edge.InvestmentSize, 0.0001, "InvestmentSize should start at 0");
+            Assert.AreEqual(0.0, edge.AlternativeQuality, 0.0001, "AlternativeQuality should start at 0");
+        }
+
+        [TestMethod]
+        public void Commitment_GrowsTowardTarget_InSatisfyingHighInvestmentBond()
+        {
+            // High satisfaction (Like/Closeness/Comfort) + high InvestmentSize → Commitment rises from 0.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 80, Trust: 80, Familiarity: 60,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 10, SexualInterest: 10,
+                    Closeness: 80, Respect: 65, Comfort: 80,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 50,
+                    InvestmentSize: 50.0)
+            }));
+
+            var before = engine.State.Edges[other].Commitment;
+            engine.Tick(_now, WTimeSpan.FromDays(3), ctx, _outbox);
+            var after = engine.State.Edges[other].Commitment;
+
+            Assert.IsTrue(after > before,
+                $"Commitment should grow in a satisfying high-investment bond (before={before:F1}, after={after:F1})");
+        }
+
+        [TestMethod]
+        public void AlternativeQuality_StaysZero_ForPlatonicEdge()
+        {
+            // IntimateAffinity below the romantic threshold + KinRole.None → CL_alt = 0.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 70, Trust: 70, Familiarity: 60,
+                    AestheticAttraction: 80, PhysicalAttraction: 80,
+                    IntimateAffinity: 10, SexualInterest: 10,
+                    Closeness: 60, Respect: 60, Comfort: 60,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 30)
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(5), ctx, _outbox);
+
+            Assert.AreEqual(0.0, engine.State.Edges[other].AlternativeQuality, 0.0001,
+                "Platonic (sub-threshold, non-partner) edge should have AlternativeQuality = 0");
+        }
+
+        [TestMethod]
+        public void AlternativeQuality_RisesWhenAttractiveAlternativeExists()
+        {
+            // A partner edge plus a second, highly attractive non-partner edge → CL_alt > 0 on the partner edge.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var partner = new HumanId(Guid.NewGuid());
+            var alternative = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [partner] = new RelationshipEdge(self, partner,
+                    Like: 70, Trust: 70, Familiarity: 70,
+                    AestheticAttraction: 40, PhysicalAttraction: 40,
+                    IntimateAffinity: 70, SexualInterest: 60,
+                    Closeness: 70, Respect: 65, Comfort: 70,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 50,
+                    KinRole: KinRole.Partner),
+                [alternative] = new RelationshipEdge(self, alternative,
+                    Like: 55, Trust: 50, Familiarity: 30,
+                    AestheticAttraction: 80, PhysicalAttraction: 80,
+                    IntimateAffinity: 20, SexualInterest: 20,
+                    Closeness: 20, Respect: 55, Comfort: 40,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 5)
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(1), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Edges[partner].AlternativeQuality > 0.0,
+                $"Partner edge CL_alt should rise when an attractive alternative exists (got {engine.State.Edges[partner].AlternativeQuality:F1})");
+        }
+
+        [TestMethod]
+        public void Commitment_ResistsClosenessDecay()
+        {
+            // Two otherwise-identical platonic edges; the high-investment (high-commitment) one
+            // should retain more Closeness after the same decay tick (stickiness).
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+
+            RelationshipEdge MakeEdge(double commitment, double investment) => new(self, other,
+                Like: 70, Trust: 70, Familiarity: 60,
+                AestheticAttraction: 40, PhysicalAttraction: 40,
+                IntimateAffinity: 10, SexualInterest: 10,
+                Closeness: 60, Respect: 60, Comfort: 70,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                PositiveInteractionCount: 50,
+                Commitment: commitment,
+                InvestmentSize: investment);
+
+            var committed = BuildEngine();
+            var uncommitted = BuildEngine();
+            var ctx = BuildContext(self);
+
+            committed.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = MakeEdge(90, 80) }));
+            uncommitted.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = MakeEdge(0, 0) }));
+
+            committed.Tick(_now, WTimeSpan.FromDays(10), ctx, _outbox);
+            uncommitted.Tick(_now, WTimeSpan.FromDays(10), ctx, _outbox);
+
+            var committedCloseness = committed.State.Edges[other].Closeness;
+            var uncommittedCloseness = uncommitted.State.Edges[other].Closeness;
+
+            Assert.IsTrue(committedCloseness > uncommittedCloseness,
+                $"High-commitment bond should resist Closeness decay (committed={committedCloseness:F2}, uncommitted={uncommittedCloseness:F2})");
+        }
+
+        [TestMethod]
+        public void Commitment_DropsWhenAlternativeQualityHigh()
+        {
+            // Low satisfaction + a high-quality alternative drives Commitment down toward 0.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var partner = new HumanId(Guid.NewGuid());
+            var alternative = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [partner] = new RelationshipEdge(self, partner,
+                    Like: 30, Trust: 35, Familiarity: 60,
+                    AestheticAttraction: 30, PhysicalAttraction: 30,
+                    IntimateAffinity: 55, SexualInterest: 30,
+                    Closeness: 30, Respect: 40, Comfort: 30,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 50,
+                    Commitment: 50.0,
+                    InvestmentSize: 0.0,
+                    KinRole: KinRole.Partner),
+                [alternative] = new RelationshipEdge(self, alternative,
+                    Like: 60, Trust: 55, Familiarity: 30,
+                    AestheticAttraction: 85, PhysicalAttraction: 85,
+                    IntimateAffinity: 25, SexualInterest: 25,
+                    Closeness: 25, Respect: 55, Comfort: 45,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 5)
+            }));
+
+            var before = engine.State.Edges[partner].Commitment;
+            engine.Tick(_now, WTimeSpan.FromDays(10), ctx, _outbox);
+            var after = engine.State.Edges[partner].Commitment;
+
+            Assert.IsTrue(after < before,
+                $"Commitment should drop under low satisfaction + high CL_alt (before={before:F1}, after={after:F1})");
+        }
+
+        #endregion Investment model (Rusbult) testy
+
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>

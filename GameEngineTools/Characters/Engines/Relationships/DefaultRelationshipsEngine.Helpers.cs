@@ -228,6 +228,69 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
         #endregion Private methods — signal deltas
 
+        #region Private methods — investment model (Rusbult)
+
+        /// <summary>
+        /// Computes CL_alt for a romantic edge: the best available alternative's romantic potential,
+        /// scanned across the owner's other edges. Returns 0 for non-romantic edges.
+        /// Attraction dimensions do not decay, so a latent alternative persists over time.
+        /// </summary>
+        /// <param name="edge">The edge whose AlternativeQuality is being computed.</param>
+        /// <param name="allEdges">All edges in the owner's graph.</param>
+        /// <param name="cfg">Engine configuration.</param>
+        private static double ComputeAlternativeQuality(
+            RelationshipEdge edge,
+            IReadOnlyDictionary<HumanId, RelationshipEdge> allEdges,
+            RelationshipsConfig cfg)
+        {
+            // Only romantic bonds have a meaningful "better partner available" pressure.
+            var isRomantic = edge.KinRole == KinRole.Partner
+                          || edge.IntimateAffinity >= cfg.RomanticEdgeIntimacyThreshold;
+            if (!isRomantic)
+            {
+                return 0.0;
+            }
+
+            var best = 0.0;
+            foreach (var other in allEdges.Values)
+            {
+                if (other.B == edge.B)
+                {
+                    continue; // skip the partner themselves
+                }
+
+                // Romantic potential of an alternative = attraction blend, gated by some familiarity.
+                var potential = other.AestheticAttraction * 0.35
+                              + other.PhysicalAttraction * 0.35
+                              + other.IntimateAffinity * 0.30;
+                if (potential > best)
+                {
+                    best = potential;
+                }
+            }
+
+            return Math.Clamp(best, 0.0, 100.0);
+        }
+
+        /// <summary>
+        /// Computes the commitment target from the Rusbult integrator:
+        /// satisfaction + investment·w − alternatives·w. Current Commitment drifts toward this.
+        /// </summary>
+        private static double ComputeCommitmentTarget(RelationshipEdge edge, RelationshipsConfig cfg)
+        {
+            // Satisfaction = Outcomes − CL (Thibaut & Kelley 1959).
+            var outcomes = (edge.Like + edge.Closeness + edge.Comfort) / 3.0;
+            var satisfaction = outcomes - cfg.ComparisonLevelBaseline;
+
+            var target = satisfaction
+                       + edge.InvestmentSize * cfg.CommitmentInvestmentWeight
+                       - edge.AlternativeQuality * cfg.CommitmentAlternativeWeight;
+
+            return Math.Clamp(target, 0.0, 100.0);
+        }
+
+        #endregion Private methods — investment model (Rusbult)
+
         #region Private methods — helpers
 
         /// <summary>

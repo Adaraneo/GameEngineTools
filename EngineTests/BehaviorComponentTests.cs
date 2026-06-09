@@ -609,6 +609,89 @@ namespace EngineTests
     }
 
     // =========================================================================
+    // InvestmentModelBiasEngine — Rusbult leave/seek-alternative pressure
+    // =========================================================================
+
+    [TestClass]
+    public class InvestmentModelBiasEngineTests : TestBase
+    {
+        private static BehaviorCandidate ReachOutTo(HumanId target, double utility)
+            => new(ReachOut, utility, WTimeSpan.FromHours(1), BehaviorDomain.Social,
+                new[] { "TargetedSocial" },
+                new SocialTargetingData(target, SpeechAct.SmallTalk, 0.5, 0.5, 0.3));
+
+        private static RelationshipEdge PartnerEdge(HumanId self, HumanId partner, double commitment, double alternativeQuality)
+            => new(self, partner,
+                Like: 60, Trust: 60, Familiarity: 60,
+                AestheticAttraction: 40, PhysicalAttraction: 40,
+                IntimateAffinity: 70, SexualInterest: 50,
+                Closeness: 60, Respect: 60, Comfort: 60,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                Commitment: commitment,
+                AlternativeQuality: alternativeQuality,
+                KinRole: KinRole.Partner);
+
+        [TestMethod]
+        public void Modify_NoPartner_NoOp()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var someone = new HumanId(Guid.NewGuid());
+            var candidates = new List<BehaviorCandidate> { ReachOutTo(someone, 20.0) };
+            var context = BehaviorComponentTestFactory.Context(selfId: self); // empty relationship graph
+
+            new InvestmentModelBiasEngine().Modify(context, candidates);
+
+            Assert.AreEqual(20.0, candidates[0].Utility, 0.0001, "No partner edge → candidates unchanged");
+        }
+
+        [TestMethod]
+        public void Modify_HighCommitment_NoLeavePressure()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var partner = new HumanId(Guid.NewGuid());
+            var rel = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [partner] = PartnerEdge(self, partner, commitment: 90.0, alternativeQuality: 10.0)
+            });
+            var candidates = new List<BehaviorCandidate> { ReachOutTo(partner, 20.0) };
+            var context = BehaviorComponentTestFactory.Context(selfId: self, relationships: rel);
+
+            new InvestmentModelBiasEngine().Modify(context, candidates);
+
+            Assert.AreEqual(20.0, candidates[0].Utility, 0.0001,
+                "High commitment + low alternative → no leave pressure, no change");
+        }
+
+        [TestMethod]
+        public void Modify_LowCommitmentHighAlternative_DampensPartnerBoostsAlternative()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var partner = new HumanId(Guid.NewGuid());
+            var alternative = new HumanId(Guid.NewGuid());
+            var rel = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [partner] = PartnerEdge(self, partner, commitment: 10.0, alternativeQuality: 80.0)
+            });
+            var candidates = new List<BehaviorCandidate>
+            {
+                ReachOutTo(partner, 30.0),
+                ReachOutTo(alternative, 30.0)
+            };
+            var context = BehaviorComponentTestFactory.Context(selfId: self, relationships: rel);
+
+            new InvestmentModelBiasEngine().Modify(context, candidates);
+
+            var towardPartner = candidates.Single(c => c.SocialTargeting!.TargetHuman == partner);
+            var towardAlternative = candidates.Single(c => c.SocialTargeting!.TargetHuman == alternative);
+
+            Assert.IsTrue(towardPartner.Utility < 30.0,
+                $"ReachOut toward partner should be dampened (got {towardPartner.Utility:F2})");
+            Assert.IsTrue(towardAlternative.Utility > 30.0,
+                $"ReachOut toward alternative should be boosted (got {towardAlternative.Utility:F2})");
+        }
+    }
+
+    // =========================================================================
     // EnvironmentalAffordanceEngine — Noise Cognitive Penalty
     // Glass & Singer 1972: noise > 0.55 degrades Work/Create utility
     // =========================================================================

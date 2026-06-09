@@ -1033,6 +1033,25 @@ namespace GameEngineTools.Logging
             double Like,
             double Attraction);
 
+        /// <summary>
+        /// Investment-model integrator state for one edge (Rusbult; debug diagnostics only).
+        /// Logs the recomputed Commitment, accumulated InvestmentSize and derived CL_alt.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 2014,
+            Level = LogLevel.Debug,
+            Message = "[REL/INVEST] {HumanId} {A} → {B}: commitment={Commitment:F1} (cíl {Target:F1}) " +
+                      "investice={Investment:F1} alternativa={Alternative:F1}.")]
+        public static partial void RelInvestmentModel(
+            this ILogger logger,
+            string HumanId,
+            string A,
+            string B,
+            double Commitment,
+            double Target,
+            double Investment,
+            double Alternative);
+
         #endregion Relationships — vztahy
 
         #region DailySchedule — 1400–1499

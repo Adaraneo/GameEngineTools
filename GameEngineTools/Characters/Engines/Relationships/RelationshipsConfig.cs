@@ -207,9 +207,41 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Utility penalty per point of PerceivedDominance above 70 when Closeness &lt; 30.
         /// Dominant strangers trigger avoidance; close dominant figures do not.
         /// </summary>
-        double DominanceAvoidancePenaltyPerPoint = 0.08)
+        double DominanceAvoidancePenaltyPerPoint = 0.08,
+
+        // ── Investment model (Rusbult; Le & Agnew 2003; Tran et al. 2019) ──────
+        /// <summary>
+        /// Comparison Level baseline subtracted from blended outcomes to yield satisfaction.
+        /// Satisfaction = mean(Like, Closeness, Comfort) − ComparisonLevelBaseline (Thibaut &amp; Kelley 1959).
+        /// </summary>
+        double ComparisonLevelBaseline = 45.0,
+        /// <summary>Weight of accumulated InvestmentSize in the commitment integrator.</summary>
+        double CommitmentInvestmentWeight = 0.6,
+        /// <summary>Weight of AlternativeQuality (CL_alt) subtracted in the commitment integrator.</summary>
+        double CommitmentAlternativeWeight = 0.5,
+        /// <summary>Per-day rate at which current Commitment drifts toward its computed target.</summary>
+        double CommitmentDriftPerDay = 0.08,
+        /// <summary>
+        /// Daily InvestmentSize growth per point of Closeness above
+        /// <see cref="DunbarTier2Threshold"/>. Never decays once accumulated.
+        /// </summary>
+        double InvestmentGrowthPerDay = 0.02,
+        /// <summary>
+        /// IntimateAffinity threshold above which an edge is treated as romantic for CL_alt
+        /// computation. Below this, AlternativeQuality stays 0 (platonic bonds have no romantic alternative).
+        /// </summary>
+        double RomanticEdgeIntimacyThreshold = 30.0,
+        /// <summary>
+        /// Max fractional reduction of Closeness/IntimateAffinity decay at Commitment = 100.
+        /// E.g. 0.6 → fully committed bonds decay at 40 % of base rate (stickiness).
+        /// </summary>
+        double CommitmentDecayResistance = 0.6)
     {
-        /// <summary>Parameterless constructor required by DI options binding.</summary>
+        /// <summary>
+        /// Parameterless constructor required by DI options binding.
+        /// <b>Must</b> mirror the positional defaults via named arguments — when adding a new
+        /// parameter to the record, add a matching named argument here or the call fails to compile.
+        /// </summary>
         public RelationshipsConfig() : this(
             DecayPerDay: 1.5,
             RepairGain: 6.0,
@@ -248,7 +280,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
             PrestigeGainPerSelfDisclosure: 1.0,
             DominanceGainPerContempt: 10.0,
             PrestigeReachOutBonusPerPoint: 0.06,
-            DominanceAvoidancePenaltyPerPoint: 0.08)
+            DominanceAvoidancePenaltyPerPoint: 0.08,
+            ComparisonLevelBaseline: 45.0,
+            CommitmentInvestmentWeight: 0.6,
+            CommitmentAlternativeWeight: 0.5,
+            CommitmentDriftPerDay: 0.08,
+            InvestmentGrowthPerDay: 0.02,
+            RomanticEdgeIntimacyThreshold: 30.0,
+            CommitmentDecayResistance: 0.6)
         { }
     }
 }

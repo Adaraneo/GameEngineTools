@@ -121,5 +121,34 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// at world-setup time; never mutated by runtime engines.
         /// Defaults to <see cref="KinRole.None"/> for all ordinary social edges.
         /// </summary>
-        KinRole KinRole = KinRole.None);
+        KinRole KinRole = KinRole.None,
+
+        /// <summary>
+        /// Felt commitment to maintaining this bond (Rusbult Investment Model).
+        /// Integrates relationship satisfaction, accumulated investment, and (inversely)
+        /// the quality of available alternatives. Acts as a stickiness force: high
+        /// Commitment slows the decay of <see cref="Closeness"/> and <see cref="IntimateAffinity"/>,
+        /// and biases behavioural arbitration toward maintaining the bond rather than seeking alternatives.
+        /// Range [0, 100], neutral 0 (no felt commitment). Drifts toward a computed target each tick.
+        /// Le &amp; Agnew (2003) k=52; Tran, Judge &amp; Kashima (2019) k=202.
+        /// </summary>
+        double Commitment = 0,
+
+        /// <summary>
+        /// Accumulated sunk investments that would be lost on dissolution — shared history,
+        /// co-built reputation, kinship ties. Grows slowly while the bond is maintained and
+        /// <b>never decays</b>; acts as a stickiness floor that keeps high-investment bonds alive
+        /// even when satisfaction drops (the empirical "stays in a bad relationship" pattern).
+        /// Range [0, 100]. Seeded above zero for kin/partner edges by FamilyBuilder.
+        /// </summary>
+        double InvestmentSize = 0,
+
+        /// <summary>
+        /// Comparison level for alternatives (CL_alt): perceived quality of the best available
+        /// alternative partner. <b>Derived, not event-driven</b> — recomputed each tick from the
+        /// owner's other relationship edges (highest romantic/sexual potential among non-partners).
+        /// High AlternativeQuality erodes <see cref="Commitment"/>. Zero for platonic/non-romantic edges.
+        /// Range [0, 100]. Thibaut &amp; Kelley (1959) CL_alt construct.
+        /// </summary>
+        double AlternativeQuality = 0);
 }

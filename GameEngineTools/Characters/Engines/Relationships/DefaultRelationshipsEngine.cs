@@ -24,11 +24,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
     /// The graph is <b>asymmetric</b>: A may like B more than B likes A.
     /// </para>
     /// <para>
-    /// <b>Three dynamic layers:</b>
+    /// <b>Dynamic layers:</b>
     /// <list type="number">
     ///   <item><b>Events</b> — immediate jumps (MicroPositive, RepairAttempt, InteractionOutcome)</item>
     ///   <item><b>Decay</b> — slow drift toward neutral values (time without contact)</item>
     ///   <item><b>DomainBreakdown</b> — granular record of <em>what</em> the character values (humour, intellect…)</item>
+    ///   <item><b>Investment model (Rusbult)</b> — each tick a per-edge Commitment integrator
+    ///         (satisfaction + accumulated InvestmentSize − derived CL_alt) drifts toward its target;
+    ///         CL_alt is derived from the rest of the graph, and high Commitment resists the decay of
+    ///         Closeness/IntimateAffinity (stickiness).</item>
     /// </list>
     /// </para>
     /// <para>
@@ -929,6 +933,26 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     ? Config.DecayMultiplierSexualInterest * Config.TonicSexualInterestDecayFactor
                     : Config.DecayMultiplierSexualInterest;
 
+                // ── Investment model (Rusbult) ─────────────────────────────────────────
+                // 1) InvestmentSize grows while the bond stays close; never decays.
+                var investmentGain = Math.Max(0.0, e.Closeness - Config.DunbarTier2Threshold)
+                                   * Config.InvestmentGrowthPerDay * days;
+                var newInvestment = Math.Min(100.0, e.InvestmentSize + investmentGain);
+
+                // 2) AlternativeQuality (CL_alt) — derived from the rest of the graph.
+                //    Reads the pre-tick snapshot (State.Edges): alternatives change slowly, and the
+                //    in-progress dict must not be observed half-mutated.
+                var newAlternativeQuality = ComputeAlternativeQuality(e, State.Edges, Config);
+
+                // 3) Commitment drifts toward the integrator target.
+                var commitmentTarget = ComputeCommitmentTarget(
+                    e with { InvestmentSize = newInvestment, AlternativeQuality = newAlternativeQuality },
+                    Config);
+                var newCommitment = Approach(e.Commitment, commitmentTarget, Config.CommitmentDriftPerDay * days * 100.0);
+
+                // 4) Commitment resists decay of bond-maintaining dimensions (stickiness).
+                var commitmentResist = 1.0 - (newCommitment / 100.0) * Config.CommitmentDecayResistance;
+
                 var decayed = e with
                 {
                     Like = Clamp(Approach(e.Like, 50, d * Config.DecayMultiplierLike) + valenceEffect - stressEffect - familiarityLikePenalty),
@@ -936,15 +960,18 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Familiarity = Clamp(Approach(e.Familiarity, Config.FamiliarityDecayFloor, d * Config.DecayMultiplierFamiliarity)),
                     AestheticAttraction = e.AestheticAttraction,
                     PhysicalAttraction = e.PhysicalAttraction,
-                    IntimateAffinity = Clamp(Approach(e.IntimateAffinity, 5, d * Config.DecayMultiplierRomanticInterest)),
+                    IntimateAffinity = Clamp(Approach(e.IntimateAffinity, 5, d * Config.DecayMultiplierRomanticInterest * commitmentResist)),
                     SexualInterest = Clamp(Approach(e.SexualInterest, 5, d * effectiveSexualInterestDecayMult)),
-                    Closeness = Clamp(Approach(e.Closeness, 5, d * Config.DecayMultiplierCloseness)),
+                    Closeness = Clamp(Approach(e.Closeness, 5, d * Config.DecayMultiplierCloseness * commitmentResist)),
                     Respect = Clamp(Approach(e.Respect, 55, d * Config.DecayMultiplierRespect)),
                     PerceivedDominance = Clamp(Approach(e.PerceivedDominance, 50, d * Config.DecayMultiplierDominance)),
                     PerceivedPrestige = Clamp(Approach(e.PerceivedPrestige, 50, d * Config.DecayMultiplierPrestige)),
                     Comfort = Clamp(Approach(e.Comfort, 45, d * Config.DecayMultiplierComfort) + valenceEffect * 0.5 - stressEffect * 0.5),
                     TransgressionResidue = newResidue,
                     ResponsiveDesireLevel = newResponsive,
+                    Commitment = newCommitment,
+                    InvestmentSize = newInvestment,
+                    AlternativeQuality = newAlternativeQuality,
                     Breakdown = new DomainBreakdown(
                         Intellect: Clamp(Approach(e.Breakdown.Intellect, 50, dd)),
                         Humor: Clamp(Approach(e.Breakdown.Humor, 50, dd)),
@@ -967,6 +994,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     }
                 }
                 CheckMilestones(ctx.Id, e, decayed);
+
+                // Investment-model diagnostics (debug only): emit when any integrator value moved.
+                if (Math.Abs(newCommitment - e.Commitment) > 0.05
+                    || Math.Abs(newInvestment - e.InvestmentSize) > 0.05
+                    || Math.Abs(newAlternativeQuality - e.AlternativeQuality) > 0.05)
+                {
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: kv.Key.Value))
+                    {
+                        _log.RelInvestmentModel(
+                            ctx.Id.Value.ToString(), e.A.Value.ToString(), e.B.Value.ToString(),
+                            newCommitment, commitmentTarget, newInvestment, newAlternativeQuality);
+                    }
+                }
 
                 dict[kv.Key] = decayed;
             }
