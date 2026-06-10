@@ -7,82 +7,500 @@
 ![Framework](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
 
-GET is a research-grade simulation platform that exposes the full internal state of characters for study and iteration. Unlike commercial titles, GET is not a presentation layer — it is a scientific sandbox for modeling human psychology, physiology, memory, relationships, and social behavior.
+GET is a research-grade simulation platform that exposes the full internal state of characters
+for study and iteration. Unlike commercial titles, GET is not a presentation layer — it is a
+scientific sandbox for modeling human physiology, psychology, memory, relationships, values,
+identity, and social behavior. Every NPC perceives the world as **structured semantic data**,
+never as pixels.
 
 ---
 
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Engine Pipeline](#engine-pipeline)
+2. [The Engine Pipeline](#the-engine-pipeline)
 3. [Engines](#engines)
-   - [PhysiologyEngine](#physiologyengine)
-   - [PsychologyEngine](#psychologyengine)
-   - [BehaviorEngine](#behaviorengine)
-   - [SleepCoordinator](#sleepcoordinator)
-   - [InteractionEngine](#interactionengine)
-   - [RelationshipsEngine](#relationshipsengine)
-   - [MemoryEngine](#memoryengine)
-   - [SemanticMemoryEngine](#semanticmemoryengine)
-4. [Character Generation](#character-generation)
-5. [SimulationScene](#simulationscene)
-6. [World & Locations](#world--locations)
-7. [Configuration Reference](#configuration-reference)
-   - [Characters:Physiology](#charactersphysiology)
-   - [Characters:MenstrualCycle](#charactersmenstrualcycle)
-   - [Characters:Psychology](#characterspsychology)
-   - [Characters:Behavior](#charactersbehavior)
-   - [Characters:Sleep](#characterssleep)
-   - [Characters:Interactions](#charactersinteractions)
-   - [Characters:Relationships](#charactersrelationships)
-   - [Characters:Memory](#charactersmemory)
-   - [Characters:SemanticMemory](#characterssemanticmemory)
-   - [Characters:Lod](#characterslod)
-   - [Characters:Fidelity](#charactersfidelity)
-8. [Project Structure](#project-structure)
+   - [Physiology](#physiology)
+   - [Psychology](#psychology)
+   - [Behavior](#behavior)
+   - [Sleep](#sleep)
+   - [Interactions](#interactions)
+   - [Object Interaction](#object-interaction)
+   - [Relationships](#relationships)
+   - [Memory](#memory)
+   - [Semantic Memory](#semantic-memory)
+   - [Goals](#goals)
+   - [Daily Schedule & Occupations](#daily-schedule--occupations)
+   - [Values](#values)
+   - [Self-Concept](#self-concept)
+   - [Interests](#interests)
+4. [Supporting Social Systems](#supporting-social-systems)
+   - [Theory of Mind](#theory-of-mind)
+   - [Community Reputation](#community-reputation)
+   - [Life-Stage Transitions](#life-stage-transitions)
+   - [Attraction](#attraction)
+5. [Traits](#traits)
+6. [Character & Family Generation](#character--family-generation)
+7. [World, Objects & Astronomy](#world-objects--astronomy)
+8. [SimulationScene](#simulationscene)
+9. [Configuration](#configuration)
+10. [DI Registration](#di-registration)
+11. [Building & Testing](#building--testing)
+12. [Project Layout](#project-layout)
 
 ---
 
 ## Architecture Overview
 
-GET models each NPC as an `OrchestratedHuman` — a character that runs a fixed multi-engine pipeline on every simulation tick. All internal state is exposed via `EnginesSnapshot`, making it suitable for debugging, visualization, and research.
+GET models each NPC as an **`OrchestratedHuman`** — a character that runs a fixed multi-engine
+pipeline on every simulation tick. All internal state is exposed via an immutable
+**`EnginesSnapshot`**, making the system suitable for debugging, visualization, persistence, and
+research.
 
-Key frameworks used internally:
+Every engine implements the same contract (`IEngine<TState, TConfig>` in
+`Characters/Core/Core.cs`):
 
-| Framework | Purpose |
+```csharp
+TState State { get; }
+TConfig Config { get; }
+void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox);
+void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox);
+void RestoreState(TState state);
+```
+
+Engines never call each other directly. They communicate by:
+
+- **Reading** the shared per-tick `EnginesSnapshot` through `IHumanContext`, and
+- **Emitting** `IDomainEvent`s into an outbox that the orchestrator drains and routes.
+
+Selected scientific frameworks used internally:
+
+| Framework | Used for |
 |---|---|
-| PAD emotional model | Valence / Arousal / Dominance state |
-| Big Five (OCEAN) | Personality generation and behavioral modulation |
-| Ebbinghaus memory decay | Episodic memory forgetting curve |
-| Dunbar time-budget model | Relationship tier capacity management |
-| 2D Anxiety × Avoidance | Attachment style (continuous, not categorical) |
-| Williams four-need-threat | Rejection effects on belonging, control, self-esteem, meaningful existence |
-| Lewicki et al. | Apology component weights for repair mechanics |
+| PAD emotional model | Valence / Arousal / Dominance affect state |
+| Big Five (OCEAN) | Personality generation + pervasive behavioral modulation |
+| HPA-axis / allostatic load | Stress, cortisol, cumulative physiological burden |
+| Ebbinghaus decay + peak-end rule | Episodic memory forgetting & salience |
+| 2D Anxiety × Avoidance (ECR-R) | Continuous attachment, not categorical |
+| Schwartz Basic Human Values | Moral value loadings + drift |
+| Holland RIASEC | Vocational interests + drift |
+| Higgins self-discrepancy / Swann self-verification | Self-concept evolution |
+| Dual Control Model (SES/SIS) + SOI-R | Sexual responsiveness & sociosexuality |
+| Kepler orbital mechanics | Day length, seasons, irradiance, ambient temperature |
 
 ---
 
-## Engine Pipeline
+## The Engine Pipeline
 
-Each tick runs in three phases:
+`OrchestratedHuman` processes each tick in **three phases**:
 
 ```
 Phase A  ──  HandleScheduled + HandleInbox
-                 (actions delivered against the previous snapshot)
+             (scheduled actions + external events delivered against the PREVIOUS snapshot)
 
-Phase B  ──  Physiology → Psychology → [RefreshSnapshot]
-             → Behavior (cadence policy) → Interactions
+Phase B  ──  [LifeStage boundary check]
+             Physiology → Psychology → [mid-tick snapshot refresh]
+             → Behavior (cadence-gated) → Interactions → ObjectInteraction
              → Relationships → Memory → SemanticMemory
-                 (engines advance; events accumulate in outbox)
+             → Goals → Schedule → Values → SelfConcept → Interests
+             [final snapshot refresh]
 
-             [RefreshSnapshot]
-
-Phase C  ──  SelfDeliver (max 8 passes)
-             → RefreshSnapshot → PublishOutbox
+Phase C  ──  SelfDeliver (≤ 8 passes)  →  snapshot refresh  →  PublishOutbox
+             (character reacts to its own Phase-B events)
 ```
 
-The mid-tick `RefreshSnapshot` between Psychology and Behavior is intentional: Behavior reads the **current tick's** physiological and psychological state, not last tick's.
+Key invariants:
 
-DI registration:
+- **The order is load-bearing.** Physiology and Psychology advance first because every downstream
+  engine reads their state. A **mid-tick snapshot is refreshed after Psychology** so Behavior sees
+  the *current* tick's physio/psych state — not last tick's.
+- **Behavior runs on a cadence.** `IBehaviorCadencePolicy` decouples expensive behavioral reasoning
+  from the base tick rate per LOD tier; physiology/psychology/memory always advance with world time.
+- **Death is terminal.** A character whose `PhysiologyState.Status == Dead` runs no engines and
+  emits no events, but stays in the roster for lookups.
+- **Action slots.** `ActiveActionSlots` tracks which body/mind channels (Hands, Mind, Posture, …)
+  are occupied by an in-flight action, so the behavior engine can gate concurrent/secondary actions
+  (multitasking) rather than committing physically impossible combinations.
+
+---
+
+## Engines
+
+### Physiology
+
+**State:** `PhysiologyState` — Energy, Hunger, Thirst, Pain, ImmuneLoad, BodyTempDelta,
+SleepDebtHours, `AllostaticLoad`, `CortisolLevel`, `Testosterone`, `Nutrition` (Calories, VitaminD,
+Iron, Protein, BloodGlucose), `Cycle` (menstrual), `Aging` (grey fraction, wrinkles, hair density,
+muscle/bone), `Status` (Alive/Dead), injury & postpartum state.
+
+Models the body's physical condition: advances biological needs and recovery, runs the menstrual
+cycle (phase transitions, ovulation window, PMS/PMDD symptoms), injury healing, postpartum recovery,
+nutrition tracking, biological aging, and mortality. Emits reproductive events
+(`PregnancyStarted`, `PregnancyDiscovered`, `ChildBorn`), `InjuryReceived`/`InjuryHealed`, and
+death. Runs first because pain, hunger, fever, and sleep debt are upstream inputs to mood, stress,
+and decision-making.
+
+### Psychology
+
+**State:** `PsychologyState` — PAD (`Valence` [−1..+1], `Arousal`/`Dominance` [0..1]), `Stress`,
+`AllostaticLoad`, `CognitiveLoad`, `Cortisol`, `MoodBaseline`, `DominantEmotion`, `Motivations`.
+
+Computes the continuous PAD affective state plus derived scalars each tick: stress recovery and
+HPA-axis growth (Neuroticism-modulated), PAD drift toward resting baseline (positive valence
+baseline), physiology modulation (pain → stress, sleep debt → cognitive load, fever → arousal
+suppression), circadian arousal rhythm, hormonal coupling (cortisol, testosterone), environmental
+effects (noise, crowding, temperature, proxemics, privacy, isolation), sickness behavior (anhedonia,
+lethargy, brain fog), discrete-emotion inference and per-emotion decay, and stress manifestation.
+**Anger is approach-motivated** (raises confrontational utility). Emits `MotivationChanged`,
+`StressSpiked`, `StressManifested`. Value-congruence violations from the Values system land here as a
+guilt spike.
+
+### Behavior
+
+The decision-making core. `DefaultBehaviorEngine` is a composition, not a monolith:
+
+- **5 need engines** (`IBehaviorNeedEngine`) — `PhysiologicalNeedsEngine`, `SocialNeedsEngine`,
+  `CompetenceNeedsEngine`, `AutonomyExplorationNeedsEngine`, and `ContingencySearchEngine` (the
+  foraging bridge: emits `MoveTo:Food`/`MoveTo:Drink` when a needed object is absent at the current
+  location). Each produces scored `BehaviorCandidate`s.
+- **Modifier engines** (`IBehaviorModifierEngine`) reshape candidate utilities — trait bias,
+  affective state, circadian arousal, habit/routine, learned habit, memory influence, environmental
+  & world-object affordance, psychological conflict, **values congruence**, **goal pressure**,
+  **daily-schedule bias**, **relationship investment**, object-interaction bias, and the
+  **object-affordance gate** (hard/soft presence gate run after scoring, before intent management).
+- **`IIntentManagementEngine`** — stabilises direction across ticks with hysteresis and an emergency
+  physiological override.
+- **`IActionArbitrationEngine`** — selects the final action; resolves conflict via ambivalence and
+  tension; supports multitasking via action slots.
+- **Habit learning** (`BehaviorHabitLearning`) — strengthens, decays, and prunes habit traces;
+  classifies them Adaptive / Neutral / MaladaptiveCoping.
+
+Emits `ActionCommitted`, `InteractionProposed`, `SleepConfirmed`/`SleepPromptRequested`.
+
+**Action names** (`Characters/Engines/ActionNames.cs`): `Work`, `Create`, `Eat`, `Drink`,
+`SelfCare`, `ReachOut`, `InviteIntimacy`, `Flee`, `Fight`, `Idle`, `Sleep`; movement
+`MoveTo:Social/Private/Work/Rest/Public/Food/Drink`; object interaction `InteractWithObject` and the
+affordance family `UseObject:Rest/Work/Fun/Warmth/Mood/Social`.
+
+### Sleep
+
+`ISleepCoordinator` (owned by Behavior) drives an `ISleepSession` state machine:
+`Falling → Light → Deep → REM → Waking`. It rolls nightmare probability from stress, ambush
+probability for outdoor sleep (reduced by a companion guard), applies sleep-overdue decline
+penalties, and fires `NightmareTriggered`/`DreamOccurred` in REM plus `SleepEnded` with a quality
+score. Downstream: Physiology recovers Energy/ImmuneLoad/Pain, Psychology adjusts Stress/MoodBaseline,
+Memory runs consolidation. Sleep is handled **outside** the utility-arbitration loop.
+
+### Interactions
+
+**State:** `InteractionSurface` — Location, HasPrivacy, Noise, Crowding, `SurfaceKind`,
+`ProxemicDistanceMeters`, and `Observers` (third-party `HumanId`s).
+
+Evaluates proposed social interactions and decides acceptance from the relationship edge,
+psychological state, and environment. Speech acts (`SpeechAct`): `SmallTalk`, `Question`,
+`SelfDisclosure`, `Validation`, `Boundary`, `Humor`, `Meta`, `Invite`. Touch levels: `None`,
+`Light`, `Friendly`, `Intimate`. A **misattribution penalty** scales with noise × stress × the
+emotional weight of the speech act. Computes peak-end valence for memory. When an accepted `Invite`
+meets relationship-readiness thresholds, emits `SexualEncounterProposed`. Presence of `Observers`
+triggers `ThirdPartyActionObserved` (reputation/witness effects). Emits `InteractionOutcome`,
+`TouchOutcome`, `SexualEncounterOutcome`.
+
+### Object Interaction
+
+Optional engine (`IObjectInteractionEngine`), wired between Interactions and Relationships when
+registered. NPCs perceive objects as structured `WorldObject` data (a category + a list of
+`WorldObjectAffordance`). The `AffordanceApplicationService` applies a used object's affordances by
+emitting `ObjectAffordanceApplied` events that Physiology/Psychology consume; `Ownership`
+affordances are routed to the object-interaction engine (pickup/inventory) instead. See
+[World, Objects & Astronomy](#world-objects--astronomy).
+
+### Relationships
+
+**State:** `RelationshipState` — an asymmetric directed graph of `RelationshipEdge` per `HumanId`.
+
+Each `RelationshipEdge` tracks (all [0–100] unless noted):
+
+- **Core:** `Like`, `Trust`, `Closeness`, `Respect`, `Comfort`, `Familiarity` (non-monotonic with
+  Like — high familiarity without positive interaction drifts Like down).
+- **Attraction:** `AestheticAttraction`, `PhysicalAttraction`, `RomanticInterest`, `SexualInterest`
+  (fastest-decaying; Coolidge effect).
+- **Relationship type:** `CommunalStrength` (need-responsive; tracking favors *hurts* a high-communal
+  bond) and `ExchangeStrength` (equity-based; independent).
+- **Investment model** (Rusbult): accumulated investment size raises commitment and dependence;
+  dissolution emits an investment-loss event consumed by Psychology.
+- **Repair:** `TransgressionResidue` (power-law decay; reduced by Lewicki-weighted apology
+  components) and the terminal `IsContemptuouslyDestroyed` flag.
+- **Desire:** `ResponsiveDesireLevel` (Basson 2001), grows with CommunalStrength + history.
+- **Kinship:** `KinRole` (Partner, Parent, Child, …) and meta (`PositiveInteractionCount`,
+  `LastContactTime`, `TargetBiology`).
+
+Seeded via `IAttractionCalculator` on `FirstImpressionFormed`. Decay accelerates under the Navarro
+8× contact-gap rule and Dunbar tier-capacity pressure. Attachment style modulates how strongly every
+dimension updates. Third-party reputation effects (`ThirdPartyActionObserved`, Feinberg 2014) update
+an observer's edge at a fraction of direct-interaction weight.
+
+### Memory
+
+**State:** `MemoryIndex` — episodic memories plus a `Knowledge` store of `SemanticFact`s.
+
+Episodic encoding, retrieval, consolidation, and forgetting: **Ebbinghaus decay**, **spacing effect**
+(repeats reinforce the existing episode via a reinforcement key rather than duplicating),
+**peak-end rule** salience, **reconsolidation** drift on each recall (negative episodes drift
+faster), and **stress distortion** at encoding. `MemoryCognition.BuildWorkingSet()` implements
+System 1 / System 2 switching: above a cognitive-burden threshold (shifted by Conscientiousness),
+episodic recall is skipped in favour of semantic reflection summaries. Sleep (`SleepEnded`) triggers
+consolidation. Knowledge facts carry confidence (direct witness vs. gossip) that decays over time.
+
+### Semantic Memory
+
+**State:** `SemanticMemoryState` — a `PersonBeliefSet` per `HumanId`.
+
+Distills episodic patterns into per-person beliefs (`PersonBeliefKind`: `Rejecting`,
+`EmotionallySafe`, `Reliable`, `Warm`, `Critical`), each with `Strength`, `Stability`, and
+`EvidenceCount`. Confirming evidence strengthens and stabilises; contradiction weakens (high-stability
+beliefs resist). Attachment style modulates learning rate (Anxious ≈ 1.30×, Avoidant ≈ 0.75×). A
+Navarro toxic-ratio rule accelerates decay (rapid disillusionment). Feeds social targeting
+(`SemanticTargeting`, `ExpectedAcceptance`) used by Behavior to choose `ReachOut`/`InviteIntimacy`
+targets — and acts as the semantic fallback for unfamiliar people.
+
+### Goals
+
+**State:** `GoalState` — a list of `PersistentGoal`.
+
+Long-term motivational drives that bias utility-based action selection without prescribing a plan.
+Each goal has `Salience` (motivational pressure), `Progress`, and `Frustration`. `PersistentGoalKind`
+covers existential (FindMeaning, OvercomeTrauma, BuildIdentity), survival (ProtectFamily,
+EscapeDanger), career (MasterCraft, BuildReputation), and relational (FindPartner, RepairRelationship,
+SeekRevenge) drives. Goals are seeded from personality, triggered by events, or scripted
+(`GoalInjected`). `GoalBehaviorModifier` translates salience into per-action utility pressure. Emits
+`GoalActivated`, `GoalProgressed`, `GoalResolved` (Completed / Abandoned / Faded / Displaced).
+
+### Daily Schedule & Occupations
+
+**State:** `DailyScheduleState` — a list of time-anchored `ScheduleSlot`s + the active occupation.
+
+Anchors a character's routine to the world `IScheduler`: each slot fires at an hour of day, biases a
+preferred action (and optionally a `MoveTo` toward a location) via `DailyScheduleBehaviorModifier`,
+and can be skipped under high stress / low energy. Slots are seeded from an occupation looked up in
+`IOccupationRegistry` (built-in occupations via `BuiltInOccupationRegistrar`, plus custom ones from
+`Occupations.csv`) and modulated by personality/chronotype. `IHuman.ChangeOccupation()` re-seeds the
+schedule at runtime. Emits `ScheduleDayRegistered`, `ScheduleSlotTriggered`, `ScheduleSlotBiasApplied`.
+
+### Values
+
+**State:** `ValuesState` — a drifting `Current` Schwartz `ValuesProfile` plus an immutable
+`Baseline`.
+
+"Prior, not constant": the baseline is seeded once from Big Five; `Current` starts equal, drifts from
+value-congruent/value-violating action, and slowly regresses toward baseline (Vecchione 2016
+rank-order stability). `ValuesBehaviorModifier` shifts action utility by value congruence and emits
+`ValueCongruenceViolated` (→ guilt spike in Psychology). Morality is keyed to who the character
+*became*, not who they were born to be.
+
+### Self-Concept
+
+**State:** `SelfConcept` — perceived Big Five, an ideal-self subset, global `SelfEsteem`, and
+`SelfDiscrepancy`.
+
+A character's self-view evolves from social feedback via Swann self-verification (confirming feedback
+is accepted; disconfirming feedback discounted). `SelfDiscrepancy` (Higgins, used only as a general
+discrepancy→distress signal) drives identity work: crossing a threshold seeds a `BuildIdentity` goal.
+Emits `MetaperceptionUpdated`.
+
+### Interests
+
+**State:** `InterestState` — a drifting `Current` RIASEC `InterestProfile` plus an immutable
+`Baseline`.
+
+Shares the "prior, not constant" pattern with Values: rewarding experience raises a matching interest,
+and regression toward baseline is the brake on the interest → salience → interest feedback loop.
+
+---
+
+## Supporting Social Systems
+
+These are not pipeline engines but shared math/services consumed by the engines above.
+
+### Theory of Mind
+
+`ToMMath` (`Characters/Engines/ToM/`) models recursive belief reasoning ("I think that she thinks
+that I…"). Each NPC has a generated recursion ceiling (population mean ≈ 4, SD ≈ 1) with a default
+working depth of 2, used by interaction and deception reasoning. `MutualKnowledgeFormed` captures the
+emergence of common knowledge between characters.
+
+### Community Reputation
+
+A **scene-level singleton** `CommunityReputationLedger` (`Characters/Engines/Reputation/`) folds
+observed acts about a subject at a locale into an aggregate reputation, with recency weighting
+(half-life ≈ 7 interactions), stern-judging negativity bias (bad acts move ≈ 1.5× as hard), and
+diffusion through the community. `ReputationMath` exposes a trust prior derived from a subject's
+spread reputation — the prior a stranger starts from.
+
+### Life-Stage Transitions
+
+`OrchestratedHuman` detects life-stage boundary crossings each tick and emits
+`LifeStageTransitionOccurred`. `LifeStageMath` provides probabilistic reappraisal hooks (e.g. midlife
+mood dip, parenting-identity shifts) — no scripted crisis, just a believability trigger for
+re-evaluation.
+
+### Attraction
+
+`DefaultAttractionCalculator` (`Characters/Engines/Attraction/`) is a pure, stateless, asymmetric
+function. Components: `BasePhysical` (WHR + height + symmetry), `PreferenceMatch` (the observer's
+height/frame/WHR/symmetry/age preferences), `StateModifier` (posture, acne, bloating), a mere-exposure
+familiarity bonus, and the Zillmann excitatory-transfer bonus. Sexual-orientation weight multiplies
+the physical components. Called per-pair on demand (e.g. at first impression).
+
+---
+
+## Traits
+
+`Characters/Traits/` holds the stable, slow-changing trait layer:
+
+- **`Personality`** — Big Five (OCEAN), each [0–1]; pervasive across every engine.
+- **`AttachmentProfile`** — continuous 2-D ECR-R model: `Anxiety` × `Avoidance` (Secure /
+  Preoccupied / Dismissing / Fearful are region shortcuts, **not** an enum).
+- **`ValuesProfile`** — Schwartz value loadings.
+- **`InterestProfile`** — Holland RIASEC interests.
+- **`PsychologicalProfile`** — composite trait bundle derived from personality.
+- **`SexualResponsiveness`** — Dual Control Model (SES / SIS1 / SIS2); `DualControlMath` &
+  `DualControlBehaviorMath`.
+- **`SociosexualityBehaviorMath`** — SOI-R; **`SexualOrientation`** + behavior math.
+- **`PhysicalAppearance`**, **`Morphology`**, **`AttractionProfile`**.
+
+---
+
+## Character & Family Generation
+
+Before simulation, a character must be generated (`Characters/Generation/`). The pipeline is a
+separate, deterministic-when-seeded subsystem that produces a `HumanBlueprint` (and an immutable
+`GeneticBlueprint`); `DefaultHumanFactory` wraps it into a live `OrchestratedHuman`.
+
+- **`HumanBlueprintGenerator`** — orchestrates the full blueprint; all generators are stadium-aware
+  (`StadiumResolver` maps age → `StadiumType`: Baby / Child / Teenager / Adult / MidAged / Old).
+- **`PersonalityGenerator`** — draws each Big Five trait from a `TraitDistribution` (inverse-normal
+  CDF with skew correction) and applies population-level correlations via Cholesky decomposition
+  (e.g. C↔N ≈ −0.35).
+- **`AppearanceGenerator`** + **`AppearanceProjector`** — generate the immutable genetic blueprint and
+  project the visible appearance at a given age (aging changes the projection, not the genes).
+- **`AttractionProfileGenerator`** — personal physical preferences and sexual orientation.
+- **`ChildBlueprintGenerator`** — blends two parents' traits into a newborn blueprint (used on
+  `ChildBorn`).
+- **Family system** (`AddFamilySystem`) — `FamilyGraph`, `FamilyBuilder`, and `NuclearFamilyGenerator`
+  generate related characters and seed kin relationship edges in one call.
+- **Portraits** (`Generation/Portraits/`) — `PortraitSpecBuilder` + `PortraitPromptFormatter` turn a
+  character into an image-generation prompt (ancestry hint, morphology, surface detail).
+
+---
+
+## World, Objects & Astronomy
+
+`GameEngineTools/World/`:
+
+- **Time** (`World/Core/Time`, `World/Utils/Time`) — use `WDateTime`, `WDateOnly`, `WTimeOnly`,
+  `WTimeSpan`, **never** `System.DateTime`. `WDateTime` is a `readonly struct` over a `long` tick
+  count. Calendar-dependent properties require `WWorld.Spec`. Default calendar (Vigilia Insectianis):
+  10 months × 36 days × 26 hours, configured by `FixedMonthsCalendar`.
+- **Locations** (`World/Location`) — `LocationDescriptor` (noise, crowding, capacity, privacy, type)
+  and `DefaultLocationService`, which computes the per-tick `InteractionSurface` and dispatches
+  `ContextChanged` only to characters that moved. `WorldMap`/`WorldMapLoader` build an immutable
+  location graph from CSV (or `SqliteWorldMapLoader`).
+- **Objects** (`World/Objects`) — `WorldObject` (`Id`, `DisplayName`, `LocationId`,
+  `WorldObjectCategory`, a list of `WorldObjectAffordance`). Providers: `StaticWorldObjectProvider`,
+  `SqliteWorldObjectProvider` (+ `WorldObjectWriteBuffer`, `WorldObjectSnapshotCache`,
+  `ObjectRespawnScheduler`, `PickupItemKind`). NPCs read objects as structured data only.
+- **Data** (`World/Data`) — `SqliteWorldDatabase` persists world objects, the map, and social norms.
+- **Astronomy** (`World/Core/Astro`) — `SunModel`/`CelestialContextComputer` produce a per-tick
+  `CelestialContext` (irradiance, day length, sunrise/sunset, season, ambient temperature) from
+  `AstroConfig`. When a `UniverseConfig` is also supplied, the `Universe/` Kepler stack
+  (`KeplerSolver`, `OrbitalElements`, `StarPhysics`, `MoonPhysics`, `RingSystem`,
+  `HabitabilityProfile`) drives season, temperature, and gravity from real planetary mechanics.
+- **Simulation** (`World/Simulation`) — `SimulationScene` and the orchestrator, perception resolver,
+  and speech-act/touch selectors (see below).
+
+---
+
+## SimulationScene
+
+`SimulationScene` is the main loop. It owns the clock, ticks all characters in list order, routes
+outcomes between characters, injects ambient/celestial context, runs the narrative formatter, and
+applies LOD. It deliberately does **not** know who the player is, select social targets, or export
+data.
+
+Per-step order:
+
+```
+1. ApplyCharacterLods            — update LOD runtime per character position
+2. CelestialContext compute      — sun/Kepler model → ambient temperature (if AstroConfig set)
+3. LocationService.Dispatch      — emit ContextChanged to moved characters
+4. OnTick callback               — scene logic, ReachOut routing (sees PREVIOUS tick's outbox)
+5. Tick all characters           — full engine pipeline per character
+6. RouteOutcomes                 — Interaction/Touch/SexualEncounter outcomes → initiator
+7. Sleep prompts                 — per SleepPromptHandlers (NPCs auto-confirm by default)
+8. Clock.Advance(dt)
+9. NarrativeFormatter scan       — format domain events → OnNarrative callback
+```
+
+Selected `SimulationSceneOptions`:
+
+| Property | Default | Effect |
+|---|---|---|
+| `Characters` | required | All characters; tick order = list order (convention: player at index 0). |
+| `SimulationDays` | `20` | In-game days before `RunAsync()` completes. |
+| `TickStep` | `0:30:00` | Clock advance per main-loop iteration. |
+| `InternalSubstep` | `null` | Slices each `TickStep` into finer sub-steps for tighter latency. |
+| `LocationService` | `null` | Enables per-tick `ContextChanged` dispatch. |
+| `DefaultCharacterLod` / `ResolveCharacterLod` | `Nearby` / `null` | LOD selection per character. |
+| `OnTick` | `null` | Scene-level callback before characters advance. |
+| `SleepPromptHandlers` | `null` | Per-character sleep decision; unmapped NPCs auto-confirm. |
+| `NarrativeFormatter` / `ResolveCharacter` / `OnNarrative` | `null` | Czech narrative diary pipeline. |
+| `AstroConfig` / `UniverseConfig` | `null` | Sun model / planetary system; inject `CelestialContext`. |
+| `ObjectSnapshotCache` / `WriteBuffer` / `RespawnScheduler` | `null` | World-object perception & lifecycle. |
+
+The **narrative** layer (`Narrative/DefaultNarrativeFormatter`) maps domain events to Czech
+`NarrativeEntry` records using `CzechWordFormComposer` from the `50PSoftware.GrammarModular.Czech`
+package, returning `null` for unmapped/low-priority events.
+
+---
+
+## Configuration
+
+All character config binds from `appsettings.Characters.json` under `Characters:*` via
+`IOptions<T>`; `appsettings.Characters.Default.json` is the documented baseline (override per
+environment). World/astronomy config binds from `appsettings.World.json` under `World:*`.
+
+Active `Characters:*` sections:
+
+| Section | Owns |
+|---|---|
+| `Physiology` | Metabolic rate, sleep-debt cap, recovery rates, injury/pain. |
+| `MenstrualCycle` | Cycle length, menses, ovulation, symptom multipliers. |
+| `Psychology` | Affect/stress/cognitive-load/circadian/hormonal/environment/emotion-decay. |
+| `Behavior` | Decision scoring (inertia, novelty, noise penalty), intent, habits, social approach. |
+| `Sleep` | Sleep scheduling, phase durations, nightmare/ambush, emergency thresholds. |
+| `Interactions` | Misattribution rate and noise amplifier. |
+| `Relationships` | Decay & repair, per-dimension decay multipliers, mere-exposure, transgression, attachment, Dunbar tiers, investment. |
+| `Memory` | Encoding, forgetting, consolidation, distortion, reconsolidation, knowledge confidence. |
+| `SemanticMemory` | Belief learning/contradiction/decay, attachment modulation, Navarro model. |
+| `Goals` | Goal seeding, salience decay, frustration → abandonment. |
+| `DailySchedule` | Slot bias strength, skip thresholds. |
+| `Values` | Drift rate, regression-to-baseline, congruence sensitivity. |
+| `SelfConcept` | Self-verification rate, discrepancy threshold for identity goals. |
+| `Interests` | RIASEC drift and regression. |
+| `Lod` | Behavior decision cadence per `CognitiveResolutionLevel` (Player / Nearby / Background). |
+| `Fidelity` | Memory / perception / social fidelity level per LOD tier. |
+
+`World:*` sections include `Perception`, `Astro` (sun model + latitude/seasonal amplitude), and
+`Universe` (full star/planet/moon/ring definition). Each config record type lives alongside its
+engine.
+
+---
+
+## DI Registration
+
+`Characters/Hosting/ServiceCollectionExtensions.cs`. The shorthand registers all nine pipeline
+engines at once (Values, SelfConcept, Interests, Goal and the support services come from
+`AddCharactersCore`):
 
 ```csharp
 services.AddCharacters<
@@ -92,872 +510,75 @@ services.AddCharacters<
     DefaultInteractionEngine,
     DefaultRelationshipsEngine,
     DefaultMemoryEngine,
-    DefaultSemanticMemoryEngine>();
+    DefaultSemanticMemoryEngine,
+    DefaultGoalEngine,
+    DefaultDailyScheduleEngine>();
 ```
 
-Config sections bind automatically from `appsettings.json` under `Characters:*`.
+Each `Add*Engine<T>()` method binds its `IOptions<TConfig>` automatically (overridable via a
+lambda). Related registrations:
 
----
-
-## Engines
-
-### PhysiologyEngine
-
-**State:** `PhysiologyState` — Energy, Hunger, Thirst, Pain, ImmuneLoad, BodyTempDelta, SleepDebtHours, MenstrualCycle, NutritionState, InjuryState, PostpartumState
-
-**What it does:**
-Models the body's physical condition. Each tick it advances biological needs (hunger, thirst, energy depletion) and applies recovery. It owns the menstrual cycle simulation — advancing cycle day, detecting phase transitions, and setting symptom flags (pain, bloating, breast tenderness, PMS/PMDD). It also models injury healing, postpartum recovery, and nutrition tracking (calories, VitaminD, iron, protein).
-
-**Reads:** World time delta, character birth date and biology.
-
-**Emits:**
-- `InjuryReceived` / `InjuryHealed` — when injury state changes
-- `PostpartumPhaseChanged` — when recovery phase advances
-- `PregnancyStarted` / `PregnancyDiscovered` / `ChildBorn` — reproductive events
-
-**Why it runs first:** All other engines (especially Psychology) read physiological state. Pain, hunger, and sleep debt are upstream inputs to mood, stress, and decision-making.
-
----
-
-### PsychologyEngine
-
-**State:** `PsychologyState` — Valence, Arousal, Dominance (PAD), Stress, CognitiveLoad, DominantEmotion, MoodBaseline, MotivationState
-
-**What it does:**
-Models the affective state using the PAD model. Each tick it:
-1. Decays Stress toward zero at `StressRecoveryRatePerHour`
-2. Drifts PAD dimensions toward their resting neutral values
-3. Applies physiology modulation (pain → stress, sleep debt → CogLoad, fever → arousal suppression, hunger/thirst → valence penalties)
-4. Applies circadian arousal rhythm (peaks at `CircadianArousalPeakHour`, troughs at `CircadianArousalTroughHour`)
-5. Applies hormonal coupling (cortisol, testosterone)
-6. Applies environmental effects (noise, crowding, temperature, isolation, privacy)
-7. Adds random daily affect noise scaled by `BaselineAffectVariance`
-8. Infers `DominantEmotion` from the current PAD coordinates via a rule table
-9. Decays each discrete emotion at its own rate (fear/surprise fast; shame/sadness very slow)
-10. Checks for stress manifestation (if stress exceeds `StressManifestationThreshold` for `StressManifestationHours`, emits `StressManifested`)
-
-**Manifestation types** depend on personality: high Neuroticism → anxiety/rumination; low Agreeableness → aggression; high Openness → creativity channel; otherwise → withdrawal.
-
-**Reads:** `PhysiologyState` (from mid-tick snapshot), personality BigFive, location context.
-
-**Emits:** `MotivationChanged`, `StressSpiked`, `StressManifested`
-
----
-
-### BehaviorEngine
-
-**State:** `BehaviorState` — NeedRest, NeedFood, NeedWater, NeedBelonging, NeedCompetence, NeedIntimacy, CurrentPlan, Cooldowns, ActiveIntent, HabitTraces, SleepDeclineCount
-
-**What it does:**
-The decision-making core. Each tick it:
-1. Recomputes all six needs from physiological and psychological state
-2. Scores all candidate actions via a utility function
-3. Applies inertia boost to the current action (`InertiaWeight`) and novelty penalty for category switching (`NoveltyPenalty`)
-4. Applies habit bias from `HabitTraces` — repeated behavior in matching cue contexts gets a multiplier and flat bonus
-5. Applies prestige/dominance modulation to social action candidates
-6. Selects the highest-utility action and emits `ActionCommitted`
-7. Manages intent stability via `DefaultIntentManagementEngine` — prevents flickering between similar-utility actions
-8. Delegates sleep lifecycle to `DefaultSleepCoordinator`
-
-**Habit learning** (`BehaviorHabitLearning`): After each `ActionCommitted`, a learning signal is built from cue kind, need relief, and coping reinforcement. Habit traces strengthen (`HabitLearningRate`), decay daily (`HabitDecayPerDay`), and are pruned when `MaxHabitTraces` is exceeded. Traces can be classified as Adaptive, Neutral, or MaladaptiveCoping.
-
-**Reads:** Full `EnginesSnapshot` (physiology, psychology, relationships, memory working set).
-
-**Emits:** `ActionCommitted`, `InteractionProposed` (from social targeting candidates), `SleepPromptRequested`
-
-**Config sections:** `Characters:Behavior`, `Characters:Sleep`
-
----
-
-### SleepCoordinator
-
-**Owned by:** `DefaultBehaviorEngine` (via `DefaultSleepCoordinator`)
-
-**What it does:**
-Manages the full sleep session lifecycle as a state machine:
-
-```
-Awake → FallingAsleep → LightSleep → DeepSleep → REM → Awake
+```csharp
+services.AddObjectInteractionEngine();   // optional object-interaction subsystem
+services.AddCharacterGeneration(spec);   // or the lazy Func<IServiceProvider, HumanBlueprintSpec> overload
+services.AddFamilySystem();              // FamilyGraph + NuclearFamilyGenerator (after AddCharacterGeneration)
 ```
 
-- Emits phase transition events as the session advances through phases
-- Rolls nightmare probability based on stress level
-- Rolls ambush probability for outdoor sleep (modified by companion guard)
-- Applies memory consolidation boost (`SleepConsolidationBoost`) at the end of REM
-- Tracks `SleepDeclineCount` and applies `DeclinePenaltyStressPerHour` when sleep is overdue
-- Emergency sleep threshold overrides intent when `NeedRest > EmergencyNeedRestThreshold` or `Energy < EmergencyEnergyThreshold`
-- Blocks sleep when hunger or thirst exceed their respective block thresholds
-
-**Emits:** `SharedSleepBegan`, `SleepEnded`, `NightmareTriggered`, `SleepInterrupted`, `SleepPromptRequested`
-
-**EventIds:** 1100–1113
-
 ---
 
-### InteractionEngine
-
-**State:** `InteractionSurface` — Location, HasPrivacy, Noise, Crowding, Kind (Social/Private/Work/Rest/Public), ProxemicDistanceMeters
-
-**What it does:**
-Evaluates proposed social interactions and decides acceptance. For each `InteractionProposed`:
-1. Reads relationship edge (Closeness, Comfort, Trust, ResponsiveDesireLevel)
-2. Reads psychological state (Valence, Stress)
-3. Reads environment (privacy, noise, crowding)
-4. Computes acceptance probability — closer relationships, better mood, privacy, and low noise all increase it
-5. Applies misattribution penalty — high stress + noise causes the character to misread intent (`MisattributionRateBase`, amplified by `NoiseAttributionAmplifier`)
-6. Computes peak-end valence for the memory engine (peak-end rule)
-7. If the interaction was an accepted `Invite` and relationship readiness thresholds are met, emits `SexualEncounterProposed`
-
-**Sexual encounter readiness gate:** Trust ≥ 72, Comfort ≥ 72, Closeness ≥ 70, SexualInterest ≥ 68, privacy required, pain < 55, energy ≥ 25, stress < 70, character is adult.
-
-Also handles `TouchAttempted` — evaluates physical touch acceptance separately with sociosexuality and Closeness guards.
-
-**Reads:** `RelationshipEdge` per target, `PsychologyState`, `InteractionSurface`.
-
-**Emits:** `InteractionOutcome`, `TouchOutcome`, `SexualEncounterProposed`, `SexualEncounterOutcome`
-
-**EventIds:** 1200–1202
-
----
-
-### RelationshipsEngine
-
-**State:** `RelationshipState` — dictionary of `RelationshipEdge` per `HumanId`
-
-**Each `RelationshipEdge` tracks:**
-Trust, Respect, Closeness, Like, Comfort, Attraction, RomanticInterest, SexualInterest, Familiarity, PerceivedDominance, PerceivedPrestige, TransgressionResidue, ResponsiveDesireLevel, PositiveInteractionCount, DomainBreakdown (Humor/Intellect/Values/Physical/Aesthetics)
-
-**What it does:**
-Maintains the full social graph and reacts to every interaction event:
-
-- **First impression** — lerps relationship dimensions 70% toward the first impression values; seeds Like via halo effect
-- **Accepted interaction** — updates Trust (SelfDisclosure, Validation, Meta only), Respect (Validation, Question, Meta), Closeness (communal growth on intimate acts), Familiarity (mere-exposure logarithmic curve up to `MereExposureSaturation`), and the relevant `DomainBreakdown` dimension per `SpeechAct`
-- **Rejected interaction** — applies half-strength domain update; can accumulate TransgressionResidue
-- **MicroPositive / MicroNegative** — small incremental boosts or penalties to Like and Comfort
-- **RepairAttempt** — accepted: reduces TransgressionResidue by `RepairGain`; rejected: adds `RupturePenalty × 0.5`
-- **SexualEncounterOutcome** — accepted: boosts Comfort, Closeness, RomanticInterest, SexualInterest; also runs `AttractionPlasticity`
-- **Daily decay** — all dimensions decay at `DecayPerDay × DecayMultiplier[dimension]`; decay accelerates when contact gap exceeds `ExpectedContactIntervalDays` (Navarro gap effect)
-- **Dunbar tier pressure** — when Tier 1 or Tier 2 capacity is exceeded, decay multipliers increase proportionally
-- **Familiarity-Like dissonance** — high Familiarity with neutral/negative history causes Like to drift down (`FamiliarityLikeDissonancePenalty`)
-
-**Attachment modulation** via `RelationalStabilization` and `RejectionStingMultiplier`: personality profile (Agreeableness, Neuroticism, attachment style) modulates how strongly decay, rejection, and repair effects hit.
-
-**EventIds:** 2001–2007
-
----
-
-### MemoryEngine
-
-**State:** `MemoryIndex` — list of `EpisodicMemory`, plus `Knowledge` (dictionary of `SemanticFact`)
-
-**Each `EpisodicMemory` tracks:**
-What (canonical key), PerceivedWhat (subjective recall), When, Salience, Strength, Emotion, Distortion, RecallConfidence, OtherPerson, BeliefEvidence
-
-**What it does:**
-Manages episodic memory encoding, retrieval, consolidation, and forgetting:
-
-- **Encode** — on relevant domain events, builds a `What` key via `MemoryWhatFactory`, computes salience from emotional intensity, and checks for an existing episode with the same key to reinforce (`ReinforcementBoost`) instead of creating a duplicate
-- **Forgetting** — each tick applies Ebbinghaus decay: strength reduces by `ForgettingRate`; episodes below `PruneThreshold` are removed
-- **Sleep consolidation** — at `SleepEnded`, recent episodes receive a `SleepConsolidationBoost` to strength
-- **Stress distortion** — high stress at encoding shifts `Distortion` upward (`StressDistortionWeight`), degrading `RecallConfidence`
-- **Reconsolidation drift** — each recall applies a small `ReconsolidationDriftRate` to PerceivedWhat, modeling memory malleability
-- **Recall** — `MemoryCognition.Recall()` returns episodes filtered by query, with retrieval quality degraded when `CognitiveBurden` exceeds `CognitiveBurdenThreshold`
-- **DecisionWorkingSet** — builds a `ReflectionSummary` for the behavior engine: mood tendency, dominant social memory, recent significant events
-- **Knowledge** — stores `SemanticFact` entries with confidence levels; direct witness confidence = `DirectWitnessConfidence`, gossip = `GossipConfidence`; knowledge decays at `KnowledgeConfidenceDecayPerDay` and is pruned below `KnowledgePruneThreshold`
-
-**What string schema:** `{Category}:{Type}:{Outcome}|key=value|key=value`  
-Example: `Interaction:SmallTalk:Accepted|from=a3f2c1d0|to=b7e9a2f1`  
-The `What` string is the reinforcement key — identical events reinforce rather than duplicate.
-
-**Emits:** `MemoryEncoded`, `MemoryConsolidated`
-
-**EventIds:** 3000–3001
-
----
-
-### SemanticMemoryEngine
-
-**State:** `SemanticMemoryState` — dictionary of `PersonBeliefSet` per `HumanId`
-
-**Each `PersonBeliefSet` tracks five belief dimensions:**
-Warm, EmotionallySafe, Reliable, Rejecting, Critical — each with Strength and Stability
-
-**What it does:**
-Processes `MemoryEncoded` events and builds generalized person-beliefs from episodic patterns. This is the character's abstract model of *who other people are*:
-
-- **Pattern detection** — examines the last `PatternWindowSize` episodes for a given person; if at least `MinimumPatternSupport` episodes match a belief pattern, the belief is updated
-- **Learning** — confirming evidence strengthens belief by `LearningRate` and increases Stability by `StabilityGainPerEvidence`
-- **Contradiction** — contradicting evidence weakens belief by `ContradictionRate` and reduces Stability by `ContradictionStabilityHit`; high-stability beliefs resist contradiction
-- **Decay** — all beliefs decay passively at `DecayPerDay`
-- **Attachment modulation** — anxious attachment amplifies learning and contradiction sensitivity; avoidant attachment suppresses learning, especially for EmotionallySafe; disorganized attachment is most destabilized by contradictions
-- **Navarro toxic pattern** — when the ratio of negative-to-positive episodes exceeds `NavarroCriticalMultiple`, decay accelerates by `NavarroDecayAccelerator` (rapid disillusionment)
-
-**Feeds into:**
-- `SemanticMath.ExpectedAcceptance()` — probability that a person will accept a ReachOut, used by social targeting
-- `SemanticTargeting.RankTargets()` / `ChooseTarget()` — selects the best social approach target
-- `SocialTargetCandidateFactory` — generates `ReachOut` and `InviteIntimacy` behavior candidates with `SocialTargetingData` (expectedAcceptance, vulnerabilitySafety, rejectionRisk)
-
----
-
-## Character Generation
-
-Before a character can be simulated it must be generated. The generation pipeline is a separate, stateless subsystem that produces a `HumanBlueprint` — a snapshot of all stable traits. The `DefaultHumanFactory` then wraps the blueprint into a live `OrchestratedHuman` with a full engine stack.
-
-### Life stages (StadiumType)
-
-All generators are stadium-aware. The `StadiumResolver` maps character age to a `StadiumType`:
-
-| Stadium | Age range | Notes |
-|---|---|---|
-| `Baby` | 0–2 | No sexual dimension, very high Neuroticism, low Conscientiousness |
-| `Child` | 3–11 | No sexual dimension, curiosity-driven, Conscientiousness still forming |
-| `Teenager` | 12–17 | High Neuroticism variance (puberty volatility), max Sociosexuality = Intermediate |
-| `Adult` | 18–39 | Default — no adjustments |
-| `MidAged` | 40–64 | Lower Neuroticism, higher Conscientiousness |
-| `Old` | 65+ | Lower Openness and Sexuality, higher Conscientiousness, aging surface detail |
-
-Thresholds can be overridden via `StadiumThresholds` for game worlds with different age conventions.
-
----
-
-### PersonalityGenerator
-
-Generates a `Personality` from a `PersonalitySpec` + optional `PersonalityHints`.
-
-**BigFive generation:**
-- Each trait is drawn from a `TraitDistribution(Mean, Dev, Skew, Concentration)` using inverse-normal CDF with delta-method skew correction
-- Correlations between traits are applied via Cholesky decomposition of the 5×5 correlation matrix
-- Default realistic correlations: C↔N = −0.35, E↔N = −0.20, O↔C = +0.12
-
-**Default population-level trait correlations:**
-
-| | O | C | E | A | N |
-|---|---|---|---|---|---|
-| **O** | 1.00 | +0.12 | +0.12 | +0.15 | −0.12 |
-| **C** | | 1.00 | +0.10 | +0.10 | **−0.35** |
-| **E** | | | 1.00 | +0.08 | **−0.20** |
-| **A** | | | | 1.00 | −0.20 |
-| **N** | | | | | 1.00 |
-
-**MotivationWeights** are derived from BigFive via a linear mapping (`MotivationMapping`):  
-`weight = Bias + wO·O + wC·C + wE·E + wA·A + wN·N`, clamped to [0, 1].  
-Example: Affiliation is driven by Extraversion (+0.25) and Agreeableness (+0.20); Achievement by Conscientiousness (+0.30).
-
-**Categorical traits** (Attachment, CommunicationStyle, Chronotype, Sociosexuality) are sampled from weighted distributions, also stage-calibrated.
-
-**Hard constraints via PersonalityHints:**
-
-| Stadium | Constraint |
-|---|---|
-| Baby | Sociosexuality = Restricted, Communication = Direct |
-| Child | Sociosexuality = Restricted |
-| Teenager | Sociosexuality ≤ Intermediate |
-| Adult+ | No hard constraints |
-
----
-
-### AppearanceGenerator
-
-Generates a `PhysicalAppearance` from a seed + `StadiumType` + `SexBiology`. Fully deterministic when a fixed seed is provided.
-
-**Generation pipeline:**
-1. **BodyLatent** — height sampled from `(HeightFemale/Male)` range; frame, body latent factors computed
-2. **FaceLatent** — correlated to body (broader frame → different facial proportions)
-3. **Body morphology** — shoulder/hip breadths correlated to height and frame; sexual dimorphism enforced via `SexBiasStrength`
-4. **Face morphology** — nose prominence, lip fullness, mandible angle, nasolabial angle, facial asymmetry — all from `MorphologyGenerationSpec`
-5. **Surface traits** — skin oiliness, acne, wrinkle tendency, scar probability — aging factor drives surface detail rate
-6. **Colors** — SkinTone, EyeColor, HairColor, HairType sampled from weighted distributions
-7. **DistinctiveMarks** — derived from surface thresholds (mole patterns, freckles, scars)
-
-**Stadium-specific morphology parameters (`MorphologyGenerationSpec.For()`):**
-
-| Parameter | Baby | Child | Teenager | Adult |
-|---|---|---|---|---|
-| `JitterAmplitude` | 0.06 | 0.10 | 0.10 | 0.10 |
-| `SexBiasStrength` | 0.10 | 0.10 | 0.28 | 0.28 |
-| `Juvenility` latent | 0.95 | 0.75 | 0.35 | 0.15 |
-| `AgingFactor` latent | 0.0 | 0.0 | 0.0 | 0.0 |
-
-Height ranges by stadium (female / male in cm):
-
-| Stadium | Female | Male |
-|---|---|---|
-| Baby | 45–90 | 45–92 |
-| Child | 90–148 | 90–150 |
-| Teenager | 148–168 | 150–178 |
-| Adult (default) | 155–175 | 165–185 |
-
----
-
-### AttractionCalculator
-
-`DefaultAttractionCalculator` computes how much observer A finds target B attractive. Attraction is **asymmetric** — called per-pair on demand (e.g. at `FirstImpressionFormed`).
-
-**Score components (sum = 100 max):**
-
-| Component | Max | What it captures |
-|---|---|---|
-| `BasePhysical` | 40 | Evolutionary signals: WHR approximation (shoulder/hip ratio), height in population range, facial symmetry proxy (nose + lip near 0.5) |
-| `PreferenceMatch` | 35 | Personal taste: height preference match, frame preference, WHR preference from observer's `AttractionProfile` |
-| `StateModifier` | −15 to +10 | Current state: posture (+), acne (−), bloating (−) from `AppearanceView` |
-| `MereExposure` | 15 | Familiarity bonus from repeated positive contact (from `RelationshipEdge`) |
-
-**First impression Like** (halo effect):  
-`Like = 25 + Attraction × 0.40 + ObserverValence × 8`, clamped to [0, 100].  
-At Attraction 50 → Like ≈ 45; at Attraction 80 → Like ≈ 57; at Attraction 20 → Like ≈ 33.
-
----
-
-### AttractionProfileGenerator
-
-Generates an `AttractionProfile` for each character — their personal physical preferences:
-- `PreferredHeightCm` — sampled with sexual dimorphism bias (women prefer taller men; men prefer slightly shorter women)
-- `HeightToleranceCm` — how wide the acceptable height range is
-- `PreferredWhr` — preferred waist-hip ratio
-- `FramePreference` — body frame preference (None / Petite / Medium / Large / Strong)
-- `SexualOrientation` — Heterosexual / Homosexual / Bisexual / Asexual
-- `TargetAttractionWeights` — per-biology attraction weights derived from orientation
-
----
-
-### ChildBlueprintGenerator
-
-Generates a newborn `HumanBlueprint` from two parent `IHuman` instances. Blends parent traits (BigFive, appearance latent factors) with Baby-stage baseline and deterministic variation. Used when `ChildBorn` is emitted by the physiology engine.
-
----
-
-## SimulationScene
-
-`SimulationScene` is the main simulation loop. It owns the clock, ticks all characters in order, routes outcomes between characters, and handles sleep prompts.
-
-**What the scene does — not what it doesn't:**
-
-| Does | Does not |
-|---|---|
-| Ticks characters in `Characters` list order | Know who is the player vs NPC |
-| Routes `InteractionOutcome` to initiator | Route `ReachOut → InteractionProposed` (caller's responsibility) |
-| Handles sleep prompts per `SleepPromptHandlers` | Export data or print headers |
-| Dispatches `ContextChanged` via `LocationService` | Select social targets |
-| Injects `CelestialContext` when `AstroConfig` set | |
-| Runs `NarrativeFormatter` + `OnNarrative` callback | |
-| Applies LOD per character via `ApplyCharacterLods` | |
-
-**Tick order within one step:**
-```
-1. ApplyCharacterLods          — update LOD runtime per character position
-2. CelestialContext compute     — sun model → ambient temperature (if AstroConfig set)
-3. LocationService.Dispatch     — emit ContextChanged to moved characters
-4. OnTick callback              — scene-level logic, ReachOut routing
-                                  (LastOutbox here = PREVIOUS tick's outbox)
-5. Tick all characters          — all engines advance
-6. RouteOutcomes                — InteractionOutcome/Touch/SexualEncounter → initiator
-7. Sleep prompts                — per SleepPromptHandlers (default: auto-confirm for NPCs)
-8. Clock.Advance(dt)
-9. NarrativeFormatter scan      — format narrative entries → OnNarrative
+## Building & Testing
+
+> **`dotnet build` / `dotnet test` are broken here** — the .NET SDK 10.0.202 install is missing
+> `Microsoft.Common.CurrentVersion.targets`. Use VS18 MSBuild + vstest instead.
+
+```bash
+# Build (EngineTests references the core lib, so this compiles both — fastest path)
+"/c/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/MSBuild.exe" \
+  "EngineTests/EngineTests.csproj" -t:Build -p:Configuration=Debug -verbosity:quiet
+
+# Run all tests
+"/c/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/Extensions/TestPlatform/vstest.console.exe" \
+  "EngineTests/bin/Debug/net8.0/EngineTests.dll" --logger:"console;verbosity=minimal"
+
+# Run a single test / one class
+... vstest.console.exe ... --filter:"TestMethodName"
+... vstest.console.exe ... --filter:"FullyQualifiedName~ClassName"
 ```
 
-If `InternalSubstep` is set, the outer `TickStep` is sliced into finer sub-steps for better character-to-character latency and timing accuracy.
-
-### SimulationSceneOptions
-
-| Property | Default | Effect |
-|---|---|---|
-| `Characters` | required | All characters in the scene. Tick order = list order; convention: player at index 0. |
-| `SimulationDays` | `20` | How many in-game days the scene runs before `RunAsync()` completes. |
-| `TickStep` | `0:30:00` | Outer tick step — how far the clock advances per main loop iteration. |
-| `InternalSubstep` | `null` | When set, each `TickStep` is divided into sub-steps of this size. Finer granularity, more CPU. |
-| `LocationService` | `null` | When provided, `DispatchContextEvents` is called before each tick. |
-| `DefaultCharacterLod` | `Nearby` | Fallback LOD when `ResolveCharacterLod` returns nothing. |
-| `ResolveCharacterLod` | `null` | Lambda: `(IHuman) → CognitiveResolutionLevel`. Used by `SceneCharacterLodResolver`. |
-| `OnTick` | `null` | Callback invoked each tick before characters advance. Receives `(WDateTime now, IReadOnlyList<IHuman> chars)`. |
-| `SleepPromptHandlers` | `{}` | Per-character sleep decision. Key = `HumanId`, value = `Func<SleepPromptRequested, bool>`. NPCs not in the dict auto-confirm sleep. |
-| `NarrativeFormatter` | `null` | Formats domain events into `NarrativeEntry` text. Pass `new DefaultNarrativeFormatter()` to enable diary. |
-| `ResolveCharacter` | `null` | Lambda: `HumanId → NarrativeCharacterInfo` for the narrative formatter (name + gender for grammar). |
-| `OnNarrative` | `null` | Callback receiving each formatted `NarrativeEntry`. Store to a diary list or show in UI. |
-| `AstroConfig` | `null` | Sun model configuration. When set, `CelestialContext` (ambient temperature, light) is injected each tick. |
-| `UniverseConfig` | `null` | Planetary system (Phase 2). When set together with `AstroConfig`, Kepler mechanics drive season, temperature, and gravity. |
+Tests use MSTest. `TestBase` provides DI setup, a `GameEngineToolsManager`, and deterministic test
+doubles (`ZeroRandom`, `NullEventBus`, `NullScheduler`, `TestClock`, `FixedSocialFidelityPolicy`) and
+calls `WWorld.Reset()` for isolation.
 
 ---
 
-## World & Locations
-
-### LocationDescriptor
-
-Describes a named place in the world. The `InteractionEngine` reads noise, crowding, and privacy from `InteractionSurface`, which is computed by `DefaultLocationService` from these descriptors.
-
-| Field | Type | Effect |
-|---|---|---|
-| `Id` | `string` | Unique identifier used in `MoveCharacter` and `GetLocation`. |
-| `DisplayName` | `string` | Human-readable name used in narrative output. |
-| `Type` | `LocationType` | Social / Private / Work / Rest / Public — drives `SurfaceKind` and `MoveTo:*` action routing. |
-| `BaseNoise` | `double [0–1]` | Ambient noise before any characters arrive. Library: 0.05; smithy: 0.70. |
-| `NoisePerPerson` | `double [0–1]` | Additional noise per character present. Formula: `BaseNoise + NoisePerPerson × count`, clamped to 1. |
-| `Capacity` | `int` | "Comfortable" capacity. Crowding = `characterCount / Capacity`, clamped to 1. |
-| `AllowsPrivacy` | `bool` | Whether privacy is ever possible here. A public square is `false` regardless of character count. |
-
-**LocationType values:**
-
-| Value | Use case |
-|---|---|
-| `Social` | Tavern, village square, market — open social space |
-| `Private` | Library, private room, study — intimate or focused |
-| `Work` | Workshop, forge, fields — tied to productive activity |
-| `Rest` | Inn, home — recovery space |
-| `Public` | Roads, large plazas — no dominant character |
-
----
-
-### DefaultLocationService
-
-Tracks character positions and computes `InteractionSurface` per location. Called by `SimulationScene` once per tick via `DispatchContextEvents`.
-
-**Noise formula:** `BaseNoise + NoisePerPerson × characterCount`, clamped to [0, 1].  
-**Crowding formula:** `characterCount / Capacity`, clamped to [0, 1].  
-**Privacy:** `AllowsPrivacy && characterCount <= 1` — a place with two or more people is no longer private even if it allows it.
-
-Only emits `ContextChanged` to characters whose location has changed since the last dispatch — not to every character every tick. Pass `forceAll: true` on the first tick to initialize everyone.
-
----
-
-### WorldMap & WorldMapLoader
-
-`WorldMap` is an immutable graph of locations loaded from CSV at startup.
-
-**`Locations.csv` columns (semicolon-separated):**
-```
-Id ; DisplayName ; Type ; Region ; BaseNoise ; NoisePerPerson ; Capacity ; AllowsPrivacy
-```
-
-**`Connections.csv` columns:**
-```
-FromId ; ToId ; TravelMinutes
-```
-
-Connections are directed edges in the adjacency graph. `WorldMap.GetNeighbors(locationId)` returns adjacent locations sorted by travel time.
-
-`WorldMap.RegisterAllLocations(locationService)` bulk-registers all loaded locations into a `DefaultLocationService` — call once at startup instead of manual `RegisterLocation` calls.
-
-Locations can be queried by region: `worldMap.GetLocationsInRegion("Castle")` returns all location IDs tagged with that region in `Locations.csv`. Region is world-level metadata only; it is not stored in `LocationDescriptor`.
-
----
-
-## Configuration Reference
-
-All configuration lives in `appsettings.Characters.json` (or `appsettings.Characters.Default.json` as the baseline). Override any value in environment-specific files.
-
----
-
-### `Characters:Physiology`
-
-| Key | Default | Effect |
-|---|---|---|
-| `RestingMetabolicRate` | `1600.0` | Base caloric need per day. Affects how quickly hunger rises when nutrition is insufficient. |
-| `MaxSleepDebtHours` | `12.0` | Cap on accumulated sleep debt. Beyond this, cognitive load and stress spike hard. |
-| `EnableMenstrualCycle` | `true` | Whether female characters run menstrual cycle simulation. Set `false` for simplified worlds. |
-| `MenstrualCycleBeginsInAge` | `12` | Minimum age (years) at which the cycle can start. |
-| `EnergyRecoveryPerSleepHour` | `10` | Energy points recovered per hour of sleep. Higher = characters bounce back faster. |
-| `PainPassiveRecoveryPerHour` | `0.3` | Pain reduction per hour while awake. Low value = injuries linger realistically. |
-| `PainSleepRecoveryPerHour` | `0.5` | Pain reduction per hour during sleep. Sleep accelerates healing. |
-
----
-
-### `Characters:MenstrualCycle`
-
-Only active when `EnableMenstrualCycle = true` and character biology is female.
-
-| Key | Default | Effect |
-|---|---|---|
-| `MeanCycleLengthDays` | `28` | Average cycle length. Actual length is sampled with Gaussian noise. |
-| `VariabilityDaysStdDev` | `2.0` | Standard deviation of cycle length. Higher = more irregular cycles. |
-| `MensesMeanDays` | `5` | Average duration of menstruation in days. |
-| `OvulationDayOfCycle` | `14` | Day on which ovulation occurs (feeds SemanticTargeting and attraction modulation). |
-| `MinCycleLengthDays` | `21` | Hard minimum to prevent biologically implausible short cycles. |
-| `MaxCycleLengthDays` | `35` | Hard maximum to clamp the sampled cycle length. |
-| `PmsRisk` | `0.35` | Probability (0–1) that a character experiences PMS symptoms in a given cycle. |
-| `EnableOvulationWindowEvents` | `true` | Whether the engine emits events during the ovulation window. |
-| `EnableSymptoms` | `true` | Whether physical symptoms (pain, bloating, breast tenderness) are simulated. |
-| `PainBaseMultiplier` | `1.0` | Scales menstrual pain intensity. `2.0` = dysmenorrhea-level pain. |
-| `BloatBaseMultiplier` | `1.0` | Scales bloating severity. Affects comfort and social willingness. |
-| `BreastTenderMultiplier` | `1.0` | Scales breast tenderness. Affects touch acceptance threshold. |
-
----
-
-### `Characters:Psychology`
-
-#### Core affect
-
-| Key | Default | Effect |
-|---|---|---|
-| `BaselineAffectVariance` | `0.02` | Random noise added to Valence each tick. Higher = mood fluctuates more. |
-| `StressRecoveryRatePerHour` | `1.5` | Stress reduction per hour under normal conditions. Low = chronic stress accumulates. |
-| `SleepQualityAffectWeight` | `0.5` | How much sleep quality shifts Valence the next morning. |
-| `MoodBaselineRecoveryPerHour` | `0.5` | Rate at which MoodBaseline drifts back toward neutral (50). |
-| `MoodBaselineHighStressThreshold` | `80.0` | Stress above this suppresses MoodBaseline recovery entirely. |
-| `MoodBaselineAgreeablenessBonus` | `0.3` | Extra MoodBaseline recovery per unit of Agreeableness above 0.5. |
-
-#### Circadian rhythm
-
-| Key | Default | Effect |
-|---|---|---|
-| `EnableCircadianRhythm` | `true` | Enables time-of-day modulation of Arousal. |
-| `CircadianArousalPeakHour` | `14.0` | Hour (0–23) when Arousal is naturally highest. |
-| `CircadianArousalTroughHour` | `3.0` | Hour when Arousal is naturally lowest (post-midnight dip). |
-| `CircadianInfluence` | `0.15` | Amplitude of circadian Arousal swing. `0.0` = flat. |
-
-#### Cognitive load
-
-| Key | Default | Effect |
-|---|---|---|
-| `CognitiveLoadSleepDebtWeight` | `1.8` | CognLoad added per hour of sleep debt. Exhausted characters can't think straight. |
-| `CognitiveLoadPainWeight` | `0.4` | CognLoad added per pain point. Pain distracts decision-making. |
-| `CognitiveLoadStressWeight` | `0.3` | CognLoad added per stress point. Stress narrows cognitive bandwidth. |
-| `CognitiveLoadRecoveryPerHour` | `5.0` | CognLoad reduction per hour of rest or low-stimulation. |
-| `FeverCognitiveLoadPerDegree` | `8.0` | CognLoad added per degree of body temperature above normal. |
-| `FeverArousalSuppressPerDegree` | `0.04` | Arousal suppressed per degree of fever. Sick characters are lethargic. |
-
-#### Stress manifestation
-
-| Key | Default | Effect |
-|---|---|---|
-| `StressManifestationThreshold` | `70.0` | Stress must exceed this value… |
-| `StressManifestationHours` | `4.0` | …for this many in-game hours before `StressManifested` is emitted. |
-
-Manifestation type is personality-driven: high Neuroticism → anxiety/rumination; low Agreeableness → aggression; high Openness → creativity channel; otherwise → withdrawal.
-
-#### Sickness behavior (immune coupling)
-
-| Key | Default | Effect |
-|---|---|---|
-| `SicknessAnhedoniaImmuneThreshold` | `50.0` | ImmuneLoad above this triggers reward blunting (anhedonia). |
-| `SicknessAnhedoniaRewardBlunting` | `0.5` | Fraction by which Valence gains are reduced during illness. |
-| `SicknessLethargyArousalPenalty` | `0.008` | Arousal reduction per tick of high ImmuneLoad. Sick = tired. |
-| `SicknessBrainFogCogLoadBonus` | `3.0` | Extra CognLoad per tick when immune system is active. |
-
-#### Hormonal coupling
-
-| Key | Default | Effect |
-|---|---|---|
-| `CortisolStressWeight` | `0.15` | How strongly cortisol level drives Stress. |
-| `CortisolArousalWeight` | `0.008` | How strongly cortisol raises Arousal (alertness under threat). |
-| `TestosteroneIntimacyWeight` | `0.3` | How strongly testosterone boosts NeedIntimacy. |
-| `TestosteroneStressResilienceWeight` | `0.008` | How much testosterone reduces Stress response. |
-
-#### Emotion decay (points per hour; lower = emotion lingers longer)
-
-| Key | Default | Character |
-|---|---|---|
-| `EmotionDecayFear` | `3.0` | Fast — dissipates once threat is gone |
-| `EmotionDecaySurprise` | `3.0` | Fast — momentary |
-| `EmotionDecayDisgust` | `2.5` | Moderate-fast |
-| `EmotionDecayJoy` | `1.0` | Moderate |
-| `EmotionDecayPride` | `0.8` | Slow — pride lingers |
-| `EmotionDecayTenderness` | `0.7` | Slow |
-| `EmotionDecayAnger` | `0.6` | Slow — anger is sticky |
-| `EmotionDecayShame` | `0.4` | Very slow — shame persists |
-| `EmotionDecaySadness` | `0.06` | Extremely slow — grief model |
-
-#### Environment effects
-
-| Key | Default | Effect |
-|---|---|---|
-| `NoiseStressThreshold` | `0.55` | Noise level (0–1) above which stress starts accumulating. |
-| `NoiseStressWeightPerHour` | `0.08` | Stress added per hour above threshold. |
-| `HomeNoiseStressMultiplier` | `0.4` | Noise at home is less stressful (familiarity effect). |
-| `ProxemicsIntimateZoneStressPerHour` | `4.0` | Stress from unwanted physical closeness. |
-| `ProxemicsPersonalZoneStressPerHour` | `1.5` | Stress from personal space invasion. |
-| `PrivacyMismatchStressWeight` | `6.0` | Stress when character needs privacy but is in a public space. |
-| `IsolationStressWeight` | `3.0` | Stress when character needs social contact but is alone. |
-| `PrivacyRecoveryBonusPerHour` | `0.8` | Stress recovery bonus per hour of sought-after solitude. |
-| `AmbientTempHeatThreshold` | `27.0` | Temperature (°C) above which heat stress begins. |
-| `AmbientTempColdThreshold` | `15.0` | Temperature below which cold discomfort begins. |
-
----
-
-### `Characters:Behavior`
-
-#### Decision scoring
-
-| Key | Default | Effect |
-|---|---|---|
-| `InertiaWeight` | `0.25` | Utility multiplier bonus for repeating the current action. `0.0` = no routine; `0.5` = strong habit effect. |
-| `NoveltyPenalty` | `0.1` | Utility penalty for switching to a different action category (cognitive switching cost). |
-| `PlanningHorizonHours` | `2.0` | How far ahead the engine considers planned actions. |
-| `NoiseCognitivePenaltyMax` | `0.45` | Maximum utility reduction for Work/Create at Noise = 1.0. Zero penalty below `NoiseStressThreshold`. |
-
-#### Sleep scheduling
-
-| Key | Default | Effect |
-|---|---|---|
-| `BaseSleepHours` | `8` | Target sleep duration under normal conditions. |
-| `MinSleepHours` | `4` | Hard minimum — character will not try to sleep shorter than this. |
-| `MaxSleepHours` | `12` | Hard maximum — even very fatigued characters cap here. |
-| `SleepCooldownHours` | `16` | Minimum waking hours before sleep can be initiated again. |
-
-#### Intent management
-
-| Key | Default | Effect |
-|---|---|---|
-| `UseIntentManagement` | `true` | Enables cross-tick intent stabilization. Disable for fully reactive behavior. |
-| `IntentSwitchMargin` | `10.0` | A new action must outscore the current intent by this margin to trigger a switch. Prevents flickering. |
-| `IntentBaseBias` | `8.0` | Flat utility bonus given to the current intent each tick. |
-| `IntentCommitmentBiasStep` | `1.0` | Additional bias added per tick the character stays committed. Long intentions become stickier. |
-| `IntentTimeoutHours` | `2.0` | After this many in-game hours the intent expires even without completion. |
-| `EmergencyIntentOverrideThreshold` | `75.0` | A need above this overrides intent regardless of commitment (biological emergency). |
-
-#### Habit system
-
-| Key | Default | Effect |
-|---|---|---|
-| `HabitLearningRate` | `0.08` | How quickly habit traces strengthen per reinforcement event. |
-| `HabitDecayPerDay` | `0.015` | Daily decay of habit strength. Low = habits persist a long time. |
-| `HabitMaxUtilityMultiplier` | `0.18` | Maximum proportional utility boost from a fully formed habit. |
-| `HabitMaxFlatBias` | `4.0` | Maximum flat utility added on top of the multiplier. |
-| `MaxHabitTraces` | `64` | Maximum stored habit traces per character. Oldest/weakest are pruned when exceeded. |
-
-#### Social approach modulation
-
-| Key | Default | Effect |
-|---|---|---|
-| `PrestigeReachOutBonusPerPoint` | `0.06` | ReachOut utility bonus per point of target's PerceivedPrestige above 50. |
-| `DominanceAvoidancePenaltyPerPoint` | `0.08` | ReachOut utility penalty per point of target's PerceivedDominance above 70 when Closeness < 30. |
-
----
-
-### `Characters:Sleep`
-
-| Key | Default | Effect |
-|---|---|---|
-| `SleepPromptThreshold` | `70.0` | NeedRest value (0–100) above which the engine requests sleep. |
-| `SleepGraceHours` | `4.0` | How long the engine waits after a prompt before applying decline penalties. |
-| `MaxDeclineCount` | `3` | Maximum number of sleep declines before forced override. |
-| `DeclinePenaltyStressPerHour` | `2.0` | Stress added per hour when sleep is declined past grace period. |
-| `FallingDurationHours` | `0.25` | Time spent in the falling-asleep phase. |
-| `LightDurationHours` | `0.75` | Duration of light sleep phase. |
-| `DeepDurationHours` | `2.5` | Duration of deep sleep (primary restoration). |
-| `RemDurationHours` | `1.5` | Duration of REM sleep (memory consolidation). |
-| `AmbushBaseChancePerHour` | `0.03` | Base probability per hour of interruption during outdoor sleep. |
-| `CompanionGuardModifier` | `0.4` | Multiplier on ambush chance when sleeping with a companion (`0.4` = 60% reduction). |
-| `NightmareStressThreshold` | `70.0` | Stress above this increases nightmare probability. |
-| `NightmareChanceHighStress` | `0.25` | Nightmare probability per session when stress exceeds threshold. |
-| `NightmareChanceNormal` | `0.05` | Nightmare probability per session under normal stress. |
-| `EmergencyNeedRestThreshold` | `90.0` | NeedRest above this triggers emergency sleep regardless of intent. |
-| `EmergencyEnergyThreshold` | `5.0` | Energy below this also triggers emergency sleep. |
-| `ThirstSleepBlockThreshold` | `80.0` | Thirst above this blocks sleep initiation (biological priority). |
-| `HungerSleepBlockThreshold` | `80.0` | Hunger above this blocks sleep initiation. |
-
----
-
-### `Characters:Interactions`
-
-| Key | Default | Effect |
-|---|---|---|
-| `MisattributionRateBase` | `0.15` | Base probability that a character misattributes an interaction outcome (e.g., blaming the other person for environmental noise). |
-| `NoiseAttributionAmplifier` | `0.40` | How much ambient noise amplifies the misattribution rate. High noise = harder to read social signals correctly. |
-
----
-
-### `Characters:Relationships`
-
-#### Decay and repair
-
-| Key | Default | Effect |
-|---|---|---|
-| `DecayPerDay` | `1.5` | Global decay multiplier. Final decay per dimension = `DecayPerDay × DecayMultiplier[Dimension]`. |
-| `RepairGain` | `6.0` | Relationship improvement after a successful repair attempt. |
-| `RupturePenalty` | `8.0` | Relationship damage after a failed repair or transgression. |
-| `ExpectedContactIntervalDays` | `14.0` | Contact gap above this accelerates decay (Navarro gap effect). |
-| `NavarrGapMultiplier` | `3.0` | Decay acceleration factor when the expected contact interval is missed. |
-
-#### Per-dimension decay multipliers
-
-Final daily decay = `DecayPerDay × multiplier`:
-
-| Key | Default | Dimension character |
-|---|---|---|
-| `DecayMultiplierTrust` | `0.06` | Extremely slow — hard to build, hard to lose passively |
-| `DecayMultiplierRespect` | `0.04` | Slowest — reputational, very stable |
-| `DecayMultiplierCloseness` | `0.35` | Moderate — needs regular meaningful contact |
-| `DecayMultiplierLike` | `0.28` | Moderate |
-| `DecayMultiplierComfort` | `0.80` | Fast — fades quickly without contact |
-| `DecayMultiplierRomanticInterest` | `1.00` | Fast — needs active reinforcement |
-| `DecayMultiplierSexualInterest` | `1.50` | Fastest — highly context-dependent |
-| `DecayMultiplierFamiliarity` | `0.08` | Very slow — face recognition persists |
-| `DecayMultiplierDominance` | `0.08` | Slow — status is stable |
-| `DecayMultiplierPrestige` | `0.08` | Slow — reputation endures |
-
-#### Mere exposure and familiarity
-
-| Key | Default | Effect |
-|---|---|---|
-| `MereExposureMaxBoost` | `15.0` | Maximum total Attraction boost from repeated positive contact (logarithmic curve). |
-| `MereExposureSaturation` | `20` | Number of interactions at which the mere-exposure boost saturates. |
-| `FamiliarityDecayFloor` | `10.0` | Familiarity never decays below this — faces are remembered even after long absence. |
-| `FamiliarityLikeDissonancePenalty` | `0.04` | Like decay accelerator when Familiarity is high but interactions have been neutral/negative. |
-
-#### Transgression system
-
-| Key | Default | Effect |
-|---|---|---|
-| `TransgressionDecayRatePerDay` | `0.04` | How quickly transgression residue fades per day. |
-| `TransgressionMicroNegativeGain` | `3.0` | Transgression residue added per MicroNegative event. |
-| `TransgressionRejectionGain` | `6.0` | Transgression residue added per rejection event. |
-
-#### Attachment and communal exchange
-
-| Key | Default | Effect |
-|---|---|---|
-| `ClosenessAvoidanceCap` | `40.0` | Maximum Closeness achievable with an avoidant-attachment character. |
-| `RejectionAnxietyAmplifier` | `0.6` | Amplifies rejection effects on NeedBelonging for anxious-attachment characters. |
-| `CommunalGrowthPerIntimateInteraction` | `1.5` | Closeness gain per intimate interaction (self-disclosure, validation). |
-
-#### Attraction plasticity
-
-| Key | Default | Effect |
-|---|---|---|
-| `AttractionPlasticityPerInteraction` | `0.25` | How much attraction preferences shift per positive/negative interaction. |
-| `TonicSexualInterestThreshold` | `40.0` | SexualInterest below this triggers tonic desire modulation. |
-| `TonicSexualInterestDecayFactor` | `0.30` | Additional decay rate below the tonic threshold. |
-| `SexualInterestSeedFactor` | `0.50` | How much initial physical attraction seeds SexualInterest on first meeting. |
-
-#### Dunbar tiers (time-budget model)
-
-| Key | Default | Effect |
-|---|---|---|
-| `DunbarTier1Threshold` | `70.0` | Closeness above this = Tier 1 (inner circle). |
-| `DunbarTier2Threshold` | `40.0` | Closeness above this = Tier 2 (good friends). |
-| `DunbarTier1Capacity` | `5` | Maximum Tier 1 relationships before attention budget pressure kicks in. |
-| `DunbarTier2Capacity` | `15` | Maximum Tier 2 relationships. |
-| `AttentionBudgetPressurePerExcessTier1` | `0.15` | Decay multiplier increase per Tier 1 relationship over capacity. |
-| `AttentionBudgetPressurePerExcessTier2` | `0.05` | Decay multiplier increase per Tier 2 relationship over capacity. |
-
-#### Dominance and prestige
-
-| Key | Default | Effect |
-|---|---|---|
-| `PrestigeGainPerPositiveAct` | `2.0` | Prestige increase from public helping or generous behavior. |
-| `DominanceGainPerNegativeAct` | `3.0` | Dominance increase from assertive or aggressive acts. |
-| `PrestigeGainPerSelfDisclosure` | `1.0` | Prestige increase from vulnerability and self-disclosure (warmth signal). |
-| `DominanceGainPerContempt` | `10.0` | Large dominance jump from contemptuous behavior. |
-| `PrestigeReachOutBonusPerPoint` | `0.06` | Utility bonus when approaching high-prestige targets. |
-| `DominanceAvoidancePenaltyPerPoint` | `0.08` | Utility penalty for unfamiliar dominant targets (Closeness < 30). |
-
----
-
-### `Characters:Memory`
-
-| Key | Default | Effect |
-|---|---|---|
-| `BaseEncoding` | `0.5` | Base memory strength at encoding (0–1). |
-| `SleepConsolidationBoost` | `0.12` | Strength increase applied to recent memories after REM sleep. |
-| `ForgettingRate` | `0.06` | Strength reduction per day (Ebbinghaus curve). |
-| `PruneThreshold` | `0.01` | Memories below this strength are permanently removed. |
-| `ReinforcementBoost` | `0.15` | Strength boost when the same event is re-encoded (repetition effect). |
-| `EmotionDecayMod` | `0.5` | Multiplier on emotional salience decay. Low = emotional charge of memories fades slowly. |
-| `StressDistortionWeight` | `0.35` | How much high stress distorts memory at encoding. |
-| `ReconsolidationDriftRate` | `0.04` | Rate at which recalled memories drift during reconsolidation (memory malleability). |
-| `CognitiveBurdenThreshold` | `0.65` | Cognitive burden above this degrades memory retrieval quality. |
-| `DirectWitnessConfidence` | `0.90` | Default confidence for memories formed by direct witness. |
-| `GossipConfidence` | `0.35` | Default confidence for hearsay-based knowledge. |
-| `KnowledgeConfidenceDecayPerDay` | `0.005` | Daily confidence decay for stored knowledge facts. |
-| `KnowledgePruneThreshold` | `0.05` | Knowledge entries below this confidence are pruned. |
-
----
-
-### `Characters:SemanticMemory`
-
-| Key | Default | Effect |
-|---|---|---|
-| `LearningRate` | `0.18` | How quickly a belief strengthens per confirming evidence. |
-| `ContradictionRate` | `0.08` | How quickly contradicting evidence weakens a belief. |
-| `DecayPerDay` | `0.01` | Daily passive belief decay. |
-| `StabilityGainPerEvidence` | `0.08` | Stability increases per confirming event. Stable beliefs resist contradiction. |
-| `PatternWindowSize` | `6` | Number of recent episodes examined to detect a pattern. |
-| `MinimumPatternSupport` | `2` | Minimum matching episodes in the window required to update a belief. |
-| `ContradictionStabilityHit` | `0.05` | Stability reduction per contradicting event. |
-
-#### Attachment modulation
-
-| Key | Default | Effect |
-|---|---|---|
-| `AttachmentLearningBoostAnxious` | `1.30` | Anxious characters learn beliefs 30% faster (hyper-vigilant to social signals). |
-| `AttachmentLearningDiscountAvoidant` | `0.75` | Avoidant characters form beliefs more slowly. |
-| `AttachmentSafeDiscountAvoidant` | `0.45` | Avoidant characters are especially resistant to forming EmotionallySafe beliefs. |
-| `AttachmentLearningBoostDisorganized` | `1.15` | Disorganized attachment — slightly elevated but inconsistent learning. |
-| `AttachmentContradictionBoostAnxious` | `1.20` | Contradictions hit anxious characters harder (rumination amplifier). |
-| `AttachmentContradictionBoostDisorganized` | `1.40` | Disorganized characters are most destabilized by contradictions. |
-
-#### Navarro toxic relationship model
-
-| Key | Default | Effect |
-|---|---|---|
-| `NavarroCriticalMultiple` | `8` | Minimum ratio of negative-to-positive episodes to trigger accelerated decay. |
-| `NavarroDecayAccelerator` | `3.0` | Decay multiplier when the Navarro pattern is detected (rapid disillusionment). |
-
----
-
-### `Characters:Lod`
-
-Controls how often the Behavior engine runs per cognitive resolution level.
-
-| Key | Default | Effect |
-|---|---|---|
-| `PlayerBehaviorDecisionStep` | `00:05:00` | Player character makes a behavior decision every 5 in-game minutes. |
-| `NearbyBehaviorDecisionStep` | `00:15:00` | Nearby characters decide every 15 minutes. |
-| `BackgroundBehaviorDecisionStep` | `01:00:00` | Background characters decide hourly. |
-
----
-
-### `Characters:Fidelity`
-
-Controls the detail level of memory, perception, and social processing per LOD tier.
-
-**MemoryFidelityLevel:** `Full` / `Reduced` / `Minimal`  
-**PerceptionFidelityLevel:** `Full` / `LocalOnly` / `Coarse`  
-**SocialFidelityLevel:** `Full` / `Reduced` / `Minimal`
-
-| Key | Default | Effect |
-|---|---|---|
-| `PlayerMemory` | `Full` | Player stores all episodic events. |
-| `NearbyMemory` | `Full` | Nearby NPCs store full episodic detail (they may become relevant later). |
-| `BackgroundMemory` | `Reduced` | Background NPCs store only meaningful events; routine actions are skipped. |
-| `PlayerPerception` | `Full` | Player perceives all characters and world objects in full detail. |
-| `NearbyPerception` | `LocalOnly` | Nearby NPCs perceive only their immediate location. |
-| `BackgroundPerception` | `Coarse` | Background NPCs have coarse perception — no fine-grained social reading. |
-| `PlayerSocial` | `Full` | Full social graph processing for the player. |
-| `NearbySocial` | `Full` | Nearby NPCs run full social updates. |
-| `BackgroundSocial` | `Reduced` | Background NPCs run minimal social updates — only large relationship events are processed. |
-
----
-
-## Project Structure
+## Project Layout
 
 ```
-GameEngineTools/
-├── Characters/
-│   ├── Core/               # OrchestratedHuman, HumanContext, EnginesSnapshot
-│   ├── Engines/
-│   │   ├── Behavior/       # DefaultBehaviorEngine, BehaviorHabitLearning
-│   │   │   └── Sleep/      # DefaultSleepCoordinator, DefaultSleepSession
-│   │   ├── Physiology/     # DefaultPhysiologyEngine, PhysiologyConfig
-│   │   ├── Psychology/     # DefaultPsychologyEngine, PsychologyConfig
-│   │   ├── Interactions/   # DefaultInteractionEngine, InteractionConfig
-│   │   ├── Relationships/  # DefaultRelationshipsEngine, RelationshipsConfig
-│   │   ├── Memory/         # DefaultMemoryEngine, MemoryCognition, MemoryWhatParser
-│   │   └── SemanticMemory/ # DefaultSemanticMemoryEngine, SemanticTargeting
-│   ├── Hosting/            # DI extensions, fidelity policies, LOD runtime
-│   └── Traits/             # Personality, BigFive, AttachmentStyle, Chronotype
-├── World/
-│   ├── Location/           # DefaultLocationService, LocationDescriptor
-│   └── Utils/Time/         # WDateTime, WTimeSpan
-├── Logging/                # CoreLog — single EventId registry
-└── Constants/              # FileSystemConstant
+GameEngineTools/                 ← Core library (.NET 8)
+  Characters/
+    Core/                        ← IEngine, OrchestratedHuman, HumanContext, EnginesSnapshot, action slots
+    Engines/
+      Physiology/ Psychology/    ← body + affect
+      Behavior/                  ← needs, modifiers, intent, arbitration, sleep, habits
+      Interactions/ Objects/     ← social acts + object interaction
+      Relationships/             ← directed social graph, investment, transgression
+      Memory/ SemanticMemory/    ← episodic + person-belief memory
+      Goals/ Values/ SelfConcept/ Interests/   ← long-term motivation & identity
+      Schedule/                  ← daily routine + occupations
+      ToM/ Reputation/ LifeStage/ Attraction/  ← supporting social math
+    Traits/                      ← Personality, Attachment, Values, Interests, sexual traits, appearance
+    Generation/                  ← blueprint/appearance/personality/family generation, Portraits/
+    Hosting/                     ← DI registration, LOD runtime, fidelity policies, occupation registry
+    Persistence/                 ← EnginesSnapshot (de)serialisation
+  World/
+    Core/ (Time, Astro, Calendars)   ← WDateTime, sun model, calendars
+    Location/ Movement/ Objects/ Data/ Simulation/
+  Universe/                      ← Kepler orbital mechanics, star/moon/ring/habitability
+  Narrative/                     ← Czech narrative formatter
 
-GameSandbox/
-├── appsettings.Characters.Default.json   # baseline config (all keys documented above)
-├── appsettings.Characters.json           # scene-specific overrides
-└── Program.cs                            # simulation entry point
-
-EngineTests/                              # MSTest unit tests
+EngineTests/        ← MSTest suite (build + run target)
+GameSandbox/        ← Console simulation runner (scene wiring, narrative loop)
+CharacterGenerator/ ← Interactive character-creation CLI
+LogsResolver/       ← WPF JSONL log viewer (+ LogsResolverTests)
+RelationshipsGame/  ← WPF prototype
 ```
-
-
