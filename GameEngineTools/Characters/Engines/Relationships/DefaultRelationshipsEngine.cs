@@ -60,6 +60,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
         private readonly ISocialFidelityPolicy _socialFidelityPolicy;
         private double _deferredDecayDays;
 
+        /// <summary>
+        /// Game days accumulated since the last periodic edge snapshot (2005) emission.
+        /// Starts saturated so the first decay pass after process start / state restore
+        /// logs snapshots immediately — log files may have been rotated away.
+        /// </summary>
+        private double _daysSinceEdgeSnapshot = double.MaxValue;
+
         #endregion Private fields
 
         #region Constructor
@@ -1038,6 +1045,32 @@ namespace GameEngineTools.Characters.Engines.Relationships
             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
             {
                 _log.RelDecayApplied(ctx.Id.Value.ToString(), State.Edges.Count, days);
+            }
+
+            // ── Periodic edge snapshot (2005) ────────────────────────────────────────
+            // Mutations log RelEdgeUpdated immediately, but decay mutates edges silently
+            // and long interaction-free stretches would leave no 2005 in the logs at all —
+            // after log rotation the relationship state becomes unreadable. Emit a full
+            // edge snapshot at most once per EdgeSnapshotIntervalDays of game time.
+            _daysSinceEdgeSnapshot += days;   // MaxValue absorbs small increments — no overflow
+            if (_daysSinceEdgeSnapshot >= Config.EdgeSnapshotIntervalDays)
+            {
+                _daysSinceEdgeSnapshot = 0;
+                foreach (var kv in State.Edges)
+                {
+                    var s = kv.Value;
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: kv.Key.Value))
+                    {
+                        _log.RelEdgeUpdated(
+                            ctx.Id.Value.ToString(), s.A.Value.ToString(), s.B.Value.ToString(),
+                            s.Like, s.Trust, s.Closeness,
+                            s.Comfort, s.Respect, s.Familiarity, s.IntimateAffinity, s.SexualInterest,
+                            s.AestheticAttraction, s.PhysicalAttraction,
+                            s.CommunalStrength, s.ExchangeStrength, s.TransgressionResidue,
+                            s.ResponsiveDesireLevel, s.PerceivedDominance, s.PerceivedPrestige,
+                            s.IsContemptuouslyDestroyed);
+                    }
+                }
             }
         }
 

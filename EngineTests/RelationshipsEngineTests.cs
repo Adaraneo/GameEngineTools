@@ -1869,6 +1869,83 @@ namespace EngineTests
         }
 
         #endregion Factory metody
+
+        // ══════════════════════════════════════════════════════════════════════════════
+        // Periodický edge snapshot (EventId 2005) z decay průchodu
+        // ══════════════════════════════════════════════════════════════════════════════
+
+        #region Periodický edge snapshot (2005)
+
+        /// <summary>
+        /// Decay průchod musí periodicky emitovat snapshot hran (2005): okamžitě při
+        /// prvním ticku po startu (logy mohly být rotovány), poté nejdřív po uplynutí
+        /// <see cref="RelationshipsConfig.EdgeSnapshotIntervalDays"/> herního času.
+        /// </summary>
+        [TestMethod]
+        public void Tick_PeriodicEdgeSnapshot_EmitsImmediatelyThenThrottles()
+        {
+            // Arrange — engine s capture loggerem (2005 je Debug level)
+            var capture = new CapturingLoggerProvider();
+            var engine = new DefaultRelationshipsEngine(
+                Options.Create(DefaultCfg),
+                LoggerFactory.Create(b => { b.SetMinimumLevel(LogLevel.Debug); b.AddProvider(capture); }),
+                new FixedSocialFidelityPolicy(SocialFidelityLevel.Full));
+
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
+            capture.Clear();   // Handle mutace loguje 2005 samo — zajímá nás jen decay cesta
+
+            // Act + Assert 1 — první decay tick emituje snapshot okamžitě (saturovaný čítač)
+            engine.Tick(_now, WTimeSpan.FromHours(1), ctx, _outbox);
+            Assert.AreEqual(1, capture.CountByEventId(2005),
+                "První decay tick po startu musí emitnout 2005 snapshot každé hrany.");
+
+            // Act + Assert 2 — další tick hluboko pod intervalem nesmí emitovat znovu
+            capture.Clear();
+            engine.Tick(_now, WTimeSpan.FromHours(1), ctx, _outbox);
+            Assert.AreEqual(0, capture.CountByEventId(2005),
+                "Tick pod EdgeSnapshotIntervalDays nesmí emitovat další 2005 snapshot.");
+
+            // Act + Assert 3 — po překročení intervalu se snapshot emituje znovu
+            engine.Tick(_now, WTimeSpan.FromDays(2), ctx, _outbox);
+            Assert.AreEqual(1, capture.CountByEventId(2005),
+                "Po uplynutí EdgeSnapshotIntervalDays se musí 2005 snapshot emitovat znovu.");
+        }
+
+        /// <summary>Minimální capture provider — sbírá EventId všech zalogovaných zpráv.</summary>
+        private sealed class CapturingLoggerProvider : ILoggerProvider
+        {
+            private readonly List<int> _eventIds = new();
+
+            public ILogger CreateLogger(string categoryName) => new CapturingLogger(_eventIds);
+
+            public void Dispose()
+            {
+            }
+
+            public void Clear() => _eventIds.Clear();
+
+            public int CountByEventId(int id) => _eventIds.Count(e => e == id);
+
+            private sealed class CapturingLogger : ILogger
+            {
+                private readonly List<int> _eventIds;
+
+                public CapturingLogger(List<int> eventIds) => _eventIds = eventIds;
+
+                public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+                public bool IsEnabled(LogLevel logLevel) => true;
+
+                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+                    => _eventIds.Add(eventId.Id);
+            }
+        }
+
+        #endregion Periodický edge snapshot (2005)
     }
 
     // =========================================================================

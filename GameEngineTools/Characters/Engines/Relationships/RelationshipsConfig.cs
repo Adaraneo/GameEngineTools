@@ -240,7 +240,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Commitment threshold below which a partner edge emits
         /// <see cref="RelationshipDissolutionConsidered"/> (one-shot on the downward crossing).
         /// </summary>
-        double DissolutionCommitmentThreshold = 15.0)
+        double DissolutionCommitmentThreshold = 15.0,
+
+        /// <summary>
+        /// Interval (game days) between periodic edge snapshots (EventId 2005) emitted
+        /// from the decay pass. Mutations log 2005 immediately; this keeps edge state
+        /// observable in logs even through long interaction-free stretches, so log
+        /// files can be rotated/deleted without losing relationship visibility.
+        /// </summary>
+        double EdgeSnapshotIntervalDays = 1.0)
     {
         /// <summary>
         /// Parameterless constructor required by DI options binding.
