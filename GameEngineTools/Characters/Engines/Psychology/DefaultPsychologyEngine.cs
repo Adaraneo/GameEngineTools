@@ -945,6 +945,56 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         break;
                     }
 
+                // ── RelationshipDissolutionConsidered — Rusbult low-commitment deliberation ──
+                // Contemplating leaving a partner is a chronic, deliberative state, not an acute
+                // exclusion shock — so the affective hit stays well below intimate rejection
+                // (Williams 4-need, d > |1.4|). Attachment differentiates the reaction
+                // (Candel & Turliuc 2019, k=132; Mikulincer & Shaver 2016):
+                //   • Anxiety (hyperactivation) amplifies distress + reassurance-seeking (NeedSocial↑)
+                //   • Avoidance (deactivation) suppresses the affective reaction and the reconnection drive
+                case Characters.Engines.Relationships.RelationshipDissolutionConsidered rdc
+                    when rdc.Self == ctx.Id:
+                    {
+                        var n = ctx.Personality.BigFive.Neuroticism;
+                        var anxiety = ctx.Personality.Attachment.Anxiety;
+                        var avoidance = ctx.Personality.Attachment.Avoidance;
+
+                        // Neuroticism scales HPA reactivity (~0.65–1.70×, the engine's stress-growth band).
+                        var neuroMult = 0.65 + n * 1.05;
+                        // Anxiety hyperactivates the felt threat of losing the bond.
+                        var anxietyAmp = 1.0 + anxiety * 0.6;
+                        // Avoidance deactivates / down-regulates the felt reaction.
+                        var avoidDamp = 1.0 - avoidance * 0.5;   // 0.5–1.0
+                        var affect = anxietyAmp * avoidDamp;
+
+                        var stressGain = 3.0 * neuroMult * avoidDamp;   // < rejection's 5.0
+                        var valenceDrop = 0.04 * affect;                // < rejection's 0.07
+                        var moodDrop = 3.0 * affect;                    // < rejection's 6.0
+
+                        var prevMotivRdc = s.Motivations ?? new MotivationState();
+                        s = s with
+                        {
+                            Valence = Math.Clamp(s.Valence - valenceDrop, -1, 1),
+                            MoodBaseline = Math.Clamp(s.MoodBaseline - moodDrop, 0, 100),
+                            Stress = Math.Clamp(s.Stress + stressGain, 0, 100),
+                            Motivations = prevMotivRdc with
+                            {
+                                // Desire for stable ground rises (stronger when anxious).
+                                NeedSafety = Math.Clamp(prevMotivRdc.NeedSafety + 4.0 * anxietyAmp, 0, 100),
+                                // Reassurance-seeking: anxious reach for reconnection, avoidant withdraw.
+                                NeedSocial = Math.Clamp(prevMotivRdc.NeedSocial + 5.0 * anxiety * (1.0 - avoidance), 0, 100)
+                            }
+                        };
+
+                        if (s.Motivations != prevMotivRdc)
+                            outbox.Add(new MotivationChanged(rdc.OccurredAt, ctx.Id, prevMotivRdc, s.Motivations!));
+
+                        if (s.Stress > 70 && State.Stress <= 70)
+                            outbox.Add(new StressSpiked(rdc.OccurredAt, ctx.Id, s.Stress));
+
+                        break;
+                    }
+
                 // --- Nightmare ---
                 // A direct stress spike + negative valence; the intensity depends on Neuroticism.
                 case Sleep.NightmareTriggered nm:

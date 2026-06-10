@@ -1052,6 +1052,21 @@ namespace GameEngineTools.Logging
             double Investment,
             double Alternative);
 
+        /// <summary>
+        /// Partner-edge commitment fell below the dissolution threshold (Rusbult leave point).
+        /// Emitted once per downward crossing alongside <see cref="GameEngineTools.Characters.Engines.Relationships.RelationshipDissolutionConsidered"/>.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 2015,
+            Level = LogLevel.Debug,
+            Message = "[REL/DISSOLUTION] {HumanId} {A} → {B}: zvažuje rozchod, commitment={Commitment:F1}.")]
+        public static partial void RelDissolutionConsidered(
+            this ILogger logger,
+            string HumanId,
+            string A,
+            string B,
+            double Commitment);
+
         #endregion Relationships — vztahy
 
         #region DailySchedule — 1400–1499

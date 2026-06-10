@@ -150,5 +150,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// High AlternativeQuality erodes <see cref="Commitment"/>. Zero for platonic/non-romantic edges.
         /// Range [0, 100]. Thibaut &amp; Kelley (1959) CL_alt construct.
         /// </summary>
-        double AlternativeQuality = 0);
+        double AlternativeQuality = 0,
+
+        /// <summary>
+        /// Latch guarding the one-shot <see cref="RelationshipDissolutionConsidered"/> emission.
+        /// Set <c>true</c> when <see cref="Commitment"/> first falls below
+        /// <see cref="RelationshipsConfig.DissolutionCommitmentThreshold"/>; cleared (re-armed)
+        /// once Commitment recovers above the threshold. Prevents the event from re-firing every
+        /// tick while the bond sits below the threshold.
+        /// </summary>
+        bool DissolutionConsidered = false);
 }

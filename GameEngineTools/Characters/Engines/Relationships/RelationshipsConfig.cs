@@ -235,7 +235,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Max fractional reduction of Closeness/IntimateAffinity decay at Commitment = 100.
         /// E.g. 0.6 → fully committed bonds decay at 40 % of base rate (stickiness).
         /// </summary>
-        double CommitmentDecayResistance = 0.6)
+        double CommitmentDecayResistance = 0.6,
+        /// <summary>
+        /// Commitment threshold below which a partner edge emits
+        /// <see cref="RelationshipDissolutionConsidered"/> (one-shot on the downward crossing).
+        /// </summary>
+        double DissolutionCommitmentThreshold = 15.0)
     {
         /// <summary>
         /// Parameterless constructor required by DI options binding.
@@ -287,7 +292,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
             CommitmentDriftPerDay: 0.08,
             InvestmentGrowthPerDay: 0.02,
             RomanticEdgeIntimacyThreshold: 30.0,
-            CommitmentDecayResistance: 0.6)
+            CommitmentDecayResistance: 0.6,
+            DissolutionCommitmentThreshold: 15.0)
         { }
     }
 }

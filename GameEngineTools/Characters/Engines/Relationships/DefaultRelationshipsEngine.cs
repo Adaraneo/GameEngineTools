@@ -953,6 +953,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 // 4) Commitment resists decay of bond-maintaining dimensions (stickiness).
                 var commitmentResist = 1.0 - (newCommitment / 100.0) * Config.CommitmentDecayResistance;
 
+                // 5) Dissolution consideration (Phase 5): one-shot emit on the downward threshold
+                //    crossing for partner edges; the latch re-arms once Commitment recovers.
+                var partnerBelowThreshold = e.KinRole == KinRole.Partner
+                                         && newCommitment < Config.DissolutionCommitmentThreshold;
+                var emitDissolution = partnerBelowThreshold && !e.DissolutionConsidered;
+                var newDissolutionConsidered = e.KinRole == KinRole.Partner
+                    ? partnerBelowThreshold
+                    : e.DissolutionConsidered;
+
                 var decayed = e with
                 {
                     Like = Clamp(Approach(e.Like, 50, d * Config.DecayMultiplierLike) + valenceEffect - stressEffect - familiarityLikePenalty),
@@ -972,6 +981,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     Commitment = newCommitment,
                     InvestmentSize = newInvestment,
                     AlternativeQuality = newAlternativeQuality,
+                    DissolutionConsidered = newDissolutionConsidered,
                     Breakdown = new DomainBreakdown(
                         Intellect: Clamp(Approach(e.Breakdown.Intellect, 50, dd)),
                         Humor: Clamp(Approach(e.Breakdown.Humor, 50, dd)),
@@ -1005,6 +1015,18 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         _log.RelInvestmentModel(
                             ctx.Id.Value.ToString(), e.A.Value.ToString(), e.B.Value.ToString(),
                             newCommitment, commitmentTarget, newInvestment, newAlternativeQuality);
+                    }
+                }
+
+                // Phase 5 — dissolution consideration: emit once on the downward crossing.
+                if (emitDissolution)
+                {
+                    outbox.Add(new RelationshipDissolutionConsidered(now, ctx.Id, e.B, newCommitment));
+
+                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: e.B.Value))
+                    {
+                        _log.RelDissolutionConsidered(
+                            ctx.Id.Value.ToString(), e.A.Value.ToString(), e.B.Value.ToString(), newCommitment);
                     }
                 }
 

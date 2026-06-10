@@ -1581,6 +1581,109 @@ namespace EngineTests
                 $"Commitment should drop under low satisfaction + high CL_alt (before={before:F1}, after={after:F1})");
         }
 
+        [TestMethod]
+        public void Dissolution_EmittedWhenPartnerCommitmentDropsBelowThreshold()
+        {
+            // Partner edge with low satisfaction + a strong alternative drives Commitment below the
+            // dissolution threshold, emitting RelationshipDissolutionConsidered once.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var partner = new HumanId(Guid.NewGuid());
+            var alternative = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [partner] = new RelationshipEdge(self, partner,
+                    Like: 25, Trust: 30, Familiarity: 60,
+                    AestheticAttraction: 25, PhysicalAttraction: 25,
+                    IntimateAffinity: 50, SexualInterest: 25,
+                    Closeness: 25, Respect: 35, Comfort: 25,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 50,
+                    Commitment: 40.0,
+                    InvestmentSize: 0.0,
+                    KinRole: KinRole.Partner),
+                [alternative] = new RelationshipEdge(self, alternative,
+                    Like: 60, Trust: 55, Familiarity: 30,
+                    AestheticAttraction: 90, PhysicalAttraction: 90,
+                    IntimateAffinity: 25, SexualInterest: 25,
+                    Closeness: 25, Respect: 55, Comfort: 45,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 5)
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(10), ctx, outbox);
+
+            var events = outbox.Drain().OfType<RelationshipDissolutionConsidered>().ToList();
+            Assert.AreEqual(1, events.Count, "Should emit exactly one dissolution event on the downward crossing");
+            Assert.AreEqual(self, events[0].Self);
+            Assert.AreEqual(partner, events[0].Partner);
+            Assert.IsTrue(engine.State.Edges[partner].DissolutionConsidered, "Latch should be set after emission");
+        }
+
+        [TestMethod]
+        public void Dissolution_NotEmittedTwice_WhileBelowThreshold()
+        {
+            // Once below threshold the latch suppresses re-emission on subsequent ticks.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var partner = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [partner] = new RelationshipEdge(self, partner,
+                    Like: 20, Trust: 25, Familiarity: 60,
+                    AestheticAttraction: 20, PhysicalAttraction: 20,
+                    IntimateAffinity: 50, SexualInterest: 20,
+                    Closeness: 20, Respect: 30, Comfort: 20,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 50,
+                    Commitment: 30.0,
+                    InvestmentSize: 0.0,
+                    KinRole: KinRole.Partner)
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(10), ctx, outbox);
+            engine.Tick(_now, WTimeSpan.FromDays(10), ctx, outbox);
+
+            var events = outbox.Drain().OfType<RelationshipDissolutionConsidered>().ToList();
+            Assert.AreEqual(1, events.Count, "Latch must prevent a second emission while still below threshold");
+        }
+
+        [TestMethod]
+        public void Dissolution_NotEmittedForNonPartnerEdge()
+        {
+            // A romantic-but-non-partner edge never emits dissolution, even at very low commitment.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 20, Trust: 25, Familiarity: 60,
+                    AestheticAttraction: 20, PhysicalAttraction: 20,
+                    IntimateAffinity: 50, SexualInterest: 20,
+                    Closeness: 20, Respect: 30, Comfort: 20,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 50,
+                    Commitment: 10.0,
+                    InvestmentSize: 0.0,
+                    KinRole: KinRole.None)
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(10), ctx, outbox);
+
+            Assert.IsFalse(outbox.Drain().OfType<RelationshipDissolutionConsidered>().Any(),
+                "Non-partner edges must not emit dissolution events");
+        }
+
         #endregion Investment model (Rusbult) testy
 
         #region Factory metody

@@ -1370,6 +1370,88 @@ namespace EngineTests
 
         #endregion NutritionEffectsOnPsychology — Phase 4
 
+        #region RelationshipDissolutionConsidered — Rusbult investment model
+
+        /// <summary>
+        /// Contemplating dissolution must dent mood: stress up, valence and MoodBaseline down.
+        /// </summary>
+        [TestMethod]
+        public void Handle_DissolutionConsidered_RaisesStressAndLowersMood()
+        {
+            var engine = BuildEngine(initialValence: 0.1, initialStress: 30);
+            var ctx = BuildContext(neuroticism: 0.5);
+            var stressBefore = engine.State.Stress;
+            var valenceBefore = engine.State.Valence;
+            var moodBefore = engine.State.MoodBaseline;
+
+            engine.Handle(
+                new GameEngineTools.Characters.Engines.Relationships.RelationshipDissolutionConsidered(
+                    new WDateTime(0), ctx.Id, new HumanId(Guid.NewGuid()), Commitment: 10.0),
+                ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Stress > stressBefore, $"Stress should rise (before {stressBefore:F1}, after {engine.State.Stress:F1})");
+            Assert.IsTrue(engine.State.Valence < valenceBefore, $"Valence should drop (before {valenceBefore:F2}, after {engine.State.Valence:F2})");
+            Assert.IsTrue(engine.State.MoodBaseline < moodBefore, $"MoodBaseline should erode (before {moodBefore:F1}, after {engine.State.MoodBaseline:F1})");
+        }
+
+        /// <summary>
+        /// The hit must stay smaller than an intimate-rejection 4-need threat (deliberation, not shock).
+        /// </summary>
+        [TestMethod]
+        public void Handle_DissolutionConsidered_IsMilderThanIntimateRejection()
+        {
+            var partner = new HumanId(Guid.NewGuid());
+
+            var dissolutionEngine = BuildEngine(initialValence: 0.1, initialStress: 30);
+            var dissolutionCtx = BuildContext(neuroticism: 0.5);
+            dissolutionEngine.Handle(
+                new GameEngineTools.Characters.Engines.Relationships.RelationshipDissolutionConsidered(
+                    new WDateTime(0), dissolutionCtx.Id, partner, Commitment: 10.0),
+                dissolutionCtx, _outbox);
+
+            var rejectionEngine = BuildEngine(initialValence: 0.1, initialStress: 30);
+            var rejectionCtx = BuildContext(neuroticism: 0.5);
+            rejectionEngine.Handle(
+                new GameEngineTools.Characters.Engines.Relationships.RejectionNeedsThreat(
+                    new WDateTime(0), rejectionCtx.Id, Intensity: 1.0, IsIntimateAdvance: true),
+                rejectionCtx, _outbox);
+
+            Assert.IsTrue(dissolutionEngine.State.Stress < rejectionEngine.State.Stress,
+                "Dissolution consideration should raise less stress than intimate rejection");
+            Assert.IsTrue(dissolutionEngine.State.Valence > rejectionEngine.State.Valence,
+                "Dissolution consideration should drop valence less than intimate rejection");
+        }
+
+        /// <summary>
+        /// Avoidant (deactivating) attachment suppresses the affective reaction relative to anxious.
+        /// </summary>
+        [TestMethod]
+        public void Handle_DissolutionConsidered_AvoidantReactsLessThanAnxious()
+        {
+            var partner = new HumanId(Guid.NewGuid());
+
+            var anxiousEngine = BuildEngine(initialValence: 0.1, initialStress: 30);
+            var anxiousCtx = BuildContext(0.5, MakePhysio(0, 0, 0), currentAction: null, attachment: AttachmentProfile.Preoccupied);
+            anxiousEngine.Handle(
+                new GameEngineTools.Characters.Engines.Relationships.RelationshipDissolutionConsidered(
+                    new WDateTime(0), anxiousCtx.Id, partner, Commitment: 10.0),
+                anxiousCtx, _outbox);
+
+            var avoidantEngine = BuildEngine(initialValence: 0.1, initialStress: 30);
+            var avoidantCtx = BuildContext(0.5, MakePhysio(0, 0, 0), currentAction: null, attachment: AttachmentProfile.Dismissing);
+            avoidantEngine.Handle(
+                new GameEngineTools.Characters.Engines.Relationships.RelationshipDissolutionConsidered(
+                    new WDateTime(0), avoidantCtx.Id, partner, Commitment: 10.0),
+                avoidantCtx, _outbox);
+
+            Assert.IsTrue(avoidantEngine.State.Stress < anxiousEngine.State.Stress,
+                $"Avoidant should incur less stress than anxious (avoidant={avoidantEngine.State.Stress:F1}, anxious={anxiousEngine.State.Stress:F1})");
+            Assert.IsTrue(avoidantEngine.State.Valence > anxiousEngine.State.Valence,
+                "Avoidant should drop valence less than anxious");
+        }
+
+        #endregion RelationshipDissolutionConsidered — Rusbult investment model
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine s výchozí nebo vlastní konfigurací.</summary>
@@ -1408,7 +1490,8 @@ namespace EngineTests
         private static IHumanContext BuildContext(
             double neuroticism,
             PhysiologyState physio,
-            string? currentAction = null)
+            string? currentAction = null,
+            AttachmentProfile? attachment = null)
         {
             var psych = new PsychologyState(
                 Valence: 0.1, Arousal: 0.4, Dominance: 0.5,
@@ -1428,7 +1511,7 @@ namespace EngineTests
 
             var personality = new Personality(
                 BigFive: new BigFive(0.5, 0.5, 0.5, 0.5, neuroticism),
-                Attachment: AttachmentProfile.Secure,
+                Attachment: attachment ?? AttachmentProfile.Secure,
                 Communication: CommunicationStyle.Direct,
                 Motivation: new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                 Sociosexuality: Sociosexuality.Intermediate,
