@@ -448,8 +448,6 @@ if (characters.Count > 0)
         }
     }, lodRuntime);
 
-    AuditConsumableRouting(objectProvider, locationService);
-
     await otherCharactersScene.RunAsync();
 }
 
