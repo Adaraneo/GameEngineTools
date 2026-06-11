@@ -828,13 +828,15 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 3000,
             Level = LogLevel.Debug,
-            Message = "[MEM/ENCODE] {HumanId} Zakódována epizoda: '{Tag}' (salience={Salience:F2}, emotion={Emotion}).")]
+            Message = "[MEM/ENCODE] {HumanId} Zakódována epizoda: '{Tag}' (salience={Salience:F2}, emotion={Emotion}, perceived='{Perceived}', distortion={Distortion:F2}).")]
         public static partial void MemoryEncoded(
             this ILogger logger,
             string HumanId,
             string Tag,
             double Salience,
-            string Emotion);
+            string Emotion,
+            string Perceived,
+            double Distortion);
 
         /// <summary>Memory consolidation ran — number of reinforced episodes.</summary>
         [LoggerMessage(

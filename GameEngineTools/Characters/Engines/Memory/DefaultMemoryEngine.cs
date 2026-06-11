@@ -138,7 +138,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                         ctx.Id.Value.ToString(),
                         episode.What,
                         reinforced.Strength,
-                        reinforced.Emotion.ToString());
+                        reinforced.Emotion.ToString(),
+                        reinforced.PerceivedWhat ?? episode.What,
+                        reinforced.Distortion);
 
                     // Raise the event for reinforcement too — Strength has been updated
                     outbox.Add(new MemoryEncoded(episode.When, ctx.Id, existing.Id, reinforced.Strength, episode.What, reinforced.PerceivedWhat, reinforced.OtherPerson, reinforced.BeliefEvidence));
@@ -160,7 +162,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                     ctx.Id.Value.ToString(),
                     encoded.What,
                     encoded.Salience,
-                    encoded.Emotion.ToString());
+                    encoded.Emotion.ToString(),
+                    encoded.PerceivedWhat ?? encoded.What,
+                    encoded.Distortion);
 
                 outbox.Add(new MemoryEncoded(encoded.When, ctx.Id, encoded.Id, encoded.Strength, encoded.What, encoded.PerceivedWhat, encoded.OtherPerson, encoded.BeliefEvidence));
             }
