@@ -1851,6 +1851,10 @@ namespace EngineTests
             BaselineAffectVariance: 0.0,
             StressRecoveryRatePerHour: 0.0,
             EnableCircadianRhythm: false,
+            // Zero the quiet-private-space recovery bonus so the isolation term is the ONLY stress
+            // source in this context — without this the 0.8/hr recovery would swamp the introvert's
+            // small graded isolation cost and mask the SBT behavior under test.
+            PrivacyRecoveryBonusPerHour: 0.0,
             IsolationStressWeight: 3.0);
 
         private static DefaultPsychologyEngine BuildIsolationEngine(double initialStress = 10)
@@ -1917,6 +1921,24 @@ namespace EngineTests
             Assert.IsTrue(extravertEngine.State.Stress > introvertEngine.State.Stress,
                 $"Extravert (E=0.9) v soukromém prostoru musí mít více stresu z izolace. " +
                 $"Extravert={extravertEngine.State.Stress:F2}, Introvert={introvertEngine.State.Stress:F2}");
+        }
+
+        [TestMethod]
+        public void IsolationStress_IntrovertAloneLongDuration_AccumulatesNonZeroStress()
+        {
+            // SBT (Coan & Sbarra 2015): introverts are not exempt from isolation cost; with
+            // actualPrivacy (alone) = 0.8 > desiredPrivacy (E=0.1 → 0.74), a small excess exists.
+            // Arrange
+            var engine = BuildIsolationEngine(initialStress: 10);
+            var ctx = BuildIsolationContext(extraversion: 0.1); // strong introvert
+
+            // Act — long solitary stretch so the small per-hour excess accumulates measurably
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(24), ctx, new EventCollector());
+
+            // Assert — strictly greater than the starting stress (no exemption)
+            Assert.IsTrue(engine.State.Stress > 10.0,
+                $"Introvert alone for 24h must accumulate SOME isolation stress (SBT). " +
+                $"Stress={engine.State.Stress:F3}");
         }
     }
 }

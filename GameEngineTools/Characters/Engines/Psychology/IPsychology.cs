@@ -123,8 +123,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// </summary>
         double PrivacyMismatchStressWeight = 6.0,
         /// <summary>
-        /// Stress per unit of isolation excess per hour, applied only when Extraversion &gt; 0.6
-        /// and actual privacy exceeds desired. Models Altman (1975) non-monotonic privacy optimum.
+        /// Stress per unit of isolation excess per hour, applied to ALL characters whenever actual
+        /// privacy exceeds desired (the personality threshold lives in desiredPrivacy, not here).
+        /// Models Social Baseline Theory (Coan &amp; Sbarra 2015): solitude is intrinsically effortful;
+        /// introverts have a higher solitude tolerance, not an exemption.
         /// </summary>
         double IsolationStressWeight = 3.0,
         /// <summary>

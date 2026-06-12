@@ -327,7 +327,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Altman (1975): desired privacy is a function of personality.
             // Two asymmetric mechanisms:
             //   • Crowding stress: actual < desired → stress for introverts in public (always).
-            //   • Isolation stress: actual > desired → stress only for E > 0.6 (Altman non-monotonic).
+            //   • Isolation stress: actual > desired → graded cost for ALL via privacyExcess
+            //     (Social Baseline Theory, Coan & Sbarra 2015; threshold set by desiredPrivacy).
             // Recovery bonus: quiet private space accelerates stress recovery (Kaplan 1995).
             // Only applies when location is known — prevents spurious stress in test contexts.
             // stressGrowthMult (Neuroticism) amplifies crowding sensitivity.
@@ -344,11 +345,17 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     var crowdingDeficit = Math.Max(0.0, desiredPrivacy - actualPrivacy);
                     var crowdingStress = crowdingDeficit * Config.PrivacyMismatchStressWeight * stressGrowthMult * h;
 
-                    // Isolation: actual > desired, only when E > 0.6 (extraverts feel lonely alone)
+                    // Isolation stress — Social Baseline Theory (Coan & Sbarra 2015).
+                    // The brain treats social proximity as its metabolic baseline, so EVERY
+                    // individual bears a regulatory cost when alone; introverts are not exempt,
+                    // they simply tolerate more solitude. That tolerance is already encoded in
+                    // desiredPrivacy (introverts → higher desiredPrivacy → smaller excess), so the
+                    // graded privacyExcess term yields a small-but-nonzero cost for introverts and a
+                    // large one for extraverts. The old `E > 0.6` hard gate (which zeroed introverts)
+                    // and the redundant `* e` factor (extraversion is already baked into
+                    // desiredPrivacy) are removed.
                     var privacyExcess = Math.Max(0.0, actualPrivacy - desiredPrivacy);
-                    var isolationStress = e > 0.6
-                        ? privacyExcess * e * Config.IsolationStressWeight * h
-                        : 0.0;
+                    var isolationStress = privacyExcess * Config.IsolationStressWeight * h;
 
                     // Recovery bonus: quiet private space → stress decays faster
                     var recoveryBonus = surface.HasPrivacy && surface.Noise < 0.3
@@ -439,7 +446,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 };
             }
 
-            // Yerkes-Dodson: an optimal cortisol band slightly improves cognition (Lupien 2007)
+            // Glucocorticoid inverted-U on cognition (Lupien et al. 2007, Brain & Cognition 65:209–237):
+            // a moderate cortisol band mildly improves cognition via MR/GR receptor balance; both very
+            // low and GR-saturating levels impair it. Inverted-U resembles Yerkes-Dodson (1908) but the
+            // mechanism is the two-receptor model, not arousal–performance. (de Quervain et al. 1998
+            // dissociate this: high cortisol enhances encoding/consolidation yet impairs retrieval.)
             if (ph.CortisolLevel >= Config.CortisolOptimalLow && ph.CortisolLevel <= Config.CortisolOptimalHigh)
                 s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad - Config.CortisolOptimalCogBonus * h) };
 
