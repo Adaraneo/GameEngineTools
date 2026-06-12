@@ -372,3 +372,4 @@ FodyWeavers.xsd
 /CLAUDE.md
 /LogReader
 /PLAN_PersistentGoalEngine.md
+/regenerateEventLogs.ps1
