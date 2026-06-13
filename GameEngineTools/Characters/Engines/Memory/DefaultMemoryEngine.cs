@@ -195,7 +195,9 @@ namespace GameEngineTools.Characters.Engines.Memory
                 CognitiveBurden = burden,
                 CurrentValence = ctx.Snapshot.Psychology.Valence,
                 NeuroticismScore = ctx.Personality.BigFive.Neuroticism,
-                DaysInNegativeMood = ComputeDaysInNegativeMood(ctx.Snapshot.Memory.Episodes, now)
+                DaysInNegativeMood = ComputeDaysInNegativeMood(ctx.Snapshot.Memory.Episodes, now),
+                MoodCongruenceWeight = Config.MoodCongruenceWeight,
+                DepressionNegativeBiasThreshold = Config.DepressionNegativeBiasThreshold
             };
             return MemoryCognition.BuildWorkingSet(State, enriched, now, threshold);
         }

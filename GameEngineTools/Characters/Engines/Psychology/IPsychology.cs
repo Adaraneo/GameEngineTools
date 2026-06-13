@@ -33,10 +33,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
         double LowIronValencePenaltyPerUnit = 0.0003,
         double LowVitaminDMoodPenaltyPerHour = 0.2,
         double AllostaticLoadCognitiveWeight = 0.4,
-        // Kortizol → psychika
+        // Cortisol → psychology
         double CortisolStressWeight = 0.15,
         double CortisolArousalWeight = 0.008,
-        // Testosteron → psychika
+        // Testosterone → psychology
         double TestosteroneIntimacyWeight = 0.3,
         double TestosteroneStressResilienceWeight = 0.008,
         // Sleep inertia (must match PhysiologyConfig.SleepInertiaMaxHours for correct normalization)
@@ -94,7 +94,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
         // Serotonin IDO pathway (Dantzer 2007) — chronic immune activation dampens MoodBaseline recovery
         double SerotoninSuppressionImmuneThreshold = 60.0,
         double SerotoninMoodRecoveryDampening = 0.3,
-        // Wanting vs. Liking — stres amplifikuje wanting/craving (Berridge 2025)
+        // Wanting vs. Liking — stress amplifies wanting/craving (Berridge 2025)
         double WantingStressThreshold = 60.0,
         double WantingNeedIntimacyBoostPerHour = 0.4,
         double WantingNeedSocialBoostPerHour = 0.2,
@@ -263,10 +263,40 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// Maximum Stress added by a single StressRaise affordance at full satisfaction (1.0).
         /// Models threat/hazard presence — fire, weapons, intimidating environment.
         /// </summary>
-        double AffordanceStressRaiseMaxStress = 12.0)
+        double AffordanceStressRaiseMaxStress = 12.0,
+        // ── Appraisal-based emotion generation (Scherer CPM) ──────────────────────
+        // Per-dimension weights used by AppraisalEmotionMap to translate appraisal checks into a
+        // PAD delta. Values are the meta-analytic appraisal→emotion link strengths (relative weights,
+        // not probabilities). Source: Yeo & Ong 2024, Psychological Bulletin 150(12).
+        /// <summary>Weight of intrinsic pleasantness on the appraisal Valence delta (pleasantness→affection r≈.57). Source: Yeo &amp; Ong 2024.</summary>
+        double AppraisalPleasantnessValenceWeight = 0.57,
+        /// <summary>Weight of goal-conduciveness on the appraisal Valence delta (goal-conduciveness→joy r≈.56). Source: Yeo &amp; Ong 2024.</summary>
+        double AppraisalGoalConducivenessValenceWeight = 0.56,
+        /// <summary>Weight of realised loss (negative conduciveness) on the appraisal Valence delta (loss→sadness r≈.42). Source: Yeo &amp; Ong 2024.</summary>
+        double AppraisalLossValenceWeight = 0.42,
+        /// <summary>Weight of threat on the appraisal Arousal delta (threat→fear r≈.47). Source: Yeo &amp; Ong 2024.</summary>
+        double AppraisalThreatArousalWeight = 0.47,
+        /// <summary>Weight of novelty on the appraisal Arousal delta. Source: Yeo &amp; Ong 2024 (novelty/suddenness check).</summary>
+        double AppraisalNoveltyArousalWeight = 0.25,
+        /// <summary>Weight of agency/coping on the appraisal Dominance delta (self-accountability→pride/control). Source: Yeo &amp; Ong 2024; Roseman 1996.</summary>
+        double AppraisalAgencyDominanceWeight = 0.30,
+        /// <summary>Overall scaling of the appraisal-driven PAD nudge so a single event does not saturate PAD. Default 0.5.</summary>
+        double AppraisalPadDeltaScale = 0.5,
+        /// <summary>
+        /// Maps the Physiology Van Dongen cognitive deficit [0..~1] onto Psychology CognitiveLoad
+        /// points. Implements the sleep-restriction dose-response on cognition: 6 h restriction
+        /// approaches one night of total deprivation. Source: Van Dongen et al. 2003, <i>Sleep</i> 26(2).
+        /// </summary>
+        double CognitiveDeficitCogLoadWeight = 25.0,
+        /// <summary>
+        /// MoodBaseline recovery applied when the character reengages on an alternative goal after
+        /// disengaging from a blocked one — the well-being benefit of adaptive goal adjustment.
+        /// Source: Wrosch et al. 2003, <i>PSPB</i> 29(12). Default 4.0.
+        /// </summary>
+        double GoalReengagementMoodRecovery = 4.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0, 0.57, 0.56, 0.42, 0.47, 0.25, 0.30, 0.5, 25.0, 4.0) { }
     }
 
     /// <summary>
@@ -363,6 +393,18 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
     /// <summary>Event — the dominant emotion / PAD state shifted.</summary>
     public sealed record EmotionShifted(WDateTime OccurredAt, HumanId Human, DiscreteEmotion To, double Valence, double Arousal, double Dominance) : IDomainEvent;
+    /// <summary>
+    /// Event — an emotion was generated via Scherer-CPM appraisal of an incoming event
+    /// (as opposed to PAD-only inference). Emitted for debugging/observability of the appraisal path.
+    /// </summary>
+    /// <param name="OccurredAt">Game time at which the appraisal occurred.</param>
+    /// <param name="Human">The appraising character.</param>
+    /// <param name="Emotion">The emotion selected by <c>AppraisalEmotionMap</c>.</param>
+    /// <param name="GoalConduciveness">Goal-conduciveness check value [−1..+1] that drove the appraisal.</param>
+    /// <param name="DeltaValence">Valence delta applied to PAD.</param>
+    /// <param name="DeltaArousal">Arousal delta applied to PAD.</param>
+    /// <param name="DeltaDominance">Dominance delta applied to PAD.</param>
+    public sealed record EmotionAppraised(WDateTime OccurredAt, HumanId Human, DiscreteEmotion Emotion, double GoalConduciveness, double DeltaValence, double DeltaArousal, double DeltaDominance) : IDomainEvent;
     /// <summary>Event — stress rose sharply.</summary>
     public sealed record StressSpiked(WDateTime OccurredAt, HumanId Human, double NewStress) : IDomainEvent;
     /// <summary>Event — motivational drive levels changed.</summary>

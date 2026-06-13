@@ -127,7 +127,15 @@ namespace GameEngineTools.Characters.Engines.Goals
         HumanId? TargetHuman = null,
 
         /// <summary>Set when the goal is resolved; null while active.</summary>
-        GoalResolution? Resolution = null);
+        GoalResolution? Resolution = null,
+
+        /// <summary>
+        /// Optional parent goal id, expressing the be-goal → do-goal → motor-goal hierarchy
+        /// (Carver &amp; Scheier 1998). <c>null</c> for a top-level (be-)goal. Flat goals created before
+        /// this field existed remain valid with a <c>null</c> parent.
+        /// Children of a goal are those whose <see cref="ParentId"/> equals its <see cref="Id"/>.
+        /// </summary>
+        Guid? ParentId = null);
 
     #endregion PersistentGoal
 
@@ -141,6 +149,11 @@ namespace GameEngineTools.Characters.Engines.Goals
 
         /// <summary>Returns only goals that are not yet resolved.</summary>
         public IEnumerable<PersistentGoal> Active => Goals.Where(g => g.Resolution is null);
+
+        /// <summary>Returns the active child sub-goals of the goal with the given id.</summary>
+        /// <param name="parentId">The parent goal id.</param>
+        public IEnumerable<PersistentGoal> Children(Guid parentId)
+            => Goals.Where(g => g.Resolution is null && g.ParentId == parentId);
     }
 
     #endregion GoalState
@@ -184,6 +197,30 @@ namespace GameEngineTools.Characters.Engines.Goals
         PersistentGoalKind Kind,
         double InitialSalience,
         HumanId? TargetHuman = null) : IDomainEvent;
+
+    /// <summary>
+    /// Emitted when a persistently-blocked goal is actively disengaged from (progress stalled +
+    /// frustration accumulated). Distinct from a fading/abandoned resolution: disengagement is an
+    /// adaptive self-regulatory act that relieves distress and precedes reengagement.
+    /// Source: Wrosch et al. (2003, <i>PSPB</i> 29(12)).
+    /// </summary>
+    public sealed record GoalDisengaged(
+        WDateTime OccurredAt,
+        HumanId Human,
+        Guid GoalId,
+        PersistentGoalKind Kind) : IDomainEvent;
+
+    /// <summary>
+    /// Emitted when, following disengagement, the character reengages on an alternative goal
+    /// (a child/sibling sub-goal where possible, else another active goal). Reengagement predicts
+    /// higher well-being. Source: Wrosch et al. (2003, <i>PSPB</i> 29(12)).
+    /// </summary>
+    public sealed record GoalReengaged(
+        WDateTime OccurredAt,
+        HumanId Human,
+        PersistentGoalKind FromKind,
+        Guid ToGoalId,
+        PersistentGoalKind ToKind) : IDomainEvent;
 
     #endregion Domain events
 

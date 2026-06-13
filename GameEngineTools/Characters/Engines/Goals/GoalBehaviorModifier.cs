@@ -21,15 +21,26 @@ namespace GameEngineTools.Characters.Engines.Goals
 
         private readonly ILogger? _log;
         private readonly double _maxFlatBiasPerGoal;
+        private readonly double _shieldingCommitmentThreshold;
+        private readonly double _shieldingMaxInhibition;
+        private readonly double _shieldingStressDampening;
 
         #endregion Private fields
 
         #region Construction
 
-        public GoalBehaviorModifier(ILogger? log = null, double maxFlatBiasPerGoal = 12.0)
+        public GoalBehaviorModifier(
+            ILogger? log = null,
+            double maxFlatBiasPerGoal = 12.0,
+            double shieldingCommitmentThreshold = 0.5,
+            double shieldingMaxInhibition = 8.0,
+            double shieldingStressDampening = 0.6)
         {
             _log = log;
             _maxFlatBiasPerGoal = maxFlatBiasPerGoal;
+            _shieldingCommitmentThreshold = shieldingCommitmentThreshold;
+            _shieldingMaxInhibition = shieldingMaxInhibition;
+            _shieldingStressDampening = shieldingStressDampening;
         }
 
         #endregion Construction
@@ -72,6 +83,65 @@ namespace GameEngineTools.Characters.Engines.Goals
                 if (totalBias > 0.0)
                 {
                     candidates[i] = candidate with { Utility = Math.Max(0.0, candidate.Utility + totalBias) };
+                }
+            }
+
+            // Goal shielding (Shah, Friedman & Kruglanski 2002): a committed focal goal inhibits the
+            // utility of actions that serve competing goals but do not facilitate the focal goal.
+            ApplyGoalShielding(context, candidates, goals);
+        }
+
+        /// <summary>
+        /// Inhibits the utility of competing-goal actions while a committed focal goal is active.
+        /// Inhibition is stronger with focal commitment (salience), absent when the action also
+        /// facilitates the focal goal, and weakened by stress (anxiety/depression proxy).
+        /// Source: Shah, Friedman &amp; Kruglanski (2002, <i>JPSP</i> 83(6)).
+        /// </summary>
+        private void ApplyGoalShielding(
+            BehaviorContext context, List<BehaviorCandidate> candidates, GoalState goals)
+        {
+            // The focal goal is the most-committed active goal above the commitment threshold.
+            PersistentGoal? focal = null;
+            foreach (var goal in goals.Active)
+            {
+                if (goal.Salience < _shieldingCommitmentThreshold) continue;
+                if (focal is null || goal.Salience > focal.Salience) focal = goal;
+            }
+            if (focal is null) return;
+
+            var stress = context.HumanContext.Snapshot.Psychology.Stress;
+            var shieldFactor = Math.Clamp(1.0 - stress / 100.0 * _shieldingStressDampening, 0.0, 1.0);
+            if (shieldFactor <= 0.0) return;
+
+            var humanId = context.HumanContext.Id.Value.ToString();
+
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var candidate = candidates[i];
+
+                // An action that facilitates the focal goal is never inhibited (Shah 2002).
+                if (GetWeight(focal, candidate) > 0.0) continue;
+
+                // Strength with which the candidate serves any competing goal.
+                var competingWeight = 0.0;
+                foreach (var goal in goals.Active)
+                {
+                    if (ReferenceEquals(goal, focal)) continue;
+                    competingWeight = Math.Max(competingWeight, GetWeight(goal, candidate));
+                }
+                if (competingWeight <= 0.0) continue;
+
+                var inhibition = focal.Salience * competingWeight * _shieldingMaxInhibition * shieldFactor;
+                if (inhibition <= 0.0) continue;
+
+                candidates[i] = candidate with { Utility = Math.Max(0.0, candidate.Utility - inhibition) };
+
+                if (_log is not null)
+                {
+                    using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(GoalBehaviorModifier)))
+                    {
+                        _log.GoalBiasApplied(humanId, candidate.Name, -inhibition, $"shield:{focal.Kind}", focal.Salience);
+                    }
                 }
             }
         }

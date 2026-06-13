@@ -82,14 +82,16 @@ namespace GameEngineTools.Characters.Engines.Behavior
             /// character's current location.
             /// </summary>
             IMutableWorldObjectProvider? objectProvider = null,
-            IOptions<DailyScheduleConfig>? scheduleCfg = null)
+            IOptions<DailyScheduleConfig>? scheduleCfg = null,
+            IOptions<Goals.GoalConfig>? goalCfg = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine(), new ContingencySearchEngine() };
-            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new InvestmentModelBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(_objectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>()), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value),
-                new Modifiers.ValuesBehaviorModifier(loggerFactory.CreateLogger<Modifiers.ValuesBehaviorModifier>()) };
+            _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new InvestmentModelBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(_objectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>(), goalCfg?.Value.MaxFlatBiasPerGoal ?? 12.0, goalCfg?.Value.ShieldingCommitmentThreshold ?? 0.5, goalCfg?.Value.ShieldingMaxInhibition ?? 8.0, goalCfg?.Value.ShieldingStressDampening ?? 0.6), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value),
+                new Modifiers.ValuesBehaviorModifier(loggerFactory.CreateLogger<Modifiers.ValuesBehaviorModifier>()),
+                new Modifiers.LossAversionModifier() };
             _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine();
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());

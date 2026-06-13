@@ -65,7 +65,32 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// Maximum flat habit bias added to locomotion actions (<c>MoveTo:*</c>).
     /// See <see cref="LocomotionHabitMultiplierCap"/>.
     /// </summary>
-    double LocomotionHabitFlatBiasCap = 1.0)
+    double LocomotionHabitFlatBiasCap = 1.0,
+
+    // ── Loss aversion (Prospect Theory) ───────────────────────────────────────
+    // Status-quo bias is NOT fully reducible to loss aversion (Gal & Rucker 2018):
+    // InertiaWeight (above) models the *inaction* component; the λ parameters below model
+    // the *loss-weighting* component. The two are independently togglable.
+
+    /// <summary>
+    /// Loss-aversion coefficient λ for general (non-risky) action domains: a perceived loss relative
+    /// to the status-quo reference point is weighted λ× an equal-magnitude gain. Source: Brown et al.
+    /// 2024 (<i>JEL</i> 62(2)) general default [1.82–2.10]. Default 1.96.
+    /// </summary>
+    double LossAversionLambda = 1.96,
+
+    /// <summary>
+    /// Loss-aversion coefficient λ for risky-choice (uncertain-outcome) domains such as social
+    /// approach with rejection risk. Lower than the general default. Source: Walasek et al. 2024
+    /// (<i>J. Econ. Psych.</i> 103) pure risky monetary choice [1.10–1.53]. Default 1.31.
+    /// </summary>
+    double LossAversionLambdaRiskyChoice = 1.31,
+
+    /// <summary>
+    /// Modest scaling of λ by Neuroticism: λ_eff = λ × (1 + (N − 0.5) × this). Individual differences
+    /// explain much of the heterogeneity in loss aversion. Hypothesis-grade link. Default 0.4.
+    /// </summary>
+    double LossAversionNeuroticismScale = 0.4)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }

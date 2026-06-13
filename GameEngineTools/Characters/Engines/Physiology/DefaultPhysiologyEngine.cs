@@ -376,6 +376,26 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (s.SleepInertiaHours > 0)
                 s = s with { SleepInertiaHours = Math.Max(0, s.SleepInertiaHours - h) };
 
+            // Borbély two-process sleep regulation (Process S) + Van Dongen cognitive deficit.
+            // Process S saturates; the cognitive deficit does not — preserving the dissociation.
+            {
+                var asleep = action == Sleep;
+                // Seed on first tick from existing sleep debt so restored saves behave sensibly.
+                var processS = s.ProcessS ?? Math.Clamp(0.3 + s.SleepDebtHours / Math.Max(1.0, Config.MaxSleepDebtHours) * 0.5, 0.0, 1.0);
+                var deficit = s.CognitiveDeficit ?? 0.0;
+
+                processS = asleep
+                    ? SleepRegulationCalculator.DecayProcessS(processS, h, Config)
+                    : SleepRegulationCalculator.BuildupProcessS(processS, h, Config);
+                deficit = SleepRegulationCalculator.UpdateCognitiveDeficit(deficit, processS, h, asleep, Config);
+
+                s = s with
+                {
+                    ProcessS = Math.Clamp(processS, 0.0, 1.0),
+                    CognitiveDeficit = Math.Max(0.0, deficit)
+                };
+            }
+
             // SAM system — very fast decay (Sympatho-Adrenomedullary, adrenaline/noradrenaline)
             if (s.AcuteArousalLevel > 0)
                 s = s with { AcuteArousalLevel = Math.Max(0, s.AcuteArousalLevel - Config.AcuteArousalDecayPerHour * h) };

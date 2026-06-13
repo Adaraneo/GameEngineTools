@@ -115,6 +115,11 @@ namespace GameEngineTools.Characters.Engines.Memory
             var neuroticismBias = ComputeNeuroticismMoodBias(
                 episode.Emotion, query.CurrentValence, query.NeuroticismScore,
                 query.DaysInNegativeMood);
+            // Normative valence-congruent recall: a small positivity bias when not depressed, reversing
+            // to negative-congruent recall below the depression threshold (Matt et al. 1992; Faul & LaBar 2023).
+            var moodCongruenceBias = ComputeMoodCongruenceBias(
+                episode.Emotion, query.CurrentValence,
+                query.MoodCongruenceWeight, query.DepressionNegativeBiasThreshold);
             var relevance = Math.Clamp(
                 (targetScore * 0.30) +
                 (situationScore * 0.24) +
@@ -123,7 +128,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                 (Math.Clamp(episode.Strength, 0.0, 1.0) * 0.08) +
                 (emotionScore * 0.08) +
                 (confidenceScore * 0.04) +
-                neuroticismBias,
+                neuroticismBias +
+                moodCongruenceBias,
                 0.0, 1.0);
 
             if (relevance < MinimumRecallRelevance)
@@ -454,6 +460,37 @@ namespace GameEngineTools.Characters.Engines.Memory
             if (neuroticism > 0.6)
                 return isPositive ? -0.08 : isNegative ? +0.06 : 0.0;
 
+            return 0.0;
+        }
+
+        /// <summary>
+        /// Small normative valence-congruent recall bias (distinct from the trait-driven
+        /// <see cref="ComputeNeuroticismMoodBias"/>). When the character is not depressed, mood-congruent
+        /// (positive) episodes get a small boost — the healthy positivity bias (d≈0.15). Once valence
+        /// drops below <paramref name="depressionThreshold"/> the bias reverses toward negative-congruent
+        /// recall (the robust clinical finding). Magnitude is deliberately small so salience/recency
+        /// dominate. Source: Matt, Vázquez &amp; Campbell (1992); Faul &amp; LaBar (2023).
+        /// </summary>
+        private static double ComputeMoodCongruenceBias(
+            EmotionalTag episodeEmotion, double currentValence, double weight, double depressionThreshold)
+        {
+            if (weight <= 0.0) return 0.0;
+
+            var isPositive = episodeEmotion == EmotionalTag.Positive;
+            var isNegative = episodeEmotion is EmotionalTag.Negative or EmotionalTag.Mixed;
+
+            // Depressed: reverse to negative-congruent recall.
+            if (currentValence <= depressionThreshold)
+                return isNegative ? +weight : isPositive ? -weight : 0.0;
+
+            // Healthy positivity bias applies only in a clearly positive mood — a neutral mood
+            // (valence within a small deadzone around 0) does not bias recall in either direction.
+            const double positiveMoodDeadzone = 0.1;
+            if (currentValence > positiveMoodDeadzone)
+            {
+                if (isPositive) return +weight;
+                if (isNegative && currentValence > 0.2) return -weight * 0.5;
+            }
             return 0.0;
         }
 

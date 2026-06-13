@@ -20,7 +20,17 @@ namespace GameEngineTools.Characters.Engines.Memory
         double CurrentValence = 0.0,
         double NeuroticismScore = 0.5,
         double? CognitiveBurden = null,
-        double DaysInNegativeMood = 0.0);
+        double DaysInNegativeMood = 0.0,
+        /// <summary>
+        /// Small valence-congruent recall weight (healthy positivity bias / depression reversal).
+        /// Source: Matt, Vázquez &amp; Campbell 1992; Faul &amp; LaBar 2023.
+        /// </summary>
+        double MoodCongruenceWeight = 0.04,
+        /// <summary>
+        /// Valence below which the positivity bias reverses to negative-congruent recall.
+        /// Source: Matt, Vázquez &amp; Campbell 1992; Faul &amp; LaBar 2023.
+        /// </summary>
+        double DepressionNegativeBiasThreshold = -0.4);
 
     /// <summary>
     /// Ranked episodic recall item with compact scoring diagnostics.
