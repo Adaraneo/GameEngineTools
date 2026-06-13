@@ -266,7 +266,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         double VitaminDSunThreshold = 0.3,
         /// <summary>
-        /// Rychlost obnovy vitaminu D (0..100) na hodinu na jednotku <c>IrradianceFactor</c>
+        /// Vitamin D restoration rate (0..100) per hour per unit of <c>IrradianceFactor</c>
         /// while outdoors (SurfaceKind.Public or Social).
         /// </summary>
         double VitaminDRestorationPerHourPerIrradiance = 4.0,
@@ -352,7 +352,29 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double ThirstDrinkingGainPerHour = 50.0, // magnitude; negated in ComputeDrift
         double PainSelfCareRecoveryPerHour = 10.0,
         double ImmuneDriftAwakePerHour = -0.3,
-        double ImmuneDriftSelfCarePerHour = -0.5)
+        double ImmuneDriftSelfCarePerHour = -0.5,
+        // ── Borbély 2-process sleep model ──────────────────────────────────────────
+        /// <summary>Process S buildup time constant (hours) while awake — saturating exponential. Source: Daan, Beersma &amp; Borbély 1984.</summary>
+        double ProcessSBuildupTimeConstantHours = 18.2,
+        /// <summary>Process S decay time constant (hours) while asleep. Source: Daan, Beersma &amp; Borbély 1984.</summary>
+        double ProcessSDecayTimeConstantHours = 4.2,
+        /// <summary>Upper asymptote (ceiling) of Process S, normalized. Default 1.0.</summary>
+        double ProcessSUpperAsymptote = 1.0,
+        /// <summary>Lower asymptote of Process S after a long sleep, normalized. Default 0.0.</summary>
+        double ProcessSLowerAsymptote = 0.0,
+        /// <summary>Process C upper (daytime) circadian threshold — hardest to fall asleep. Default 0.90.</summary>
+        double ProcessCUpperThreshold = 0.90,
+        /// <summary>Process C lower (nighttime) circadian threshold — easiest to fall asleep. Default 0.17.</summary>
+        double ProcessCLowerThreshold = 0.17,
+        /// <summary>Hour of day at which the Process C alerting threshold peaks (afternoon). Default 16.0.</summary>
+        double ProcessCPeakHour = 16.0,
+        // ── Van Dongen cognitive deficit (dose-response, separate accumulator from S) ──
+        /// <summary>Behavioural cognitive deficit accrued per awake hour (base rate; modulated up when Process S is high). Source: Van Dongen et al. 2003.</summary>
+        double CognitiveDeficitAccumPerHour = 0.012,
+        /// <summary>Behavioural cognitive deficit recovered per hour of sleep. Calibrated so 6 h restriction grows the deficit while 8 h clears it. Source: Van Dongen et al. 2003.</summary>
+        double CognitiveDeficitRecoveryPerSleepHour = 0.028,
+        /// <summary>Process S level above which the awake cognitive-deficit accrual is amplified (chronic restriction). Source: Van Dongen et al. 2003.</summary>
+        double CognitiveDeficitRestrictionThreshold = 0.55)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
@@ -613,7 +635,25 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// when a natural death occurs. Persisted in the snapshot so that
         /// <see cref="SimulationScene"/> can restore the dead-character set after save/load.
         /// </summary>
-        StatusType Status = StatusType.Alive);
+        StatusType Status = StatusType.Alive,
+        /// <summary>
+        /// Borbély Process S — homeostatic sleep pressure [0..1]. Rises (saturating exponential)
+        /// while awake with time constant <see cref="PhysiologyConfig.ProcessSBuildupTimeConstantHours"/>
+        /// and decays while asleep with <see cref="PhysiologyConfig.ProcessSDecayTimeConstantHours"/>.
+        /// Sleep propensity is the distance of S above the Process-C circadian threshold (subtractive,
+        /// not additive). <c>null</c> until first initialised (seeded from <see cref="SleepDebtHours"/>
+        /// on the first tick); <see cref="SleepDebtHours"/> is retained for save compatibility.
+        /// Source: Borbély (1982); Daan, Beersma &amp; Borbély (1984).
+        /// </summary>
+        double? ProcessS = null,
+        /// <summary>
+        /// Van Dongen behavioural cognitive-performance deficit [0..~1]. Unlike <see cref="ProcessS"/>
+        /// it does NOT saturate: under chronic sleep restriction it keeps accumulating (PVT-style
+        /// lapses), modelling the homeostatic/behavioural dissociation that the old flat sinusoid
+        /// could not produce. Recovers during sleep. <c>null</c> until first initialised.
+        /// Source: Van Dongen et al. (2003, <i>Sleep</i> 26(2)).
+        /// </summary>
+        double? CognitiveDeficit = null);
 
     /// <summary>
     /// The physiology engine — first stage of the per-character tick pipeline. Advances

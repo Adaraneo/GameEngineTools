@@ -55,10 +55,25 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// Confidence decay per day for object location facts.
         /// Default 0.05 → a directly-seen object's confidence drops from 0.85 to 0.0 in ~17 days.
         /// </summary>
-        double ObjectLocationDecayPerDay = 0.05)
+        double ObjectLocationDecayPerDay = 0.05,
+        /// <summary>
+        /// Small additive weight for valence-congruent episodic recall. A non-depressed character
+        /// recalls mood-congruent (positive) episodes slightly more (healthy positivity bias, d≈0.15);
+        /// the bias reverses to negative-congruent recall once mood drops below
+        /// <see cref="DepressionNegativeBiasThreshold"/>. Kept small so salience/recency dominate.
+        /// Episodic/self-referential only — not applied to semantic memory.
+        /// Source: Matt, Vázquez &amp; Campbell 1992; Faul &amp; LaBar 2023.
+        /// </summary>
+        double MoodCongruenceWeight = 0.04,
+        /// <summary>
+        /// Valence threshold below which the normative positivity bias reverses toward negative-congruent
+        /// recall (the robust clinical depression finding). Source: Matt, Vázquez &amp; Campbell 1992;
+        /// Faul &amp; LaBar 2023. Default −0.4.
+        /// </summary>
+        double DepressionNegativeBiasThreshold = -0.4)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35, 0.04, 0.65, 0.90, 0.35, 0.005, 0.05, 0.05) { }
+        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35, 0.04, 0.65, 0.90, 0.35, 0.005, 0.05, 0.05, 0.04, -0.4) { }
     }
 
     /// <summary>

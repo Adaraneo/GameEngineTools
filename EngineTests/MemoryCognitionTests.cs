@@ -337,6 +337,71 @@ namespace EngineTests
         }
     }
 
+    [TestClass]
+    public class MemoryCognitionMoodCongruenceTests : TestBase
+    {
+        private static MemoryIndex PositiveAndNegativeEpisodes(HumanId target, WDateTime now)
+            => new(new List<EpisodicMemory>
+            {
+                Episode(now, 3, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.60, target, salience: 0.60),
+                Episode(now, 3, "Interaction:SmallTalk:Rejected|from=a|to=b", EmotionalTag.Negative, 0.60, target, salience: 0.60)
+            });
+
+        private static double RelevanceOf(MemoryRecallResult recall, EmotionalTag emotion)
+            => recall.Items.First(i => i.Episode.Emotion == emotion).Relevance;
+
+        [TestMethod]
+        public void PositiveMood_RanksPositiveEpisodeAboveNegative()
+        {
+            var target = new HumanId(Guid.NewGuid());
+            var now = WDateTime.New(100, 1, 10, 12);
+            var memory = PositiveAndNegativeEpisodes(target, now);
+
+            var recall = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 2,
+                    CurrentValence: 0.6, NeuroticismScore: 0.5), now);
+
+            Assert.IsTrue(RelevanceOf(recall, EmotionalTag.Positive) > RelevanceOf(recall, EmotionalTag.Negative),
+                "A positive-mood character recalls positive episodes slightly more (healthy positivity bias).");
+        }
+
+        [TestMethod]
+        public void DepressedMood_ReversesToNegativeCongruentRecall()
+        {
+            var target = new HumanId(Guid.NewGuid());
+            var now = WDateTime.New(100, 1, 10, 12);
+            var memory = PositiveAndNegativeEpisodes(target, now);
+
+            var recall = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 2,
+                    CurrentValence: -0.6, NeuroticismScore: 0.5), now);
+
+            Assert.IsTrue(RelevanceOf(recall, EmotionalTag.Negative) > RelevanceOf(recall, EmotionalTag.Positive),
+                "Below the depression threshold the positivity bias reverses to negative-congruent recall.");
+        }
+
+        [TestMethod]
+        public void MoodCongruence_StaysBelow_SalienceAndRecencyDominance()
+        {
+            var target = new HumanId(Guid.NewGuid());
+            var now = WDateTime.New(100, 1, 10, 12);
+            // A far more salient & recent NEGATIVE episode still outranks a faint positive one even in
+            // a positive mood — mood congruence is small and never overrides salience/recency.
+            var memory = new MemoryIndex(new List<EpisodicMemory>
+            {
+                Episode(now, 30, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.40, target, salience: 0.35),
+                Episode(now, 1,  "Interaction:SmallTalk:Rejected|from=a|to=b", EmotionalTag.Negative, 0.95, target, salience: 0.95)
+            });
+
+            var recall = MemoryCognition.Recall(memory,
+                new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 2,
+                    CurrentValence: 0.6, NeuroticismScore: 0.5), now);
+
+            Assert.IsTrue(RelevanceOf(recall, EmotionalTag.Negative) > RelevanceOf(recall, EmotionalTag.Positive),
+                "Mood-congruence must not override salience/recency dominance.");
+        }
+    }
+
     internal static class MemoryCognitionTestData
     {
         internal static EpisodicMemory Episode(

@@ -60,7 +60,7 @@ namespace GameEngineTools.Characters.Core
         SexBiology Biology { get; }   // Female/Male/Intersex etc.
 
         /// <summary>Big Five personality traits (slow-changing).</summary>
-        Personality Personality { get; } // Trait modul (nemění se rychle)
+        Personality Personality { get; } // Trait module (does not change quickly)
 
         /// <summary>Psychological trait profile (attachment, values, sexual responsiveness, …).</summary>
         PsychologicalProfile PsychologyProfile { get; }
@@ -298,7 +298,7 @@ namespace GameEngineTools.Characters.Core
         void Add(IDomainEvent @event);
 
         /// <summary>Removes and returns all collected events.</summary>
-        IReadOnlyList<IDomainEvent> Drain(); // použije orchestrátor
+        IReadOnlyList<IDomainEvent> Drain(); // used by the orchestrator
     }
 
     /// <summary>Base contract for all domain events — every event carries the time it occurred.</summary>

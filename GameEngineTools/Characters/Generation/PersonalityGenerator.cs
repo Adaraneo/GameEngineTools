@@ -323,10 +323,10 @@ public sealed record MotivationMapping(
         BiasAff: 0.50, WAff: (wO: +0.10, wC: -0.05, wE: +0.25, wA: +0.20, wN: -0.05), // extraverze/agreeab.
         BiasAch: 0.50, WAch: (wO: 0.00, wC: +0.30, wE: +0.05, wA: +0.05, wN: -0.10), // conscientiousness
         BiasPow: 0.45, WPow: (wO: -0.05, wC: +0.10, wE: +0.25, wA: -0.15, wN: +0.05), // dominance vs. agreeab.
-        BiasAlt: 0.50, WAlt: (wO: +0.05, wC: 0.00, wE: -0.05, wA: +0.35, wN: -0.05), // prosocialita
+        BiasAlt: 0.50, WAlt: (wO: +0.05, wC: 0.00, wE: -0.05, wA: +0.35, wN: -0.05), // prosociality
         BiasCmp: 0.52, WCmp: (wO: +0.08, wC: +0.34, wE: 0.04, wA: 0.02, wN: -0.12),
-        BiasAut: 0.50, WAut: (wO: +0.10, wC: +0.05, wE: -0.10, wA: -0.10, wN: +0.05), // autonomie vs. afiliace
-        BiasCur: 0.50, WCur: (wO: +0.35, wC: 0.00, wE: +0.05, wA: 0.00, wN: -0.05), // otevřenost
+        BiasAut: 0.50, WAut: (wO: +0.10, wC: +0.05, wE: -0.10, wA: -0.10, wN: +0.05), // autonomy vs. affiliation
+        BiasCur: 0.50, WCur: (wO: +0.35, wC: 0.00, wE: +0.05, wA: 0.00, wN: -0.05), // openness
         BiasRes: 0.50, WRes: (wO: -0.05, wC: +0.05, wE: -0.20, wA: +0.05, wN: +0.15),
         BiasSex: 0.50, WSex: (wO: +0.05, wC: -0.10, wE: +0.20, wA: 0.00, wN: +0.05)
     );

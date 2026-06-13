@@ -119,17 +119,12 @@
                 manager.Characters.Clear();
             }
 
-            PC player = null;
-            NPC significantOther = null;
-            NPC friend = null;
-            NPC friendSignificantOther = null;
-
             Console.WriteLine("Generator will generate player's character and non-playable character's...");
 
-            player = new PC(100, manager.RandomizePerson(40, null, 14));
-            significantOther = new NPC(100, manager.RandomizePerson(player));
-            friend = new NPC(100, manager.RandomizePerson(40, null, 14));
-            friendSignificantOther = new NPC(100, manager.RandomizePerson(friend));
+            PC player = new PC(100, manager.RandomizePerson(40, null, 14));
+            NPC significantOther = new NPC(100, manager.RandomizePerson(player));
+            NPC friend = new NPC(100, manager.RandomizePerson(40, null, 14));
+            NPC friendSignificantOther = new NPC(100, manager.RandomizePerson(friend));
 
             var characters = manager.Characters;
             characters.Add(player);

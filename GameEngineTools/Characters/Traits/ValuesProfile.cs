@@ -34,27 +34,27 @@ namespace GameEngineTools.Characters.Traits
     public sealed record ValuesProfile(
         /// <summary>
         /// Benevolence — caring for close others, loyalty, helpfulness.
-        /// Self-Transcendence pole. Primary predictor: Agreeableness (ρ=.61).
+        /// Self-Transcendence pole. Primary predictor: Agreeableness (ρ=.43).
         /// Guilt is triggered when an action violates this value.
         /// </summary>
         double Benevolence,
 
         /// <summary>
         /// Universalism — understanding, tolerance, justice, nature protection.
-        /// Self-Transcendence pole. Predictors: Agreeableness (ρ=.39), Openness (ρ=.33).
+        /// Self-Transcendence pole. Predictors: Openness (ρ=.30), Agreeableness (ρ=.27).
         /// Guilt is triggered when an action violates this value.
         /// </summary>
         double Universalism,
 
         /// <summary>
         /// Self-Direction — autonomy, creativity, curiosity, freedom.
-        /// Openness-to-Change pole. Primary predictor: Openness (ρ=.52).
+        /// Openness-to-Change pole. Primary predictor: Openness (ρ=.42).
         /// </summary>
         double SelfDirection,
 
         /// <summary>
         /// Stimulation — excitement, novelty, challenge.
-        /// Openness-to-Change pole. Predictors: Openness (ρ=.36), Extraversion (ρ=.36).
+        /// Openness-to-Change pole. Predictors: Openness (ρ=.33), Extraversion (ρ=.21).
         /// </summary>
         double Stimulation,
 
@@ -67,34 +67,34 @@ namespace GameEngineTools.Characters.Traits
 
         /// <summary>
         /// Achievement — personal success, competence, ambition.
-        /// Self-Enhancement pole. Predictors: Extraversion (ρ=.31), Conscientiousness (ρ=.17).
+        /// Self-Enhancement pole. Predictors: Extraversion (ρ=.25), Conscientiousness (ρ=.17).
         /// Note: Extraversion is the dominant predictor, not Conscientiousness.
         /// </summary>
         double Achievement,
 
         /// <summary>
         /// Power — social status, dominance, control over resources.
-        /// Self-Enhancement pole. Predictors: Extraversion (ρ=.31), low Agreeableness (ρ=−.42).
+        /// Self-Enhancement pole. Predictors: low Agreeableness (ρ=−.31), Extraversion (ρ=.19).
         /// </summary>
         double Power,
 
         /// <summary>
         /// Security — safety, stability, order, harmony.
-        /// Conservation pole. Predictors: Conscientiousness (ρ=.37), low Openness (ρ=−.24).
+        /// Conservation pole. Predictors: Conscientiousness (ρ=.21), low Openness (ρ=−.18).
         /// </summary>
         double Security,
 
         /// <summary>
         /// Conformity — restraint of impulses and actions that violate norms.
-        /// Conservation pole. Predictors: Conscientiousness (ρ=.27), Agreeableness (ρ=.26),
-        /// low Openness (ρ=−.27).
+        /// Conservation pole. Predictors: low Openness (ρ=−.21), Conscientiousness (ρ=.20),
+        /// Agreeableness (ρ=.19).
         /// </summary>
         double Conformity,
 
         /// <summary>
         /// Tradition — respect for customs, religious devotion, acceptance of fate.
-        /// Conservation pole. Predictors: low Openness (ρ=−.31), Agreeableness (ρ=.22).
-        /// Note: Conscientiousness is not the primary driver (ρ=.10, non-significant).
+        /// Conservation pole. Predictors: low Openness (ρ=−.28), Agreeableness (ρ=.14).
+        /// Note: Conscientiousness is not the primary driver (ρ≈.10, non-significant).
         /// </summary>
         double Tradition);
 
@@ -106,16 +106,77 @@ namespace GameEngineTools.Characters.Traits
     /// Coefficient source: Parks-Leduc, Feldman &amp; Bardi (2015, <i>PSPR</i> 19:3–29),
     /// meta-analysis of 60 studies, N≈55,000, sample-size weighted, corrected for unreliability.
     /// <para>
-    /// Three critical corrections vs. the original research-plan proposal:
+    /// Four critical corrections vs. the original research-plan proposal:
     /// <list type="number">
     ///   <item>Neuroticism removed entirely — ρ≈0 with all 10 values in meta-analytic data.</item>
-    ///   <item>Achievement: Extraversion is the dominant predictor (ρ=.31 &gt; C ρ=.17).</item>
-    ///   <item>Tradition: driven by low Openness (ρ=−.31) and Agreeableness, not Conscientiousness.</item>
+    ///   <item>Achievement: Extraversion is the dominant predictor (ρ=.25 &gt; C ρ=.17).</item>
+    ///   <item>Tradition: driven by low Openness (ρ=−.28) and Agreeableness, not Conscientiousness.</item>
+    ///   <item>Magnitudes pulled to the meta-analytic weighted means (e.g. Benevolence↔Agreeableness
+    ///         ρ=.43, not .61; Power↔low-Agreeableness ρ=−.31, not −.42). The earlier constants sat
+    ///         above the meta-analytic mean and over-determined values from personality.</item>
     /// </list>
+    /// Every coefficient is exposed via <see cref="CoefficientAudit"/> with its cited upper bound
+    /// so a unit test can guard against future inflation past the literature ceiling.
     /// </para>
     /// </remarks>
     public static class ValuesProfileGenerator
     {
+        #region Regression coefficients (Parks-Leduc et al. 2015 meta-analytic means)
+
+        // Each constant is the meta-analytic weighted-mean correlation between a Big Five trait
+        // and a Schwartz value (Parks-Leduc, Feldman & Bardi 2015, PSPR 19:3–29). Signs preserve
+        // the validated direction; magnitudes are held at or below the meta-analytic mean.
+        private const double BenevolenceAgreeableness = 0.43;   // Source: Parks-Leduc 2015 (was .61)
+        private const double UniversalismAgreeableness = 0.27;  // Source: Parks-Leduc 2015
+        private const double UniversalismOpenness = 0.30;       // Source: Parks-Leduc 2015
+        private const double SelfDirectionOpenness = 0.42;      // Source: Parks-Leduc 2015 (was .52)
+        private const double StimulationOpenness = 0.33;        // Source: Parks-Leduc 2015
+        private const double StimulationExtraversion = 0.21;    // Source: Parks-Leduc 2015 (was .36)
+        private const double HedonismExtraversion = 0.20;       // Source: Parks-Leduc 2015
+        private const double HedonismConscientiousness = -0.19; // Source: Parks-Leduc 2015
+        private const double AchievementExtraversion = 0.25;    // Source: Parks-Leduc 2015 (was .31)
+        private const double AchievementConscientiousness = 0.17; // Source: Parks-Leduc 2015
+        private const double PowerExtraversion = 0.19;          // Source: Parks-Leduc 2015 (was .31)
+        private const double PowerAgreeableness = -0.31;        // Source: Parks-Leduc 2015 (was -.42)
+        private const double SecurityConscientiousness = 0.21;  // Source: Parks-Leduc 2015 (was .37)
+        private const double SecurityOpenness = -0.18;          // Source: Parks-Leduc 2015 (was -.24)
+        private const double ConformityConscientiousness = 0.20; // Source: Parks-Leduc 2015
+        private const double ConformityAgreeableness = 0.19;    // Source: Parks-Leduc 2015 (was .26)
+        private const double ConformityOpenness = -0.21;        // Source: Parks-Leduc 2015
+        private const double TraditionOpenness = -0.28;         // Source: Parks-Leduc 2015 (was -.31)
+        private const double TraditionAgreeableness = 0.14;     // Source: Parks-Leduc 2015 (was .22)
+
+        /// <summary>
+        /// Audit table of every regression coefficient used by <see cref="Generate"/>, paired with
+        /// the meta-analytic upper bound it must not exceed in magnitude. Used by unit tests to guard
+        /// against silent re-inflation of personality→value coupling past the literature ceiling
+        /// (Parks-Leduc, Feldman &amp; Bardi 2015, <i>PSPR</i> 19:3–29).
+        /// </summary>
+        public static readonly System.Collections.Generic.IReadOnlyList<(string Name, double Coefficient, double MetaAnalyticUpperBound)> CoefficientAudit =
+            new (string, double, double)[]
+            {
+                ("Benevolence←Agreeableness", BenevolenceAgreeableness, 0.45),
+                ("Universalism←Agreeableness", UniversalismAgreeableness, 0.30),
+                ("Universalism←Openness", UniversalismOpenness, 0.33),
+                ("SelfDirection←Openness", SelfDirectionOpenness, 0.45),
+                ("Stimulation←Openness", StimulationOpenness, 0.36),
+                ("Stimulation←Extraversion", StimulationExtraversion, 0.30),
+                ("Hedonism←Extraversion", HedonismExtraversion, 0.22),
+                ("Hedonism←Conscientiousness", HedonismConscientiousness, 0.20),
+                ("Achievement←Extraversion", AchievementExtraversion, 0.31),
+                ("Achievement←Conscientiousness", AchievementConscientiousness, 0.20),
+                ("Power←Extraversion", PowerExtraversion, 0.25),
+                ("Power←Agreeableness", PowerAgreeableness, 0.35),
+                ("Security←Conscientiousness", SecurityConscientiousness, 0.25),
+                ("Security←Openness", SecurityOpenness, 0.24),
+                ("Conformity←Conscientiousness", ConformityConscientiousness, 0.27),
+                ("Conformity←Agreeableness", ConformityAgreeableness, 0.26),
+                ("Conformity←Openness", ConformityOpenness, 0.27),
+                ("Tradition←Openness", TraditionOpenness, 0.31),
+                ("Tradition←Agreeableness", TraditionAgreeableness, 0.22),
+            };
+
+        #endregion
         // ── Calibration noise ─────────────────────────────────────────────────
         // Meta-analytic ρ² explains only 4–37% of value variance.
         // The remainder is environment, socialization, and individual experience.
@@ -148,16 +209,16 @@ namespace GameEngineTools.Characters.Traits
             // Raw scores from regression equations (Parks-Leduc et al. 2015).
             // Formula: 0.5 + Σ(ρ_trait × (trait − 0.5)) + noise
             // The 0.5 baseline centres all values at the population midpoint.
-            double benevolence = 0.5 + 0.61 * (a - 0.5);
-            double universalism = 0.5 + 0.39 * (a - 0.5) + 0.33 * (o - 0.5);
-            double selfDir = 0.5 + 0.52 * (o - 0.5);
-            double stimulation = 0.5 + 0.36 * (o - 0.5) + 0.36 * (e - 0.5);
-            double hedonism = 0.5 + 0.20 * (e - 0.5) - 0.19 * (c - 0.5);
-            double achievement = 0.5 + 0.31 * (e - 0.5) + 0.17 * (c - 0.5);
-            double power = 0.5 + 0.31 * (e - 0.5) - 0.42 * (a - 0.5);
-            double security = 0.5 + 0.37 * (c - 0.5) - 0.24 * (o - 0.5);
-            double conformity = 0.5 + 0.27 * (c - 0.5) + 0.26 * (a - 0.5) - 0.27 * (o - 0.5);
-            double tradition = 0.5 - 0.31 * (o - 0.5) + 0.22 * (a - 0.5);
+            double benevolence = 0.5 + BenevolenceAgreeableness * (a - 0.5);
+            double universalism = 0.5 + UniversalismAgreeableness * (a - 0.5) + UniversalismOpenness * (o - 0.5);
+            double selfDir = 0.5 + SelfDirectionOpenness * (o - 0.5);
+            double stimulation = 0.5 + StimulationOpenness * (o - 0.5) + StimulationExtraversion * (e - 0.5);
+            double hedonism = 0.5 + HedonismExtraversion * (e - 0.5) + HedonismConscientiousness * (c - 0.5);
+            double achievement = 0.5 + AchievementExtraversion * (e - 0.5) + AchievementConscientiousness * (c - 0.5);
+            double power = 0.5 + PowerExtraversion * (e - 0.5) + PowerAgreeableness * (a - 0.5);
+            double security = 0.5 + SecurityConscientiousness * (c - 0.5) + SecurityOpenness * (o - 0.5);
+            double conformity = 0.5 + ConformityConscientiousness * (c - 0.5) + ConformityAgreeableness * (a - 0.5) + ConformityOpenness * (o - 0.5);
+            double tradition = 0.5 + TraditionOpenness * (o - 0.5) + TraditionAgreeableness * (a - 0.5);
 
             // Add residual noise when a random source is provided.
             if (random is not null)

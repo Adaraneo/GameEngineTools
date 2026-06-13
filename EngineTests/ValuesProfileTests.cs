@@ -41,9 +41,10 @@ namespace EngineTests
             // Act — deterministic (null random)
             var profile = ValuesProfileGenerator.Generate(bigFive, random: null);
 
-            // Assert — Benevolence is elevated; after ipsatization should be > 0.70
-            Assert.IsTrue(profile.Benevolence > 0.70,
-                $"High A should produce Benevolence > 0.70. Got: {profile.Benevolence:F3}");
+            // Assert — Benevolence is elevated; after ipsatization should be > 0.60.
+            // Threshold lowered from 0.70 after the Parks-Leduc 2015 recalibration (ρ .61→.43).
+            Assert.IsTrue(profile.Benevolence > 0.60,
+                $"High A should produce Benevolence > 0.60. Got: {profile.Benevolence:F3}");
         }
 
         #endregion
@@ -60,9 +61,9 @@ namespace EngineTests
             // Act
             var profile = ValuesProfileGenerator.Generate(bigFive, random: null);
 
-            // Assert — Benevolence < 0.35
-            Assert.IsTrue(profile.Benevolence < 0.35,
-                $"Low A should produce Benevolence < 0.35. Got: {profile.Benevolence:F3}");
+            // Assert — Benevolence < 0.40 (threshold widened from 0.35 after recalibration ρ .61→.43).
+            Assert.IsTrue(profile.Benevolence < 0.40,
+                $"Low A should produce Benevolence < 0.40. Got: {profile.Benevolence:F3}");
         }
 
         #endregion
@@ -79,9 +80,9 @@ namespace EngineTests
             // Act
             var profile = ValuesProfileGenerator.Generate(bigFive, random: null);
 
-            // Assert — SelfDirection > 0.70 (ρ=.52 from Parks-Leduc et al. 2015)
-            Assert.IsTrue(profile.SelfDirection > 0.70,
-                $"High O should produce SelfDirection > 0.70. Got: {profile.SelfDirection:F3}");
+            // Assert — SelfDirection > 0.62 (ρ=.42 from Parks-Leduc et al. 2015; was .52/0.70).
+            Assert.IsTrue(profile.SelfDirection > 0.62,
+                $"High O should produce SelfDirection > 0.62. Got: {profile.SelfDirection:F3}");
         }
 
         #endregion
@@ -118,9 +119,9 @@ namespace EngineTests
             // Act
             var profile = ValuesProfileGenerator.Generate(bigFive, random: null);
 
-            // Assert — Security > 0.65
-            Assert.IsTrue(profile.Security > 0.65,
-                $"High C + Low O should produce Security > 0.65. Got: {profile.Security:F3}");
+            // Assert — Security > 0.60 (threshold lowered from 0.65 after recalibration ρ .37→.21).
+            Assert.IsTrue(profile.Security > 0.60,
+                $"High C + Low O should produce Security > 0.60. Got: {profile.Security:F3}");
         }
 
         #endregion
@@ -183,6 +184,24 @@ namespace EngineTests
             // Assert — byte-identical
             Assert.AreEqual(p1, p2,
                 "Null-random generation must be deterministic (no noise).");
+        }
+
+        #endregion
+
+        #region Test 8b — Coefficient magnitudes stay within meta-analytic bounds
+
+        [TestMethod]
+        public void ValuesProfileGenerator_AllCoefficients_WithinMetaAnalyticUpperBound()
+        {
+            // Each regression coefficient must not exceed (in magnitude) the cited Parks-Leduc et al.
+            // (2015) meta-analytic ceiling. Guards against silent re-inflation of personality→value
+            // coupling.
+            foreach (var (name, coefficient, upperBound) in ValuesProfileGenerator.CoefficientAudit)
+            {
+                Assert.IsTrue(Math.Abs(coefficient) <= upperBound + 1e-9,
+                    $"Coefficient {name} magnitude {Math.Abs(coefficient):F3} exceeds meta-analytic " +
+                    $"upper bound {upperBound:F3}.");
+            }
         }
 
         #endregion

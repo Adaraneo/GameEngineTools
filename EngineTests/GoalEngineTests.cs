@@ -351,6 +351,143 @@ namespace EngineTests
             Assert.AreEqual(before, candidates[0].Utility, 0.001, "No bias should be applied with empty goals");
         }
 
+        // ── Section 6: Hierarchy (Task 4.1) ────────────────────────────────────
+
+        [TestMethod]
+        public void GoalState_Children_ReturnsActiveSubGoalsOfParent()
+        {
+            var now = new WDateTime(0);
+            var parent = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.FindMeaning, GoalOrigin.Personality,
+                0.5, 0.0, 0.0, now, now);
+            var child = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.MasterCraft, GoalOrigin.Personality,
+                0.4, 0.0, 0.0, now, now, ParentId: parent.Id);
+            var unrelated = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.FindPartner, GoalOrigin.Personality,
+                0.4, 0.0, 0.0, now, now);
+
+            var state = new GoalState(new[] { parent, child, unrelated });
+
+            var children = state.Children(parent.Id).ToList();
+            Assert.AreEqual(1, children.Count);
+            Assert.AreEqual(child.Id, children[0].Id);
+        }
+
+        // ── Section 7: Goal shielding (Task 4.2) ───────────────────────────────
+
+        [TestMethod]
+        public void GoalShielding_CommittedFocalGoal_InhibitsCompetitorAction()
+        {
+            var now = new WDateTime(0);
+            var findPartner = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.FindPartner, GoalOrigin.Personality,
+                0.5, 0.0, 0.0, now, now);
+            var masterCraft = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.MasterCraft, GoalOrigin.Personality,
+                1.0, 0.0, 0.0, now, now);
+
+            // Baseline: only the FindPartner goal — InviteIntimacy is boosted, not shielded.
+            var modifier = new GoalBehaviorModifier();
+            var baselineCandidates = new List<BehaviorCandidate>
+            {
+                new(InviteIntimacy, 40.0, WTimeSpan.FromHours(1), BehaviorDomain.Social)
+            };
+            modifier.Modify(BuildBehaviorContext(new GoalState(new[] { findPartner })), baselineCandidates);
+            var baselineUtility = baselineCandidates[0].Utility;
+
+            // With a committed focal MasterCraft goal, InviteIntimacy (a competitor) is shielded.
+            var shieldedCandidates = new List<BehaviorCandidate>
+            {
+                new(InviteIntimacy, 40.0, WTimeSpan.FromHours(1), BehaviorDomain.Social),
+                new(Work, 50.0, WTimeSpan.FromHours(2), BehaviorDomain.Competence)
+            };
+            modifier.Modify(BuildBehaviorContext(new GoalState(new[] { findPartner, masterCraft })), shieldedCandidates);
+            var shieldedIntimacy = shieldedCandidates.First(c => c.Name == InviteIntimacy).Utility;
+            var shieldedWork = shieldedCandidates.First(c => c.Name == Work).Utility;
+
+            Assert.IsTrue(shieldedIntimacy < baselineUtility,
+                $"A committed focal goal must lower competitor utility. Baseline={baselineUtility:F2}, Shielded={shieldedIntimacy:F2}");
+            Assert.IsTrue(shieldedWork > 50.0,
+                $"The focal-facilitating action must NOT be shielded (and is boosted). Got {shieldedWork:F2}");
+        }
+
+        // ── Section 8: Disengagement / reengagement (Task 4.3) ─────────────────
+
+        [TestMethod]
+        public void Tick_BlockedGoal_DisengagesAndReengagesOnAlternative()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var now = new WDateTime(0);
+
+            var blocked = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.FindPartner, GoalOrigin.Personality,
+                0.5, 0.2, 0.7, now, now - WTimeSpan.FromDays(10));
+            var alternative = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.MasterCraft, GoalOrigin.Personality,
+                0.4, 0.2, 0.0, now, now);
+            engine.RestoreState(new GoalState(new[] { blocked, alternative }));
+            var altSalienceBefore = alternative.Salience;
+
+            var dt = WTimeSpan.FromHours(1);
+            var outbox = new EventCollector();
+            engine.Tick(now + dt, dt, BuildContext(self), outbox);
+
+            var blockedAfter = engine.State.Goals.First(g => g.Id == blocked.Id);
+            var altAfter = engine.State.Goals.First(g => g.Id == alternative.Id);
+            var events = outbox.Drain();
+
+            Assert.IsNotNull(blockedAfter.Resolution, "Persistently-blocked goal must be disengaged from.");
+            Assert.IsTrue(events.OfType<GoalDisengaged>().Any(e => e.GoalId == blocked.Id),
+                "GoalDisengaged must be emitted for the blocked goal.");
+            var reengaged = events.OfType<GoalReengaged>().FirstOrDefault();
+            Assert.IsNotNull(reengaged, "GoalReengaged must be emitted.");
+            Assert.AreEqual(alternative.Id, reengaged!.ToGoalId, "Reengagement must target the alternative goal.");
+            Assert.IsTrue(altAfter.Salience > altSalienceBefore,
+                $"Reengagement must boost the alternative goal's salience. Before={altSalienceBefore:F2}, After={altAfter.Salience:F2}");
+        }
+
+        [TestMethod]
+        public void Tick_BlockedBeGoal_CascadesReengagementToChildDoGoal()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var now = new WDateTime(0);
+
+            var beGoal = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.FindMeaning, GoalOrigin.Personality,
+                0.5, 0.1, 0.7, now, now - WTimeSpan.FromDays(10));
+            var childDoGoal = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.MasterCraft, GoalOrigin.Personality,
+                0.3, 0.1, 0.0, now, now, ParentId: beGoal.Id);
+            // A higher-salience unrelated goal must NOT be preferred over the child.
+            var unrelated = new PersistentGoal(Guid.NewGuid(), PersistentGoalKind.FindPartner, GoalOrigin.Personality,
+                0.9, 0.1, 0.0, now, now);
+            engine.RestoreState(new GoalState(new[] { beGoal, childDoGoal, unrelated }));
+
+            var dt = WTimeSpan.FromHours(1);
+            var outbox = new EventCollector();
+            engine.Tick(now + dt, dt, BuildContext(self), outbox);
+
+            var reengaged = outbox.Drain().OfType<GoalReengaged>().FirstOrDefault();
+            Assert.IsNotNull(reengaged, "GoalReengaged must be emitted.");
+            Assert.AreEqual(childDoGoal.Id, reengaged!.ToGoalId,
+                "A blocked be-goal must cascade reengagement to its child do-goal, not a higher-salience unrelated goal.");
+        }
+
+        [TestMethod]
+        public void PsychologyEngine_GoalReengaged_RaisesMoodBaseline()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var cfg = new PsychologyConfig(
+                BaselineAffectVariance: 0.0, StressRecoveryRatePerHour: 0.0, EnableCircadianRhythm: false);
+            var engine = new DefaultPsychologyEngine(
+                Options.Create(cfg),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new ZeroRandom());
+            engine.RestoreState(new PsychologyState(0.0, 0.4, 0.5, 0, 10, DiscreteEmotion.Neutral, MoodBaseline: 50));
+
+            var moodBefore = engine.State.MoodBaseline;
+            engine.Handle(
+                new GoalReengaged(new WDateTime(100), self, PersistentGoalKind.FindPartner, Guid.NewGuid(), PersistentGoalKind.MasterCraft),
+                BuildContext(self), new EventCollector());
+
+            Assert.IsTrue(engine.State.MoodBaseline > moodBefore,
+                $"Reengagement should raise MoodBaseline (well-being recovery). Before={moodBefore:F2}, After={engine.State.MoodBaseline:F2}");
+        }
+
         // ── Helpers ────────────────────────────────────────────────────────────
 
         private static DefaultGoalEngine BuildEngine(GoalConfig? config = null)

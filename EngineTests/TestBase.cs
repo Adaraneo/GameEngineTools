@@ -37,22 +37,22 @@ namespace EngineTests
     using System.Linq;
 
     /// <summary>
-    /// Základní třída pro synchronní integrační testy herního enginu.
-    /// Sestaví DI kontejner a zpřístupní klíčové služby jako chráněné vlastnosti.
+    /// Base class for synchronous integration tests of the game engine.
+    /// Builds the DI container and exposes key services as protected properties.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Pro asynchronní testy (hosted services) použij <see cref="AsyncTestBase"/>.
+    /// For asynchronous tests (hosted services) use <see cref="AsyncTestBase"/>.
     /// </para>
     /// <para>
-    /// <b>Pořadí DI závislostí:</b>
+    /// <b>DI dependency order:</b>
     /// <code>
     /// InitWorldClockConfig (appsettings)
     ///   → WorldTimeSpec      (singleton)
     ///   → IWorldClock        (singleton)
-    ///   → IClock / TestClock (singleton — bere WorldTimeSpec přímo)
+    ///   → IClock / TestClock (singleton — takes WorldTimeSpec directly)
     ///   → WorldTimeContext   (singleton — legacy wrapper)
-    ///   → WWorld.Configure   (ambient konfigurace pro W-typy)
+    ///   → WWorld.Configure   (ambient configuration for W-types)
     ///   → HumanBlueprintSpec (lazy factory)
     /// </code>
     /// </para>
@@ -60,37 +60,37 @@ namespace EngineTests
     [TestClass]
     public abstract class TestBase
     {
-        #region Konstanty
+        #region Constants
 
         protected const int MaxHealth = 100;
         protected const int PlayersMaxAge = 35;
         protected const int PlayersMinAge = 15;
 
-        #endregion Konstanty
+        #endregion Constants
 
-        #region Chráněné vlastnosti
+        #region Protected properties
 
-        /// <summary>DI provider sestavený v <see cref="InitializeServicesAndGetProvider"/>.</summary>
+        /// <summary>DI provider built in <see cref="InitializeServicesAndGetProvider"/>.</summary>
         protected IServiceProvider ServiceProvider { get; set; }
 
-        /// <summary>Správce postav.</summary>
+        /// <summary>Character manager.</summary>
         public GameEngineToolsManager CharacterManager { get; protected set; }
 
-        /// <summary>Export/import postav do/ze souborů.</summary>
+        /// <summary>Export/import of characters to/from files.</summary>
         protected GeneratedFile GeneratedFile { get; set; }
 
-        /// <summary>Zdroj náhodných čísel pro pomocné výpočty v testech.</summary>
+        /// <summary>Random-number source for helper computations in tests.</summary>
         protected Random Random { get; private set; }
 
-        /// <summary>Seznam názvů souborů pro import/export postav.</summary>
+        /// <summary>List of file names for character import/export.</summary>
         protected List<string> Filenames { get; set; } = new();
 
-        #endregion Chráněné vlastnosti
+        #endregion Protected properties
 
         #region TestInitialize / TestCleanup
 
         /// <summary>
-        /// Spouštěno před každým testem — inicializuje Random a sestaví DI.
+        /// Run before each test — initializes Random and builds DI.
         /// </summary>
         [TestInitialize]
         public void Init()
@@ -100,16 +100,16 @@ namespace EngineTests
         }
 
         /// <summary>
-        /// Spouštěno po každém testu — uklízí sdílený stav pro izolaci testů.
+        /// Run after each test — cleans up shared state for test isolation.
         /// </summary>
         /// <remarks>
-        /// <see cref="WWorld.Reset"/> zajistí, že ambient konfigurace nepřeteče
-        /// mezi testy — každý test musí začínat čistým slate.
+        /// <see cref="WWorld.Reset"/> ensures that ambient configuration does not leak
+        /// between tests — every test must start from a clean slate.
         /// </remarks>
         [TestCleanup]
         public void Cleanup()
         {
-            // Resetujeme WWorld aby ambient konfigurace nepřetékala mezi testy
+            // Reset WWorld so ambient configuration does not leak between tests
             WWorld.Reset();
 
             CharacterManager?.Characters.Clear();
@@ -119,8 +119,8 @@ namespace EngineTests
         }
 
         /// <summary>
-        /// Hook pro odvozené třídy — voláno z <see cref="Init"/>.
-        /// Výchozí implementace volá <see cref="InitializeServicesAndGetProvider"/>.
+        /// Hook for derived classes — called from <see cref="Init"/>.
+        /// The default implementation calls <see cref="InitializeServicesAndGetProvider"/>.
         /// </summary>
         protected virtual void TestInit()
         {
@@ -135,7 +135,7 @@ namespace EngineTests
         #region Import / Export
 
         /// <summary>
-        /// Načte soubory postav z testovacího souborového systému do <see cref="Filenames"/>.
+        /// Loads character files from the test file system into <see cref="Filenames"/>.
         /// </summary>
         protected void GetFiles()
         {
@@ -155,7 +155,7 @@ namespace EngineTests
         }
 
         /// <summary>
-        /// Importuje všechny postavy ze <see cref="Filenames"/> do <see cref="CharacterManager"/>.
+        /// Imports all characters from <see cref="Filenames"/> into <see cref="CharacterManager"/>.
         /// </summary>
         public virtual void Import()
         {
@@ -174,7 +174,7 @@ namespace EngineTests
         }
 
         /// <summary>
-        /// Importuje všechny postavy a vrátí je jako seznam.
+        /// Imports all characters and returns them as a list.
         /// </summary>
         public virtual void Import(out List<CharacterBase> nppcs)
         {
@@ -194,18 +194,18 @@ namespace EngineTests
 
         #endregion Import / Export
 
-        #region DI inicializace
+        #region DI initialization
 
         /// <summary>
-        /// Sestaví DI kontejner pro testy, nakonfiguruje <see cref="WWorld"/>
-        /// a naplní chráněné vlastnosti.
+        /// Builds the DI container for tests, configures <see cref="WWorld"/>
+        /// and populates the protected properties.
         /// </summary>
         /// <remarks>
-        /// <b>Proč jen jedno <c>BuildServiceProvider()</c>?</b><br/>
-        /// Původní kód volal <c>BuildServiceProvider()</c> dvakrát —
-        /// každé volání vytvořilo nový kontejner s vlastními singletony.
-        /// Nyní je <c>HumanBlueprintSpec</c> lazy factory — vyhodnotí se až
-        /// při prvním resolve, kdy DI kontejner existuje a <c>IClock</c> je k dispozici.
+        /// <b>Why only one <c>BuildServiceProvider()</c>?</b><br/>
+        /// The original code called <c>BuildServiceProvider()</c> twice —
+        /// each call created a new container with its own singletons.
+        /// Now <c>HumanBlueprintSpec</c> is a lazy factory — it is evaluated only
+        /// on the first resolve, when the DI container exists and <c>IClock</c> is available.
         /// </remarks>
         protected virtual void InitializeServicesAndGetProvider()
         {
@@ -224,7 +224,7 @@ namespace EngineTests
                 });
             });
 
-            // ── Konfigurace ───────────────────────────────────────────────────
+            // ── Configuration ─────────────────────────────────────────────────
             var cprovider = Config.ConfigProvider.Configuration;
             var useWorldType = cprovider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             services.AddSingleton<IConfiguration>(cprovider);
@@ -260,7 +260,7 @@ namespace EngineTests
 
             services.AddSingleton<IClock, TestClock>();
 
-            // ── Soubory ───────────────────────────────────────────────────────
+            // ── Files ─────────────────────────────────────────────────────────
             services.AddSingleton<IGeneratedFile, GeneratedFile>();
             services.Configure<GeneratedFileOptions>(opt =>
             {
@@ -268,7 +268,7 @@ namespace EngineTests
                 opt.PlayerDirectory = GameEngineTools.Constants.TestFSConstatns.player;
             });
 
-            // ── Enginy postav ─────────────────────────────────────────────────
+            // ── Character engines ─────────────────────────────────────────────
             services.AddCharacters<
                 DefaultPhysiologyEngine,
                 DefaultPsychologyEngine,
@@ -284,7 +284,7 @@ namespace EngineTests
                     .BindConfiguration("Characters:MenstrualCycle");
 
             // ── HumanBlueprintSpec — lazy factory ──────────────────────────────
-            //    WWorld musí být nakonfigurován před prvním resolve (níže).
+            //    WWorld must be configured before the first resolve (below).
             services.AddCharacterGeneration(sp =>
             {
                 var clock = sp.GetRequiredService<IClock>();
@@ -310,14 +310,14 @@ namespace EngineTests
             //services.AddSingleton<IWorldObjectProvider>(
             //    sp => sp.GetRequiredService<SqliteWorldObjectProvider>());
 
-            // Write buffer — obalí provider, bufferuje mutace
+            // Write buffer — wraps the provider, buffers mutations
             services.AddSingleton<WorldObjectWriteBuffer>();
 
-            // IMutableWorldObjectProvider → WriteBuffer (místo přímého provideru)
+            // IMutableWorldObjectProvider → WriteBuffer (instead of the direct provider)
             services.AddSingleton<IMutableWorldObjectProvider>(
                 sp => sp.GetRequiredService<WorldObjectWriteBuffer>());
 
-            // Read cache stále obaluje přímý provider (ne buffer) — čte committovaná data
+            // Read cache still wraps the direct provider (not the buffer) — reads committed data
             services.AddSingleton<WorldObjectSnapshotCache>(sp =>
                 new WorldObjectSnapshotCache(sp.GetRequiredService<SqliteWorldObjectProvider>()));
 
@@ -340,12 +340,12 @@ namespace EngineTests
                 opt.UseConsoleLogging = true;
             });
 
-            // ── Sestavení — jedno volání, jeden kontejner, sdílené singletony ─
+            // ── Build — one call, one container, shared singletons ────────────
             var provider = services.BuildServiceProvider(
                 new ServiceProviderOptions { ValidateOnBuild = true });
 
-            // ── WWorld.Configure — ambient konfigurace pro W-typy ──────────────
-            // Musí proběhnout před jakýmkoli voláním WDateTime.Now, dt.Year atd.
+            // ── WWorld.Configure — ambient configuration for W-types ───────────
+            // Must run before any call to WDateTime.Now, dt.Year, etc.
             var resolvedSpec = provider.GetRequiredService<WorldTimeSpec>();
             var resolvedClock = provider.GetRequiredService<IClock>();
             WWorld.Configure(resolvedSpec, resolvedClock);
@@ -357,11 +357,11 @@ namespace EngineTests
             Assert.IsNotNull(provider.GetRequiredService<IClock>().Now);
         }
 
-        #endregion DI inicializace
+        #endregion DI initialization
 
-        #region Pomocné metody
+        #region Helper methods
 
-        /// <summary>RNG vracející vždy 0 — eliminuje náhodný šum z Tick().</summary>
+        /// <summary>RNG that always returns 0 — eliminates random noise from Tick().</summary>
         protected sealed class ZeroRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
@@ -413,6 +413,6 @@ namespace EngineTests
             public SocialFidelityLevel GetLevel(HumanId human) => _level;
         }
 
-        #endregion Pomocné metody
+        #endregion Helper methods
     }
 }

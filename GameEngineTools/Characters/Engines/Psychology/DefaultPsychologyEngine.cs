@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
+    using GameEngineTools.Characters.Engines.Psychology.Appraisal;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Objects;
@@ -184,7 +185,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     ph.SleepDebtHours * Config.CognitiveLoadSleepDebtWeight
                     + ph.Pain * Config.CognitiveLoadPainWeight
                     + s.Stress * Config.CognitiveLoadStressWeight
-                    + feverDegrees * Config.FeverCognitiveLoadPerDegree);
+                    + feverDegrees * Config.FeverCognitiveLoadPerDegree
+                    // Van Dongen (2003) sleep-restriction dose-response: behavioural deficit keeps
+                    // accumulating under chronic restriction even after homeostatic Process S saturates.
+                    + (ph.CognitiveDeficit ?? 0.0) * Config.CognitiveDeficitCogLoadWeight);
 
                 var recoveryRate = (action is GameEngineTools.Characters.Engines.ActionNames.Sleep
                                        or GameEngineTools.Characters.Engines.ActionNames.Idle)
@@ -659,6 +663,33 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var s = State;
             var ph = ctx.Snapshot.Physiology;
 
+            // ── Appraisal-based emotion generation (Scherer CPM) ──────────────────────
+            // For appraisable events that have no bespoke affect handler below, drive emotion via
+            // appraisal: the discrete emotion is selected from the appraisal structure (agency,
+            // conduciveness, coping) rather than from PAD alone, then a coherent PAD delta is applied.
+            // Events the evaluator does not recognise fall through to the legacy switch / InferEmotion.
+            var appraisal = AppraisalEvaluator.TryEvaluate(@event, ctx, s);
+            if (appraisal is { } outcome && outcome.IsRelevant())
+            {
+                var result = AppraisalEmotionMap.Map(outcome, Config);
+                var previousEmotion = s.DominantEmotion;
+                s = s with
+                {
+                    Valence = Math.Clamp(s.Valence + result.DeltaValence, -1, 1),
+                    Arousal = Math.Clamp(s.Arousal + result.DeltaArousal, 0, 1),
+                    Dominance = Math.Clamp(s.Dominance + result.DeltaDominance, 0, 1),
+                    DominantEmotion = result.Emotion
+                };
+                State = s;
+
+                outbox.Add(new EmotionAppraised(
+                    @event.OccurredAt, ctx.Id, result.Emotion,
+                    outcome.GoalConduciveness, result.DeltaValence, result.DeltaArousal, result.DeltaDominance));
+                if (result.Emotion != previousEmotion)
+                    outbox.Add(new EmotionShifted(@event.OccurredAt, ctx.Id, result.Emotion, s.Valence, s.Arousal, s.Dominance));
+                return;
+            }
+
             switch (@event)
             {
                 case Characters.Engines.Relationships.MicroPositive:
@@ -1011,14 +1042,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 case Sleep.NightmareTriggered nm:
                     {
                         var neuroticism = ctx.Personality.BigFive.Neuroticism;
-                        var stressSpike = 8.0 + neuroticism * 12.0;               // 8–20 bodů stresu
+                        var stressSpike = 8.0 + neuroticism * 12.0;               // 8–20 stress points
                         var valencePenalty = 0.08 + neuroticism * 0.10;             // 0.08–0.18
 
                         s = s with
                         {
                             Stress = Math.Clamp(s.Stress + stressSpike, 0, 100),
                             Valence = Math.Clamp(s.Valence - valencePenalty, -1, 1),
-                            Arousal = Math.Clamp(s.Arousal + 0.2, 0, 1)             // probuzení = vysoký arousal
+                            Arousal = Math.Clamp(s.Arousal + 0.2, 0, 1)             // waking up = high arousal
                         };
 
                         outbox.Add(new StressSpiked(nm.OccurredAt, ctx.Id, s.Stress));
@@ -1055,6 +1086,20 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                 case LifeStage.EmptyNestOccurred en when en.Human == ctx.Id:
                     s = HandleEmptyNest(en, s, ctx);
+                    break;
+
+                // Adaptive goal disengagement relieves frustration-driven distress (Wrosch 2003).
+                case Goals.GoalDisengaged gd when gd.Human == ctx.Id:
+                    s = s with { Stress = Math.Clamp(s.Stress - 2.0, 0, 100) };
+                    break;
+
+                // Reengaging on an alternative goal restores a sense of purpose → well-being recovery.
+                case Goals.GoalReengaged gr when gr.Human == ctx.Id:
+                    s = s with
+                    {
+                        MoodBaseline = Math.Clamp(s.MoodBaseline + Config.GoalReengagementMoodRecovery, 0, 100),
+                        Valence = Math.Clamp(s.Valence + 0.05, -1, 1)
+                    };
                     break;
             }
 
@@ -1155,7 +1200,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Guilt — negative + medium dominance + elevated arousal (approach-motivated, reparative)
             // Key difference from Shame: higher Dominance (0.30–0.55) = the character is not paralyzed and wants to make amends.
             // VAD: V<-0.35, D∈[0.25,0.55], A>0.35
-            // Zdroj: Tangney & Dearing (2002); Singh & Bhushan (2025, PMC12647085).
+            // Source: Tangney & Dearing (2002); Singh & Bhushan (2025, PMC12647085).
             if (ps.Valence < -0.35 && ps.Dominance is >= 0.25 and <= 0.55 && ps.Arousal > 0.35 && ps.Stress < 50)
                 return DiscreteEmotion.Guilt;
 

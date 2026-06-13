@@ -151,7 +151,97 @@ namespace GameEngineTools.Characters.Engines.Goals
                 updated.Add(mutated);
             }
 
+            // Disengagement / reengagement (Wrosch et al. 2003): a goal that is persistently blocked
+            // (frustration high + progress stalled) but not yet at the harder abandonment threshold is
+            // actively disengaged from, then the character reengages on an alternative goal.
+            ApplyDisengagementReengagement(updated, now, ctx, outbox);
+
             State = new GoalState(updated);
+        }
+
+        /// <summary>
+        /// Detects persistently-blocked goals and performs adaptive disengagement followed by
+        /// reengagement onto an alternative goal (preferring a child, then a sibling, then any other
+        /// active goal). Mutates <paramref name="goals"/> in place and emits the corresponding events.
+        /// Source: Wrosch et al. (2003, <i>PSPB</i> 29(12)).
+        /// </summary>
+        private void ApplyDisengagementReengagement(
+            List<PersistentGoal> goals, WDateTime now, IHumanContext ctx, IEventCollector outbox)
+        {
+            for (var i = 0; i < goals.Count; i++)
+            {
+                var goal = goals[i];
+                if (goal.Resolution is not null || goal.Progress >= 1.0) continue;
+
+                var stallDays = Math.Max(0.0, (now - goal.LastProgressAt).TotalDays);
+                var blocked = goal.Frustration >= Config.DisengagementFrustrationThreshold
+                              && stallDays >= Config.DisengagementStallDays;
+                if (!blocked) continue;
+
+                // Disengage — adaptive relief, not a generic abandonment (no GoalResolved/appraisal distress).
+                goals[i] = goal with { Resolution = GoalResolution.Abandoned };
+                outbox.Add(new GoalDisengaged(now, ctx.Id, goal.Id, goal.Kind));
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultGoalEngine)))
+                {
+                    _log.GoalResolved(ctx.Id.Value.ToString(), goal.Kind.ToString(), "Disengaged",
+                        goal.Progress, goal.Frustration);
+                }
+
+                // Reengage onto an alternative active goal.
+                var altIdx = SelectReengagementTarget(goals, goal, i);
+                if (altIdx >= 0)
+                {
+                    var alt = goals[altIdx];
+                    var boosted = alt with
+                    {
+                        Salience = Clamp01(alt.Salience + Config.ReengagementSalienceBoost),
+                        LastProgressAt = now
+                    };
+                    goals[altIdx] = boosted;
+                    outbox.Add(new GoalReengaged(now, ctx.Id, goal.Kind, boosted.Id, boosted.Kind));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Chooses the goal to reengage on after disengaging from <paramref name="disengaged"/>:
+        /// prefer an active child (cascade a blocked be-goal down to a do-goal), then a sibling, then
+        /// any other active goal — highest salience within the chosen tier. Returns -1 if none exists.
+        /// </summary>
+        private static int SelectReengagementTarget(List<PersistentGoal> goals, PersistentGoal disengaged, int disengagedIndex)
+        {
+            int Best(Func<PersistentGoal, bool> predicate)
+            {
+                var bestIdx = -1;
+                var bestSalience = double.NegativeInfinity;
+                for (var i = 0; i < goals.Count; i++)
+                {
+                    if (i == disengagedIndex) continue;
+                    var g = goals[i];
+                    if (g.Resolution is not null) continue;
+                    if (!predicate(g)) continue;
+                    if (g.Salience > bestSalience)
+                    {
+                        bestSalience = g.Salience;
+                        bestIdx = i;
+                    }
+                }
+                return bestIdx;
+            }
+
+            // 1. Active children of the disengaged goal (cascade down the hierarchy).
+            var child = Best(g => g.ParentId == disengaged.Id);
+            if (child >= 0) return child;
+
+            // 2. Active siblings (same parent).
+            if (disengaged.ParentId is { } parent)
+            {
+                var sibling = Best(g => g.ParentId == parent);
+                if (sibling >= 0) return sibling;
+            }
+
+            // 3. Any other active goal.
+            return Best(_ => true);
         }
 
         #endregion IEngine — Tick

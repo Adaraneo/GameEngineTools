@@ -59,12 +59,55 @@ namespace GameEngineTools.Characters.Engines.Goals
         double FindMeaningOpennessThreshold = 0.75,
 
         /// <summary>Initial salience for personality-seeded goals. Default 0.25.</summary>
-        double PersonalitySeedSalience = 0.25
+        double PersonalitySeedSalience = 0.25,
+
+        // ── Goal shielding (Shah, Friedman & Kruglanski 2002) ─────────────────
+
+        /// <summary>
+        /// Salience an active goal must reach to act as the committed <i>focal</i> goal that
+        /// shields against competitors. Source: Shah, Friedman &amp; Kruglanski 2002. Default 0.5.
+        /// </summary>
+        double ShieldingCommitmentThreshold = 0.5,
+
+        /// <summary>
+        /// Maximum utility inhibition applied to a competing-goal action while a focal goal is
+        /// committed. Inhibition scales with focal commitment and competitor relevance.
+        /// Source: Shah, Friedman &amp; Kruglanski 2002. Default 8.0.
+        /// </summary>
+        double ShieldingMaxInhibition = 8.0,
+
+        /// <summary>
+        /// Fraction by which stress (anxiety/depression proxy) weakens shielding. Shielding factor
+        /// = 1 − stress/100 × this. Source: Shah, Friedman &amp; Kruglanski 2002 (anxiety/depression
+        /// impair shielding). Default 0.6.
+        /// </summary>
+        double ShieldingStressDampening = 0.6,
+
+        // ── Disengagement / reengagement (Wrosch et al. 2003) ─────────────────
+
+        /// <summary>
+        /// Frustration level above which a stalled goal is disengaged from (below the harder
+        /// <see cref="AbandonmentFrustrationThreshold"/>). Source: Wrosch et al. 2003. Default 0.6.
+        /// </summary>
+        double DisengagementFrustrationThreshold = 0.6,
+
+        /// <summary>
+        /// Days without progress required (together with high frustration) before disengagement.
+        /// Source: Wrosch et al. 2003. Default 5.0.
+        /// </summary>
+        double DisengagementStallDays = 5.0,
+
+        /// <summary>
+        /// Salience boost applied to the alternative goal chosen at reengagement [0..1].
+        /// Source: Wrosch et al. 2003. Default 0.3.
+        /// </summary>
+        double ReengagementSalienceBoost = 0.3
     )
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public GoalConfig() : this(0.008, 2.5, 3.0, 0.06, 0.04, 0.015, 0.12, 0.05, 0.85, 0.03, 12.0,
-                                    0.72, 0.70, 0.75, 0.25)
+                                    0.72, 0.70, 0.75, 0.25,
+                                    0.5, 8.0, 0.6, 0.6, 5.0, 0.3)
         { }
     }
 }

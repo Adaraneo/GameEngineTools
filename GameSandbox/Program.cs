@@ -280,7 +280,7 @@ for (int index = 0; index < 5; index++)
 var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
 
 var mainCharactersQuery = from mainCharacters in manager.Characters
-                          where mainCharacters.Person.Id.Value == playerPerson.Id.Value || mainCharacters.Person.Id.Value == soid || mainCharacters.Person.Id.Value == friendId || mainCharacters.Person.Id.Value == friendSOId
+                          //where mainCharacters.Person.Id.Value == playerPerson.Id.Value || mainCharacters.Person.Id.Value == soid || mainCharacters.Person.Id.Value == friendId || mainCharacters.Person.Id.Value == friendSOId
                           select mainCharacters;
 
 var mainCharactersPersonQuery = from mainCharacters in mainCharactersQuery
@@ -326,7 +326,7 @@ Console.WriteLine("Press any key to continue...");
 
 var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>();
 var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
-var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
+//var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
 
 var writeBuffer = runtime.Services.GetRequiredService<WorldObjectWriteBuffer>();
 var objectSnapshotCache = runtime.Services.GetRequiredService<WorldObjectSnapshotCache>();
@@ -335,7 +335,8 @@ Console.ReadKey();
 
 var mainCharactersSceneOpts = new SimulationSceneOptions
 {
-    Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
+    //Characters = [playerPerson, significantOtherPerson, friendPerson, friendSOPerson],
+    Characters = manager.Characters.Select(p => p.Person).ToList(),
     LocationService = locationService,
     AstroConfig = astroOptions,
     UniverseConfig = universeOptions,
@@ -394,62 +395,62 @@ AuditConsumableRouting(objectProvider, locationService);
 
 await mainCharactersScene.RunAsync();
 
-var characters = new List<IHuman>();
+//var characters = new List<IHuman>();
 
-foreach (var character in manager.Characters.Select(c => c.Person).ToList())
-{
-    var mainCharacters = mainCharactersPersonQuery.ToList();
-    if (mainCharacters.Contains(character))
-    {
-        continue;
-    }
+//foreach (var character in manager.Characters.Select(c => c.Person).ToList())
+//{
+//    var mainCharacters = mainCharactersPersonQuery.ToList();
+//    if (mainCharacters.Contains(character))
+//    {
+//        continue;
+//    }
 
-    characters.Add(character);
-}
+//    characters.Add(character);
+//}
 
-if (characters.Count > 0)
-{
-    var ocLocations = worldMap.GetLocationsInRegion("Village");
+//if (characters.Count > 0)
+//{
+//    var ocLocations = worldMap.GetLocationsInRegion("Village");
 
-    foreach (var character in characters)
-    {
-        if (character.Snapshot.InteractionSurface.Location == "Unknown")
-        {
-            locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
-        }
-        else
-        {
-            locationService.MoveCharacter(character.Id, character.Snapshot.InteractionSurface.Location);
-        }
-    }
+//    foreach (var character in characters)
+//    {
+//        if (character.Snapshot.InteractionSurface.Location == "Unknown")
+//        {
+//            locationService.MoveCharacter(character.Id, ocLocations[rng.Next(0, ocLocations.Count)]);
+//        }
+//        else
+//        {
+//            locationService.MoveCharacter(character.Id, character.Snapshot.InteractionSurface.Location);
+//        }
+//    }
 
-    clock.SetNow(startNow);
+//    clock.SetNow(startNow);
 
-    var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
-    {
-        Characters = characters,
-        LocationService = locationService,
-        TickStep = WTimeSpan.FromHours(2),
-        AstroConfig = astroOptions,
-        UniverseConfig = universeOptions,
-        SimulationDays = simulationDays,
-        ObjectSnapshotCache = objectSnapshotCache,
-        WriteBuffer = writeBuffer,
-        RespawnScheduler = objectRespawner,
-        DefaultCharacterLod = CognitiveResolutionLevel.Background,
-        InternalSubstep = WTimeSpan.FromMinutes(30),
-        OnTick = (now, chars) =>
-        {
-            bgSceneOrchestrator.OnTick(now, chars);
+//    var otherCharactersScene = new SimulationScene(clock, new SimulationSceneOptions
+//    {
+//        Characters = characters,
+//        LocationService = locationService,
+//        TickStep = WTimeSpan.FromHours(2),
+//        AstroConfig = astroOptions,
+//        UniverseConfig = universeOptions,
+//        SimulationDays = simulationDays,
+//        ObjectSnapshotCache = objectSnapshotCache,
+//        WriteBuffer = writeBuffer,
+//        RespawnScheduler = objectRespawner,
+//        DefaultCharacterLod = CognitiveResolutionLevel.Background,
+//        InternalSubstep = WTimeSpan.FromMinutes(30),
+//        OnTick = (now, chars) =>
+//        {
+//            bgSceneOrchestrator.OnTick(now, chars);
 
-            HandleChildBornEvents(now, chars, familyGraph, manager, gf, locationService, runtime.Services, bgSceneOrchestrator);
+//            HandleChildBornEvents(now, chars, familyGraph, manager, gf, locationService, runtime.Services, bgSceneOrchestrator);
 
-            Console.Title = now.Date.ToString();
-        }
-    }, lodRuntime);
+//            Console.Title = now.Date.ToString();
+//        }
+//    }, lodRuntime);
 
-    await otherCharactersScene.RunAsync();
-}
+//    await otherCharactersScene.RunAsync();
+//}
 
 // ── Diary export ──────────────────────────────────────────────────────────────
 var sbDiary = new StringBuilder();

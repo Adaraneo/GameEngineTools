@@ -20,7 +20,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
     /// </remarks>
     internal sealed class DefaultSleepSession : ISleepSession
     {
-        #region Privátní pole
+        #region Private fields
 
         private readonly SleepConfig _cfg;
         private readonly ILogger _log;
@@ -38,9 +38,9 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <summary>True if a dream event has already been generated during the REM phase.</summary>
         private bool _dreamFiredThisRem;
 
-        #endregion Privátní pole
+        #endregion Private fields
 
-        #region Veřejné vlastnosti (ISleepSession)
+        #region Public properties (ISleepSession)
 
         /// <inheritdoc/>
         public SleepPhase CurrentPhase { get; private set; }
@@ -57,15 +57,15 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <inheritdoc/>
         public double HoursSlept { get; private set; }
 
-        #endregion Veřejné vlastnosti (ISleepSession)
+        #endregion Public properties (ISleepSession)
 
-        #region Konstruktor
+        #region Constructor
 
         /// <summary>
         /// Creates the session instance. Call <see cref="Begin"/> to start it.
         /// </summary>
         /// <param name="cfg">Configuration of the sleep subsystem.</param>
-        /// <param name="loggerFactory">Factory pro logger.</param>
+        /// <param name="loggerFactory">Logger factory.</param>
         /// <param name="rng">The character's deterministic random-number generator.</param>
         public DefaultSleepSession(SleepConfig cfg, ILoggerFactory loggerFactory, IRandomSource rng)
         {
@@ -74,7 +74,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             _rng = rng;
         }
 
-        #endregion Konstruktor
+        #endregion Constructor
 
         #region Lifecycle
 
@@ -159,8 +159,8 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
                     if (timeInPhase.TotalHours >= _cfg.RemDurationHours)
                     {
-                        _dreamFiredThisRem = false; // reset pro příští REM
-                        EnterPhase(SleepPhase.Light, now, ctx, outbox); // cyklus znovu
+                        _dreamFiredThisRem = false; // reset for the next REM
+                        EnterPhase(SleepPhase.Light, now, ctx, outbox); // cycle again
                     }
                     break;
 
@@ -187,7 +187,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
         #endregion Lifecycle
 
-        #region Privátní pomocné metody
+        #region Private helper methods
 
         /// <summary>
         /// Transitions to the given phase and publishes <see cref="SleepPhaseChanged"/>.
@@ -213,10 +213,10 @@ namespace GameEngineTools.Characters.Engines.Sleep
             // REM phase — the character is at rest but reacts poorly
             var phaseModifier = CurrentPhase switch
             {
-                SleepPhase.Falling => 1.2,  // snadno přepadnutelný, ještě nespí
+                SleepPhase.Falling => 1.2,  // easily ambushed, not yet asleep
                 SleepPhase.Light => 1.0,
-                SleepPhase.Deep => 0.6,  // hluboko spí — útočník má výhodu, ale postava hůře reaguje
-                SleepPhase.Rem => 0.4,  // tělesně uvolněná, psychicky aktivní
+                SleepPhase.Deep => 0.6,  // deeply asleep — attacker has the advantage, but the character reacts worse
+                SleepPhase.Rem => 0.4,  // physically relaxed, mentally active
                 SleepPhase.Waking => 0.8,
                 _ => 1.0
             };
@@ -313,11 +313,11 @@ namespace GameEngineTools.Characters.Engines.Sleep
             {
                 quality *= CurrentPhase switch
                 {
-                    SleepPhase.Falling => 0.2,  // skoro nic
+                    SleepPhase.Falling => 0.2,  // almost nothing
                     SleepPhase.Light => 0.4,
                     SleepPhase.Deep => 0.6,
-                    SleepPhase.Rem => 0.75, // REM je cenný, přerušení bolí
-                    SleepPhase.Waking => 0.9,  // skoro dospáno
+                    SleepPhase.Rem => 0.75, // REM is valuable, interruption hurts
+                    SleepPhase.Waking => 0.9,  // almost finished sleeping
                     _ => 0.5
                 };
             }
@@ -325,6 +325,6 @@ namespace GameEngineTools.Characters.Engines.Sleep
             return Math.Clamp(quality, 0, 100);
         }
 
-        #endregion Privátní pomocné metody
+        #endregion Private helper methods
     }
 }
