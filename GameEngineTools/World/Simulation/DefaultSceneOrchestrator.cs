@@ -12,6 +12,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.Reputation;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
@@ -117,6 +118,14 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Tunable scalar parameters for this orchestrator instance.</summary>
         private readonly SceneOrchestratorOptions _options;
 
+        /// <summary>
+        /// Optional scene-level community reputation aggregate. When non-null, the orchestrator
+        /// folds witnessed <see cref="ThirdPartyActionObserved"/> acts into it each tick and seeds
+        /// a newcomer's first impression with the locale's standing reputation of the target.
+        /// <c>null</c> disables community reputation entirely (per-observer edges are unaffected).
+        /// </summary>
+        private readonly CommunityReputationLedger? _reputationLedger;
+
         #endregion Private fields
 
         #region Constructor
@@ -139,6 +148,11 @@ namespace GameEngineTools.World.Simulation
         /// across the scene when routing <c>MoveTo:Food</c> and <c>MoveTo:Drink</c> actions.
         /// </param>
         /// <param name="options">Tunable scalar parameters (defaults preserve legacy behavior).</param>
+        /// <param name="reputationLedger">
+        /// Optional scene-level community reputation aggregate. When supplied, witnessed third-party
+        /// acts feed it and newcomers' first impressions inherit the locale's reputation of the target.
+        /// <c>null</c> disables community reputation (default — preserves legacy behavior).
+        /// </param>
         public DefaultSceneOrchestrator(
             IAttractionCalculator attractionCalculator,
             ILocationService locationService,
@@ -150,7 +164,8 @@ namespace GameEngineTools.World.Simulation
             Random rng,
             ILogger<DefaultSceneOrchestrator> log,
             IWorldObjectProvider objectProvider,
-            SceneOrchestratorOptions options)
+            SceneOrchestratorOptions options,
+            CommunityReputationLedger? reputationLedger = null)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -163,6 +178,7 @@ namespace GameEngineTools.World.Simulation
             _log = log;
             _objectProvider = objectProvider;
             _options = options;
+            _reputationLedger = reputationLedger;
         }
 
         #endregion Constructor
@@ -203,6 +219,11 @@ namespace GameEngineTools.World.Simulation
                     _socialCharsBuffer.Add(c);
             }
 
+            // ── Community reputation ──────────────────────────────────────────────
+            // Fold acts witnessed last tick into the scene ledger BEFORE first impressions,
+            // so a newcomer met this tick already inherits the up-to-date local reputation.
+            FoldReputationObservations(chars);
+
             // ── Social functions ──────────────────────────────────────────────────
             FireFirstImpressions(now, chars);
             RouteMoveTo(now, chars);
@@ -225,6 +246,41 @@ namespace GameEngineTools.World.Simulation
             => _fullyMetLocations.Remove(locationId);
 
         #endregion Public API
+
+        #region Community reputation
+
+        /// <summary>
+        /// Folds every <see cref="ThirdPartyActionObserved"/> act emitted in the previous tick into
+        /// the scene-level <see cref="CommunityReputationLedger"/>, scoped to the actor's location.
+        /// </summary>
+        /// <remarks>
+        /// One witnessed act fans out to one event per observer, so a more widely-witnessed act is
+        /// folded more times — exactly the behaviour the Nowak–Sigmund spread term (<c>q</c>) models:
+        /// reputation that more of the community holds. <see cref="ThirdPartyObservationType.IntimateAct"/>
+        /// is reputation-neutral and is dropped inside <see cref="ReputationMath.UpdateScore"/>.
+        /// No-op when no ledger is configured.
+        /// </remarks>
+        /// <param name="chars">All characters in the scene for this substep.</param>
+        private void FoldReputationObservations(IReadOnlyList<IHuman> chars)
+        {
+            if (_reputationLedger is null)
+                return;
+
+            foreach (var c in chars)
+            {
+                foreach (var observed in c.LastOutbox.OfType<ThirdPartyActionObserved>())
+                {
+                    // Reputation is local: it accrues at the locale where the act was witnessed.
+                    var locationId = _locationService.GetLocation(observed.Actor);
+                    if (locationId is null)
+                        continue;
+
+                    _reputationLedger.Observe(observed.Actor, locationId, observed.Type, observed.OccurredAt);
+                }
+            }
+        }
+
+        #endregion Community reputation
 
         #region FireFirstImpressions
 
@@ -341,15 +397,22 @@ namespace GameEngineTools.World.Simulation
                                     targetAgeYears: a.Age)
                                 : AttractionResult.Neutral;
 
+                            // Community reputation prior: each newcomer inherits the locale's
+                            // standing opinion of the other before any personal history exists.
+                            var aTrustPriorOfB = _reputationLedger?.InitialTrustPrior(b.Id, locationId);
+                            var bTrustPriorOfA = _reputationLedger?.InitialTrustPrior(a.Id, locationId);
+
                             if (!aAlreadyKnowsB)
                                 a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
                                     aResult.FirstImpressionLike, aResult.Score,
-                                    aResult.BasePhysical, aResult.PreferenceMatch));
+                                    aResult.BasePhysical, aResult.PreferenceMatch,
+                                    TrustPrior: aTrustPriorOfB));
 
                             if (!bAlreadyKnowsA)
                                 b.ReceiveEvent(new FirstImpressionFormed(now, b.Id, a.Id,
                                     bResult.FirstImpressionLike, bResult.Score,
-                                    bResult.BasePhysical, bResult.PreferenceMatch));
+                                    bResult.BasePhysical, bResult.PreferenceMatch,
+                                    TrustPrior: bTrustPriorOfA));
 
                             continue;
                         }

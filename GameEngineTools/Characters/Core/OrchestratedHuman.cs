@@ -17,6 +17,7 @@ namespace GameEngineTools.Characters.Core
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.SelfConcept;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Engines.Social;
     using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
@@ -131,6 +132,7 @@ namespace GameEngineTools.Characters.Core
         private readonly IValuesEngine _values;
         private readonly ISelfConceptEngine _selfConcept;
         private readonly IInterestEngine _interests;
+        private readonly ISocialComparisonEngine? _socialComparison;
         private readonly IObjectInteractionEngine? _objectInteraction;
 
         // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
@@ -219,7 +221,9 @@ namespace GameEngineTools.Characters.Core
             // optional behavior cadence override
             Hosting.IBehaviorCadencePolicy? behaviorCadencePolicy = null,
             // optional object interaction engine
-            IObjectInteractionEngine? objectInteraction = null)
+            IObjectInteractionEngine? objectInteraction = null,
+            // optional social comparison engine (believability layer)
+            ISocialComparisonEngine? socialComparison = null)
         {
             Id = id;
             Identity = identity;
@@ -246,6 +250,7 @@ namespace GameEngineTools.Characters.Core
             _values = values;
             _selfConcept = selfConcept;
             _interests = interests;
+            _socialComparison = socialComparison;
             _objectInteraction = objectInteraction;
 
             Snapshot = initialSnapshot;
@@ -367,6 +372,7 @@ namespace GameEngineTools.Characters.Core
             _values.Tick(now, dt, _ctx, outbox);
             _selfConcept.Tick(now, dt, _ctx, outbox);
             _interests.Tick(now, dt, _ctx, outbox);
+            _socialComparison?.Tick(now, dt, _ctx, outbox);
 
             // Final snapshot after all Phase B engines complete.
             RefreshSnapshot();
@@ -408,6 +414,8 @@ namespace GameEngineTools.Characters.Core
                 _selfConcept.RestoreState(snapshot.SelfConcept);
             if (snapshot.Interests is not null)
                 _interests.RestoreState(snapshot.Interests);
+            if (snapshot.SocialComparison is not null)
+                _socialComparison?.RestoreState(snapshot.SocialComparison);
         }
 
         /// <inheritdoc/>
@@ -520,6 +528,7 @@ namespace GameEngineTools.Characters.Core
             try { _values.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Values.Handle failed.", Id.Value); }
             try { _selfConcept.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SelfConcept.Handle failed.", Id.Value); }
             try { _interests.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Interests.Handle failed.", Id.Value); }
+            try { _socialComparison?.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SocialComparison.Handle failed.", Id.Value); }
 
             // Acquire action slots when this character commits an action.
             // AcquireOrReplace: if the channel is already occupied, the new action wins —
@@ -593,6 +602,11 @@ namespace GameEngineTools.Characters.Core
             if (_lastStadium is { } prev && prev != stadium)
             {
                 outbox.Add(new LifeStageTransitionOccurred(now, Id, prev, stadium));
+
+                using (_log.BeginCharacterScope(Id.Value, nameof(OrchestratedHuman)))
+                {
+                    _log.LifeStageTransition(Id.Value.ToString(), prev.ToString(), stadium.ToString());
+                }
             }
 
             _lastStadium = stadium;
@@ -627,7 +641,8 @@ namespace GameEngineTools.Characters.Core
                 Schedule: _schedule.State,
                 Values: _values.State,
                 SelfConcept: _selfConcept.State,
-                Interests: _interests.State);
+                Interests: _interests.State,
+                SocialComparison: _socialComparison?.State);
 
             _ctx.Snapshot = Snapshot;
         }
@@ -733,6 +748,31 @@ namespace GameEngineTools.Characters.Core
                     _log.BehaviorPlan(
                         Id.Value.ToString(),
                         plan.Name, plan.Start.ToString(), plan.ExpectedDuration.ToString(), plan.Utility);
+                }
+
+                // Self-concept (esteem, ideal/perceived discrepancy, perceived vs ideal Big Five).
+                // Slow, stable scalars — a believability identity time series.
+                if (s.SelfConcept is { } sc)
+                {
+                    _log.SelfConceptSnapshot(
+                        Id.Value.ToString(),
+                        sc.SelfEsteem, sc.SelfDiscrepancy,
+                        sc.PerceivedOpenness, sc.PerceivedConscientiousness, sc.PerceivedExtraversion,
+                        sc.PerceivedAgreeableness, sc.PerceivedNeuroticism,
+                        sc.IdealExtraversion, sc.IdealAgreeableness, sc.IdealConscientiousness);
+                }
+
+                // RIASEC interest profile — current vs baseline drift; logged per-tick.
+                if (s.Interests is { } intr)
+                {
+                    var cur = intr.Current;
+                    var bas = intr.Baseline;
+                    _log.InterestsSnapshot(
+                        Id.Value.ToString(),
+                        cur.Realistic, cur.Investigative, cur.Artistic,
+                        cur.Social, cur.Enterprising, cur.Conventional,
+                        bas.Realistic, bas.Investigative, bas.Artistic,
+                        bas.Social, bas.Enterprising, bas.Conventional);
                 }
             }
         }

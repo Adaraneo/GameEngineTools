@@ -444,5 +444,13 @@ namespace GameEngineTools.Characters.Core
         /// <c>null</c> for characters created before this field existed (backward compatibility).
         /// Evolved by <see cref="GameEngineTools.Characters.Engines.Interests.DefaultInterestEngine"/>.
         /// </summary>
-        GameEngineTools.Characters.Engines.Interests.InterestState? Interests = null);
+        GameEngineTools.Characters.Engines.Interests.InterestState? Interests = null,
+
+        /// <summary>
+        /// The character's social comparison state (throttle timestamp for the reflective
+        /// comparison cadence). <c>null</c> for characters created before this field existed
+        /// or when the engine is not wired (backward compatibility).
+        /// Evolved by <see cref="GameEngineTools.Characters.Engines.Social.DefaultSocialComparisonEngine"/>.
+        /// </summary>
+        GameEngineTools.Characters.Engines.Social.SocialComparisonState? SocialComparison = null);
 }

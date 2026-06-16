@@ -891,6 +891,15 @@ namespace GameEngineTools.Characters.Engines.Memory
             {
                 outbox.Add(new MutualKnowledgeFormed(
                     now, selfId.Value, subject, sharedWith!.Value, actionKind));
+
+                using (_log.BeginCharacterScope(selfId.Value.Value, nameof(DefaultMemoryEngine), relatedPersonId: sharedWith!.Value.Value))
+                {
+                    _log.MutualKnowledgeFormedLog(
+                        selfId.Value.Value.ToString(),
+                        subject.Value.ToString(),
+                        sharedWith!.Value.Value.ToString(),
+                        actionKind);
+                }
             }
         }
 

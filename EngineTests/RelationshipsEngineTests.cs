@@ -73,6 +73,59 @@ namespace EngineTests
         #endregion Setup
 
         // ══════════════════════════════════════════════════════════════════════════════
+        // Community reputation — newcomer trust prior at FirstImpressionFormed
+        // ══════════════════════════════════════════════════════════════════════════════
+
+        #region FirstImpression — community reputation trust prior
+
+        /// <summary>
+        /// A community trust prior carried on <see cref="FirstImpressionFormed"/> biases the seeded
+        /// Trust: a well-regarded newcomer (prior 0.7) is trusted above the halo baseline, an
+        /// ill-regarded one (prior 0.15) below it, and an unknown one (null) is unchanged.
+        /// With Attraction = 40 the halo bonus is zero, so the halo-only baseline Trust is exactly 50
+        /// (50 + (prior − 0.4) × ReputationTrustPriorWeight).
+        /// </summary>
+        [TestMethod]
+        public void Handle_FirstImpression_TrustPrior_ShiftsSeededTrust()
+        {
+            // Arrange — three independent meetings, identical attraction, differing reputation prior.
+            var self = new HumanId(Guid.NewGuid());
+            var goodRep = new HumanId(Guid.NewGuid());
+            var badRep = new HumanId(Guid.NewGuid());
+            var unknown = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            var weight = DefaultCfg.ReputationTrustPriorWeight;
+
+            // Act
+            var goodEngine = BuildEngine();
+            goodEngine.Handle(new FirstImpressionFormed(_now, self, goodRep, Like: 50, Attraction: 40, TrustPrior: 0.7), ctx, _outbox);
+
+            var badEngine = BuildEngine();
+            badEngine.Handle(new FirstImpressionFormed(_now, self, badRep, Like: 50, Attraction: 40, TrustPrior: 0.15), ctx, _outbox);
+
+            var unknownEngine = BuildEngine();
+            unknownEngine.Handle(new FirstImpressionFormed(_now, self, unknown, Like: 50, Attraction: 40, TrustPrior: null), ctx, _outbox);
+
+            // Assert — exact halo baseline (50) shifted by (prior − 0.4) × weight.
+            var goodTrust = goodEngine.State.Edges[goodRep].Trust;
+            var badTrust = badEngine.State.Edges[badRep].Trust;
+            var unknownTrust = unknownEngine.State.Edges[unknown].Trust;
+
+            Assert.AreEqual(50.0 + (0.7 - 0.4) * weight, goodTrust, 0.001,
+                $"Good local reputation must raise seeded Trust above the halo baseline. Got: {goodTrust:F2}");
+            Assert.AreEqual(50.0 + (0.15 - 0.4) * weight, badTrust, 0.001,
+                $"Bad local reputation must lower seeded Trust below the halo baseline. Got: {badTrust:F2}");
+            Assert.AreEqual(50.0, unknownTrust, 0.001,
+                $"An unknown newcomer (null prior) must seed the halo baseline unchanged. Got: {unknownTrust:F2}");
+
+            Assert.IsTrue(goodTrust > unknownTrust && unknownTrust > badTrust,
+                "Reputation must order newcomer trust: good > unknown > bad.");
+        }
+
+        #endregion FirstImpression — community reputation trust prior
+
+        // ══════════════════════════════════════════════════════════════════════════════
         // BUG 1 — RepairAttempt musí používat Config.RepairGain / RupturePenalty
         // ══════════════════════════════════════════════════════════════════════════════
 

@@ -16,6 +16,7 @@ namespace GameEngineTools.Characters.Hosting
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.SelfConcept;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Engines.Social;
     using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting.Defaults;
@@ -153,6 +154,7 @@ namespace GameEngineTools.Characters.Hosting
             var valuesEngine = _sp.GetRequiredService<IValuesEngine>();
             var selfConcept = _sp.GetRequiredService<ISelfConceptEngine>();
             var interestEngine = _sp.GetRequiredService<IInterestEngine>();
+            var socialComparison = _sp.GetRequiredService<ISocialComparisonEngine>();
 
             // Object interaction engine is optional — only wired when both the world object provider
             // and location service are registered in the DI container.
@@ -183,7 +185,8 @@ namespace GameEngineTools.Characters.Hosting
             var snapshot = new EnginesSnapshot(
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
                 Goals: goal.State, Schedule: schedule.State, Values: valuesState,
-                SelfConcept: selfConcept.State, Interests: interestState);
+                SelfConcept: selfConcept.State, Interests: interestState,
+                SocialComparison: socialComparison.State);
 
             var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.GeneticBlueprint,
@@ -193,7 +196,8 @@ namespace GameEngineTools.Characters.Hosting
                 interestEngine,
                 snapshot,
                 _behaviorCadencePolicy,
-                objectInteraction);
+                objectInteraction,
+                socialComparison);
 
             goal.SeedFromPersonality(b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now);
 
@@ -214,7 +218,8 @@ namespace GameEngineTools.Characters.Hosting
                 Schedule = schedule.State,
                 Values = valuesState,
                 SelfConcept = selfConcept.State,
-                Interests = interestState
+                Interests = interestState,
+                SocialComparison = socialComparison.State
             }, _clock.Now.Date);
 
             return human;

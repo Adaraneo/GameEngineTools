@@ -7,6 +7,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Reputation;
+    using GameEngineTools.Characters.Engines.Social;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
@@ -112,8 +114,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             var attraction = fi.Attraction;  // [0, 100]
                             var haloBonus = Math.Clamp(attraction - 50.0, 0.0, 50.0); // 0..50
 
-                            // Trust: small halo boost (easily overwritten by actual interaction)
+                            // Trust: small halo boost (easily overwritten by actual interaction)…
                             var haloTrust = e.Trust <= 0 ? 50.0 + haloBonus * 0.10 : e.Trust;
+
+                            // …shifted by the locale's community reputation of the target (indirect
+                            // reciprocity; Nowak & Sigmund 2005). A newcomer inherits the standing
+                            // local opinion before any personal history exists. Prior is centred on
+                            // DefaultTrustPrior (0.4); null when no community signal is known.
+                            if (fi.TrustPrior is { } prior)
+                            {
+                                haloTrust += (prior - ReputationMath.DefaultTrustPrior) * Config.ReputationTrustPriorWeight;
+                            }
                             // Comfort: moderate boost above default (45) — attractive stranger feels safer
                             var haloComfort = Math.Max(e.Comfort, 45.0 + haloBonus * 0.40);
                             // Respect: above neutral (50) — attractive people are assumed more capable
@@ -791,6 +802,24 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 case Interactions.ObserverNormReaction onr:
                     HandleObserverNormReaction(onr, self, ctx, outbox);
+                    break;
+
+                // ── Malicious envy from social comparison ────────────────────────────────
+                // An unattainable upward comparison under low agreeableness breeds hostility toward
+                // the envied peer — derogation, not contact (van de Ven et al.; Meier & Schäfer 2018).
+                // now: null — envy is not an interaction, so it must not reset the Navarro gap clock.
+                case Social.SocialComparisonOccurred sc
+                    when sc.Human == self && sc.Envy == Social.ComparisonEnvy.Malicious && sc.TargetHostilityDelta > 0:
+                    Upsert(self, sc.Target, e => e with
+                    {
+                        Like = Bump(e.Like, -sc.TargetHostilityDelta),
+                        Respect = Bump(e.Respect, -sc.TargetHostilityDelta * 0.5),
+                        TransgressionResidue = Math.Min(100, e.TransgressionResidue + sc.TargetHostilityDelta * 0.5)
+                    },
+                    eventType: "MaliciousEnvy",
+                    outcome: $"hostility={sc.TargetHostilityDelta:F1}",
+                    detail: $"target={sc.Target.Value}",
+                    now: null);
                     break;
             }
         }

@@ -1101,6 +1101,23 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         Valence = Math.Clamp(s.Valence + 0.05, -1, 1)
                     };
                     break;
+
+                // Social comparison: upward contrast dents mood; downward repairs it; benign envy
+                // raises achievement motivation (Gerber 2018; Wills 1981; van de Ven et al.).
+                case Social.SocialComparisonOccurred sc when sc.Human == ctx.Id:
+                    {
+                        var prevMotivSc = s.Motivations ?? new MotivationState();
+                        s = s with
+                        {
+                            Valence = Math.Clamp(s.Valence + sc.MoodValenceDelta, -1, 1),
+                            MoodBaseline = Math.Clamp(s.MoodBaseline + sc.MoodBaselineDelta, 0, 100),
+                            Motivations = prevMotivSc with
+                            {
+                                NeedAchievement = Math.Clamp(prevMotivSc.NeedAchievement + sc.AchievementMotivationDelta, 0, 100)
+                            }
+                        };
+                        break;
+                    }
             }
 
             State = s;
@@ -1125,6 +1142,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 // is driven by subsequent behaviour, not forced here.
                 s = s with { Stress = Math.Clamp(s.Stress + 2.0, 0, 100) };
                 outbox.Add(new LifeStage.LifeEvaluationEpisodeStarted(e.OccurredAt, ctx.Id, e.From, e.To));
+
+                using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
+                {
+                    _log.LifeEvaluationEpisode(ctx.Id.Value.ToString(), e.From.ToString(), e.To.ToString());
+                }
             }
 
             return s;

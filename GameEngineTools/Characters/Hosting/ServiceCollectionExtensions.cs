@@ -17,6 +17,7 @@ using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Engines.SelfConcept;
 using GameEngineTools.Characters.Engines.SemanticMemory;
 using GameEngineTools.Characters.Engines.Sleep;
+using GameEngineTools.Characters.Engines.Social;
 using GameEngineTools.Characters.Engines.Values;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Generation.Portraits;
@@ -70,6 +71,7 @@ namespace GameEngineTools.Characters.Hosting
             services.TryAddTransient<IValuesEngine, DefaultValuesEngine>();
             services.TryAddTransient<ISelfConceptEngine, DefaultSelfConceptEngine>();
             services.TryAddTransient<IInterestEngine, DefaultInterestEngine>();
+            services.TryAddTransient<ISocialComparisonEngine, DefaultSocialComparisonEngine>();
 
             // Scene-level reputation aggregate (singleton — shared across all characters in a world).
             services.TryAddSingleton<CommunityReputationLedger>();
@@ -82,6 +84,9 @@ namespace GameEngineTools.Characters.Hosting
 
             var interestsOb = services.AddOptions<InterestConfig>();
             interestsOb.BindConfiguration("Characters:Interests");
+
+            var socialComparisonOb = services.AddOptions<SocialComparisonConfig>();
+            socialComparisonOb.BindConfiguration("Characters:SocialComparison");
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();
             lodOb.BindConfiguration("Characters:Lod");

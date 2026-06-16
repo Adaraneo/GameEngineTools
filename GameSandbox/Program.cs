@@ -8,6 +8,7 @@ using GameEngineTools.Characters.Engines.Attraction;
 using GameEngineTools.Characters.Engines.Behavior;
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.Characters.Engines.Relationships;
+using GameEngineTools.Characters.Engines.Reputation;
 using GameEngineTools.Characters.Engines.Schedule;
 using GameEngineTools.Characters.Generation;
 using GameEngineTools.Characters.Generation.Portraits;
@@ -325,7 +326,8 @@ foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
 Console.WriteLine("Press any key to continue...");
 
 var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>();
-var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
+var reputationLedger = runtime.Services.GetRequiredService<CommunityReputationLedger>();
+var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger);
 //var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
 
 var writeBuffer = runtime.Services.GetRequiredService<WorldObjectWriteBuffer>();

@@ -248,7 +248,20 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// observable in logs even through long interaction-free stretches, so log
         /// files can be rotated/deleted without losing relationship visibility.
         /// </summary>
-        double EdgeSnapshotIntervalDays = 1.0)
+        double EdgeSnapshotIntervalDays = 1.0,
+
+        // ── Community reputation (indirect reciprocity; Nowak & Sigmund 2005) ───
+        /// <summary>
+        /// Weight converting a newcomer's community trust prior (from
+        /// <see cref="GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger"/>)
+        /// into a Trust offset at <see cref="FirstImpressionFormed"/>. The prior is centred on
+        /// <see cref="GameEngineTools.Characters.Engines.Reputation.ReputationMath.DefaultTrustPrior"/>
+        /// (0.4); the seeded Trust is shifted by <c>(prior − 0.4) × weight</c>. Default 80 maps the
+        /// prior range [0.15..0.7] to a Trust offset of roughly [−20..+24] — a good local reputation
+        /// makes a stranger trusted on arrival, a bad one makes them suspect.
+        /// Applied only when the impression carries a prior (null = no community signal known).
+        /// </summary>
+        double ReputationTrustPriorWeight = 80.0)
     {
         /// <summary>
         /// Parameterless constructor required by DI options binding.

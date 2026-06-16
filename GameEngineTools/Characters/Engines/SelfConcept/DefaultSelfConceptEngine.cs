@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.SelfConcept
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Social;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Options;
@@ -109,6 +110,38 @@ namespace GameEngineTools.Characters.Engines.SelfConcept
                 case LifeStage.LifeStageTransitionOccurred lst when lst.Human == ctx.Id:
                     HandleLifeStageTransition(lst, ctx, outbox);
                     break;
+
+                case SocialComparisonOccurred sc when sc.Human == ctx.Id:
+                    HandleSocialComparison(sc, ctx, outbox);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// A social comparison nudges global self-esteem (upward contrast lowers it, downward
+        /// contrast / mood repair raises it). Self-esteem is highly stable, so the per-comparison
+        /// step is small; the discrepancy is recomputed and a meta-perception event emitted on a
+        /// meaningful move (Gerber, Wheeler &amp; Suls 2018; Wills 1981).
+        /// </summary>
+        private void HandleSocialComparison(SocialComparisonOccurred sc, IHumanContext ctx, IEventCollector outbox)
+        {
+            if (Math.Abs(sc.SelfEsteemDelta) < 1e-6)
+                return;
+
+            var s = State;
+            var newEsteem = Math.Clamp(s.SelfEsteem + sc.SelfEsteemDelta, 0.0, 1.0);
+            if (Math.Abs(newEsteem - s.SelfEsteem) < 1e-9)
+                return;
+
+            s = s with { SelfEsteem = newEsteem };
+            s = s with { SelfDiscrepancy = ComputeDiscrepancy(s) };
+            State = s;
+
+            if (Math.Abs(sc.SelfEsteemDelta) > Config.MetaperceptionEmitThreshold)
+            {
+                outbox.Add(new MetaperceptionUpdated(
+                    sc.OccurredAt, ctx.Id, s.PerceivedExtraversion, s.PerceivedAgreeableness,
+                    s.SelfEsteem, s.SelfDiscrepancy));
             }
         }
 

@@ -259,6 +259,103 @@ namespace GameEngineTools.Logging
 
         #endregion Behavior — snapshoty
 
+        #region SelfConcept & LifeStage — 5300 / 1600–1610
+
+        /// <summary>
+        /// Per-tick snapshot of the self-concept: global self-esteem, ideal/perceived
+        /// discrepancy, and the perceived vs. ideal Big Five. Both esteem and discrepancy
+        /// are slow, stable scalars — useful as an identity time series.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 5300,
+            Level = LogLevel.Debug,
+            Message = "[SELF] {HumanId} esteem={Esteem:F2} discrepancy={Discrepancy:F2} | perc O:{PercOpen:F2} C:{PercCons:F2} E:{PercExtra:F2} A:{PercAgree:F2} N:{PercNeuro:F2} | ideal E:{IdealExtra:F2} A:{IdealAgree:F2} C:{IdealCons:F2}")]
+        public static partial void SelfConceptSnapshot(
+            this ILogger logger,
+            string HumanId,
+            double Esteem,
+            double Discrepancy,
+            double PercOpen,
+            double PercCons,
+            double PercExtra,
+            double PercAgree,
+            double PercNeuro,
+            double IdealExtra,
+            double IdealAgree,
+            double IdealCons);
+
+        /// <summary>Life-stage transition — the character aged into a new developmental stadium.</summary>
+        [LoggerMessage(
+            EventId = 1600,
+            Level = LogLevel.Information,
+            Message = "[LIFE] {HumanId} Life stage: {From} → {To}.")]
+        public static partial void LifeStageTransition(
+            this ILogger logger,
+            string HumanId,
+            string From,
+            string To);
+
+        /// <summary>
+        /// A life-evaluation (reappraisal) episode opened on a stage transition — the
+        /// midlife/reflective reappraisal window (probabilistic).
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1601,
+            Level = LogLevel.Information,
+            Message = "[LIFE] {HumanId} Life evaluation episode started on {From} → {To}.")]
+        public static partial void LifeEvaluationEpisode(
+            this ILogger logger,
+            string HumanId,
+            string From,
+            string To);
+
+        /// <summary>
+        /// Theory-of-Mind L2 mutual-knowledge formed — character knows that SharedWith also
+        /// knows the ActionKind performed by Subject. Discrete event; logged once per new
+        /// common-ground fact.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1610,
+            Level = LogLevel.Information,
+            Message = "[TOM/L2] {HumanId} mutual knowledge: subject={Subject} sharedWith={SharedWith} actionKind={ActionKind}")]
+        public static partial void MutualKnowledgeFormedLog(
+            this ILogger logger,
+            string HumanId,
+            string Subject,
+            string SharedWith,
+            string ActionKind);
+
+        #endregion SelfConcept & LifeStage — 5300 / 1600–1610
+
+        #region Interests (RIASEC) — 5400
+
+        /// <summary>
+        /// Per-tick snapshot of the RIASEC interest profile — current vs. baseline.
+        /// Both Current and Baseline dimensions are logged so the LogReader can chart
+        /// drift over time. Values are in [0..1].
+        /// </summary>
+        [LoggerMessage(
+            EventId = 5400,
+            Level = LogLevel.Debug,
+            Message = "[INTERESTS] {HumanId} R:{Realistic:F3} I:{Investigative:F3} A:{Artistic:F3} S:{Social:F3} E:{Enterprising:F3} C:{Conventional:F3} | base R:{BaseRealistic:F3} I:{BaseInvestigative:F3} A:{BaseArtistic:F3} S:{BaseSocial:F3} E:{BaseEnterprising:F3} C:{BaseConventional:F3}")]
+        public static partial void InterestsSnapshot(
+            this ILogger logger,
+            string HumanId,
+            double Realistic,
+            double Investigative,
+            double Artistic,
+            double Social,
+            double Enterprising,
+            double Conventional,
+            double BaseRealistic,
+            double BaseInvestigative,
+            double BaseArtistic,
+            double BaseSocial,
+            double BaseEnterprising,
+            double BaseConventional);
+
+        #endregion Interests (RIASEC) — 5400
+
         #region Behavior — rozhodování
 
         /// <summary>An action candidate with its computed utility — logged during action selection.</summary>
