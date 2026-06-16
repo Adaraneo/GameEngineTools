@@ -144,7 +144,7 @@ namespace EngineTests
             var ctx = BuildContext(self, selfEsteem: 0.5, valence: 0.0,
                 edges: new() { [peer] = Edge(self, peer, standing: 85, closeness: 20, familiarity: 40) });
 
-            var engine = new DefaultSocialComparisonEngine(Options.Create(Cfg));
+            var engine = new DefaultSocialComparisonEngine(Options.Create(Cfg), LoggerFactory.Create(_ => { }));
             var outbox = new EventCollector();
             engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, outbox);
 
@@ -163,7 +163,7 @@ namespace EngineTests
             var ctx = BuildContext(self, selfEsteem: 0.5, valence: 0.0,
                 edges: new() { [peer] = Edge(self, peer, standing: 85, closeness: 20, familiarity: 40) });
 
-            var engine = new DefaultSocialComparisonEngine(Options.Create(Cfg));
+            var engine = new DefaultSocialComparisonEngine(Options.Create(Cfg), LoggerFactory.Create(_ => { }));
 
             var first = new EventCollector();
             engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), ctx, first);

@@ -7,7 +7,9 @@ namespace GameEngineTools.Characters.Engines.Social
     using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
     /// <summary>
@@ -41,10 +43,19 @@ namespace GameEngineTools.Characters.Engines.Social
 
         #endregion State and configuration
 
+        #region Private fields
+
+        private readonly ILogger _log;
+
+        #endregion Private fields
+
         #region Construction
 
-        public DefaultSocialComparisonEngine(IOptions<SocialComparisonConfig> cfg)
-            => Config = cfg.Value;
+        public DefaultSocialComparisonEngine(IOptions<SocialComparisonConfig> cfg, ILoggerFactory loggerFactory)
+        {
+            Config = cfg.Value;
+            _log = loggerFactory.CreateLogger<DefaultSocialComparisonEngine>();
+        }
 
         #endregion Construction
 
@@ -93,6 +104,21 @@ namespace GameEngineTools.Characters.Engines.Social
                 result.Direction, result.Reaction, result.Envy,
                 result.SelfEsteemDelta, result.MoodValenceDelta, result.MoodBaselineDelta,
                 result.AchievementMotivationDelta, result.TargetHostilityDelta));
+
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSocialComparisonEngine), relatedPersonId: targetId.Value))
+            {
+                _log.SocialComparisonOccurredLog(
+                    ctx.Id.Value.ToString(),
+                    targetId.Value.ToString(),
+                    result.Direction.ToString(),
+                    result.Reaction.ToString(),
+                    result.Envy.ToString(),
+                    result.SelfEsteemDelta,
+                    result.MoodValenceDelta,
+                    result.MoodBaselineDelta,
+                    result.AchievementMotivationDelta,
+                    result.TargetHostilityDelta);
+            }
         }
 
         #endregion IEngine — Tick

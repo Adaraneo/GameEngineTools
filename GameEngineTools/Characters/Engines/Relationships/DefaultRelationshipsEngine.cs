@@ -174,6 +174,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 ctx.Id.Value.ToString(),
                                 fi.A.Value.ToString(), fi.B.Value.ToString(),
                             fi.Like);
+
+                            if (fi.TrustPrior is { } loggedPrior)
+                            {
+                                var trustShift = (loggedPrior - ReputationMath.DefaultTrustPrior) * Config.ReputationTrustPriorWeight;
+                                _log.ReputationPriorApplied(
+                                    ctx.Id.Value.ToString(),
+                                    ctx.Id.Value.ToString(),
+                                    other.Value.ToString(),
+                                    loggedPrior,
+                                    trustShift);
+                            }
                         }
 
                         break;

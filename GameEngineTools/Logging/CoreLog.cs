@@ -1166,6 +1166,45 @@ namespace GameEngineTools.Logging
             string B,
             double Commitment);
 
+        /// <summary>
+        /// Social comparison occurred — the character evaluated themselves against a peer.
+        /// Carries the comparison direction, reaction, envy type, and the delta effects on
+        /// self-esteem, mood, achievement motivation, and target hostility.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 2016,
+            Level = LogLevel.Information,
+            Message = "[SOCIAL/COMPARE] {HumanId} compared to {Target}: direction={Direction} reaction={Reaction} envy={Envy} selfEsteemDelta={SelfEsteemDelta:+0.000;-0.000} moodValenceDelta={MoodValenceDelta:+0.000;-0.000} moodBaselineDelta={MoodBaselineDelta:+0.0;-0.0} achieveDelta={AchievementMotivationDelta:+0.0;-0.0} hostilityDelta={TargetHostilityDelta:F2}")]
+        public static partial void SocialComparisonOccurredLog(
+            this ILogger logger,
+            string HumanId,
+            string Target,
+            string Direction,
+            string Reaction,
+            string Envy,
+            double SelfEsteemDelta,
+            double MoodValenceDelta,
+            double MoodBaselineDelta,
+            double AchievementMotivationDelta,
+            double TargetHostilityDelta);
+
+        /// <summary>
+        /// Community reputation prior applied at first impression — the newcomer's initial Trust
+        /// toward a subject was shifted by the locale's aggregate reputation score.
+        /// Logged in DefaultRelationshipsEngine when fi.TrustPrior is non-null.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 2017,
+            Level = LogLevel.Information,
+            Message = "[REL/REPUTATION] {HumanId} observer={Observer} subject={Subject}: reputationPrior={ReputationPrior:F3} trustShift={TrustShift:+0.0;-0.0}")]
+        public static partial void ReputationPriorApplied(
+            this ILogger logger,
+            string HumanId,
+            string Observer,
+            string Subject,
+            double ReputationPrior,
+            double TrustShift);
+
         #endregion Relationships — vztahy
 
         #region DailySchedule — 1400–1499
