@@ -90,7 +90,26 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// Modest scaling of λ by Neuroticism: λ_eff = λ × (1 + (N − 0.5) × this). Individual differences
     /// explain much of the heterogeneity in loss aversion. Hypothesis-grade link. Default 0.4.
     /// </summary>
-    double LossAversionNeuroticismScale = 0.4)
+    double LossAversionNeuroticismScale = 0.4,
+
+    // ── Dark-core behavioral modulation ───────────────────────────────────────
+    // D-factor (Moshagen et al. 2018) scales antagonistic utility and penalises prosocial actions.
+    // Calibrated against: D↔self-reported aggression r≈.65–.67 (Moshagen et al. 2020);
+    //                     D↔low empathy r≈−.31 to −.37 (Moshagen et al. 2020).
+
+    /// <summary>
+    /// Flat utility bonus added to antagonistic actions (e.g. <c>Fight</c>) per unit DarkCore axis [0..1].
+    /// At DarkCore=1.0 the bonus equals this value; at DarkCore=0 the bonus is zero.
+    /// Calibration anchor: D↔self-reported aggression r≈.65–.67 (Moshagen et al. 2020).
+    /// </summary>
+    double DarkCoreAntagonismUtilityWeight = 12.0,
+
+    /// <summary>
+    /// Flat utility penalty applied to prosocial actions (e.g. <c>ReachOut</c>, <c>InviteIntimacy</c>)
+    /// per unit DarkCore axis [0..1]. At DarkCore=1.0 the penalty equals this value.
+    /// Calibration anchor: D↔low empathy r≈−.31 to −.37 (Moshagen et al. 2020).
+    /// </summary>
+    double DarkCoreProsocialPenaltyWeight = 8.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }

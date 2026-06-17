@@ -87,7 +87,17 @@ namespace GameEngineTools.Characters.Engines.Social
 
         // ── Target standing blend ──────────────────────────────────────────────
         /// <summary>Weight of edge Respect in the target's perceived standing (rest from PerceivedPrestige). Default 0.6.</summary>
-        double StandingRespectWeight = 0.6)
+        double StandingRespectWeight = 0.6,
+
+        // ── Dark-core amplification of malicious envy ──────────────────────────
+        /// <summary>
+        /// Multiplier applied to the malicious-envy <see cref="SocialComparisonResult.TargetHostilityDelta"/>
+        /// per unit DarkCore axis [0..1]: <c>hostility *= (1 + DarkCore × this)</c>.
+        /// Default 0.5 — a fully dark-core character generates 1.5× the baseline malicious hostility.
+        /// Sources: van de Ven (2009); Lange &amp; Crusius (2015) — dark-core amplifies the antagonistic
+        /// (malicious) envy branch. Default 0.0 ⇒ no change ⇒ existing tests stay green.
+        /// </summary>
+        double DarkCoreMaliciousAmplification = 0.5)
     {
         /// <summary>Parameterless constructor required by DI options binding — all fields use defaults.</summary>
         public SocialComparisonConfig() : this(ComparisonCooldownDays: 0.5)

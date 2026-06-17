@@ -437,7 +437,18 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         var dcm = hints.SexualResponsiveness
             ?? DualControlMath.Generate(rng, O, C, E, N, socio);
 
-        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling);
+        // SCO: sampled per-NPC from Big Five priors + noise via project IRandomSource.
+        var sco = ComparisonOrientationGenerator.Generate(rng, bigFive);
+
+        // Dark-core: generated from Big Five without sex here because PersonalityGenerator has no
+        // access to SexBiology (Personality carries no sex). The male shift is fully available via
+        // the DarkCoreGenerator.Generate(rng, bigFive, biology) overload at any call site that has
+        // the character's biology (e.g. CharacterGenerator / OrchestratedHuman construction).
+        // NOTE: callers with SexBiology should re-generate or override DarkCore post-construction
+        // to apply the +0.06 male shift (Muris et al. 2017).
+        var darkCore = DarkCoreGenerator.Generate(rng, bigFive, GameEngineTools.Characters.Core.SexBiology.Unknown);
+
+        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore);
     }
 
     private static (double O, double C, double E, double A, double N) GenerateBigFive(IRandomSource rng, PersonalitySpec spec)

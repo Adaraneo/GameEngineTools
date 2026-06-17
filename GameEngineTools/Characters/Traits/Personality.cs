@@ -32,24 +32,27 @@ namespace GameEngineTools.Characters.Traits
         /// Population mean ≈ 4, SD ≈ 1 (Kinderman 1998). Default 4 for backward compatibility;
         /// sampled per character by the generator via <see cref="Engines.ToM.ToMMath.GenerateCeiling"/>.
         /// </summary>
-        int ToMCeiling = 4);
+        int ToMCeiling = 4,
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // TODO (Finding 7 — Dark Triad / dark core): add a single Honesty-Humility /
-    //   dark-core axis to the personality model rather than three correlated factors.
-    //   Verdict: the Dark Triad is confirmed as incremental over Big Five but largely
-    //   overlaps with low Agreeableness / low Honesty-Humility (dark-core latent r ≈ −0.95),
-    //   so the parsimonious route is preferred first. Only split into the full Dark Triad
-    //   (or Tetrad with sadism) if a use case needs differential prediction.
-    //   Integration point: add the dimension to BigFive/Personality here, then gate
-    //   antagonistic behaviour downstream in Interactions/Relationships.
-    //   Key papers: Muris et al. (2017) Perspectives on Psychological Science 12(2);
-    //     O'Boyle et al. (2012) JAP 97(3); O'Boyle et al. (2014) J. Personality 82(6);
-    //     Moshagen, Hilbig & Zettler (2018) Psychological Review 125(5); Hodson et al. (2018) JRP 73.
-    //   Do NOT implement logic until explicitly tasked.
-    // ──────────────────────────────────────────────────────────────────────────
+        /// <summary>
+        /// Iowa-Netherlands Comparison Orientation Measure (INCOM; Gibbons &amp; Buunk 1999).
+        /// <c>null</c> = engine falls back to inline computation from Neuroticism — backward compatible.
+        /// When set, <see cref="ComparisonOrientationProfile.Overall"/> is used directly as the
+        /// comparison intensity scalar in the social comparison engine.
+        /// </summary>
+        ComparisonOrientationProfile? ComparisonOrientation = null,
 
-    /// <summary>Big Five (OCEAN) personality dimensions, each in [0–1].</summary>
+        /// <summary>
+        /// General dark-core factor (D-factor) profile (Moshagen, Hilbig &amp; Zettler 2018).
+        /// <c>null</c> = character was generated before this feature; downstream engines treat null
+        /// as zero dark-core (backward-compatible no-op). When set,
+        /// <see cref="DarkCoreProfile.DarkCore"/> scales antagonistic utility in the behavior engine
+        /// and amplifies malicious envy in the social comparison engine.
+        /// </summary>
+        DarkCoreProfile? DarkCore = null);
+
+
+/// <summary>Big Five (OCEAN) personality dimensions, each in [0–1].</summary>
     /// <param name="Openness">Openness to experience.</param>
     /// <param name="Conscientiousness">Conscientiousness.</param>
     /// <param name="Extraversion">Extraversion.</param>

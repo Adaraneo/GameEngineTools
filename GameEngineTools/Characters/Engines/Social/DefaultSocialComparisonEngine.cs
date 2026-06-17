@@ -92,9 +92,17 @@ namespace GameEngineTools.Characters.Engines.Social
             State = State with { LastComparisonAt = now };
 
             var bf = ctx.Personality.BigFive;
+
+            // Use the per-character INCOM trait when available; fall back to inline computation
+            // from Neuroticism + self-esteem (backward-compatible with characters generated
+            // without an explicit ComparisonOrientationProfile).
+            var orientationOverride = ctx.Personality.ComparisonOrientation?.Overall;
+
             var result = SocialComparisonMath.Evaluate(
                 selfStanding, targetStanding, closeness,
-                bf.Neuroticism, bf.Agreeableness, selfEsteem, Config);
+                bf.Neuroticism, bf.Agreeableness, selfEsteem, Config,
+                orientationOverride,
+                darkCore: ctx.Personality.DarkCore?.DarkCore ?? 0.0);
 
             if (result.IsNegligible)
                 return;

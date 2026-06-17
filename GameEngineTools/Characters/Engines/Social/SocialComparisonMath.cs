@@ -69,6 +69,12 @@ namespace GameEngineTools.Characters.Engines.Social
         /// <param name="agreeableness">Comparer Agreeableness [0..1].</param>
         /// <param name="selfEsteem">Comparer global self-esteem [0..1].</param>
         /// <param name="c">Tuning config.</param>
+        /// <param name="orientationOverride">
+        /// When non-null, used directly as the comparison intensity scalar instead of computing it from
+        /// Neuroticism and self-esteem inline. Supply
+        /// <see cref="GameEngineTools.Characters.Traits.ComparisonOrientationProfile.Overall"/>
+        /// when the trait is available on the character's personality.
+        /// </param>
         public static SocialComparisonResult Evaluate(
             double selfStanding,
             double targetStanding,
@@ -76,14 +82,16 @@ namespace GameEngineTools.Characters.Engines.Social
             double neuroticism,
             double agreeableness,
             double selfEsteem,
-            SocialComparisonConfig c)
+            SocialComparisonConfig c,
+            double? orientationOverride = null,
+            double darkCore = 0.0)
         {
             var gap = targetStanding - selfStanding;
             var absGap = Math.Abs(gap);
             if (absGap < c.MinSalientGap)
                 return SocialComparisonResult.None;
 
-            var intensity = ComparisonOrientation(neuroticism, selfEsteem, c);
+            var intensity = orientationOverride ?? ComparisonOrientation(neuroticism, selfEsteem, c);
             var gapNorm = Math.Clamp(absGap / Math.Max(1e-6, c.GapNormDivisor), 0.0, 1.0);
             var attainable = absGap <= c.AttainabilityGap;
             var identified = closeness >= c.IdentificationCloseness;
@@ -107,6 +115,10 @@ namespace GameEngineTools.Characters.Engines.Social
                 // Contrast (the default): self-evaluation drops away from the superior standard.
                 var maliciousScore = c.MaliciousEnvyDispositionWeight * (1.0 - agreeableness) * intensity * gapNorm;
                 var malicious = maliciousScore >= c.MaliciousEnvyThreshold;
+                // Dark-core amplifies the antagonistic (malicious) envy branch.
+                // Sources: van de Ven 2009; Lange & Crusius 2015.
+                // Default darkCore=0.0 → multiplier=1.0 → no change to existing behaviour.
+                var darkCoreAmplification = 1.0 + darkCore * c.DarkCoreMaliciousAmplification;
                 return new SocialComparisonResult(
                     ComparisonDirection.Upward, ComparisonReaction.Contrast,
                     malicious ? ComparisonEnvy.Malicious : ComparisonEnvy.None,
@@ -114,7 +126,7 @@ namespace GameEngineTools.Characters.Engines.Social
                     MoodValenceDelta: -c.ContrastMoodDrop * intensity * gapNorm,
                     MoodBaselineDelta: -c.ContrastMoodBaselineDrop * intensity * gapNorm,
                     AchievementMotivationDelta: 0.0,
-                    TargetHostilityDelta: malicious ? c.MaliciousEnvyHostilityWeight * maliciousScore : 0.0);
+                    TargetHostilityDelta: malicious ? c.MaliciousEnvyHostilityWeight * maliciousScore * darkCoreAmplification : 0.0);
             }
 
             // ── Downward comparison ────────────────────────────────────────────
