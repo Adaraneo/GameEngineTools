@@ -5,6 +5,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
     using System;
     using System.Collections.Generic;
+    using GameEngineTools.Logging;
+    using Microsoft.Extensions.Logging;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -31,6 +33,21 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     /// </remarks>
     internal sealed class DarkCoreModifier : IBehaviorModifierEngine
     {
+        #region Private fields
+
+        private readonly ILogger? _log;
+
+        #endregion Private fields
+
+        #region Construction
+
+        /// <summary>
+        /// Initialises the modifier. Logger is optional — omit in unit tests.
+        /// </summary>
+        public DarkCoreModifier(ILogger? log = null) => _log = log;
+
+        #endregion Construction
+
         #region IBehaviorModifierEngine
 
         /// <inheritdoc/>
@@ -52,12 +69,39 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                     // Raise utility of antagonistic actions proportionally to DarkCore.
                     var bonus = d * cfg.DarkCoreAntagonismUtilityWeight;
                     candidates[i] = candidate with { Utility = candidate.Utility + bonus };
+
+                    if (_log is not null)
+                    {
+                        using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DarkCoreModifier)))
+                        {
+                            _log.DarkCoreModifierApplied(
+                                context.HumanContext.Id.Value.ToString(),
+                                candidate.Name,
+                                "Antagonism",
+                                d,
+                                bonus);
+                        }
+                    }
                 }
                 else if (IsProsocial(candidate.Name))
                 {
                     // Lower utility of prosocial actions proportionally to DarkCore.
                     var penalty = d * cfg.DarkCoreProsocialPenaltyWeight;
+                    var actualDelta = -Math.Min(penalty, candidate.Utility); // clamped signed delta
                     candidates[i] = candidate with { Utility = Math.Max(0.0, candidate.Utility - penalty) };
+
+                    if (_log is not null)
+                    {
+                        using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DarkCoreModifier)))
+                        {
+                            _log.DarkCoreModifierApplied(
+                                context.HumanContext.Id.Value.ToString(),
+                                candidate.Name,
+                                "Prosocial",
+                                d,
+                                actualDelta);
+                        }
+                    }
                 }
             }
         }

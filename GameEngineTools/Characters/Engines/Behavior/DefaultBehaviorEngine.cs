@@ -91,7 +91,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine(), new ContingencySearchEngine() };
             _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new InvestmentModelBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(_objectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>(), goalCfg?.Value.MaxFlatBiasPerGoal ?? 12.0, goalCfg?.Value.ShieldingCommitmentThreshold ?? 0.5, goalCfg?.Value.ShieldingMaxInhibition ?? 8.0, goalCfg?.Value.ShieldingStressDampening ?? 0.6), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value),
                 new Modifiers.ValuesBehaviorModifier(loggerFactory.CreateLogger<Modifiers.ValuesBehaviorModifier>()),
-                new Modifiers.DarkCoreModifier(),
+                new Modifiers.DarkCoreModifier(loggerFactory.CreateLogger<Modifiers.DarkCoreModifier>()),
                 new Modifiers.LossAversionModifier() };
             _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine();
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);

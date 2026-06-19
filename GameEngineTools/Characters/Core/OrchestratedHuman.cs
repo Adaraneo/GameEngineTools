@@ -774,6 +774,15 @@ namespace GameEngineTools.Characters.Core
                         bas.Realistic, bas.Investigative, bas.Artistic,
                         bas.Social, bas.Enterprising, bas.Conventional);
                 }
+
+                // Dark Core (D-factor) — snapshot per-tick when the profile is present.
+                // Characters generated before Stage 3 have a null DarkCore; skip them.
+                if (Personality.DarkCore is { } dc)
+                {
+                    _log.DarkCoreSnapshot(
+                        Id.Value.ToString(),
+                        dc.DarkCore, dc.JustifyingBeliefs);
+                }
             }
         }
 

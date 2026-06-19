@@ -356,6 +356,26 @@ namespace GameEngineTools.Logging
 
         #endregion Interests (RIASEC) — 5400
 
+        #region Dark Core (D-factor) — 5500
+
+        /// <summary>
+        /// Per-tick snapshot of the character's Dark Core (D-factor) profile.
+        /// Logged only when a <see cref="GameEngineTools.Characters.Traits.DarkCoreProfile"/> is
+        /// present (characters generated before Stage 3 have none — no-op for them).
+        /// Both components are logged so the LogReader can chart each axis independently.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 5500,
+            Level = LogLevel.Debug,
+            Message = "[DARKCORE] {HumanId} DarkCore:{DarkCore:F3} JustifyingBeliefs:{JustifyingBeliefs:F3}")]
+        public static partial void DarkCoreSnapshot(
+            this ILogger logger,
+            string HumanId,
+            double DarkCore,
+            double JustifyingBeliefs);
+
+        #endregion Dark Core (D-factor) — 5500
+
         #region Behavior — rozhodování
 
         /// <summary>An action candidate with its computed utility — logged during action selection.</summary>
@@ -575,6 +595,22 @@ namespace GameEngineTools.Logging
         public static partial void NeedThresholdCrossed(
             this ILogger logger, string HumanId, string Need,
             double Threshold, double OldValue, double NewValue);
+
+        /// <summary>
+        /// Dark-core modifier applied a utility shift to an action candidate.
+        /// Emitted once per candidate that receives either an antagonism bonus or a prosocial penalty.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1017,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/DARKCORE] {HumanId} Action:{Action} Kind:{Kind} DarkCore:{DarkCore:F3} Delta:{Delta:F3}")]
+        public static partial void DarkCoreModifierApplied(
+            this ILogger logger,
+            string HumanId,
+            string Action,
+            string Kind,
+            double DarkCore,
+            double Delta);
 
         #endregion Behavior — rozhodování
 
