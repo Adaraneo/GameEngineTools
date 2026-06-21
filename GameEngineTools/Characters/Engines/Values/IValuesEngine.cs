@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Values
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.World.Utils.Time;
 
     #region ValuesState
 
@@ -28,7 +29,8 @@ namespace GameEngineTools.Characters.Engines.Values
     /// </remarks>
     public sealed record ValuesState(
         ValuesProfile Current,
-        ValuesProfile Baseline)
+        ValuesProfile Baseline,
+        WDateTime?[]? LastAffirmedAt = null)
     {
         /// <summary>Creates a state where Current equals Baseline (freshly seeded character).</summary>
         public static ValuesState FromBaseline(ValuesProfile baseline) => new(baseline, baseline);

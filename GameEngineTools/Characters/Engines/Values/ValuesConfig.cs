@@ -64,13 +64,40 @@ namespace GameEngineTools.Characters.Engines.Values
 
         /// <summary>
         /// Congruence above which a committed action is treated as value-affirming and strengthens
-        /// the dominant expressed value. Default 0.0.
+        /// the dominant expressed value. Default 0.04.
         /// </summary>
-        double PositiveCongruenceThreshold = 0.0
+        /// <remarks>
+        /// <para>
+        /// This gate filters routine actions with a thin, broadly-spread positive loading
+        /// (Sleep, Eat, MoveTo*, Idle) so they no longer count as "value-affirming" events —
+        /// only genuinely value-charged choices nudge the profile. Without it, every mundane
+        /// commit pushed <c>+LearningRate</c> into some dimension and, via circumplex coupling,
+        /// systematically saturated the profile to the clamp over thousands of game days.
+        /// </para>
+        /// <para>
+        /// <b>Scale note.</b> <see cref="GameEngineTools.Characters.Engines.Behavior.ValueLoadVector.Congruence"/>
+        /// is a dot-product normalised by <c>/10</c>. With action loadings ≤ 0.65 and profile
+        /// weights ≤ 1.0, the achievable congruence range is only ≈ [−0.12 .. +0.12] — it never
+        /// approaches the theoretical clamp of ±1. The default is therefore set on that real
+        /// scale: 0.04 sits above the congruence of routine actions (Sleep ≈ 0.013,
+        /// Eat/MoveToSocial ≈ 0.025, ReachOut ≈ 0.035 at a neutral profile) but below
+        /// intentional, identity-expressing ones (Create ≈ 0.048). A literal 0.35 would disable
+        /// the affirmation channel entirely.
+        /// </para>
+        /// </remarks>
+        double PositiveCongruenceThreshold = 0.04,
+
+        /// <summary>
+        /// Minimum number of game days that must elapse before the <i>same</i> value dimension can
+        /// be affirmed again. Caps reinforcement at one nudge per dimension per this window,
+        /// so an action repeated many times in a single day cannot saturate the value it expresses.
+        /// Default 1.0. Set to 0 to disable the cooldown.
+        /// </summary>
+        double AffirmationCooldownDays = 1.0
     )
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public ValuesConfig() : this(0.02, 0.00023, 0.4, 2.5, 0.5, 0.5, 0.25, 0.0)
+        public ValuesConfig() : this(0.02, 0.00023, 0.4, 2.5, 0.5, 0.5, 0.25, 0.04, 1.0)
         { }
     }
 }

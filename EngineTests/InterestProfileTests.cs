@@ -156,6 +156,50 @@ namespace EngineTests
 
         #endregion
 
+        #region Test 5 — neutral-mood routine actions do not saturate Social (saturation fix)
+
+        [TestMethod]
+        public void InterestProfile_NeutralValenceRoutineActions_DoNotSaturateSocial()
+        {
+            var baseline = Neutral();
+            // Documented baseline PAD valence is +0.1..+0.2: a contented, neutral mood — not a reward.
+            var (engine, ctx, self) = MakeEngine(baseline, valence: 0.15);
+
+            for (var i = 0; i < 500; i++)
+                engine.Handle(new ActionCommitted(At(100), self, ActionNames.ReachOut, WTimeSpan.FromHours(1)),
+                    ctx, new EventCollector());
+
+            var social = engine.State.Current.Social;
+            Assert.IsTrue(Math.Abs(social - baseline.Social) < 0.2,
+                $"Baseline-mood routine social actions must not saturate Social. " +
+                $"baseline={baseline.Social:F3}, social={social:F3}");
+            Assert.IsTrue(social < 0.99, "Social must not reach the ceiling from mere baseline mood.");
+        }
+
+        #endregion
+
+        #region Test 6 — a genuinely rewarding moment still raises interest (regression guard)
+
+        [TestMethod]
+        public void InterestProfile_GenuinelyRewardingMoment_StillRaisesInterest()
+        {
+            var baseline = Neutral();
+            // Clearly above-baseline positive moment.
+            var (engine, ctx, self) = MakeEngine(baseline, valence: 0.6);
+            var before = engine.State.Current.Social;
+
+            for (var i = 0; i < 5; i++)
+                engine.Handle(new ActionCommitted(At(100), self, ActionNames.ReachOut, WTimeSpan.FromHours(1)),
+                    ctx, new EventCollector());
+
+            var after = engine.State.Current.Social;
+            Assert.IsTrue(after > before + 0.05,
+                $"A genuinely rewarding moment must still raise interest after the threshold change. " +
+                $"before={before:F3}, after={after:F3}");
+        }
+
+        #endregion
+
         #region Helpers
 
         private static InterestProfile Neutral()

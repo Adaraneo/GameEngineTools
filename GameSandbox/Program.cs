@@ -28,7 +28,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
-using System.ComponentModel.DataAnnotations;
 using System.Text;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
 using TFSC = GameEngineTools.Constants.TestFSConstatns;
@@ -113,7 +112,7 @@ foreach (var filename in npcFiles)
     if (character.Person.Id.Value.Equals(soid) || character.Person.Id.Value.Equals(friendId) || character.Person.Id.Value.Equals(friendSOId))
         continue;
 
-    if (character.Person.Identity.BirthDate > startNow.Date || character.Person.Age < 12)
+    if (character.Person.Identity.BirthDate > startNow.Date || character.Person.Age < 6)
         continue;
 
     manager.Characters.Add(character);
@@ -224,6 +223,32 @@ var rng = new Random();
 var db = runtime.Services.GetRequiredService<SqliteWorldDatabase>();
 var worldMap = SqliteWorldMapLoader.Load(db);
 var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
+
+{
+    for (int index = 0; index < 25; index++)
+    {
+        var locationDescr = new LocationDescriptor($"village_house_{(index + 1):D2}", $"Village House {(index + 1):D2}", 0.2, 0.5, 3, true, LocationType.Rest, TerrainType.Indoor, 0, true, null);
+        worldMap.AddLocation(locationDescr, "Village", locationService);
+
+        var villagelocations = worldMap.GetLocationsInRegion("Village");
+
+        // Napoj nově přidaný dům na každou ostatní vesnickou lokaci obousměrnou
+        // hranou se symetrickou náhodnou pěší vzdáleností. Každá dvojice se zpracuje
+        // jen jednou (později přidané domy navazují na ty dřívější), takže nevznikají
+        // duplicitní hrany.
+        foreach (var villageLocation in villagelocations)
+        {
+            if (villageLocation == locationDescr.Id) continue;
+
+            var distanceMeters = rng.Next(6, 120) + rng.NextDouble();
+            worldMap.AddConnection(locationDescr.Id, villageLocation, distanceMeters);
+            worldMap.AddConnection(villageLocation, locationDescr.Id, distanceMeters);
+        }
+
+        Console.WriteLine("Location updated");
+    }
+}
+
 worldMap.RegisterAllLocations(locationService);
 var objectProvider = runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
@@ -295,10 +320,16 @@ var locationQuery = from locations in mainCharactersPersonQuery
                     where locations.Snapshot.InteractionSurface.Location != "Unknown"
                     select locations;
 
+var hlq = from locs in worldMap.GetLocationsInRegion("Village")
+          select locs;
+
+var homeLocationsIds = hlq.Where(loc => loc.Contains("house")).ToList();
+
 foreach (var personToMove in unknownLocationQuery)
 {
-    var homeLocationId = mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count)];
-    locationService.MoveCharacter(personToMove.Id, homeLocationId);
+    var homeLocationId = homeLocationsIds[rng.Next(0, homeLocationsIds.Count)];
+    var startLocationId = mainCharactersLocations[rng.Next(0, mainCharactersLocations.Count)];
+    locationService.MoveCharacter(personToMove.Id, startLocationId);
     personToMove.SetHomeLocation(homeLocationId);
 }
 

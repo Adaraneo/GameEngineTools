@@ -14,8 +14,18 @@ namespace GameEngineTools.Characters.Engines.Interests
         /// <summary>Per-day lerp fraction pulling Current toward Baseline (the runaway brake). Default 0.0015.</summary>
         double RegressionPerDay = 0.0015,
 
-        /// <summary>Psychology valence above which an action counts as "rewarding". Default 0.10.</summary>
-        double RewardValenceThreshold = 0.10,
+        /// <summary>
+        /// Psychology valence above which an action counts as "rewarding" and raises its RIASEC
+        /// dimension. Default 0.35.
+        /// </summary>
+        /// <remarks>
+        /// The documented baseline PAD valence is already +0.1..+0.2 (a contented, neutral mood),
+        /// so a threshold at or below that band makes <i>every</i> routine action "rewarding" and
+        /// saturates the most-frequently-mapped dimension (Social, via ReachOut/InviteIntimacy)
+        /// while the rarer ones stay at baseline. 0.35 requires a clearly above-baseline positive
+        /// moment, not merely the absence of bad mood.
+        /// </remarks>
+        double RewardValenceThreshold = 0.35,
 
         /// <summary>
         /// Age below which interests are plastic (Low 2005: stabilise ~22). Default 22.
@@ -30,7 +40,7 @@ namespace GameEngineTools.Characters.Engines.Interests
     )
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public InterestConfig() : this(0.03, 0.0015, 0.10, 22, 1.5, 0.5)
+        public InterestConfig() : this(0.03, 0.0015, 0.35, 22, 1.5, 0.5)
         { }
     }
 }

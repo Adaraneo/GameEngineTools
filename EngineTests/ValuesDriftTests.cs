@@ -209,7 +209,77 @@ namespace EngineTests
 
         #endregion
 
+        #region Test 6 — routine actions over many years do not saturate (saturation fix)
+
+        [TestMethod]
+        public void ValuesDrift_RoutineActionsOverManyYears_DoNotSaturate()
+        {
+            var baseline = Neutral();
+            var (engine, ctx, self) = MakeEngine(baseline);
+
+            var outbox = new EventCollector();
+            var dt = WTimeSpan.FromDays(1);
+            var start = At(100);
+
+            // 10 game years of a thin, broadly-loaded routine action (Sleep), committed every day,
+            // with daily regression. Before the fix this saturated several dimensions to the clamp
+            // via the unconditioned affirmation channel + circumplex coupling.
+            for (var day = 0; day < 3650; day++)
+            {
+                var now = start + WTimeSpan.FromDays(day);
+                engine.Handle(
+                    new ActionCommitted(now, self, ActionNames.Sleep, WTimeSpan.FromHours(8)), ctx, outbox);
+                engine.Tick(now, dt, ctx, outbox);
+            }
+
+            var cur = ToArray(engine.State.Current);
+            var baseArr = ToArray(baseline);
+            for (var i = 0; i < cur.Length; i++)
+            {
+                Assert.IsTrue(Math.Abs(cur[i] - baseArr[i]) <= 0.25,
+                    $"Routine actions must not drive value drift to saturation. " +
+                    $"Dim {i}: current={cur[i]:F3}, baseline={baseArr[i]:F3}");
+            }
+        }
+
+        #endregion
+
+        #region Test 7 — per-dimension cooldown caps same-day affirmations (saturation fix)
+
+        [TestMethod]
+        public void ValuesDrift_CooldownPreventsMultipleNudgesPerDay()
+        {
+            var baseline = Neutral();
+            var (engine, ctx, self) = MakeEngine(baseline);
+            var before = engine.State.Current.SelfDirection;
+
+            // Commit the same value-charged action 20× within a single instant (same day).
+            var now = At(100);
+            for (var i = 0; i < 20; i++)
+                engine.Handle(new ActionCommitted(now, self, ActionNames.Create, WTimeSpan.FromHours(1)),
+                    ctx, new EventCollector());
+
+            var afterSameDay = engine.State.Current.SelfDirection;
+            Assert.AreEqual(0.02, afterSameDay - before, 1e-9,
+                "Cooldown must cap same-day affirmations of one dimension to a single LearningRate nudge.");
+
+            // Once the cooldown window elapses, the dimension can be affirmed again.
+            var later = now + WTimeSpan.FromDays(2);
+            engine.Handle(new ActionCommitted(later, self, ActionNames.Create, WTimeSpan.FromHours(1)),
+                ctx, new EventCollector());
+            Assert.IsTrue(engine.State.Current.SelfDirection > afterSameDay,
+                "A fresh nudge must land once the affirmation cooldown expires.");
+        }
+
+        #endregion
+
         #region Helpers
+
+        private static double[] ToArray(ValuesProfile p) => new[]
+        {
+            p.SelfDirection, p.Stimulation, p.Hedonism, p.Achievement, p.Power,
+            p.Security, p.Conformity, p.Tradition, p.Benevolence, p.Universalism
+        };
 
         private static ValuesProfile Neutral()
             => new ValuesProfile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5);

@@ -195,6 +195,19 @@ namespace GameEngineTools.Characters.Engines.Values
             var winnerIdx = DominantIndex(loadArr, cur, mostNegative: false);
             if (winnerIdx < 0) return;
 
+            // Per-dimension affirmation cooldown: the same value cannot be reinforced more than
+            // once per Config.AffirmationCooldownDays. Without this, a high-frequency action (the
+            // same commit fired many times a day) would nudge its winning dimension on every commit
+            // and saturate it to the clamp far faster than RegressionPerDay can pull it back.
+            var stamps = State.LastAffirmedAt;
+            if (Config.AffirmationCooldownDays > 0.0
+                && stamps is not null
+                && stamps[winnerIdx] is { } lastAffirmed
+                && WDateTime.Difference(ac.OccurredAt, lastAffirmed).TotalDays < Config.AffirmationCooldownDays)
+            {
+                return;
+            }
+
             // Kelley discounting: an action with a sufficient external cause (it was displaced /
             // pressured by conflict arbitration) reinforces the internal value less.
             var externalIncentive = ac.ConflictReason is not null;
@@ -204,7 +217,11 @@ namespace GameEngineTools.Characters.Engines.Values
             if (lr <= 0.0) return;
 
             ApplyNudge(cur, winnerIdx, +lr);
-            State = State with { Current = FromArray(cur) };
+
+            var nextStamps = stamps is null ? new WDateTime?[Dim] : (WDateTime?[])stamps.Clone();
+            nextStamps[winnerIdx] = ac.OccurredAt;
+
+            State = State with { Current = FromArray(cur), LastAffirmedAt = nextStamps };
         }
 
         #endregion Drift handlers
