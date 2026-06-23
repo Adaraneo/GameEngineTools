@@ -73,6 +73,18 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Characters that have died and must no longer tick.</summary>
         private readonly HashSet<HumanId> _deadCharacters = new();
 
+        /// <summary>
+        /// Live character list driving every tick. Seeded from <see cref="SimulationSceneOptions.Characters"/>
+        /// and grown at runtime via <see cref="AddCharacter"/> (e.g. newborns joining the world).
+        /// </summary>
+        private readonly List<IHuman> _characters;
+
+        /// <summary>Characters queued by <see cref="AddCharacter"/>, merged in at the next substep boundary.</summary>
+        private readonly List<IHuman> _pendingAdditions = new();
+
+        /// <summary>Guards <see cref="_pendingAdditions"/> so additions are safe from any thread.</summary>
+        private readonly object _addLock = new();
+
         #endregion Privátní pole
 
         #region Konstruktor
@@ -104,6 +116,7 @@ namespace GameEngineTools.World.Simulation
             _clock = clock;
             _options = options;
             _lodRuntime = characterLodRuntime;
+            _characters = new List<IHuman>(options.Characters);
 
             // Restore dead-character set from persisted snapshot.
             // Characters that died in a previous session have Status = Dead in their PhysiologyState.
@@ -136,6 +149,26 @@ namespace GameEngineTools.World.Simulation
         public Task RunAsync()
             => SimulateAsync();
 
+        /// <summary>
+        /// Adds a character to a running (or not-yet-started) simulation.
+        /// </summary>
+        /// <param name="character">The character to start ticking.</param>
+        /// <remarks>
+        /// The character is queued and joins at the next substep boundary — never mid-tick — so the
+        /// per-tick character iteration is never mutated underneath. Thread-safe: may be called from
+        /// the scene's own <c>OnTick</c> callback (the typical case — e.g. wiring a newborn after a
+        /// <c>ChildBorn</c> event) or from another thread. The caller is responsible for placing the
+        /// character in the world (location, family graph) before adding it.
+        /// </remarks>
+        public void AddCharacter(IHuman character)
+        {
+            ArgumentNullException.ThrowIfNull(character);
+            lock (_addLock)
+            {
+                _pendingAdditions.Add(character);
+            }
+        }
+
         #endregion Veřejné API
 
         #region Simulační smyčka
@@ -147,7 +180,6 @@ namespace GameEngineTools.World.Simulation
         {
             var startTime = _clock.Now;
             var endTime = _clock.Now.AddDays(_options.SimulationDays);
-            var chars = _options.Characters;
             var macroStep = _options.TickStep;
             var internalSubstep = ResolveInternalSubstep(macroStep);
 
@@ -157,9 +189,12 @@ namespace GameEngineTools.World.Simulation
 
                 while (macroRemaining > WTimeSpan.Zero && _clock.Now < endTime)
                 {
+                    // Merge any queued additions at this clean boundary, before the per-tick iteration.
+                    DrainPendingAdditions();
+
                     var remainingToEnd = endTime - _clock.Now;
                     var dt = WTimeSpan.Min(internalSubstep, WTimeSpan.Min(macroRemaining, remainingToEnd));
-                    SimulateSingleStep(startTime, chars, dt);
+                    SimulateSingleStep(startTime, _characters, dt);
                     macroRemaining -= dt;
                 }
             }
@@ -273,6 +308,29 @@ namespace GameEngineTools.World.Simulation
 
             // ── Krok 4: Posun hodin ────────────────────────────────────────────────
             _clock.Advance(dt);
+        }
+
+        /// <summary>
+        /// Moves any characters queued by <see cref="AddCharacter"/> into the live list.
+        /// Runs at a substep boundary, so the per-tick iteration is never mutated mid-flight.
+        /// A queued character already marked Dead is registered straight into the dead set.
+        /// </summary>
+        private void DrainPendingAdditions()
+        {
+            lock (_addLock)
+            {
+                if (_pendingAdditions.Count == 0)
+                    return;
+
+                foreach (var character in _pendingAdditions)
+                {
+                    _characters.Add(character);
+                    if (character.Snapshot.Physiology.Status == StatusType.Dead)
+                        _deadCharacters.Add(character.Id);
+                }
+
+                _pendingAdditions.Clear();
+            }
         }
 
         private WTimeSpan ResolveInternalSubstep(WTimeSpan macroStep)
