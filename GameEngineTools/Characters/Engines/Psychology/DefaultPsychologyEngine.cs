@@ -458,13 +458,20 @@ namespace GameEngineTools.Characters.Engines.Psychology
             if (ph.CortisolLevel >= Config.CortisolOptimalLow && ph.CortisolLevel <= Config.CortisolOptimalHigh)
                 s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad - Config.CortisolOptimalCogBonus * h) };
 
-            // PMDD: more severe psychological effects in the luteal phase for characters with high PmsRisk
+            // PMDD: late-luteal severity tracks the WITHDRAWAL of ovarian hormones, not their absolute
+            // level — PMDD is abnormal sensitivity to the NORMAL premenstrual fall of estradiol/
+            // progesterone/allopregnanolone (Schiller et al. 2016; Eisenlohr-Moul 2019). Falling
+            // estradiol toward menses intensifies the premenstrual mood dip.
+            // ⚠ VERIFY: mechanism is well-supported, but the withdrawal scaling magnitude below is a
+            // tuned placeholder, not calibrated to a specific effect size — check against peer-reviewed.
             if (ph.Cycle?.PmddActive == true)
             {
+                const double withdrawalRef = 70.0; // estradiol at/above which no extra withdrawal penalty
+                var withdrawal = Math.Clamp(1.0 + (withdrawalRef - ph.Cycle.Estradiol) / withdrawalRef, 0.5, 2.0);
                 s = s with
                 {
-                    Valence = Clampm1p1(s.Valence - Config.PmddValencePenaltyPerHour * h),
-                    Stress = Clamp01p(s.Stress + Config.PmddStressBonus * h)
+                    Valence = Clampm1p1(s.Valence - Config.PmddValencePenaltyPerHour * withdrawal * h),
+                    Stress = Clamp01p(s.Stress + Config.PmddStressBonus * withdrawal * h)
                 };
             }
 

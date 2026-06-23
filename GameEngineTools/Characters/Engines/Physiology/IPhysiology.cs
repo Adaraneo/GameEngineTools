@@ -813,7 +813,22 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Set when suppression accumulator crosses the onset threshold.
         /// Cleared when the recovery accumulator crosses the recovery threshold.
         /// </summary>
-        bool AnovulatoryCycleActive = false);
+        bool AnovulatoryCycleActive = false,
+
+        /// <summary>
+        /// Estradiol proxy [0..100]. Low during menses, rises through the follicular phase to a
+        /// periovulatory surge (~day 13–15), with a smaller mid-luteal bump, then declines pre-menses.
+        /// Positively modulates desire (<see cref="LibidoMod"/>). Source: estradiol+ → touha
+        /// (within-subject β ≈ 0.10–0.25, Roney &amp; Simmons; replicated).
+        /// </summary>
+        double Estradiol = 20.0,
+
+        /// <summary>
+        /// Progesterone proxy [0..100]. Near-zero before ovulation, rises sharply to a mid-luteal
+        /// peak (~day 20–24), then falls before menses. Negatively modulates desire and underlies
+        /// late-luteal symptoms / PMDD. Source: progesteron− → touha (β ≈ −0.10..−0.20; replicated).
+        /// </summary>
+        double Progesterone = 10.0);
 
     /// <summary>State of the character's ongoing pregnancy.</summary>
     /// <param name="OtherParent">Identity of the other parent.</param>
