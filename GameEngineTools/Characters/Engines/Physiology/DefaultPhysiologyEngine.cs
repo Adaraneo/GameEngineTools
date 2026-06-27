@@ -238,6 +238,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 && s.Pregnancy is null && (s.Aging?.AgeYears ?? 0) >= 45;
             var immuneDecayFactor = isPostMenopauseImmune ? 0.7 : 1.0;
 
+            // Within-cycle estradiol modestly modulates immune recovery (broadly immunoenhancing —
+            // the same direction as the post-menopause estrogen-loss slowdown above, just within-cycle:
+            // high-estradiol follicular/periovulatory phase recovers a little faster than low-estradiol menses).
+            // ⚠ VERIFY (low certainty): estrogen's immune effect is biphasic and context-dependent
+            // (immunoenhancing at physiological doses but with an autoimmune dimension) — the ±8% band
+            // is a conservative placeholder, not a calibrated effect size. Check against peer-reviewed.
+            if (s.Cycle is { Phase: not CyclePhase.Paused } cyc)
+                immuneDecayFactor *= 1.0 + (cyc.Estradiol - 50.0) / 50.0 * 0.08;
+
             // Single source of truth for action-driven drift (energy, hunger, thirst, pain, immune).
             var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor);
 
@@ -890,7 +899,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private PhysiologyState ApplyCycleSymptoms(PhysiologyState s)
         {
-            var (pain, bloatTarget, tenderTarget, libido) = SymptomsFor(s.Cycle!, s.CurrentContraception);
+            var (pain, bloatTarget, tenderTarget, libido, estradiol, progesterone) = SymptomsFor(s.Cycle!, s.CurrentContraception);
             var day = (double)s.Cycle!.DayInCycle;
             var ovulDay = (double)Math.Max(_cycleCfg.MensesMeanDays + 2, s.Cycle.CurrentCycleLength - _cycleCfg.LutealMeanDays);
             var lutealFactor = Math.Max(0, (day - (ovulDay + 7)) / 7.0);
@@ -903,7 +912,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     SymptomBloat = ApproachClamped(s.Cycle.SymptomBloat, bloatTarget, _cycleCfg.SymptomTrackingRatePerDay),
                     SymptomBreastTender = ApproachClamped(s.Cycle.SymptomBreastTender, tenderTarget, _cycleCfg.SymptomTrackingRatePerDay),
                     LibidoMod = libido,
-                    PmddActive = isPmddActive
+                    PmddActive = isPmddActive,
+                    Estradiol = estradiol,
+                    Progesterone = progesterone
                 }
             };
         }
@@ -1140,12 +1151,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Scientific basis: the estrogen/progesterone drift is smooth, not a binary switch
         /// (reference: physiology-psychology.md).
         /// </summary>
-        private (double pain, double bloatTarget, double tenderTarget, double libidoMod) SymptomsFor(
+        private (double pain, double bloatTarget, double tenderTarget, double libidoMod, double estradiol, double progesterone) SymptomsFor(
             MenstrualCycleState c,
             ContraceptionLevel contraception = ContraceptionLevel.Unspecified)
         {
             if (c.Phase == CyclePhase.Paused)
-                return (0.0, 0.0, 0.0, 1.0);
+                return (0.0, 0.0, 0.0, 1.0, 20.0, 10.0);
 
             var day = (double)c.DayInCycle;
             // Ovulation day for this cycle — dynamic per cycle (stored in CurrentCycleLength).
@@ -1168,10 +1179,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var lutealTender = _cycleCfg.LutealBreastTenderPeak * Math.Max(0, (day - (ovulDay + 5)) / 7.0);
             var tenderTarget = (mensesTender + lutealTender) * _cycleCfg.BreastTenderMultiplier;
 
-            // LibidoMod: a Gaussian peak at ovulation, a mild dip during menses, baseline 0.95
-            var libidoBoost = 0.25 * Math.Exp(-Math.Pow(day - ovulDay, 2) / 8.0);
-            var mensesDip = -0.10 * Math.Exp(-Math.Pow(day - mensesMid, 2) / 4.0);
-            var libidoMod = Math.Clamp(0.95 + libidoBoost + mensesDip, 0.80, 1.20);
+            // Ovarian hormones (proxies, 0..100) → desire (estradiol+ / progesterone−).
+            var (estradiol, progesterone) = CycleHormones(day, ovulDay, mensesMid);
+            var libidoMod = CycleLibido(estradiol, progesterone, day, mensesMid);
 
             // PMDD amplifier — luteal symptoms are more severe for characters with PmsRisk > 0.3
             // Contraception (High/Moderate) reduces PMS/PMDD severity
@@ -1188,7 +1198,37 @@ namespace GameEngineTools.Characters.Engines.Physiology
             bloatTarget *= pmddMultiplier;
             tenderTarget *= pmddMultiplier;
 
-            return (rawPain, bloatTarget, tenderTarget, libidoMod);
+            return (rawPain, bloatTarget, tenderTarget, libidoMod, estradiol, progesterone);
+        }
+
+        /// <summary>
+        /// Ovarian-hormone proxies [0..100] for a given cycle day. Estradiol: follicular ramp +
+        /// periovulatory surge (~ovulDay) + smaller mid-luteal bump. Progesterone: ~0 before
+        /// ovulation, sharp rise to a mid-luteal peak (~ovulDay+7), falls pre-menses.
+        /// Source: human-behavior-npc B.2 (estradiol+/progesteron− → touha; replicated).
+        /// </summary>
+        private static (double estradiol, double progesterone) CycleHormones(double day, double ovulDay, double mensesMid)
+        {
+            var follicularRamp = 18.0 * Math.Clamp((day - mensesMid) / Math.Max(1.0, ovulDay - mensesMid), 0, 1);
+            var ovulSurge = 80.0 * Math.Exp(-Math.Pow(day - ovulDay, 2) / (2 * 2.0 * 2.0));
+            var lutealEstroBump = 35.0 * Math.Exp(-Math.Pow(day - (ovulDay + 7), 2) / (2 * 4.0 * 4.0));
+            var estradiol = Math.Clamp(10.0 + follicularRamp + ovulSurge + lutealEstroBump, 5, 100);
+
+            var progRaw = 90.0 * Math.Exp(-Math.Pow(day - (ovulDay + 7), 2) / (2 * 4.5 * 4.5));
+            var progesterone = Math.Clamp(4.0 + (day >= ovulDay ? progRaw : progRaw * 0.05), 3, 100);
+            return (estradiol, progesterone);
+        }
+
+        /// <summary>
+        /// Cycle desire multiplier from ovarian hormones: <c>1 + 0.30·E − 0.20·P</c> (E,P normalised
+        /// 0..1) plus a mild menses dip, clamped to [0.80, 1.30]. Source: human-behavior-npc B.2.
+        /// </summary>
+        private static double CycleLibido(double estradiol, double progesterone, double day, double mensesMid)
+        {
+            var mensesDip = -0.10 * Math.Exp(-Math.Pow(day - mensesMid, 2) / 4.0);
+            return Math.Clamp(
+                1.0 + 0.30 * (estradiol / 100.0) - 0.20 * (progesterone / 100.0) + mensesDip,
+                0.80, 1.30);
         }
 
         private static CyclePhase PhaseFor(int day, int length, int mensesDays, int ovulationDay)
@@ -1223,14 +1263,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             // Back-estimate when menstruation began
             var lastMensesStart = now.AddDays(-(day - 1));
+
+            // Seed hormones consistent with the starting day (so a fresh cycle isn't at defaults
+            // until the first day rollover).
+            var mensesMid = cfg.MensesMeanDays / 2.0;
+            var (estradiol, progesterone) = CycleHormones(day, ovulDay, mensesMid);
             return new MenstrualCycleState(
                 Phase: phase,
                 DayInCycle: day,
                 OvulationWindow: false,
                 SymptomPain: 0, SymptomBreastTender: 0, SymptomBloat: 0,
-                LibidoMod: 1.0,
+                LibidoMod: CycleLibido(estradiol, progesterone, day, mensesMid),
                 LastMensesStart: lastMensesStart,
-                CurrentCycleLength: cycleLength);
+                CurrentCycleLength: cycleLength,
+                Estradiol: estradiol,
+                Progesterone: progesterone);
         }
 
         private double SafeHours(WTimeSpan dt) => Math.Max(0, dt.TotalHours);
