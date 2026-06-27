@@ -1148,6 +1148,95 @@ namespace EngineTests
 
         #endregion Scenario 21 — Kognitivní stárnutí + percepce
 
+        #region Scenario 22 — Full-cycle hormone & PMDD propagation
+
+        /// <summary>
+        /// Drives a female character through a full 28-day cycle (one 24 h physiology Tick per day)
+        /// and verifies that the ovarian-hormone proxies (Estradiol/Progesterone), the libido
+        /// multiplier, and the PMDD valence penalty propagate end-to-end Physiology→Psychology in
+        /// the expected phases. Each day a fresh psychology engine ticks against a context carrying
+        /// only the current cycle (other physiology held constant) so that valence movement isolates
+        /// the PMDD withdrawal effect.
+        /// </summary>
+        [TestMethod]
+        public void FullCycle_HormonesLibidoAndPmdd_PropagateThroughPsychology()
+        {
+            // CycleCfg: length 28, luteal 12 → ovulDay 16; PmsRisk 0.35 (> 0.3) enables PMDD.
+            const int ovulDay = 16;
+            var (physio, _, physioCtx, now) = BuildIntegrationPair(
+                cycleDayStart: 1, cyclePhaseStart: CyclePhase.Menses);
+
+            // BuildIntegrationPair seeds CurrentCycleLength to its default (30); align it with the
+            // configured 28-day length so the hormone ovulDay (= length − luteal 12 = 16) is
+            // consistent and the late-luteal PMDD window is actually reached within one cycle.
+            physio.RestoreState(physio.State with
+            {
+                Cycle = physio.State.Cycle! with { CurrentCycleLength = 28 }
+            });
+
+            var psychCfg = Options.Create(new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false));
+            var logFactory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning));
+
+            var estradiol = new double[29];
+            var progesterone = new double[29];
+            var libido = new double[29];
+            var pmddActive = new bool[29];
+            var valence = new double[29];
+
+            for (int i = 0; i < 28; i++)
+            {
+                physio.Tick(now, WTimeSpan.FromHours(24), physioCtx, new EventCollector());
+                var cycle = physio.State.Cycle!;
+                int day = cycle.DayInCycle; // 1..28
+
+                estradiol[day] = cycle.Estradiol;
+                progesterone[day] = cycle.Progesterone;
+                libido[day] = cycle.LibidoMod;
+                pmddActive[day] = cycle.PmddActive;
+
+                // Fresh psychology each day from an identical baseline; only the cycle varies, so
+                // the resulting valence isolates the PMDD propagation (hunger/pain held constant).
+                var psych = new DefaultPsychologyEngine(psychCfg, logFactory, new ZeroRandom());
+                psych.RestoreState(psych.State with { Valence = 0.1 });
+                var cleanPhysio = MakePhysio(0, 0, 0) with { Cycle = cycle };
+                var psychCtx = BuildRawContext(neuroticism: 0.5, physio: cleanPhysio);
+                psych.Tick(now, WTimeSpan.FromHours(24), psychCtx, new EventCollector());
+                valence[day] = psych.State.Valence;
+            }
+
+            // Estradiol surge peaks in the periovulatory window.
+            int estArgmax = 1;
+            for (int day = 2; day <= 28; day++)
+                if (estradiol[day] > estradiol[estArgmax])
+                    estArgmax = day;
+            Assert.IsTrue(Math.Abs(estArgmax - ovulDay) <= 2,
+                $"Estradiol musí kulminovat kolem ovulace (≈den {ovulDay}); skutečně den {estArgmax}.");
+
+            // Progesterone peaks in the mid-luteal phase (~ovulDay + 7).
+            int progArgmax = 1;
+            for (int day = 2; day <= 28; day++)
+                if (progesterone[day] > progesterone[progArgmax])
+                    progArgmax = day;
+            Assert.IsTrue(Math.Abs(progArgmax - (ovulDay + 7)) <= 2,
+                $"Progesteron musí kulminovat v mid-luteálu (≈den {ovulDay + 7}); skutečně den {progArgmax}.");
+
+            // Libido is higher at ovulation than during menses.
+            Assert.IsTrue(libido[ovulDay] > libido[3],
+                $"LibidoMod v ovulaci ({libido[ovulDay]:F4}) musí být vyšší než v menses ({libido[3]:F4}).");
+
+            // PMDD activates in the late luteal phase and depresses valence relative to follicular.
+            Assert.IsTrue(pmddActive[28],
+                "PMDD musí být aktivní v pozdním luteálu (den 28).");
+            Assert.IsTrue(valence[28] < valence[10],
+                $"PMDD withdrawal musí přes Psychology snížit valenci v pozdním luteálu vs folikulární fáze. " +
+                $"den28={valence[28]:F4}, den10={valence[10]:F4}.");
+        }
+
+        #endregion Scenario 22 — Full-cycle hormone & PMDD propagation
+
         #region Helpers
 
         /// <summary>

@@ -1098,6 +1098,149 @@ namespace EngineTests
 
         #endregion Menstruační cyklus — sinusoidální drift
 
+        #region Menstrual Cycle — Hormones (E2/P4) & Libido
+
+        // Default MenstrualCycleConfig with ZeroRandom: cycle length 30, luteal 12 → ovulDay 18.
+        private const int DefaultOvulDay = 18;
+
+        /// <summary>
+        /// Advances the engine exactly one cycle-day so hormones are recomputed, then returns the
+        /// resulting cycle state at <paramref name="targetDay"/>. AdvanceCycleDay increments
+        /// DayInCycle by one per 24 h tick, so we seed <c>targetDay − 1</c>.
+        /// </summary>
+        private static MenstrualCycleState HormonesAtDay(DefaultPhysiologyEngine engine, IHumanContext ctx, int targetDay)
+        {
+            engine.RestoreState(engine.State with
+            {
+                Cycle = engine.State.Cycle! with { DayInCycle = targetDay - 1 }
+            });
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            return engine.State.Cycle!;
+        }
+
+        /// <summary>Estradiol musí mít své celocyklové maximum na ovulačním dni (periovulační surge).</summary>
+        [TestMethod]
+        public void CycleHormones_EstradiolPeaksAtOvulationDay()
+        {
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            var estAtOvul = HormonesAtDay(engine, ctx, DefaultOvulDay).Estradiol;
+
+            for (int day = 2; day <= 30; day++)
+            {
+                var est = HormonesAtDay(engine, ctx, day).Estradiol;
+                Assert.IsTrue(estAtOvul >= est - 1e-9,
+                    $"Estradiol na ovulačním dni ({estAtOvul:F2}) musí být maximem cyklu; den {day} = {est:F2}.");
+            }
+
+            Assert.IsTrue(estAtOvul > HormonesAtDay(engine, ctx, 8).Estradiol,
+                "Estradiol v ovulaci musí být vyšší než ve folikulární fázi (den 8).");
+            Assert.IsTrue(estAtOvul > HormonesAtDay(engine, ctx, DefaultOvulDay + 7).Estradiol,
+                "Estradiol v ovulaci musí být vyšší než luteální bump (ovulDay+7).");
+        }
+
+        /// <summary>Progesteron musí kulminovat zhruba 7 dní po ovulaci (mid-luteální peak).</summary>
+        [TestMethod]
+        public void CycleHormones_ProgesteronePeaksApproxSevenDaysAfterOvulation()
+        {
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            int argmaxDay = -1;
+            double maxProg = double.MinValue;
+            for (int day = 2; day <= 30; day++)
+            {
+                var prog = HormonesAtDay(engine, ctx, day).Progesterone;
+                if (prog > maxProg)
+                {
+                    maxProg = prog;
+                    argmaxDay = day;
+                }
+            }
+
+            Assert.IsTrue(Math.Abs(argmaxDay - (DefaultOvulDay + 7)) <= 2,
+                $"Progesteron musí kulminovat ~7 dní po ovulaci (≈den {DefaultOvulDay + 7}); skutečně den {argmaxDay}.");
+        }
+
+        /// <summary>Progesteron v rané folikulární fázi musí být výrazně níž než luteální peak (≈0).</summary>
+        [TestMethod]
+        public void CycleHormones_ProgesteroneNearZeroBeforeOvulation()
+        {
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            var progFollicular = HormonesAtDay(engine, ctx, 5).Progesterone;
+            var progLutealPeak = HormonesAtDay(engine, ctx, DefaultOvulDay + 7).Progesterone;
+
+            Assert.IsTrue(progFollicular < 0.2 * progLutealPeak,
+                $"Folikulární progesteron ({progFollicular:F2}) musí být << luteální peak ({progLutealPeak:F2}).");
+        }
+
+        /// <summary>Sekundární luteální bump estradiolu musí být menší než periovulační peak.</summary>
+        [TestMethod]
+        public void CycleHormones_EstradiolHasSecondaryLutealBump_SmallerThanOvulatoryPeak()
+        {
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            var estOvul = HormonesAtDay(engine, ctx, DefaultOvulDay).Estradiol;
+            var estLuteal = HormonesAtDay(engine, ctx, DefaultOvulDay + 7).Estradiol;
+
+            Assert.IsTrue(estLuteal < estOvul,
+                $"Luteální bump ({estLuteal:F2}) musí být menší než ovulační peak ({estOvul:F2}).");
+
+            var ratio = estLuteal / estOvul;
+            Assert.IsTrue(ratio >= 0.45 && ratio <= 0.75,
+                $"Poměr luteální bump / ovulační peak má ležet ~0.5–0.65; skutečně {ratio:F2}.");
+        }
+
+        /// <summary>LibidoMod na ovulačním dni musí kulminovat v umírněném pásmu [1.15, 1.25].</summary>
+        [TestMethod]
+        public void CycleLibido_AtOvulationDay_PeaksWithinModestRange()
+        {
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            var libido = HormonesAtDay(engine, ctx, DefaultOvulDay).LibidoMod;
+
+            Assert.IsTrue(libido >= 1.15 && libido <= 1.25,
+                $"LibidoMod na ovulačním dni ({libido:F4}) musí ležet v [1.15, 1.25].");
+        }
+
+        /// <summary>Žádný den cyklu nesmí překročit zpřísněný horní clamp 1.25 (ani spodní 0.80).</summary>
+        [TestMethod]
+        public void CycleLibido_NeverExceedsTightenedUpperClamp()
+        {
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            for (int day = 2; day <= 30; day++)
+            {
+                var libido = HormonesAtDay(engine, ctx, day).LibidoMod;
+                Assert.IsTrue(libido <= 1.25 + 1e-9,
+                    $"Den {day}: LibidoMod {libido:F4} překročil horní clamp 1.25.");
+                Assert.IsTrue(libido >= 0.80 - 1e-9,
+                    $"Den {day}: LibidoMod {libido:F4} je pod spodním clampem 0.80.");
+            }
+        }
+
+        /// <summary>LibidoMod má lokální minimum kolem menses (mensesMid ≈ den 3).</summary>
+        [TestMethod]
+        public void CycleLibido_DipsAroundMenses()
+        {
+            var engine = BuildEngine(_now, birthYear: 101, cycleEnabled: true);
+            var ctx = BuildContextWithAction(null);
+
+            var libidoMenses = HormonesAtDay(engine, ctx, 3).LibidoMod;
+            var libidoFollicular = HormonesAtDay(engine, ctx, 10).LibidoMod;
+
+            Assert.IsTrue(libidoMenses < libidoFollicular,
+                $"LibidoMod kolem menses ({libidoMenses:F4}) musí být nižší než ve folikulární fázi ({libidoFollicular:F4}).");
+        }
+
+        #endregion Menstrual Cycle — Hormones (E2/P4) & Libido
+
         #region SAM systém (AcuteArousalLevel)
 
         [TestMethod]

@@ -460,14 +460,29 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
             // PMDD: late-luteal severity tracks the WITHDRAWAL of ovarian hormones, not their absolute
             // level — PMDD is abnormal sensitivity to the NORMAL premenstrual fall of estradiol/
-            // progesterone/allopregnanolone (Schiller et al. 2016; Eisenlohr-Moul 2019). Falling
-            // estradiol toward menses intensifies the premenstrual mood dip.
-            // ⚠ VERIFY: mechanism is well-supported, but the withdrawal scaling magnitude below is a
-            // tuned placeholder, not calibrated to a specific effect size — check against peer-reviewed.
+            // progesterone/allopregnanolone (Schiller et al. 2016; Eisenlohr-Moul 2019). Combines two
+            // withdrawal terms: the neurosteroid literature identifies progesterone/allopregnanolone
+            // decline as the leading proximate driver (Hantsoo & Epperson 2020, Neurobiology of Stress
+            // 12:100213; Schmidt et al. 2017, Translational Psychiatry — symptom recurrence tracked
+            // hormone *change*, not steady-state level), but estradiol add-back alone can also provoke
+            // symptoms (Schmidt et al. 1998; Segebladh et al. 2009), so a pure single-hormone model would
+            // overstate certainty the evidence doesn't have. PmddProgesteroneWithdrawalWeight controls
+            // the blend (default 0.6 toward progesterone).
+            // ✅ VERIFIED 2026-06 (see GET_MenstrualCycle_Hormone_Calibration_Implementation_Plan_v2.md):
+            // mechanism and relative weighting are literature-supported, but the withdrawal scaling
+            // magnitude (refs, clamp bounds) remains a tuned placeholder — check against peer-reviewed
+            // effect sizes if a calibration source is found.
             if (ph.Cycle?.PmddActive == true)
             {
-                const double withdrawalRef = 70.0; // estradiol at/above which no extra withdrawal penalty
-                var withdrawal = Math.Clamp(1.0 + (withdrawalRef - ph.Cycle.Estradiol) / withdrawalRef, 0.5, 2.0);
+                var estradiolWithdrawal = Math.Clamp(
+                    1.0 + (Config.PmddEstradiolWithdrawalRef - ph.Cycle.Estradiol) / Config.PmddEstradiolWithdrawalRef,
+                    0.5, 2.0);
+                var progesteroneWithdrawal = Math.Clamp(
+                    1.0 + (Config.PmddProgesteroneWithdrawalRef - ph.Cycle.Progesterone) / Config.PmddProgesteroneWithdrawalRef,
+                    0.5, 2.0);
+                var withdrawal =
+                    Config.PmddProgesteroneWithdrawalWeight * progesteroneWithdrawal
+                    + (1.0 - Config.PmddProgesteroneWithdrawalWeight) * estradiolWithdrawal;
                 s = s with
                 {
                     Valence = Clampm1p1(s.Valence - Config.PmddValencePenaltyPerHour * withdrawal * h),

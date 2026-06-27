@@ -1452,6 +1452,94 @@ namespace EngineTests
 
         #endregion RelationshipDissolutionConsidered — Rusbult investment model
 
+        #region PMDD — hormone-withdrawal weighting (progesteron + estradiol)
+
+        /// <summary>Sestaví PhysiologyState s pozdně-luteálním cyklem a danými hormony pro PMDD testy.</summary>
+        private static PhysiologyState MakePhysioWithPmdd(double estradiol, double progesterone, bool pmddActive = true)
+        {
+            var cycle = new MenstrualCycleState(
+                Phase: CyclePhase.Luteal,
+                DayInCycle: 29,
+                OvulationWindow: false,
+                SymptomPain: 0, SymptomBreastTender: 0, SymptomBloat: 0,
+                LibidoMod: 1.0,
+                LastMensesStart: WDateOnly.New(116, 1, 1),
+                PmddActive: pmddActive,
+                Estradiol: estradiol,
+                Progesterone: progesterone);
+
+            return new PhysiologyState(70, 0, 20, 15, 0, 5, 0, Cycle: cycle);
+        }
+
+        /// <summary>Spustí jeden Psychology Tick s daným PMDD stavem a vrátí výslednou valenci.</summary>
+        private static double ValenceAfterPmddTick(double estradiol, double progesterone, bool pmddActive = true, double hours = 24.0)
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var physio = MakePhysioWithPmdd(estradiol, progesterone, pmddActive);
+            var ctx = BuildContext(0.5, physio, currentAction: null);
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(hours), ctx, new EventCollector());
+            return engine.State.Valence;
+        }
+
+        /// <summary>
+        /// Při defaultní váze 0.6 musí mít stejně velký pokles progesteronu větší dopad na PMDD
+        /// withdrawal (a tedy větší pokles valence) než stejný pokles estradiolu.
+        /// </summary>
+        [TestMethod]
+        public void Pmdd_CombinedWithdrawal_WeightsProgesteroneHigherThanEstradiol()
+        {
+            // Referenční bod jsou prahy (E=70, P=60 → oba withdrawaly = 1.0). Snížíme každý hormon
+            // o 30 jednotek zvlášť: díky váze 0.6 na progesteron musí mít P-pokles větší účinek.
+            var valenceProgDrop = ValenceAfterPmddTick(estradiol: 70, progesterone: 30);
+            var valenceEstDrop = ValenceAfterPmddTick(estradiol: 40, progesterone: 60);
+
+            Assert.IsTrue(valenceProgDrop < valenceEstDrop,
+                $"Pokles progesteronu musí mít větší PMDD dopad než stejný pokles estradiolu. " +
+                $"ProgDrop valence={valenceProgDrop:F5}, EstDrop valence={valenceEstDrop:F5}.");
+        }
+
+        /// <summary>Mimo gated okno (PmddActive=false) nesmí mít hormony žádný vliv na valenci.</summary>
+        [TestMethod]
+        public void Pmdd_Withdrawal_ZeroOutsideGate()
+        {
+            var valenceLowHorm = ValenceAfterPmddTick(estradiol: 10, progesterone: 10, pmddActive: false);
+            var valenceHighHorm = ValenceAfterPmddTick(estradiol: 100, progesterone: 100, pmddActive: false);
+
+            Assert.AreEqual(valenceHighHorm, valenceLowHorm, delta: 1e-9,
+                "Při zavřeném gate (PmddActive=false) nesmí hodnota hormonů ovlivnit valenci.");
+
+            // Kontrola, že při otevřeném gate stejné nízké hormony valenci skutečně srážejí.
+            var valenceGateOpen = ValenceAfterPmddTick(estradiol: 10, progesterone: 10, pmddActive: true);
+            Assert.IsTrue(valenceGateOpen < valenceLowHorm,
+                "Při otevřeném gate musí silný withdrawal (nízké hormony) snižovat valenci.");
+        }
+
+        /// <summary>
+        /// Withdrawal faktor (a tedy valence penalty) musí monotónně růst směrem k menses, kde
+        /// estradiol i progesteron klesají. Postupné dvojice (E,P) reprezentují po sobě jdoucí
+        /// pozdně-luteální dny blížící se menses.
+        /// </summary>
+        [TestMethod]
+        public void Pmdd_Withdrawal_IncreasesTowardMenses()
+        {
+            var lateLutealDescent = new (double Estradiol, double Progesterone)[]
+            {
+                (60, 90), (55, 80), (50, 65), (45, 55), (40, 45)
+            };
+
+            double prevValence = double.MaxValue;
+            foreach (var (estradiol, progesterone) in lateLutealDescent)
+            {
+                var valence = ValenceAfterPmddTick(estradiol, progesterone);
+                Assert.IsTrue(valence < prevValence,
+                    $"Valence penalty musí monotónně růst směrem k menses. " +
+                    $"(E={estradiol}, P={progesterone}) valence={valence:F5}, předchozí={prevValence:F5}.");
+                prevValence = valence;
+            }
+        }
+
+        #endregion PMDD — hormone-withdrawal weighting (progesteron + estradiol)
+
         #region Pomocné metody
 
         /// <summary>Sestaví engine s výchozí nebo vlastní konfigurací.</summary>

@@ -238,14 +238,17 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 && s.Pregnancy is null && (s.Aging?.AgeYears ?? 0) >= 45;
             var immuneDecayFactor = isPostMenopauseImmune ? 0.7 : 1.0;
 
-            // Within-cycle estradiol modestly modulates immune recovery (broadly immunoenhancing —
-            // the same direction as the post-menopause estrogen-loss slowdown above, just within-cycle:
-            // high-estradiol follicular/periovulatory phase recovers a little faster than low-estradiol menses).
-            // ⚠ VERIFY (low certainty): estrogen's immune effect is biphasic and context-dependent
-            // (immunoenhancing at physiological doses but with an autoimmune dimension) — the ±8% band
-            // is a conservative placeholder, not a calibrated effect size. Check against peer-reviewed.
-            if (s.Cycle is { Phase: not CyclePhase.Paused } cyc)
-                immuneDecayFactor *= 1.0 + (cyc.Estradiol - 50.0) / 50.0 * 0.08;
+            // DECISION (2026-06, peer-review verified): NOT modeling a cyclical (within-cycle) estradiol→
+            // immune-recovery coupling here, despite the symmetry with the menopause factor above.
+            // Estrogen's immune effect is biphasic/dose-dependent (Calabrese 2001, biphasic dose-response
+            // review), and the female autoimmune burden (~78.8% of autoimmune-disease patients are women
+            // — Fairweather & Rose) shows "more estrogen = better immunity" is too simple and, for
+            // autoimmunity, roughly backwards. The best within-cycle meta-analysis (Notbohm et al. 2023,
+            // Acta Physiologica 238:e14013; 159 studies) found NO systematic follicular-vs-luteal
+            // difference in CRP or adaptive immune markers — only some innate cell counts, which is not
+            // the same as recovery speed. The post-menopause factor above stays unchanged: it rests on a
+            // different, more robust evidence base (chronic estrogen-loss state, not within-cycle
+            // fluctuation).
 
             // Single source of truth for action-driven drift (energy, hunger, thirst, pain, immune).
             var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor);
@@ -858,7 +861,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             var length = Math.Max(_cycleCfg.MinCycleLengthDays, Math.Min(_cycleCfg.MaxCycleLengthDays,
                 _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
-            // Ovulation = cycle length − mean luteal phase (Bull 2019: luteal ~11.7 days, SD 2.8).
+            // Ovulation = cycle length − mean luteal phase. Luteal length ≈ 11.7-12.4 days across two
+            // pooled cohort studies (Najmabadi et al. 2020: 11.7 days SD 2.8; Bull et al. 2019: 12.4 days,
+            // 95% CI 7-17) — NOT the textbook fixed 14 days.
             // The follicular phase is the main source of variability — ovulDay changes every cycle.
             var ovulDay = Math.Max(_cycleCfg.MensesMeanDays + 2, length - _cycleCfg.LutealMeanDays);
             var day = c.DayInCycle + 1;
@@ -1221,14 +1226,32 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         /// <summary>
         /// Cycle desire multiplier from ovarian hormones: <c>1 + 0.30·E − 0.20·P</c> (E,P normalised
-        /// 0..1) plus a mild menses dip, clamped to [0.80, 1.30]. Source: human-behavior-npc B.2.
+        /// 0..1) plus a mild menses dip, clamped to [0.80, 1.25]. Direction and within-subject
+        /// magnitude confirmed: estradiol+ on desire (Roney &amp; Simmons 2013, Hormones and Behavior
+        /// 63(4):636-645, γ≈+0.16 at 2-day lag), progesterone− on desire (γ≈−0.13 to −0.20).
+        /// Periovulatory peak (~+25% at this clamp) matches the modest, replicated fertile-window
+        /// desire increase (Arslan et al. 2018/2021, JPSP, 26,000-entry preregistered diary study;
+        /// d-equivalent effect sizes 0.12-0.43) — NOT the often-cited but overstated 25-60% figure.
+        /// The 0.30/0.20 coefficients are a tuned heuristic translation of those within-subject betas
+        /// onto GET's 0-100 proxy scale, not a direct unit-for-unit mapping.
+        /// ✅ VERIFIED 2026-06 (see GET_MenstrualCycle_Hormone_Calibration_Implementation_Plan_v2.md).
         /// </summary>
+        // DECISION (2026-06, peer-review verified): do NOT add a fertile-window shift in
+        // preferred-partner traits (masculinity, facial/body symmetry — "ovulatory shift hypothesis").
+        // Large preregistered studies (Jones et al. 2018; Jünger et al. 2018; Marcinkowska et al.
+        // 2016/2018; Stern et al. 2020/2021) consistently find null effects; the supporting 2014
+        // meta-analysis (Gildersleeve et al.) is contradicted by a same-year counter-analysis
+        // (Wood et al.) and has not held up. Only the overall desire/initiation increase modeled
+        // here is well-replicated.
         private static double CycleLibido(double estradiol, double progesterone, double day, double mensesMid)
         {
             var mensesDip = -0.10 * Math.Exp(-Math.Pow(day - mensesMid, 2) / 4.0);
+            // Upper clamp tightened to 1.25 — Roney & Simmons (2013) and Arslan et al. (2018/2021)
+            // support a modest ~10-25% periovulatory desire increase, not higher; 1.30 left unused
+            // headroom beyond what's evidenced.
             return Math.Clamp(
                 1.0 + 0.30 * (estradiol / 100.0) - 0.20 * (progesterone / 100.0) + mensesDip,
-                0.80, 1.30);
+                0.80, 1.25);
         }
 
         private static CyclePhase PhaseFor(int day, int length, int mensesDays, int ovulationDay)

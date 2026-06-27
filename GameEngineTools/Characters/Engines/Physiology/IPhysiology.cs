@@ -695,7 +695,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
     /// <summary>
     /// Tuning constants for the menstrual-cycle module. Cycle lengths and variability are
-    /// calibrated against Bull et al. 2019; stress/sleep parameters govern HPA-mediated anovulation.
+    /// calibrated against Bull et al. 2019 and Najmabadi et al. 2020 (luteal phase);
+    /// stress/sleep parameters govern HPA-mediated anovulation.
     /// </summary>
     /// <param name="MensesMeanDays">Mean duration of menstruation in days.</param>
     /// <param name="PmsRisk">Probability (0..1) a character is PMS/PMDD-prone.</param>
@@ -707,16 +708,27 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// <param name="BloatBaseMultiplier">Base multiplier on cyclic bloat symptoms.</param>
     /// <param name="BreastTenderMultiplier">Base multiplier on cyclic breast-tenderness symptoms.</param>
     public sealed record MenstrualCycleConfig(
-        /// <summary>Bull et al. 2019 (n = 3,324 cycles): mean 30.3 days.</summary>
+        /// <summary>
+        /// Bull et al. 2019 (npj Digital Medicine 2:83; 612,613 ovulatory cycles, 124,648 users):
+        /// mean cycle length 29.3 days. Default kept at 30 as a round population-level number.
+        /// </summary>
         int MeanCycleLengthDays = 30,
-        /// <summary>Bull et al. 2019: SD 6.7 days — the follicular phase is the main source of variability.</summary>
+        /// <summary>
+        /// Engine-level tuning for *total* cycle-length spread (covers the realistic 21-36 day
+        /// range via MinCycleLengthDays/MaxCycleLengthDays). Bull et al. 2019 itself reports only
+        /// the luteal-phase spread directly (95% CI 7-17 days, SD ≈ 2.4) — see LutealMeanDays.
+        /// </summary>
         double VariabilityDaysStdDev = 6.7,
         int MensesMeanDays = 5,
         double PmsRisk = 0.35,
         bool EnableOvulationWindowEvents = true,
         bool EnableSymptoms = true,
         /// <summary>
-        /// Mean luteal-phase length (Bull et al. 2019: mean 11.7 days, SD 2.8).
+        /// Mean luteal-phase length. Two independent pooled cohort analyses converge here:
+        /// Najmabadi et al. (2020, Paediatric and Perinatal Epidemiology 34(3):318-327; 581 women,
+        /// 3,324 cycles): 11.7 days (SD 2.8). Bull et al. (2019, npj Digital Medicine 2:83;
+        /// 612,613 cycles): 12.4 days (95% CI 7-17, SD ≈ 2.4). Default 12 sits between both —
+        /// NOT the textbook fixed 14 days.
         /// From this the engine computes the dynamic ovulation day per cycle: ovulDay = length − LutealMeanDays.
         /// </summary>
         int LutealMeanDays = 12,

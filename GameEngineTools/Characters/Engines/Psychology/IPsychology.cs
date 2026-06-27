@@ -69,6 +69,32 @@ namespace GameEngineTools.Characters.Engines.Psychology
         // PMDD (PmsRisk amplifier)
         double PmddValencePenaltyPerHour = 0.002,
         double PmddStressBonus = 0.5,
+        #region PMDD hormone-withdrawal weighting (Hantsoo & Epperson 2020; Schmidt et al. 2017)
+
+        /// <summary>
+        /// Estradiol level (GET 0..100 proxy scale) at/above which no extra estradiol-withdrawal
+        /// penalty applies. Existing tuned placeholder, unchanged from the original implementation.
+        /// </summary>
+        double PmddEstradiolWithdrawalRef = 70.0,
+
+        /// <summary>
+        /// Progesterone level (GET 0..100 proxy scale) at/above which no extra progesterone/
+        /// allopregnanolone-withdrawal penalty applies. Approximate proxy for the late-luteal
+        /// progesterone peak the engine's CycleHormones model produces (~90-100 at ovulDay+7).
+        /// </summary>
+        double PmddProgesteroneWithdrawalRef = 60.0,
+
+        /// <summary>
+        /// Relative weight (0..1) given to progesterone/allopregnanolone withdrawal vs. estradiol
+        /// withdrawal in the combined PMDD severity factor. Default 0.6 reflects the neurosteroid
+        /// literature's emphasis on progesterone/allopregnanolone as the leading proximate driver
+        /// (Hantsoo &amp; Epperson 2020), while keeping a real (not zero) estradiol contribution
+        /// because the evidence does not cleanly isolate the two hormones (Schmidt et al. 1998
+        /// showed estradiol add-back alone can also provoke symptoms).
+        /// </summary>
+        double PmddProgesteroneWithdrawalWeight = 0.6,
+
+        #endregion PMDD hormone-withdrawal weighting
         // Postpartum hormonal crash
         double PostpartumCrashValenceLability = 0.05,
         double PostpartumCrashMoodBaselinePenalty = 0.3,
