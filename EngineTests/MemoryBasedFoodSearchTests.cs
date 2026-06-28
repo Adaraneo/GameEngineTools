@@ -289,12 +289,65 @@ namespace EngineTests
         }
 
         // ══════════════════════════════════════════════════════════════════════
+        // Test 7 — Travel time: character stays in transit, arrives after the trip
+        // ══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// With <see cref="SceneOrchestratorOptions.EnableTravelTime"/> on, a 1600 m trip at
+        /// 80 m/min takes 20 minutes: the character must NOT teleport on the routing tick — it
+        /// stays at home until the arrival time is reached, then is placed at the tavern.
+        /// </summary>
+        [TestMethod]
+        public void RouteMoveTo_TravelTimeEnabled_ArrivesOnlyAfterTravelDuration()
+        {
+            var knownObjects = new[]
+            {
+                new ObjectLocationFact("bread_01", TavernId, Now, 0.85, PickupItemKind.Food)
+            };
+
+            // home → tavern, 1600 m; at 80 m/min that is a 20-minute walk.
+            var worldMap = BuildMap(new[] { (HomeId, TavernId, 1600.0) });
+
+            var character = BuildForagingHuman(
+                currentLocation: HomeId,
+                action: MoveToFood,
+                knownObjects: knownObjects);
+
+            var orchestrator = BuildOrchestrator(
+                worldMap,
+                provider: new EmptyWorldObjectProvider(),
+                options: new SceneOrchestratorOptions { EnableTravelTime = true });
+
+            // Routing tick: trip starts, character is in transit (still at home).
+            orchestrator.OnTick(Now, new[] { character });
+            Assert.AreEqual(HomeId, _locationService.GetLocation(character.Id),
+                "While travelling the character must remain at the origin, not teleport.");
+            Assert.AreEqual(TavernId, orchestrator.GetTravelDestination(character.Id),
+                "The orchestrator must report the in-flight destination.");
+
+            // Halfway (10 min < 20 min): still travelling.
+            orchestrator.OnTick(Now + WTimeSpan.FromMinutes(10), new[] { character });
+            Assert.AreEqual(HomeId, _locationService.GetLocation(character.Id),
+                "Before the travel duration elapses the character has not arrived yet.");
+
+            // Past arrival (25 min >= 20 min): placed at the destination.
+            orchestrator.OnTick(Now + WTimeSpan.FromMinutes(25), new[] { character });
+            Assert.AreEqual(TavernId, _locationService.GetLocation(character.Id),
+                "Once the travel duration has elapsed the character arrives at the tavern.");
+            Assert.IsNull(orchestrator.GetTravelDestination(character.Id),
+                "After arrival the character is no longer in transit.");
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
         // Factory helpers
         // ══════════════════════════════════════════════════════════════════════
 
         #region Factory methods
 
-        private DefaultSceneOrchestrator BuildOrchestrator(WorldMap worldMap, IWorldObjectProvider provider)
+        private DefaultSceneOrchestrator BuildOrchestrator(
+            WorldMap worldMap,
+            IWorldObjectProvider provider,
+            SceneOrchestratorOptions? options = null)
             => new DefaultSceneOrchestrator(
                 attractionCalculator: new NeutralAttractionCalculator(),
                 locationService: _locationService,
@@ -314,7 +367,7 @@ namespace EngineTests
                 rng: new Random(42),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
                 objectProvider: provider,
-                options: new SceneOrchestratorOptions());
+                options: options ?? new SceneOrchestratorOptions());
 
         private ForagingHuman BuildForagingHuman(
             string currentLocation,

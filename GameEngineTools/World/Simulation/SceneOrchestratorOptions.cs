@@ -30,5 +30,23 @@ namespace GameEngineTools.World.Simulation
         /// forgotten for navigation. Default 0.15 reproduces the legacy const.
         /// </summary>
         public double MinMemoryConfidence { get; init; } = 0.15;
+
+        /// <summary>
+        /// When <c>true</c>, <c>MoveTo:*</c> actions no longer relocate a character instantly.
+        /// Instead the orchestrator holds the character in transit at their origin for the travel
+        /// duration (<see cref="World.Movement.TravelDurationComputer"/> over the destination
+        /// distance at the character's current movement speed), then places them on arrival.
+        /// While in transit further <c>MoveTo</c> actions are ignored — the character is committed
+        /// to the current trip. Default <c>false</c> reproduces the legacy instant-move behavior.
+        /// </summary>
+        public bool EnableTravelTime { get; init; } = false;
+
+        /// <summary>
+        /// Travel distance in metres assumed when a chosen destination is not an adjacent
+        /// graph edge (a cross-locale fallback reached via <c>FindBestMoveTarget</c> /
+        /// <c>FindLocationWithCategory</c> rather than a direct <see cref="World.Objects.WorldConnection"/>).
+        /// Only consulted when <see cref="EnableTravelTime"/> is <c>true</c>. Default 1200 m.
+        /// </summary>
+        public double FallbackTravelDistanceMeters { get; init; } = 1200.0;
     }
 }

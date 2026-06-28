@@ -126,6 +126,21 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private readonly CommunityReputationLedger? _reputationLedger;
 
+        /// <summary>
+        /// Characters currently travelling between locations, keyed by id. Populated only when
+        /// <see cref="SceneOrchestratorOptions.EnableTravelTime"/> is enabled: a <c>MoveTo:*</c>
+        /// records the destination and arrival time here instead of relocating instantly, and the
+        /// character is committed to that trip (further <c>MoveTo</c> actions are ignored) until
+        /// <see cref="RouteMoveTo"/> sees <c>now &gt;= ArriveAt</c> and places them.
+        /// </summary>
+        private readonly Dictionary<HumanId, TransitState> _inTransit = new();
+
+        /// <summary>A pending arrival: where the traveller is headed and when they get there.</summary>
+        private readonly record struct TransitState(string Destination, WDateTime ArriveAt);
+
+        /// <summary>A resolved move destination together with the distance to travel to it.</summary>
+        private readonly record struct MoveTarget(string LocationId, double DistanceMeters);
+
         #endregion Private fields
 
         #region Constructor
@@ -499,8 +514,19 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         private void RouteMoveTo(WDateTime now, IReadOnlyList<IHuman> chars)
         {
+            // ── Process arrivals first (travel-time mode only) ────────────────────────
+            // Anyone whose trip has elapsed is placed at their destination this substep and
+            // recorded so the per-character loop below does not immediately re-route them on
+            // a now-stale MoveTo (they have only just arrived — let them act next substep).
+            var arrivedThisSubstep = ProcessArrivals(now);
+
             foreach (var character in chars)
             {
+                // Committed to an in-flight trip, or just arrived this substep → do not re-route.
+                if (_options.EnableTravelTime &&
+                    (_inTransit.ContainsKey(character.Id) || arrivedThisSubstep.Contains(character.Id)))
+                    continue;
+
                 var moveTo = character.LastOutbox
                     .OfType<ActionCommitted>()
                     .FirstOrDefault(a => a.ActionName.StartsWith("MoveTo:"));
@@ -531,8 +557,7 @@ namespace GameEngineTools.World.Simulation
 
                     if (destination is not null)
                     {
-                        _locationService.MoveCharacter(character.Id, destination);
-                        _fullyMetLocations.Remove(destination);
+                        CommitMove(character, destination.Value, now);
                     }
                     else
                     {
@@ -565,10 +590,82 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
-                _locationService.MoveCharacter(character.Id, chosen);
-                _fullyMetLocations.Remove(chosen);
+                CommitMove(character, chosen.Value, now);
             }
         }
+
+        /// <summary>
+        /// Places every traveller whose arrival time has been reached and removes them from the
+        /// in-transit set. No-op (returns an empty set) unless
+        /// <see cref="SceneOrchestratorOptions.EnableTravelTime"/> is enabled.
+        /// </summary>
+        /// <returns>The ids placed this substep — callers skip re-routing them on a stale MoveTo.</returns>
+        private HashSet<HumanId> ProcessArrivals(WDateTime now)
+        {
+            if (!_options.EnableTravelTime || _inTransit.Count == 0)
+                return Empty;
+
+            var arrived = new HashSet<HumanId>();
+
+            // ToList(): we mutate _inTransit inside the loop.
+            foreach (var kv in _inTransit.ToList())
+            {
+                if (now >= kv.Value.ArriveAt)
+                {
+                    Arrive(kv.Key, kv.Value.Destination);
+                    _inTransit.Remove(kv.Key);
+                    arrived.Add(kv.Key);
+                }
+            }
+
+            return arrived;
+        }
+
+        /// <summary>Shared empty id set returned when no arrivals are processed (avoids allocation).</summary>
+        private static readonly HashSet<HumanId> Empty = new();
+
+        /// <summary>
+        /// Realises a resolved <paramref name="target"/> move for a character. In instant mode
+        /// (default) the character is placed immediately. In travel-time mode the character is held
+        /// in transit for the computed travel duration and placed later by <see cref="ProcessArrivals"/>;
+        /// a zero-or-negative duration (e.g. a co-located destination) is treated as instant.
+        /// </summary>
+        private void CommitMove(IHuman character, MoveTarget target, WDateTime now)
+        {
+            if (!_options.EnableTravelTime)
+            {
+                Arrive(character.Id, target.LocationId);
+                return;
+            }
+
+            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
+            var minutes = TravelDurationComputer.ComputeMinutes(target.DistanceMeters, speed);
+
+            if (minutes <= 0.0)
+            {
+                Arrive(character.Id, target.LocationId);
+                return;
+            }
+
+            _inTransit[character.Id] = new TransitState(target.LocationId, now + WTimeSpan.FromMinutes(minutes));
+        }
+
+        /// <summary>Places a character at a destination and rescans it for first impressions.</summary>
+        private void Arrive(HumanId characterId, string destination)
+        {
+            _locationService.MoveCharacter(characterId, destination);
+            _fullyMetLocations.Remove(destination);
+        }
+
+        /// <summary>
+        /// The destination a character is currently travelling to, or <c>null</c> when they are
+        /// not in transit. Exposed so observers can surface "on the way to X" without the
+        /// orchestrator owning any presentation concern.
+        /// </summary>
+        /// <param name="characterId">Character to query.</param>
+        /// <returns>Destination location id, or <c>null</c> if the character is not travelling.</returns>
+        public string? GetTravelDestination(HumanId characterId)
+            => _inTransit.TryGetValue(characterId, out var t) ? t.Destination : null;
 
         /// <summary>
         /// Resolves the best move destination for a character requesting a given location type.
@@ -577,8 +674,8 @@ namespace GameEngineTools.World.Simulation
         /// <param name="character">Character requesting the move.</param>
         /// <param name="currentLocationId">Character's current location, or <c>null</c> if unplaced.</param>
         /// <param name="requestedType">The type of location the character wants to reach.</param>
-        /// <returns>The chosen location id, or <c>null</c> if no suitable location exists.</returns>
-        private string? FindBestMoveTarget(
+        /// <returns>The chosen location and its travel distance, or <c>null</c> if none exists.</returns>
+        private MoveTarget? FindBestMoveTarget(
             IHuman character,
             string? currentLocationId,
             LocationType requestedType)
@@ -594,7 +691,7 @@ namespace GameEngineTools.World.Simulation
                 .Select(conn => (conn, descriptor: _worldMap.GetLocation(conn.TargetLocationId)))
                 .Where(t => t.descriptor?.Type == requestedType)
                 .OrderBy(t => TravelDurationComputer.ComputeMinutes(t.conn.DistanceMeters, speed))
-                .Select(t => t.conn.TargetLocationId)
+                .Select(t => (MoveTarget?)new MoveTarget(t.conn.TargetLocationId, t.conn.DistanceMeters))
                 .FirstOrDefault();
 
             if (adjacentTarget is not null)
@@ -634,7 +731,8 @@ namespace GameEngineTools.World.Simulation
                 .OrderByDescending(x => ScoreMoveTarget(character, requestedType, x.Noise, x.Crowding, x.Privacy))
                 .First();
 
-            return best.Id;
+            // Non-adjacent fallback: no graph edge, so assume the configured cross-locale distance.
+            return new MoveTarget(best.Id, _options.FallbackTravelDistanceMeters);
         }
 
         /// <summary>
@@ -645,7 +743,7 @@ namespace GameEngineTools.World.Simulation
         /// <param name="character">The character that is about to move.</param>
         /// <param name="currentLocationId">Character's current location, or <c>null</c> if unplaced.</param>
         /// <param name="category">Required object category (e.g. Food, Drink).</param>
-        private string? FindLocationWithCategory(
+        private MoveTarget? FindLocationWithCategory(
             IHuman character,
             string? currentLocationId,
             WorldObjectCategory category)
@@ -670,15 +768,15 @@ namespace GameEngineTools.World.Simulation
                 .GetConnections(currentLocationId)
                 .Where(conn => candidateLocations.Contains(conn.TargetLocationId))
                 .OrderBy(conn => TravelDurationComputer.ComputeMinutes(conn.DistanceMeters, speed))
-                .Select(conn => conn.TargetLocationId)
+                .Select(conn => (MoveTarget?)new MoveTarget(conn.TargetLocationId, conn.DistanceMeters))
                 .FirstOrDefault();
 
             if (adjacentMatch is not null)
                 return adjacentMatch;
 
             // Fallback: pick arbitrarily from all known locations with the required object.
-            // Could be improved with distance scoring if WorldMap exposes path lengths.
-            return candidateLocations.First();
+            // No graph edge, so assume the configured cross-locale distance.
+            return new MoveTarget(candidateLocations.First(), _options.FallbackTravelDistanceMeters);
         }
 
         /// <summary>
@@ -704,7 +802,7 @@ namespace GameEngineTools.World.Simulation
         /// The best remembered location ID, or <c>null</c> when memory is empty or
         /// all facts are below the confidence threshold.
         /// </returns>
-        private string? FindLocationWithCategoryViaMemory(
+        private MoveTarget? FindLocationWithCategoryViaMemory(
             IHuman character,
             string? currentLocationId,
             PickupItemKind itemKind)
@@ -741,21 +839,24 @@ namespace GameEngineTools.World.Simulation
                 .Where(conn => rememberedLocations.Any(r => r.LocationId == conn.TargetLocationId))
                 .Select(conn => (
                     conn.TargetLocationId,
+                    conn.DistanceMeters,
                     TravelMinutes: TravelDurationComputer.ComputeMinutes(conn.DistanceMeters, speed),
                     BestConfidence: rememberedLocations.First(r => r.LocationId == conn.TargetLocationId).BestConfidence))
                 .OrderBy(x => x.TravelMinutes)
                 .ThenByDescending(x => x.BestConfidence)
-                .Select(x => x.TargetLocationId)
+                .Select(x => (MoveTarget?)new MoveTarget(x.TargetLocationId, x.DistanceMeters))
                 .FirstOrDefault();
 
             if (adjacentMatch is not null)
                 return adjacentMatch;
 
             // Fallback within memory: non-adjacent remembered location with best confidence.
-            return rememberedLocations
+            // No graph edge, so assume the configured cross-locale distance.
+            var bestRemembered = rememberedLocations
                 .OrderByDescending(r => r.BestConfidence)
-                .Select(r => r.LocationId)
                 .First();
+
+            return new MoveTarget(bestRemembered.LocationId, _options.FallbackTravelDistanceMeters);
         }
 
         /// <summary>
