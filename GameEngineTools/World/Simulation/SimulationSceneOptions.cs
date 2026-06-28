@@ -3,6 +3,7 @@
 
 namespace GameEngineTools.World.Simulation
 {
+    using System;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Hosting;
@@ -73,6 +74,15 @@ namespace GameEngineTools.World.Simulation
         /// sub-steps for lower inter-character latency and more accurate timing.
         /// </remarks>
         public WTimeSpan TickStep { get; init; } = WTimeSpan.FromHours(0.5);
+
+        /// <summary>
+        /// Optional provider for a <b>dynamic</b> outer step, re-read once per main-loop iteration.
+        /// When set, its return value is used instead of the fixed <see cref="TickStep"/>, letting a
+        /// host change how much world time passes per tick at runtime (e.g. a live "world tempo" /
+        /// fast-forward control) without restarting the scene. A non-positive result falls back to
+        /// <see cref="TickStep"/>. Default <c>null</c> preserves the fixed-step behavior.
+        /// </summary>
+        public Func<WTimeSpan>? TickStepProvider { get; init; }
 
         /// <summary>
         /// Optional finer sub-step for the scene.

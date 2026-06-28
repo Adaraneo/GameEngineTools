@@ -180,11 +180,12 @@ namespace GameEngineTools.World.Simulation
         {
             var startTime = _clock.Now;
             var endTime = _clock.Now.AddDays(_options.SimulationDays);
-            var macroStep = _options.TickStep;
-            var internalSubstep = ResolveInternalSubstep(macroStep);
 
             while (_clock.Now < endTime)
             {
+                // Re-read the step each iteration so a host can change world tempo (fast-forward) live.
+                var macroStep = ResolveMacroStep();
+                var internalSubstep = ResolveInternalSubstep(macroStep);
                 var macroRemaining = macroStep;
 
                 while (macroRemaining > WTimeSpan.Zero && _clock.Now < endTime)
@@ -331,6 +332,22 @@ namespace GameEngineTools.World.Simulation
 
                 _pendingAdditions.Clear();
             }
+        }
+
+        /// <summary>
+        /// The outer step for the current iteration: the dynamic <see cref="SimulationSceneOptions.TickStepProvider"/>
+        /// when supplied and positive, otherwise the fixed <see cref="SimulationSceneOptions.TickStep"/>.
+        /// </summary>
+        private WTimeSpan ResolveMacroStep()
+        {
+            if (_options.TickStepProvider is { } provider)
+            {
+                var dynamic = provider();
+                if (dynamic > WTimeSpan.Zero)
+                    return dynamic;
+            }
+
+            return _options.TickStep;
         }
 
         private WTimeSpan ResolveInternalSubstep(WTimeSpan macroStep)
