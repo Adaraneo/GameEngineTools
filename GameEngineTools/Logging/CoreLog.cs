@@ -142,6 +142,17 @@ namespace GameEngineTools.Logging
             int Age,
             double Risk);
 
+        /// <summary>Per-tick hormone snapshot (Estradiol/Progesterone) for characters with an active menstrual cycle.</summary>
+        [LoggerMessage(
+            EventId = 5600,
+            Level = LogLevel.Debug,
+            Message = "[PHYSIO/HORMONES] {HumanId} Estradiol:{Estradiol:F2} Progesterone:{Progesterone:F2}")]
+        public static partial void HormoneSnapshot(
+            this ILogger logger,
+            string HumanId,
+            double Estradiol,
+            double Progesterone);
+
         #endregion Physiology
 
         #region Psychology
@@ -1409,6 +1420,32 @@ namespace GameEngineTools.Logging
             double ElapsedMinutes);
 
         #endregion World Objects — 1500–1599
+
+        #region Movement / Transit — 1700–1799
+
+        /// <summary>A character was placed into transit for a routed move (travel-time mode).</summary>
+        [LoggerMessage(
+            EventId = 1700,
+            Level = LogLevel.Information,
+            Message = "[TRAVEL] {HumanId} departed for {Destination}, ETA {ArriveAt} ({Minutes:F1}min).")]
+        public static partial void TravelDeparted(
+            this ILogger logger,
+            string HumanId,
+            string Destination,
+            double Minutes,
+            string ArriveAt);
+
+        /// <summary>A character completed a tracked transit and arrived at its destination.</summary>
+        [LoggerMessage(
+            EventId = 1701,
+            Level = LogLevel.Information,
+            Message = "[TRAVEL] {HumanId} arrived at {Destination}.")]
+        public static partial void TravelArrived(
+            this ILogger logger,
+            string HumanId,
+            string Destination);
+
+        #endregion Movement / Transit — 1700–1799
 
         #region Scheduler a infrastruktura
 

@@ -612,7 +612,7 @@ namespace GameEngineTools.World.Simulation
             {
                 if (now >= kv.Value.ArriveAt)
                 {
-                    Arrive(kv.Key, kv.Value.Destination);
+                    Arrive(kv.Key, kv.Value.Destination, fromTransit: true);
                     _inTransit.Remove(kv.Key);
                     arrived.Add(kv.Key);
                 }
@@ -651,14 +651,32 @@ namespace GameEngineTools.World.Simulation
             // perceived/social at, its origin while travelling. The scene's post-movement context
             // refresh then announces the "on the road" surface; ProcessArrivals re-places it on arrival.
             _locationService.RemoveCharacter(character.Id);
-            _inTransit[character.Id] = new TransitState(target.LocationId, now + WTimeSpan.FromMinutes(minutes));
+            var arriveAt = now + WTimeSpan.FromMinutes(minutes);
+            _inTransit[character.Id] = new TransitState(target.LocationId, arriveAt);
+
+            using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
+            {
+                _log.TravelDeparted(character.Id.Value.ToString(), target.LocationId, minutes, arriveAt.ToString());
+            }
         }
 
         /// <summary>Places a character at a destination and rescans it for first impressions.</summary>
-        private void Arrive(HumanId characterId, string destination)
+        /// <param name="fromTransit">
+        /// <c>true</c> when this arrival completes a tracked travel-time transit (logged as a
+        /// <c>TravelArrived</c> event); <c>false</c> for instant placements (no travel to report).
+        /// </param>
+        private void Arrive(HumanId characterId, string destination, bool fromTransit = false)
         {
             _locationService.MoveCharacter(characterId, destination);
             _fullyMetLocations.Remove(destination);
+
+            if (fromTransit)
+            {
+                using (_log.BeginCharacterScope(characterId.Value, "SceneOrchestrator"))
+                {
+                    _log.TravelArrived(characterId.Value.ToString(), destination);
+                }
+            }
         }
 
         /// <summary>

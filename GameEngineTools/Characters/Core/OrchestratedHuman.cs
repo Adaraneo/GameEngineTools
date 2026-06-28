@@ -722,6 +722,8 @@ namespace GameEngineTools.Characters.Core
                     _log.PhysiologyCycle(Id.Value.ToString(), c.Phase.ToString(), c.DayInCycle,
                         c.LibidoMod, c.OvulationWindow, c.SymptomPain, c.SymptomBloat,
                         c.SymptomBreastTender, c.PmddActive);
+
+                    _log.HormoneSnapshot(Id.Value.ToString(), c.Estradiol, c.Progesterone);
                 }
 
                 var mot = s.Psychology.Motivations;
