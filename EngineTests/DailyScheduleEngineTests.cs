@@ -174,19 +174,29 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void Tick_ClearsActiveSlotFromPreviousTick()
+        public void Tick_KeepsActiveSlotUntilSuperseded()
         {
+            // A slot fires on a single tick but behavior runs on a coarser LOD cadence, so the active
+            // slot must persist across ticks (until the next slot replaces it) — otherwise its bias is
+            // dropped before behavior ever reads it.
             var engine = BuildEngine();
             var self = new HumanId(Guid.NewGuid());
             var now = new WDateTime(0);
-            var slot = new ScheduleSlot("test_slot", 8, Work);
-            var state = new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson);
-            engine.RestoreState(state);
 
+            engine.SeedFromOccupation(OccupationIds.Craftsperson, BuildPersonality(), now, new RecordingScheduler(), self);
+            var slot = engine.State.Slots.First();
             var ctx = BuildContext(self);
+
+            engine.Handle(
+                new ScheduleSlotTriggered(now, self, slot.SlotId, slot.PreferredAction, slot.PreferredLocationId, slot.BiasStrength),
+                ctx, new EventCollector());
+            Assert.IsNotNull(engine.State.ActiveSlot, "Sanity: Handle must set ActiveSlot");
+
+            // A same-day tick must NOT drop the active slot.
             engine.Tick(now + WTimeSpan.FromHours(1), WTimeSpan.FromHours(1), ctx, new EventCollector());
 
-            Assert.IsNull(engine.State.ActiveSlot, "Tick should clear ActiveSlot from previous tick");
+            Assert.IsNotNull(engine.State.ActiveSlot, "ActiveSlot must persist across ticks until a new slot supersedes it");
+            Assert.AreEqual(slot.SlotId, engine.State.ActiveSlot!.SlotId);
         }
 
         [TestMethod]
@@ -312,6 +322,58 @@ namespace EngineTests
             Assert.IsTrue(candidates[0].Utility > before, "Non-skippable slot should bias even under stress");
         }
 
+        [TestMethod]
+        public void Modifier_WorkSlot_NotAtWorkSurface_BoostsMoveToWork()
+        {
+            var modifier = new DailyScheduleBehaviorModifier();
+            var now = new WDateTime(0);
+            var slot = new ScheduleSlot("work_slot", 8, Work, PreferredLocationId: "office", BiasStrength: 0.8);
+
+            // Character is on a Social surface (e.g. at home/out), not at a Work place.
+            var context = BuildBehaviorContext(
+                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson),
+                stress: 20.0, energy: 80.0, surfaceKind: SurfaceKind.Social);
+
+            // MoveToWork starts at 0 utility (the need engine emits it as a placeholder).
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(Work, 50.0, WTimeSpan.FromHours(2), BehaviorDomain.Competence),
+                new(MoveToWork, 0.0, WTimeSpan.FromMinutes(20), BehaviorDomain.Competence),
+                new(Idle, 30.0, WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological)
+            };
+
+            modifier.Modify(context, candidates);
+
+            var moveToWork = candidates.First(c => c.Name == MoveToWork);
+            Assert.IsTrue(moveToWork.Utility > 0.0,
+                $"MoveToWork must be boosted (commute) when scheduled to work but not at a work surface: {moveToWork.Utility}");
+        }
+
+        [TestMethod]
+        public void Modifier_WorkSlot_AlreadyAtWorkSurface_DoesNotBoostMoveToWork()
+        {
+            var modifier = new DailyScheduleBehaviorModifier();
+            var now = new WDateTime(0);
+            var slot = new ScheduleSlot("work_slot", 8, Work, PreferredLocationId: "office", BiasStrength: 0.8);
+
+            // Character is already on a Work surface — no commute needed.
+            var context = BuildBehaviorContext(
+                new DailyScheduleState(new[] { slot }, slot, now.Date.DayIndex, OccupationIds.Craftsperson),
+                stress: 20.0, energy: 80.0, surfaceKind: SurfaceKind.Work);
+
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(Work, 50.0, WTimeSpan.FromHours(2), BehaviorDomain.Competence),
+                new(MoveToWork, 0.0, WTimeSpan.FromMinutes(20), BehaviorDomain.Competence)
+            };
+
+            modifier.Modify(context, candidates);
+
+            var moveToWork = candidates.First(c => c.Name == MoveToWork);
+            Assert.AreEqual(0.0, moveToWork.Utility, 0.001,
+                "MoveToWork must not be boosted when the character is already at a work surface.");
+        }
+
         // ── Section 5: Integration ─────────────────────────────────────────────
 
         [TestMethod]
@@ -382,7 +444,8 @@ namespace EngineTests
                 chronotype);
 
         private static IHumanContext BuildContext(HumanId self, DailyScheduleState? schedule = null,
-            double stress = 20.0, double energy = 80.0, IScheduler? scheduler = null)
+            double stress = 20.0, double energy = 80.0, IScheduler? scheduler = null,
+            SurfaceKind surfaceKind = SurfaceKind.Social)
         {
             var personality = BuildPersonality();
             return new HumanContext
@@ -399,7 +462,7 @@ namespace EngineTests
                     new PhysiologyState(energy, 0, 5, 5, 0, 0, 0, null),
                     new PsychologyState(0, 0.5, 0.5, stress, 0, DiscreteEmotion.Neutral),
                     new BehaviorState(10, 5, 5, 20, 50, 30, null),
-                    new InteractionSurface("test", false, 0.2, 0.2, SurfaceKind.Social),
+                    new InteractionSurface("test", false, 0.2, 0.2, surfaceKind),
                     new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                     new MemoryIndex(new List<EpisodicMemory>()),
                     SemanticMemoryState.Empty,
@@ -414,9 +477,10 @@ namespace EngineTests
         private static BehaviorContext BuildBehaviorContext(
             DailyScheduleState schedule,
             double stress = 20.0,
-            double energy = 80.0)
+            double energy = 80.0,
+            SurfaceKind surfaceKind = SurfaceKind.Social)
         {
-            var human = BuildContext(new HumanId(Guid.NewGuid()), schedule, stress, energy);
+            var human = BuildContext(new HumanId(Guid.NewGuid()), schedule, stress, energy, surfaceKind: surfaceKind);
             var state = new BehaviorState(10, 5, 5, 20, 50, 30, null);
             return new BehaviorContext(
                 new WDateTime(0),

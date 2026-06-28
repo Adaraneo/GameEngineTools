@@ -71,10 +71,13 @@ namespace GameEngineTools.Characters.Engines.Schedule
         /// <inheritdoc/>
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
-            // Clear active slot from previous tick
-            var newState = State.ActiveSlot is not null
-                ? State with { ActiveSlot = null }
-                : State;
+            // NOTE: ActiveSlot is intentionally NOT cleared here. A slot fires on a single tick (its
+            // scheduled hour), but behavior runs on a coarser LOD cadence, so clearing per-tick used to
+            // drop the schedule bias before behavior ever read it (the character never acted on its
+            // schedule unless the fire tick happened to coincide with a decision tick). Keeping the slot
+            // active until the NEXT slot supersedes it gives sustained pressure for the whole block —
+            // the character heads to work and keeps working until the next scheduled activity.
+            var newState = State;
 
             // Check whether we need to pre-schedule a future day
             // Look ahead by RescheduleLeadHours to catch the next calendar day
