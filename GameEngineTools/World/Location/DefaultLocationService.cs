@@ -91,6 +91,10 @@ namespace GameEngineTools.World.Location
         }
 
         /// <inheritdoc/>
+        public void RemoveCharacter(HumanId characterId)
+            => _characterLocation.Remove(characterId);
+
+        /// <inheritdoc/>
         public string? GetLocation(HumanId characterId)
             => _characterLocation.GetValueOrDefault(characterId);
 
@@ -116,12 +120,33 @@ namespace GameEngineTools.World.Location
 
             foreach (var character in characters)
             {
-                // Skip characters that have not been placed in any location yet.
+                var previousLocation = _lastDispatchedLocation.GetValueOrDefault(character.Id);
+
+                // Unplaced (never placed, or currently in transit between locations).
                 if (!_characterLocation.TryGetValue(character.Id, out var locationId))
+                {
+                    // Already known to be nowhere, or never placed → nothing to announce.
+                    if (string.IsNullOrEmpty(previousLocation))
+                        continue;
+
+                    // Just left a real location: emit a one-shot "on the road" context (empty
+                    // Location, no objects/privacy) so engines stop reading the old surface, then
+                    // record the nowhere sentinel so it is not re-emitted every substep.
+                    character.ReceiveEvent(new ContextChanged(
+                        OccurredAt: now,
+                        Human: character.Id,
+                        Location: string.Empty,
+                        HasPrivacy: false,
+                        Noise: 0.0,
+                        Crowding: 0.0,
+                        Kind: SurfaceKind.Unknown,
+                        NormContext: null));
+
+                    _lastDispatchedLocation[character.Id] = string.Empty;
                     continue;
+                }
 
                 // Only dispatch if location changed — or if caller forces a full refresh.
-                var previousLocation = _lastDispatchedLocation.GetValueOrDefault(character.Id);
                 if (!forceAll && previousLocation == locationId)
                     continue;
 

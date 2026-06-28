@@ -647,6 +647,10 @@ namespace GameEngineTools.World.Simulation
                 return;
             }
 
+            // The character is genuinely on the road now: unplace it so it is not counted at, nor
+            // perceived/social at, its origin while travelling. The scene's post-movement context
+            // refresh then announces the "on the road" surface; ProcessArrivals re-places it on arrival.
+            _locationService.RemoveCharacter(character.Id);
             _inTransit[character.Id] = new TransitState(target.LocationId, now + WTimeSpan.FromMinutes(minutes));
         }
 

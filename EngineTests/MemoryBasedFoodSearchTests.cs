@@ -294,8 +294,10 @@ namespace EngineTests
 
         /// <summary>
         /// With <see cref="SceneOrchestratorOptions.EnableTravelTime"/> on, a 1600 m trip at
-        /// 80 m/min takes 20 minutes: the character must NOT teleport on the routing tick — it
-        /// stays at home until the arrival time is reached, then is placed at the tavern.
+        /// 80 m/min takes 20 minutes: the character must NOT teleport on the routing tick. While
+        /// travelling it is genuinely unplaced (on the road — <c>GetLocation</c> is <c>null</c>,
+        /// so it is not at its origin for crowding/social purposes), then it is placed at the
+        /// tavern once the arrival time is reached.
         /// </summary>
         [TestMethod]
         public void RouteMoveTo_TravelTimeEnabled_ArrivesOnlyAfterTravelDuration()
@@ -318,17 +320,19 @@ namespace EngineTests
                 provider: new EmptyWorldObjectProvider(),
                 options: new SceneOrchestratorOptions { EnableTravelTime = true });
 
-            // Routing tick: trip starts, character is in transit (still at home).
+            // Routing tick: trip starts, character is on the road (unplaced), not at home.
             orchestrator.OnTick(Now, new[] { character });
-            Assert.AreEqual(HomeId, _locationService.GetLocation(character.Id),
-                "While travelling the character must remain at the origin, not teleport.");
+            Assert.IsNull(_locationService.GetLocation(character.Id),
+                "While travelling the character must be unplaced (on the road), not at its origin.");
             Assert.AreEqual(TavernId, orchestrator.GetTravelDestination(character.Id),
                 "The orchestrator must report the in-flight destination.");
 
-            // Halfway (10 min < 20 min): still travelling.
+            // Halfway (10 min < 20 min): still travelling, still unplaced.
             orchestrator.OnTick(Now + WTimeSpan.FromMinutes(10), new[] { character });
-            Assert.AreEqual(HomeId, _locationService.GetLocation(character.Id),
+            Assert.IsNull(_locationService.GetLocation(character.Id),
                 "Before the travel duration elapses the character has not arrived yet.");
+            Assert.AreEqual(TavernId, orchestrator.GetTravelDestination(character.Id),
+                "Still in transit halfway through the trip.");
 
             // Past arrival (25 min >= 20 min): placed at the destination.
             orchestrator.OnTick(Now + WTimeSpan.FromMinutes(25), new[] { character });

@@ -112,6 +112,17 @@ namespace GameEngineTools.World.Location
         void MoveCharacter(HumanId characterId, string locationId);
 
         /// <summary>
+        /// Removes a character's location assignment, leaving it unplaced (e.g. while travelling
+        /// between locations). <see cref="GetLocation"/> returns <c>null</c> afterwards and the
+        /// character is excluded from <see cref="GetCharactersAt"/> and crowding counts.
+        /// The next <see cref="DispatchContextEvents"/> emits a one-shot "left location"
+        /// <see cref="ContextChanged"/> (empty <c>Location</c>) so engines stop reading the old surface.
+        /// No-op if the character is not currently placed.
+        /// </summary>
+        /// <param name="characterId">The character to unplace.</param>
+        void RemoveCharacter(HumanId characterId);
+
+        /// <summary>
         /// Emits a <see cref="ContextChanged"/> event to every character
         /// whose current location has changed since the last dispatch,
         /// or to all characters if <paramref name="forceAll"/> is true.
