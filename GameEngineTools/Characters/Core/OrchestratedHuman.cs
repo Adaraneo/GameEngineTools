@@ -795,6 +795,19 @@ namespace GameEngineTools.Characters.Core
                         Id.Value.ToString(),
                         dc.DarkCore, dc.JustifyingBeliefs);
                 }
+
+                // SDT basic-need appraisal (Stage 4 Subsystem E) — Competence/Relatedness/Autonomy
+                // satisfaction & frustration plus the global balance. Characters created before this
+                // feature have a null NeedAppraisal; skip them.
+                if (s.NeedAppraisal is { } na)
+                {
+                    _log.NeedAppraisalSnapshot(
+                        Id.Value.ToString(),
+                        na.Competence.Satisfaction, na.Competence.Frustration,
+                        na.Relatedness.Satisfaction, na.Relatedness.Frustration,
+                        na.Autonomy.Satisfaction, na.Autonomy.Frustration,
+                        na.GlobalBalance);
+                }
             }
         }
 

@@ -268,6 +268,26 @@ namespace GameEngineTools.Logging
             string Duration,
             double Utility);
 
+        /// <summary>
+        /// Per-tick snapshot of the SDT basic-need appraisal layer (Stage 4 Subsystem E):
+        /// Satisfaction/Frustration for Competence, Relatedness and Autonomy, plus the
+        /// global satisfaction-minus-frustration balance averaged across all three channels.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 5210,
+            Level = LogLevel.Debug,
+            Message = "[BEHAV/NEEDAPPRAISAL] {personId} Competence S:{competenceSatisfaction:F2} F:{competenceFrustration:F2} Relatedness S:{relatednessSatisfaction:F2} F:{relatednessFrustration:F2} Autonomy S:{autonomySatisfaction:F2} F:{autonomyFrustration:F2} GlobalBalance:{globalBalance:F3}")]
+        public static partial void NeedAppraisalSnapshot(
+            this ILogger logger,
+            string personId,
+            double competenceSatisfaction,
+            double competenceFrustration,
+            double relatednessSatisfaction,
+            double relatednessFrustration,
+            double autonomySatisfaction,
+            double autonomyFrustration,
+            double globalBalance);
+
         #endregion Behavior — snapshoty
 
         #region SelfConcept & LifeStage — 5300 / 1600–1610
