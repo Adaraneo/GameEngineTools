@@ -47,16 +47,22 @@ namespace EngineTests
         /// </summary>
         private static readonly WDateTime FarFuture = new WDateTime(WTimeSpan.FromDays(2).Ticks);
 
-        /// <summary>Základní konfigurace — výchozí InertiaWeight=0.25, NoveltyPenalty=0.1.</summary>
-        private static readonly BehaviorConfig DefaultCfg = new BehaviorConfig();
+        /// <summary>
+        /// Základní konfigurace — výchozí InertiaWeight=0.25, NoveltyPenalty=0.1.
+        /// Temporal discounting je vypnuté: tyto testy ručně kalibrují přesné utility hodnoty
+        /// a izolují inertia/novelty mechaniku, kterou by delay-discounting jinak zašuměl.
+        /// </summary>
+        private static readonly BehaviorConfig DefaultCfg =
+            new BehaviorConfig() with { TemporalDiscountingEnabled = false };
 
         /// <summary>
         /// Konfigurace s vypnutou setrvačností — pro izolaci NoveltyPenalty.
         /// Bez InertiaWeight boost žádná akce nedostane výhodu jen proto,
         /// že ji postava dělala předtím — čistý test penalizace.
+        /// Temporal discounting je rovněž vypnuté (viz <see cref="DefaultCfg"/>).
         /// </summary>
         private static readonly BehaviorConfig NoInertiaCfg =
-            new BehaviorConfig() with { InertiaWeight = 0.0 };
+            new BehaviorConfig() with { InertiaWeight = 0.0, TemporalDiscountingEnabled = false };
 
         /// <summary>Sleep threshold=999 — Tick() nikdy nezablokuje v sleep-prompt čekání.</summary>
         private static readonly SleepConfig NoSleepCfg = new SleepConfig() with

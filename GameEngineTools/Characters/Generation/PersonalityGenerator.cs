@@ -448,7 +448,12 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // to apply the +0.06 male shift (Muris et al. 2017).
         var darkCore = DarkCoreGenerator.Generate(rng, bigFive, GameEngineTools.Characters.Core.SexBiology.Unknown);
 
-        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore);
+        // Temporal discounting: per-agent k sampled lognormally, independent of Big Five
+        // (Yeh, Myerson & Green 2021). Uses the default BehaviorConfig means — the generator has
+        // no bound config, mirroring how DarkCore uses fixed generation constants.
+        var temporalDiscount = TemporalDiscountGenerator.Generate(rng, new Engines.Behavior.BehaviorConfig());
+
+        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore, temporalDiscount);
     }
 
     private static (double O, double C, double E, double A, double N) GenerateBigFive(IRandomSource rng, PersonalitySpec spec)

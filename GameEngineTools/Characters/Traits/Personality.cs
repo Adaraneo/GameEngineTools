@@ -49,7 +49,16 @@ namespace GameEngineTools.Characters.Traits
         /// <see cref="DarkCoreProfile.DarkCore"/> scales antagonistic utility in the behavior engine
         /// and amplifies malicious envy in the social comparison engine.
         /// </summary>
-        DarkCoreProfile? DarkCore = null);
+        DarkCoreProfile? DarkCore = null,
+
+        /// <summary>
+        /// Per-character hyperboloid temporal-discounting profile (Green &amp; Myerson 2004).
+        /// <c>null</c> = character predates this feature; the behavior engine falls back to the
+        /// population mean <c>DiscountRateKMean</c> with no per-agent variance (backward-compatible).
+        /// When set, <see cref="TemporalDiscountProfile.K"/> drives the
+        /// <c>DiscountedValueModifier</c> in the behavior engine.
+        /// </summary>
+        TemporalDiscountProfile? TemporalDiscount = null);
 
 
 /// <summary>Big Five (OCEAN) personality dimensions, each in [0–1].</summary>

@@ -109,7 +109,54 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// per unit DarkCore axis [0..1]. At DarkCore=1.0 the penalty equals this value.
     /// Calibration anchor: D↔low empathy r≈−.31 to −.37 (Moshagen et al. 2020).
     /// </summary>
-    double DarkCoreProsocialPenaltyWeight = 8.0)
+    double DarkCoreProsocialPenaltyWeight = 8.0,
+
+    // ── Temporal discounting (Green & Myerson 2004 hyperboloid) ────────────────
+    // Source: Green & Myerson 2004, Psychological Bulletin 130(5):769–792.
+    // Hyperboloid V = A/(1+kD)^s is the default; quasi-hyperbolic (Laibson 1997) is an opt-in
+    // alternate mode for commitment-device scenarios. Applied AFTER loss aversion (value transform
+    // first, then discount — Loewenstein & Prelec 1992). See Modifiers.DiscountedValueModifier.
+
+    /// <summary>
+    /// Enables the <see cref="Modifiers.DiscountedValueModifier"/>. Default <c>true</c>; set to
+    /// <c>false</c> as a global kill switch (e.g. for tests that predate the modifier).
+    /// </summary>
+    bool TemporalDiscountingEnabled = true,
+
+    /// <summary>
+    /// Hyperboloid exponent s. Green &amp; Myerson (2004) report s reliably &lt; 1.0 (illustrative
+    /// average ≈ 0.7). Configurable — there is no single empirical consensus value. Default 0.7.
+    /// </summary>
+    double DiscountHyperboloidExponent = 0.7,
+
+    /// <summary>
+    /// Population mean of the per-agent per-day discount rate k. Individual k is drawn from a
+    /// lognormal distribution around this mean at character creation
+    /// (<see cref="Traits.TemporalDiscountProfile"/>). A designer-tunable default, not an empirical
+    /// constant — Frederick, Loewenstein &amp; O'Donoghue (2002) document order-of-magnitude variation.
+    /// Default 0.05.
+    /// </summary>
+    double DiscountRateKMean = 0.05,
+
+    /// <summary>
+    /// Lognormal SD (in log-space) of the per-agent k distribution. Default 0.6 — wide, reflecting
+    /// the documented heterogeneity (FLO 2002).
+    /// </summary>
+    double DiscountRateKLogSigma = 0.6,
+
+    /// <summary>
+    /// Present-bias β, applied only when <see cref="UseQuasiHyperbolicMode"/> is <c>true</c>.
+    /// β = 1.0 means no present bias (default). For the monetary domain use ≈0.94 (Cheung, Tymula &amp;
+    /// Wang 2025); for non-monetary/consumption ≈0.75. Default 1.0 — monetary present bias is contested.
+    /// </summary>
+    double PresentBiasBeta = 1.0,
+
+    /// <summary>
+    /// Switches <see cref="Modifiers.DiscountedValueModifier"/> from the default hyperboloid form to
+    /// Laibson's (1997) quasi-hyperbolic β-δ form. Use only for commitment-device / time-inconsistency
+    /// scenarios. Default <c>false</c>.
+    /// </summary>
+    bool UseQuasiHyperbolicMode = false)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
