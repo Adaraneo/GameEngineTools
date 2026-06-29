@@ -1108,7 +1108,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             s.AestheticAttraction, s.PhysicalAttraction,
                             s.CommunalStrength, s.ExchangeStrength, s.TransgressionResidue,
                             s.ResponsiveDesireLevel, s.PerceivedDominance, s.PerceivedPrestige,
-                            s.IsContemptuouslyDestroyed);
+                            s.IsContemptuouslyDestroyed,
+                            s.Commitment, s.InvestmentSize, s.AlternativeQuality, s.DissolutionConsidered);
                     }
                 }
             }

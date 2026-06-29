@@ -497,7 +497,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     updated.Comfort, updated.Respect, updated.Familiarity, updated.IntimateAffinity, updated.SexualInterest, updated.AestheticAttraction, updated.PhysicalAttraction,
                     updated.CommunalStrength, updated.ExchangeStrength, updated.TransgressionResidue,
                     updated.ResponsiveDesireLevel, updated.PerceivedDominance, updated.PerceivedPrestige,
-                    updated.IsContemptuouslyDestroyed);
+                    updated.IsContemptuouslyDestroyed,
+                    updated.Commitment, updated.InvestmentSize, updated.AlternativeQuality, updated.DissolutionConsidered);
             }
 
             CheckMilestones(self, e, updated);

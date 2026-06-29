@@ -1077,7 +1077,7 @@ namespace GameEngineTools.Logging
         [LoggerMessage(
             EventId = 2005,
             Level = LogLevel.Debug,
-            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}, Familiarity={Familiarity:F1}, IntimateAffinity={IntimateAffinity:F1}, SexualInterest={Sexual:F1}, AestheticAttraction={Aesthetic:F1}, PhysicalAttraction={Physical:F1}, Communal={Communal:F1}, Exchange={Exchange:F1}, Residue={Residue:F1}, Responsive={Responsive:F1}, Dominance={Dominance:F1}, Prestige={Prestige:F1}, Contempt={Contempt}")]
+            Message = "[REL/EDGE] {HumanId} Hrana {From}→{To}: Like={Like:F1}, Trust={Trust:F1}, Closeness={Closeness:F1}, Comfort={Comfort:F1}, Respect={Respect:F1}, Familiarity={Familiarity:F1}, IntimateAffinity={IntimateAffinity:F1}, SexualInterest={Sexual:F1}, AestheticAttraction={Aesthetic:F1}, PhysicalAttraction={Physical:F1}, Communal={Communal:F1}, Exchange={Exchange:F1}, Residue={Residue:F1}, Responsive={Responsive:F1}, Dominance={Dominance:F1}, Prestige={Prestige:F1}, Contempt={Contempt}, Commitment={Commitment:F1}, InvestmentSize={InvestmentSize:F1}, AlternativeQuality={AlternativeQuality:F1}, DissolutionConsidered={DissolutionConsidered}")]
         public static partial void RelEdgeUpdated(
             this ILogger logger,
             string HumanId,
@@ -1099,7 +1099,11 @@ namespace GameEngineTools.Logging
             double Responsive,
             double Dominance,
             double Prestige,
-            bool Contempt);
+            bool Contempt,
+            double Commitment,
+            double InvestmentSize,
+            double AlternativeQuality,
+            bool DissolutionConsidered);
 
         /// <summary>Relationship decay was applied across the character's edges.</summary>
         [LoggerMessage(
