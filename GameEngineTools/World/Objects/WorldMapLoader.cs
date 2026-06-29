@@ -24,7 +24,7 @@ namespace GameEngineTools.World.Objects
     ///   </item>
     ///   <item>
     ///     <c>Connections.csv</c> — one row per directed edge in the adjacency graph,
-    ///     defines FromId, ToId, and TravelMinutes.
+    ///     defines FromId, ToId, and DistanceMeters.
     ///   </item>
     /// </list>
     /// </para>
@@ -34,7 +34,7 @@ namespace GameEngineTools.World.Objects
     /// </para>
     /// <para>
     /// <b>Connections.csv column order:</b><br/>
-    /// <c>FromId;ToId;TravelMinutes</c>
+    /// <c>FromId;ToId;DistanceMeters</c>
     /// </para>
     /// </remarks>
     public static class WorldMapLoader
