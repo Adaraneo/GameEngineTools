@@ -453,7 +453,11 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // no bound config, mirroring how DarkCore uses fixed generation constants.
         var temporalDiscount = TemporalDiscountGenerator.Generate(rng, new Engines.Behavior.BehaviorConfig());
 
-        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore, temporalDiscount);
+        // Regulatory focus: Promotion/Prevention sampled from Big Five directions + wide residual
+        // (Lanaj, Chang & Johnson 2012). Two near-independent dimensions, no bipolar scale.
+        var regulatoryFocus = RegulatoryFocusGenerator.Generate(rng, bigFive);
+
+        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore, temporalDiscount, regulatoryFocus);
     }
 
     private static (double O, double C, double E, double A, double N) GenerateBigFive(IRandomSource rng, PersonalitySpec spec)

@@ -58,7 +58,16 @@ namespace GameEngineTools.Characters.Traits
         /// When set, <see cref="TemporalDiscountProfile.K"/> drives the
         /// <c>DiscountedValueModifier</c> in the behavior engine.
         /// </summary>
-        TemporalDiscountProfile? TemporalDiscount = null);
+        TemporalDiscountProfile? TemporalDiscount = null,
+
+        /// <summary>
+        /// Higgins (1997) regulatory-focus profile (Promotion / Prevention).
+        /// <c>null</c> = character predates this feature; both integration points are no-ops
+        /// (no λ modulation in loss aversion, no regulatory-fit bonus) — backward-compatible.
+        /// When set, <see cref="RegulatoryFocusProfile.Prevention"/> minus
+        /// <see cref="RegulatoryFocusProfile.Promotion"/> modulates effective loss-aversion λ.
+        /// </summary>
+        RegulatoryFocusProfile? RegulatoryFocus = null);
 
 
 /// <summary>Big Five (OCEAN) personality dimensions, each in [0–1].</summary>

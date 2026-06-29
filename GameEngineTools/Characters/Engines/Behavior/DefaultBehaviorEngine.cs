@@ -92,8 +92,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new InvestmentModelBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(_objectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>(), goalCfg?.Value.MaxFlatBiasPerGoal ?? 12.0, goalCfg?.Value.ShieldingCommitmentThreshold ?? 0.5, goalCfg?.Value.ShieldingMaxInhibition ?? 8.0, goalCfg?.Value.ShieldingStressDampening ?? 0.6), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value),
                 new Modifiers.ValuesBehaviorModifier(loggerFactory.CreateLogger<Modifiers.ValuesBehaviorModifier>()),
                 new Modifiers.DarkCoreModifier(loggerFactory.CreateLogger<Modifiers.DarkCoreModifier>()),
-                new Modifiers.LossAversionModifier(),
-                new Modifiers.DiscountedValueModifier() }; // sequentially AFTER loss aversion (value transform → discount)
+                new Modifiers.LossAversionModifier(),       // reads RegulatoryFocus internally for λ modulation
+                new Modifiers.DiscountedValueModifier(),     // sequentially AFTER loss aversion (value transform → discount)
+                new Modifiers.RegulatoryFitModifier() };     // optional, OFF by default — small eager/vigilant fit bonus
             _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine();
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());

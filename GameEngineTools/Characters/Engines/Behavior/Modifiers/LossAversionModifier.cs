@@ -17,7 +17,10 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     /// <remarks>
     /// λ is domain-contingent — risky/uncertain-outcome domains (e.g. social approach with rejection
     /// risk) use the lower <see cref="BehaviorConfig.LossAversionLambdaRiskyChoice"/>; everyday domains
-    /// use <see cref="BehaviorConfig.LossAversionLambda"/>. λ is modestly scaled by Neuroticism.
+    /// use <see cref="BehaviorConfig.LossAversionLambda"/>. λ is modestly scaled by Neuroticism and,
+    /// when the character carries a <see cref="Traits.RegulatoryFocusProfile"/>, by regulatory focus:
+    /// Prevention pushes λ up, Promotion pulls it down (Idson, Liberman &amp; Higgins 2000; Halamish et
+    /// al. 2008). A null RegulatoryFocus leaves λ at its Neuroticism-scaled value (backward compatible).
     /// Sources: Brown et al. (2024, <i>JEL</i> 62(2)); Walasek et al. (2024, <i>J. Econ. Psych.</i> 103);
     /// Kahneman &amp; Tversky (1979); Gal &amp; Rucker (2018).
     /// </remarks>
@@ -35,6 +38,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             var cfg = context.Config;
             var neuroticism = context.HumanContext.Personality.BigFive.Neuroticism;
 
+            // RegulatoryFocus λ modulation — trait-level, computed once. Prevention pushes λ up,
+            // Promotion pulls it down. null RegulatoryFocus = 1.0 (no-op, backward compatible).
+            var focusMultiplier = 1.0;
+            if (context.HumanContext.Personality.RegulatoryFocus is { } rf)
+                focusMultiplier = 1.0 + (rf.Prevention - rf.Promotion) * cfg.RegulatoryFocusLambdaModulation;
+
             for (var i = 0; i < candidates.Count; i++)
             {
                 var candidate = candidates[i];
@@ -44,7 +53,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 var lambdaBase = IsRiskyChoiceDomain(candidate.Domain)
                     ? cfg.LossAversionLambdaRiskyChoice
                     : cfg.LossAversionLambda;
-                var lambda = lambdaBase * (1.0 + (neuroticism - 0.5) * cfg.LossAversionNeuroticismScale);
+                var lambda = lambdaBase
+                    * (1.0 + (neuroticism - 0.5) * cfg.LossAversionNeuroticismScale)
+                    * focusMultiplier;
 
                 var adjusted = refUtility + lambda * delta; // delta < 0 → steeper loss
                 candidates[i] = candidate with { Utility = Math.Max(0.0, adjusted) };

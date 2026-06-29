@@ -156,7 +156,34 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// Laibson's (1997) quasi-hyperbolic β-δ form. Use only for commitment-device / time-inconsistency
     /// scenarios. Default <c>false</c>.
     /// </summary>
-    bool UseQuasiHyperbolicMode = false)
+    bool UseQuasiHyperbolicMode = false,
+
+    // ── Regulatory focus (Higgins 1997) ───────────────────────────────────────
+    // Promotion/Prevention (Traits.RegulatoryFocusProfile) modulate behavior in two ways:
+    // (1) effective loss-aversion λ inside LossAversionModifier (the primary, higher-confidence path),
+    // and (2) an optional, feature-flagged regulatory-fit bonus (Modifiers.RegulatoryFitModifier).
+
+    /// <summary>
+    /// Scales how strongly RegulatoryFocus modulates effective λ around the Brown, Imai, Vieider &amp;
+    /// Camerer (2024) baseline (1.96). Prevention pushes λ up, Promotion pulls it down:
+    /// <c>λ ×= 1 + (Prevention − Promotion) × this</c>. Default 0.3 — modest modulation, not a second
+    /// independent multiplier. Source: Idson, Liberman &amp; Higgins (2000); Halamish et al. (2008,
+    /// <i>J. Econ. Psych.</i>).
+    /// </summary>
+    double RegulatoryFocusLambdaModulation = 0.3,
+
+    /// <summary>
+    /// Enables the low-confidence regulatory-fit bonus (<see cref="Modifiers.RegulatoryFitModifier"/>).
+    /// Default <c>false</c> — disable until a post-2025 replication establishes the effect more firmly
+    /// (Janson, Siebert &amp; Dickhäuser 2022 found most predicted fit effects non-significant).
+    /// </summary>
+    bool RegulatoryFitEnabled = false,
+
+    /// <summary>
+    /// Magnitude of the eager/vigilant strategy-fit bonus, anchored to r≈.10 (Motyka et al. 2014).
+    /// Default 3.0 — small relative to the typical 0–100 utility scale.
+    /// </summary>
+    double RegulatoryFitBonusMagnitude = 3.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
