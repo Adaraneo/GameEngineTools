@@ -457,7 +457,11 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // (Lanaj, Chang & Johnson 2012). Two near-independent dimensions, no bipolar scale.
         var regulatoryFocus = RegulatoryFocusGenerator.Generate(rng, bigFive);
 
-        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore, temporalDiscount, regulatoryFocus);
+        // Wanting/Liking: incentive-salience sensitivity (weak Big Five bridge, Mitchell et al. 2007)
+        // + near-independent hedonic capacity (Berridge & Robinson 2016).
+        var wantingSensitivity = WantingSensitivityGenerator.Generate(rng, bigFive);
+
+        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore, temporalDiscount, regulatoryFocus, wantingSensitivity);
     }
 
     private static (double O, double C, double E, double A, double N) GenerateBigFive(IRandomSource rng, PersonalitySpec spec)

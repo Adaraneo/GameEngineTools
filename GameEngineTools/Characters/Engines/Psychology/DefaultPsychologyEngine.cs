@@ -1515,10 +1515,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
             {
                 // Pleasant environment — art, candles, flowers, nature sounds.
                 // Valence spike is immediate; MoodBaseline shift is small but persistent.
+                // Hedonic impact ("liking") is the consumption-time realisation of Subsystem C:
+                // scaled by the character's LikingCapacity (Berridge & Robinson 2016) — deliberately
+                // separate from the decision-time "wanting" gain. null profile → factor 1.0 (no-op).
                 AffordanceType.MoodBoost => s with
                 {
-                    Valence = Math.Clamp(s.Valence + oaa.Satisfaction * Config.AffordanceMoodBoostMaxValence, -1, 1),
-                    MoodBaseline = Math.Clamp(s.MoodBaseline + oaa.Satisfaction * Config.AffordanceMoodBoostMaxMoodBaseline, 0, 100)
+                    Valence = Math.Clamp(s.Valence + oaa.Satisfaction * Config.AffordanceMoodBoostMaxValence * LikingFactor(ctx), -1, 1),
+                    MoodBaseline = Math.Clamp(s.MoodBaseline + oaa.Satisfaction * Config.AffordanceMoodBoostMaxMoodBaseline * LikingFactor(ctx), 0, 100)
                 },
 
                 // Warmth relief — fireplace, hearth, forge.
@@ -1550,6 +1553,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 // Hunger, Thirst, Rest, Work, Entertainment — not psychology concerns at this layer.
                 _ => s
             };
+
+        /// <summary>
+        /// Hedonic-impact ("liking") multiplier on a consumed reward: <c>0.5 + 0.5 × LikingCapacity</c>
+        /// (Berridge &amp; Robinson 2016), mapping LikingCapacity [0..1] → factor [0.5..1.0]. A null
+        /// <see cref="Traits.WantingSensitivityProfile"/> returns 1.0 (unscaled, backward-compatible).
+        /// </summary>
+        private static double LikingFactor(IHumanContext ctx)
+            => ctx.Personality.WantingSensitivity is { } w ? 0.5 + 0.5 * w.LikingCapacity : 1.0;
 
         #endregion Object affordance application
     }

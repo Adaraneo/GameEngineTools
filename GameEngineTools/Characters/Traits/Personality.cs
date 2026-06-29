@@ -67,7 +67,15 @@ namespace GameEngineTools.Characters.Traits
         /// When set, <see cref="RegulatoryFocusProfile.Prevention"/> minus
         /// <see cref="RegulatoryFocusProfile.Promotion"/> modulates effective loss-aversion λ.
         /// </summary>
-        RegulatoryFocusProfile? RegulatoryFocus = null);
+        RegulatoryFocusProfile? RegulatoryFocus = null,
+
+        /// <summary>
+        /// Incentive-salience ("wanting") sensitivity and hedonic-impact ("liking") capacity
+        /// (Berridge &amp; Robinson 2016). <c>null</c> = character predates this feature; the
+        /// cue-gated wanting gain defaults to κ=1.0 (neutral) and liking leaves hedonic impact
+        /// unscaled — both no-ops (backward-compatible).
+        /// </summary>
+        WantingSensitivityProfile? WantingSensitivity = null);
 
 
 /// <summary>Big Five (OCEAN) personality dimensions, each in [0–1].</summary>

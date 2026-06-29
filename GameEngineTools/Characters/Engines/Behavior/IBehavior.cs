@@ -183,7 +183,26 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// Magnitude of the eager/vigilant strategy-fit bonus, anchored to r≈.10 (Motyka et al. 2014).
     /// Default 3.0 — small relative to the typical 0–100 utility scale.
     /// </summary>
-    double RegulatoryFitBonusMagnitude = 3.0)
+    double RegulatoryFitBonusMagnitude = 3.0,
+
+    // ── Incentive salience: wanting gain (Berridge & Robinson 2016) ────────────
+    // Cue-gated multiplicative salience gain κ on already-transformed utility (post loss aversion,
+    // post discounting). Liking (hedonic impact) is realised separately at consumption time and is
+    // deliberately NOT fed into κ. See Modifiers.WantingGainModifier.
+
+    /// <summary>
+    /// Enables <see cref="Modifiers.WantingGainModifier"/>. Default <c>false</c> — human translational
+    /// evidence for incentive salience is thinner than for loss aversion or discounting; ship disabled
+    /// until cue-gating logic and calibration are validated. Source: Berridge &amp; Robinson (2016);
+    /// Robinson &amp; Berridge (2025).
+    /// </summary>
+    bool WantingGainEnabled = false,
+
+    /// <summary>
+    /// Maximum κ boost (<c>κ = 1 + WantingSensitivity × this</c>) at WantingSensitivity = 1.0.
+    /// Designer-tunable — no consensus human quantitative value exists. Default 0.5.
+    /// </summary>
+    double WantingGainMaxBoost = 0.5)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }
