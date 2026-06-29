@@ -134,6 +134,7 @@ namespace GameEngineTools.Characters.Core
         private readonly IInterestEngine _interests;
         private readonly ISocialComparisonEngine? _socialComparison;
         private readonly IObjectInteractionEngine? _objectInteraction;
+        private readonly Engines.Behavior.NeedAppraisal.INeedAppraisalEngine? _needAppraisal;
 
         // Inbox of externally delivered events (processed at the start of the next tick — Phase A)
         private readonly ConcurrentQueue<IDomainEvent> _inbox = new();
@@ -223,7 +224,9 @@ namespace GameEngineTools.Characters.Core
             // optional object interaction engine
             IObjectInteractionEngine? objectInteraction = null,
             // optional social comparison engine (believability layer)
-            ISocialComparisonEngine? socialComparison = null)
+            ISocialComparisonEngine? socialComparison = null,
+            // optional SDT need-appraisal layer (read-only derivation over goals/relationships/focus)
+            Engines.Behavior.NeedAppraisal.INeedAppraisalEngine? needAppraisal = null)
         {
             Id = id;
             Identity = identity;
@@ -252,6 +255,7 @@ namespace GameEngineTools.Characters.Core
             _interests = interests;
             _socialComparison = socialComparison;
             _objectInteraction = objectInteraction;
+            _needAppraisal = needAppraisal;
 
             Snapshot = initialSnapshot;
             _behaviorCadencePolicy = behaviorCadencePolicy;
@@ -374,7 +378,12 @@ namespace GameEngineTools.Characters.Core
             _interests.Tick(now, dt, _ctx, outbox);
             _socialComparison?.Tick(now, dt, _ctx, outbox);
 
-            // Final snapshot after all Phase B engines complete.
+            // Refresh so the SDT need-appraisal layer reads THIS tick's goal/relationship state
+            // (it derives from the committed snapshot, not live engine fields).
+            RefreshSnapshot();
+            _needAppraisal?.Tick(now, dt, _ctx);
+
+            // Final snapshot after all Phase B engines complete (now including the need appraisal).
             RefreshSnapshot();
 
             // Phase C: self-deliver — character reacts to its own Phase B events
@@ -642,7 +651,8 @@ namespace GameEngineTools.Characters.Core
                 Values: _values.State,
                 SelfConcept: _selfConcept.State,
                 Interests: _interests.State,
-                SocialComparison: _socialComparison?.State);
+                SocialComparison: _socialComparison?.State,
+                NeedAppraisal: _needAppraisal?.State);
 
             _ctx.Snapshot = Snapshot;
         }

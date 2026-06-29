@@ -155,6 +155,7 @@ namespace GameEngineTools.Characters.Hosting
             var selfConcept = _sp.GetRequiredService<ISelfConceptEngine>();
             var interestEngine = _sp.GetRequiredService<IInterestEngine>();
             var socialComparison = _sp.GetRequiredService<ISocialComparisonEngine>();
+            var needAppraisal = _sp.GetRequiredService<Engines.Behavior.NeedAppraisal.INeedAppraisalEngine>();
 
             // Object interaction engine is optional — only wired when both the world object provider
             // and location service are registered in the DI container.
@@ -197,7 +198,8 @@ namespace GameEngineTools.Characters.Hosting
                 snapshot,
                 _behaviorCadencePolicy,
                 objectInteraction,
-                socialComparison);
+                socialComparison,
+                needAppraisal);
 
             goal.SeedFromPersonality(b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now);
 

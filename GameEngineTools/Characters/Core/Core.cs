@@ -452,5 +452,14 @@ namespace GameEngineTools.Characters.Core
         /// or when the engine is not wired (backward compatibility).
         /// Evolved by <see cref="GameEngineTools.Characters.Engines.Social.DefaultSocialComparisonEngine"/>.
         /// </summary>
-        GameEngineTools.Characters.Engines.Social.SocialComparisonState? SocialComparison = null);
+        GameEngineTools.Characters.Engines.Social.SocialComparisonState? SocialComparison = null,
+
+        /// <summary>
+        /// Derived SDT basic-need appraisal (Competence/Relatedness/Autonomy satisfaction &amp;
+        /// frustration), computed each tick from goals/relationships/regulatory-focus.
+        /// <c>null</c> for characters created before this field existed or when the appraisal engine
+        /// is not wired; the engine initialises it to <see cref="GameEngineTools.Characters.Engines.Behavior.NeedAppraisal.NeedAppraisalState.Empty"/>
+        /// on its first tick (backward compatibility).
+        /// </summary>
+        GameEngineTools.Characters.Engines.Behavior.NeedAppraisal.NeedAppraisalState? NeedAppraisal = null);
 }

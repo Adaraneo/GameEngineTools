@@ -72,6 +72,7 @@ namespace GameEngineTools.Characters.Hosting
             services.TryAddTransient<ISelfConceptEngine, DefaultSelfConceptEngine>();
             services.TryAddTransient<IInterestEngine, DefaultInterestEngine>();
             services.TryAddTransient<ISocialComparisonEngine, DefaultSocialComparisonEngine>();
+            services.TryAddTransient<Engines.Behavior.NeedAppraisal.INeedAppraisalEngine, Engines.Behavior.NeedAppraisal.DefaultNeedAppraisalEngine>();
 
             // Scene-level reputation aggregate (singleton — shared across all characters in a world).
             services.TryAddSingleton<CommunityReputationLedger>();
