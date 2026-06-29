@@ -638,7 +638,8 @@ namespace GameEngineTools.World.Simulation
                 return;
             }
 
-            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
+            var terrain = _locationService.GetDescriptor(target.LocationId)?.Terrain ?? TerrainType.Indoor;
+            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot, terrain);
             var minutes = TravelDurationComputer.ComputeMinutes(target.DistanceMeters, speed);
 
             if (minutes <= 0.0)
@@ -705,14 +706,16 @@ namespace GameEngineTools.World.Simulation
             if (currentLocationId is null)
                 return null;
 
-            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
-
             // Prefer adjacent locations of the requested type, ordered by travel time.
+            // Speed is computed per-candidate because each connection may lead into a
+            // different terrain, which affects travel duration.
             var adjacentTarget = _worldMap
                 .GetConnections(currentLocationId)
                 .Select(conn => (conn, descriptor: _worldMap.GetLocation(conn.TargetLocationId)))
                 .Where(t => t.descriptor?.Type == requestedType)
-                .OrderBy(t => TravelDurationComputer.ComputeMinutes(t.conn.DistanceMeters, speed))
+                .Select(t => (t.conn, speed: _speedProvider.GetSpeedMetersPerMinute(
+                    character.Snapshot, t.descriptor?.Terrain ?? TerrainType.Indoor)))
+                .OrderBy(t => TravelDurationComputer.ComputeMinutes(t.conn.DistanceMeters, t.speed))
                 .Select(t => (MoveTarget?)new MoveTarget(t.conn.TargetLocationId, t.conn.DistanceMeters))
                 .FirstOrDefault();
 
@@ -773,8 +776,6 @@ namespace GameEngineTools.World.Simulation
             if (currentLocationId is null)
                 return null;
 
-            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
-
             // Build the set of locations that have the required category, excluding the current one.
             var candidateLocations = _objectProvider
                 .GetAllObjects()
@@ -786,11 +787,15 @@ namespace GameEngineTools.World.Simulation
                 return null;
 
             // Prefer the nearest adjacent location that has the required objects.
+            // Speed is per-candidate because terrain (resolved per destination) affects duration.
             var adjacentMatch = _worldMap
                 .GetConnections(currentLocationId)
                 .Where(conn => candidateLocations.Contains(conn.TargetLocationId))
-                .OrderBy(conn => TravelDurationComputer.ComputeMinutes(conn.DistanceMeters, speed))
-                .Select(conn => (MoveTarget?)new MoveTarget(conn.TargetLocationId, conn.DistanceMeters))
+                .Select(conn => (conn, speed: _speedProvider.GetSpeedMetersPerMinute(
+                    character.Snapshot,
+                    _locationService.GetDescriptor(conn.TargetLocationId)?.Terrain ?? TerrainType.Indoor)))
+                .OrderBy(t => TravelDurationComputer.ComputeMinutes(t.conn.DistanceMeters, t.speed))
+                .Select(t => (MoveTarget?)new MoveTarget(t.conn.TargetLocationId, t.conn.DistanceMeters))
                 .FirstOrDefault();
 
             if (adjacentMatch is not null)
@@ -852,9 +857,8 @@ namespace GameEngineTools.World.Simulation
             if (rememberedLocations.Count == 0)
                 return null;
 
-            var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot);
-
             // Prefer an adjacent location the character remembers — nearest + highest confidence.
+            // Speed is per-candidate because terrain (resolved per destination) affects duration.
             var adjacentConnections = _worldMap.GetConnections(currentLocationId);
 
             var adjacentMatch = adjacentConnections
@@ -862,7 +866,11 @@ namespace GameEngineTools.World.Simulation
                 .Select(conn => (
                     conn.TargetLocationId,
                     conn.DistanceMeters,
-                    TravelMinutes: TravelDurationComputer.ComputeMinutes(conn.DistanceMeters, speed),
+                    TravelMinutes: TravelDurationComputer.ComputeMinutes(
+                        conn.DistanceMeters,
+                        _speedProvider.GetSpeedMetersPerMinute(
+                            character.Snapshot,
+                            _locationService.GetDescriptor(conn.TargetLocationId)?.Terrain ?? TerrainType.Indoor)),
                     BestConfidence: rememberedLocations.First(r => r.LocationId == conn.TargetLocationId).BestConfidence))
                 .OrderBy(x => x.TravelMinutes)
                 .ThenByDescending(x => x.BestConfidence)

@@ -520,10 +520,11 @@ namespace EngineTests
                 => AttractionResult.Neutral;
         }
 
-        /// <summary>Returns a constant speed regardless of snapshot state.</summary>
+        /// <summary>Returns a constant speed regardless of snapshot state or terrain.</summary>
         private sealed class ConstantSpeedProvider(double metersPerMinute) : IMovementSpeedProvider
         {
-            public double GetSpeedMetersPerMinute(EnginesSnapshot snapshot) => metersPerMinute;
+            public double GetSpeedMetersPerMinute(
+                EnginesSnapshot snapshot, TerrainType terrain = TerrainType.Indoor) => metersPerMinute;
         }
 
         /// <summary>Returns empty collections for all object queries.</summary>

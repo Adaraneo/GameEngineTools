@@ -1,4 +1,4 @@
-// SceneOrchestratorOptionsTests.cs
+// MovementTerrainRoutingTests.cs
 // Copyright (c) 50PSoftware
 
 namespace EngineTests
@@ -21,25 +21,26 @@ namespace EngineTests
     using GameEngineTools.World.Simulation;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging.Abstractions;
+    using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
     using System.Collections.Generic;
     using System.Linq;
 
     /// <summary>
-    /// Tests for <see cref="SceneOrchestratorOptions"/>: default-equivalence with the legacy
-    /// hard-coded literals, and verification that an option value actually drives orchestrator
-    /// behavior (plumbing).
+    /// Integration tests for terrain-aware movement routing in
+    /// <see cref="DefaultSceneOrchestrator.RouteMoveTo"/> / <c>FindBestMoveTarget</c>.
     /// </summary>
+    /// <remarks>
+    /// Demonstrates the per-candidate speed change from Task 2: when two destinations of the
+    /// requested type are reachable, the one with the shorter <em>travel time</em> must win,
+    /// even when it is farther in straight-line distance — because slow terrain (e.g. a bog)
+    /// inflates travel time on the nearer route.
+    /// </remarks>
     [TestClass]
-    public class SceneOrchestratorOptionsTests : TestBase
+    public class MovementTerrainRoutingTests
     {
-        #region Constants
-
         private static readonly WDateTime Now = new WDateTime(0);
-
-        /// <summary>Low-noise surface — does not block any perception fidelity tier.</summary>
-        private const double LowNoise = 0.10;
 
         private static readonly CharacterPerceptionOptions DefaultOptions = new()
         {
@@ -51,138 +52,109 @@ namespace EngineTests
             CoarseCrowdingThreshold = 0.70
         };
 
-        private static readonly LocationDescriptor TestRoom = new(
-            Id: "test_room",
-            DisplayName: "Test Room",
+        // Origin connects to two Social destinations:
+        //   • near_bog : 100 m away, Water terrain (×0.56) → speed 44.8 → ~2.23 min
+        //   • far_road : 130 m away, Indoor terrain (×1.00) → speed 80.0 → 1.625 min
+        // Terrain-blind routing would pick near_bog (shorter distance); terrain-aware
+        // routing must pick far_road (shorter time).
+        private const string Origin = "origin";
+        private const string NearBog = "near_bog";
+        private const string FarRoad = "far_road";
+
+        [TestMethod]
+        public void RouteMoveTo_TerrainAware_PrefersFartherButFasterRoute()
+        {
+            // Arrange — real terrain-aware speed provider.
+            var locationService = BuildLocationService();
+            var worldMap = BuildWorldMap();
+            var orchestrator = BuildOrchestrator(
+                locationService, worldMap,
+                new DefaultMovementSpeedProvider(Options.Create(new MovementConfig())));
+
+            var character = BuildMover();
+            locationService.MoveCharacter(character.Id, Origin);
+
+            // Act
+            orchestrator.OnTick(Now, new IHuman[] { character });
+
+            // Assert — slow bog terrain makes the nearer route slower; the faster road wins.
+            Assert.AreEqual(FarRoad, locationService.GetLocation(character.Id),
+                "Terrain-aware routing must choose the farther-but-faster road over the nearer bog.");
+        }
+
+        [TestMethod]
+        public void RouteMoveTo_TerrainBlind_PrefersNearerRoute_Control()
+        {
+            // Arrange — terrain-blind constant speed provider (control for the test above).
+            var locationService = BuildLocationService();
+            var worldMap = BuildWorldMap();
+            var orchestrator = BuildOrchestrator(
+                locationService, worldMap, new ConstantSpeedProvider(80.0));
+
+            var character = BuildMover();
+            locationService.MoveCharacter(character.Id, Origin);
+
+            // Act
+            orchestrator.OnTick(Now, new IHuman[] { character });
+
+            // Assert — without terrain, the nearer location wins on raw distance.
+            Assert.AreEqual(NearBog, locationService.GetLocation(character.Id),
+                "Terrain-blind routing must choose the nearer location by raw distance.");
+        }
+
+        #region Factory methods
+
+        private static DefaultLocationService BuildLocationService()
+        {
+            var svc = new DefaultLocationService();
+            svc.RegisterLocation(SocialLocation(Origin, TerrainType.Indoor));
+            svc.RegisterLocation(SocialLocation(NearBog, TerrainType.Water));
+            svc.RegisterLocation(SocialLocation(FarRoad, TerrainType.Indoor));
+            return svc;
+        }
+
+        private static WorldMap BuildWorldMap()
+        {
+            var map = new WorldMap(
+                new Dictionary<string, LocationDescriptor>(),
+                new Dictionary<string, IReadOnlyList<WorldConnection>>(),
+                new Dictionary<string, IReadOnlyList<string>>());
+
+            map.AddLocation(SocialLocation(Origin, TerrainType.Indoor));
+            map.AddLocation(SocialLocation(NearBog, TerrainType.Water));
+            map.AddLocation(SocialLocation(FarRoad, TerrainType.Indoor));
+
+            map.AddConnection(Origin, NearBog, 100.0);
+            map.AddConnection(Origin, FarRoad, 130.0);
+            return map;
+        }
+
+        private static LocationDescriptor SocialLocation(string id, TerrainType terrain) => new(
+            Id: id,
+            DisplayName: id,
             BaseNoise: 0.05,
             NoisePerPerson: 0.01,
             Capacity: 50,
             AllowsPrivacy: false,
-            Type: LocationType.Social);
+            Type: LocationType.Social,
+            Terrain: terrain);
 
-        #endregion Constants
-
-        #region Private fields
-
-        private DefaultLocationService _locationService = default!;
-
-        #endregion Private fields
-
-        #region Setup
-
-        protected override void TestInit()
-        {
-            base.TestInit();
-            _locationService = new DefaultLocationService();
-            _locationService.RegisterLocation(TestRoom);
-        }
-
-        #endregion Setup
-
-        // ══════════════════════════════════════════════════════════════════════
-        // 4a — default-equivalence (protects the "no behavior change" boundary)
-        // ══════════════════════════════════════════════════════════════════════
-
-        #region Default equivalence
-
-        [TestMethod]
-        public void Defaults_MatchLegacyLiterals_PreserveBehavior()
-        {
-            // Arrange
-            var options = new SceneOrchestratorOptions();
-
-            // Assert
-            Assert.AreEqual(0.25, options.ReachOutExplorationTemperature, 1e-9);
-            Assert.AreEqual(0.30, options.OrganicMicroPositiveChance, 1e-9);
-            Assert.AreEqual(0.15, options.MinMemoryConfidence, 1e-9);
-        }
-
-        #endregion Default equivalence
-
-        // ══════════════════════════════════════════════════════════════════════
-        // 4b — plumbing: OrganicMicroPositiveChance actually gates emission
-        // ══════════════════════════════════════════════════════════════════════
-
-        #region OrganicMicroPositiveChance plumbing
-
-        [TestMethod]
-        public void OrganicMicroPositives_ChanceZero_EmitsNoMicroPositive()
-        {
-            // Arrange — chance 0.0 must suppress every MicroPositive event.
-            var orchestrator = BuildOrchestrator(
-                new SceneOrchestratorOptions { OrganicMicroPositiveChance = 0.0 });
-            var creator = BuildCreator();
-            var witness = BuildWitness();
-            Place(creator, witness);
-
-            // Act
-            orchestrator.OnTick(Now, new IHuman[] { creator, witness });
-
-            // Assert
-            Assert.AreEqual(
-                0,
-                creator.ReceivedEvents.OfType<MicroPositive>().Count(),
-                "Chance 0.0 must emit no MicroPositive.");
-        }
-
-        [TestMethod]
-        public void OrganicMicroPositives_ChanceOne_EmitsMicroPositive()
-        {
-            // Arrange — chance 1.0 always emits when a witness is present.
-            var orchestrator = BuildOrchestrator(
-                new SceneOrchestratorOptions { OrganicMicroPositiveChance = 1.0 });
-            var creator = BuildCreator();
-            var witness = BuildWitness();
-            Place(creator, witness);
-
-            // Act
-            orchestrator.OnTick(Now, new IHuman[] { creator, witness });
-
-            // Assert
-            Assert.AreEqual(
-                1,
-                creator.ReceivedEvents.OfType<MicroPositive>().Count(),
-                "Chance 1.0 must emit exactly one MicroPositive for one perceived witness.");
-        }
-
-        #endregion OrganicMicroPositiveChance plumbing
-
-        // ══════════════════════════════════════════════════════════════════════
-        // Factory and stubs
-        // ══════════════════════════════════════════════════════════════════════
-
-        #region Factory methods
-
-        private DefaultSceneOrchestrator BuildOrchestrator(SceneOrchestratorOptions options)
+        private static DefaultSceneOrchestrator BuildOrchestrator(
+            ILocationService locationService, WorldMap worldMap, IMovementSpeedProvider speedProvider)
             => new DefaultSceneOrchestrator(
                 attractionCalculator: new NeutralAttractionCalculator(),
-                locationService: _locationService,
+                locationService: locationService,
                 perceptionPolicy: new AllFullPerceptionPolicy(),
                 perceptionOptions: DefaultOptions,
                 lodRuntime: new AllNearbyLodRuntime(),
-                worldMap: new WorldMap(
-                    new Dictionary<string, LocationDescriptor>(),
-                    new Dictionary<string, IReadOnlyList<WorldConnection>>(),
-                    new Dictionary<string, IReadOnlyList<string>>()),
-                speedProvider: new ConstantSpeedProvider(80.0),
+                worldMap: worldMap,
+                speedProvider: speedProvider,
                 rng: new Random(42),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
                 objectProvider: new EmptyWorldObjectProvider(),
-                options: options);
+                options: new SceneOrchestratorOptions());
 
-        /// <summary>Builds a character whose last outbox contains a witnessed <c>Create</c> action.</summary>
-        private static OrchestratorSpyHuman BuildCreator()
-        {
-            var human = BuildSpyHuman(LowNoise);
-            human.SetLastOutbox(new ActionCommitted(
-                Now, human.Id, ActionNames.Create, WTimeSpan.Zero));
-            return human;
-        }
-
-        /// <summary>Builds a plain co-located witness with an empty outbox.</summary>
-        private static OrchestratorSpyHuman BuildWitness() => BuildSpyHuman(LowNoise);
-
-        private static OrchestratorSpyHuman BuildSpyHuman(double noise)
+        private static MoverSpyHuman BuildMover()
         {
             var id = new HumanId(Guid.NewGuid());
             var personality = new Personality(
@@ -197,35 +169,29 @@ namespace EngineTests
                 new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
                 new PsychologyState(0.0, 0.5, 0.5, 10, 10, DiscreteEmotion.Neutral),
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
-                new InteractionSurface(TestRoom.Id, false, noise, 0.1, SurfaceKind.Social),
+                new InteractionSurface(Origin, false, 0.1, 0.1, SurfaceKind.Social),
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(new List<EpisodicMemory>()));
 
-            return new OrchestratorSpyHuman(id, personality, snapshot);
-        }
-
-        private void Place(params OrchestratorSpyHuman[] chars)
-        {
-            foreach (var c in chars)
-                _locationService.MoveCharacter(c.Id, TestRoom.Id);
+            var human = new MoverSpyHuman(id, personality, snapshot);
+            human.SetLastOutbox(new ActionCommitted(
+                Now, id, ActionNames.MoveToSocial, WTimeSpan.Zero));
+            return human;
         }
 
         #endregion Factory methods
 
-        #region OrchestratorSpyHuman
+        #region MoverSpyHuman
 
-        /// <summary>
-        /// Minimal <see cref="IHuman"/> that records received events and exposes a settable
-        /// <see cref="LastOutbox"/> so creative-action witnessing can be simulated.
-        /// </summary>
-        private sealed class OrchestratorSpyHuman : IHuman
+        /// <summary>Minimal <see cref="IHuman"/> with a settable outbox for MoveTo routing.</summary>
+        private sealed class MoverSpyHuman : IHuman
         {
             private readonly List<IDomainEvent> _receivedEvents = new();
             private IReadOnlyList<IDomainEvent> _lastOutbox = Array.Empty<IDomainEvent>();
             private EnginesSnapshot _snapshot;
             private readonly Personality _personality;
 
-            public OrchestratorSpyHuman(HumanId id, Personality personality, EnginesSnapshot snapshot)
+            public MoverSpyHuman(HumanId id, Personality personality, EnginesSnapshot snapshot)
             {
                 Id = id;
                 _personality = personality;
@@ -272,7 +238,6 @@ namespace EngineTests
 
             public IReadOnlyList<IDomainEvent> ReceivedEvents => _receivedEvents;
 
-            /// <summary>Sets the outbox the orchestrator reads to detect witnessed actions.</summary>
             public void SetLastOutbox(params IDomainEvent[] events) => _lastOutbox = events;
 
             public void ReceiveEvent(IDomainEvent @event) => _receivedEvents.Add(@event);
@@ -287,7 +252,7 @@ namespace EngineTests
             public int CompareTo(IHuman? other) => throw new NotImplementedException();
         }
 
-        #endregion OrchestratorSpyHuman
+        #endregion MoverSpyHuman
 
         #region Stubs
 
@@ -296,7 +261,6 @@ namespace EngineTests
             public PerceptionFidelityLevel GetLevel(HumanId id) => PerceptionFidelityLevel.Full;
         }
 
-        /// <summary>Returns <see cref="CognitiveResolutionLevel.Nearby"/> so social functions run.</summary>
         private sealed class AllNearbyLodRuntime : ICognitiveResolutionLevelRuntime
         {
             public void Clear(HumanId id) { }

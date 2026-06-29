@@ -256,6 +256,8 @@ namespace GameEngineTools
 
             services.AddObjectInteractionEngine();
 
+            services.AddOptions<MovementConfig>()
+                    .BindConfiguration("World:Movement");
             services.AddSingleton<DefaultMovementSpeedProvider>();
             services.AddSingleton<IMovementSpeedProvider>(sp => sp.GetRequiredService<DefaultMovementSpeedProvider>());
 

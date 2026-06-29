@@ -542,7 +542,8 @@ namespace EngineTests
 
         private sealed class ConstantSpeedProvider(double metersPerMinute) : IMovementSpeedProvider
         {
-            public double GetSpeedMetersPerMinute(EnginesSnapshot snapshot) => metersPerMinute;
+            public double GetSpeedMetersPerMinute(
+                EnginesSnapshot snapshot, TerrainType terrain = TerrainType.Indoor) => metersPerMinute;
         }
 
         private sealed class EmptyWorldObjectProvider : IWorldObjectProvider
