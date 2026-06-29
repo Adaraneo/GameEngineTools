@@ -461,7 +461,12 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
         // + near-independent hedonic capacity (Berridge & Robinson 2016).
         var wantingSensitivity = WantingSensitivityGenerator.Generate(rng, bigFive);
 
-        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore, temporalDiscount, regulatoryFocus, wantingSensitivity);
+        // FFFS: fast-escape sensitivity from the Neuroticism fear-facet (Corr & Cooper 2016). Generated
+        // with SexBiology.Unknown here (PersonalityGenerator carries no sex, like DarkCore) → no female
+        // shift at this call site; callers with known biology re-generate to apply the +0.10 female prior.
+        var fffs = FFFSGenerator.Generate(rng, bigFive, GameEngineTools.Characters.Core.SexBiology.Unknown);
+
+        return new Personality(bigFive, attach, comm, motivation, socio, chrono, dcm, tomCeiling, sco, darkCore, temporalDiscount, regulatoryFocus, wantingSensitivity, fffs);
     }
 
     private static (double O, double C, double E, double A, double N) GenerateBigFive(IRandomSource rng, PersonalitySpec spec)

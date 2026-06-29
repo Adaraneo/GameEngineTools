@@ -75,7 +75,15 @@ namespace GameEngineTools.Characters.Traits
         /// cue-gated wanting gain defaults to κ=1.0 (neutral) and liking leaves hedonic impact
         /// unscaled — both no-ops (backward-compatible).
         /// </summary>
-        WantingSensitivityProfile? WantingSensitivity = null);
+        WantingSensitivityProfile? WantingSensitivity = null,
+
+        /// <summary>
+        /// Fight-Flight-Freeze System (FFFS) trait sensitivity (Gray &amp; McNaughton 2000) — fast
+        /// escape/panic response to proximal threat. <c>null</c> = character predates this feature;
+        /// the escape modifier is a no-op (backward-compatible). When set,
+        /// <see cref="FFFSProfile.Sensitivity"/> scales escape urgency under a detected proximal hazard.
+        /// </summary>
+        FFFSProfile? FFFS = null);
 
 
 /// <summary>Big Five (OCEAN) personality dimensions, each in [0–1].</summary>

@@ -202,7 +202,25 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// Maximum κ boost (<c>κ = 1 + WantingSensitivity × this</c>) at WantingSensitivity = 1.0.
     /// Designer-tunable — no consensus human quantitative value exists. Default 0.5.
     /// </summary>
-    double WantingGainMaxBoost = 0.5)
+    double WantingGainMaxBoost = 0.5,
+
+    // ── FFFS fast escape (Gray & McNaughton 2000; McNaughton & Corr 2004) ──────
+    // Fast, proximity-triggered defensive escape — distinct from the slow deliberative avoidance
+    // (LossAversion λ + Prevention). Fires only on a present hazard object, NOT on chronic stress.
+    // See Modifiers.FFFSEscapeModifier. (BAS/BIS deliberately NOT implemented — redundancy audit.)
+
+    /// <summary>
+    /// Enables <see cref="Modifiers.FFFSEscapeModifier"/>. Default <c>false</c> until proximal-threat
+    /// signals are routinely present in the world model. Source: McNaughton &amp; Corr (2004).
+    /// </summary>
+    bool FFFSEnabled = false,
+
+    /// <summary>
+    /// Magnitude of the escape-urgency boost/suppression at full threat × full sensitivity
+    /// (<c>urgency = threat × Sensitivity × this</c>). Designer-tunable — no established human
+    /// quantitative parameter exists. Default 15.0.
+    /// </summary>
+    double FFFSEscapeMagnitude = 15.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }

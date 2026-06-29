@@ -95,7 +95,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 new Modifiers.LossAversionModifier(),       // reads RegulatoryFocus internally for λ modulation
                 new Modifiers.DiscountedValueModifier(),     // sequentially AFTER loss aversion (value transform → discount)
                 new Modifiers.WantingGainModifier(),         // cue-gated multiplicative κ on already-transformed utility (OFF by default)
-                new Modifiers.RegulatoryFitModifier() };     // optional, OFF by default — small eager/vigilant fit bonus
+                new Modifiers.RegulatoryFitModifier(),       // optional, OFF by default — small eager/vigilant fit bonus
+                new Modifiers.FFFSEscapeModifier() };        // fast proximal-threat escape, OFF by default; last so it dominates when it fires
             _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine();
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
