@@ -357,6 +357,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             _ => 0.0
                         };
 
+                        // Authority-Ranking relational context: interacting with a perceived superior
+                        // builds deference (Respect) and loyalty (Trust) — the AR relational dynamic,
+                        // orthogonal to the individual Dominance/Prestige routes to status (Cheng 2013).
+                        var authorityRanking = ctx.Snapshot.InteractionSurface.NormContext?.RelationalModel
+                            == Characters.Engines.Interactions.RelationalModel.AuthorityRanking;
+
                         Upsert(self, otherId, e =>
                         {
                             // Mere-exposure: incremental familiarity boost from repeated accepted contact.
@@ -369,6 +375,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 ? stabilization * 0.28
                                 : stabilization * 0.10;
                             var attractionPlasticity = ComputeAttractionPlasticity(e, positive: true, act: io.Act);
+
+                            // Deference/loyalty scale with how far above neutral the other is perceived.
+                            var superiority = authorityRanking
+                                ? Math.Max(0.0, Math.Max(e.PerceivedPrestige, e.PerceivedDominance) - 50.0) / 50.0
+                                : 0.0;
+                            var arDeference = superiority * Config.AuthorityRankingDeferenceRespect;
+                            var arLoyalty = superiority * Config.AuthorityRankingLoyaltyTrust;
 
                             // Attachment.Avoidance caps how close A can get to B.
                             // Dismissing characters (high Avoidance) resist deep closeness.
@@ -386,8 +399,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 Comfort = Bump(e.Comfort, +0.8 + stabilization * 0.45 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
                                 IntimateAffinity = Bump(e.IntimateAffinity, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
-                                Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation),
-                                Respect = respectDelta > 0 ? Bump(e.Respect, respectDelta) : e.Respect,
+                                Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation + arLoyalty),
+                                Respect = respectDelta + arDeference > 0 ? Bump(e.Respect, respectDelta + arDeference) : e.Respect,
                                 Familiarity = Bump(e.Familiarity, familiarityDelta),
                                 AestheticAttraction = Bump(e.AestheticAttraction, attractionPlasticity),
                                 PhysicalAttraction = Bump(e.PhysicalAttraction, attractionPlasticity * 0.65),

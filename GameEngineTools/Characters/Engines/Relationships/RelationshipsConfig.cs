@@ -261,7 +261,24 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// makes a stranger trusted on arrival, a bad one makes them suspect.
         /// Applied only when the impression carries a prior (null = no community signal known).
         /// </summary>
-        double ReputationTrustPriorWeight = 80.0)
+        double ReputationTrustPriorWeight = 80.0,
+
+        // ── Authority Ranking relational model (Fiske AR; Zakharin & Bates 2023) ──
+        /// <summary>
+        /// Extra Respect (deference) gained per accepted interaction with a perceived <i>superior</i>
+        /// when the interaction surface's <see cref="GameEngineTools.Characters.Engines.Interactions.RelationalModel"/>
+        /// is <see cref="GameEngineTools.Characters.Engines.Interactions.RelationalModel.AuthorityRanking"/>.
+        /// Scaled by how far above neutral (50) the superior is perceived. Default 1.5.
+        /// AR is a <b>relational type</b> (how the bond updates) — orthogonal to the individual
+        /// Dominance/Prestige routes to status (Cheng 2013). Source: Zakharin &amp; Bates 2023; Fiske 1992.
+        /// </summary>
+        double AuthorityRankingDeferenceRespect = 1.5,
+
+        /// <summary>
+        /// Extra Trust (loyalty) gained per accepted interaction with a perceived superior in an
+        /// Authority-Ranking context, scaled by perceived superiority. Default 1.0.
+        /// </summary>
+        double AuthorityRankingLoyaltyTrust = 1.0)
     {
         /// <summary>
         /// Parameterless constructor required by DI options binding.

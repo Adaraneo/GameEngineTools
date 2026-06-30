@@ -2061,6 +2061,77 @@ namespace EngineTests
             };
         }
 
+        private IHumanContext BuildCtxWithNorm(HumanId self, RelationalModel model)
+        {
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new InteractionSurface(null, false, 0.3, 0.3, SurfaceKind.Unknown,
+                    NormContext: new SocialNormContext(SocialNormKind.Greeting, 0.5, 0.5, model)),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = self,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        // ------------------------------------------------------------------
+        // Authority Ranking: deference + loyalty toward a perceived superior
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void AuthorityRanking_InteractionWithSuperior_BuildsExtraDeferenceAndLoyalty()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var superior = new HumanId(Guid.NewGuid());
+
+            // self perceives `superior` as high-prestige — i.e. a superior in the hierarchy.
+            RelationshipEdge Seed() => new RelationshipEdge(
+                self, superior, Like: 50, Trust: 50, Familiarity: 40,
+                AestheticAttraction: 50, PhysicalAttraction: 50, IntimateAffinity: 20, SexualInterest: 20,
+                Closeness: 50, Respect: 50, Comfort: 50,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                PerceivedPrestige: 90);
+
+            var smallTalk = new InteractionOutcome(_now, superior, self, Accepted: true, Reason: "test", Act: SpeechAct.SmallTalk);
+
+            // Baseline: no relational model on the surface.
+            var baseEngine = BuildEngine();
+            baseEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [superior] = Seed() }));
+            baseEngine.Handle(smallTalk, BuildCtx(self), _outbox);
+            var baseEdge = baseEngine.State.Edges[superior];
+
+            // Authority-Ranking context.
+            var arEngine = BuildEngine();
+            arEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [superior] = Seed() }));
+            arEngine.Handle(smallTalk, BuildCtxWithNorm(self, RelationalModel.AuthorityRanking), _outbox);
+            var arEdge = arEngine.State.Edges[superior];
+
+            Assert.IsTrue(arEdge.Respect > baseEdge.Respect,
+                $"AR deference builds extra Respect toward a superior. base={baseEdge.Respect:F2}, AR={arEdge.Respect:F2}");
+            Assert.IsTrue(arEdge.Trust > baseEdge.Trust,
+                $"AR loyalty builds extra Trust toward a superior. base={baseEdge.Trust:F2}, AR={arEdge.Trust:F2}");
+        }
+
         // ------------------------------------------------------------------
         // Test 1: PositiveAct → PerceivedPrestige roste
         // ------------------------------------------------------------------
