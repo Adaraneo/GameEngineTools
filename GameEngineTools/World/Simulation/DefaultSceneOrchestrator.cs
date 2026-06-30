@@ -136,7 +136,7 @@ namespace GameEngineTools.World.Simulation
         private readonly Dictionary<HumanId, TransitState> _inTransit = new();
 
         /// <summary>A pending arrival: where the traveller is headed and when they get there.</summary>
-        private readonly record struct TransitState(string Destination, WDateTime ArriveAt);
+        private readonly record struct TransitState(string Origin, string Destination, WDateTime DepartAt, WDateTime ArriveAt);
 
         /// <summary>A resolved move destination together with the distance to travel to it.</summary>
         private readonly record struct MoveTarget(string LocationId, double DistanceMeters);
@@ -651,9 +651,10 @@ namespace GameEngineTools.World.Simulation
             // The character is genuinely on the road now: unplace it so it is not counted at, nor
             // perceived/social at, its origin while travelling. The scene's post-movement context
             // refresh then announces the "on the road" surface; ProcessArrivals re-places it on arrival.
+            var origin = _locationService.GetLocation(character.Id) ?? string.Empty;
             _locationService.RemoveCharacter(character.Id);
             var arriveAt = now + WTimeSpan.FromMinutes(minutes);
-            _inTransit[character.Id] = new TransitState(target.LocationId, arriveAt);
+            _inTransit[character.Id] = new TransitState(origin, target.LocationId, now, arriveAt);
 
             using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
             {
@@ -689,6 +690,22 @@ namespace GameEngineTools.World.Simulation
         /// <returns>Destination location id, or <c>null</c> if the character is not travelling.</returns>
         public string? GetTravelDestination(HumanId characterId)
             => _inTransit.TryGetValue(characterId, out var t) ? t.Destination : null;
+
+        /// <summary>
+        /// The character's in-progress trip at <paramref name="now"/>: origin and destination location
+        /// ids plus fractional progress [0..1], or <c>null</c> when not travelling. Lets an observer
+        /// animate the character along the road in step with real travel time.
+        /// </summary>
+        public (string Origin, string Destination, double Progress)? GetTransit(HumanId characterId, WDateTime now)
+        {
+            if (!_inTransit.TryGetValue(characterId, out var t))
+                return null;
+
+            var total = (t.ArriveAt - t.DepartAt).Ticks;
+            var elapsed = (now - t.DepartAt).Ticks;
+            var progress = total <= 0 ? 1.0 : Math.Clamp((double)elapsed / total, 0.0, 1.0);
+            return (t.Origin, t.Destination, progress);
+        }
 
         /// <summary>
         /// Resolves the best move destination for a character requesting a given location type.
