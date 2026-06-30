@@ -122,6 +122,7 @@ namespace EngineTests
 
             var grave = objects.GetAllObjects().Single(o => o.Category == WorldObjectCategory.Grave);
             Assert.AreEqual(Cemetery.Id, grave.LocationId, "With a cemetery configured, the grave is dug there, not at the death site.");
+            Assert.AreEqual(Cemetery.Id, locations.GetLocation(mournerId), "The burier carries the body to the cemetery and ends up at the graveside.");
         }
 
         [TestMethod]

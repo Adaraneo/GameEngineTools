@@ -467,18 +467,27 @@ namespace GameEngineTools.World.Simulation
                     continue;
 
                 // The grave goes to the cemetery when one is configured, otherwise it is dug in place.
-                var graveLocation = ResolveGraveLocation(corpse.LocationId);
-                _mutableObjects.RemoveObject(corpse.LocationId, corpse.Id);
+                var funeralSite = corpse.LocationId;
+                var graveLocation = ResolveGraveLocation(funeralSite);
+                _mutableObjects.RemoveObject(funeralSite, corpse.Id);
                 _mutableObjects.AddObject(Objects.BurialObjects.Grave(deceasedId, graveLocation, corpse.DisplayName));
 
                 var attendees = chars
-                    .Where(c => _locationService.GetLocation(c.Id) == corpse.LocationId && IsMourner(c, deceasedId, out _))
+                    .Where(c => _locationService.GetLocation(c.Id) == funeralSite && IsMourner(c, deceasedId, out _))
                     .ToList();
 
                 foreach (var mourner in attendees)
                 {
                     mourner.ReceiveEvent(new Buried(now, mourner.Id, deceasedId));
                     mourner.ReceiveEvent(new FuneralHeld(now, mourner.Id, deceasedId, attendees.Count));
+                }
+
+                // The burier carries the body to its resting place — they end up at the graveside.
+                // (The carry is instantaneous; travel time for the cortège is not modelled.)
+                if (graveLocation != funeralSite)
+                {
+                    _locationService.MoveCharacter(burier.Id, graveLocation);
+                    _fullyMetLocations.Remove(graveLocation);
                 }
             }
 
