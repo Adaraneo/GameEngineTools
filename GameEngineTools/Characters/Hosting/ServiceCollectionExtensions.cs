@@ -77,10 +77,18 @@ namespace GameEngineTools.Characters.Hosting
             // Scene-level reputation aggregate (singleton — shared across all characters in a world).
             services.TryAddSingleton<CommunityReputationLedger>();
 
+            // Ascribed status prior (role/occupation/lineage) — consumers assign roles; the ledger blends it in.
+            services.TryAddSingleton(sp =>
+                new Engines.Status.DefaultAscribedStatusProvider(
+                    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Engines.Status.StatusConfig>>().Value));
+            services.TryAddSingleton<Engines.Status.IAscribedStatusProvider>(sp =>
+                sp.GetRequiredService<Engines.Status.DefaultAscribedStatusProvider>());
+
             // Scene-level social-status aggregate (singleton — emergent Dominance/Prestige consensus).
             services.TryAddSingleton(sp =>
                 new Engines.Status.StatusLedger(
-                    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Engines.Status.StatusConfig>>().Value));
+                    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Engines.Status.StatusConfig>>().Value,
+                    sp.GetService<Engines.Status.IAscribedStatusProvider>()));
 
             // Bereavement engine (believability layer — grief trajectories + DPM oscillation).
             services.TryAddTransient<Engines.Bereavement.IBereavementEngine, Engines.Bereavement.DefaultBereavementEngine>();

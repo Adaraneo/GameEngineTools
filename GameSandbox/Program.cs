@@ -377,6 +377,22 @@ Console.WriteLine("Press any key to continue...");
 var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>();
 var reputationLedger = runtime.Services.GetRequiredService<CommunityReputationLedger>();
 var statusLedger = runtime.Services.GetRequiredService<GameEngineTools.Characters.Engines.Status.StatusLedger>();
+
+// Ascribed status: give a few occupations a conferred-rank prior (radní/vedoucí/starší) that the
+// StatusLedger blends with the emergent consensus. Most occupations are commoners (no prior).
+var ascribedStatus = runtime.Services.GetRequiredService<GameEngineTools.Characters.Engines.Status.DefaultAscribedStatusProvider>();
+foreach (var ch in manager.Characters)
+{
+    var role = ch.Person.Snapshot.Schedule?.Occupation switch
+    {
+        "scholar" => GameEngineTools.Characters.Engines.Status.AscribedRole.Leader,
+        "merchant" or "guard" => GameEngineTools.Characters.Engines.Status.AscribedRole.Official,
+        "healer" => GameEngineTools.Characters.Engines.Status.AscribedRole.Elder,
+        _ => GameEngineTools.Characters.Engines.Status.AscribedRole.Commoner,
+    };
+    ascribedStatus.SetRole(ch.Person.Id, role);
+}
+
 var mutableObjectProvider = runtime.Services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>();
 var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger, statusLedger, mutableObjectProvider);
 //var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger);

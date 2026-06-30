@@ -79,11 +79,44 @@ namespace GameEngineTools.Characters.Engines.Status
         /// superiors — dominance drives compliance/avoidance, not voluntary approach). Default 0.010.
         /// Source: Cheng et al. 2013.
         /// </summary>
-        double DominanceAvoidanceWeight = 0.010)
+        double DominanceAvoidanceWeight = 0.010,
+
+        // ── Ascribed status (role / occupation / lineage prior) ────────────────
+        /// <summary>
+        /// How strongly an ascribed prior persists against the emergent consensus, in [0,1]: the blended
+        /// status is <c>consensus·(1−p) + prior·p</c>. A <b>society parameter, not a fixed law</b> — modern
+        /// mobility ≈ 0.4–0.47, traditional ≈ 0.75. Default 0.45. Source: Corak 2013; Clark 2014.
+        /// </summary>
+        double AscribedPersistence = 0.45,
+
+        /// <summary>Dominance prior for an <see cref="AscribedRole.Official"/> (vedoucí). Default 55.</summary>
+        double OfficialDominancePrior = 55.0,
+        /// <summary>Prestige prior for an <see cref="AscribedRole.Official"/>. Default 62.</summary>
+        double OfficialPrestigePrior = 62.0,
+        /// <summary>Dominance prior for an <see cref="AscribedRole.Leader"/> (radní). Default 62.</summary>
+        double LeaderDominancePrior = 62.0,
+        /// <summary>Prestige prior for an <see cref="AscribedRole.Leader"/>. Default 75.</summary>
+        double LeaderPrestigePrior = 75.0,
+        /// <summary>Dominance prior for an <see cref="AscribedRole.Elder"/> (low coercion). Default 52.</summary>
+        double ElderDominancePrior = 52.0,
+        /// <summary>Prestige prior for an <see cref="AscribedRole.Elder"/> (high respect). Default 72.</summary>
+        double ElderPrestigePrior = 72.0)
     {
         /// <summary>Parameterless constructor required by DI options binding — all fields use defaults.</summary>
         public StatusConfig() : this(MinObserverFamiliarity: 5.0)
         {
         }
+
+        /// <summary>
+        /// The ascribed <see cref="SocietalStatus"/> prior for a role, or <c>null</c> for
+        /// <see cref="AscribedRole.Commoner"/> (no ascribed advantage).
+        /// </summary>
+        public SocietalStatus? PriorForRole(AscribedRole role) => role switch
+        {
+            AscribedRole.Official => new SocietalStatus(OfficialDominancePrior, OfficialPrestigePrior),
+            AscribedRole.Leader => new SocietalStatus(LeaderDominancePrior, LeaderPrestigePrior),
+            AscribedRole.Elder => new SocietalStatus(ElderDominancePrior, ElderPrestigePrior),
+            _ => null
+        };
     }
 }

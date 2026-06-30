@@ -30,6 +30,7 @@ namespace GameEngineTools.Characters.Engines.Status
     public sealed class StatusLedger
     {
         private readonly StatusConfig _config;
+        private readonly IAscribedStatusProvider? _ascribed;
 
         private readonly Dictionary<HumanId, SocietalStatus> _status = new();
         private readonly Dictionary<HumanId, double> _prevSalience = new();
@@ -40,7 +41,16 @@ namespace GameEngineTools.Characters.Engines.Status
         private double _stability = 1.0;
 
         /// <summary>Creates a ledger with the given tuning configuration (defaults when omitted).</summary>
-        public StatusLedger(StatusConfig? config = null) => _config = config ?? new StatusConfig();
+        /// <param name="config">Tuning configuration.</param>
+        /// <param name="ascribed">
+        /// Optional ascribed-status provider. When supplied, <see cref="Get"/> blends each agent's role/
+        /// occupation/lineage prior into the emergent consensus by <see cref="StatusConfig.AscribedPersistence"/>.
+        /// </param>
+        public StatusLedger(StatusConfig? config = null, IAscribedStatusProvider? ascribed = null)
+        {
+            _config = config ?? new StatusConfig();
+            _ascribed = ascribed;
+        }
 
         /// <summary>Tuning configuration in effect for this ledger.</summary>
         public StatusConfig Config => _config;
@@ -108,14 +118,25 @@ namespace GameEngineTools.Characters.Engines.Status
         }
 
         /// <summary>
-        /// The emergent status of <paramref name="target"/>, or <see cref="SocietalStatus.Neutral"/>
-        /// when nobody sufficiently acquainted has yet formed a perception of them.
+        /// The status of <paramref name="target"/>: the emergent consensus, blended with their ascribed
+        /// prior (role/occupation/lineage) when one exists. Returns <see cref="SocietalStatus.Neutral"/>
+        /// when there is neither a consensus nor an ascribed prior.
         /// </summary>
         public SocietalStatus Get(HumanId target)
-            => _status.TryGetValue(target, out var s) ? s : SocietalStatus.Neutral;
+        {
+            var consensus = _status.TryGetValue(target, out var s) ? s : SocietalStatus.Neutral;
 
-        /// <summary>Whether <paramref name="target"/> currently has a computed (non-default) status.</summary>
-        public bool Has(HumanId target) => _status.ContainsKey(target);
+            if (_ascribed?.GetPrior(target) is { } prior)
+                return StatusMath.BlendAscribed(consensus, prior, _config.AscribedPersistence);
+
+            return consensus;
+        }
+
+        /// <summary>
+        /// Whether <paramref name="target"/> currently has a non-default status — an emergent consensus
+        /// or an ascribed prior.
+        /// </summary>
+        public bool Has(HumanId target) => _status.ContainsKey(target) || _ascribed?.GetPrior(target) is not null;
 
         /// <summary>The smoothed local hierarchy stability in [0,1] (1 = perfectly stable).</summary>
         public double HierarchyStability() => _stability;

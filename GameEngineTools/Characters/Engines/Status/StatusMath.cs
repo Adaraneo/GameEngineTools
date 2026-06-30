@@ -94,6 +94,19 @@ namespace GameEngineTools.Characters.Engines.Status
         }
 
         /// <summary>
+        /// Blends an ascribed <paramref name="prior"/> into the emergent <paramref name="consensus"/> by the
+        /// ascribed-persistence weight: <c>consensus·(1−p) + prior·p</c> per axis. High persistence keeps a
+        /// character near their ascribed start; the rest stays driven by the live consensus (never frozen).
+        /// </summary>
+        internal static SocietalStatus BlendAscribed(SocietalStatus consensus, SocietalStatus prior, double persistence)
+        {
+            persistence = Math.Clamp(persistence, 0.0, 1.0);
+            return new SocietalStatus(
+                consensus.DominanceStatus * (1.0 - persistence) + prior.DominanceStatus * persistence,
+                consensus.PrestigeStatus * (1.0 - persistence) + prior.PrestigeStatus * persistence);
+        }
+
+        /// <summary>
         /// Deference bias added to a reach-out candidate's attractiveness given the actor's own status
         /// and the candidate's status: approach is drawn <i>up</i> the prestige ladder (admiration) but
         /// pushed <i>away</i> from coercive dominance (avoidance). Positive = more likely to approach.

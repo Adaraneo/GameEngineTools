@@ -198,6 +198,89 @@ namespace EngineTests
 
         #endregion
 
+        #region Ascribed status (role / occupation prior)
+
+        [TestMethod]
+        public void Math_BlendAscribed_WeightsPriorByPersistence()
+        {
+            var consensus = new SocietalStatus(20, 20);
+            var prior = new SocietalStatus(80, 80);
+
+            var half = StatusMath.BlendAscribed(consensus, prior, 0.5);
+            Assert.AreEqual(50.0, half.PrestigeStatus, 1e-6, "Half persistence is the midpoint.");
+
+            var traditional = StatusMath.BlendAscribed(consensus, prior, 0.75);
+            Assert.IsTrue(traditional.PrestigeStatus > half.PrestigeStatus, "Higher persistence weights the ascribed prior more.");
+        }
+
+        [TestMethod]
+        public void Ascribed_Prior_ShiftsStart_ForUnobservedLeader()
+        {
+            var ascribed = new DefaultAscribedStatusProvider(Cfg);
+            var leader = NewId();
+            ascribed.SetRole(leader, AscribedRole.Leader);
+
+            var ledger = new StatusLedger(Cfg, ascribed);
+            ledger.Fold(Array.Empty<(HumanId, IReadOnlyDictionary<HumanId, RelationshipEdge>)>());
+
+            Assert.IsTrue(ledger.Has(leader), "An ascribed role gives a status even with no observers yet.");
+            Assert.IsTrue(ledger.Get(leader).PrestigeStatus > 50.0, "An unobserved leader starts above neutral prestige.");
+        }
+
+        [TestMethod]
+        public void Ascribed_StatusStaysDynamic_ConsensusDragsUnpopularLeaderDown()
+        {
+            var ascribed = new DefaultAscribedStatusProvider(Cfg);
+            var leader = NewId();
+            ascribed.SetRole(leader, AscribedRole.Leader);
+
+            var ledger = new StatusLedger(Cfg, ascribed);
+            var a = NewId();
+            var b = NewId();
+
+            // Everyone perceives the "leader" as low-prestige despite the ascribed office.
+            ledger.Fold(new[]
+            {
+                (a, Edges((leader, Edge(a, leader, dom: 50, pres: 10, familiarity: 60)))),
+                (b, Edges((leader, Edge(b, leader, dom: 50, pres: 10, familiarity: 60)))),
+            });
+
+            var blended = ledger.Get(leader);
+            Assert.IsTrue(blended.PrestigeStatus < Cfg.LeaderPrestigePrior - 10.0,
+                "Consensus drags an unpopular leader well below their ascribed prestige — no frozen caste.");
+            Assert.IsTrue(blended.PrestigeStatus > 10.0,
+                "But the ascribed prior still keeps them above the raw consensus.");
+        }
+
+        [TestMethod]
+        public void Ascribed_Commoner_CarriesNoPrior()
+        {
+            var ascribed = new DefaultAscribedStatusProvider(Cfg);
+            var id = NewId();
+            ascribed.SetRole(id, AscribedRole.Commoner);
+            Assert.IsNull(ascribed.GetPrior(id), "Commoner confers no ascribed advantage.");
+        }
+
+        #endregion
+
+        #region Gossip / observation co-evolution
+
+        [TestMethod]
+        public void Gossip_WitnessedPrestige_RaisesEmergentStatus()
+        {
+            // The relationships engine raises PerceivedPrestige on observers' edges after a witnessed
+            // positive act; the ledger folds those edges, so status co-evolves with gossip.
+            var ledger = new StatusLedger(Cfg);
+            var target = NewId();
+            var a = NewId();
+
+            ledger.Fold(new[] { (a, Edges((target, Edge(a, target, dom: 50, pres: 85, familiarity: 60)))) });
+
+            Assert.IsTrue(ledger.Get(target).PrestigeStatus > 70.0, "Witnessed prestige propagates into emergent status.");
+        }
+
+        #endregion
+
         #region Helpers
 
         private static HumanId NewId() => new(Guid.NewGuid());
