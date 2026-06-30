@@ -133,6 +133,7 @@ namespace GameEngineTools.Characters.Core
         private readonly ISelfConceptEngine _selfConcept;
         private readonly IInterestEngine _interests;
         private readonly ISocialComparisonEngine? _socialComparison;
+        private readonly Engines.Bereavement.IBereavementEngine? _bereavement;
         private readonly IObjectInteractionEngine? _objectInteraction;
         private readonly Engines.Behavior.NeedAppraisal.INeedAppraisalEngine? _needAppraisal;
 
@@ -226,7 +227,9 @@ namespace GameEngineTools.Characters.Core
             // optional social comparison engine (believability layer)
             ISocialComparisonEngine? socialComparison = null,
             // optional SDT need-appraisal layer (read-only derivation over goals/relationships/focus)
-            Engines.Behavior.NeedAppraisal.INeedAppraisalEngine? needAppraisal = null)
+            Engines.Behavior.NeedAppraisal.INeedAppraisalEngine? needAppraisal = null,
+            // optional bereavement engine (believability layer — grief trajectories, DPM oscillation)
+            Engines.Bereavement.IBereavementEngine? bereavement = null)
         {
             Id = id;
             Identity = identity;
@@ -256,6 +259,7 @@ namespace GameEngineTools.Characters.Core
             _socialComparison = socialComparison;
             _objectInteraction = objectInteraction;
             _needAppraisal = needAppraisal;
+            _bereavement = bereavement;
 
             Snapshot = initialSnapshot;
             _behaviorCadencePolicy = behaviorCadencePolicy;
@@ -377,6 +381,7 @@ namespace GameEngineTools.Characters.Core
             _selfConcept.Tick(now, dt, _ctx, outbox);
             _interests.Tick(now, dt, _ctx, outbox);
             _socialComparison?.Tick(now, dt, _ctx, outbox);
+            _bereavement?.Tick(now, dt, _ctx, outbox);
 
             // Refresh so the SDT need-appraisal layer reads THIS tick's goal/relationship state
             // (it derives from the committed snapshot, not live engine fields).
@@ -425,6 +430,8 @@ namespace GameEngineTools.Characters.Core
                 _interests.RestoreState(snapshot.Interests);
             if (snapshot.SocialComparison is not null)
                 _socialComparison?.RestoreState(snapshot.SocialComparison);
+            if (snapshot.Bereavement is not null)
+                _bereavement?.RestoreState(snapshot.Bereavement);
         }
 
         /// <inheritdoc/>
@@ -538,6 +545,7 @@ namespace GameEngineTools.Characters.Core
             try { _selfConcept.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SelfConcept.Handle failed.", Id.Value); }
             try { _interests.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Interests.Handle failed.", Id.Value); }
             try { _socialComparison?.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SocialComparison.Handle failed.", Id.Value); }
+            try { _bereavement?.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Bereavement.Handle failed.", Id.Value); }
 
             // Acquire action slots when this character commits an action.
             // AcquireOrReplace: if the channel is already occupied, the new action wins —
@@ -652,7 +660,10 @@ namespace GameEngineTools.Characters.Core
                 SelfConcept: _selfConcept.State,
                 Interests: _interests.State,
                 SocialComparison: _socialComparison?.State,
-                NeedAppraisal: _needAppraisal?.State);
+                NeedAppraisal: _needAppraisal?.State,
+                SocietalStatus: prev.SocietalStatus,
+                HierarchyStability: prev.HierarchyStability,
+                Bereavement: _bereavement?.State);
 
             _ctx.Snapshot = Snapshot;
         }
@@ -664,6 +675,17 @@ namespace GameEngineTools.Characters.Core
             {
                 AmbientTemperature = ambientTempC,
                 Celestial = celestial,
+            };
+            _ctx.Snapshot = Snapshot;
+        }
+
+        /// <inheritdoc/>
+        public void SetSocietalStatus(Engines.Status.SocietalStatus status, double hierarchyStability)
+        {
+            Snapshot = Snapshot with
+            {
+                SocietalStatus = status,
+                HierarchyStability = hierarchyStability,
             };
             _ctx.Snapshot = Snapshot;
         }

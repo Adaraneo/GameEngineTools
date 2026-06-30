@@ -44,6 +44,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private double _postpartumAccHours;
         private bool _mensesOn;
         private readonly WDateOnly _birthDate;
+        private readonly SexBiology _biology;
+        private readonly Bereavement.BereavementConfig _bereavementCfg;
 
         /// <summary>
         /// Optional world object provider for resolving nutritional profiles
@@ -72,11 +74,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
             SexBiology biology,
             WDateOnly birthDate,
             WDateOnly now,
-            IWorldObjectProvider? objectProvider = null)
+            IWorldObjectProvider? objectProvider = null,
+            IOptions<Bereavement.BereavementConfig>? bereavementCfg = null)
         {
             Config = cfg.Value;
             _cycleCfg = cycleCfg.Value;
             _birthDate = birthDate;
+            _biology = biology;
+            _bereavementCfg = bereavementCfg?.Value ?? new Bereavement.BereavementConfig();
 
             _log = loggerFactory.CreateLogger<DefaultPhysiologyEngine>();
             _rng = rng;
@@ -626,6 +631,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 if (ageYears >= Config.NaturalMortalityGompertzStart || HasCriticalState(s))
                 {
                     var risk = NaturalMortalityCalculator.ComputeHourlyRisk(s, ageYears, Config);
+
+                    // Widowhood effect: a recently-bereaved surviving partner carries an elevated
+                    // mortality hazard (acute cardiovascular stress), strongest in the first ~6 months
+                    // and worse for men. Moon 2011; Shor 2012; Parkes 1969.
+                    risk *= WidowhoodHazardMultiplier(ctx, now);
+
                     // P(death in dt hours) = 1 − (1 − risk_per_hour)^dt
                     var tickRisk = 1.0 - Math.Pow(1.0 - risk, h);
                     if (ctx.Random.Chance(tickRisk))
@@ -664,6 +675,17 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             return _objectProvider.FindObject(interaction.ObjectId)?.NutritionalProfile;
         }
+
+        /// <summary>
+        /// The widowhood mortality-hazard multiplier (≥1) for this character, derived from any active
+        /// partner-loss in the bereavement snapshot: <see cref="Bereavement.BereavementConfig.WidowhoodHazardFirst"/>
+        /// during the acute window, tapering to <see cref="Bereavement.BereavementConfig.WidowhoodHazardTail"/>,
+        /// then 1.0. Male survivors are scaled by <see cref="Bereavement.BereavementConfig.WidowhoodMaleFactor"/>.
+        /// Returns 1.0 when the character has no partner loss (no effect, preserves legacy behaviour).
+        /// </summary>
+        private double WidowhoodHazardMultiplier(IHumanContext ctx, WDateTime now)
+            => Bereavement.BereavementMath.WidowhoodHazardMultiplier(
+                ctx.Snapshot.Bereavement, _biology, now, _bereavementCfg);
 
         private bool HasCriticalState(PhysiologyState s) =>
             s.Hunger >= Config.NaturalMortalityStarvationThreshold

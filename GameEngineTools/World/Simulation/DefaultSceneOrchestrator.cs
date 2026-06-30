@@ -9,11 +9,14 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Attraction;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Bereavement;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Reputation;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Engines.Status;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
@@ -127,6 +130,31 @@ namespace GameEngineTools.World.Simulation
         private readonly CommunityReputationLedger? _reputationLedger;
 
         /// <summary>
+        /// Optional scene-level social-status aggregate. When non-null, the orchestrator folds the
+        /// per-observer <c>PerceivedDominance</c>/<c>PerceivedPrestige</c> edges into an emergent
+        /// per-agent <see cref="GameEngineTools.Characters.Engines.Status.SocietalStatus"/> each tick,
+        /// pushes it into every character (status×stability stress in Psychology), and biases reach-out
+        /// target selection by deference. <c>null</c> disables the social-hierarchy subsystem.
+        /// </summary>
+        private readonly Characters.Engines.Status.StatusLedger? _statusLedger;
+
+        /// <summary>Deaths already routed to mourners — prevents re-delivering bereavement every tick.</summary>
+        private readonly HashSet<HumanId> _bereavementRouted = new();
+
+        /// <summary>
+        /// Optional mutable world-object provider used for physical burial: a corpse is spawned at the
+        /// place of death and converted into a grave once interred. <c>null</c> disables physical burial
+        /// (the abstract funeral mechanic still runs).
+        /// </summary>
+        private readonly Objects.IMutableWorldObjectProvider? _mutableObjects;
+
+        /// <summary>Deaths whose corpse has already been spawned — avoids duplicate corpses.</summary>
+        private readonly HashSet<HumanId> _corpseSpawned = new();
+
+        /// <summary>(mourner, deceased) pairs whose grave visit has already fired — fires once per pair.</summary>
+        private readonly HashSet<(HumanId Mourner, HumanId Deceased)> _graveVisited = new();
+
+        /// <summary>
         /// Characters currently travelling between locations, keyed by id. Populated only when
         /// <see cref="SceneOrchestratorOptions.EnableTravelTime"/> is enabled: a <c>MoveTo:*</c>
         /// records the destination and arrival time here instead of relocating instantly, and the
@@ -180,7 +208,9 @@ namespace GameEngineTools.World.Simulation
             ILogger<DefaultSceneOrchestrator> log,
             IWorldObjectProvider objectProvider,
             SceneOrchestratorOptions options,
-            CommunityReputationLedger? reputationLedger = null)
+            CommunityReputationLedger? reputationLedger = null,
+            Characters.Engines.Status.StatusLedger? statusLedger = null,
+            Objects.IMutableWorldObjectProvider? mutableObjects = null)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -194,6 +224,8 @@ namespace GameEngineTools.World.Simulation
             _objectProvider = objectProvider;
             _options = options;
             _reputationLedger = reputationLedger;
+            _statusLedger = statusLedger;
+            _mutableObjects = mutableObjects;
         }
 
         #endregion Constructor
@@ -238,6 +270,18 @@ namespace GameEngineTools.World.Simulation
             // Fold acts witnessed last tick into the scene ledger BEFORE first impressions,
             // so a newcomer met this tick already inherits the up-to-date local reputation.
             FoldReputationObservations(chars);
+
+            // ── Social status ─────────────────────────────────────────────────────
+            // Recompute the emergent Dominance/Prestige consensus and push it into every character
+            // so this tick's Psychology reads an up-to-date status×stability stress signal.
+            FoldAndPushStatus(chars);
+
+            // ── Bereavement ───────────────────────────────────────────────────────
+            // Route this/last tick's deaths to bonded survivors as grief onsets (+ abstract funerals).
+            RouteBereavement(now, chars);
+
+            // Physical burial: inter corpses with a co-located mourner and fire graveside visits.
+            RouteBurial(now, chars);
 
             // ── Social functions ──────────────────────────────────────────────────
             FireFirstImpressions(now, chars);
@@ -296,6 +340,192 @@ namespace GameEngineTools.World.Simulation
         }
 
         #endregion Community reputation
+
+        #region Social status
+
+        /// <summary>
+        /// Folds the current relationship graph into the <see cref="StatusLedger"/> and injects each
+        /// character's emergent status + the local hierarchy stability back into them via
+        /// <see cref="IHuman.SetSocietalStatus"/>. No-op when no ledger is configured.
+        /// </summary>
+        private void FoldAndPushStatus(IReadOnlyList<IHuman> chars)
+        {
+            if (_statusLedger is null)
+                return;
+
+            _statusLedger.Fold(chars.Select(c => (c.Id, c.Snapshot.Relationships.Edges)));
+
+            var stability = _statusLedger.HierarchyStability();
+            foreach (var c in chars)
+                c.SetSocietalStatus(_statusLedger.Get(c.Id), stability);
+        }
+
+        #endregion Social status
+
+        #region Bereavement
+
+        /// <summary>
+        /// Routes each freshly-detected <see cref="CharacterDied"/> to every bonded survivor as a
+        /// <see cref="BereavementOnset"/>, then emits an abstract <see cref="FuneralHeld"/> for mourners
+        /// who are co-located (a mourning gathering). Each death is routed once.
+        /// </summary>
+        /// <remarks>
+        /// A survivor is a mourner when they hold an edge to the deceased that is either kin
+        /// (<see cref="KinRole"/> ≠ <see cref="KinRole.None"/>) or close
+        /// (<c>Closeness ≥ <see cref="SceneOrchestratorOptions.BereavementClosenessThreshold"/></c>).
+        /// The lost-bond strength is the larger of Closeness and CommunalStrength.
+        /// </remarks>
+        private void RouteBereavement(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            foreach (var deceased in chars)
+            {
+                var death = deceased.LastOutbox.OfType<CharacterDied>().FirstOrDefault();
+                if (death is null || _bereavementRouted.Contains(deceased.Id))
+                    continue;
+
+                _bereavementRouted.Add(deceased.Id);
+
+                var mourners = new List<IHuman>();
+                foreach (var survivor in chars)
+                {
+                    if (survivor.Id == deceased.Id)
+                        continue;
+
+                    if (!IsMourner(survivor, deceased.Id, out var edge))
+                        continue;
+
+                    var bondStrength = Math.Max(edge.Closeness, edge.CommunalStrength);
+                    survivor.ReceiveEvent(new BereavementOnset(
+                        now, survivor.Id, deceased.Id, bondStrength, death.Cause, edge.KinRole));
+                    mourners.Add(survivor);
+                }
+
+                EmitFunerals(now, deceased.Id, mourners);
+                SpawnCorpse(deceased);
+            }
+        }
+
+        /// <summary>
+        /// True when <paramref name="survivor"/> mourns <paramref name="deceasedId"/> — i.e. holds an edge
+        /// toward them that is kin (any <see cref="KinRole"/>) or close enough
+        /// (Closeness ≥ <see cref="SceneOrchestratorOptions.BereavementClosenessThreshold"/>).
+        /// </summary>
+        private bool IsMourner(IHuman survivor, HumanId deceasedId, out RelationshipEdge edge)
+        {
+            if (!survivor.Snapshot.Relationships.Edges.TryGetValue(deceasedId, out edge!))
+                return false;
+
+            return edge.KinRole != KinRole.None || edge.Closeness >= _options.BereavementClosenessThreshold;
+        }
+
+        /// <summary>Spawns a corpse object at the place of death (physical burial only; no-op without a mutable provider).</summary>
+        private void SpawnCorpse(IHuman deceased)
+        {
+            if (_mutableObjects is null || _corpseSpawned.Contains(deceased.Id))
+                return;
+
+            var location = _locationService.GetLocation(deceased.Id);
+            if (location is null)
+                return;
+
+            _corpseSpawned.Add(deceased.Id);
+            _mutableObjects.AddObject(Objects.BurialObjects.Corpse(deceased.Id, location, deceased.ToString() ?? "Corpse"));
+        }
+
+        #endregion Bereavement
+
+        #region Burial
+
+        /// <summary>
+        /// Physical burial: inters any corpse that has a co-located mourner (corpse → grave at the same
+        /// place), notifying the mourners (<see cref="Buried"/> + a graveside <see cref="FuneralHeld"/>),
+        /// and fires a one-shot <see cref="GraveVisited"/> for each grieving mourner standing at a grave.
+        /// No-op without a mutable world-object provider.
+        /// </summary>
+        private void RouteBurial(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            if (_mutableObjects is null)
+                return;
+
+            // ── Inter corpses with a co-located mourner ───────────────────────────────
+            foreach (var corpse in _mutableObjects.GetAllObjects()
+                         .Where(o => o.Category == WorldObjectCategory.Corpse && o.IsAvailable)
+                         .ToList())
+            {
+                if (!Objects.BurialObjects.TryGetDeceased(corpse, out var deceasedId))
+                    continue;
+
+                var coLocated = chars
+                    .Where(c => _locationService.GetLocation(c.Id) == corpse.LocationId && IsMourner(c, deceasedId, out _))
+                    .ToList();
+
+                if (coLocated.Count == 0)
+                    continue;
+
+                _mutableObjects.RemoveObject(corpse.LocationId, corpse.Id);
+                _mutableObjects.AddObject(Objects.BurialObjects.Grave(deceasedId, corpse.LocationId, corpse.DisplayName));
+
+                foreach (var mourner in coLocated)
+                {
+                    mourner.ReceiveEvent(new Buried(now, mourner.Id, deceasedId));
+                    mourner.ReceiveEvent(new FuneralHeld(now, mourner.Id, deceasedId, coLocated.Count));
+                }
+            }
+
+            // ── Graveside visits: one-shot grief consolidation per (mourner, deceased) ─
+            foreach (var grave in _mutableObjects.GetAllObjects()
+                         .Where(o => o.Category == WorldObjectCategory.Grave)
+                         .ToList())
+            {
+                if (!Objects.BurialObjects.TryGetDeceased(grave, out var deceasedId))
+                    continue;
+
+                foreach (var visitor in chars)
+                {
+                    if (_locationService.GetLocation(visitor.Id) != grave.LocationId)
+                        continue;
+                    if (!IsGrievingFor(visitor, deceasedId))
+                        continue;
+
+                    var key = (visitor.Id, deceasedId);
+                    if (!_graveVisited.Add(key))
+                        continue;
+
+                    visitor.ReceiveEvent(new GraveVisited(now, visitor.Id, deceasedId));
+                }
+            }
+        }
+
+        /// <summary>True when <paramref name="visitor"/> is actively grieving <paramref name="deceasedId"/>.</summary>
+        private static bool IsGrievingFor(IHuman visitor, HumanId deceasedId)
+            => visitor.Snapshot.Bereavement is { } b && b.Losses.Any(l => l.DeceasedId == deceasedId);
+
+        /// <summary>
+        /// Stage-1 abstract funeral: any group of mourners sharing a location holds a mourning gathering,
+        /// delivering a <see cref="FuneralHeld"/> (grief relief + cohesion) to each co-located mourner.
+        /// </summary>
+        private void EmitFunerals(WDateTime now, HumanId deceasedId, IReadOnlyList<IHuman> mourners)
+        {
+            if (mourners.Count < 2)
+                return;
+
+            var byLocation = mourners
+                .Select(m => (Mourner: m, Location: _locationService.GetLocation(m.Id)))
+                .Where(x => x.Location is not null)
+                .GroupBy(x => x.Location!);
+
+            foreach (var group in byLocation)
+            {
+                var attendees = group.Count();
+                if (attendees < 2)
+                    continue;
+
+                foreach (var (mourner, _) in group)
+                    mourner.ReceiveEvent(new FuneralHeld(now, mourner.Id, deceasedId, attendees));
+            }
+        }
+
+        #endregion Bereavement
 
         #region FireFirstImpressions
 
@@ -997,6 +1227,11 @@ namespace GameEngineTools.World.Simulation
                 if (target is null)
                     continue;
 
+                // Status deference: freely-conferred admiration draws reach-out up the prestige ladder,
+                // while coercive dominance is avoided (Henrich & Gil-White 2001; Cheng et al. 2013).
+                // Only active when the hierarchy subsystem is wired; preserves legacy targeting otherwise.
+                target = ApplyDeference(character, candidates, target);
+
                 var selection = ReachOutSpeechActSelector.SelectSpeechAct(character, target, now, _rng);
 
                 using (_log.BeginCharacterScope(
@@ -1014,6 +1249,39 @@ namespace GameEngineTools.World.Simulation
 
                 TryTouch(now, character, target);
             }
+        }
+
+        /// <summary>
+        /// Applies status deference to a chosen reach-out target. When the status subsystem is wired and
+        /// a clearly higher-deference candidate exists (more prestigious, not more coercively dominant),
+        /// that candidate is preferred; otherwise the semantically-chosen <paramref name="semanticTarget"/>
+        /// is kept unchanged. A no-op (returns <paramref name="semanticTarget"/>) when no ledger is wired.
+        /// </summary>
+        private IHuman ApplyDeference(IHuman actor, IReadOnlyList<IHuman> candidates, IHuman semanticTarget)
+        {
+            if (_statusLedger is null)
+                return semanticTarget;
+
+            var self = _statusLedger.Get(actor.Id);
+            var cfg = _statusLedger.Config;
+
+            IHuman best = semanticTarget;
+            var bestBias = StatusMath.DeferenceBias(self, _statusLedger.Get(semanticTarget.Id), cfg);
+
+            foreach (var candidate in candidates)
+            {
+                if (candidate.Id == actor.Id)
+                    continue;
+
+                var bias = StatusMath.DeferenceBias(self, _statusLedger.Get(candidate.Id), cfg);
+                if (bias > bestBias)
+                {
+                    bestBias = bias;
+                    best = candidate;
+                }
+            }
+
+            return best;
         }
 
         #endregion DynamicReachOutRouting

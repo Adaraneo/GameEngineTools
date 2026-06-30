@@ -77,6 +77,14 @@ namespace GameEngineTools.Characters.Hosting
             // Scene-level reputation aggregate (singleton — shared across all characters in a world).
             services.TryAddSingleton<CommunityReputationLedger>();
 
+            // Scene-level social-status aggregate (singleton — emergent Dominance/Prestige consensus).
+            services.TryAddSingleton(sp =>
+                new Engines.Status.StatusLedger(
+                    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Engines.Status.StatusConfig>>().Value));
+
+            // Bereavement engine (believability layer — grief trajectories + DPM oscillation).
+            services.TryAddTransient<Engines.Bereavement.IBereavementEngine, Engines.Bereavement.DefaultBereavementEngine>();
+
             var valuesOb = services.AddOptions<ValuesConfig>();
             valuesOb.BindConfiguration("Characters:Values");
 
@@ -88,6 +96,12 @@ namespace GameEngineTools.Characters.Hosting
 
             var socialComparisonOb = services.AddOptions<SocialComparisonConfig>();
             socialComparisonOb.BindConfiguration("Characters:SocialComparison");
+
+            var statusOb = services.AddOptions<Engines.Status.StatusConfig>();
+            statusOb.BindConfiguration("Characters:Status");
+
+            var bereavementOb = services.AddOptions<Engines.Bereavement.BereavementConfig>();
+            bereavementOb.BindConfiguration("Characters:Bereavement");
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();
             lodOb.BindConfiguration("Characters:Lod");

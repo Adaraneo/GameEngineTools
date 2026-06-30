@@ -48,5 +48,12 @@ namespace GameEngineTools.World.Simulation
         /// Only consulted when <see cref="EnableTravelTime"/> is <c>true</c>. Default 1200 m.
         /// </summary>
         public double FallbackTravelDistanceMeters { get; init; } = 1200.0;
+
+        /// <summary>
+        /// Minimum edge <c>Closeness</c> (0–100) a non-kin survivor must hold toward the deceased to be
+        /// routed a <c>BereavementOnset</c> when a death occurs. Kin (any <c>KinRole</c>) always mourn
+        /// regardless of this threshold. Default 35 — acquaintances below this do not grieve.
+        /// </summary>
+        public double BereavementClosenessThreshold { get; init; } = 35.0;
     }
 }

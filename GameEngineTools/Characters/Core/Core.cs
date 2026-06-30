@@ -136,6 +136,14 @@ namespace GameEngineTools.Characters.Core
 
         /// <summary>Adopts <paramref name="partner"/>'s surname (e.g. on marriage). Default no-op.</summary>
         void SetLastName(IHuman partner) { }
+
+        /// <summary>
+        /// Injects the character's emergent social status and the local hierarchy stability before its
+        /// tick. Called by the scene orchestrator once per tick after folding the
+        /// <see cref="GameEngineTools.Characters.Engines.Status.StatusLedger"/>, so Psychology reads an
+        /// up-to-date status×stability signal. The default implementation is a no-op — for test stubs.
+        /// </summary>
+        void SetSocietalStatus(GameEngineTools.Characters.Engines.Status.SocietalStatus status, double hierarchyStability) { }
     }
 
     /// <summary>Stable unique identifier for a character, wrapping a <see cref="Guid"/>.</summary>
@@ -461,5 +469,29 @@ namespace GameEngineTools.Characters.Core
         /// is not wired; the engine initialises it to <see cref="GameEngineTools.Characters.Engines.Behavior.NeedAppraisal.NeedAppraisalState.Empty"/>
         /// on its first tick (backward compatibility).
         /// </summary>
-        GameEngineTools.Characters.Engines.Behavior.NeedAppraisal.NeedAppraisalState? NeedAppraisal = null);
+        GameEngineTools.Characters.Engines.Behavior.NeedAppraisal.NeedAppraisalState? NeedAppraisal = null,
+
+        /// <summary>
+        /// The character's emergent two-axis social status (Dominance/Prestige), as conferred by the
+        /// surrounding network. <c>null</c> until the scene's <c>StatusLedger</c> injects it (or when the
+        /// social-hierarchy subsystem is not wired). Pushed in by
+        /// <see cref="GameEngineTools.Characters.Core.IHuman.SetSocietalStatus"/>, not by any engine.
+        /// Read by Psychology (status×stability stress).
+        /// </summary>
+        GameEngineTools.Characters.Engines.Status.SocietalStatus? SocietalStatus = null,
+
+        /// <summary>
+        /// Local hierarchy stability [0,1] (1 = stable) at the character's locale, injected alongside
+        /// <see cref="SocietalStatus"/>. Default 1.0 (stable / unknown) preserves legacy behaviour.
+        /// </summary>
+        double HierarchyStability = 1.0,
+
+        /// <summary>
+        /// Per-deceased bereavement state (loss records, grief trajectories, DPM oscillation phase).
+        /// <c>null</c> for characters created before this field existed or when the bereavement engine is
+        /// not wired (backward compatibility). Evolved by
+        /// <see cref="GameEngineTools.Characters.Engines.Bereavement.DefaultBereavementEngine"/>;
+        /// read by Physiology (widowhood hazard).
+        /// </summary>
+        GameEngineTools.Characters.Engines.Bereavement.BereavementState? Bereavement = null);
 }

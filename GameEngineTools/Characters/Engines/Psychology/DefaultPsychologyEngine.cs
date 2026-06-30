@@ -49,6 +49,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
+        private readonly Status.StatusConfig _statusConfig;
         private WDateTime? _stressAbove70Since;
         private double _previousAllostaticLoad;
 
@@ -59,11 +60,16 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// <param name="cfg">Psychology configuration options.</param>
         /// <param name="loggerFactory">Logger factory injected by the DI container.</param>
         /// <param name="rng">Random source for daily affect noise; use <c>ZeroRandom</c> in tests.</param>
-        public DefaultPsychologyEngine(IOptions<PsychologyConfig> cfg, ILoggerFactory loggerFactory, IRandomSource rng)
+        public DefaultPsychologyEngine(
+            IOptions<PsychologyConfig> cfg,
+            ILoggerFactory loggerFactory,
+            IRandomSource rng,
+            IOptions<Status.StatusConfig>? statusCfg = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultPsychologyEngine>();
             _rng = rng;
+            _statusConfig = statusCfg?.Value ?? new Status.StatusConfig();
 
             State = new PsychologyState(
                 Valence: 0.1, Arousal: 0.4, Dominance: 0.5,
@@ -394,6 +400,25 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 }
             }
 
+            // ── Social status × hierarchy stability → stress ──────────────────────────────
+            // Emergent rank interacts with the stability of the hierarchy and the character's
+            // perceived control (proxied by PAD Dominance):
+            //   • high status + UNSTABLE hierarchy → "cost of the top" (defending rank). Gesquiere 2011.
+            //   • high status + STABLE   hierarchy → secure rank buffers stress.
+            //   • low  status + low control + stable → chronic low-control burden. Marmot/Whitehall.
+            // Skipped entirely when the scene has not injected a status (preserves legacy behaviour).
+            if (ctx.Snapshot.SocietalStatus is { } myStatus)
+            {
+                var statusStress = Status.StatusMath.StatusStressPerHour(
+                    myStatus, ctx.Snapshot.HierarchyStability, perceivedControl: s.Dominance, _statusConfig) * h;
+
+                // Stress accumulation (positive) is amplified by HPA reactivity; relief is not.
+                if (statusStress > 0)
+                    statusStress *= stressGrowthMult;
+
+                s = s with { Stress = Clamp01p(s.Stress + statusStress) };
+            }
+
             // SAM system → PAD (Sympatho-Adrenomedullary: immediate sympathetic activation)
             if (ph.AcuteArousalLevel > 0)
             {
@@ -716,6 +741,20 @@ namespace GameEngineTools.Characters.Engines.Psychology
             {
                 case Characters.Engines.Relationships.MicroPositive:
                     s = s with { Valence = Math.Min(1, s.Valence + 0.05) };
+                    break;
+
+                case Characters.Engines.Bereavement.GriefPang pang:
+                    // A wave of grief (or the acute onset spike): drop valence + mood baseline, raise stress.
+                    // Sadness is the long-lingering emotion (EmotionDecaySadness ≈ 0.06) — grief has a long tail.
+                    s = s with
+                    {
+                        Valence = Math.Clamp(s.Valence + pang.ValenceDelta, -1, 1),
+                        MoodBaseline = Math.Clamp(s.MoodBaseline + pang.MoodBaselineDelta, 0, 100),
+                        Stress = Math.Clamp(s.Stress + pang.StressDelta, 0, 100),
+                        DominantEmotion = DiscreteEmotion.Sadness
+                    };
+                    if (s.Stress > 70 && State.Stress <= 70)
+                        outbox.Add(new StressSpiked(pang.OccurredAt, ctx.Id, s.Stress));
                     break;
 
                 case Characters.Engines.Relationships.MicroNegative:

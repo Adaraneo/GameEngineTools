@@ -358,8 +358,10 @@ Console.WriteLine("Press any key to continue...");
 
 var orchestratorLogger = runtime.Services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>();
 var reputationLedger = runtime.Services.GetRequiredService<CommunityReputationLedger>();
-var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger);
-//var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions);
+var statusLedger = runtime.Services.GetRequiredService<GameEngineTools.Characters.Engines.Status.StatusLedger>();
+var mutableObjectProvider = runtime.Services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>();
+var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger, statusLedger, mutableObjectProvider);
+//var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger);
 
 var writeBuffer = runtime.Services.GetRequiredService<WorldObjectWriteBuffer>();
 var objectSnapshotCache = runtime.Services.GetRequiredService<WorldObjectSnapshotCache>();

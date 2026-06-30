@@ -117,7 +117,9 @@ namespace WorldObserver.Simulation
                 // Realistic movement: MoveTo:* takes travel time (character is held in transit
                 // at its origin until the trip duration elapses) instead of teleporting.
                 new SceneOrchestratorOptions { EnableTravelTime = true },
-                services.GetService<CommunityReputationLedger>());
+                services.GetService<CommunityReputationLedger>(),
+                services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>(),
+                services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>());
 
             // Undirected connection list (the seed stores both directions) for the realistic map layout.
             var connections = db.GetAllConnections()

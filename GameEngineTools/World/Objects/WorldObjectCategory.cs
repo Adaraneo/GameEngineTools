@@ -60,6 +60,19 @@ namespace GameEngineTools.World.Objects
         /// Decorative or ambient element — painting, statue, banner.
         /// Low behavioral impact; may contribute to valence.
         /// </summary>
-        Ambient
+        Ambient,
+
+        /// <summary>
+        /// The body of a deceased character, spawned at the place of death.
+        /// A mourner can inter it (<see cref="GameEngineTools.Characters.Engines.ActionNames.Bury"/>),
+        /// which consumes the corpse and produces a <see cref="Grave"/>.
+        /// </summary>
+        Corpse,
+
+        /// <summary>
+        /// A grave carrying a deceased character's identity, produced by burial.
+        /// Mourners visiting it generate grave-visit grief modulation (continuing bonds).
+        /// </summary>
+        Grave
     }
 }

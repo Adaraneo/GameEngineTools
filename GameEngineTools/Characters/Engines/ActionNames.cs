@@ -84,5 +84,22 @@ namespace GameEngineTools.Characters.Engines
         public const string GatherAtObject = "UseObject:Social";
 
         #endregion Affordance-driven object interactions
+
+        #region Bereavement / burial
+
+        /// <summary>
+        /// Inter a co-located corpse — consumes the <c>Corpse</c> object and produces a <c>Grave</c>
+        /// carrying the deceased's identity. Currently scene-orchestrated (see
+        /// <c>DefaultSceneOrchestrator.RouteBurial</c>), not yet utility-arbitrated.
+        /// </summary>
+        public const string Bury = "Bury";
+
+        /// <summary>Mourn at a deceased person's grave — a grieving visit (scene-orchestrated for now).</summary>
+        public const string MournAtGrave = "MournAtGrave";
+
+        /// <summary>Forage-style move toward a location with a grave (reserved for behavior-driven grave visits).</summary>
+        public const string MoveToGrave = "MoveTo:Grave";
+
+        #endregion Bereavement / burial
     }
 }
