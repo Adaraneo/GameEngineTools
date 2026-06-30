@@ -249,6 +249,24 @@ var locationService = (DefaultLocationService)runtime.Services.GetRequiredServic
     }
 }
 
+// ── Cemetery (Village / Public) — where the dead are interred and mourned ─────
+{
+    var cemetery = new LocationDescriptor("cemetery", "Hřbitov", 0.05, 0.0, 200, false, LocationType.Public, TerrainType.Courtyard, 0, true, null);
+    worldMap.AddLocation(cemetery, "Village", locationService);
+
+    foreach (var villageLocation in worldMap.GetLocationsInRegion("Village"))
+    {
+        if (villageLocation == cemetery.Id) continue;
+
+        var distanceMeters = rng.Next(40, 200) + rng.NextDouble();
+        worldMap.AddConnection(cemetery.Id, villageLocation, distanceMeters);
+        worldMap.AddConnection(villageLocation, cemetery.Id, distanceMeters);
+    }
+}
+
+// Route burials + grave visits to the cemetery instead of interring in place.
+sceneOrchestratorOptions = sceneOrchestratorOptions with { CemeteryLocationId = "cemetery" };
+
 worldMap.RegisterAllLocations(locationService);
 var objectProvider = runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
