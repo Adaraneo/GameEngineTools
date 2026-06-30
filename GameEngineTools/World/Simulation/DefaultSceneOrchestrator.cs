@@ -151,9 +151,6 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Deaths whose corpse has already been spawned — avoids duplicate corpses.</summary>
         private readonly HashSet<HumanId> _corpseSpawned = new();
 
-        /// <summary>(mourner, deceased) pairs whose grave visit has already fired — fires once per pair.</summary>
-        private readonly HashSet<(HumanId Mourner, HumanId Deceased)> _graveVisited = new();
-
         /// <summary>
         /// Characters currently travelling between locations, keyed by id. Populated only when
         /// <see cref="SceneOrchestratorOptions.EnableTravelTime"/> is enabled: a <c>MoveTo:*</c>
@@ -437,68 +434,115 @@ namespace GameEngineTools.World.Simulation
         #region Burial
 
         /// <summary>
-        /// Physical burial: inters any corpse that has a co-located mourner (corpse → grave at the same
-        /// place), notifying the mourners (<see cref="Buried"/> + a graveside <see cref="FuneralHeld"/>),
-        /// and fires a one-shot <see cref="GraveVisited"/> for each grieving mourner standing at a grave.
-        /// No-op without a mutable world-object provider.
+        /// Physical burial: when a character commits a <see cref="ActionNames.Bury"/> action, inters a
+        /// co-located corpse (corpse → grave at the same place), notifying every co-located mourner
+        /// (<see cref="Buried"/> + a graveside <see cref="FuneralHeld"/>), and fires a one-shot
+        /// <see cref="GraveVisited"/> for each grieving mourner standing at a grave. The decision to bury
+        /// is made by the burier's behavior engine (the <c>BereavementBehaviorBridge</c>); the scene only
+        /// applies the world mutation. No-op without a mutable world-object provider.
         /// </summary>
         private void RouteBurial(WDateTime now, IReadOnlyList<IHuman> chars)
         {
             if (_mutableObjects is null)
                 return;
 
-            // ── Inter corpses with a co-located mourner ───────────────────────────────
-            foreach (var corpse in _mutableObjects.GetAllObjects()
-                         .Where(o => o.Category == WorldObjectCategory.Corpse && o.IsAvailable)
-                         .ToList())
+            // ── Inter a corpse when a co-located character commits a Bury action ──────
+            foreach (var burier in chars)
             {
-                if (!Objects.BurialObjects.TryGetDeceased(corpse, out var deceasedId))
+                if (!burier.LastOutbox.OfType<ActionCommitted>().Any(a => a.ActionName == Bury))
                     continue;
 
-                var coLocated = chars
+                var location = _locationService.GetLocation(burier.Id);
+                if (location is null)
+                    continue;
+
+                // Bury a corpse at the burier's location, preferring one they grieve for.
+                var corpse = _mutableObjects.GetObjectsAt(location)
+                    .Where(o => o.Category == WorldObjectCategory.Corpse && o.IsAvailable)
+                    .OrderByDescending(o =>
+                        Objects.BurialObjects.TryGetDeceased(o, out var d) && IsGrievingFor(burier, d) ? 1 : 0)
+                    .FirstOrDefault();
+
+                if (corpse is null || !Objects.BurialObjects.TryGetDeceased(corpse, out var deceasedId))
+                    continue;
+
+                // The grave goes to the cemetery when one is configured, otherwise it is dug in place.
+                var graveLocation = ResolveGraveLocation(corpse.LocationId);
+                _mutableObjects.RemoveObject(corpse.LocationId, corpse.Id);
+                _mutableObjects.AddObject(Objects.BurialObjects.Grave(deceasedId, graveLocation, corpse.DisplayName));
+
+                var attendees = chars
                     .Where(c => _locationService.GetLocation(c.Id) == corpse.LocationId && IsMourner(c, deceasedId, out _))
                     .ToList();
 
-                if (coLocated.Count == 0)
-                    continue;
-
-                _mutableObjects.RemoveObject(corpse.LocationId, corpse.Id);
-                _mutableObjects.AddObject(Objects.BurialObjects.Grave(deceasedId, corpse.LocationId, corpse.DisplayName));
-
-                foreach (var mourner in coLocated)
+                foreach (var mourner in attendees)
                 {
                     mourner.ReceiveEvent(new Buried(now, mourner.Id, deceasedId));
-                    mourner.ReceiveEvent(new FuneralHeld(now, mourner.Id, deceasedId, coLocated.Count));
+                    mourner.ReceiveEvent(new FuneralHeld(now, mourner.Id, deceasedId, attendees.Count));
                 }
             }
 
-            // ── Graveside visits: one-shot grief consolidation per (mourner, deceased) ─
-            foreach (var grave in _mutableObjects.GetAllObjects()
-                         .Where(o => o.Category == WorldObjectCategory.Grave)
-                         .ToList())
+            // ── Graveside visits: fire on a committed MournAtGrave at a grieved grave ──
+            foreach (var visitor in chars)
             {
-                if (!Objects.BurialObjects.TryGetDeceased(grave, out var deceasedId))
+                if (!visitor.LastOutbox.OfType<ActionCommitted>().Any(a => a.ActionName == MournAtGrave))
                     continue;
 
-                foreach (var visitor in chars)
+                var location = _locationService.GetLocation(visitor.Id);
+                if (location is null)
+                    continue;
+
+                foreach (var grave in _mutableObjects.GetObjectsAt(location)
+                             .Where(o => o.Category == WorldObjectCategory.Grave))
                 {
-                    if (_locationService.GetLocation(visitor.Id) != grave.LocationId)
-                        continue;
-                    if (!IsGrievingFor(visitor, deceasedId))
-                        continue;
-
-                    var key = (visitor.Id, deceasedId);
-                    if (!_graveVisited.Add(key))
-                        continue;
-
-                    visitor.ReceiveEvent(new GraveVisited(now, visitor.Id, deceasedId));
+                    if (Objects.BurialObjects.TryGetDeceased(grave, out var deceasedId) && IsGrievingFor(visitor, deceasedId))
+                    {
+                        visitor.ReceiveEvent(new GraveVisited(now, visitor.Id, deceasedId));
+                        break; // one grave per mourning act
+                    }
                 }
             }
+        }
+
+        /// <summary>
+        /// The location a grave should be created at: the configured cemetery when it exists, otherwise
+        /// <paramref name="deathLocation"/> (buried in place).
+        /// </summary>
+        private string ResolveGraveLocation(string deathLocation)
+        {
+            if (_options.CemeteryLocationId is { } cemetery && _locationService.GetDescriptor(cemetery) is not null)
+                return cemetery;
+
+            return deathLocation;
         }
 
         /// <summary>True when <paramref name="visitor"/> is actively grieving <paramref name="deceasedId"/>.</summary>
         private static bool IsGrievingFor(IHuman visitor, HumanId deceasedId)
             => visitor.Snapshot.Bereavement is { } b && b.Losses.Any(l => l.DeceasedId == deceasedId);
+
+        /// <summary>
+        /// Resolves where a grieving character should travel for a <c>MoveTo:Grave</c>: the configured
+        /// cemetery when set, otherwise the location of a grave belonging to someone they grieve. Returns
+        /// <c>null</c> when there is nowhere (else they are already there) to go.
+        /// </summary>
+        private MoveTarget? ResolveGraveDestination(IHuman character, string? currentLocation)
+        {
+            if (_options.CemeteryLocationId is { } cemetery
+                && cemetery != currentLocation
+                && _locationService.GetDescriptor(cemetery) is not null)
+                return new MoveTarget(cemetery, _options.FallbackTravelDistanceMeters);
+
+            foreach (var grave in _objectProvider.GetAllObjects())
+            {
+                if (grave.Category != WorldObjectCategory.Grave || grave.LocationId == currentLocation)
+                    continue;
+
+                if (Objects.BurialObjects.TryGetDeceased(grave, out var deceasedId) && IsGrievingFor(character, deceasedId))
+                    return new MoveTarget(grave.LocationId, _options.FallbackTravelDistanceMeters);
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// Stage-1 abstract funeral: any group of mourners sharing a location holds a mourning gathering,
@@ -765,6 +809,17 @@ namespace GameEngineTools.World.Simulation
                     continue;
 
                 var currentLocation = _locationService.GetLocation(character.Id);
+
+                // ── Grave visit movement (MoveTo:Grave) ────────────────────────────────────
+                // Routes a grieving character toward the cemetery (or the grave's location).
+                if (moveTo.ActionName == MoveToGrave)
+                {
+                    var graveDestination = ResolveGraveDestination(character, currentLocation);
+                    if (graveDestination is not null)
+                        CommitMove(character, graveDestination.Value, now);
+
+                    continue;
+                }
 
                 // ── Object-category foraging movement (MoveTo:Food, MoveTo:Drink) ──────────
                 // These bypass LocationType routing and search by required object category.

@@ -8,6 +8,7 @@ namespace EngineTests
     using System.Linq;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Attraction;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Bereavement;
@@ -39,6 +40,10 @@ namespace EngineTests
             Id: "room", DisplayName: "Room", BaseNoise: 0.05, NoisePerPerson: 0.01,
             Capacity: 50, AllowsPrivacy: false, Type: LocationType.Social);
 
+        private static readonly LocationDescriptor Cemetery = new(
+            Id: "cemetery", DisplayName: "Cemetery", BaseNoise: 0.02, NoisePerPerson: 0.0,
+            Capacity: 200, AllowsPrivacy: false, Type: LocationType.Public);
+
         [TestMethod]
         public void Death_SpawnsCorpse_MournerBuries_AndVisitsGrave()
         {
@@ -59,6 +64,8 @@ namespace EngineTests
                 new LossRecord(deceasedId, KinRole.Partner, 85, Now,
                     GriefTrajectory.ModerateStable, 60, 1.0, ContinuingBond.None, false)
             }));
+            // The grieving mourner's behavior engine chose to inter the corpse — the scene applies it.
+            mourner.SetLastOutbox(new ActionCommitted(Now, mournerId, ActionNames.Bury, WTimeSpan.FromMinutes(30)));
 
             // Deceased: emits CharacterDied this tick; mutual edge so first-impressions stay quiet.
             var deceased = new BurialSpy(deceasedId,
@@ -87,14 +94,100 @@ namespace EngineTests
                 "The mourner receives a Buried notification.");
             Assert.IsTrue(mourner.ReceivedEvents.OfType<FuneralHeld>().Any(e => e.Deceased == deceasedId),
                 "Burial holds a graveside funeral.");
-            Assert.IsTrue(mourner.ReceivedEvents.OfType<GraveVisited>().Any(e => e.Deceased == deceasedId),
-                "A grieving mourner at the fresh grave makes a graveside visit.");
+        }
+
+        [TestMethod]
+        public void Burial_PlacesGraveAtCemetery_WhenConfigured()
+        {
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(Room);
+            locations.RegisterLocation(Cemetery);
+
+            var objects = new InMemoryMutableProvider();
+            var orchestrator = BuildOrchestrator(locations, objects,
+                new SceneOrchestratorOptions { CemeteryLocationId = Cemetery.Id });
+
+            var deceasedId = new HumanId(Guid.NewGuid());
+            var mournerId = new HumanId(Guid.NewGuid());
+
+            objects.AddObject(BurialObjects.Corpse(deceasedId, Room.Id, "Tom"));
+
+            var mourner = new BurialSpy(mournerId,
+                edges: new() { [deceasedId] = Edge(mournerId, deceasedId, KinRole.Partner, closeness: 85) });
+            mourner.SetBereavement(Loss(deceasedId, buried: false));
+            mourner.SetLastOutbox(new ActionCommitted(Now, mournerId, ActionNames.Bury, WTimeSpan.FromMinutes(30)));
+
+            locations.MoveCharacter(mournerId, Room.Id);
+            orchestrator.OnTick(Now, new IHuman[] { mourner });
+
+            var grave = objects.GetAllObjects().Single(o => o.Category == WorldObjectCategory.Grave);
+            Assert.AreEqual(Cemetery.Id, grave.LocationId, "With a cemetery configured, the grave is dug there, not at the death site.");
+        }
+
+        [TestMethod]
+        public void GraveVisit_FiresOnCommittedMournAtGrave()
+        {
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(Cemetery);
+
+            var objects = new InMemoryMutableProvider();
+            var orchestrator = BuildOrchestrator(locations, objects);
+
+            var deceasedId = new HumanId(Guid.NewGuid());
+            var visitorId = new HumanId(Guid.NewGuid());
+
+            objects.AddObject(BurialObjects.Grave(deceasedId, Cemetery.Id, "Tom"));
+
+            var visitor = new BurialSpy(visitorId,
+                edges: new() { [deceasedId] = Edge(visitorId, deceasedId, KinRole.Partner, closeness: 85) });
+            visitor.SetBereavement(Loss(deceasedId, buried: true));
+            visitor.SetLastOutbox(new ActionCommitted(Now, visitorId, ActionNames.MournAtGrave, WTimeSpan.FromMinutes(60)));
+
+            locations.MoveCharacter(visitorId, Cemetery.Id);
+            orchestrator.OnTick(Now, new IHuman[] { visitor });
+
+            Assert.IsTrue(visitor.ReceivedEvents.OfType<GraveVisited>().Any(e => e.Deceased == deceasedId),
+                "Committing MournAtGrave at the deceased's grave fires a graveside visit.");
+        }
+
+        [TestMethod]
+        public void MoveToGrave_RoutesGrieverToCemetery()
+        {
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(Room);
+            locations.RegisterLocation(Cemetery);
+
+            var objects = new InMemoryMutableProvider();
+            var orchestrator = BuildOrchestrator(locations, objects,
+                new SceneOrchestratorOptions { CemeteryLocationId = Cemetery.Id });
+
+            var deceasedId = new HumanId(Guid.NewGuid());
+            var visitorId = new HumanId(Guid.NewGuid());
+
+            objects.AddObject(BurialObjects.Grave(deceasedId, Cemetery.Id, "Tom"));
+
+            var visitor = new BurialSpy(visitorId,
+                edges: new() { [deceasedId] = Edge(visitorId, deceasedId, KinRole.Partner, closeness: 85) });
+            visitor.SetBereavement(Loss(deceasedId, buried: true));
+            visitor.SetLastOutbox(new ActionCommitted(Now, visitorId, ActionNames.MoveToGrave, WTimeSpan.FromMinutes(20)));
+
+            locations.MoveCharacter(visitorId, Room.Id);
+            orchestrator.OnTick(Now, new IHuman[] { visitor });
+
+            Assert.AreEqual(Cemetery.Id, locations.GetLocation(visitorId), "MoveTo:Grave routes the griever to the cemetery.");
         }
 
         #region Helpers
 
+        private static BereavementState Loss(HumanId deceasedId, bool buried)
+            => new(new[]
+            {
+                new LossRecord(deceasedId, KinRole.Partner, 85, Now,
+                    GriefTrajectory.ModerateStable, 60, 1.0, ContinuingBond.None, buried)
+            });
+
         private static DefaultSceneOrchestrator BuildOrchestrator(
-            DefaultLocationService locations, IMutableWorldObjectProvider objects)
+            DefaultLocationService locations, IMutableWorldObjectProvider objects, SceneOrchestratorOptions? options = null)
             => new DefaultSceneOrchestrator(
                 attractionCalculator: new NeutralAttractionCalculator(),
                 locationService: locations,
@@ -109,7 +202,7 @@ namespace EngineTests
                 rng: new Random(7),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
                 objectProvider: objects,
-                options: new SceneOrchestratorOptions(),
+                options: options ?? new SceneOrchestratorOptions(),
                 mutableObjects: objects);
 
         private static RelationshipEdge Edge(HumanId a, HumanId b, KinRole kin, double closeness)

@@ -53,6 +53,13 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
                 // ── Idle ───────────────────────────────────────────────────────
                 [Idle] = ActionSlotMask.None,
+
+                // ── Burial (digging a grave) — occupies hands + body ────────────
+                [Bury] = ActionSlotMask.Hands | ActionSlotMask.Posture,
+
+                // ── Grave visits ────────────────────────────────────────────────
+                [MoveToGrave] = ActionSlotMask.Posture,
+                [MournAtGrave] = ActionSlotMask.None,
             };
 
         #endregion Lookup table

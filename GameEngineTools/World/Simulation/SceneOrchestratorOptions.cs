@@ -55,5 +55,12 @@ namespace GameEngineTools.World.Simulation
         /// regardless of this threshold. Default 35 — acquaintances below this do not grieve.
         /// </summary>
         public double BereavementClosenessThreshold { get; init; } = 35.0;
+
+        /// <summary>
+        /// Location id of the cemetery where the dead are interred. When set (and the location is
+        /// registered), burial places the grave here and grieving characters route <c>MoveTo:Grave</c>
+        /// to it; <c>null</c> buries the dead in place at the location of death. Default <c>null</c>.
+        /// </summary>
+        public string? CemeteryLocationId { get; init; } = null;
     }
 }

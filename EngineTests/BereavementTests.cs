@@ -7,7 +7,9 @@ namespace EngineTests
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Behavior.Needs;
     using GameEngineTools.Characters.Engines.Bereavement;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
@@ -15,6 +17,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -290,6 +293,148 @@ namespace EngineTests
 
             Assert.IsTrue(GameEngineTools.World.Objects.BurialObjects.TryGetDeceased(corpse, out var fromCorpse) && fromCorpse == deceased);
             Assert.IsTrue(GameEngineTools.World.Objects.BurialObjects.TryGetDeceased(grave, out var fromGrave) && fromGrave == deceased);
+        }
+
+        #endregion
+
+        #region Behavior bridge — Bury becomes a utility candidate
+
+        [TestMethod]
+        public void Bridge_EmitsBuryCandidate_WhenGrievingAtCorpse()
+        {
+            var self = NewId();
+            var deceased = NewId();
+            var ctx = BuildBehaviorContext(self, deceased, griefIntensity: 60, buried: false, corpsePresent: true);
+
+            var output = new BereavementBehaviorBridge().Evaluate(ctx);
+
+            Assert.IsTrue(output.Candidates.Any(c => c.Name == ActionNames.Bury),
+                "A grieving character co-located with the corpse wants to bury it.");
+        }
+
+        [TestMethod]
+        public void Bridge_NoCandidate_WhenNotGrievingForThatCorpse()
+        {
+            var self = NewId();
+            var deceased = NewId();
+            // A corpse of a stranger (no loss record) → no burial drive.
+            var ctx = BuildBehaviorContext(self, deceased, griefIntensity: 0, buried: false, corpsePresent: true, grievingForCorpse: false);
+
+            var output = new BereavementBehaviorBridge().Evaluate(ctx);
+
+            Assert.IsFalse(output.Candidates.Any(c => c.Name == ActionNames.Bury), "Only the bereaved bury.");
+        }
+
+        [TestMethod]
+        public void Bridge_NoCandidate_WhenNoCorpsePresent()
+        {
+            var self = NewId();
+            var deceased = NewId();
+            var ctx = BuildBehaviorContext(self, deceased, griefIntensity: 60, buried: false, corpsePresent: false);
+
+            var output = new BereavementBehaviorBridge().Evaluate(ctx);
+
+            Assert.IsFalse(output.Candidates.Any(c => c.Name == ActionNames.Bury), "No corpse here → nothing to bury.");
+        }
+
+        [TestMethod]
+        public void Bridge_NoCandidate_WhenAlreadyBuried()
+        {
+            var self = NewId();
+            var deceased = NewId();
+            var ctx = BuildBehaviorContext(self, deceased, griefIntensity: 60, buried: true, corpsePresent: true);
+
+            var output = new BereavementBehaviorBridge().Evaluate(ctx);
+
+            Assert.IsFalse(output.Candidates.Any(c => c.Name == ActionNames.Bury), "An already-buried loss produces no burial drive.");
+        }
+
+        [TestMethod]
+        public void Bridge_EmitsMournAtGrave_WhenGrievingAtGrave()
+        {
+            var self = NewId();
+            var deceased = NewId();
+            var ctx = BuildBridgeContext(self, deceased, griefIntensity: 50, buried: true,
+                objects: new List<WorldObject> { BurialObjects.Grave(deceased, "cemetery", "Tom") });
+
+            var output = new BereavementBehaviorBridge().Evaluate(ctx);
+
+            Assert.IsTrue(output.Candidates.Any(c => c.Name == ActionNames.MournAtGrave), "At the grave, the griever mourns.");
+            Assert.IsFalse(output.Candidates.Any(c => c.Name == ActionNames.MoveToGrave), "No travel candidate while already at the grave.");
+        }
+
+        [TestMethod]
+        public void Bridge_EmitsMoveToGrave_WhenBuriedLoss_AndNoGraveHere()
+        {
+            var self = NewId();
+            var deceased = NewId();
+            var ctx = BuildBridgeContext(self, deceased, griefIntensity: 50, buried: true,
+                objects: new List<WorldObject>());
+
+            var output = new BereavementBehaviorBridge().Evaluate(ctx);
+
+            Assert.IsTrue(output.Candidates.Any(c => c.Name == ActionNames.MoveToGrave),
+                "A buried loss with no grave here pulls the griever toward the cemetery.");
+        }
+
+        private static BehaviorContext BuildBridgeContext(
+            HumanId self, HumanId deceased, double griefIntensity, bool buried, List<WorldObject> objects)
+        {
+            var bereavement = new BereavementState(new[]
+            {
+                new LossRecord(deceased, KinRole.Partner, 85, new WDateTime(0),
+                    GriefTrajectory.ModerateStable, griefIntensity, 1.0, ContinuingBond.None, buried)
+            });
+
+            var snapshot = BuildSnapshot() with { Bereavement = bereavement };
+            return new BehaviorContext(
+                new WDateTime(0), WTimeSpan.FromHours(1), ContextFrom(self, snapshot), new EventCollector(),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new BehaviorConfig(),
+                new Dictionary<string, double>(),
+                AvailableObjects: objects);
+        }
+
+        private static BehaviorContext BuildBehaviorContext(
+            HumanId self, HumanId deceased, double griefIntensity, bool buried, bool corpsePresent,
+            bool grievingForCorpse = true)
+        {
+            var bereavement = new BereavementState(new[]
+            {
+                new LossRecord(deceased, KinRole.Partner, 85, new WDateTime(0),
+                    GriefTrajectory.ModerateStable, griefIntensity, 1.0, ContinuingBond.None, buried)
+            });
+
+            var snapshot = BuildSnapshot() with { Bereavement = bereavement };
+            var human = ContextFrom(self, snapshot);
+
+            var objects = corpsePresent
+                ? new List<WorldObject> { BurialObjects.Corpse(grievingForCorpse ? deceased : NewId(), "room", "Tom") }
+                : new List<WorldObject>();
+
+            return new BehaviorContext(
+                new WDateTime(0), WTimeSpan.FromHours(1), human, new EventCollector(),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new BehaviorConfig(),
+                new Dictionary<string, double>(),
+                AvailableObjects: objects);
+        }
+
+        private static IHumanContext ContextFrom(HumanId id, EnginesSnapshot snapshot)
+        {
+            var personality = BuildPersonality();
+            return new HumanContext
+            {
+                Id = id,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandomSource(),
+                Logger = Loggers().CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
         }
 
         #endregion
