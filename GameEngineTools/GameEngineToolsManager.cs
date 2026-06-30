@@ -131,22 +131,25 @@ namespace GameEngineTools
         {
             var now = _clock.Now;
             var year = now.Year;
-            var monthsInYear = WWorld.Spec.Calendar.MonthsInYear(year);
 
             var rng = _rngFactory.Create(Environment.TickCount);
 
-            var daysInMonth = WWorld.Spec.Calendar.DaysInMonth(year, rng.Next(1, monthsInYear));
+            // Pick a random, calendar-valid birth date for the given year. The month is chosen first,
+            // then the day is bounded by THAT month's length in the active (appsettings-configured)
+            // calendar — months can differ in length (e.g. the real-world calendar), so the day range
+            // must follow the chosen month, not an unrelated one.
+            WDateOnly RandomBirthDate(int birthYear)
+            {
+                var calendar = WWorld.Spec.Calendar;
+                var months = calendar.MonthsInYear(birthYear);
+                var month = rng.Next(1, months + 1);                                 // [1, months]
+                var day = rng.Next(1, calendar.DaysInMonth(birthYear, month) + 1);    // [1, daysInMonth]
+                return WDateOnly.New(birthYear, month, day);
+            }
 
-            // Date = year ± age, random month and day within the range of the current day
-            var minBirth = WDateOnly.New(
-                year - maxAge,
-                rng.Next(1, monthsInYear),
-                rng.Next(1, daysInMonth + 1));
-
-            var maxBirth = WDateOnly.New(
-                year - minAge,
-                rng.Next(1, monthsInYear),
-                rng.Next(1, daysInMonth + 1));
+            // Date = year ± age, with a random month/day valid for the configured calendar.
+            var minBirth = RandomBirthDate(year - maxAge);
+            var maxBirth = RandomBirthDate(year - minAge);
 
             var factory = _serviceProvider.GetRequiredService<IHumanFactory>();
             var hpb = _serviceProvider.GetRequiredService<IHumanBlueprintGenerator>().Generate(
