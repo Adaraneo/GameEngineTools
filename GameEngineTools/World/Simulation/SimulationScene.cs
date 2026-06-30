@@ -85,6 +85,9 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Guards <see cref="_pendingAdditions"/> so additions are safe from any thread.</summary>
         private readonly object _addLock = new();
 
+        /// <summary>When set, the live character list is cleared at the next substep boundary (world replace).</summary>
+        private bool _resetRequested;
+
         #endregion Privátní pole
 
         #region Konstruktor
@@ -166,6 +169,21 @@ namespace GameEngineTools.World.Simulation
             lock (_addLock)
             {
                 _pendingAdditions.Add(character);
+            }
+        }
+
+        /// <summary>
+        /// Requests that the live character list be emptied at the next substep boundary (a "replace
+        /// the world" operation). Characters queued via <see cref="AddCharacter"/> after this call are
+        /// added <b>after</b> the clear, so a clear + a batch of additions atomically replaces the
+        /// roster. Thread-safe; may be called from <c>OnTick</c> or another thread. The caller owns any
+        /// world-side cleanup (locations, narrative names) for the removed characters.
+        /// </summary>
+        public void ResetCharacters()
+        {
+            lock (_addLock)
+            {
+                _resetRequested = true;
             }
         }
 
@@ -320,6 +338,15 @@ namespace GameEngineTools.World.Simulation
         {
             lock (_addLock)
             {
+                // Replace-the-world: clear the live roster first, so queued additions below become
+                // the entire new roster.
+                if (_resetRequested)
+                {
+                    _characters.Clear();
+                    _deadCharacters.Clear();
+                    _resetRequested = false;
+                }
+
                 if (_pendingAdditions.Count == 0)
                     return;
 
