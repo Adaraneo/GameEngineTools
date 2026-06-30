@@ -1,0 +1,15 @@
+# Build artifacts
+bin/
+obj/
+
+# Ephemeral runtime data (world.db is re-seeded on every startup; exports are staged here)
+data/
+world.db
+world.db-*
+
+# Per-character engine logs
+logs/
+
+# User-specific
+*.user
+Properties/launchSettings.json

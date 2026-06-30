@@ -1,0 +1,62 @@
+OccupationId;SlotId;HourOfDay;Action;LocationKey;BiasStrength;CanSkipWhenStressed
+# WorldObserver — modern-day occupations (custom). One row per schedule slot; rows with the
+# same OccupationId are grouped. LocationKey is a concrete location id from the modern seed,
+# or HomeLocation for the character's own home, or empty for no specific location.
+#
+# programmer
+programmer;programmer_work_morning;9;Work;office_a;0.85;true
+programmer;programmer_lunch;12;Eat;cafe_a;0.7;false
+programmer;programmer_work_afternoon;14;Work;office_a;0.75;true
+programmer;programmer_social_evening;19;ReachOut;bar;0.5;false
+# barista
+barista;barista_work_morning;7;Work;cafe_a;0.85;true
+barista;barista_lunch;13;Eat;bistro;0.7;false
+barista;barista_rest_evening;19;SelfCare;HomeLocation;0.5;false
+# doctor
+doctor;doctor_work_morning;8;Work;clinic;0.85;true
+doctor;doctor_lunch;13;Eat;restaurant;0.7;false
+doctor;doctor_care_evening;20;SelfCare;HomeLocation;0.6;false
+# trainer
+trainer;trainer_work_morning;10;Work;gym;0.85;true
+trainer;trainer_lunch;13;Eat;cafe_a;0.7;false
+trainer;trainer_work_afternoon;16;Work;gym;0.7;true
+# shopkeeper
+shopkeeper;shopkeeper_work_morning;8;Work;supermarket;0.85;true
+shopkeeper;shopkeeper_lunch;12;Eat;supermarket;0.7;false
+shopkeeper;shopkeeper_work_afternoon;15;Work;supermarket;0.75;true
+# chef
+chef;chef_work_morning;10;Work;restaurant;0.85;true
+chef;chef_work_evening;17;Work;restaurant;0.8;true
+chef;chef_social_late;21;ReachOut;bar;0.5;false
+# librarian
+librarian;librarian_work_morning;9;Work;library;0.8;true
+librarian;librarian_create_afternoon;14;Create;library;0.7;true
+librarian;librarian_rest_evening;19;SelfCare;HomeLocation;0.5;false
+# clerk
+clerk;clerk_work_morning;9;Work;coworking;0.8;true
+clerk;clerk_lunch;12;Eat;supermarket;0.7;false
+clerk;clerk_work_afternoon;14;Work;coworking;0.75;true
+# barkeeper
+barkeeper;barkeeper_work_evening;17;Work;bar;0.85;true
+barkeeper;barkeeper_social_late;22;ReachOut;bar;0.6;false
+barkeeper;barkeeper_rest_morning;10;SelfCare;HomeLocation;0.5;false
+# baker — processes ingredients into bread/pastries at the bakery (Work-type, has ovens/tools)
+baker;baker_work_early;6;Work;bakery;0.85;true
+baker;baker_lunch;12;Eat;bakery;0.7;false
+baker;baker_work_afternoon;14;Work;bakery;0.7;true
+baker;baker_rest_evening;19;SelfCare;HomeLocation;0.5;false
+# farmer — grows crops/produce in the fields (Work-type, has farm tools)
+farmhand;farmhand_work_morning;6;Work;farm_fields;0.9;true
+farmhand;farmhand_eat_midday;12;Eat;HomeLocation;0.75;false
+farmhand;farmhand_work_afternoon;14;Work;farm_fields;0.75;true
+farmhand;farmhand_rest_evening;19;SelfCare;HomeLocation;0.5;false
+# food_worker — processes produce into packaged meals at the food factory
+food_worker;food_worker_work_morning;7;Work;food_factory;0.85;true
+food_worker;food_worker_lunch;12;Eat;food_factory;0.7;false
+food_worker;food_worker_work_afternoon;14;Work;food_factory;0.75;true
+food_worker;food_worker_social_evening;19;ReachOut;pub;0.5;false
+# orchardist — tends the orchard, harvesting fruit
+orchardist;orchardist_work_morning;7;Work;orchard;0.88;true
+orchardist;orchardist_lunch;12;Eat;HomeLocation;0.7;false
+orchardist;orchardist_work_afternoon;15;Work;orchard;0.72;true
+orchardist;orchardist_rest_evening;20;SelfCare;HomeLocation;0.5;false

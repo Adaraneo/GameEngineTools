@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>World Observer</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">🌍 World Observer</div>
+        <div class="clock" id="clock">—</div>
+        <div class="elapsed" id="elapsed" title="Uplynulý herní čas od spuštění světa">⏱ —</div>
+        <div class="elapsed" id="realElapsed" title="Reálný (skutečný) čas běhu od spuštění aplikace">🕒 —</div>
+        <div class="elapsed" id="popcount" title="Počet postav ve světě (celkem / živých)">👥 —</div>
+        <div class="controls">
+            <button id="btnPlay" title="Spustit">▶</button>
+            <button id="btnPause" title="Pauza">⏸</button>
+            <button id="btnStep" title="Krok" disabled>⏭</button>
+            <label class="speed">
+                Zpomalení
+                <input type="range" id="speed" min="0" max="2000" step="20" value="120" />
+                <span id="speedVal">120 ms</span>
+            </label>
+            <label class="speed" title="Kolik herního času uběhne za jeden tik (vyšší = svět běží rychleji)">
+                Tempo světa
+                <input type="range" id="tickmin" min="1" max="120" step="1" value="3" />
+                <span id="tickminVal">3 min/tik</span>
+            </label>
+            <button id="btnExport" title="Exportovat postavy do vybrané složky">⬇ Export</button>
+            <button id="btnImport" title="Importovat (přidat) postavy z vybrané složky">⬆ Import</button>
+            <button id="btnReplace" title="Nahradit celý svět postavami z vybrané složky (stávající se odstraní)">⟳ Nahradit</button>
+            <input type="file" id="importFiles" accept=".json" multiple hidden />
+            <span class="conn" id="conn">připojuji…</span>
+        </div>
+    </header>
+    <div id="toast" class="toast" hidden></div>
+
+    <main class="grid">
+        <section class="panel" id="panel-vitals">
+            <h2>Vitály postav</h2>
+            <div class="cards" id="vitals"></div>
+        </section>
+
+        <section class="panel" id="panel-graph">
+            <h2>Graf vztahů &amp; detail postavy</h2>
+            <svg id="graph" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="legend">Síla čáry = blízkost · <span class="lg-partner">♥ partner</span> · <span class="lg-strong">silný vztah</span> · <span class="lg-up">▲ prohlubuje</span>/<span class="lg-down">▼ ochlazuje</span> · klikni na postavu · ✝ = mrtvá</div>
+            <details id="metric-picker" class="metric-picker">
+                <summary>⚙ Metriky grafů</summary>
+                <div id="metric-picker-body"></div>
+            </details>
+            <div id="rel-detail" class="rel-detail">
+                <div class="rel-detail-hint">Klikni na postavu (v grafu nebo ve Vitálech) a uvidíš její pohyb, fyziologii, psychiku a vývoj vztahů.</div>
+            </div>
+        </section>
+
+        <section class="panel" id="panel-map">
+            <h2>Mapa / pohyb postav
+                <select id="mapMode" class="map-mode" title="Režim mapy">
+                    <option value="graph">Realistická (síť cest)</option>
+                    <option value="grid">Mřížka</option>
+                    <option value="list">Seznam lokací</option>
+                </select>
+            </h2>
+            <svg id="mapsvg" viewBox="0 0 800 560" preserveAspectRatio="xMidYMid meet"></svg>
+            <div id="maplist" hidden></div>
+            <div class="legend">Tečka = postava (jede po cestě) · uzel = lokace (<span style="color:#6da3ff">město</span>/<span style="color:var(--good)">příroda</span>) · čára = cesta · ✝ = mrtvá</div>
+        </section>
+
+        <section class="panel" id="panel-feed">
+            <h2>Živý feed dění</h2>
+            <ul id="feed"></ul>
+        </section>
+    </main>
+
+    <script src="lib/signalr/signalr.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPublishable>False</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameEngineTools\GameEngineTools.csproj" />
+  </ItemGroup>
+
+  <!-- Copy wwwroot physically so static files are served even when the app runs outside
+       the dev-time static-web-assets manifest (Production / IIS). web.config makes the build
+       output folder directly deployable to IIS (point the site's physical path at it). -->
+  <ItemGroup>
+    <Content Update="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="web.config" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    Self-contained: appsettings*.json + SourceFiles live in this project. The engine resolves them
+    relative to the working directory (ConfigProvider, FileSystemConstant). .json files are implicitly
+    Content (Web SDK glob) → Update forces an Always copy; the .csv data files are not, so they are
+    included explicitly. world.db self-seeds on first run.
+  -->
+  <ItemGroup>
+    <Content Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.Characters.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.World.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <!-- Reference default-config files copied to output so the defaults are available alongside the app. -->
+    <Content Update="*.Default.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="SourceFiles\**\*.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SourceFiles\**\*.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <!-- WorldObserver's own modern-city world: a disk-override seed the engine seeder loads
+         (SourceFiles\World\SQL\seed_data.sql) instead of the embedded medieval seed. -->
+    <Content Include="SourceFiles\**\*.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
