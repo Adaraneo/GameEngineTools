@@ -31,7 +31,8 @@ namespace WorldObserver.Simulation
         ICognitiveResolutionLevelRuntime Lod,
         IReadOnlyList<string> KnownLocations,
         IReadOnlyList<(string From, string To, double Dist)> Connections,
-        IReadOnlyDictionary<string, string> Regions);
+        IReadOnlyDictionary<string, string> Regions,
+        GameEngineTools.Characters.Engines.Status.StatusLedger? StatusLedger);
 
     /// <summary>
     /// Loads WorldObserver's world (a modern-day city) from the database and places the characters.
@@ -116,7 +117,8 @@ namespace WorldObserver.Simulation
                 services.GetRequiredService<IWorldObjectProvider>(),
                 // Realistic movement: MoveTo:* takes travel time (character is held in transit
                 // at its origin until the trip duration elapses) instead of teleporting.
-                new SceneOrchestratorOptions { EnableTravelTime = true },
+                // Cemetery location: dead are interred there; grievers route to visit.
+                new SceneOrchestratorOptions { EnableTravelTime = true, CemeteryLocationId = "cemetery" },
                 services.GetService<CommunityReputationLedger>(),
                 services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>(),
                 services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>());
@@ -131,8 +133,18 @@ namespace WorldObserver.Simulation
             var regions = allLocations.ToDictionary(id => id, id => worldMap.GetRegionOf(id) ?? "");
 
             return new WorldContext(
-                clock, people, locations, orchestrator,
-                objectCache, writeBuffer, respawn, lod, allLocations, connections, regions);
+                Clock: clock,
+                Characters: people,
+                Locations: locations,
+                Orchestrator: orchestrator,
+                ObjectCache: objectCache,
+                WriteBuffer: writeBuffer,
+                Respawn: respawn,
+                Lod: lod,
+                KnownLocations: allLocations,
+                Connections: connections,
+                Regions: regions,
+                StatusLedger: services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>());
         }
     }
 }

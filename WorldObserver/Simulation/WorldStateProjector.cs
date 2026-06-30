@@ -8,7 +8,9 @@ namespace WorldObserver.Simulation
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
+    using GameEngineTools.Characters.Engines.Status;
     using GameEngineTools.World.Location;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using WorldObserver.Dtos;
 
@@ -34,10 +36,14 @@ namespace WorldObserver.Simulation
             IReadOnlyList<string>? mapLocationIds = null,
             IReadOnlyList<(string From, string To, double Dist)>? mapConnections = null,
             System.Func<HumanId, (string Origin, string Destination, double Progress)?>? transitOf = null,
-            IReadOnlyDictionary<string, string>? regions = null)
+            IReadOnlyDictionary<string, string>? regions = null,
+            IWorldObjectProvider? objectProvider = null,
+            StatusLedger? statusLedger = null)
         {
             var idSet = characters.Select(c => c.Id).ToHashSet();
             var nameById = characters.ToDictionary(c => c.Id, c => c.Identity.FirstName.Original);
+            // Hierarchy stability is scene-global; read once and use for all character status DTOs.
+            var hierarchyStability = statusLedger?.HierarchyStability() ?? 1.0;
 
             var characterDtos = characters.Select(c =>
             {
@@ -106,6 +112,34 @@ namespace WorldObserver.Simulation
                         Protein: Round(nut.Protein),
                         BloodGlucose: Round(nut.BloodGlucoseLevel),
                         PostMealHours: Math.Round(nut.PostMealHours, 1)));
+
+                // Bereavement — map each active LossRecord to a flat LossDto.
+                var bereavementState = snap.Bereavement;
+                IReadOnlyList<LossDto>? losses = null;
+                if (bereavementState is { Losses.Count: > 0 })
+                {
+                    losses = bereavementState.Losses
+                        .Select(l => new LossDto(
+                            DeceasedId: l.DeceasedId.Value.ToString(),
+                            DeceasedName: nameById.TryGetValue(l.DeceasedId, out var dn) ? dn : l.DeceasedId.Value.ToString()[..8],
+                            KinRole: l.KinRole.ToString(),
+                            GriefIntensity: Round(l.GriefIntensity),
+                            Trajectory: l.Trajectory.ToString(),
+                            Bond: l.Bond.ToString(),
+                            Buried: l.Buried))
+                        .ToList();
+                }
+
+                // Social status — read from the ledger if available, fall back to snapshot.
+                StatusDto? socialStatus = null;
+                var snapStatus = statusLedger?.Get(c.Id) ?? snap.SocietalStatus;
+                if (snapStatus is { } ss)
+                {
+                    socialStatus = new StatusDto(
+                        Dominance: Round(ss.DominanceStatus),
+                        Prestige: Round(ss.PrestigeStatus),
+                        HierarchyStability: Math.Round(hierarchyStability, 3));
+                }
 
                 var preg = phy.Pregnancy;
                 var pp = phy.Postpartum;
@@ -221,7 +255,9 @@ namespace WorldObserver.Simulation
                     DeathCause: deathCause,
                     Interaction: interaction,
                     Bio: bio,
-                    Reproduction: reproduction);
+                    Reproduction: reproduction,
+                    Losses: losses,
+                    SocialStatus: socialStatus);
             }).ToList();
 
             // Dynamic map: list exactly the locations characters currently occupy (grouped from their
@@ -276,6 +312,26 @@ namespace WorldObserver.Simulation
                 }
             }
 
+            // Collect grave and corpse markers from the world objects for rendering on the map.
+            var graveMarkers = new List<GraveMarkerDto>();
+            if (objectProvider is not null)
+            {
+                foreach (var obj in objectProvider.GetAllObjects())
+                {
+                    if (obj.Category != WorldObjectCategory.Grave && obj.Category != WorldObjectCategory.Corpse)
+                        continue;
+                    if (!BurialObjects.TryGetDeceased(obj, out var deceasedId))
+                        continue;
+                    var deceasedName = nameById.TryGetValue(deceasedId, out var dn) ? dn : deceasedId.Value.ToString()[..8];
+                    graveMarkers.Add(new GraveMarkerDto(
+                        ObjectId: obj.Id,
+                        LocationId: obj.LocationId ?? "",
+                        DeceasedId: deceasedId.Value.ToString(),
+                        DeceasedName: deceasedName,
+                        IsGrave: obj.Category == WorldObjectCategory.Grave));
+                }
+            }
+
             return new WorldStateDto(
                 Time: now.ToString(),
                 Characters: characterDtos,
@@ -294,7 +350,8 @@ namespace WorldObserver.Simulation
                     .ToList(),
                 MapConnections: (mapConnections ?? System.Array.Empty<(string, string, double)>())
                     .Select(c => new MapConnectionDto(c.From, c.To, c.Dist))
-                    .ToList());
+                    .ToList(),
+                Graves: graveMarkers);
         }
 
         /// <summary>Formats a game-time span since launch as "Xd Yh Zm" using the world calendar's units.</summary>

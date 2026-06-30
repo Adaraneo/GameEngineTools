@@ -7,6 +7,7 @@ namespace WorldObserver.Simulation
     using System.Linq;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Bereavement;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
@@ -144,6 +145,9 @@ namespace WorldObserver.Simulation
                         }
                     }
 
+                    // (3c) Push bereavement domain events as Czech narrative lines.
+                    PushBereavementNarrative(now, chars, names);
+
                     // (4) Record movement trails every tick (push is throttled, so do this here).
                     UpdateTrails(chars);
 
@@ -201,7 +205,9 @@ namespace WorldObserver.Simulation
                 mapLocationIds: ctx.KnownLocations,
                 mapConnections: ctx.Connections,
                 transitOf: id => ctx.Orchestrator.GetTransit(id, now),
-                regions: ctx.Regions);
+                regions: ctx.Regions,
+                objectProvider: ctx.ObjectCache,
+                statusLedger: ctx.StatusLedger);
             _ = _hub.Clients.All.SendAsync("Tick", dto);
         }
 
@@ -230,6 +236,56 @@ namespace WorldObserver.Simulation
                     trail.Add(loc);
                     while (trail.Count > trailLength)
                         trail.RemoveAt(0);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Scans every character's outbox for bereavement domain events and pushes them to the
+        /// narrative feed as Czech-language lines. Called each tick from <c>OnTick</c>.
+        /// </summary>
+        private void PushBereavementNarrative(
+            WDateTime now,
+            IReadOnlyList<IHuman> chars,
+            IReadOnlyDictionary<HumanId, NarrativeCharacterInfo> names)
+        {
+            string ResolveName(HumanId id)
+                => names.TryGetValue(id, out var info) ? info.Name : id.Value.ToString()[..8];
+
+            foreach (var c in chars)
+            {
+                foreach (var ev in c.LastOutbox)
+                {
+                    string? text = null;
+                    string priority = "Medium";
+
+                    switch (ev)
+                    {
+                        case BereavementOnset onset:
+                            text = $"{ResolveName(onset.Human)} truchlí za {ResolveName(onset.Deceased)} (síla pouta {onset.BondStrength:F0}, příčina: {onset.Cause})";
+                            priority = "High";
+                            break;
+                        case GriefTrajectoryAssigned traj:
+                            text = $"{ResolveName(traj.Human)}: přiřazena trajektorie žalu — {traj.Trajectory}";
+                            break;
+                        case FuneralHeld funeral:
+                            text = $"Pohřeb: {ResolveName(funeral.Human)} pohřbil(a) {ResolveName(funeral.Deceased)} ({funeral.Attendees} účastníků)";
+                            priority = "High";
+                            break;
+                        case Buried burial:
+                            text = $"{ResolveName(burial.Human)} pohřbil(a) {ResolveName(burial.Deceased)}";
+                            priority = "High";
+                            break;
+                        case GraveVisited visit:
+                            text = $"{ResolveName(visit.Human)} navštívil(a) hrob {ResolveName(visit.Deceased)}";
+                            break;
+                    }
+
+                    if (text is not null)
+                    {
+                        var dto = new NarrativeDto(now.ToString(), ResolveName(c.Id), text, priority);
+                        _ = _hub.Clients.All.SendAsync("Narrative", dto);
+                    }
                 }
             }
         }

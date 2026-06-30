@@ -19,7 +19,16 @@ namespace WorldObserver.Dtos
         string Elapsed,
         string RealElapsed,
         IReadOnlyList<MapLocationDto> MapLocations,
-        IReadOnlyList<MapConnectionDto> MapConnections);
+        IReadOnlyList<MapConnectionDto> MapConnections,
+        IReadOnlyList<GraveMarkerDto> Graves);
+
+    /// <summary>A grave or corpse world object placed in the world (cemetery or death site).</summary>
+    public sealed record GraveMarkerDto(
+        string ObjectId,
+        string LocationId,
+        string DeceasedId,
+        string DeceasedName,
+        bool IsGrave);
 
     /// <summary>A location on the spatial map (stable across ticks — used to lay out the movement view).</summary>
     public sealed record MapLocationDto(string Id, string DisplayName, string Region);
@@ -92,7 +101,27 @@ namespace WorldObserver.Dtos
         // ── Biological cycles ─────────────────────────────────────────────────
         BioDto Bio,
         // ── Reproduction ──────────────────────────────────────────────────────
-        ReproductionDto Reproduction);
+        ReproductionDto Reproduction,
+        // ── Bereavement (active grief losses) ────────────────────────────────
+        IReadOnlyList<LossDto>? Losses,
+        // ── Emergent social status (dominance + prestige axes, orthogonal) ────
+        StatusDto? SocialStatus);
+
+    /// <summary>One active grief loss the character is currently carrying.</summary>
+    public sealed record LossDto(
+        string DeceasedId,
+        string DeceasedName,
+        string KinRole,
+        double GriefIntensity,
+        string Trajectory,
+        string Bond,
+        bool Buried);
+
+    /// <summary>Emergent social status on both orthogonal axes (dominance and prestige are never collapsed).</summary>
+    public sealed record StatusDto(
+        double Dominance,
+        double Prestige,
+        double HierarchyStability);
 
     /// <summary>Reproductive state — pregnancy, postpartum, contraception, fertile window.</summary>
     public sealed record ReproductionDto(

@@ -47,6 +47,16 @@ let histId = null;
 
 const edgeKey = (e) => e.from + "|" + e.to;
 const isDead = (id) => last.statusById.get(id) === "Dead";
+// Status helpers: format Dominance / Prestige as compact badges.
+function statusBadge(status) {
+    if (!status) return null;
+    const dom = Math.round(status.dominance);
+    const pre = Math.round(status.prestige);
+    const span = el("span", { class: "status-badge" });
+    span.appendChild(el("span", { class: "status-dom " + (dom > 60 ? "hi" : dom < 40 ? "lo" : "mid"), text: "D:" + dom }));
+    span.appendChild(el("span", { class: "status-pre " + (pre > 60 ? "hi" : pre < 40 ? "lo" : "mid"), text: " P:" + pre }));
+    return span;
+}
 // Display name of a character's partner (KinRole == Partner), or null.
 const partnerNameOf = (id) => {
     for (const e of last.edges) {
@@ -354,6 +364,10 @@ function renderVitals(characters) {
         e.name.appendChild(el("span", { class: "cid", text: " #" + c.id.slice(0, 8) }));
         const partner = partnerNameOf(c.id);
         if (partner) e.name.appendChild(el("span", { class: "partner-badge", text: "♥ " + partner }));
+        if (c.losses && c.losses.length > 0)
+            e.name.appendChild(el("span", { class: "grief-badge", text: " ✦ truchlí" }));
+        const sb = statusBadge(c.socialStatus);
+        if (sb) e.name.appendChild(sb);
 
         let sub = `${c.sex} · ${orientLabel(c.orientation)}, ${c.age} let${c.occupation ? " · " + c.occupation : ""} · ${c.status}`;
         if (c.status === "Dead" && c.deathCause) sub += ` (${c.deathCause})`;
@@ -497,6 +511,34 @@ function renderMap(state) {
     const byLoc = new Map();
     for (const c of state.characters) {
         const arr = byLoc.get(c.location) || []; arr.push(c.id); byLoc.set(c.location, arr);
+    }
+
+    // Render grave / corpse markers: stable SVG elements keyed by objectId.
+    const gravesSeen = new Set();
+    for (const gr of (state.graves || [])) {
+        gravesSeen.add(gr.objectId);
+        const pos = mapLayout.get(gr.locationId);
+        if (!pos) continue;
+        let ge = mapDots.get("grave:" + gr.objectId);
+        if (!ge) {
+            const g = svgEl("g", { class: "map-grave" });
+            const sym = svgEl("text", { class: gr.isGrave ? "grave-sym" : "corpse-sym", x: 0, y: 0, "text-anchor": "middle", "dominant-baseline": "central" });
+            sym.textContent = gr.isGrave ? "+" : "☠";
+            const title = svgEl("title", {});
+            g.appendChild(sym); g.appendChild(title);
+            dotLayer.appendChild(g);
+            ge = { g, sym, title };
+            mapDots.set("grave:" + gr.objectId, ge);
+        }
+        ge.title.textContent = (gr.isGrave ? "Hrob: " : "Mrtvola: ") + gr.deceasedName;
+        ge.g.setAttribute("transform", `translate(${pos.x.toFixed(1)},${pos.y.toFixed(1)})`);
+    }
+    // Remove stale grave markers.
+    for (const [key, ge] of mapDots) {
+        if (key.startsWith("grave:") && !gravesSeen.has(key.slice(6))) {
+            ge.g.remove();
+            mapDots.delete(key);
+        }
     }
 
     const seen = new Set();
@@ -1117,6 +1159,32 @@ function renderDetail() {
             reproRows.push(row("Po porodu", `${rr.postpartumPhase} · ${rr.postpartumDays} dní`));
         }
         box.appendChild(section("Reprodukce", reproRows));
+
+        // Social status (Dominance + Prestige — two orthogonal axes, never collapsed)
+        if (c.socialStatus) {
+            const ss = c.socialStatus;
+            const ssRows = [
+                dimRow("Dominance", ss.dominance, undefined),
+                dimRow("Prestiž", ss.prestige, undefined),
+                dimRow("Stabilita hierarchie", ss.hierarchyStability * 100, undefined),
+            ];
+            box.appendChild(section("Emergentní status", ssRows));
+        }
+
+        // Bereavement — active grief losses
+        if (c.losses && c.losses.length > 0) {
+            const berRows = [];
+            for (const loss of c.losses) {
+                const nm = loss.deceasedName || loss.deceasedId.slice(0, 8);
+                const kinTxt = loss.kinRole && loss.kinRole !== "None" ? ` (${loss.kinRole})` : "";
+                berRows.push(row("Zemřel/a" + kinTxt, nm));
+                berRows.push(dimRow("Intenzita žalu", loss.griefIntensity, undefined));
+                berRows.push(row("Trajektorie", loss.trajectory));
+                berRows.push(row("Pouto", loss.bond));
+                berRows.push(row("Pohřben/a", loss.buried ? "ano" : "ne"));
+            }
+            box.appendChild(section("Truchlení (DPM)", berRows));
+        }
 
         // Self-concept
         appendSection(box, "Sebepojetí", c, p, [

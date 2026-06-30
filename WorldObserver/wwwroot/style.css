@@ -232,4 +232,21 @@ body {
 #feed li.Medium { border-left: 3px solid var(--warn); }
 #feed li.Low { border-left: 3px solid var(--line); }
 
+/* ── Status badges (Dominance / Prestige) on character cards ── */
+.status-badge { font-size: 0.65rem; font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: 0.4rem; }
+.status-dom, .status-pre { padding: 0 0.2rem; border-radius: 3px; }
+.status-dom.hi { color: var(--bad); font-weight: 700; }
+.status-dom.lo { color: var(--muted); }
+.status-dom.mid { color: var(--text); }
+.status-pre.hi { color: var(--good); font-weight: 700; }
+.status-pre.lo { color: var(--muted); }
+.status-pre.mid { color: var(--text); }
+
+/* ── Grief badge on character cards ── */
+.grief-badge { font-size: 0.65rem; color: #c8a0ff; margin-left: 0.3rem; white-space: nowrap; }
+
+/* ── Grave / corpse SVG markers on the map ── */
+.grave-sym { fill: #8b8b8b; font-size: 11px; cursor: default; }
+.corpse-sym { fill: var(--bad); font-size: 11px; cursor: default; opacity: 0.75; }
+
 @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
