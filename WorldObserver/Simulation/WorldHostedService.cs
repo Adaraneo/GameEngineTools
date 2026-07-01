@@ -322,19 +322,24 @@ namespace WorldObserver.Simulation
             var list = new List<CharacterFileDto>();
             if (chars is null) return list;
 
-            Directory.CreateDirectory(genFile.NPCDirectory); // Export writes here; ensure it exists.
+            // data/npcs is used ONLY as a scratch dir: each character is written, read back into the
+            // returned bundle, and its file deleted immediately — nothing is persisted or depended on
+            // (the whole dir may be deleted/overwritten between runs; it is re-created on demand).
+            Directory.CreateDirectory(genFile.NPCDirectory);
 
             foreach (var person in chars)
             {
                 string json;
+                var written = string.Empty;
                 try
                 {
                     // Export writes a CharacterData file into NPCDirectory and returns its name;
                     // read it back from there (the returned value is not a cwd-rooted full path).
-                    var written = genFile.Export(new NPC(100, person));
-                    json = File.ReadAllText(Path.Combine(genFile.NPCDirectory, Path.GetFileName(written)));
+                    written = Path.Combine(genFile.NPCDirectory, Path.GetFileName(genFile.Export(new NPC(100, person))));
+                    json = File.ReadAllText(written);
                 }
                 catch (Exception ex) { _log.LogWarning(ex, "Export of {Id} failed.", person.Id.Value); continue; }
+                finally { if (written.Length > 0) { try { File.Delete(written); } catch { /* best-effort */ } } }
                 // Unique, human-readable file name (id suffix avoids collisions between same-named characters).
                 var fileName = Sanitize(person.Identity.FirstName.Original) + "_" + person.Id.Value.ToString()[..8] + ".json";
                 list.Add(new CharacterFileDto(fileName, json));

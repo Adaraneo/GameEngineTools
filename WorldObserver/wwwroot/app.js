@@ -139,13 +139,8 @@ function toast(msg) {
     toastTimer = setTimeout(() => { toastEl.hidden = true; }, 4500);
 }
 
-async function writeFile(dir, name, text) {
-    const h = await dir.getFileHandle(name, { create: true });
-    const w = await h.createWritable();
-    await w.write(text);
-    await w.close();
-}
-
+// Export = one portable JSON file with complete world data (world time + every character's full
+// CharacterData). Works in any browser (plain download); server uses data/npcs only as scratch.
 async function exportCharacters() {
     let bundle;
     try {
@@ -156,23 +151,13 @@ async function exportCharacters() {
     const files = bundle.characters || [];
     if (!files.length) { toast("Žádné postavy k exportu."); return; }
 
-    if (window.showDirectoryPicker) {
-        try {
-            const dir = await window.showDirectoryPicker({ mode: "readwrite", id: "wo-characters" });
-            for (const f of files) await writeFile(dir, f.fileName, f.json);
-            // World clock alongside the characters — restored on a "replace" import.
-            await writeFile(dir, "_world.json", JSON.stringify({ worldTimeTicks: bundle.worldTimeTicks }));
-            toast(`Exportováno ${files.length} postav + čas světa do vybrané složky.`);
-        } catch (e) { if (e.name !== "AbortError") toast("Export selhal: " + e.message); }
-    } else {
-        const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "world-characters.json";
-        a.click();
-        URL.revokeObjectURL(a.href);
-        toast(`Staženo ${files.length} postav + čas světa (bundle) — prohlížeč nepodporuje výběr složky.`);
-    }
+    const blob = new Blob([JSON.stringify(bundle)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "world_" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast(`Exportováno ${files.length} postav + čas světa do souboru.`);
 }
 
 async function postImport(files, replace, worldTimeTicks) {
@@ -223,25 +208,16 @@ function collectImport(entries) {
     return { files, worldTimeTicks };
 }
 
-let fallbackReplace = false;
-async function importCharacters(replace) {
-    if (replace && !confirm("Nahradit celý svět postavami ze složky? Stávající postavy budou odstraněny a čas světa se obnoví z exportu.")) return;
-    if (window.showDirectoryPicker) {
-        try {
-            const dir = await window.showDirectoryPicker({ id: "wo-characters" });
-            const entries = [];
-            for await (const handle of dir.values()) {
-                if (handle.kind === "file" && handle.name.toLowerCase().endsWith(".json")) {
-                    entries.push({ name: handle.name, text: await (await handle.getFile()).text() });
-                }
-            }
-            const { files, worldTimeTicks } = collectImport(entries);
-            await postImport(files, replace, worldTimeTicks);
-        } catch (e) { if (e.name !== "AbortError") toast("Import selhal: " + e.message); }
-    } else {
-        fallbackReplace = replace;
-        $("importFiles").click(); // fallback: multi-file picker
-    }
+// Import = upload file(s). "Import" adds one or more characters (individual files or an export
+// bundle); "Nahradit" takes one complete-data file, replaces the world and restores its clock.
+let pendingReplace = false;
+function importCharacters(replace) {
+    if (replace && !confirm("Nahradit celý svět daty ze souboru? Stávající postavy budou odstraněny a čas světa se obnoví z exportu.")) return;
+    pendingReplace = replace;
+    const input = $("importFiles");
+    input.multiple = !replace;          // additive = 1+ soubory; nahradit = jeden kompletní soubor
+    input.value = "";
+    input.click();
 }
 
 $("btnExport").addEventListener("click", exportCharacters);
@@ -254,7 +230,7 @@ $("importFiles").addEventListener("change", async (ev) => {
         if (file.name.toLowerCase().endsWith(".json")) entries.push({ name: file.name, text: await file.text() });
     }
     ev.target.value = "";
-    const replace = fallbackReplace; fallbackReplace = false;
+    const replace = pendingReplace; pendingReplace = false;
     const { files, worldTimeTicks } = collectImport(entries);
     await postImport(files, replace, worldTimeTicks);
 });

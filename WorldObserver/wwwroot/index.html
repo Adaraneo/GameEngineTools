@@ -27,10 +27,10 @@
                 <input type="range" id="tickmin" min="1" max="120" step="1" value="3" />
                 <span id="tickminVal">3 min/tik</span>
             </label>
-            <button id="btnExport" title="Exportovat postavy do vybrané složky">⬇ Export</button>
-            <button id="btnImport" title="Importovat (přidat) postavy z vybrané složky">⬆ Import</button>
-            <button id="btnReplace" title="Nahradit celý svět postavami z vybrané složky (stávající se odstraní)">⟳ Nahradit</button>
-            <input type="file" id="importFiles" accept=".json" multiple hidden />
+            <button id="btnExport" title="Stáhnout kompletní data světa (čas + všechny postavy) do jednoho JSON souboru">⬇ Export</button>
+            <button id="btnImport" title="Přidat jednu či více postav ze souboru(ů)">⬆ Import</button>
+            <button id="btnReplace" title="Nahradit celý svět z jednoho kompletního JSON souboru (stávající se odstraní, čas se obnoví)">⟳ Nahradit</button>
+            <input type="file" id="importFiles" accept=".json,application/json" multiple hidden />
             <span class="conn" id="conn">připojuji…</span>
         </div>
     </header>
