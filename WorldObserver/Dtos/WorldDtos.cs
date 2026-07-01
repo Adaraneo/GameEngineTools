@@ -262,6 +262,9 @@ namespace WorldObserver.Dtos
     /// <summary>One exported/imported character: the file name to use and its full CharacterData JSON.</summary>
     public sealed record CharacterFileDto(string FileName, string Json);
 
+    /// <summary>Export payload: the world clock (portable WorldTicks) plus the characters.</summary>
+    public sealed record ExportBundleDto(long WorldTimeTicks, IReadOnlyList<CharacterFileDto> Characters);
+
     /// <summary>A location and who is currently standing in it.</summary>
     public sealed record LocationDto(
         string Id,

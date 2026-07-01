@@ -93,7 +93,8 @@ namespace WorldObserver.Simulation
             // Character export/import (folder chosen in the browser; import applied on the sim thread).
             var genFile = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
             _liveChars = ctx.Characters;
-            _port.Configure(() => ExportLiveCharacters(genFile));
+            // Export bundles the current world clock (portable WorldTicks) with the characters.
+            _port.Configure(() => new ExportBundleDto(ctx.Clock.Now.WorldTicks, ExportLiveCharacters(genFile)));
 
             // Mutable so newborns can be added to the narrative resolver as they are born.
             var names = ctx.Characters.ToDictionary(
@@ -134,9 +135,18 @@ namespace WorldObserver.Simulation
 
                     // (3b) Track the live roster (for export) and apply any queued character imports.
                     _liveChars = chars;
-                    if (_port.TryTakeImportBatch(out var importFiles, out var replace))
+                    if (_port.TryTakeImportBatch(out var importFiles, out var replace, out var worldTimeTicks))
                     {
                         if (replace) ResetWorld(ctx, scene, names);
+
+                        // Restore the saved world clock on a replace (world is restored, not reloaded).
+                        if (replace && worldTimeTicks > 0)
+                        {
+                            ctx.Clock.SetNow(new WDateTime(worldTimeTicks));
+                            _startTime = ctx.Clock.Now; // re-baseline the "elapsed since start" readout
+                            _log.LogInformation("World clock restored to {Time}.", ctx.Clock.Now);
+                        }
+
                         var batch = new HashSet<HumanId>();
                         foreach (var f in importFiles)
                         {

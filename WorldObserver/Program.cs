@@ -35,7 +35,7 @@ app.MapHub<WorldHub>("/world");
 app.MapGet("/api/characters/export", (CharacterPort port) =>
     port.Ready ? Results.Json(port.Export()) : Results.StatusCode(503));
 
-app.MapPost("/api/characters/import", (CharacterPort port, List<WorldObserver.Dtos.CharacterFileDto> files, bool replace = false) =>
-    Results.Json(new { accepted = port.QueueImport(files ?? new List<WorldObserver.Dtos.CharacterFileDto>(), replace) }));
+app.MapPost("/api/characters/import", (CharacterPort port, List<WorldObserver.Dtos.CharacterFileDto> files, bool replace = false, long worldTimeTicks = 0) =>
+    Results.Json(new { accepted = port.QueueImport(files ?? new List<WorldObserver.Dtos.CharacterFileDto>(), replace, worldTimeTicks) }));
 
 app.Run();

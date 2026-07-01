@@ -139,74 +139,104 @@ function toast(msg) {
     toastTimer = setTimeout(() => { toastEl.hidden = true; }, 4500);
 }
 
+async function writeFile(dir, name, text) {
+    const h = await dir.getFileHandle(name, { create: true });
+    const w = await h.createWritable();
+    await w.write(text);
+    await w.close();
+}
+
 async function exportCharacters() {
-    let files;
+    let bundle;
     try {
         const res = await fetch("/api/characters/export");
         if (!res.ok) { toast("Export: svět ještě není připraven."); return; }
-        files = await res.json();
+        bundle = await res.json();               // { worldTimeTicks, characters }
     } catch (e) { toast("Export selhal: " + e.message); return; }
+    const files = bundle.characters || [];
     if (!files.length) { toast("Žádné postavy k exportu."); return; }
 
     if (window.showDirectoryPicker) {
         try {
             const dir = await window.showDirectoryPicker({ mode: "readwrite", id: "wo-characters" });
-            for (const f of files) {
-                const h = await dir.getFileHandle(f.fileName, { create: true });
-                const w = await h.createWritable();
-                await w.write(f.json);
-                await w.close();
-            }
-            toast(`Exportováno ${files.length} postav do vybrané složky.`);
+            for (const f of files) await writeFile(dir, f.fileName, f.json);
+            // World clock alongside the characters — restored on a "replace" import.
+            await writeFile(dir, "_world.json", JSON.stringify({ worldTimeTicks: bundle.worldTimeTicks }));
+            toast(`Exportováno ${files.length} postav + čas světa do vybrané složky.`);
         } catch (e) { if (e.name !== "AbortError") toast("Export selhal: " + e.message); }
     } else {
-        // Fallback (non-Chromium): download a single bundle the fallback import can re-read.
-        const blob = new Blob([JSON.stringify(files, null, 2)], { type: "application/json" });
+        const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = "world-characters.json";
         a.click();
         URL.revokeObjectURL(a.href);
-        toast(`Staženo ${files.length} postav (bundle) — prohlížeč nepodporuje výběr složky.`);
+        toast(`Staženo ${files.length} postav + čas světa (bundle) — prohlížeč nepodporuje výběr složky.`);
     }
 }
 
-async function postImport(files, replace) {
-    if (!files.length) { toast("Žádné platné soubory postav."); return; }
+async function postImport(files, replace, worldTimeTicks) {
+    if (!files.length && !(replace && worldTimeTicks)) { toast("Žádné platné soubory postav."); return; }
     try {
-        const res = await fetch("/api/characters/import?replace=" + (replace ? "true" : "false"), {
+        const res = await fetch(`/api/characters/import?replace=${replace ? "true" : "false"}&worldTimeTicks=${worldTimeTicks || 0}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(files),
         });
         const r = await res.json();
-        toast(`${replace ? "Nahrazeno" : "Import"}: přijato ${r.accepted} postav (objeví se v příštích ticích).`);
+        const timeNote = replace && worldTimeTicks ? " + čas světa obnoven" : "";
+        toast(`${replace ? "Nahrazeno" : "Import"}: přijato ${r.accepted} postav${timeNote} (projeví se v příštích ticích).`);
     } catch (e) { toast("Import selhal: " + e.message); }
 }
 
-// Accepts either individual CharacterData files or an exported bundle (array of {fileName, json}).
-async function readImportFile(file) {
-    const text = await file.text();
+// Parses one picked file into { chars:[{fileName,json}], worldTimeTicks }. Handles: the world-time
+// sidecar (_world.json), a full export bundle ({worldTimeTicks, characters}), a legacy array bundle,
+// or a single CharacterData file.
+function parseImportFile(name, text) {
+    if (name.toLowerCase() === "_world.json") {
+        try { return { chars: [], worldTimeTicks: Number(JSON.parse(text).worldTimeTicks) || 0 }; }
+        catch { return { chars: [], worldTimeTicks: 0 }; }
+    }
     try {
         const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) return parsed.filter((e) => e && e.json).map((e) => ({ fileName: e.fileName || file.name, json: e.json }));
-    } catch { /* not a bundle — treat as a single character */ }
-    return [{ fileName: file.name, json: text }];
+        if (Array.isArray(parsed)) {
+            return { chars: parsed.filter((e) => e && e.json).map((e) => ({ fileName: e.fileName || name, json: e.json })), worldTimeTicks: 0 };
+        }
+        if (parsed && Array.isArray(parsed.characters)) {
+            return {
+                chars: parsed.characters.filter((e) => e && e.json).map((e) => ({ fileName: e.fileName || name, json: e.json })),
+                worldTimeTicks: Number(parsed.worldTimeTicks) || 0,
+            };
+        }
+    } catch { /* not JSON container — treat as a single character */ }
+    return { chars: [{ fileName: name, json: text }], worldTimeTicks: 0 };
+}
+
+// Merges parsed entries ({name, text}) into { files, worldTimeTicks }.
+function collectImport(entries) {
+    const files = []; let worldTimeTicks = 0;
+    for (const { name, text } of entries) {
+        const r = parseImportFile(name, text);
+        files.push(...r.chars);
+        if (r.worldTimeTicks) worldTimeTicks = r.worldTimeTicks;
+    }
+    return { files, worldTimeTicks };
 }
 
 let fallbackReplace = false;
 async function importCharacters(replace) {
-    if (replace && !confirm("Nahradit celý svět postavami ze složky? Všechny stávající postavy budou odstraněny.")) return;
+    if (replace && !confirm("Nahradit celý svět postavami ze složky? Stávající postavy budou odstraněny a čas světa se obnoví z exportu.")) return;
     if (window.showDirectoryPicker) {
         try {
             const dir = await window.showDirectoryPicker({ id: "wo-characters" });
-            const files = [];
+            const entries = [];
             for await (const handle of dir.values()) {
                 if (handle.kind === "file" && handle.name.toLowerCase().endsWith(".json")) {
-                    files.push(...(await readImportFile(await handle.getFile())));
+                    entries.push({ name: handle.name, text: await (await handle.getFile()).text() });
                 }
             }
-            await postImport(files, replace);
+            const { files, worldTimeTicks } = collectImport(entries);
+            await postImport(files, replace, worldTimeTicks);
         } catch (e) { if (e.name !== "AbortError") toast("Import selhal: " + e.message); }
     } else {
         fallbackReplace = replace;
@@ -219,13 +249,14 @@ $("btnImport").addEventListener("click", () => importCharacters(false));
 $("btnReplace").addEventListener("click", () => importCharacters(true));
 $("importFiles").addEventListener("change", async (ev) => {
     const picked = Array.from(ev.target.files || []);
-    const files = [];
+    const entries = [];
     for (const file of picked) {
-        if (file.name.toLowerCase().endsWith(".json")) files.push(...(await readImportFile(file)));
+        if (file.name.toLowerCase().endsWith(".json")) entries.push({ name: file.name, text: await file.text() });
     }
     ev.target.value = "";
     const replace = fallbackReplace; fallbackReplace = false;
-    await postImport(files, replace);
+    const { files, worldTimeTicks } = collectImport(entries);
+    await postImport(files, replace, worldTimeTicks);
 });
 
 function reflectPaused(paused) {
