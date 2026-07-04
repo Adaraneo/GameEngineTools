@@ -387,6 +387,43 @@ namespace GameEngineTools.Logging
 
         #endregion Interests (RIASEC) — 5400
 
+        #region Values (Schwartz) — 5700
+
+        /// <summary>
+        /// Per-tick snapshot of the Schwartz Basic Human Values profile — current vs. baseline.
+        /// Both Current and Baseline dimensions are logged so the LogReader can chart
+        /// drift over time. Values are in [0..1].
+        /// </summary>
+        [LoggerMessage(
+            EventId = 5700,
+            Level = LogLevel.Debug,
+            Message = "[VALUES] {HumanId} Ben:{Benevolence:F3} Uni:{Universalism:F3} SelfDir:{SelfDirection:F3} Stim:{Stimulation:F3} Hed:{Hedonism:F3} Ach:{Achievement:F3} Pow:{Power:F3} Sec:{Security:F3} Conf:{Conformity:F3} Trad:{Tradition:F3} | base Ben:{BaseBenevolence:F3} Uni:{BaseUniversalism:F3} SelfDir:{BaseSelfDirection:F3} Stim:{BaseStimulation:F3} Hed:{BaseHedonism:F3} Ach:{BaseAchievement:F3} Pow:{BasePower:F3} Sec:{BaseSecurity:F3} Conf:{BaseConformity:F3} Trad:{BaseTradition:F3}")]
+        public static partial void ValuesSnapshot(
+            this ILogger logger,
+            string HumanId,
+            double Benevolence,
+            double Universalism,
+            double SelfDirection,
+            double Stimulation,
+            double Hedonism,
+            double Achievement,
+            double Power,
+            double Security,
+            double Conformity,
+            double Tradition,
+            double BaseBenevolence,
+            double BaseUniversalism,
+            double BaseSelfDirection,
+            double BaseStimulation,
+            double BaseHedonism,
+            double BaseAchievement,
+            double BasePower,
+            double BaseSecurity,
+            double BaseConformity,
+            double BaseTradition);
+
+        #endregion Values (Schwartz) — 5700
+
         #region Dark Core (D-factor) — 5500
 
         /// <summary>

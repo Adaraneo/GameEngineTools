@@ -809,6 +809,19 @@ namespace GameEngineTools.Characters.Core
                         bas.Social, bas.Enterprising, bas.Conventional);
                 }
 
+                // Schwartz Basic Human Values — current vs baseline drift; logged per-tick.
+                if (s.Values is { } vals)
+                {
+                    var curV = vals.Current;
+                    var basV = vals.Baseline;
+                    _log.ValuesSnapshot(
+                        Id.Value.ToString(),
+                        curV.Benevolence, curV.Universalism, curV.SelfDirection, curV.Stimulation, curV.Hedonism,
+                        curV.Achievement, curV.Power, curV.Security, curV.Conformity, curV.Tradition,
+                        basV.Benevolence, basV.Universalism, basV.SelfDirection, basV.Stimulation, basV.Hedonism,
+                        basV.Achievement, basV.Power, basV.Security, basV.Conformity, basV.Tradition);
+                }
+
                 // Dark Core (D-factor) — snapshot per-tick when the profile is present.
                 // Characters generated before Stage 3 have a null DarkCore; skip them.
                 if (Personality.DarkCore is { } dc)
