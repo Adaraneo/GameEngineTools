@@ -16,6 +16,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Simulation;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using System;
@@ -520,6 +521,168 @@ namespace EngineTests
                 0.000001,
                 "Pouhá přítomnost substringu 'help' v nesémantickém parametru nesmí vytvořit Reliable belief.");
         }
+
+        #region Transference (Topic C) — SignificantOthers storage + perturbation
+
+        private FacialMorphology MakeFace(int seed = 1)
+        {
+            var rngFactory = ServiceProvider.GetRequiredService<GameEngineTools.Characters.Hosting.Defaults.IRandomSourceFactory>();
+            return new GameEngineTools.Characters.Generation.AppearanceGenerator(rngFactory)
+                .Generate(SexBiology.Female, seed).Face;
+        }
+
+        private SignificantOtherImprint MakeImprint(double significance, PersonBeliefKind kind = PersonBeliefKind.Warm, double strength = 0.8)
+            => new(
+                SourcePersonId: new HumanId(Guid.NewGuid()),
+                CapturedAt: new WDateTime(0),
+                FaceSummary: MakeFace(),
+                PersonalitySummary: new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                DominantBeliefKind: kind,
+                DominantBeliefStrength: strength,
+                Significance: significance);
+
+        [TestMethod]
+        public void SignificantOthers_SurvivesForgetPerson()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new MemoryEncoded(new WDateTime(0), self, Guid.NewGuid(), 0.5,
+                "Interaction:Validation:accepted", "PerceivedWarmth:Interaction:Validation:accepted",
+                other, new PersonBeliefEvidence(other, PersonBeliefKind.Warm, 0.5, "test")), ctx, new EventCollector());
+            Assert.IsNotNull(engine.State.GetBeliefs(other));
+
+            var imprint = MakeImprint(80.0);
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, imprint), ctx, new EventCollector());
+            Assert.AreEqual(1, engine.State.SignificantOthersOrEmpty.Count);
+
+            engine.ForgetPerson(other);
+
+            Assert.IsNull(engine.State.GetBeliefs(other), "ForgetPerson should still remove the person's beliefs");
+            Assert.AreEqual(1, engine.State.SignificantOthersOrEmpty.Count,
+                "SignificantOthers must survive ForgetPerson — retained independently of People");
+        }
+
+        [TestMethod]
+        public void SignificantOthers_CappedAtMax_EvictsLowestSignificance()
+        {
+            var engine = BuildEngine(); // default MaxSignificantOtherImprints = 3
+            var self = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(30.0)), ctx, new EventCollector());
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(50.0)), ctx, new EventCollector());
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(70.0)), ctx, new EventCollector());
+            Assert.AreEqual(3, engine.State.SignificantOthersOrEmpty.Count);
+
+            // A weaker new capture than the current weakest (30.0) must be discarded.
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(10.0)), ctx, new EventCollector());
+
+            Assert.AreEqual(3, engine.State.SignificantOthersOrEmpty.Count, "Cap must not be exceeded");
+            Assert.IsFalse(engine.State.SignificantOthersOrEmpty.Any(i => i.Significance == 10.0),
+                "A weaker capture than every retained imprint must be discarded, not evict a stronger one");
+        }
+
+        [TestMethod]
+        public void SignificantOthers_HigherSignificanceReplacesLowest_WhenAtCapacity()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(30.0)), ctx, new EventCollector());
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(50.0)), ctx, new EventCollector());
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(70.0)), ctx, new EventCollector());
+
+            engine.Handle(new SignificantOtherImprintCaptured(new WDateTime(0), self, MakeImprint(90.0)), ctx, new EventCollector());
+
+            var significances = engine.State.SignificantOthersOrEmpty.Select(i => i.Significance).OrderBy(x => x).ToList();
+            Assert.AreEqual(3, significances.Count);
+            CollectionAssert.AreEqual(new[] { 50.0, 70.0, 90.0 }, significances,
+                "The new higher-significance imprint should replace the lowest (30.0) retained one");
+        }
+
+        [TestMethod]
+        public void TransferenceActivated_AppliesLowStabilityBelief_ToNewPersonBeliefSet()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var newPerson = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new TransferenceActivated(
+                new WDateTime(0), self, newPerson, PersonBeliefKind.Rejecting, SourceBeliefStrength: 0.8, Resemblance: 0.9),
+                ctx, new EventCollector());
+
+            var beliefs = engine.State.GetBeliefs(newPerson);
+            Assert.IsNotNull(beliefs);
+            Assert.IsTrue(beliefs!.StrengthOf(PersonBeliefKind.Rejecting) > 0.0,
+                "TransferenceActivated should seed a belief of the transferred kind on the new person");
+        }
+
+        [TestMethod]
+        public void TransferredBelief_HasLowStability_ComparedToEvidenceAccruedBelief()
+        {
+            var config = new SemanticMemoryConfig();
+            var transferEngine = BuildEngine();
+            var evidenceEngine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var newPerson = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            transferEngine.Handle(new TransferenceActivated(
+                new WDateTime(0), self, newPerson, PersonBeliefKind.Warm, SourceBeliefStrength: 0.8, Resemblance: 0.9),
+                ctx, new EventCollector());
+
+            for (var i = 0; i < 4; i++)
+            {
+                evidenceEngine.Handle(new MemoryEncoded(new WDateTime(i), self, Guid.NewGuid(), 0.7,
+                    "Interaction:Validation:accepted", "PerceivedWarmth:Interaction:Validation:accepted",
+                    newPerson, new PersonBeliefEvidence(newPerson, PersonBeliefKind.Warm, 0.5, "test-warm")), ctx, new EventCollector());
+            }
+
+            var transferredStability = transferEngine.State.GetBeliefs(newPerson)!.Beliefs[PersonBeliefKind.Warm].Stability;
+            var evidenceStability = evidenceEngine.State.GetBeliefs(newPerson)!.Beliefs[PersonBeliefKind.Warm].Stability;
+
+            Assert.AreEqual(config.TransferenceInitialStability, transferredStability, 0.0001);
+            Assert.IsTrue(evidenceStability > transferredStability,
+                $"Evidence-accrued Stability ({evidenceStability:F2}) should exceed transferred Stability ({transferredStability:F2})");
+        }
+
+        [TestMethod]
+        public void TransferredBelief_OverriddenQuickly_ByContradictingRealEvidence()
+        {
+            // Mirrors the existing Handle_RepeatedContradiction_WeakensEstablishedRejectingBelief
+            // pattern: seed a transferred Rejecting belief, then feed repeated real Warm evidence,
+            // and assert the transferred belief's influence has become negligible.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var newPerson = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new TransferenceActivated(
+                new WDateTime(0), self, newPerson, PersonBeliefKind.Rejecting, SourceBeliefStrength: 0.9, Resemblance: 0.9),
+                ctx, new EventCollector());
+            var before = engine.State.GetBeliefs(newPerson)!.StrengthOf(PersonBeliefKind.Rejecting);
+            Assert.IsTrue(before > 0.0);
+
+            for (var i = 0; i < 6; i++)
+            {
+                engine.Handle(new MemoryEncoded(new WDateTime(1 + i), self, Guid.NewGuid(), 0.7,
+                    "Interaction:Validation:accepted", "PerceivedWarmth:Interaction:Validation:accepted",
+                    newPerson, new PersonBeliefEvidence(newPerson, PersonBeliefKind.Warm, 0.5, "test-warm")), ctx, new EventCollector());
+            }
+
+            var after = engine.State.GetBeliefs(newPerson)!.StrengthOf(PersonBeliefKind.Rejecting);
+
+            Assert.IsTrue(after < before * 0.7,
+                $"Repeated contradicting real evidence should substantially weaken the transferred belief " +
+                $"(before={before:F3}, after={after:F3})");
+        }
+
+        #endregion Transference
 
         private static DefaultSemanticMemoryEngine BuildEngine()
             => new(Options.Create(new SemanticMemoryConfig()));

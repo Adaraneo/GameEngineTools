@@ -1739,6 +1739,766 @@ namespace EngineTests
 
         #endregion Investment model (Rusbult) testy
 
+        #region Four Horsemen (Gottman 1994, descriptive) + Demand/Withdraw testy
+
+        [TestMethod]
+        public void DefensiveActPerformed_ReducesComfortAndTrust_NotIrreversible()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, _outbox);
+            var before = engine.State.Edges[other];
+
+            engine.Handle(new DefensiveActPerformed(_now, self, other), ctx, _outbox);
+            var after = engine.State.Edges[other];
+
+            Assert.IsTrue(after.Comfort < before.Comfort,
+                $"Defensiveness should reduce Comfort (before={before.Comfort:F1}, after={after.Comfort:F1})");
+            Assert.IsTrue(after.Trust < before.Trust,
+                $"Defensiveness should reduce Trust (before={before.Trust:F1}, after={after.Trust:F1})");
+            Assert.IsFalse(after.IsContemptuouslyDestroyed,
+                "Defensiveness is reversible — must never trip the contempt-only irreversibility flag");
+        }
+
+        [TestMethod]
+        public void StonewallingActPerformed_ReducesCloseness_NotIrreversible()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            // FirstImpressionFormed seeds Closeness at 0 (halo effect only touches Trust/Comfort/
+            // Respect), which cannot decrease further — start from an established edge instead.
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 40,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 20, SexualInterest: 20,
+                    Closeness: 40, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+            var before = engine.State.Edges[other];
+
+            engine.Handle(new StonewallingActPerformed(_now, self, other), ctx, _outbox);
+            var after = engine.State.Edges[other];
+
+            Assert.IsTrue(after.Closeness < before.Closeness,
+                $"Stonewalling should reduce Closeness (before={before.Closeness:F1}, after={after.Closeness:F1})");
+            Assert.IsFalse(after.IsContemptuouslyDestroyed,
+                "Stonewalling is reversible — must never trip the contempt-only irreversibility flag");
+        }
+
+        [TestMethod]
+        public void DemandWithdrawScore_AccumulatesAcrossRepeatedNegativeEvents_WithoutRepair()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, _outbox);
+            Assert.AreEqual(0.0, engine.State.Edges[other].DemandWithdrawScore, 0.0001);
+
+            engine.Handle(new MicroNegative(_now, self, other, "criticism"), ctx, _outbox);
+            var afterOne = engine.State.Edges[other].DemandWithdrawScore;
+
+            engine.Handle(new StonewallingActPerformed(_now, self, other), ctx, _outbox);
+            var afterTwo = engine.State.Edges[other].DemandWithdrawScore;
+
+            Assert.IsTrue(afterOne > 0.0, "First negative event should raise DemandWithdrawScore above 0");
+            Assert.IsTrue(afterTwo > afterOne,
+                "Recurring negative events without repair should keep raising DemandWithdrawScore");
+        }
+
+        [TestMethod]
+        public void DemandWithdrawScore_ReducedByAcceptedRepairAttempt()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 40,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 20, SexualInterest: 20,
+                    Closeness: 40, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    DemandWithdrawScore: 40.0)
+            }));
+
+            var before = engine.State.Edges[other].DemandWithdrawScore;
+            engine.Handle(new RepairAttempt(_now, self, other, Accepted: true), ctx, _outbox);
+            var after = engine.State.Edges[other].DemandWithdrawScore;
+
+            Assert.IsTrue(after < before,
+                $"Accepted RepairAttempt should reduce DemandWithdrawScore (before={before:F1}, after={after:F1})");
+        }
+
+        [TestMethod]
+        public void DemandWithdrawScore_DecaysOverTime_WhenNoNewEvents()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 40,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 20, SexualInterest: 20,
+                    Closeness: 40, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    DemandWithdrawScore: 40.0)
+            }));
+
+            var before = engine.State.Edges[other].DemandWithdrawScore;
+            engine.Tick(_now, WTimeSpan.FromDays(30), ctx, _outbox);
+            var after = engine.State.Edges[other].DemandWithdrawScore;
+
+            Assert.IsTrue(after < before,
+                $"DemandWithdrawScore should decay without reinforcement (before={before:F1}, after={after:F1})");
+        }
+
+        [TestMethod]
+        public void ConflictTrajectory_BandsReflectScoreThresholds()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+
+            RelationshipEdge MakeScoredEdge(double score) => new(self, other,
+                Like: 60, Trust: 60, Familiarity: 40,
+                AestheticAttraction: 50, PhysicalAttraction: 50,
+                IntimateAffinity: 20, SexualInterest: 20,
+                Closeness: 40, Respect: 55, Comfort: 50,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                DemandWithdrawScore: score);
+
+            Assert.AreEqual(ConflictTrajectoryReading.Stable, MakeScoredEdge(10.0).ConflictTrajectory);
+            Assert.AreEqual(ConflictTrajectoryReading.Escalating, MakeScoredEdge(30.0).ConflictTrajectory);
+            Assert.AreEqual(ConflictTrajectoryReading.Entrenched, MakeScoredEdge(70.0).ConflictTrajectory);
+        }
+
+        [TestMethod]
+        public void RejectedRepairAttempt_HighAvoidance_MoreLikelyStonewalling()
+        {
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                new AttachmentProfile(Anxiety: 0.2, Avoidance: 0.9),
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var (stonewallCount, defensiveCount) = SampleRejectedRepairClassification(personality, draws: 300);
+
+            Assert.IsTrue(stonewallCount > defensiveCount,
+                $"High avoidance should skew rejected repairs toward stonewalling (stonewall={stonewallCount}, defensive={defensiveCount})");
+        }
+
+        [TestMethod]
+        public void RejectedRepairAttempt_LowAvoidance_MoreLikelyDefensive()
+        {
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                new AttachmentProfile(Anxiety: 0.2, Avoidance: 0.1),
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var (stonewallCount, defensiveCount) = SampleRejectedRepairClassification(personality, draws: 300);
+
+            Assert.IsTrue(defensiveCount > stonewallCount,
+                $"Low avoidance should skew rejected repairs toward defensiveness (stonewall={stonewallCount}, defensive={defensiveCount})");
+        }
+
+        [TestMethod]
+        public void RejectedRepairAttempt_ExistingRupturePenalty_StillApplied()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, _outbox);
+            _outbox.Drain();
+            var before = engine.State.Edges[other].Trust;
+
+            engine.Handle(new RepairAttempt(_now, self, other, Accepted: false), ctx, _outbox);
+            var after = engine.State.Edges[other].Trust;
+
+            Assert.AreEqual(before - DefaultCfg.RupturePenalty, after, 0.0001,
+                "Rejected RepairAttempt must still apply the existing flat RupturePenalty regardless of the new classification");
+
+            var classificationEvents = _outbox.Drain()
+                .Where(e => e is StonewallingActPerformed || e is DefensiveActPerformed)
+                .ToList();
+            Assert.AreEqual(1, classificationEvents.Count,
+                "Exactly one classification event (Stonewalling XOR Defensive) should be emitted additively");
+        }
+
+        [TestMethod]
+        public void Commitment_ReducedByHighDemandWithdrawScore_ButRemainsSmallRelativeToSatisfaction()
+        {
+            // Matched-magnitude scenario: identical satisfying edges, one with a maxed-out
+            // DemandWithdrawScore. The conflict-trajectory penalty must move Commitment,
+            // but by far less than the satisfaction/investment terms already do.
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+
+            RelationshipEdge MakeEdge(double demandWithdrawScore) => new(self, other,
+                Like: 80, Trust: 80, Familiarity: 60,
+                AestheticAttraction: 50, PhysicalAttraction: 50,
+                IntimateAffinity: 10, SexualInterest: 10,
+                Closeness: 80, Respect: 65, Comfort: 80,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                PositiveInteractionCount: 50,
+                InvestmentSize: 50.0,
+                DemandWithdrawScore: demandWithdrawScore);
+
+            var withConflict = BuildEngine();
+            var withoutConflict = BuildEngine();
+            var ctx = BuildContext(self);
+
+            withConflict.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = MakeEdge(100.0) }));
+            withoutConflict.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = MakeEdge(0.0) }));
+
+            // 15 days is long enough for CommitmentDriftPerDay's per-tick step to fully reach the
+            // target (not be capped by the drift-rate ceiling), so the two scenarios' Commitment
+            // actually reflects their differing targets rather than an identical capped step.
+            withConflict.Tick(_now, WTimeSpan.FromDays(15), ctx, _outbox);
+            withoutConflict.Tick(_now, WTimeSpan.FromDays(15), ctx, _outbox);
+
+            var commitmentWithConflict = withConflict.State.Edges[other].Commitment;
+            var commitmentWithoutConflict = withoutConflict.State.Edges[other].Commitment;
+
+            Assert.IsTrue(commitmentWithConflict < commitmentWithoutConflict,
+                "A maxed-out DemandWithdrawScore should reduce Commitment relative to an otherwise identical edge");
+
+            var conflictReduction = commitmentWithoutConflict - commitmentWithConflict;
+            var satisfactionAndInvestmentTerm = (80.0 + 80.0 + 80.0) / 3.0 - DefaultCfg.ComparisonLevelBaseline
+                + 50.0 * DefaultCfg.CommitmentInvestmentWeight;
+
+            Assert.IsTrue(conflictReduction < satisfactionAndInvestmentTerm * 0.5,
+                $"Conflict-trajectory reduction ({conflictReduction:F2}) must stay small relative to the " +
+                $"satisfaction/investment contribution ({satisfactionAndInvestmentTerm:F2}) — guards against " +
+                "future config drift accidentally amplifying it into a doom-loop.");
+        }
+
+        [TestMethod]
+        public void Commitment_ZeroDemandWithdrawScore_UnaffectedByTask_D5_Change()
+        {
+            // Regression guard: DemandWithdrawScore = 0 (the default) must reproduce the exact
+            // pre-Task-D.5 Commitment target — the existing Investment Model tests implicitly
+            // rely on this.
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 80, Trust: 80, Familiarity: 60,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 10, SexualInterest: 10,
+                    Closeness: 80, Respect: 65, Comfort: 80,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 50,
+                    InvestmentSize: 50.0)
+            }));
+
+            var before = engine.State.Edges[other].Commitment;
+            engine.Tick(_now, WTimeSpan.FromDays(3), ctx, _outbox);
+            var after = engine.State.Edges[other].Commitment;
+
+            Assert.IsTrue(after > before,
+                $"Commitment should still grow in a satisfying high-investment bond with zero conflict trajectory (before={before:F1}, after={after:F1})");
+        }
+
+        /// <summary>
+        /// Runs many independent rejected-RepairAttempt draws against a fresh edge/engine each
+        /// time (classification is stateless per draw — only Attachment.Avoidance and the RNG
+        /// matter), tallying how often each failure mode was emitted.
+        /// </summary>
+        private (int Stonewall, int Defensive) SampleRejectedRepairClassification(Personality personality, int draws)
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var rng = new SeededRandomSource(12345);
+
+            var ctx = new HumanContext
+            {
+                Id = self,
+                Biology = SexBiology.Female,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = new EnginesSnapshot(
+                    new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                    new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral),
+                    new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                    new InteractionSurface(null, false, 0.3, 0.3, SurfaceKind.Unknown),
+                    new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                    new MemoryIndex(new List<EpisodicMemory>())),
+                Random = rng,
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+
+            var engine = BuildEngine();
+            engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 60, Attraction: 50), ctx, _outbox);
+            _outbox.Drain();
+
+            var stonewall = 0;
+            var defensive = 0;
+            for (var i = 0; i < draws; i++)
+            {
+                engine.Handle(new RepairAttempt(_now, self, other, Accepted: false), ctx, _outbox);
+                foreach (var evt in _outbox.Drain())
+                {
+                    if (evt is StonewallingActPerformed)
+                    {
+                        stonewall++;
+                    }
+                    else if (evt is DefensiveActPerformed)
+                    {
+                        defensive++;
+                    }
+                }
+            }
+
+            return (stonewall, defensive);
+        }
+
+        private sealed class SeededRandomSource : IRandomSource
+        {
+            private readonly System.Random _r;
+
+            public SeededRandomSource(int seed) => _r = new System.Random(seed);
+
+            public int Next(int min, int max) => _r.Next(min, max);
+
+            public double NextUnit() => _r.NextDouble();
+
+            public bool Chance(double p) => _r.NextDouble() < p;
+        }
+
+        #endregion Four Horsemen (Gottman 1994, descriptive) + Demand/Withdraw testy
+
+        #region Jealousy gap-fill (Buss et al. 1992; Dijkstra & Buunk 1998; Pollet & Saxton 2020) testy
+
+        private static RelationshipEdge JealousyActorEdge(HumanId self, HumanId actor) => new(self, actor,
+            Like: 60, Trust: 60, Familiarity: 40,
+            AestheticAttraction: 50, PhysicalAttraction: 50,
+            IntimateAffinity: 60, SexualInterest: 60,
+            Closeness: 50, Respect: 55, Comfort: 50,
+            Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
+
+        [TestMethod]
+        public void JealousyIntimateAct_IncreasesRivalHostility_TowardTarget()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = JealousyActorEdge(self, actor),
+                [target] = new RelationshipEdge(self, target,
+                    Like: 55, Trust: 55, Familiarity: 20,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: 10, Respect: 50, Comfort: 40,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            var before = engine.State.Edges[target];
+            engine.Handle(new ThirdPartyActionObserved(_now, self, actor, target, Valence: 0.0, ThirdPartyObservationType.IntimateAct), ctx, _outbox);
+            var after = engine.State.Edges[target];
+
+            Assert.IsTrue(after.Like < before.Like,
+                $"Rival edge Like should decrease from witnessed jealousy (before={before.Like:F1}, after={after.Like:F1})");
+            Assert.IsTrue(after.Respect < before.Respect,
+                $"Rival edge Respect should decrease from witnessed jealousy (before={before.Respect:F1}, after={after.Respect:F1})");
+        }
+
+        [TestMethod]
+        public void JealousyIntimateAct_BothEdgesChangeSimultaneously_FromOneEvent()
+        {
+            // Existing JealousyDistressApplied behavior (Self->Actor edge) must remain unchanged
+            // alongside the new rival-edge propagation (Self->Target edge).
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = JealousyActorEdge(self, actor),
+                [target] = new RelationshipEdge(self, target,
+                    Like: 55, Trust: 55, Familiarity: 20,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: 10, Respect: 50, Comfort: 40,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            var beforeActor = engine.State.Edges[actor];
+            var beforeTarget = engine.State.Edges[target];
+
+            engine.Handle(new ThirdPartyActionObserved(_now, self, actor, target, Valence: 0.0, ThirdPartyObservationType.IntimateAct), ctx, _outbox);
+
+            var afterActor = engine.State.Edges[actor];
+            var afterTarget = engine.State.Edges[target];
+
+            Assert.IsTrue(afterActor.TransgressionResidue > beforeActor.TransgressionResidue,
+                "Self->Actor TransgressionResidue jealousy path must remain unchanged by the rival-edge addition");
+            Assert.IsTrue(afterTarget.Like < beforeTarget.Like,
+                "Self->Target rival edge must also change from the same single event");
+        }
+
+        [TestMethod]
+        public void RivalAttractivenessModifier_HighAttractiveness_IncreasesJealousyIntensity()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var lowAttractiveTarget = new HumanId(Guid.NewGuid());
+            var highAttractiveTarget = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            var lowEngine = BuildEngine();
+            lowEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = JealousyActorEdge(self, actor),
+                [lowAttractiveTarget] = new RelationshipEdge(self, lowAttractiveTarget,
+                    Like: 55, Trust: 55, Familiarity: 20,
+                    AestheticAttraction: 10, PhysicalAttraction: 10,
+                    IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: 10, Respect: 50, Comfort: 40,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            var highEngine = BuildEngine();
+            highEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = JealousyActorEdge(self, actor),
+                [highAttractiveTarget] = new RelationshipEdge(self, highAttractiveTarget,
+                    Like: 55, Trust: 55, Familiarity: 20,
+                    AestheticAttraction: 90, PhysicalAttraction: 90,
+                    IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: 10, Respect: 50, Comfort: 40,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            lowEngine.Handle(new ThirdPartyActionObserved(_now, self, actor, lowAttractiveTarget, 0.0, ThirdPartyObservationType.IntimateAct), ctx, _outbox);
+            highEngine.Handle(new ThirdPartyActionObserved(_now, self, actor, highAttractiveTarget, 0.0, ThirdPartyObservationType.IntimateAct), ctx, _outbox);
+
+            var lowResidue = lowEngine.State.Edges[actor].TransgressionResidue;
+            var highResidue = highEngine.State.Edges[actor].TransgressionResidue;
+
+            Assert.IsTrue(highResidue > lowResidue,
+                $"A more attractive rival should intensify jealousy (low={lowResidue:F2}, high={highResidue:F2})");
+        }
+
+        [TestMethod]
+        public void RivalAttractivenessModifier_NoRivalDominanceEffect()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var lowDominanceTarget = new HumanId(Guid.NewGuid());
+            var highDominanceTarget = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+
+            RelationshipEdge RivalEdge(HumanId target, double dominance) => new(self, target,
+                Like: 55, Trust: 55, Familiarity: 20,
+                AestheticAttraction: 50, PhysicalAttraction: 50,
+                IntimateAffinity: 0, SexualInterest: 0,
+                Closeness: 10, Respect: 50, Comfort: 40,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                PerceivedDominance: dominance);
+
+            var lowDomEngine = BuildEngine();
+            lowDomEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = JealousyActorEdge(self, actor),
+                [lowDominanceTarget] = RivalEdge(lowDominanceTarget, 20.0)
+            }));
+
+            var highDomEngine = BuildEngine();
+            highDomEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = JealousyActorEdge(self, actor),
+                [highDominanceTarget] = RivalEdge(highDominanceTarget, 90.0)
+            }));
+
+            lowDomEngine.Handle(new ThirdPartyActionObserved(_now, self, actor, lowDominanceTarget, 0.0, ThirdPartyObservationType.IntimateAct), ctx, _outbox);
+            highDomEngine.Handle(new ThirdPartyActionObserved(_now, self, actor, highDominanceTarget, 0.0, ThirdPartyObservationType.IntimateAct), ctx, _outbox);
+
+            var lowResidue = lowDomEngine.State.Edges[actor].TransgressionResidue;
+            var highResidue = highDomEngine.State.Edges[actor].TransgressionResidue;
+
+            Assert.AreEqual(lowResidue, highResidue, 0.0001,
+                "Rival PerceivedDominance must have zero effect on jealousy intensity (Pollet & Saxton 2020: confirmed only for rival attractiveness, not dominance)");
+        }
+
+        [TestMethod]
+        public void EmotionalIntimacyAct_FemaleObserver_HigherJealousyThanMale()
+        {
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var femaleSelf = new HumanId(Guid.NewGuid());
+            var maleSelf = new HumanId(Guid.NewGuid());
+
+            var femaleEngine = BuildEngine();
+            femaleEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [actor] = JealousyActorEdge(femaleSelf, actor) }));
+            var maleEngine = BuildEngine();
+            maleEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [actor] = JealousyActorEdge(maleSelf, actor) }));
+
+            femaleEngine.Handle(new ThirdPartyActionObserved(_now, femaleSelf, actor, target, 0.0, ThirdPartyObservationType.EmotionalIntimacyAct),
+                BuildContextWithBiology(femaleSelf, SexBiology.Female), _outbox);
+            maleEngine.Handle(new ThirdPartyActionObserved(_now, maleSelf, actor, target, 0.0, ThirdPartyObservationType.EmotionalIntimacyAct),
+                BuildContextWithBiology(maleSelf, SexBiology.Male), _outbox);
+
+            var femaleResidue = femaleEngine.State.Edges[actor].TransgressionResidue;
+            var maleResidue = maleEngine.State.Edges[actor].TransgressionResidue;
+
+            Assert.IsTrue(femaleResidue > maleResidue,
+                $"EmotionalIntimacyAct should intensify jealousy more for female observers, inverting the " +
+                $"IntimateAct sex pattern (Buss et al. 1992; Harris 2003) (female={femaleResidue:F2}, male={maleResidue:F2})");
+        }
+
+        [TestMethod]
+        public void ApplyJealousyReaction_SharedLogic_BothObservationTypesConsistent()
+        {
+            // IntimateAct+Male and EmotionalIntimacyAct+Female both resolve to the same 1.2×
+            // biasMultiplier — the shared ApplyJealousyReaction helper must therefore produce
+            // numerically identical behavior regardless of which branch invoked it.
+            var actor = new HumanId(Guid.NewGuid());
+            var target = new HumanId(Guid.NewGuid());
+            var maleSelf = new HumanId(Guid.NewGuid());
+            var femaleSelf = new HumanId(Guid.NewGuid());
+
+            var intimateEngine = BuildEngine();
+            intimateEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [actor] = JealousyActorEdge(maleSelf, actor) }));
+            var emotionalEngine = BuildEngine();
+            emotionalEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [actor] = JealousyActorEdge(femaleSelf, actor) }));
+
+            intimateEngine.Handle(new ThirdPartyActionObserved(_now, maleSelf, actor, target, 0.0, ThirdPartyObservationType.IntimateAct),
+                BuildContextWithBiology(maleSelf, SexBiology.Male), _outbox);
+            emotionalEngine.Handle(new ThirdPartyActionObserved(_now, femaleSelf, actor, target, 0.0, ThirdPartyObservationType.EmotionalIntimacyAct),
+                BuildContextWithBiology(femaleSelf, SexBiology.Female), _outbox);
+
+            var intimateResidue = intimateEngine.State.Edges[actor].TransgressionResidue;
+            var emotionalResidue = emotionalEngine.State.Edges[actor].TransgressionResidue;
+
+            Assert.AreEqual(intimateResidue, emotionalResidue, 0.0001,
+                "Both branches route through the shared ApplyJealousyReaction helper with matching " +
+                "bias multipliers (1.2) and must produce identical numeric behavior.");
+        }
+
+        [TestMethod]
+        public void EmotionalIntimacyAct_EmittedOnHighAffinityLowSexualSelfDisclosure_WithObservers()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var observer = new HumanId(Guid.NewGuid());
+            var ctx = BuildContextWithObservers(self, new List<HumanId> { observer });
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 40,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 60, SexualInterest: 10,
+                    Closeness: 50, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+
+            var emitted = _outbox.Drain().OfType<ThirdPartyActionObserved>()
+                .Where(e => e.Type == ThirdPartyObservationType.EmotionalIntimacyAct)
+                .ToList();
+
+            Assert.AreEqual(1, emitted.Count, "EmotionalIntimacyAct should be emitted to the observer");
+            Assert.AreEqual(observer, emitted[0].Observer);
+        }
+
+        [TestMethod]
+        public void EmotionalIntimacyAct_NotEmitted_WhenSexualInterestAboveCeiling()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var observer = new HumanId(Guid.NewGuid());
+            var ctx = BuildContextWithObservers(self, new List<HumanId> { observer });
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 40,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 60, SexualInterest: 40,
+                    Closeness: 50, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+
+            var emitted = _outbox.Drain().OfType<ThirdPartyActionObserved>()
+                .Where(e => e.Type == ThirdPartyObservationType.EmotionalIntimacyAct)
+                .ToList();
+
+            Assert.AreEqual(0, emitted.Count,
+                "SexualInterest above the ceiling should be classified as sexual, not emotional, intimacy");
+        }
+
+        [TestMethod]
+        public void IntimateAct_StillEmitted_Unaffected_ByEmotionalIntimacyActAddition()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var observer = new HumanId(Guid.NewGuid());
+            var ctx = BuildContextWithObservers(self, new List<HumanId> { observer });
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 60, Trust: 60, Familiarity: 40,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 60, SexualInterest: 60,
+                    Closeness: 50, Respect: 55, Comfort: 50,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
+            }));
+
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.Invite), ctx, _outbox);
+
+            var emitted = _outbox.Drain().OfType<ThirdPartyActionObserved>()
+                .Where(e => e.Type == ThirdPartyObservationType.IntimateAct)
+                .ToList();
+
+            Assert.AreEqual(1, emitted.Count, "IntimateAct emission must be unaffected by the EmotionalIntimacyAct addition");
+        }
+
+        /// <summary>Builds a context with a specific biology, otherwise identical to <see cref="BuildContext"/>.</summary>
+        private IHumanContext BuildContextWithBiology(HumanId id, SexBiology biology)
+        {
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+
+            var snapshot = new EnginesSnapshot(
+                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                new PsychologyState(0.0, 0.5, 0.5, 0, 0, DiscreteEmotion.Neutral),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new InteractionSurface(null, false, 0.3, 0.3, SurfaceKind.Unknown),
+                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(new List<EpisodicMemory>()));
+
+            return new HumanContext
+            {
+                Id = id,
+                Biology = biology,
+                Personality = personality,
+                PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
+            };
+        }
+
+        #endregion Jealousy gap-fill testy
+
+        #region Transference (Topic C) — SignificantOtherThresholdCrossed emission
+
+        [TestMethod]
+        public void SignificantOtherThresholdCrossed_EmittedOnce_WhenCommitmentCrossesThreshold()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 90, Trust: 90, Familiarity: 80,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 20, SexualInterest: 20,
+                    Closeness: 90, Respect: 80, Comfort: 90,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 60,
+                    Commitment: 60.0,
+                    InvestmentSize: 80.0)
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(20), ctx, outbox);
+
+            var events = outbox.Drain().OfType<SignificantOtherThresholdCrossed>().ToList();
+            Assert.AreEqual(1, events.Count, "Should emit exactly once when Commitment crosses the significant-other threshold");
+            Assert.AreEqual(self, events[0].Self);
+            Assert.AreEqual(other, events[0].Other);
+            Assert.IsTrue(engine.State.Edges[other].SignificantOtherImprinted, "Latch should be set after emission");
+        }
+
+        [TestMethod]
+        public void SignificantOtherThresholdCrossed_DoesNotReFire_IfCommitmentDropsAndRises()
+        {
+            // Once already imprinted, the latch must never re-arm — even if Commitment later falls
+            // below the threshold and rises back above it (unlike DissolutionConsidered's latch).
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            var outbox = new EventCollector();
+
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [other] = new RelationshipEdge(self, other,
+                    Like: 90, Trust: 90, Familiarity: 80,
+                    AestheticAttraction: 50, PhysicalAttraction: 50,
+                    IntimateAffinity: 20, SexualInterest: 20,
+                    Closeness: 90, Respect: 80, Comfort: 90,
+                    Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    PositiveInteractionCount: 60,
+                    Commitment: 20.0,
+                    InvestmentSize: 80.0,
+                    SignificantOtherImprinted: true)
+            }));
+
+            engine.Tick(_now, WTimeSpan.FromDays(20), ctx, outbox);
+
+            Assert.IsTrue(engine.State.Edges[other].Commitment >= DefaultCfg.SignificantOtherCommitmentThreshold,
+                "Sanity check: Commitment should have risen back above threshold this tick");
+            Assert.IsFalse(outbox.Drain().OfType<SignificantOtherThresholdCrossed>().Any(),
+                "Latch must not re-fire once already imprinted, even after Commitment falls and rises again");
+        }
+
+        #endregion Transference (Topic C) — SignificantOtherThresholdCrossed emission
+
         #region Factory metody
 
         /// <summary>Sestaví engine s konfigurací dle <see cref="DefaultCfg"/>.</summary>

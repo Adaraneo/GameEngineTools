@@ -23,6 +23,16 @@ namespace GameEngineTools.Characters.Traits
     ///     (deactivation strategy).</item>
     /// </list>
     /// </para>
+    /// <para>
+    /// <b>Relationship to transference (<see cref="GameEngineTools.Characters.Engines.SemanticMemory.SignificantOtherImprint"/>):</b>
+    /// AttachmentProfile is a general, trait-like relational style applied to every new person.
+    /// Transference is a separate, resemblance-gated, memory-activated perturbation that only
+    /// applies to specific new people who resemble a specific past significant other, and decays
+    /// quickly as real evidence accrues. The two are complementary and must never be merged into a
+    /// single computation (Brumbaugh &amp; Fraley 2006 empirically demonstrate both operating
+    /// simultaneously: general attachment style applies to all targets, more strongly when the
+    /// target resembles a past partner).
+    /// </para>
     /// </remarks>
     public sealed record AttachmentProfile(
         /// <summary>

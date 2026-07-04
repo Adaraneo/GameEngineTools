@@ -152,6 +152,15 @@ namespace GameEngineTools.World.Simulation
         private readonly HashSet<HumanId> _corpseSpawned = new();
 
         /// <summary>
+        /// Optional Relationships configuration, read for the transference subsystem's thresholds
+        /// and sex-weighting (Topic C: <see cref="RelationshipsConfig.SignificantOtherCommitmentThreshold"/>,
+        /// <see cref="RelationshipsConfig.TransferenceActivationThreshold"/>, etc.). <c>null</c> disables
+        /// transference entirely (default — preserves legacy behavior); significant-other imprint
+        /// capture still requires this to compute resemblance weighting.
+        /// </summary>
+        private readonly RelationshipsConfig? _relationshipsConfig;
+
+        /// <summary>
         /// Characters currently travelling between locations, keyed by id. Populated only when
         /// <see cref="SceneOrchestratorOptions.EnableTravelTime"/> is enabled: a <c>MoveTo:*</c>
         /// records the destination and arrival time here instead of relocating instantly, and the
@@ -207,7 +216,8 @@ namespace GameEngineTools.World.Simulation
             SceneOrchestratorOptions options,
             CommunityReputationLedger? reputationLedger = null,
             Characters.Engines.Status.StatusLedger? statusLedger = null,
-            Objects.IMutableWorldObjectProvider? mutableObjects = null)
+            Objects.IMutableWorldObjectProvider? mutableObjects = null,
+            RelationshipsConfig? relationshipsConfig = null)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -223,6 +233,7 @@ namespace GameEngineTools.World.Simulation
             _reputationLedger = reputationLedger;
             _statusLedger = statusLedger;
             _mutableObjects = mutableObjects;
+            _relationshipsConfig = relationshipsConfig;
         }
 
         #endregion Constructor
@@ -279,6 +290,12 @@ namespace GameEngineTools.World.Simulation
 
             // Physical burial: inter corpses with a co-located mourner and fire graveside visits.
             RouteBurial(now, chars);
+
+            // ── Transference (Topic C) ────────────────────────────────────────────
+            // Fold last tick's SignificantOtherThresholdCrossed events into full imprints before
+            // this tick's FireFirstImpressions, so a newly-crossed threshold is available for
+            // resemblance-checking against people met in a later substep.
+            RouteSignificantOtherImprints(now, chars);
 
             // ── Social functions ──────────────────────────────────────────────────
             FireFirstImpressions(now, chars);
@@ -430,6 +447,88 @@ namespace GameEngineTools.World.Simulation
         }
 
         #endregion Bereavement
+
+        #region Transference
+
+        /// <summary>
+        /// Folds every <see cref="SignificantOtherThresholdCrossed"/> event emitted in the previous
+        /// tick into a full <see cref="SignificantOtherImprint"/>, resolving the Other person's
+        /// appearance and personality via the orchestrator's full <see cref="IHuman"/> roster (the
+        /// same access pattern <see cref="FireFirstImpressions"/> already uses for
+        /// <see cref="IAttractionCalculator"/>), then delivers a
+        /// <see cref="SignificantOtherImprintCaptured"/> event back into Self's inbox.
+        /// </summary>
+        private void RouteSignificantOtherImprints(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            var byId = chars.ToDictionary(c => c.Id);
+
+            foreach (var character in chars)
+            {
+                foreach (var evt in character.LastOutbox.OfType<SignificantOtherThresholdCrossed>())
+                {
+                    if (!byId.TryGetValue(evt.Other, out var other))
+                        continue; // Other no longer present in the scene roster (e.g. moved away) — skip capture
+
+                    var beliefs = character.Snapshot.SemanticMemory?.GetBeliefs(evt.Other);
+                    var dominant = beliefs?.Beliefs.Values.OrderByDescending(b => b.Strength).FirstOrDefault();
+                    if (dominant is null)
+                        continue; // no belief pattern to transfer yet — skip rather than capture an empty imprint
+
+                    var imprint = new SignificantOtherImprint(
+                        evt.Other, now,
+                        other.PhysicalAppearance.Face,
+                        other.Personality.BigFive,
+                        dominant.Kind,
+                        dominant.Strength,
+                        evt.Commitment);
+
+                    character.ReceiveEvent(new SignificantOtherImprintCaptured(now, character.Id, imprint));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Checks <paramref name="observer"/>'s stored <see cref="SignificantOtherImprint"/>s for
+        /// resemblance to a newly-met <paramref name="target"/>, emitting
+        /// <see cref="TransferenceActivated"/> when the best match crosses the activation threshold.
+        /// No-op without <see cref="_relationshipsConfig"/> configured (transference disabled by
+        /// default) or when the observer has no stored imprints (cheap early exit — comparison stays
+        /// O(imprints), never O(all known people)).
+        /// </summary>
+        private void CheckTransference(WDateTime now, IHuman observer, IHuman target)
+        {
+            if (_relationshipsConfig is null)
+                return;
+
+            var imprints = observer.Snapshot.SemanticMemory?.SignificantOthers;
+            if (imprints is not { Count: > 0 })
+                return;
+
+            SignificantOtherImprint? bestMatch = null;
+            var bestResemblance = 0.0;
+
+            foreach (var imprint in imprints)
+            {
+                var facial = TransferenceMath.FacialResemblance(imprint.FaceSummary, target.PhysicalAppearance.Face);
+                var personality = TransferenceMath.PersonalityResemblance(imprint.PersonalitySummary, target.Personality.BigFive);
+                var combined = TransferenceMath.CombinedResemblance(facial, personality, observer.Biology, _relationshipsConfig);
+
+                if (combined > bestResemblance)
+                {
+                    bestResemblance = combined;
+                    bestMatch = imprint;
+                }
+            }
+
+            if (bestMatch is not null && bestResemblance >= _relationshipsConfig.TransferenceActivationThreshold)
+            {
+                observer.ReceiveEvent(new TransferenceActivated(
+                    now, observer.Id, target.Id, bestMatch.DominantBeliefKind,
+                    bestMatch.DominantBeliefStrength, bestResemblance));
+            }
+        }
+
+        #endregion Transference
 
         #region Burial
 
@@ -701,16 +800,27 @@ namespace GameEngineTools.World.Simulation
                             var bTrustPriorOfA = _reputationLedger?.InitialTrustPrior(a.Id, locationId);
 
                             if (!aAlreadyKnowsB)
+                            {
                                 a.ReceiveEvent(new FirstImpressionFormed(now, a.Id, b.Id,
                                     aResult.FirstImpressionLike, aResult.Score,
                                     aResult.BasePhysical, aResult.PreferenceMatch,
                                     TrustPrior: aTrustPriorOfB));
 
+                                // Task C.4 — transference check, using the SAME b.PhysicalAppearance/
+                                // b.Personality already resolved above for the attraction calculation.
+                                // No new cross-person lookup introduced.
+                                CheckTransference(now, a, b);
+                            }
+
                             if (!bAlreadyKnowsA)
+                            {
                                 b.ReceiveEvent(new FirstImpressionFormed(now, b.Id, a.Id,
                                     bResult.FirstImpressionLike, bResult.Score,
                                     bResult.BasePhysical, bResult.PreferenceMatch,
                                     TrustPrior: bTrustPriorOfA));
+
+                                CheckTransference(now, b, a);
+                            }
 
                             continue;
                         }

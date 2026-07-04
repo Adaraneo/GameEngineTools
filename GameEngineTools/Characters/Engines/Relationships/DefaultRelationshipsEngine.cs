@@ -270,7 +270,10 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         Like = Bump(e.Like, -2.5),
                         Trust = Bump(e.Trust, -2.0),
                         Comfort = Bump(e.Comfort, -2.0),
-                        TransgressionResidue = Math.Min(100, e.TransgressionResidue + Config.TransgressionMicroNegativeGain)
+                        TransgressionResidue = Math.Min(100, e.TransgressionResidue + Config.TransgressionMicroNegativeGain),
+                        // Demand/withdraw trajectory (Schrodt, Witt & Shimkowski 2014) — recurrence
+                        // pattern, distinct from the single-event TransgressionResidue above.
+                        DemandWithdrawScore = Math.Min(100, e.DemandWithdrawScore + Config.DemandWithdrawGainPerNegativeEvent)
                     },
                     eventType: nameof(MicroNegative),
                     outcome: "negative",
@@ -280,6 +283,39 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     EmitThirdPartyEvents(mn.OccurredAt, self, mn.B, mn.A,
                         ThirdPartyObservationType.NegativeAct, valence: -1.0,
                         ctx.Snapshot.InteractionSurface.Observers, outbox);
+                    break;
+
+                // ── Defensiveness (Gottman 1994 Four Horsemen, descriptive only — see
+                // ContemptuousActPerformed remarks for the crossvalidation critique) ─────
+                case DefensiveActPerformed da:
+                    Upsert(self, da.To, e => e with
+                    {
+                        Comfort = Bump(e.Comfort, -Config.DefensivenessComfortPenalty),
+                        Trust = Bump(e.Trust, -Config.DefensivenessTrustPenalty),
+                        TransgressionResidue = Math.Min(100, e.TransgressionResidue + Config.TransgressionDefensivenessGain),
+                        DemandWithdrawScore = Math.Min(100, e.DemandWithdrawScore + Config.DemandWithdrawGainPerNegativeEvent)
+                    },
+                    eventType: nameof(DefensiveActPerformed),
+                    outcome: "defensive",
+                    detail: $"from={da.From.Value}",
+                    now: da.OccurredAt);
+                    break;
+
+                // ── Stonewalling (Gottman 1994 Four Horsemen, descriptive only) ──────────
+                case StonewallingActPerformed sa:
+                    Upsert(self, sa.To, e => e with
+                    {
+                        Closeness = Bump(e.Closeness, -Config.StonewallingClosenessPenalty),
+                        TransgressionResidue = Math.Min(100, e.TransgressionResidue + Config.TransgressionStonewallingGain),
+                        // Recurring-pattern accumulator (Task D.2) — do not add a second, separate
+                        // short-window decay-acceleration multiplier here; DemandWithdrawScore is the
+                        // single accumulator for this dynamic.
+                        DemandWithdrawScore = Math.Min(100, e.DemandWithdrawScore + Config.DemandWithdrawGainPerNegativeEvent)
+                    },
+                    eventType: nameof(StonewallingActPerformed),
+                    outcome: "stonewalled",
+                    detail: $"from={sa.From.Value}",
+                    now: sa.OccurredAt);
                     break;
 
                 // ── Repair attempt ───────────────────────────────────────────────────────
@@ -315,19 +351,50 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 newCloseness = Math.Min(newCloseness, ContemptClosenessCeiling);
                             }
 
+                            // Conflict-trajectory pattern (Task D.2): reuses the same Avoidance-based
+                            // repair-effectiveness modifier as Trust/Closeness above, so dismissive
+                            // characters also de-escalate the recurring pattern less effectively.
+                            // The trajectory this repairs against is grounded in the demand/withdraw
+                            // meta-analysis, not Gottman's contested predictive model:
+                            // Source: Schrodt, Witt & Shimkowski (2014); Kanter, Lavner, Lannin,
+                            // Hilgard & Monk (2022, JMF, 84(2), 533–551) — negativity → dissolution
+                            // d=−0.41, effects explicitly small.
+                            var newDemandWithdraw = ra.Accepted
+                                ? Math.Max(0, e.DemandWithdrawScore - Config.DemandWithdrawRepairReduction * repairGainModifier)
+                                : e.DemandWithdrawScore;
+
                             return e with
                             {
                                 Trust = newTrust,
                                 Closeness = newCloseness,
                                 TransgressionResidue = ra.Accepted
                                     ? Math.Max(0, e.TransgressionResidue - Config.RepairGain)
-                                    : Math.Min(100, e.TransgressionResidue + Config.RupturePenalty * 0.5)
+                                    : Math.Min(100, e.TransgressionResidue + Config.RupturePenalty * 0.5),
+                                DemandWithdrawScore = newDemandWithdraw
                             };
                         },
                         eventType: nameof(RepairAttempt),
                         outcome: ra.Accepted ? "accepted" : "rejected",
                         detail: $"source={ra.A.Value}->{ra.B.Value}",
                         now: ra.OccurredAt);
+
+                        // ── Rejected-repair classification (Task D.4) ────────────────────────
+                        // Source: attachment avoidance as a deactivating strategy (withdrawal under
+                        // conflict) is well-established broadly in attachment literature (see
+                        // AttachmentProfile.cs remarks; Mikulincer & Shaver). The SPECIFIC
+                        // 50/50-at-Avoidance=0.5 split and the classification-by-Avoidance-alone
+                        // design are architectural choices — no peer-reviewed source specifies
+                        // numeric probabilities for "does a rejected repair manifest as stonewalling
+                        // vs. defensiveness". Flagged accordingly. Additive on top of the flat
+                        // RupturePenalty path above, not a replacement.
+                        if (!ra.Accepted)
+                        {
+                            var stonewalls = ctx.Random.Chance(avoidance);
+                            outbox.Add(stonewalls
+                                ? new StonewallingActPerformed(ra.OccurredAt, self, ra.B)
+                                : new DefensiveActPerformed(ra.OccurredAt, self, ra.B));
+                        }
+
                         break;
                     }
 
@@ -427,6 +494,25 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         {
                             EmitThirdPartyEvents(io.OccurredAt, self, io.From, io.To,
                                 ThirdPartyObservationType.IntimateAct, valence: 0.0,
+                                ctx.Snapshot.InteractionSurface.Observers, outbox);
+                        }
+
+                        // EmotionalIntimacyAct: sustained emotional intimacy without physical/sexual
+                        // content. Reuses the edge's own IntimateAffinity/SexualInterest split as the
+                        // "emotional but not sexual" signal — no new appearance/interaction data
+                        // required, self-contained like the IntimateAct path above.
+                        // Source: operationalizes Buss et al. (1992)'s emotional-infidelity construct
+                        // using GET's existing edge dimensions; the specific IntimateAffinity/
+                        // SexualInterest crossover thresholds below are an architectural
+                        // approximation, not literature-specified values.
+                        if (io.Act == SpeechAct.SelfDisclosure
+                            && ctx.Snapshot.InteractionSurface.Observers is { Count: > 0 }
+                            && State.Edges.TryGetValue(otherId, out var eiaEdge)
+                            && eiaEdge.IntimateAffinity >= Config.EmotionalIntimacyAffinityThreshold
+                            && eiaEdge.SexualInterest < Config.EmotionalIntimacySexualCeiling)
+                        {
+                            EmitThirdPartyEvents(io.OccurredAt, self, io.From, io.To,
+                                ThirdPartyObservationType.EmotionalIntimacyAct, valence: 0.0,
                                 ctx.Snapshot.InteractionSurface.Observers, outbox);
                         }
                         break;
@@ -637,41 +723,25 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             }
                         }
 
-                        // Jealousy — an IntimateAct involving a person the observer has romantic/sexual interest in.
-                        // A robust sex difference in the forced-choice format (Buss et al. 1992, 48 countries).
+                        // Jealousy — an IntimateAct/EmotionalIntimacyAct involving a person the
+                        // observer has romantic/sexual interest in. Buss et al. (1992, 48 countries):
+                        // a robust sex difference in sensitivity, but INVERTED between the two
+                        // infidelity types — men more sensitive to sexual (IntimateAct), women more
+                        // sensitive to emotional (EmotionalIntimacyAct) infidelity (Harris 2003).
                         // The distributions overlap → individual variance via AttachmentAnxiety and SOI.
-                        if (tpa.Type == ThirdPartyObservationType.IntimateAct
+                        if ((tpa.Type == ThirdPartyObservationType.IntimateAct || tpa.Type == ThirdPartyObservationType.EmotionalIntimacyAct)
                             && State.Edges.TryGetValue(tpa.Actor, out var actorEdge))
                         {
                             var intimacyInterest = actorEdge.IntimateAffinity * 0.55 + actorEdge.SexualInterest * 0.45;
                             if (intimacyInterest >= 25.0)
                             {
-                                var anxiety = ctx.Personality.Attachment.Anxiety;
-                                var soiAttitude = ctx.Personality.Sociosexuality.Attitude;
-                                // Men: slightly higher sexual jealousy (forced-choice d ~ 0.3; weak on Likert scales)
-                                var sexualBias = ctx.Biology == SexBiology.Male ? 1.2 : 1.0;
-                                var jealousyBase = Math.Clamp(intimacyInterest / 100.0, 0, 1);
-                                var jealousyIntensity = jealousyBase * sexualBias
-                                                      * (1.0 + anxiety * 0.8)
-                                                      * (1.0 - soiAttitude * 0.3);
-                                var transgressionAmount = Math.Clamp(jealousyIntensity * 12.0, 0, 20.0);
-                                var oldResidue = State.Edges.TryGetValue(tpa.Actor, out var jealEdge) ? jealEdge.TransgressionResidue : 0.0;
-                                Upsert(self, tpa.Actor, e => e with
-                                {
-                                    TransgressionResidue = Math.Min(100, e.TransgressionResidue + transgressionAmount)
-                                },
-                                eventType: "JealousyDistress",
-                                outcome: $"distress={transgressionAmount:F1}",
-                                detail: $"actor={tpa.Actor.Value}, intimacyInterest={intimacyInterest:F0}");
+                                var biasMultiplier = tpa.Type == ThirdPartyObservationType.IntimateAct
+                                    ? (ctx.Biology == SexBiology.Male ? 1.2 : 1.0)     // sexual infidelity: men more sensitive
+                                    : (ctx.Biology == SexBiology.Female ? 1.2 : 1.0);  // emotional infidelity: women more sensitive
 
-                                using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: tpa.Actor.Value))
-                                {
-                                    _log.JealousyDistressApplied(
-                                        self.Value.ToString(),
-                                        tpa.Actor.Value.ToString(),
-                                        tpa.Target.Value.ToString(),
-                                        oldResidue, oldResidue + transgressionAmount);
-                                }
+                                ApplyJealousyReaction(
+                                    self, tpa.Actor, tpa.Target, ctx, intimacyInterest, biasMultiplier,
+                                    JealousyType.Reactive, tpa.OccurredAt, outbox);
                             }
                         }
                         break;
@@ -959,6 +1029,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     }
                 }
 
+                // ── DemandWithdrawScore power-law decay ──────────────────────────────────
+                // Same decay shape as TransgressionResidue above — both are recurrence/severity
+                // accumulators that fade without reinforcement; no separate decay model invented.
+                var newDemandWithdrawDecayed = e.DemandWithdrawScore;
+                if (newDemandWithdrawDecayed > 0)
+                {
+                    newDemandWithdrawDecayed *= Math.Pow(1.0 - Config.TransgressionDecayRatePerDay, days);
+                    if (newDemandWithdrawDecayed < 0.5)
+                    {
+                        newDemandWithdrawDecayed = 0;
+                    }
+                }
+
                 // ── Familiarity–Like dissonance (non-monotonicity) ───────────────────────
                 // Norton, Frost & Ariely 2007: high Familiarity without ongoing contact
                 // erodes Like (overexposure without renewal breeds indifference).
@@ -1006,7 +1089,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                 // 3) Commitment drifts toward the integrator target.
                 var commitmentTarget = ComputeCommitmentTarget(
-                    e with { InvestmentSize = newInvestment, AlternativeQuality = newAlternativeQuality },
+                    e with
+                    {
+                        InvestmentSize = newInvestment,
+                        AlternativeQuality = newAlternativeQuality,
+                        DemandWithdrawScore = newDemandWithdrawDecayed
+                    },
                     Config);
                 var newCommitment = Approach(e.Commitment, commitmentTarget, Config.CommitmentDriftPerDay * days * 100.0);
 
@@ -1021,6 +1109,12 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 var newDissolutionConsidered = e.KinRole == KinRole.Partner
                     ? partnerBelowThreshold
                     : e.DissolutionConsidered;
+
+                // 6) Significant-other imprint eligibility (Topic C, Task C.1): one-shot, non-re-arming
+                // latch — reuses the Commitment integrator above as the significance measure.
+                var emitSignificantOther = !e.SignificantOtherImprinted
+                                        && newCommitment >= Config.SignificantOtherCommitmentThreshold;
+                var newSignificantOtherImprinted = e.SignificantOtherImprinted || emitSignificantOther;
 
                 var decayed = e with
                 {
@@ -1042,6 +1136,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     InvestmentSize = newInvestment,
                     AlternativeQuality = newAlternativeQuality,
                     DissolutionConsidered = newDissolutionConsidered,
+                    DemandWithdrawScore = newDemandWithdrawDecayed,
+                    SignificantOtherImprinted = newSignificantOtherImprinted,
                     Breakdown = new DomainBreakdown(
                         Intellect: Clamp(Approach(e.Breakdown.Intellect, 50, dd)),
                         Humor: Clamp(Approach(e.Breakdown.Humor, 50, dd)),
@@ -1088,6 +1184,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         _log.RelDissolutionConsidered(
                             ctx.Id.Value.ToString(), e.A.Value.ToString(), e.B.Value.ToString(), newCommitment);
                     }
+                }
+
+                // Task C.1 — significant-other threshold crossed: self-scoped only, no appearance
+                // data (this engine cannot resolve Other's PhysicalAppearance/Personality).
+                // DefaultSceneOrchestrator.RouteSignificantOtherImprints resolves the rest.
+                if (emitSignificantOther)
+                {
+                    outbox.Add(new SignificantOtherThresholdCrossed(now, ctx.Id, e.B, newCommitment));
                 }
 
                 dict[kv.Key] = decayed;

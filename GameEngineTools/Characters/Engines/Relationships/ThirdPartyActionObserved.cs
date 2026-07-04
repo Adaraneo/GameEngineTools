@@ -47,9 +47,17 @@ namespace GameEngineTools.Characters.Engines.Relationships
         Betrayal,
 
         /// <summary>
-        /// An intimate/sexual act witnessed between Actor and Target.
-        /// Triggers jealousy in the observer when they hold romantic or sexual interest in Actor.
+        /// A physical/sexual act witnessed between Actor and Target.
+        /// Triggers jealousy in the observer when they hold romantic or sexual interest in Actor,
+        /// more strongly weighted for male observers (Buss et al. 1992).
         /// </summary>
-        IntimateAct
+        IntimateAct,
+
+        /// <summary>
+        /// Sustained emotional intimacy (deep self-disclosure, exclusive romantic attention) witnessed
+        /// between Actor and Target, absent physical/sexual content. Triggers emotional-infidelity-type
+        /// jealousy, more strongly weighted for female observers (Buss et al. 1992; Harris 2003).
+        /// </summary>
+        EmotionalIntimacyAct
     }
 }

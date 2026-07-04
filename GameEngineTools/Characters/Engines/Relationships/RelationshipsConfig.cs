@@ -278,7 +278,91 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Extra Trust (loyalty) gained per accepted interaction with a perceived superior in an
         /// Authority-Ranking context, scaled by perceived superiority. Default 1.0.
         /// </summary>
-        double AuthorityRankingLoyaltyTrust = 1.0)
+        double AuthorityRankingLoyaltyTrust = 1.0,
+
+        // ── Four Horsemen (Gottman 1994, descriptive only — see ContemptuousActPerformed) ──
+        /// <summary>Comfort penalty per DefensiveActPerformed (Gottman 1994, descriptive category only).</summary>
+        double DefensivenessComfortPenalty = 3.0,
+        /// <summary>Trust penalty per DefensiveActPerformed.</summary>
+        double DefensivenessTrustPenalty = 1.5,
+        /// <summary>TransgressionResidue gain per DefensiveActPerformed.</summary>
+        double TransgressionDefensivenessGain = 4.0,
+        /// <summary>Closeness penalty per StonewallingActPerformed.</summary>
+        double StonewallingClosenessPenalty = 4.0,
+        /// <summary>TransgressionResidue gain per StonewallingActPerformed.</summary>
+        double TransgressionStonewallingGain = 5.0,
+
+        // ── Demand/withdraw conflict trajectory (Schrodt, Witt & Shimkowski 2014) ──────
+        /// <summary>
+        /// DemandWithdrawScore gained per negative-behavior event (MicroNegative,
+        /// DefensiveActPerformed, StonewallingActPerformed) without an intervening repair.
+        /// </summary>
+        double DemandWithdrawGainPerNegativeEvent = 5.0,
+        /// <summary>DemandWithdrawScore reduction per accepted RepairAttempt.</summary>
+        double DemandWithdrawRepairReduction = 12.0,
+        /// <summary>
+        /// Weight of DemandWithdrawScore subtracted in the commitment integrator. Kept small
+        /// per Kanter, Lavner, Lannin, Hilgard &amp; Monk (2022, <i>JMF</i>, 84(2), 533–551) —
+        /// negativity → dissolution d=−0.41, explicitly a small effect — see
+        /// <see cref="DefaultRelationshipsEngine.ComputeCommitmentTarget"/> remarks.
+        /// </summary>
+        double CommitmentConflictTrajectoryWeight = 0.15,
+
+        // ── Jealousy gap-fill (Buss et al. 1992; Dijkstra & Buunk 1998; Pollet & Saxton 2020) ──
+        /// <summary>
+        /// Scale applied to rival-directed hostility (Like/Respect penalty) relative to computed
+        /// jealousy intensity. No literature-specified value exists for this propagation weight
+        /// (architectural design decision) — keep conservative (default 0.5×) relative to the
+        /// partner-directed TransgressionResidue effect until playtesting data suggests otherwise.
+        /// </summary>
+        double RivalHostilityScale = 0.5,
+        /// <summary>Rival-attractiveness modulator weight for female observers (Pollet &amp; Saxton 2020).</summary>
+        double RivalAttractivenessWeightFemale = 0.4,
+        /// <summary>Rival-attractiveness modulator weight for male observers (smaller per replication).</summary>
+        double RivalAttractivenessWeightMale = 0.2,
+        /// <summary>
+        /// IntimateAffinity threshold above which an observed SelfDisclosure exchange counts
+        /// as emotional intimacy for EmotionalIntimacyAct purposes. Architectural default, not sourced.
+        /// </summary>
+        double EmotionalIntimacyAffinityThreshold = 50.0,
+        /// <summary>
+        /// SexualInterest ceiling below which the exchange is classified emotional rather than
+        /// sexual — keeps EmotionalIntimacyAct and IntimateAct mutually distinguishing. Not sourced.
+        /// </summary>
+        double EmotionalIntimacySexualCeiling = 25.0,
+
+        // ── Transference (Andersen & Chen 2002 — single-lab-origin caution, see SignificantOtherImprint) ──
+        /// <summary>
+        /// Commitment threshold above which a relationship becomes eligible for
+        /// <see cref="SemanticMemory.SignificantOtherImprint"/> capture. No literature-specified value
+        /// exists for this threshold (architectural decision, not a sourced constant) — set high enough
+        /// that only genuinely significant bonds qualify (partners, and by extension deep long-term
+        /// friendships), consistent with Andersen &amp; Chen's "significant other" framing, not casual
+        /// acquaintances.
+        /// </summary>
+        double SignificantOtherCommitmentThreshold = 70.0,
+        /// <summary>
+        /// Combined-resemblance threshold above which transference activates. Architectural default —
+        /// no literature-specified activation threshold exists (flagged per research doc).
+        /// </summary>
+        double TransferenceActivationThreshold = 0.70,
+        /// <summary>
+        /// Whether facial resemblance is sex-weighted per Günaydın et al. (2012) — see the extrapolation
+        /// caveat on <c>TransferenceMath.SexWeightedFacialResemblance</c>. Default true per explicit
+        /// inclusion instruction; set false to fall back to sex-neutral resemblance.
+        /// </summary>
+        bool ApplySexDifferentiatedFacialResemblance = true,
+        /// <summary>
+        /// Facial-resemblance multiplier for female observers. Deliberately damped relative to the
+        /// source's own d=0.87 (measured for liking judgments, not belief-transference) — default 1.15,
+        /// not the much larger ratio the raw effect sizes would imply.
+        /// </summary>
+        double FacialResemblanceWeightFemale = 1.15,
+        /// <summary>
+        /// Facial-resemblance multiplier for male observers. Damped toward neutral (default 0.90, not
+        /// the near-zero d=0.12 the raw effect size would imply) for the same extrapolation reason.
+        /// </summary>
+        double FacialResemblanceWeightMale = 0.90)
     {
         /// <summary>
         /// Parameterless constructor required by DI options binding.

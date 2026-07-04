@@ -90,16 +90,29 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 decayedPeople[other] = set with { Beliefs = beliefs };
             }
 
-            State = new SemanticMemoryState(decayedPeople);
+            State = State with { People = decayedPeople };
         }
 
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
         {
-            if (@event is not MemoryEncoded encoded)
+            switch (@event)
             {
-                return;
-            }
+                case MemoryEncoded encoded:
+                    HandleMemoryEncoded(encoded, ctx, outbox);
+                    break;
 
+                case SignificantOtherImprintCaptured soic when soic.Self == ctx.Id:
+                    AppendSignificantOtherImprint(soic.Imprint);
+                    break;
+
+                case TransferenceActivated ta when ta.Self == ctx.Id:
+                    ApplyTransferencePerturbation(ta.NewPerson, ta.TransferredKind, ta.SourceBeliefStrength, ta.Resemblance, ta.OccurredAt);
+                    break;
+            }
+        }
+
+        private void HandleMemoryEncoded(MemoryEncoded encoded, IHumanContext ctx, IEventCollector outbox)
+        {
             var other = encoded.OtherPerson ?? encoded.BeliefEvidence?.Other;
             if (other is null)
             {
@@ -166,12 +179,100 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             }
 
             people[other.Value] = set with { Beliefs = beliefs };
-            State = new SemanticMemoryState(people);
+            State = State with { People = people };
         }
 
         public void RestoreState(SemanticMemoryState state) => State = state;
 
         #endregion IEngine
+
+        #region Transference (Topic C — single-lab-origin caution, see SignificantOtherImprint)
+
+        /// <summary>
+        /// Appends a captured imprint to <see cref="SemanticMemoryState.SignificantOthers"/>, evicting the
+        /// lowest-<see cref="SignificantOtherImprint.Significance"/> entry when at capacity.
+        /// </summary>
+        /// <remarks>
+        /// Architectural decision (not sourced): when at capacity, keep the highest-Commitment imprints.
+        /// The literature does not specify how many significant others a person "carries" simultaneously
+        /// or how they compete for retrieval priority — this is a reasonable, cheap approximation.
+        /// </remarks>
+        private void AppendSignificantOtherImprint(SignificantOtherImprint imprint)
+        {
+            var current = State.SignificantOthersOrEmpty.ToList();
+
+            if (current.Count < Config.MaxSignificantOtherImprints)
+            {
+                current.Add(imprint);
+                State = State with { SignificantOthers = current };
+                return;
+            }
+
+            var lowest = current.OrderBy(i => i.Significance).First();
+            if (imprint.Significance <= lowest.Significance)
+            {
+                return; // discard — doesn't beat the weakest retained imprint
+            }
+
+            current.Remove(lowest);
+            current.Add(imprint);
+            State = State with { SignificantOthers = current };
+        }
+
+        /// <summary>
+        /// Seeds a resemblance-gated, low-stability initial belief bias on a newly-met person's
+        /// <see cref="PersonBeliefSet"/>, borrowed from a resembling <see cref="SignificantOtherImprint"/>.
+        /// </summary>
+        /// <remarks>
+        /// Stability is set deliberately low (<see cref="SemanticMemoryConfig.TransferenceInitialStability"/>,
+        /// far below normal evidence-accrued stability) so ordinary interaction evidence quickly overrides
+        /// it — this operationalizes the architectural assumption (not literature-quantified; see Topic C
+        /// research doc Q4) that transference is a first-impression bias that fades as the new person's
+        /// own <see cref="PersonBeliefSet"/> accrues.
+        /// <para>
+        /// Creates the baseline <see cref="PersonBeliefSet"/> for <paramref name="newPerson"/> defensively
+        /// if it does not already exist — <see cref="Relationships.FirstImpressionFormed"/> and
+        /// <see cref="Relationships.TransferenceActivated"/>-triggering resemblance checks are both
+        /// delivered by the orchestrator in the same tick, but this handler does not assume a strict
+        /// delivery order between them.
+        /// </para>
+        /// </remarks>
+        private void ApplyTransferencePerturbation(
+            HumanId newPerson, PersonBeliefKind kind, double sourceStrength, double resemblance, WDateTime occurredAt)
+        {
+            var transferredStrength = sourceStrength * resemblance * Config.TransferenceWeight;
+
+            var people = State.People.ToDictionary(
+                pair => pair.Key,
+                pair => new PersonBeliefSet(pair.Value.Other, pair.Value.Beliefs.ToDictionary(entry => entry.Key, entry => entry.Value)));
+
+            if (!people.TryGetValue(newPerson, out var set))
+            {
+                set = new PersonBeliefSet(newPerson, new Dictionary<PersonBeliefKind, PersonBelief>());
+                people[newPerson] = set;
+            }
+
+            var beliefs = set.Beliefs.ToDictionary(entry => entry.Key, entry => entry.Value);
+
+            // Merge into any already-existing belief of this kind rather than clobbering real evidence
+            // that may already have accrued this same tick.
+            var current = beliefs.TryGetValue(kind, out var existing)
+                ? existing
+                : new PersonBelief(newPerson, kind, 0.0, 0.0, 0, occurredAt);
+
+            beliefs[kind] = current with
+            {
+                Strength = Math.Clamp(current.Strength + (1.0 - current.Strength) * transferredStrength, 0.0, 1.0),
+                Stability = Math.Max(current.Stability, Config.TransferenceInitialStability),
+                LastUpdatedAt = occurredAt,
+                LastEvidenceSource = "Transference"
+            };
+
+            people[newPerson] = set with { Beliefs = beliefs };
+            State = State with { People = people };
+        }
+
+        #endregion Transference
 
         #region Diagnostics & management
 
@@ -193,7 +294,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             var updated = State.People
                 .Where(kv => kv.Key != other)
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
-            State = new SemanticMemoryState(updated);
+            // SignificantOthers (Topic C) is intentionally untouched — it survives ForgetPerson
+            // by design, retained independently of the per-person belief dictionary.
+            State = State with { People = updated };
         }
 
         #endregion Diagnostics & management

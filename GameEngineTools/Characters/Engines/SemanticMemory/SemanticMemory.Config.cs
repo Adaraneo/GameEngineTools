@@ -41,7 +41,21 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         /// </summary>
         int NavarroCriticalMultiple = 8,
         /// <summary>Decay multiplier when the Navarro threshold is exceeded (default 3×).</summary>
-        double NavarroDecayAccelerator = 3.0)
+        double NavarroDecayAccelerator = 3.0,
+        // ── Transference (Andersen & Chen 2002 — single-lab-origin caution) ─────────
+        /// <summary>Max retained SignificantOtherImprints per character (Topic C, Task C.2).</summary>
+        int MaxSignificantOtherImprints = 3,
+        /// <summary>
+        /// Fraction of the significant other's DominantBeliefStrength transferred to a resembling new
+        /// person, before resemblance scaling. Architectural default, kept conservative (0.4) given the
+        /// single-lab-origin caution (Topic C, Task C.4).
+        /// </summary>
+        double TransferenceWeight = 0.4,
+        /// <summary>
+        /// Initial Stability assigned to a transferred belief — deliberately far below normal
+        /// evidence-accrued stability, so real interaction evidence overrides it quickly.
+        /// </summary>
+        double TransferenceInitialStability = 0.10)
     {
         /// <summary>Parameterless constructor required by the Options pattern.</summary>
         public SemanticMemoryConfig() : this(

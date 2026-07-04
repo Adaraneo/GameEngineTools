@@ -12,6 +12,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Location;
@@ -283,6 +284,168 @@ namespace EngineTests
         #endregion One-way observation
 
         // ══════════════════════════════════════════════════════════════════════
+        // Transference (Topic C) — RouteSignificantOtherImprints + FireFirstImpressions
+        // ══════════════════════════════════════════════════════════════════════
+
+        #region Transference — RouteSignificantOtherImprints
+
+        [TestMethod]
+        public void RouteSignificantOtherImprints_ResolvesOtherAppearance_FromOrchestratorRoster()
+        {
+            var a = BuildSpyHuman(LowNoise);
+            var b = BuildSpyHuman(LowNoise);
+            var orchestrator = BuildOrchestrator(new RelationshipsConfig());
+
+            a.SetSemanticMemory(new SemanticMemoryState(new Dictionary<HumanId, PersonBeliefSet>
+            {
+                [b.Id] = new PersonBeliefSet(b.Id, new Dictionary<PersonBeliefKind, PersonBelief>
+                {
+                    [PersonBeliefKind.Warm] = new PersonBelief(b.Id, PersonBeliefKind.Warm, 0.7, 0.5, 4, Now)
+                })
+            }));
+            a.SetLastOutbox(new SignificantOtherThresholdCrossed(Now, a.Id, b.Id, Commitment: 80.0));
+
+            orchestrator.OnTick(Now, new[] { a, b });
+
+            var captured = a.ReceivedEvents.OfType<SignificantOtherImprintCaptured>().ToList();
+            Assert.AreEqual(1, captured.Count);
+            Assert.AreEqual(b.Id, captured[0].Imprint.SourcePersonId);
+            Assert.AreEqual(b.PhysicalAppearance.Face, captured[0].Imprint.FaceSummary);
+            Assert.AreEqual(b.Personality.BigFive, captured[0].Imprint.PersonalitySummary);
+            Assert.AreEqual(PersonBeliefKind.Warm, captured[0].Imprint.DominantBeliefKind);
+            Assert.AreEqual(0.7, captured[0].Imprint.DominantBeliefStrength, 0.0001);
+            Assert.AreEqual(80.0, captured[0].Imprint.Significance, 0.0001);
+        }
+
+        [TestMethod]
+        public void RouteSignificantOtherImprints_SkipsCapture_WhenOtherNoLongerInScene()
+        {
+            var a = BuildSpyHuman(LowNoise);
+            var movedAwayId = new HumanId(Guid.NewGuid());
+            var orchestrator = BuildOrchestrator(new RelationshipsConfig());
+
+            a.SetSemanticMemory(new SemanticMemoryState(new Dictionary<HumanId, PersonBeliefSet>
+            {
+                [movedAwayId] = new PersonBeliefSet(movedAwayId, new Dictionary<PersonBeliefKind, PersonBelief>
+                {
+                    [PersonBeliefKind.Warm] = new PersonBelief(movedAwayId, PersonBeliefKind.Warm, 0.7, 0.5, 4, Now)
+                })
+            }));
+            a.SetLastOutbox(new SignificantOtherThresholdCrossed(Now, a.Id, movedAwayId, Commitment: 80.0));
+
+            orchestrator.OnTick(Now, new[] { a }); // movedAwayId is not in the scene roster
+
+            Assert.IsFalse(a.ReceivedEvents.OfType<SignificantOtherImprintCaptured>().Any(),
+                "Capture must be skipped gracefully when Other is no longer present in the scene roster");
+        }
+
+        [TestMethod]
+        public void RouteSignificantOtherImprints_SkipsCapture_WhenNoDominantBeliefExists()
+        {
+            var a = BuildSpyHuman(LowNoise);
+            var b = BuildSpyHuman(LowNoise);
+            var orchestrator = BuildOrchestrator(new RelationshipsConfig());
+
+            // a has no SemanticMemory beliefs about b at all.
+            a.SetLastOutbox(new SignificantOtherThresholdCrossed(Now, a.Id, b.Id, Commitment: 80.0));
+
+            orchestrator.OnTick(Now, new[] { a, b });
+
+            Assert.IsFalse(a.ReceivedEvents.OfType<SignificantOtherImprintCaptured>().Any(),
+                "Capture must be skipped when there is no belief pattern to transfer yet");
+        }
+
+        #endregion Transference — RouteSignificantOtherImprints
+
+        #region Transference — FireFirstImpressions resemblance check
+
+        private static Personality PersonalityWith(BigFive bigFive)
+            => new(bigFive, AttachmentProfile.Secure, CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
+                Sociosexuality.Intermediate, Chronotype.Neutral);
+
+        [TestMethod]
+        public void FireFirstImpressions_ResemblingNewPerson_EmitsTransferenceActivated()
+        {
+            var matchingBigFive = new BigFive(0.5, 0.5, 0.5, 0.5, 0.5);
+            var a = BuildSpyHuman(LowNoise, PersonalityWith(matchingBigFive));
+            var b = BuildSpyHuman(LowNoise, PersonalityWith(matchingBigFive));
+            var orchestrator = BuildOrchestrator(new RelationshipsConfig());
+
+            _fidelityOverrides[a.Id] = PerceptionFidelityLevel.Full;
+            _fidelityOverrides[b.Id] = PerceptionFidelityLevel.Full;
+
+            // a carries an imprint whose personality matches b exactly (and whose face — like every
+            // SpyHuman's fixed test appearance — trivially matches b's too), so resemblance is maximal.
+            a.SetSemanticMemory(new SemanticMemoryState(
+                new Dictionary<HumanId, PersonBeliefSet>(),
+                new[]
+                {
+                    new SignificantOtherImprint(
+                        new HumanId(Guid.NewGuid()), Now, b.PhysicalAppearance.Face, matchingBigFive,
+                        PersonBeliefKind.Warm, 0.8, Significance: 80.0)
+                }));
+
+            Place(a, b);
+            orchestrator.OnTick(Now, new[] { a, b });
+
+            var activated = a.ReceivedEvents.OfType<TransferenceActivated>().ToList();
+            Assert.AreEqual(1, activated.Count);
+            Assert.AreEqual(b.Id, activated[0].NewPerson);
+            Assert.AreEqual(PersonBeliefKind.Warm, activated[0].TransferredKind);
+        }
+
+        [TestMethod]
+        public void FireFirstImpressions_NonResemblingNewPerson_NoTransferenceActivated()
+        {
+            var a = BuildSpyHuman(LowNoise, PersonalityWith(new BigFive(0.5, 0.5, 0.5, 0.5, 0.5)));
+            var b = BuildSpyHuman(LowNoise, PersonalityWith(new BigFive(1.0, 1.0, 1.0, 1.0, 1.0)));
+            var orchestrator = BuildOrchestrator(new RelationshipsConfig());
+
+            _fidelityOverrides[a.Id] = PerceptionFidelityLevel.Full;
+            _fidelityOverrides[b.Id] = PerceptionFidelityLevel.Full;
+
+            // Imprint's personality is maximally different from b's actual (1,1,1,1,1) BigFive —
+            // combined resemblance stays well below the activation threshold even though facial
+            // resemblance is maximal (all SpyHumans share an identical fixed test appearance).
+            a.SetSemanticMemory(new SemanticMemoryState(
+                new Dictionary<HumanId, PersonBeliefSet>(),
+                new[]
+                {
+                    new SignificantOtherImprint(
+                        new HumanId(Guid.NewGuid()), Now, b.PhysicalAppearance.Face, new BigFive(0.0, 0.0, 0.0, 0.0, 0.0),
+                        PersonBeliefKind.Rejecting, 0.8, Significance: 80.0)
+                }));
+
+            Place(a, b);
+            orchestrator.OnTick(Now, new[] { a, b });
+
+            Assert.IsFalse(a.ReceivedEvents.OfType<TransferenceActivated>().Any(),
+                "A dissimilar imprint must not activate transference");
+        }
+
+        [TestMethod]
+        public void FirstImpression_NoSignificantOthers_NoTransferenceAttempted()
+        {
+            var a = BuildSpyHuman(LowNoise);
+            var b = BuildSpyHuman(LowNoise);
+            var orchestrator = BuildOrchestrator(new RelationshipsConfig());
+
+            _fidelityOverrides[a.Id] = PerceptionFidelityLevel.Full;
+            _fidelityOverrides[b.Id] = PerceptionFidelityLevel.Full;
+
+            // a has no SemanticMemory / no SignificantOthers at all (default SpyHuman state).
+            Place(a, b);
+            orchestrator.OnTick(Now, new[] { a, b });
+
+            Assert.IsTrue(a.ReceivedEvents.OfType<FirstImpressionFormed>().Any(), "Sanity check: impression still fires");
+            Assert.IsFalse(a.ReceivedEvents.OfType<TransferenceActivated>().Any(),
+                "No stored imprints — transference must not be attempted at all");
+        }
+
+        #endregion Transference — FireFirstImpressions resemblance check
+
+        // ══════════════════════════════════════════════════════════════════════
         // Factory and stubs
         // ══════════════════════════════════════════════════════════════════════
 
@@ -294,7 +457,7 @@ namespace EngineTests
                 _locationService.MoveCharacter(c.Id, TestRoom.Id);
         }
 
-        private DefaultSceneOrchestrator BuildOrchestrator()
+        private DefaultSceneOrchestrator BuildOrchestrator(RelationshipsConfig? relationshipsConfig = null)
             => new DefaultSceneOrchestrator(
                 attractionCalculator: new NeutralAttractionCalculator(),
                 locationService: _locationService,
@@ -309,17 +472,18 @@ namespace EngineTests
                 rng: new Random(42),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
                 objectProvider: new EmptyWorldObjectProvider(),
-                options: new SceneOrchestratorOptions());
+                options: new SceneOrchestratorOptions(),
+                relationshipsConfig: relationshipsConfig);
 
         /// <summary>
         /// Builds a <see cref="SpyHuman"/> with the given noise level in its
         /// <see cref="InteractionSurface"/> — used by <see cref="CharacterPerceptionResolver"/>
         /// to determine perception range when fidelity is Coarse or LocalOnly.
         /// </summary>
-        private static SpyHuman BuildSpyHuman(double noise)
+        private static SpyHuman BuildSpyHuman(double noise, Personality? personality = null)
         {
             var id = new HumanId(Guid.NewGuid());
-            var personality = new Personality(
+            personality ??= new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
                 AttachmentProfile.Secure,
                 CommunicationStyle.Direct,
@@ -399,7 +563,16 @@ namespace EngineTests
 
             public EnginesSnapshot Snapshot => _snapshot;
 
-            public IReadOnlyList<IDomainEvent> LastOutbox => Array.Empty<IDomainEvent>();
+            private IReadOnlyList<IDomainEvent> _lastOutbox = Array.Empty<IDomainEvent>();
+
+            public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutbox;
+
+            /// <summary>Sets this character's LastOutbox — simulates events emitted on a prior tick.</summary>
+            public void SetLastOutbox(params IDomainEvent[] events) => _lastOutbox = events;
+
+            /// <summary>Sets this character's SemanticMemory snapshot (Topic C transference tests).</summary>
+            public void SetSemanticMemory(GameEngineTools.Characters.Engines.SemanticMemory.SemanticMemoryState semanticMemory)
+                => _snapshot = _snapshot with { SemanticMemory = semanticMemory };
 
             public int Age => 25;
 

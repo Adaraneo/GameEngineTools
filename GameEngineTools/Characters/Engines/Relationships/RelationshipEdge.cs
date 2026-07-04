@@ -159,5 +159,60 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// once Commitment recovers above the threshold. Prevents the event from re-firing every
         /// tick while the bond sits below the threshold.
         /// </summary>
-        bool DissolutionConsidered = false);
+        bool DissolutionConsidered = false,
+
+        /// <summary>
+        /// Rolling accumulator for the demand/withdraw conflict pattern: rises when negative-behavior
+        /// events (MicroNegative, DefensiveActPerformed, StonewallingActPerformed) recur without an
+        /// intervening accepted RepairAttempt, decays otherwise. Distinct from
+        /// <see cref="TransgressionResidue"/>, which tracks single-event severity — this tracks
+        /// <b>recurrence pattern</b>, the specific construct the cited meta-analyses measure.
+        /// </summary>
+        /// <remarks>
+        /// Source: Schrodt, P., Witt, P. L., &amp; Shimkowski, J. R. (2014). Meta-analytical review of
+        /// the demand/withdraw pattern. <i>Communication Monographs</i>, 81(1), 28–58. k=74 studies,
+        /// N=14,255; demand/withdraw ↔ relational outcomes r=.423 (larger in distressed samples, r=.413,
+        /// than nondistressed, r=.345). Effect confirmed as robust but only <b>moderate</b> in size —
+        /// this field must not be tuned to feel deterministic/doom-loop; keep consistent with a
+        /// correlational, not near-certain, real-world effect.
+        /// Range [0, 100].
+        /// </remarks>
+        double DemandWithdrawScore = 0,
+
+        /// <summary>
+        /// Latch guarding the one-shot <see cref="SignificantOtherThresholdCrossed"/> emission.
+        /// Set true once Commitment first crosses <see cref="RelationshipsConfig.SignificantOtherCommitmentThreshold"/>.
+        /// Unlike <see cref="DissolutionConsidered"/>, this does NOT re-arm — an imprint is captured once
+        /// per relationship, not re-captured if commitment later drops and rises again.
+        /// </summary>
+        bool SignificantOtherImprinted = false)
+{
+    /// <summary>
+    /// Qualitative conflict-trajectory readout, derived on demand from
+    /// <see cref="DemandWithdrawScore"/>. Primarily descriptive/diagnostic (logging, future UI/AI
+    /// introspection), but also feeds a small, capped term in
+    /// <see cref="DefaultRelationshipsEngine.ComputeCommitmentTarget"/> — see that method's remarks
+    /// for why the numeric consumption is deliberately bounded rather than driving dissolution
+    /// probability directly off these bands.
+    /// </summary>
+    public ConflictTrajectoryReading ConflictTrajectory => DemandWithdrawScore switch
+    {
+        < 20.0 => ConflictTrajectoryReading.Stable,
+        < 50.0 => ConflictTrajectoryReading.Escalating,
+        _ => ConflictTrajectoryReading.Entrenched
+    };
+}
+
+/// <summary>Qualitative bands over <see cref="RelationshipEdge.DemandWithdrawScore"/>.</summary>
+public enum ConflictTrajectoryReading
+{
+    /// <summary>Low/no recurring negative-behavior pattern.</summary>
+    Stable,
+
+    /// <summary>Recurring pattern building without sufficient repair.</summary>
+    Escalating,
+
+    /// <summary>Persistent, poorly-repaired pattern — Kanter et al. (2022) dissolution-risk band.</summary>
+    Entrenched
+}
 }

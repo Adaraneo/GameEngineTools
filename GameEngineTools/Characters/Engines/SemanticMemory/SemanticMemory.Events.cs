@@ -22,4 +22,32 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         double Strength,
         /// <summary>Total number of pieces of evidence for this belief kind.</summary>
         int EvidenceCount) : IDomainEvent;
+
+    /// <summary>
+    /// Delivered by <c>DefaultSceneOrchestrator</c> after resolving a
+    /// <see cref="Relationships.SignificantOtherThresholdCrossed"/> event into a full
+    /// <see cref="SignificantOtherImprint"/> (cross-person appearance/personality data, only
+    /// available at orchestrator level). <see cref="ISemanticMemoryEngine"/> appends the imprint
+    /// on receipt (Topic C, Task C.1/C.2).
+    /// </summary>
+    public sealed record SignificantOtherImprintCaptured(
+        WDateTime OccurredAt,
+        HumanId Self,
+        SignificantOtherImprint Imprint) : IDomainEvent;
+
+    /// <summary>
+    /// Delivered by <c>DefaultSceneOrchestrator</c> when a newly-encountered person's resemblance
+    /// to a stored <see cref="SignificantOtherImprint"/> crosses the activation threshold.
+    /// Cross-person appearance/personality resolution happens only at orchestrator level (see
+    /// <c>DefaultSceneOrchestrator.FireFirstImpressions</c>) — this event carries the
+    /// already-resolved result so <see cref="ISemanticMemoryEngine"/> only needs to apply it
+    /// (Topic C, Task C.4).
+    /// </summary>
+    public sealed record TransferenceActivated(
+        WDateTime OccurredAt,
+        HumanId Self,
+        HumanId NewPerson,
+        PersonBeliefKind TransferredKind,
+        double SourceBeliefStrength,
+        double Resemblance) : IDomainEvent;
 }

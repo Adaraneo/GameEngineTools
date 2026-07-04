@@ -1163,14 +1163,26 @@ namespace GameEngineTools.Logging
             this ILogger logger, string Observer, string Actor, string Target,
             string Dimension, double OldValue, double NewValue, double Weight);
 
-        /// <summary>Jealousy distress applied — TransgressionResidue increased.</summary>
+        /// <summary>
+        /// Jealousy distress applied — TransgressionResidue increased. Tagged with the trigger
+        /// classification (Attridge 2013): GET only implements the evidence-based Reactive path;
+        /// Suspicious (evidence-independent) jealousy has no generative mechanism yet.
+        /// </summary>
         [LoggerMessage(
             EventId = 2012,
             Level = LogLevel.Information,
-            Message = "[REL/JEALOUSY] {HumanId} Jealousy distress: {IntimateActor}->{IntimateTarget} observed, transgressionResidue {OldResidue:F2}->{NewResidue:F2}")]
+            Message = "[REL/JEALOUSY] {HumanId} Jealousy distress ({JealousyType}): {IntimateActor}->{IntimateTarget} observed, transgressionResidue {OldResidue:F2}->{NewResidue:F2}")]
         public static partial void JealousyDistressApplied(
-            this ILogger logger, string HumanId, string IntimateActor, string IntimateTarget,
+            this ILogger logger, string HumanId, string JealousyType, string IntimateActor, string IntimateTarget,
             double OldResidue, double NewResidue);
+
+        /// <summary>Rival-directed hostility applied (Like/Respect decrease) after a jealousy trigger.</summary>
+        [LoggerMessage(
+            EventId = 2018,
+            Level = LogLevel.Information,
+            Message = "[REL/JEALOUSY] {HumanId} Rival hostility: rival={Rival} viaActor={ViaActor}, hostility={Hostility:F2}")]
+        public static partial void JealousyRivalHostilityApplied(
+            this ILogger logger, string HumanId, string Rival, string ViaActor, double Hostility);
 
         /// <summary>A touch interaction outcome was decided — logs level, acceptance probability and result.</summary>
         [LoggerMessage(

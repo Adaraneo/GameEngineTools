@@ -276,20 +276,187 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Computes the commitment target from the Rusbult integrator:
         /// satisfaction + investment·w − alternatives·w. Current Commitment drifts toward this.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Predictor covariance (research gate, resolved):</b> satisfaction, investment and
+        /// alternatives are computed independently here, which matches the Investment Model's
+        /// theoretical structure (Rusbult; Le &amp; Agnew 2003; Tran et al. 2019). In practice the three
+        /// predictors correlate substantially (Joel, MacDonald et al. 2015, <i>Journal of Social and
+        /// Personal Relationships</i>: r ≈ −.44 to .42 across the Le &amp; Agnew meta-analytic sample,
+        /// attributed to a shared perceived-partner-responsiveness factor). This is expected covariance
+        /// from shared upstream signals (Like/Closeness/Comfort feed both Satisfaction and, indirectly,
+        /// InvestmentSize growth) — not a defect to be "decorrelated".
+        /// </para>
+        /// <para>
+        /// <b>Relational vs. non-relational domain differentiation (research gate, resolved):</b> Le &amp;
+        /// Agnew (2003) found the Investment Model holds more strongly in relational domains than in
+        /// non-relational ones (friendship, work, community). <see cref="ComputeAlternativeQuality"/>
+        /// already gates CL_alt to romantic edges (<see cref="KinRole.Partner"/> or an intimacy
+        /// threshold) — a reasonable proxy, since CL_alt (competing partners) is theoretically
+        /// near-meaningless for platonic bonds. <see cref="RelationshipsConfig.InvestmentGrowthPerDay"/>
+        /// and <see cref="RelationshipsConfig.ComparisonLevelBaseline"/> apply uniformly across all
+        /// <see cref="KinRole"/> values — verified deliberate, not an oversight: the literature reports
+        /// only a qualitative "significantly stronger" effect with no citable numeric ratio, so adding a
+        /// differentiation multiplier here would violate GET's citation-gate policy (no uncited constants).
+        /// </para>
+        /// <para>
+        /// <b>Conflict-trajectory term (Topic D, Task D.5):</b> Source: Kanter, Lavner, Lannin, Hilgard &amp;
+        /// Monk (2022, <i>JMF</i>, 84(2), 533–551) — negativity → dissolution d=−0.41, negativity →
+        /// relational quality r=−.17. The authors explicitly caution these are SMALL effects and single
+        /// assessments are only modestly predictive. <see cref="RelationshipsConfig.CommitmentConflictTrajectoryWeight"/>
+        /// is therefore kept deliberately small (default 0.15, well below
+        /// <see cref="RelationshipsConfig.CommitmentAlternativeWeight"/>'s 0.5) so a high
+        /// <see cref="RelationshipEdge.DemandWithdrawScore"/> nudges Commitment down without dominating
+        /// the satisfaction/investment/alternatives terms that carry the strongest (r≈.65-.68) empirical support.
+        /// </para>
+        /// </remarks>
         private static double ComputeCommitmentTarget(RelationshipEdge edge, RelationshipsConfig cfg)
         {
             // Satisfaction = Outcomes − CL (Thibaut & Kelley 1959).
             var outcomes = (edge.Like + edge.Closeness + edge.Comfort) / 3.0;
             var satisfaction = outcomes - cfg.ComparisonLevelBaseline;
 
+            var conflictPenalty = (edge.DemandWithdrawScore / 100.0) * cfg.CommitmentConflictTrajectoryWeight;
+
             var target = satisfaction
                        + edge.InvestmentSize * cfg.CommitmentInvestmentWeight
-                       - edge.AlternativeQuality * cfg.CommitmentAlternativeWeight;
+                       - edge.AlternativeQuality * cfg.CommitmentAlternativeWeight
+                       - conflictPenalty * 100.0;
 
             return Math.Clamp(target, 0.0, 100.0);
         }
 
         #endregion Private methods — investment model (Rusbult)
+
+        #region Private methods — jealousy (Buss et al. 1992; Dijkstra & Buunk 1998; Pollet & Saxton 2020)
+
+        /// <summary>
+        /// Rival-attractiveness modulator for jealousy intensity: a more attractive rival intensifies
+        /// the reaction, gated by sex per the confirmed replication.
+        /// </summary>
+        /// <remarks>
+        /// Source: Dijkstra &amp; Buunk (1998, <i>PSPB</i>, 24(11), 1158–1166) — original vignette
+        /// finding; Pollet &amp; Saxton (2020, <i>PSPB</i>, 46(10), 1428–1443) — two large replications
+        /// (combined N=5,899/4,038) CONFIRM the rival-attractiveness × sex interaction; they do NOT
+        /// confirm a rival-dominance effect, which is therefore deliberately absent from this
+        /// computation (rival dominance is an explicit rejection, not an oversight — do not add a
+        /// PerceivedDominance-based modulator here).
+        /// </remarks>
+        /// <param name="rival">The rival's HumanId (tpa.Target).</param>
+        /// <param name="allEdges">The observer's full edge graph.</param>
+        /// <param name="observerSex">The observer's biological sex, for the sex-differentiated weighting.</param>
+        /// <param name="cfg">Engine configuration.</param>
+        /// <returns>Multiplier in roughly [0.7, 1.3] applied to base jealousy intensity.</returns>
+        private static double ComputeRivalAttractivenessModifier(
+            HumanId rival,
+            IReadOnlyDictionary<HumanId, RelationshipEdge> allEdges,
+            SexBiology observerSex,
+            RelationshipsConfig cfg)
+        {
+            if (!allEdges.TryGetValue(rival, out var rivalEdge))
+            {
+                return 1.0; // no prior perception of the rival — neutral baseline
+            }
+
+            var rivalAttractiveness = Math.Clamp(
+                (rivalEdge.AestheticAttraction + rivalEdge.PhysicalAttraction) / 2.0 / 100.0,
+                0.0, 1.0);
+
+            // Pollet & Saxton (2020): women's jealousy responds more strongly to rival attractiveness
+            // than men's. Small effect — keep the sex differential modest.
+            var sexWeight = observerSex == SexBiology.Female
+                ? cfg.RivalAttractivenessWeightFemale
+                : cfg.RivalAttractivenessWeightMale;
+
+            return 1.0 + (rivalAttractiveness - 0.5) * sexWeight;
+        }
+
+        /// <summary>
+        /// Applies a jealousy reaction to both the actor edge (partner-trust/distress content) and
+        /// the rival edge (rival-directed hostility), shared by the IntimateAct and
+        /// EmotionalIntimacyAct third-party observation branches so the two never drift out of sync.
+        /// </summary>
+        /// <remarks>
+        /// Source: Buss, Larsen, Westen &amp; Semmelroth (1992) — sex-differentiated sensitivity to
+        /// sexual vs. emotional infidelity, passed in via <paramref name="biasMultiplier"/>; Dijkstra
+        /// &amp; Buunk (1998) and Pollet &amp; Saxton (2020) — rival attractiveness intensifies
+        /// jealousy (rival dominance explicitly rejected — see
+        /// <see cref="ComputeRivalAttractivenessModifier"/>). Only <see cref="JealousyType.Reactive"/>
+        /// is generated here — see that type's remarks for why Suspicious jealousy has no generative
+        /// mechanism in GET.
+        /// <para>
+        /// The rival-attractiveness modifier is folded into <c>jealousyIntensity</c> exactly once and
+        /// then reused for both the partner-distress term (TransgressionResidue) and the
+        /// rival-hostility term (Like/Respect) — it is deliberately not re-applied a second time to
+        /// the rival-hostility term, which would silently square its effect.
+        /// </para>
+        /// </remarks>
+        private void ApplyJealousyReaction(
+            HumanId self,
+            HumanId actor,
+            HumanId target,
+            IHumanContext ctx,
+            double intimacyInterest,
+            double biasMultiplier,
+            JealousyType jealousyType,
+            WDateTime occurredAt,
+            IEventCollector outbox)
+        {
+            var anxiety = ctx.Personality.Attachment.Anxiety;
+            var soiAttitude = ctx.Personality.Sociosexuality.Attitude;
+            var rivalAttractivenessModifier = ComputeRivalAttractivenessModifier(target, State.Edges, ctx.Biology, Config);
+
+            var jealousyBase = Math.Clamp(intimacyInterest / 100.0, 0, 1);
+            var jealousyIntensity = jealousyBase * biasMultiplier * rivalAttractivenessModifier
+                                  * (1.0 + anxiety * 0.8)
+                                  * (1.0 - soiAttitude * 0.3);
+
+            var transgressionAmount = Math.Clamp(jealousyIntensity * 12.0, 0, 20.0);
+            var oldResidue = State.Edges.TryGetValue(actor, out var jealEdge) ? jealEdge.TransgressionResidue : 0.0;
+
+            Upsert(self, actor, e => e with
+            {
+                TransgressionResidue = Math.Min(100, e.TransgressionResidue + transgressionAmount)
+            },
+            eventType: "JealousyDistress",
+            outcome: $"distress={transgressionAmount:F1}",
+            detail: $"actor={actor.Value}, intimacyInterest={intimacyInterest:F0}",
+            now: occurredAt);
+
+            using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: actor.Value))
+            {
+                _log.JealousyDistressApplied(
+                    self.Value.ToString(), jealousyType.ToString(), actor.Value.ToString(), target.Value.ToString(),
+                    oldResidue, oldResidue + transgressionAmount);
+            }
+
+            // Rival-edge propagation (research gate, resolved: propagate to BOTH edges with
+            // different content). The actor edge above absorbed partner-trust/distress content;
+            // the rival edge absorbs hostility toward the third party.
+            // Source: Buss et al. (1992); Dijkstra & Buunk (1998) — rival characteristics shape the
+            // intensity of rival-directed hostility, distinct from partner-directed distress.
+            var rivalHostility = Math.Clamp(jealousyIntensity * Config.RivalHostilityScale, 0.0, 20.0);
+            if (rivalHostility > 0.0)
+            {
+                Upsert(self, target, e => e with
+                {
+                    Like = Bump(e.Like, -rivalHostility),
+                    Respect = Bump(e.Respect, -rivalHostility * 0.5)
+                },
+                eventType: "JealousyRivalHostility",
+                outcome: $"hostility={rivalHostility:F1}",
+                detail: $"rival={target.Value}, viaActor={actor.Value}",
+                now: occurredAt);
+
+                using (_log.BeginCharacterScope(self.Value, nameof(DefaultRelationshipsEngine), relatedPersonId: target.Value))
+                {
+                    _log.JealousyRivalHostilityApplied(
+                        self.Value.ToString(), target.Value.ToString(), actor.Value.ToString(), rivalHostility);
+                }
+            }
+        }
+
+        #endregion Private methods — jealousy
 
         #region Private methods — helpers
 
