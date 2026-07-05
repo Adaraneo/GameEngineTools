@@ -105,7 +105,15 @@ namespace WorldObserver.Dtos
         // ── Bereavement (active grief losses) ────────────────────────────────
         IReadOnlyList<LossDto>? Losses,
         // ── Emergent social status (dominance + prestige axes, orthogonal) ────
-        StatusDto? SocialStatus);
+        StatusDto? SocialStatus,
+        // ── Pantry / inventory (food-economy Tier 1: items the character carries) ─
+        IReadOnlyList<PantryDto>? Pantry);
+
+    /// <summary>One food/drink item the character is carrying, with its remaining freshness [0..1].</summary>
+    public sealed record PantryDto(
+        string ItemKind,
+        string DisplayName,
+        double Freshness);
 
     /// <summary>One active grief loss the character is currently carrying.</summary>
     public sealed record LossDto(

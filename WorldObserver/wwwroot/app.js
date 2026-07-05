@@ -1167,6 +1167,15 @@ function renderDetail() {
         }
         box.appendChild(section("Reprodukce", reproRows));
 
+        // Pantry / inventory — carried food & drink with remaining freshness (food-economy Tier 1)
+        if (c.pantry && c.pantry.length > 0) {
+            const panRows = [];
+            for (const it of c.pantry) {
+                panRows.push(dimRow(it.displayName, Math.round(it.freshness * 100), undefined));
+            }
+            box.appendChild(section(`Spíž (${c.pantry.length})`, panRows));
+        }
+
         // Social status (Dominance + Prestige — two orthogonal axes, never collapsed)
         if (c.socialStatus) {
             const ss = c.socialStatus;

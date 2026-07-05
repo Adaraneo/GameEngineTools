@@ -11,6 +11,7 @@ namespace WorldObserver.Simulation
     using GameEngineTools.Characters.Engines.Status;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using WorldObserver.Dtos;
 
@@ -42,6 +43,14 @@ namespace WorldObserver.Simulation
         {
             var idSet = characters.Select(c => c.Id).ToHashSet();
             var nameById = characters.ToDictionary(c => c.Id, c => c.Identity.FirstName.Original);
+
+            // Held items grouped by holder (the pantry/inventory), built once per push. Only the read
+            // provider is available here, so we filter GetAllObjects rather than call GetHeldBy.
+            var heldByHolder = objectProvider?.GetAllObjects()
+                .Where(o => o.HeldBy is not null
+                    && (o.Category == WorldObjectCategory.Food || o.Category == WorldObjectCategory.Drink))
+                .GroupBy(o => o.HeldBy!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
             // Hierarchy stability is scene-global; read once and use for all character status DTOs.
             var hierarchyStability = statusLedger?.HierarchyStability() ?? 1.0;
 
@@ -139,6 +148,19 @@ namespace WorldObserver.Simulation
                         Dominance: Round(ss.DominanceStatus),
                         Prestige: Round(ss.PrestigeStatus),
                         HierarchyStability: Math.Round(hierarchyStability, 3));
+                }
+
+                // Pantry — carried food/drink with remaining freshness (spoilage rates are static design data).
+                IReadOnlyList<PantryDto>? pantry = null;
+                if (heldByHolder is not null && heldByHolder.TryGetValue(c.Id, out var heldItems) && heldItems.Count > 0)
+                {
+                    pantry = heldItems
+                        .Select(o => new PantryDto(
+                            ItemKind: o.ItemKind.ToString(),
+                            DisplayName: o.DisplayName,
+                            Freshness: Math.Round(Spoilage.Freshness(o, now, SpoilageConfig.Default), 2)))
+                        .OrderBy(p => p.Freshness)
+                        .ToList();
                 }
 
                 var preg = phy.Pregnancy;
@@ -257,7 +279,8 @@ namespace WorldObserver.Simulation
                     Bio: bio,
                     Reproduction: reproduction,
                     Losses: losses,
-                    SocialStatus: socialStatus);
+                    SocialStatus: socialStatus,
+                    Pantry: pantry);
             }).ToList();
 
             // Dynamic map: list exactly the locations characters currently occupy (grouped from their

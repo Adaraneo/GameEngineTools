@@ -17793,3 +17793,22 @@ INSERT OR IGNORE INTO NutritionalProfiles (ObjectId, CalorieGain, ProteinGain, I
     ('campfood_campsite_10', 40, 12, 8, 2, 55),
     ('campfood_campsite_11', 40, 12, 8, 2, 55),
     ('campfood_campsite_12', 40, 12, 8, 2, 55);
+
+-- ── Food-economy Tier 1 production sites ──────────────────────────────────────
+-- Immovable Ambient fixtures carrying a Production affordance. ItemKind names the
+-- output; a recipe (Flour/Bread) marks a processing site, no recipe (Grain) a raw
+-- harvest site. Non-pickable, non-respawning. (WorldObjects must precede Affordances
+-- for the ObjectId foreign key.)
+INSERT OR IGNORE INTO WorldObjects
+    (Id, DisplayName, Category, LocationId, IsAvailable, IsPickable, WeightGrams, ItemKind, Respawns, RespawnMinutes)
+VALUES
+    ('field_farm_fields', 'Obilné pole', 'Ambient', 'farm_fields', 1, 0, 500000, 'Grain', 0, 0),
+    ('mill_farm_fields',  'Mlýn',        'Ambient', 'farm_fields', 1, 0, 500000, 'Flour', 0, 0),
+    ('bakery_station_bakery', 'Pekárna', 'Ambient', 'bakery',      1, 0, 500000, 'Bread', 0, 0);
+
+INSERT OR IGNORE INTO Affordances
+    (ObjectId, Type, Satisfaction)
+VALUES
+    ('field_farm_fields', 'Production', 1.0),
+    ('mill_farm_fields',  'Production', 1.0),
+    ('bakery_station_bakery', 'Production', 1.0);
