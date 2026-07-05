@@ -70,6 +70,14 @@ namespace GameEngineTools.World.Objects
         /// Signals that an object can be taken and carried by the character.
         /// Satisfaction = desirability of taking this object [0, 1].
         /// </summary>
-        Ownership
+        Ownership,
+
+        /// <summary>
+        /// Marks a location/tool object as capable of producing or processing food via labor
+        /// (see <c>ProductionService</c>). What it produces is the carrying object's
+        /// <see cref="PickupItemKind"/> (raw production) or the matching <c>Recipe</c> output
+        /// (processing). Satisfaction is unused (0). Food-economy Tier 1.
+        /// </summary>
+        Production
     }
 }

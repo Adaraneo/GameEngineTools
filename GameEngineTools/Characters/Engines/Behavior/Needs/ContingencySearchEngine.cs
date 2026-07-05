@@ -3,8 +3,11 @@
 
 namespace GameEngineTools.Characters.Engines.Behavior.Needs
 {
+    using System;
     using System.Collections.Generic;
+    using System.Linq;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
@@ -48,7 +51,24 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         /// </summary>
         private const double MinNeedToSearch = 20.0;
 
+        // Food-economy Tier 1 provisioning weights, ordered by diet-breadth return rate
+        // (optimal-foraging: prefer the option that satiates soonest for the least labor).
+        // Eat (world Food, PhysiologicalNeedsEngine) = 1.2 is the top of this ladder.
+        private const double EatStoredWeight = 1.15; // eat from hand: immediate, no labor
+        private const double ProcessWeight   = 1.05; // cook held inputs: some labor, then edible
+        private const double ProduceWeight   = 0.90; // harvest raw material: furthest from a meal
+
         #endregion Constants
+
+        #region Construction
+
+        private readonly SpoilageConfig _spoilage;
+
+        /// <summary>Creates the bridge; spoilage rates default to <see cref="SpoilageConfig.Default"/>.</summary>
+        public ContingencySearchEngine(SpoilageConfig? spoilage = null)
+            => _spoilage = spoilage ?? SpoilageConfig.Default;
+
+        #endregion Construction
 
         #region IBehaviorNeedEngine
 
@@ -62,21 +82,59 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
             var candidates = new List<BehaviorCandidate>(capacity: 2);
 
-            // ── Food foraging ─────────────────────────────────────────────────────────
-            // Only generate MoveTo:Food when the character is hungry AND food is absent.
-            // If food is present, Eat survives gating and no foraging candidate is needed.
-            if (context.State.NeedFood >= MinNeedToSearch &&
-                !HasCategory(context.AvailableObjects, WorldObjectCategory.Food))
+            // ── Food provisioning ladder (Tier 1) + foraging fallback ───────────────────
+            // When hungry, offer every actionable way to reach a meal; arbitration picks the
+            // best by utility. Options are gated to what is actually possible here-and-now.
+            if (context.State.NeedFood >= MinNeedToSearch)
             {
-                candidates.Add(new BehaviorCandidate(
-                    MoveToFood,
+                var need = context.State.NeedFood;
 
-                    // Slightly lower weight than Eat (1.2) so actual eating always beats foraging
-                    // when both are possible (e.g., food was just dropped in the location).
-                    BehaviorMath.Util(context.State.NeedFood, 1.0),
-                    WTimeSpan.FromMinutes(20),
-                    BehaviorDomain.Physiological,
-                    Tags: new[] { "EnvironmentMovement" }));
+                // 1) Eat from hand — a fresh, edible item is already carried.
+                if (context.HeldObjects is { } held && HasFreshFood(held, context.Now))
+                {
+                    candidates.Add(new BehaviorCandidate(
+                        EatStored,
+                        BehaviorMath.Util(need, EatStoredWeight),
+                        WTimeSpan.FromMinutes(15),
+                        BehaviorDomain.Physiological,
+                        Tags: new[] { "FoodEconomy" }));
+                }
+
+                // 2) Process held/co-located inputs into food at a co-located processing site.
+                if (TryFindSatisfiableRecipe(context.AvailableObjects, context.HeldObjects, out var recipe))
+                {
+                    candidates.Add(new BehaviorCandidate(
+                        Process,
+                        BehaviorMath.Util(need, ProcessWeight),
+                        WTimeSpan.FromMinutes(recipe!.DurationMinutes),
+                        BehaviorDomain.Physiological,
+                        Tags: new[] { "FoodEconomy" }));
+                }
+
+                // 3) Harvest raw material at a co-located raw-production site.
+                if (HasRawProductionSite(context.AvailableObjects))
+                {
+                    candidates.Add(new BehaviorCandidate(
+                        Produce,
+                        BehaviorMath.Util(need, ProduceWeight),
+                        WTimeSpan.FromMinutes(30),
+                        BehaviorDomain.Physiological,
+                        Tags: new[] { "FoodEconomy" }));
+                }
+
+                // 4) Foraging fallback — no ready Food object here → move toward one.
+                if (!HasCategory(context.AvailableObjects, WorldObjectCategory.Food))
+                {
+                    candidates.Add(new BehaviorCandidate(
+                        MoveToFood,
+
+                        // Slightly lower weight than Eat (1.2) so actual eating always beats foraging
+                        // when both are possible (e.g., food was just dropped in the location).
+                        BehaviorMath.Util(need, 1.0),
+                        WTimeSpan.FromMinutes(20),
+                        BehaviorDomain.Physiological,
+                        Tags: new[] { "EnvironmentMovement" }));
+                }
             }
 
             // ── Drink foraging ────────────────────────────────────────────────────────
@@ -117,6 +175,79 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             }
 
             return false;
+        }
+
+        /// <summary>True when the character carries at least one still-edible (unspoiled) food item.</summary>
+        private bool HasFreshFood(IReadOnlyList<WorldObject> held, WDateTime now)
+        {
+            foreach (var obj in held)
+            {
+                if (obj.Category == WorldObjectCategory.Food && Spoilage.Freshness(obj, now, _spoilage) > 0.0)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>True when a co-located object is a raw-production site (Production affordance, no recipe).</summary>
+        private static bool HasRawProductionSite(IReadOnlyList<WorldObject> availableObjects)
+        {
+            foreach (var obj in availableObjects)
+            {
+                if (obj.Affordances.Any(a => a.Type == AffordanceType.Production)
+                    && RecipeRegistry.FindByOutput(obj.ItemKind) is null)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Finds a co-located processing site (Production affordance whose output has a recipe) for
+        /// which the character's held plus co-located items satisfy every input. Returns the recipe.
+        /// </summary>
+        private static bool TryFindSatisfiableRecipe(
+            IReadOnlyList<WorldObject> availableObjects,
+            IReadOnlyList<WorldObject>? heldObjects,
+            out Recipe? recipe)
+        {
+            foreach (var site in availableObjects)
+            {
+                if (!site.Affordances.Any(a => a.Type == AffordanceType.Production))
+                    continue;
+                var candidate = RecipeRegistry.FindByOutput(site.ItemKind);
+                if (candidate is null)
+                    continue; // raw site, not a processing site
+                if (CanSatisfy(candidate, availableObjects, heldObjects))
+                {
+                    recipe = candidate;
+                    return true;
+                }
+            }
+            recipe = null;
+            return false;
+        }
+
+        /// <summary>
+        /// All-or-nothing check that held + co-located items cover every <see cref="RecipeInput"/>,
+        /// counting each item toward at most one input line (mirrors <c>ProductionService</c>).
+        /// </summary>
+        private static bool CanSatisfy(
+            Recipe recipe,
+            IReadOnlyList<WorldObject> availableObjects,
+            IReadOnlyList<WorldObject>? heldObjects)
+        {
+            var pool = (heldObjects ?? Array.Empty<WorldObject>()).Concat(availableObjects);
+            var usedIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var input in recipe.Inputs)
+            {
+                var matched = pool
+                    .Where(o => o.ItemKind == input.Kind && !usedIds.Contains(o.Id))
+                    .Take(input.Quantity)
+                    .ToList();
+                if (matched.Count < input.Quantity)
+                    return false;
+                foreach (var o in matched) usedIds.Add(o.Id);
+            }
+            return true;
         }
 
         #endregion Helpers

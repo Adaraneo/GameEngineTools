@@ -101,5 +101,24 @@ namespace GameEngineTools.Characters.Engines
         public const string MoveToGrave = "MoveTo:Grave";
 
         #endregion Bereavement / burial
+
+        #region Food economy (Tier 1)
+
+        /// <summary>
+        /// Raw-material production at a production site (harvest grain, milk a cow): no inputs, only
+        /// labor time, yields one fresh item in hand. Gated by a <c>Production</c> affordance.
+        /// </summary>
+        public const string Produce = "Produce";
+
+        /// <summary>
+        /// Recipe-based processing (mill grain→flour, bake flour→bread, curdle milk→cheese): consumes
+        /// held/co-located inputs and yields the recipe output. Gated by a <c>Production</c> affordance.
+        /// </summary>
+        public const string Process = "Process";
+
+        /// <summary>Eat a food item already held or stored in the character's pantry (no world Food object needed).</summary>
+        public const string EatStored = "EatStored";
+
+        #endregion Food economy (Tier 1)
     }
 }

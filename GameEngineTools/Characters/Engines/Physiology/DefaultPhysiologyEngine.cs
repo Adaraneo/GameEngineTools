@@ -173,9 +173,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
             };
 
             // Hunger: rises while awake, slower during sleep, drops while eating.
+            // EatStored (pantry/held food, food-economy Tier 1) reduces hunger identically to Eat.
             var hunger = action switch
             {
-                Eat => config.HungerEatingGainPerHour * h,
+                Eat or EatStored => config.HungerEatingGainPerHour * h,
                 Sleep => config.HungerDriftSleepPerHour * h,
                 _ => config.HungerDriftAwakePerHour * h
             };
@@ -284,16 +285,18 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Iron is restored by sleep; VitaminD declines slowly
             if (s.Nutrition is { } nut)
             {
-                var caloriesDelta = action == Eat ? (nutProfile?.CalorieGain ?? Config.CaloriesEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
-                var proteinDelta = action == Eat ? (nutProfile?.ProteinGain ?? Config.ProteinEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
+                // Both Eat (world Food object) and EatStored (pantry/held food, Tier 1) count as a meal.
+                var isEating = action is Eat or EatStored;
+                var caloriesDelta = isEating ? (nutProfile?.CalorieGain ?? Config.CaloriesEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
+                var proteinDelta = isEating ? (nutProfile?.ProteinGain ?? Config.ProteinEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
                 var ironDelta = action == Sleep ? Config.IronSleepRecoveryPerHour * h : -Config.NutritionDecayPerHour * h * 0.3;
                 // Glycemic state: a spike when eating, a rebound dip 1–2 h after a meal
-                var glucoseDelta = action == Eat ? Config.BloodGlucoseEatingGain * h : 0.0;
-                var postMealHours = action == Eat ? 0.0 : nut.PostMealHours + h;
+                var glucoseDelta = isEating ? Config.BloodGlucoseEatingGain * h : 0.0;
+                var postMealHours = isEating ? 0.0 : nut.PostMealHours + h;
                 var inDipWindow = postMealHours > Config.BloodGlucoseDipStartHours
                                  && postMealHours < Config.BloodGlucoseDipEndHours;
                 var glucoseDecay = Config.BloodGlucoseBaseDecayPerHour + (inDipWindow ? Config.BloodGlucoseDipDecayBonus : 0);
-                if (action != Eat) glucoseDelta -= glucoseDecay * h;
+                if (!isEating) glucoseDelta -= glucoseDecay * h;
 
                 s = s with
                 {

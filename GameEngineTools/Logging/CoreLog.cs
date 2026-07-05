@@ -1492,6 +1492,65 @@ namespace GameEngineTools.Logging
             string LocationId,
             double ElapsedMinutes);
 
+        /// <summary>
+        /// Character produced a raw food item by labor (harvest/milk) — food economy Tier 1.
+        /// Logged at Information so production activity appears alongside action decisions.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1502,
+            Level = LogLevel.Information,
+            Message = "[OBJ/PRODUCE] {HumanId} produced {ItemKind} ({ObjectId}) at {LocationId}")]
+        public static partial void ItemProduced(
+            this ILogger logger,
+            string HumanId,
+            string ItemKind,
+            string ObjectId,
+            string LocationId);
+
+        /// <summary>
+        /// Character processed inputs into an output via a recipe (mill/bake/curdle) — food economy Tier 1.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1503,
+            Level = LogLevel.Information,
+            Message = "[OBJ/PROCESS] {HumanId} processed {RecipeId} → {ItemKind} ({ObjectId}) at {LocationId}")]
+        public static partial void ItemProcessed(
+            this ILogger logger,
+            string HumanId,
+            string RecipeId,
+            string ItemKind,
+            string ObjectId,
+            string LocationId);
+
+        /// <summary>
+        /// A stored/held food item spoiled and was discarded before or during a consumption attempt — food economy Tier 1.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1504,
+            Level = LogLevel.Information,
+            Message = "[OBJ/SPOIL] {HumanId} discarded spoiled {ItemKind} ({ObjectId}) — freshness={Freshness:F2}")]
+        public static partial void ItemSpoiled(
+            this ILogger logger,
+            string HumanId,
+            string ItemKind,
+            string ObjectId,
+            double Freshness);
+
+        /// <summary>
+        /// Character ate a food item from hand/pantry rather than a fixed world Food object — food economy Tier 1.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1505,
+            Level = LogLevel.Information,
+            Message = "[OBJ/PANTRY] {HumanId} ate stored {ItemKind} ({ObjectId}) freshness={Freshness:F2} nutrition={Nutrition:F2}")]
+        public static partial void PantryConsumed(
+            this ILogger logger,
+            string HumanId,
+            string ItemKind,
+            string ObjectId,
+            double Freshness,
+            double Nutrition);
+
         #endregion World Objects — 1500–1599
 
         #region Movement / Transit — 1700–1799

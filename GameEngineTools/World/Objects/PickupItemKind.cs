@@ -45,4 +45,23 @@ public enum PickupItemKind
 
     /// <summary>Musical instrument or game piece — lute, dice, chess board.</summary>
     Instrument,
+
+    // ── Food-economy Tier 1: raw materials and processed foods ──────────────
+    // Typed kinds let RecipeRegistry verify input/output at compile time (grain→flour→bread,
+    // milk→cheese). See docs/plans/food-economy-tier1-implementation-plan.md §1.
+
+    /// <summary>Raw grain harvested from a field (input to milling).</summary>
+    Grain,
+
+    /// <summary>Milled flour (output of grain, input to baking).</summary>
+    Flour,
+
+    /// <summary>Raw milk (input to cheese-making).</summary>
+    Milk,
+
+    /// <summary>Baked bread — a processed, edible food.</summary>
+    Bread,
+
+    /// <summary>Cheese — a processed, edible food.</summary>
+    Cheese,
 }

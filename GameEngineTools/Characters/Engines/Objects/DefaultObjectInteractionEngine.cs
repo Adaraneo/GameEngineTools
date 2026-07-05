@@ -9,6 +9,7 @@ namespace GameEngineTools.Characters.Engines.Objects
     using GameEngineTools.Logging;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
 
@@ -22,22 +23,30 @@ namespace GameEngineTools.Characters.Engines.Objects
         private readonly IMutableWorldObjectProvider _objectProvider;
         private readonly ILocationService _locations;
         private readonly IObjectInteractionPolicy _policy;
+        private readonly ProductionService _production;
+        private readonly SpoilageConfig _spoilage;
         private readonly ILogger<DefaultObjectInteractionEngine> _logger;
 
-        /// <summary>Creates the engine with its world-object, location, policy and logging dependencies.</summary>
+        /// <summary>Creates the engine with its world-object, location, policy, production and logging dependencies.</summary>
         /// <param name="objectProvider">Provider of mutable world objects.</param>
         /// <param name="locations">Location service.</param>
         /// <param name="policy">Object-interaction permission policy.</param>
+        /// <param name="production">Food-economy production/processing service (Tier 1).</param>
+        /// <param name="spoilage">Food-spoilage rate configuration (Tier 1).</param>
         /// <param name="logger">Logger.</param>
         public DefaultObjectInteractionEngine(
             IMutableWorldObjectProvider objectProvider,
             ILocationService locations,
             IObjectInteractionPolicy policy,
+            ProductionService production,
+            SpoilageConfig spoilage,
             ILogger<DefaultObjectInteractionEngine> logger)
         {
             _objectProvider = objectProvider;
             _locations = locations;
             _policy = policy;
+            _production = production;
+            _spoilage = spoilage;
             _logger = logger;
         }
 
@@ -55,13 +64,26 @@ namespace GameEngineTools.Characters.Engines.Objects
             var data = committed.ObjectInteraction;
             if (data is null)
             {
-                // Path B: Eat / Drink win the arbitration as plain need-based actions
-                // (without an ObjectInteraction payload). Find and consume the best
-                // matching food/drink object so that EventId 1500 is still emitted and
-                // the object stock is properly depleted.
-                // NOTE: hunger/thirst reduction is intentionally skipped here —
-                // DefaultPhysiologyEngine already handles it directly from the ActionCommitted event.
-                HandleEatDrinkWithoutPayload(committed, ctx, outbox);
+                // Path B: need-based actions without an ObjectInteraction payload.
+                // Eat / Drink deplete a co-located Food/Drink object; the food-economy Tier 1
+                // actions (EatStored / Produce / Process) touch the character's inventory and
+                // production sites instead. Hunger/thirst reduction stays with
+                // DefaultPhysiologyEngine (driven by the same ActionCommitted event).
+                switch (committed.ActionName)
+                {
+                    case ActionNames.Eat or ActionNames.Drink:
+                        HandleEatDrinkWithoutPayload(committed, ctx, outbox);
+                        break;
+                    case ActionNames.EatStored:
+                        HandleEatStored(committed, ctx, outbox);
+                        break;
+                    case ActionNames.Produce:
+                        HandleProduce(committed, ctx, outbox);
+                        break;
+                    case ActionNames.Process:
+                        HandleProcess(committed, ctx, outbox);
+                        break;
+                }
                 return;
             }
 
@@ -219,6 +241,113 @@ namespace GameEngineTools.Characters.Engines.Objects
                         totalSatisfaction,
                         wasConsumed);
             }
+        }
+
+        /// <summary>
+        /// Handles <see cref="ActionNames.EatStored"/>: eats the freshest edible food item held by the
+        /// character (food-economy Tier 1 pantry). Fully spoiled items are discarded, never eaten.
+        /// Hunger reduction stays with <c>DefaultPhysiologyEngine</c> (same <c>EatStored</c> action).
+        /// </summary>
+        private void HandleEatStored(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var now = committed.OccurredAt;
+            var held = _objectProvider.GetHeldBy(ctx.Id)
+                                      .Where(o => o.Category == WorldObjectCategory.Food)
+                                      .ToList();
+            if (held.Count == 0)
+                return;
+
+            // Discard anything that has fully spoiled; eat the freshest of what remains.
+            WorldObject? freshest = null;
+            var bestFreshness = 0.0;
+            foreach (var o in held)
+            {
+                var freshness = Spoilage.Freshness(o, now, _spoilage);
+                if (freshness <= 0.0)
+                {
+                    _objectProvider.RemoveObject(o.LocationId, o.Id);
+                    using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                        _logger.ItemSpoiled(ctx.Id.ToString(), o.ItemKind.ToString(), o.Id, freshness);
+                    continue;
+                }
+                if (freshness > bestFreshness)
+                {
+                    bestFreshness = freshness;
+                    freshest = o;
+                }
+            }
+
+            if (freshest is null)
+                return; // everything held was spoiled
+
+            _objectProvider.RemoveObject(freshest.LocationId, freshest.Id);
+            outbox.Add(new ObjectUsed(now, ctx.Id, freshest.Id, freshest.LocationId, true));
+
+            var nutrition = (freshest.NutritionalProfile?.CalorieGain ?? 1.0) * bestFreshness;
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                _logger.PantryConsumed(ctx.Id.ToString(), freshest.ItemKind.ToString(), freshest.Id, bestFreshness, nutrition);
+        }
+
+        /// <summary>
+        /// Handles <see cref="ActionNames.Produce"/>: harvests one raw item at the current production
+        /// site (the co-located <c>Production</c>-affordance object whose output has no recipe).
+        /// </summary>
+        private void HandleProduce(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var locationId = _locations.GetLocation(ctx.Id);
+            if (locationId is null)
+                return;
+
+            var outputKind = ResolveProductionOutput(locationId, wantRecipe: false);
+            if (outputKind is null)
+                return;
+
+            var produced = _production.Produce(ctx, locationId, outputKind.Value, committed.OccurredAt);
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                _logger.ItemProduced(ctx.Id.ToString(), produced.ItemKind.ToString(), produced.Id, locationId);
+        }
+
+        /// <summary>
+        /// Handles <see cref="ActionNames.Process"/>: runs the recipe of the current processing site
+        /// (the co-located <c>Production</c>-affordance object whose output has a recipe), consuming
+        /// held/co-located inputs. No-op when inputs are insufficient.
+        /// </summary>
+        private void HandleProcess(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var locationId = _locations.GetLocation(ctx.Id);
+            if (locationId is null)
+                return;
+
+            var outputKind = ResolveProductionOutput(locationId, wantRecipe: true);
+            if (outputKind is null)
+                return;
+
+            var produced = _production.Process(ctx, locationId, outputKind.Value, committed.OccurredAt);
+            if (produced is null)
+                return; // insufficient inputs — nothing consumed
+
+            var recipe = RecipeRegistry.FindByOutput(produced.ItemKind);
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                _logger.ItemProcessed(ctx.Id.ToString(), recipe?.Id ?? "?", produced.ItemKind.ToString(), produced.Id, locationId);
+        }
+
+        /// <summary>
+        /// Finds the output kind of the production site at <paramref name="locationId"/>: the first
+        /// co-located object carrying a <see cref="AffordanceType.Production"/> affordance whose
+        /// <c>ItemKind</c> either has a recipe (<paramref name="wantRecipe"/> = true → processing site)
+        /// or has none (raw production site). Returns <c>null</c> when no matching site is present.
+        /// </summary>
+        private PickupItemKind? ResolveProductionOutput(string locationId, bool wantRecipe)
+        {
+            foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
+            {
+                if (!o.Affordances.Any(a => a.Type == AffordanceType.Production))
+                    continue;
+                var hasRecipe = RecipeRegistry.FindByOutput(o.ItemKind) is not null;
+                if (hasRecipe == wantRecipe)
+                    return o.ItemKind;
+            }
+            return null;
         }
     }
 }

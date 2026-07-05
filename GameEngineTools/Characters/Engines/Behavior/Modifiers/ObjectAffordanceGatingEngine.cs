@@ -4,7 +4,9 @@
 namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
     using System.Collections.Generic;
+    using System.Linq;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Production;
     using static ActionNames;
 
     /// <summary>
@@ -76,6 +78,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 return;
 
             ApplyGates(candidates, context.AvailableObjects);
+            ApplyFoodEconomyGates(candidates, context.AvailableObjects, context.HeldObjects);
         }
 
         #endregion IBehaviorModifierEngine
@@ -116,6 +119,50 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Food-economy Tier 1 hard gates that cannot be expressed as a simple category match:
+        /// <list type="bullet">
+        ///   <item><c>EatStored</c> needs at least one held <see cref="WorldObjectCategory.Food"/> item.</item>
+        ///   <item><c>Produce</c> needs a co-located <see cref="AffordanceType.Production"/> site whose
+        ///   output has no recipe (a raw-harvest site).</item>
+        ///   <item><c>Process</c> needs a co-located <see cref="AffordanceType.Production"/> site whose
+        ///   output has a recipe (a processing site).</item>
+        /// </list>
+        /// </summary>
+        private static void ApplyFoodEconomyGates(
+            List<BehaviorCandidate> candidates,
+            IReadOnlyList<WorldObject> availableObjects,
+            IReadOnlyList<WorldObject>? heldObjects)
+        {
+            var hasHeldFood = heldObjects is not null
+                && heldObjects.Any(o => o.Category == WorldObjectCategory.Food);
+            if (!hasHeldFood)
+                candidates.RemoveAll(c => c.Name == EatStored);
+
+            if (!HasProductionSite(availableObjects, wantRecipe: false))
+                candidates.RemoveAll(c => c.Name == Produce);
+
+            if (!HasProductionSite(availableObjects, wantRecipe: true))
+                candidates.RemoveAll(c => c.Name == Process);
+        }
+
+        /// <summary>
+        /// True when a co-located object carries a <see cref="AffordanceType.Production"/> affordance
+        /// whose <c>ItemKind</c> either has a recipe (<paramref name="wantRecipe"/>) or has none.
+        /// </summary>
+        private static bool HasProductionSite(IReadOnlyList<WorldObject> availableObjects, bool wantRecipe)
+        {
+            foreach (var obj in availableObjects)
+            {
+                if (!obj.Affordances.Any(a => a.Type == AffordanceType.Production))
+                    continue;
+                var hasRecipe = RecipeRegistry.FindByOutput(obj.ItemKind) is not null;
+                if (hasRecipe == wantRecipe)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>

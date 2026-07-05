@@ -431,6 +431,9 @@ namespace GameEngineTools.Characters.Hosting
         public static IServiceCollection AddObjectInteractionEngine(this IServiceCollection services)
         {
             services.TryAddSingleton<IObjectInteractionPolicy, DefaultObjectInteractionPolicy>();
+            // Food-economy Tier 1: production/processing service + spoilage rates.
+            services.TryAddSingleton<GameEngineTools.Characters.Engines.Objects.ProductionService>();
+            services.TryAddSingleton(GameEngineTools.World.Objects.Production.SpoilageConfig.Default);
             services.TryAddSingleton<IObjectInteractionEngine, DefaultObjectInteractionEngine>();
             return services;
         }

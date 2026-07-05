@@ -22,6 +22,7 @@ using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Movement;
 using GameEngineTools.World.Objects;
+using GameEngineTools.World.Objects.Production;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;
@@ -288,6 +289,14 @@ for (int index = 0; index < 20; index++)
     objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"bread_market_{(index + 1):D2}", DisplayName = "Bochánek chleba", LocationId = "market_square", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 60, WeightGrams = 200, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.6)], NutritionalProfile = new NutritionalProfile(CalorieGain: 48, ProteinGain: 14, IronGain: 8, VitaminDGain: 0, HydrationGain: 5) });
 for (int index = 0; index < 10; index++)
     objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"well_market_{(index + 1):D2}", DisplayName = "Studniční voda", LocationId = "market_square", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 10, WeightGrams = 300, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.9)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
+
+// ── Food-economy Tier 1 production sites (Village / Market Square) ─────────────
+// Non-respawning fixtures: a field yields raw grain (Produce), the mill turns grain→flour
+// and the bakery turns flour→bread (Process). With free respawning food nearby these are a
+// fallback — production is meant to matter once scarcity (Tier 2) removes the free stock.
+objectProvider.AddObject(ProductionSiteFactory.Create("field_market", "market_square", PickupItemKind.Grain, "Obilné pole"));
+objectProvider.AddObject(ProductionSiteFactory.Create("mill_market", "market_square", PickupItemKind.Flour, "Mlýn"));
+objectProvider.AddObject(ProductionSiteFactory.Create("bakery_market", "market_square", PickupItemKind.Bread, "Pekárna"));
 
 // ── Inn Room (Village / Rest) ─────────────────────────────────────────────────
 for (int index = 0; index < 5; index++)

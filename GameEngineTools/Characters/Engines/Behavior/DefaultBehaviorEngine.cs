@@ -144,6 +144,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             State = stateWithNeeds;
 
             IReadOnlyList<WorldObject>? availableObjects = null;
+            IReadOnlyList<WorldObject>? heldObjects = null;
             if (_objectProvider is not null)
             {
                 var locationId = ctx.Snapshot.InteractionSurface.Location;
@@ -158,9 +159,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 {
                     availableObjects = new List<WorldObject>();
                 }
+
+                // Pantry/inventory for food-economy Tier 1 (eat-from-hand, recipe inputs).
+                heldObjects = _objectProvider.GetHeldBy(ctx.Id).ToList();
             }
 
-            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator, availableObjects);
+            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator, availableObjects, heldObjects);
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.
             var sleep = _sleepCoordinator.Tick(context);

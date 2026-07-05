@@ -147,5 +147,16 @@ namespace GameEngineTools.World.Objects
         public NutritionalProfile? NutritionalProfile { get; init; } = null;
 
         #endregion Nutritional profile
+
+        #region Spoilage (food-economy Tier 1 pantry decay)
+
+        /// <summary>
+        /// When this object was produced/harvested/acquired, used with the category's spoilage rate
+        /// to compute freshness lazily at consumption time. <c>null</c> = never spoils (default, so
+        /// existing objects are unaffected). Food-economy Tier 1.
+        /// </summary>
+        public WDateTime? ProducedAt { get; init; } = null;
+
+        #endregion Spoilage (food-economy Tier 1 pantry decay)
     }
 }

@@ -43,5 +43,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// (tests, standalone runs).
         /// Only available objects (<see cref="WorldObject.IsAvailable"/> == true) are included.
         /// </summary>
-        IReadOnlyList<WorldObject>? AvailableObjects = null);
+        IReadOnlyList<WorldObject>? AvailableObjects = null,
+
+        /// <summary>
+        /// Items currently held by this character (the pantry/inventory), from
+        /// <see cref="IWorldObjectProvider.GetHeldBy"/>. Drives food-economy Tier 1 gating and
+        /// provisioning (eat-from-hand / recipe inputs). <c>null</c> when no provider is wired.
+        /// </summary>
+        IReadOnlyList<WorldObject>? HeldObjects = null);
 }
