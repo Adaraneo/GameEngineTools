@@ -297,6 +297,7 @@ namespace WorldObserver.Narrative
                 IsAnimate = !actor.IsFemale,
                 Pattern = pattern,
                 HasMobileE = false,
+                IsIndeclinable = actor.Name.EndsWith('x')
             };
             return SafeForm(req, actor.Name);
         }
