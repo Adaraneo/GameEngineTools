@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using GameEngineTools.Characters.Engines.Economy;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
@@ -58,15 +59,31 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         private const double ProcessWeight   = 1.05; // cook held inputs: some labor, then edible
         private const double ProduceWeight   = 0.90; // harvest raw material: furthest from a meal
 
+        // Food-economy Tier 2: buying food is weighted between EatStored (near-zero effort) and
+        // Process/Produce (labor-intensive) — it costs money, not time. Whether it is offered at all
+        // depends on affordability + need via WillingnessToPay; the fixed weight only sets its rank
+        // once offered. Generalizes diet-breadth from "labor cost" to "cheapest path to satiety".
+        private const double BuyBaseWeight = 1.10; // between EatStored and Process
+
+        /// <summary>Below this hunger a character with surplus food may sell it (no urgent need to keep it).</summary>
+        private const double MaxNeedToSell = 15.0;
+
+        /// <summary>Low fixed utility for a surplus-selling candidate — only wins when nothing pressing competes.</summary>
+        private const double SellUtility = 12.0;
+
         #endregion Constants
 
         #region Construction
 
         private readonly SpoilageConfig _spoilage;
+        private readonly EconomyConfig _economy;
 
-        /// <summary>Creates the bridge; spoilage rates default to <see cref="SpoilageConfig.Default"/>.</summary>
-        public ContingencySearchEngine(SpoilageConfig? spoilage = null)
-            => _spoilage = spoilage ?? SpoilageConfig.Default;
+        /// <summary>Creates the bridge; spoilage/economy configs default to their <c>Default</c> instances.</summary>
+        public ContingencySearchEngine(SpoilageConfig? spoilage = null, EconomyConfig? economy = null)
+        {
+            _spoilage = spoilage ?? SpoilageConfig.Default;
+            _economy = economy ?? EconomyConfig.Default;
+        }
 
         #endregion Construction
 
@@ -122,7 +139,21 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                         Tags: new[] { "FoodEconomy" }));
                 }
 
-                // 4) Foraging fallback — no ready Food object here → move toward one.
+                // 4) Buy from a co-located shop (Tier 2) — a priced Food object is present and the
+                //    character is willing to spend given wealth + hunger. Affordability itself is
+                //    enforced by the gate; here we only decide whether buying is worth offering.
+                if (HasPricedFood(context.AvailableObjects)
+                    && WillingnessToPay(context.Wealth, need, _economy) > 0.0)
+                {
+                    candidates.Add(new BehaviorCandidate(
+                        Buy,
+                        BehaviorMath.Util(need, BuyBaseWeight),
+                        WTimeSpan.FromMinutes(15),
+                        BehaviorDomain.Physiological,
+                        Tags: new[] { "FoodEconomy" }));
+                }
+
+                // 5) Foraging fallback — no ready Food object here → move toward one.
                 if (!HasCategory(context.AvailableObjects, WorldObjectCategory.Food))
                 {
                     candidates.Add(new BehaviorCandidate(
@@ -151,6 +182,22 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     Tags: new[] { "EnvironmentMovement" }));
             }
 
+            // ── Sell surplus (Tier 2) ───────────────────────────────────────────────────
+            // A character who is not hungry and holds food a co-located shop trades can monetize the
+            // surplus. Low fixed utility — this only wins when no pressing need competes (closes the
+            // farmer/baker → coin loop). Affordability is not relevant on the sell side.
+            if (context.HeldObjects is { } held2
+                && context.State.NeedFood <= MaxNeedToSell
+                && HasSellableSurplus(held2, context.AvailableObjects, context.Now))
+            {
+                candidates.Add(new BehaviorCandidate(
+                    Sell,
+                    SellUtility,
+                    WTimeSpan.FromMinutes(15),
+                    BehaviorDomain.Physiological,
+                    Tags: new[] { "FoodEconomy" }));
+            }
+
             return candidates.Count == 0
                 ? BehaviorNeedOutput.Empty
                 : new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), candidates);
@@ -174,6 +221,82 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     return true;
             }
 
+            return false;
+        }
+
+        /// <summary>True when a co-located object is for sale (<see cref="WorldObject.Price"/> non-null) and is Food.</summary>
+        private static bool HasPricedFood(IReadOnlyList<WorldObject> objects)
+        {
+            foreach (var obj in objects)
+            {
+                if (obj.Price is not null && obj.Category == WorldObjectCategory.Food)
+                    return true;
+            }
+            return false;
+        }
+
+        #region Willingness to pay (Tier 2)
+
+        /// <summary>
+        /// Whether the character is willing to spend on a purchase, combining two behavioral-economics
+        /// effects into a single scalar (positive ⇒ willing):
+        /// <list type="bullet">
+        ///   <item><description>Diminishing marginal utility of wealth (Bernoulli 1738/1954, <i>Econometrica</i>
+        ///   22(1):23-36) — a richer character parts with a coin more easily, modeled as a concave
+        ///   (square-root) affordability factor.</description></item>
+        ///   <item><description>Loss aversion on spending (Tversky &amp; Kahneman 1992, corrected default
+        ///   λ = 1.955 per 2024 meta-analyses — see <see cref="EconomyConfig.SpendingLossAversionLambda"/>) —
+        ///   reluctance to spend that high need overrides.</description></item>
+        /// </list>
+        /// The exact functional form (sqrt, linear combination) is a <b>tuned proposal</b>, not a citable
+        /// equation — the literature confirms the direction/mechanism (concavity, loss aversion), not the
+        /// shape. Marked the same way as <c>PmddEstradiolWithdrawalRef</c>: "mechanism confirmed, magnitude/shape tuned".
+        /// </summary>
+        private static double WillingnessToPay(double wealth, double need, EconomyConfig config)
+        {
+            if (wealth <= 0.0)
+                return 0.0;
+
+            // Concave dampening: the felt cost of a coin drops as wealth grows (diminishing MU).
+            var affordabilityFactor = Math.Sqrt(wealth / config.ReferenceWealth);
+
+            // Higher need pushes through the reluctance to spend (need overrides loss aversion at high hunger).
+            var needPressure = Math.Clamp(need / 100.0, 0.0, 1.0);
+
+            return affordabilityFactor * (1.0 - config.SpendingLossAversionLambda * (1.0 - needPressure));
+        }
+
+        #endregion Willingness to pay (Tier 2)
+
+        /// <summary>
+        /// True when the character holds a still-fresh food/drink item whose <see cref="WorldObject.ItemKind"/>
+        /// a co-located shop trades (has stock of the same kind).
+        /// </summary>
+        private bool HasSellableSurplus(
+            IReadOnlyList<WorldObject> held,
+            IReadOnlyList<WorldObject> available,
+            WDateTime now)
+        {
+            foreach (var obj in held)
+            {
+                if (obj.Category is not (WorldObjectCategory.Food or WorldObjectCategory.Drink))
+                    continue;
+                if (Spoilage.Freshness(obj, now, _spoilage) <= 0.0)
+                    continue; // no one buys spoiled food back
+                if (ShopTrades(available, obj.ItemKind))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>True when a co-located shop stocks (and therefore trades) the given item kind.</summary>
+        private static bool ShopTrades(IReadOnlyList<WorldObject> available, PickupItemKind kind)
+        {
+            foreach (var obj in available)
+            {
+                if (obj.ShopId is not null && obj.ItemKind == kind)
+                    return true;
+            }
             return false;
         }
 

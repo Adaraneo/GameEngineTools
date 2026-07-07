@@ -157,6 +157,13 @@ namespace GameEngineTools.Characters.Hosting
             var socialComparison = _sp.GetRequiredService<ISocialComparisonEngine>();
             var needAppraisal = _sp.GetRequiredService<Engines.Behavior.NeedAppraisal.INeedAppraisalEngine>();
             var bereavement = _sp.GetService<Engines.Bereavement.IBereavementEngine>();
+            var economy = _sp.GetService<Engines.Economy.IEconomyEngine>();
+
+            // Seed starting wealth by occupation (food-economy Tier 2) so an NPC can afford a first
+            // purchase before earning a first wage (cold-start avoidance). null when no economy engine.
+            var economyState = economy is not null
+                ? new Traits.EconomyState(economy.Config.StartingWealth(b.Occupation))
+                : null;
 
             // Object interaction engine is optional — only wired when both the world object provider
             // and location service are registered in the DI container.
@@ -188,7 +195,8 @@ namespace GameEngineTools.Characters.Hosting
                 physio.State, psych.State, behav.State, inter.State, rel.State, mem.State, semantic.State,
                 Goals: goal.State, Schedule: schedule.State, Values: valuesState,
                 SelfConcept: selfConcept.State, Interests: interestState,
-                SocialComparison: socialComparison.State);
+                SocialComparison: socialComparison.State,
+                Economy: economyState);
 
             var human = new OrchestratedHuman(
                 b.Id, b.Identity, b.Biology, b.Personality, b.GeneticBlueprint,
@@ -201,7 +209,8 @@ namespace GameEngineTools.Characters.Hosting
                 objectInteraction,
                 socialComparison,
                 needAppraisal,
-                bereavement);
+                bereavement,
+                economy);
 
             goal.SeedFromPersonality(b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now);
 
@@ -223,7 +232,8 @@ namespace GameEngineTools.Characters.Hosting
                 Values = valuesState,
                 SelfConcept = selfConcept.State,
                 Interests = interestState,
-                SocialComparison = socialComparison.State
+                SocialComparison = socialComparison.State,
+                Economy = economyState
             }, _clock.Now.Date);
 
             return human;

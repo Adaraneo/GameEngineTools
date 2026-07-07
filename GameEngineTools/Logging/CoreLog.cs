@@ -1551,6 +1551,69 @@ namespace GameEngineTools.Logging
             double Freshness,
             double Nutrition);
 
+        /// <summary>
+        /// Character earned a wage for time worked — food economy Tier 2.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1506,
+            Level = LogLevel.Information,
+            Message = "[ECON/WAGE] {HumanId} earned wage as {Occupation}: {WagePerHour:F2}/h × {HoursWorked:F2}h → wealth={NewWealth:F2}")]
+        public static partial void WageEarned(
+            this ILogger logger,
+            string HumanId,
+            string Occupation,
+            double WagePerHour,
+            double HoursWorked,
+            double NewWealth);
+
+        /// <summary>
+        /// Character bought a priced object from a shop — food economy Tier 2.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1507,
+            Level = LogLevel.Information,
+            Message = "[ECON/BUY] {HumanId} bought {ItemKind} ({ObjectId}) from {ShopId} for {Price:F2} → wealth={NewWealth:F2}")]
+        public static partial void Purchased(
+            this ILogger logger,
+            string HumanId,
+            string ObjectId,
+            string ItemKind,
+            string ShopId,
+            double Price,
+            double NewWealth);
+
+        /// <summary>
+        /// Character sold a held item back to a shop — food economy Tier 2.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1508,
+            Level = LogLevel.Information,
+            Message = "[ECON/SELL] {HumanId} sold {ItemKind} ({ObjectId}) to {ShopId} for {Price:F2} → wealth={NewWealth:F2}")]
+        public static partial void Sold(
+            this ILogger logger,
+            string HumanId,
+            string ObjectId,
+            string ItemKind,
+            string ShopId,
+            double Price,
+            double NewWealth);
+
+        /// <summary>
+        /// A shop's posted price for an item kind changed after a buy/sell/restock — food economy Tier 2.
+        /// No HumanId scope required; carried for observer bookkeeping.
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1509,
+            Level = LogLevel.Debug,
+            Message = "[ECON/PRICE] {ShopId} {ItemKind}: {OldPrice:F2} → {NewPrice:F2} (stock={NewStockCount})")]
+        public static partial void PriceChanged(
+            this ILogger logger,
+            string ShopId,
+            string ItemKind,
+            double OldPrice,
+            double NewPrice,
+            int NewStockCount);
+
         #endregion World Objects — 1500–1599
 
         #region Movement / Transit — 1700–1799

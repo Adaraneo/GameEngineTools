@@ -134,6 +134,7 @@ namespace GameEngineTools.Characters.Core
         private readonly IInterestEngine _interests;
         private readonly ISocialComparisonEngine? _socialComparison;
         private readonly Engines.Bereavement.IBereavementEngine? _bereavement;
+        private readonly Engines.Economy.IEconomyEngine? _economy;
         private readonly IObjectInteractionEngine? _objectInteraction;
         private readonly Engines.Behavior.NeedAppraisal.INeedAppraisalEngine? _needAppraisal;
 
@@ -229,7 +230,9 @@ namespace GameEngineTools.Characters.Core
             // optional SDT need-appraisal layer (read-only derivation over goals/relationships/focus)
             Engines.Behavior.NeedAppraisal.INeedAppraisalEngine? needAppraisal = null,
             // optional bereavement engine (believability layer — grief trajectories, DPM oscillation)
-            Engines.Bereavement.IBereavementEngine? bereavement = null)
+            Engines.Bereavement.IBereavementEngine? bereavement = null,
+            // optional economy engine (food-economy Tier 2 — wealth, wages, buy/sell)
+            Engines.Economy.IEconomyEngine? economy = null)
         {
             Id = id;
             Identity = identity;
@@ -260,6 +263,7 @@ namespace GameEngineTools.Characters.Core
             _objectInteraction = objectInteraction;
             _needAppraisal = needAppraisal;
             _bereavement = bereavement;
+            _economy = economy;
 
             Snapshot = initialSnapshot;
             _behaviorCadencePolicy = behaviorCadencePolicy;
@@ -382,6 +386,7 @@ namespace GameEngineTools.Characters.Core
             _interests.Tick(now, dt, _ctx, outbox);
             _socialComparison?.Tick(now, dt, _ctx, outbox);
             _bereavement?.Tick(now, dt, _ctx, outbox);
+            _economy?.Tick(now, dt, _ctx, outbox);
 
             // Refresh so the SDT need-appraisal layer reads THIS tick's goal/relationship state
             // (it derives from the committed snapshot, not live engine fields).
@@ -432,6 +437,8 @@ namespace GameEngineTools.Characters.Core
                 _socialComparison?.RestoreState(snapshot.SocialComparison);
             if (snapshot.Bereavement is not null)
                 _bereavement?.RestoreState(snapshot.Bereavement);
+            if (snapshot.Economy is not null)
+                _economy?.RestoreState(snapshot.Economy);
         }
 
         /// <inheritdoc/>
@@ -546,6 +553,7 @@ namespace GameEngineTools.Characters.Core
             try { _interests.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Interests.Handle failed.", Id.Value); }
             try { _socialComparison?.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] SocialComparison.Handle failed.", Id.Value); }
             try { _bereavement?.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Bereavement.Handle failed.", Id.Value); }
+            try { _economy?.Handle(ev, _ctx, outbox); } catch (Exception ex) { _log.LogError(ex, "[{Human}] Economy.Handle failed.", Id.Value); }
 
             // Acquire action slots when this character commits an action.
             // AcquireOrReplace: if the channel is already occupied, the new action wins —
@@ -663,7 +671,8 @@ namespace GameEngineTools.Characters.Core
                 NeedAppraisal: _needAppraisal?.State,
                 SocietalStatus: prev.SocietalStatus,
                 HierarchyStability: prev.HierarchyStability,
-                Bereavement: _bereavement?.State);
+                Bereavement: _bereavement?.State,
+                Economy: _economy?.State);
 
             _ctx.Snapshot = Snapshot;
         }

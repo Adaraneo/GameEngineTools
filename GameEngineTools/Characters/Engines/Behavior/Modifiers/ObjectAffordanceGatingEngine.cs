@@ -79,6 +79,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
             ApplyGates(candidates, context.AvailableObjects);
             ApplyFoodEconomyGates(candidates, context.AvailableObjects, context.HeldObjects);
+            ApplyEconomyTradeGates(candidates, context.AvailableObjects, context.HeldObjects, context.Wealth);
         }
 
         #endregion IBehaviorModifierEngine
@@ -168,6 +169,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// <summary>
         /// Returns <c>true</c> when at least one available object satisfies the requirement.
         /// </summary>
+        /// <remarks>
+        /// Food-economy Tier 2 scarcity: only <b>free</b> objects (<see cref="WorldObject.Price"/> is
+        /// <c>null</c>) satisfy a free-take/consume action. A priced object cannot be eaten/used for
+        /// free — it must be acquired via <c>Buy</c> first.
+        /// </remarks>
         /// <param name="requirement">The requirement to check.</param>
         /// <param name="availableObjects">Objects to search. Already filtered by availability.</param>
         private static bool IsRequirementMet(
@@ -180,10 +186,72 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             // Iterate without LINQ — the list is small and this is a hot path (every tick).
             foreach (var obj in availableObjects)
             {
-                if (requirement.RequiredCategories.Contains(obj.Category))
+                if (obj.Price is null && requirement.RequiredCategories.Contains(obj.Category))
                     return true;
             }
 
+            return false;
+        }
+
+        /// <summary>
+        /// Food-economy Tier 2 market gates:
+        /// <list type="bullet">
+        ///   <item><c>Buy</c> survives only when a co-located priced object is present <b>and</b>
+        ///   affordable (<c>Price ≤ Wealth</c>).</item>
+        ///   <item><c>Sell</c> survives only when the character holds a food/drink item whose kind a
+        ///   co-located shop trades (has stock of the same <see cref="WorldObject.ItemKind"/>).</item>
+        /// </list>
+        /// </summary>
+        private static void ApplyEconomyTradeGates(
+            List<BehaviorCandidate> candidates,
+            IReadOnlyList<WorldObject> availableObjects,
+            IReadOnlyList<WorldObject>? heldObjects,
+            double wealth)
+        {
+            if (!CanBuyHere(availableObjects, wealth))
+                candidates.RemoveAll(c => c.Name == Buy);
+
+            if (!CanSellHere(availableObjects, heldObjects))
+                candidates.RemoveAll(c => c.Name == Sell);
+        }
+
+        /// <summary>True when a co-located priced object is present and affordable at the given wealth.</summary>
+        private static bool CanBuyHere(IReadOnlyList<WorldObject> availableObjects, double wealth)
+        {
+            foreach (var obj in availableObjects)
+            {
+                if (obj.Price is { } price && price <= wealth)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>True when the character holds a food/drink item whose kind a co-located shop trades.</summary>
+        private static bool CanSellHere(
+            IReadOnlyList<WorldObject> availableObjects,
+            IReadOnlyList<WorldObject>? heldObjects)
+        {
+            if (heldObjects is null)
+                return false;
+
+            foreach (var held in heldObjects)
+            {
+                if (held.Category is not (WorldObjectCategory.Food or WorldObjectCategory.Drink))
+                    continue;
+                if (ShopTrades(availableObjects, held.ItemKind))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>True when a co-located shop stocks (and therefore trades) the given item kind.</summary>
+        private static bool ShopTrades(IReadOnlyList<WorldObject> availableObjects, PickupItemKind kind)
+        {
+            foreach (var obj in availableObjects)
+            {
+                if (obj.ShopId is not null && obj.ItemKind == kind)
+                    return true;
+            }
             return false;
         }
 

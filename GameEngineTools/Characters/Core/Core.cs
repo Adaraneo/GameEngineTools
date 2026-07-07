@@ -493,5 +493,13 @@ namespace GameEngineTools.Characters.Core
         /// <see cref="GameEngineTools.Characters.Engines.Bereavement.DefaultBereavementEngine"/>;
         /// read by Physiology (widowhood hazard).
         /// </summary>
-        GameEngineTools.Characters.Engines.Bereavement.BereavementState? Bereavement = null);
+        GameEngineTools.Characters.Engines.Bereavement.BereavementState? Bereavement = null,
+
+        /// <summary>
+        /// Per-character economic state: current wealth in the single abstract currency unit ("coin").
+        /// <c>null</c> for characters created before this field existed or when the economy engine is
+        /// not wired (backward compatibility — treated as <c>Wealth = 0</c>). Evolved by
+        /// <see cref="GameEngineTools.Characters.Engines.Economy.DefaultEconomyEngine"/>. Food-economy Tier 2.
+        /// </summary>
+        GameEngineTools.Characters.Traits.EconomyState? Economy = null);
 }

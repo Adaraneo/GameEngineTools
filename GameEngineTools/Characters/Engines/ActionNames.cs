@@ -120,5 +120,21 @@ namespace GameEngineTools.Characters.Engines
         public const string EatStored = "EatStored";
 
         #endregion Food economy (Tier 1)
+
+        #region Food economy (Tier 2)
+
+        /// <summary>
+        /// Buy a co-located priced object (<c>WorldObject.Price != null</c>) from a shop: transfers coin
+        /// to the shop and the object into the buyer's hand. Gated by object presence and affordability.
+        /// </summary>
+        public const string Buy = "Buy";
+
+        /// <summary>
+        /// Sell a held item back to a co-located shop that trades that item kind: transfers the object
+        /// into the shop's stock and credits coin to the seller. Gated by held stock + shop demand.
+        /// </summary>
+        public const string Sell = "Sell";
+
+        #endregion Food economy (Tier 2)
     }
 }

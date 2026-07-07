@@ -164,7 +164,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 heldObjects = _objectProvider.GetHeldBy(ctx.Id).ToList();
             }
 
-            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator, availableObjects, heldObjects);
+            var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator, availableObjects, heldObjects, ctx.Snapshot.Economy?.Wealth ?? 0.0);
 
             // Sleep can consume the entire tick because it owns a runtime session and prompt flow.
             var sleep = _sleepCoordinator.Tick(context);

@@ -50,5 +50,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// <see cref="IWorldObjectProvider.GetHeldBy"/>. Drives food-economy Tier 1 gating and
         /// provisioning (eat-from-hand / recipe inputs). <c>null</c> when no provider is wired.
         /// </summary>
-        IReadOnlyList<WorldObject>? HeldObjects = null);
+        IReadOnlyList<WorldObject>? HeldObjects = null,
+
+        /// <summary>
+        /// The character's current wealth in abstract currency units, surfaced from
+        /// <c>Snapshot.Economy</c> for food-economy Tier 2 <c>Buy</c> gating and willingness-to-pay.
+        /// <c>0</c> when the economy engine is not wired (backward compatible).
+        /// </summary>
+        double Wealth = 0.0);
 }

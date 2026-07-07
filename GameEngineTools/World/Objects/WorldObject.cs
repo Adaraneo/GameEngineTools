@@ -158,5 +158,24 @@ namespace GameEngineTools.World.Objects
         public WDateTime? ProducedAt { get; init; } = null;
 
         #endregion Spoilage (food-economy Tier 1 pantry decay)
+
+        #region Shop pricing (food-economy Tier 2)
+
+        /// <summary>
+        /// Price in abstract currency units required to acquire this object via <c>Buy</c>.
+        /// <c>null</c> means the object is not for sale — it can still be freely taken/eaten (foraging,
+        /// gifts, communal objects), exactly as in Tier 1. A non-null price gates free <c>Eat</c>/
+        /// <c>Take</c> out and requires <c>Buy</c> instead (see the gating/commit changes). Food-economy Tier 2.
+        /// </summary>
+        public double? Price { get; init; } = null;
+
+        /// <summary>
+        /// Identifies which shop's stock this object belongs to, for <c>EconomyLedger</c>
+        /// price-adjustment bookkeeping (stock level per shop per <see cref="ItemKind"/>).
+        /// <c>null</c> when <see cref="Price"/> is also <c>null</c>. Food-economy Tier 2.
+        /// </summary>
+        public string? ShopId { get; init; } = null;
+
+        #endregion Shop pricing (food-economy Tier 2)
     }
 }

@@ -6,12 +6,15 @@ namespace GameEngineTools.Characters.Engines.Objects
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Economy;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Economy;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Options;
 
     /// <summary>
     /// Resolves <see cref="ActionNames.InteractWithObject"/> actions committed by the Behavior engine.
@@ -25,14 +28,18 @@ namespace GameEngineTools.Characters.Engines.Objects
         private readonly IObjectInteractionPolicy _policy;
         private readonly ProductionService _production;
         private readonly SpoilageConfig _spoilage;
+        private readonly EconomyLedger _economyLedger;
+        private readonly EconomyConfig _economyConfig;
         private readonly ILogger<DefaultObjectInteractionEngine> _logger;
 
-        /// <summary>Creates the engine with its world-object, location, policy, production and logging dependencies.</summary>
+        /// <summary>Creates the engine with its world-object, location, policy, production, economy and logging dependencies.</summary>
         /// <param name="objectProvider">Provider of mutable world objects.</param>
         /// <param name="locations">Location service.</param>
         /// <param name="policy">Object-interaction permission policy.</param>
         /// <param name="production">Food-economy production/processing service (Tier 1).</param>
         /// <param name="spoilage">Food-spoilage rate configuration (Tier 1).</param>
+        /// <param name="economyLedger">Scene posted-price aggregate (Tier 2).</param>
+        /// <param name="economyConfig">Economy tuning configuration (Tier 2).</param>
         /// <param name="logger">Logger.</param>
         public DefaultObjectInteractionEngine(
             IMutableWorldObjectProvider objectProvider,
@@ -40,6 +47,8 @@ namespace GameEngineTools.Characters.Engines.Objects
             IObjectInteractionPolicy policy,
             ProductionService production,
             SpoilageConfig spoilage,
+            EconomyLedger economyLedger,
+            IOptions<EconomyConfig> economyConfig,
             ILogger<DefaultObjectInteractionEngine> logger)
         {
             _objectProvider = objectProvider;
@@ -47,6 +56,8 @@ namespace GameEngineTools.Characters.Engines.Objects
             _policy = policy;
             _production = production;
             _spoilage = spoilage;
+            _economyLedger = economyLedger;
+            _economyConfig = economyConfig.Value;
             _logger = logger;
         }
 
@@ -82,6 +93,12 @@ namespace GameEngineTools.Characters.Engines.Objects
                         break;
                     case ActionNames.Process:
                         HandleProcess(committed, ctx, outbox);
+                        break;
+                    case ActionNames.Buy:
+                        HandleBuy(committed, ctx, outbox);
+                        break;
+                    case ActionNames.Sell:
+                        HandleSell(committed, ctx, outbox);
                         break;
                 }
                 return;
@@ -209,10 +226,11 @@ namespace GameEngineTools.Characters.Engines.Objects
                 ? WorldObjectCategory.Food
                 : WorldObjectCategory.Drink;
 
-            // Pick the first available object of the matching category.
+            // Pick the first available FREE object of the matching category. Priced (shop-stock)
+            // objects cannot be eaten/drunk for free — they must be bought first (Tier 2 scarcity).
             // Objects are already filtered to IsAvailable by IWorldObjectProvider.GetObjectsAt.
             var obj = _objectProvider.GetObjectsAt(locationId)
-                                     .FirstOrDefault(o => o.Category == requiredCategory);
+                                     .FirstOrDefault(o => o.Category == requiredCategory && o.Price is null);
             if (obj is null)
                 return;
 
@@ -329,6 +347,114 @@ namespace GameEngineTools.Characters.Engines.Objects
             var recipe = RecipeRegistry.FindByOutput(produced.ItemKind);
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
                 _logger.ItemProcessed(ctx.Id.ToString(), recipe?.Id ?? "?", produced.ItemKind.ToString(), produced.Id, locationId);
+        }
+
+        /// <summary>
+        /// Handles <see cref="ActionNames.Buy"/>: acquires the cheapest affordable co-located priced
+        /// object (preferring Food) from a shop — deducting coin (via the emitted <see cref="Purchased"/>
+        /// event, consumed by <c>DefaultEconomyEngine</c>) and placing the object into the buyer's hand
+        /// with its shop pricing cleared. Adjusts the shop's posted price for the reduced stock.
+        /// </summary>
+        private void HandleBuy(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var now = committed.OccurredAt;
+            var location = _locations.GetLocation(ctx.Id);
+            if (location is null)
+                return;
+
+            var wealth = ctx.Snapshot.Economy?.Wealth ?? 0.0;
+
+            // Cheapest affordable priced object, preferring Food (the provisioning use case).
+            var affordable = _objectProvider.GetObjectsAt(location)
+                                            .Where(o => o.Price is { } p && p <= wealth)
+                                            .ToList();
+            var obj = affordable.Where(o => o.Category == WorldObjectCategory.Food).OrderBy(o => o.Price).FirstOrDefault()
+                      ?? affordable.OrderBy(o => o.Price).FirstOrDefault();
+            if (obj is null || obj.Price is not { } price)
+                return; // nothing affordable here (gate should have prevented Buy) — no-op
+
+            var shopId = obj.ShopId ?? "shop";
+            var kind = obj.ItemKind;
+
+            // Transfer the object into the buyer's hand and strip its shop pricing — it is now owned.
+            _objectProvider.RemoveObject(obj.LocationId, obj.Id);
+            _objectProvider.AddObject(obj with { HeldBy = ctx.Id, LocationId = location, Price = null, ShopId = null });
+
+            // Recompute the shop's posted price against the reduced stock (excludes the now-held object).
+            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
+            var oldPrice = _economyLedger.GetPrice(shopId, kind);
+            var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
+            var newWealth = wealth - price;
+
+            outbox.Add(new Purchased(now, ctx.Id, obj.Id, kind, shopId, price, newWealth));
+            outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
+
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+            {
+                _logger.Purchased(ctx.Id.ToString(), obj.Id, kind.ToString(), shopId, price, newWealth);
+                _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
+            }
+        }
+
+        /// <summary>
+        /// Handles <see cref="ActionNames.Sell"/>: sells a held, still-fresh food/drink item back to a
+        /// co-located shop that trades its kind — moving the object into the shop's stock and crediting
+        /// coin (via the emitted <see cref="Sold"/> event). Adjusts the shop's posted price for the
+        /// increased stock. No-op when the character holds nothing a co-located shop will buy.
+        /// </summary>
+        private void HandleSell(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var now = committed.OccurredAt;
+            var location = _locations.GetLocation(ctx.Id);
+            if (location is null)
+                return;
+
+            var shopStock = _objectProvider.GetObjectsAt(location)
+                                           .Where(o => o.ShopId is not null)
+                                           .ToList();
+            if (shopStock.Count == 0)
+                return;
+
+            // First held food/drink item that is still fresh and that a co-located shop trades.
+            WorldObject? item = null;
+            WorldObject? shop = null;
+            foreach (var held in _objectProvider.GetHeldBy(ctx.Id))
+            {
+                if (held.Category is not (WorldObjectCategory.Food or WorldObjectCategory.Drink))
+                    continue;
+                if (Spoilage.Freshness(held, now, _spoilage) <= 0.0)
+                    continue; // no one buys spoiled food back
+                shop = shopStock.FirstOrDefault(s => s.ItemKind == held.ItemKind);
+                if (shop is not null)
+                {
+                    item = held;
+                    break;
+                }
+            }
+
+            if (item is null || shop?.ShopId is not { } shopId)
+                return;
+
+            var kind = item.ItemKind;
+            var salePrice = shop.Price ?? _economyLedger.GetPrice(shopId, kind);
+
+            // Move the item from the seller's hand into the shop's stock.
+            _objectProvider.RemoveObject(item.LocationId, item.Id);
+            _objectProvider.AddObject(item with { HeldBy = null, LocationId = location, Price = salePrice, ShopId = shopId });
+
+            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
+            var oldPrice = _economyLedger.GetPrice(shopId, kind);
+            var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
+            var newWealth = (ctx.Snapshot.Economy?.Wealth ?? 0.0) + salePrice;
+
+            outbox.Add(new Sold(now, ctx.Id, item.Id, kind, shopId, salePrice, newWealth));
+            outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
+
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+            {
+                _logger.Sold(ctx.Id.ToString(), item.Id, kind.ToString(), shopId, salePrice, newWealth);
+                _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
+            }
         }
 
         /// <summary>

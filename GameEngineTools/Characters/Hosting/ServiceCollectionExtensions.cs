@@ -93,6 +93,12 @@ namespace GameEngineTools.Characters.Hosting
             // Bereavement engine (believability layer — grief trajectories + DPM oscillation).
             services.TryAddTransient<Engines.Bereavement.IBereavementEngine, Engines.Bereavement.DefaultBereavementEngine>();
 
+            // Economy engine (food-economy Tier 2 — per-character wealth, wages, buy/sell).
+            services.TryAddTransient<Engines.Economy.IEconomyEngine, Engines.Economy.DefaultEconomyEngine>();
+
+            // Scene-level posted-price aggregate (singleton — per-shop, per-item-kind stock feedback).
+            services.TryAddSingleton<World.Economy.EconomyLedger>();
+
             var valuesOb = services.AddOptions<ValuesConfig>();
             valuesOb.BindConfiguration("Characters:Values");
 
@@ -110,6 +116,9 @@ namespace GameEngineTools.Characters.Hosting
 
             var bereavementOb = services.AddOptions<Engines.Bereavement.BereavementConfig>();
             bereavementOb.BindConfiguration("Characters:Bereavement");
+
+            var economyOb = services.AddOptions<Engines.Economy.EconomyConfig>();
+            economyOb.BindConfiguration("Characters:Economy");
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();
             lodOb.BindConfiguration("Characters:Lod");
@@ -434,6 +443,8 @@ namespace GameEngineTools.Characters.Hosting
             // Food-economy Tier 1: production/processing service + spoilage rates.
             services.TryAddSingleton<GameEngineTools.Characters.Engines.Objects.ProductionService>();
             services.TryAddSingleton(GameEngineTools.World.Objects.Production.SpoilageConfig.Default);
+            // Food-economy Tier 2: posted-price ledger the buy/sell commit path adjusts.
+            services.TryAddSingleton<World.Economy.EconomyLedger>();
             services.TryAddSingleton<IObjectInteractionEngine, DefaultObjectInteractionEngine>();
             return services;
         }
