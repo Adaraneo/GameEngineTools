@@ -17812,3 +17812,13 @@ VALUES
     ('field_farm_fields', 'Production', 1.0),
     ('mill_farm_fields',  'Production', 1.0),
     ('bakery_station_bakery', 'Production', 1.0);
+
+-- ── Food-economy Tier 2: the bakery is a bread shop ─────────────────────────────
+-- Turn the bakery's ready-to-eat food into priced shop stock (scarcity, decision §6):
+-- at the bakery, bread must be bought, not freely taken. Bakers working there earn a
+-- wage and can sell the bread they produce back to the shop (matching ItemKind 'Bread').
+-- All other locations keep their free food (foraging stays non-monetary), so nobody
+-- outside the market starves. Fountains/wild food are untouched.
+UPDATE WorldObjects
+   SET Price = 2.0, ShopId = 'bakery_shop', ItemKind = 'Bread'
+ WHERE LocationId = 'bakery' AND Category = 'Food';

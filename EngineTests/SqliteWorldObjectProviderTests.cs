@@ -111,6 +111,41 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AddObject_PricedShopObject_PriceAndShopIdRoundTrip()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+            var provider = new SqliteWorldObjectProvider(db);
+            SeedLocation(db, "bakery");
+
+            var bread = MakeObject("shop_bread_01", "bakery") with
+            {
+                Category = WorldObjectCategory.Food,
+                ItemKind = PickupItemKind.Bread,
+                Price = 2.5,
+                ShopId = "bakery_shop",
+            };
+            provider.AddObject(bread);
+
+            // Standard query path (behavior AvailableObjects) must surface Price/ShopId (food-economy Tier 2).
+            var viaGet = provider.GetObjectsAt("bakery").Single(o => o.Id == "shop_bread_01");
+            Assert.AreEqual(2.5, viaGet.Price);
+            Assert.AreEqual("bakery_shop", viaGet.ShopId);
+
+            // Runtime-state query path (GetAllObjectsAt) must also carry them, with HeldBy/ConsumedAt intact.
+            var viaAll = provider.GetAllObjectsAt("bakery").Single(o => o.Id == "shop_bread_01");
+            Assert.AreEqual(2.5, viaAll.Price);
+            Assert.AreEqual("bakery_shop", viaAll.ShopId);
+            Assert.IsNull(viaAll.HeldBy);
+
+            // A free (unpriced) object round-trips as null Price/ShopId.
+            provider.AddObject(MakeObject("free_apple", "bakery") with { Category = WorldObjectCategory.Food });
+            var free = provider.GetObjectsAt("bakery").Single(o => o.Id == "free_apple");
+            Assert.IsNull(free.Price);
+            Assert.IsNull(free.ShopId);
+        }
+
+        [TestMethod]
         public void AddObject_MultipleObjects_AllReturnedByGetObjectsAt()
         {
             using var db = new SqliteWorldDatabase(":memory:");

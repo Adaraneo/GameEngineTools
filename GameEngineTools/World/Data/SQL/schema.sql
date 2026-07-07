@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS Connections (
 -- ── World Objects ─────────────────────────────────────────────────────────────
 -- HeldBy     NULL = object is at its location; TEXT = holder HumanId GUID.
 -- ConsumedAt NULL = available; INTEGER = WDateTime.WorldTicks of consumption.
+-- Price      NULL = free/foraged; REAL = shop price (food-economy Tier 2).
+-- ShopId     NULL when Price is NULL; TEXT = owning shop id (Tier 2).
 
 CREATE TABLE IF NOT EXISTS WorldObjects (
     Id                TEXT    PRIMARY KEY,
@@ -77,6 +79,8 @@ CREATE TABLE IF NOT EXISTS WorldObjects (
     ItemKind          TEXT    NOT NULL DEFAULT 'None',
     Respawns          INTEGER NOT NULL DEFAULT 0,
     RespawnMinutes    INTEGER NOT NULL DEFAULT 1440,
+    Price             REAL            DEFAULT NULL,
+    ShopId            TEXT            DEFAULT NULL,
     HeldBy            TEXT            DEFAULT NULL,
     ConsumedAt        INTEGER         DEFAULT NULL
 );

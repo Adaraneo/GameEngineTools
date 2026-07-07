@@ -12,6 +12,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Behavior.Needs;
     using GameEngineTools.Characters.Engines.Economy;
     using GameEngineTools.Characters.Engines.Objects;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Economy;
     using GameEngineTools.World.Location;
@@ -202,12 +203,60 @@ namespace EngineTests
                 "Buy is regulated out by the affordability gate, not merely by rank.");
         }
 
+        // ── §7 LOD: background agents skip the ledger price formation ────────────────
+
+        [TestMethod]
+        public void Buy_BackgroundLod_SkipsLedgerPriceFormation()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(PricedFood("shop_bread", price: 2.0, shop: "bakery"));
+
+            var ctx = BuyerContext(self, wealth: 30.0);
+            var background = MakeObjectEngine(provider, new AllBackgroundLod());
+            var outbox = new EventCollector();
+
+            background.Handle(new ActionCommitted(new WDateTime(0), self, Buy, WTimeSpan.FromMinutes(15)), ctx, outbox);
+
+            var events = outbox.Drain();
+            Assert.IsTrue(events.OfType<Purchased>().Any(), "Background buy still transfers the object + deducts coin.");
+            Assert.IsFalse(events.OfType<PriceChanged>().Any(),
+                "Background agents must NOT trigger per-shop price formation (no PriceChanged / ledger call).");
+            Assert.AreEqual(1, provider.GetHeldBy(self).Count(), "The bought item still lands in the buyer's hand.");
+        }
+
+        [TestMethod]
+        public void Buy_FullSimulation_DoesLedgerPriceFormation()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(PricedFood("shop_bread", price: 2.0, shop: "bakery"));
+
+            var ctx = BuyerContext(self, wealth: 30.0);
+            var full = MakeObjectEngine(provider, lod: null); // no LOD runtime ⇒ fully simulated
+            var outbox = new EventCollector();
+
+            full.Handle(new ActionCommitted(new WDateTime(0), self, Buy, WTimeSpan.FromMinutes(15)), ctx, outbox);
+
+            Assert.IsTrue(outbox.Drain().OfType<PriceChanged>().Any(),
+                "A fully-simulated buy adjusts the shop's posted price (PriceChanged emitted).");
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────────────
+
+        /// <summary>An <see cref="IHumanContext"/> whose snapshot carries the given wealth (for Buy affordability).</summary>
+        private static IHumanContext BuyerContext(HumanId self, double wealth)
+        {
+            var ctx = (HumanContext)BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
+            ctx.Snapshot = ctx.Snapshot with { Economy = new EconomyState(wealth) };
+            return ctx;
+        }
 
         private static DefaultEconomyEngine MakeEconomyEngine()
             => new(Options.Create(EconomyConfig.Default), NullLoggerFactory.Instance);
 
-        private static DefaultObjectInteractionEngine MakeObjectEngine(MemProvider provider)
+        private static DefaultObjectInteractionEngine MakeObjectEngine(
+            MemProvider provider, ICognitiveResolutionLevelRuntime? lod = null)
             => new(
                 provider,
                 new FixedLocationService(Loc),
@@ -216,7 +265,8 @@ namespace EngineTests
                 SpoilageConfig.Default,
                 new GameEngineTools.World.Economy.EconomyLedger(),
                 Options.Create(EconomyConfig.Default),
-                NullLogger<DefaultObjectInteractionEngine>.Instance);
+                NullLogger<DefaultObjectInteractionEngine>.Instance,
+                lod);
 
         private static BehaviorContext EconContext(
             List<WorldObject> available, List<WorldObject> held, double wealth, double hunger = 5)
@@ -290,6 +340,14 @@ namespace EngineTests
             public ObjectInteractionPermission Evaluate(
                 IHumanContext actor, WorldObject target, ObjectInteractionKind kind, LocationDescriptor location)
                 => new(IsAllowed: true);
+        }
+
+        /// <summary>LOD runtime stub that reports every character as Background (Tier 2 §7 abstraction).</summary>
+        private sealed class AllBackgroundLod : ICognitiveResolutionLevelRuntime
+        {
+            public CognitiveResolutionLevel Get(HumanId id) => CognitiveResolutionLevel.Background;
+            public void Set(HumanId id, CognitiveResolutionLevel level) { }
+            public void Clear(HumanId id) { }
         }
     }
 }

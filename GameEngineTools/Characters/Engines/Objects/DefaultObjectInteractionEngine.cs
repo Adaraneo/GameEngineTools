@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Objects
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Economy;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Economy;
     using GameEngineTools.World.Location;
@@ -30,6 +31,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         private readonly SpoilageConfig _spoilage;
         private readonly EconomyLedger _economyLedger;
         private readonly EconomyConfig _economyConfig;
+        private readonly ICognitiveResolutionLevelRuntime? _lodRuntime;
         private readonly ILogger<DefaultObjectInteractionEngine> _logger;
 
         /// <summary>Creates the engine with its world-object, location, policy, production, economy and logging dependencies.</summary>
@@ -41,6 +43,12 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <param name="economyLedger">Scene posted-price aggregate (Tier 2).</param>
         /// <param name="economyConfig">Economy tuning configuration (Tier 2).</param>
         /// <param name="logger">Logger.</param>
+        /// <param name="lodRuntime">
+        /// Optional LOD registry. For <see cref="CognitiveResolutionLevel.Background"/> characters the
+        /// buy/sell commit skips the per-shop <see cref="EconomyLedger"/> price formation (Gode &amp;
+        /// Sunder: institutional pricing needs no per-agent simulation) — see food-economy Tier 2 §7.
+        /// <c>null</c> ⇒ every character is treated as fully simulated (no LOD abstraction).
+        /// </param>
         public DefaultObjectInteractionEngine(
             IMutableWorldObjectProvider objectProvider,
             ILocationService locations,
@@ -49,7 +57,8 @@ namespace GameEngineTools.Characters.Engines.Objects
             SpoilageConfig spoilage,
             EconomyLedger economyLedger,
             IOptions<EconomyConfig> economyConfig,
-            ILogger<DefaultObjectInteractionEngine> logger)
+            ILogger<DefaultObjectInteractionEngine> logger,
+            ICognitiveResolutionLevelRuntime? lodRuntime = null)
         {
             _objectProvider = objectProvider;
             _locations = locations;
@@ -58,8 +67,16 @@ namespace GameEngineTools.Characters.Engines.Objects
             _spoilage = spoilage;
             _economyLedger = economyLedger;
             _economyConfig = economyConfig.Value;
+            _lodRuntime = lodRuntime;
             _logger = logger;
         }
+
+        /// <summary>
+        /// True when the character is simulated at <see cref="CognitiveResolutionLevel.Background"/> —
+        /// the buy/sell commit then abstracts away the ledger price formation (Tier 2 §7 LOD discipline).
+        /// </summary>
+        private bool IsBackground(HumanId id)
+            => _lodRuntime?.Get(id) == CognitiveResolutionLevel.Background;
 
         /// <inheritdoc/>
         public void Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox)
@@ -380,20 +397,23 @@ namespace GameEngineTools.Characters.Engines.Objects
             _objectProvider.RemoveObject(obj.LocationId, obj.Id);
             _objectProvider.AddObject(obj with { HeldBy = ctx.Id, LocationId = location, Price = null, ShopId = null });
 
+            var newWealth = wealth - price;
+            outbox.Add(new Purchased(now, ctx.Id, obj.Id, kind, shopId, price, newWealth));
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                _logger.Purchased(ctx.Id.ToString(), obj.Id, kind.ToString(), shopId, price, newWealth);
+
+            // LOD §7: background characters skip the per-shop price formation entirely.
+            if (IsBackground(ctx.Id))
+                return;
+
             // Recompute the shop's posted price against the reduced stock (excludes the now-held object).
             var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
             var oldPrice = _economyLedger.GetPrice(shopId, kind);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
-            var newWealth = wealth - price;
 
-            outbox.Add(new Purchased(now, ctx.Id, obj.Id, kind, shopId, price, newWealth));
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
-
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-            {
-                _logger.Purchased(ctx.Id.ToString(), obj.Id, kind.ToString(), shopId, price, newWealth);
                 _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
-            }
         }
 
         /// <summary>
@@ -442,19 +462,22 @@ namespace GameEngineTools.Characters.Engines.Objects
             _objectProvider.RemoveObject(item.LocationId, item.Id);
             _objectProvider.AddObject(item with { HeldBy = null, LocationId = location, Price = salePrice, ShopId = shopId });
 
+            var newWealth = (ctx.Snapshot.Economy?.Wealth ?? 0.0) + salePrice;
+            outbox.Add(new Sold(now, ctx.Id, item.Id, kind, shopId, salePrice, newWealth));
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                _logger.Sold(ctx.Id.ToString(), item.Id, kind.ToString(), shopId, salePrice, newWealth);
+
+            // LOD §7: background characters skip the per-shop price formation entirely.
+            if (IsBackground(ctx.Id))
+                return;
+
             var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
             var oldPrice = _economyLedger.GetPrice(shopId, kind);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
-            var newWealth = (ctx.Snapshot.Economy?.Wealth ?? 0.0) + salePrice;
 
-            outbox.Add(new Sold(now, ctx.Id, item.Id, kind, shopId, salePrice, newWealth));
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
-
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-            {
-                _logger.Sold(ctx.Id.ToString(), item.Id, kind.ToString(), shopId, salePrice, newWealth);
                 _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
-            }
         }
 
         /// <summary>
