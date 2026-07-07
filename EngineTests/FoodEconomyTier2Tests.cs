@@ -51,7 +51,7 @@ namespace EngineTests
             var engine = MakeEconomyEngine();
 
             // Commit-side gating-bug guard: committing a purchase you cannot afford must throw loudly.
-            Assert.ThrowsException<InvalidOperationException>(
+            Assert.Throws<InvalidOperationException>(
                 () => engine.ApplyPurchase(new EconomyState(1.0), price: 5.0));
         }
 

@@ -109,7 +109,7 @@ namespace EngineTests
             var id = NewId();
 
             // Act + Assert
-            Assert.ThrowsException<InvalidOperationException>(
+            Assert.Throws<InvalidOperationException>(
                 () => _sut.MoveCharacter(id, "nonexistent"),
                 "MoveCharacter must throw for an unregistered location.");
         }

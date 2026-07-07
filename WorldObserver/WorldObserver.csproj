@@ -10,7 +10,8 @@
   <ItemGroup>
     <ProjectReference Include="..\GameEngineTools\GameEngineTools.csproj" />
     <!-- Czech grammar composer for the custom narrative formatter (same version as the core lib). -->
-    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.14" />
+    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.15" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
 
   <!-- Copy wwwroot physically so static files are served even when the app runs outside

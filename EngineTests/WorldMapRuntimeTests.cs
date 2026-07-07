@@ -74,7 +74,7 @@ namespace EngineTests
             var loc = MakeLocation("duplicate");
             map.AddLocation(loc);
 
-            Assert.ThrowsException<InvalidOperationException>(() => map.AddLocation(loc));
+            Assert.Throws<InvalidOperationException>(() => map.AddLocation(loc));
         }
 
         [TestMethod]
@@ -164,7 +164,7 @@ namespace EngineTests
             var map = CreateEmptyMap();
             map.AddLocation(MakeLocation("known"));
 
-            Assert.ThrowsException<InvalidOperationException>(
+            Assert.Throws<InvalidOperationException>(
                 () => map.AddConnection("ghost", "known", 10.0));
         }
 
@@ -174,7 +174,7 @@ namespace EngineTests
             var map = CreateEmptyMap();
             map.AddLocation(MakeLocation("known"));
 
-            Assert.ThrowsException<InvalidOperationException>(
+            Assert.Throws<InvalidOperationException>(
                 () => map.AddConnection("known", "ghost", 10.0));
         }
 

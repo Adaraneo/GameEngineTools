@@ -131,7 +131,7 @@ namespace EngineTests
                 surnames: _surnames);
             var rng = new FixedIndexRandom(0);
 
-            Assert.ThrowsException<InvalidOperationException>(
+            Assert.Throws<InvalidOperationException>(
                 () => sut.Generate(SexBiology.Female, TestData.SomeBirthDate, rng));
         }
 
@@ -144,7 +144,7 @@ namespace EngineTests
                 surnames: _surnames);
             var rng = new FixedIndexRandom(0);
 
-            Assert.ThrowsException<InvalidOperationException>(
+            Assert.Throws<InvalidOperationException>(
                 () => sut.Generate(SexBiology.Male, TestData.SomeBirthDate, rng));
         }
 
@@ -157,7 +157,7 @@ namespace EngineTests
                 surnames: []);
             var rng = new FixedIndexRandom(0);
 
-            Assert.ThrowsException<InvalidOperationException>(
+            Assert.Throws<InvalidOperationException>(
                 () => sut.Generate(SexBiology.Female, TestData.SomeBirthDate, rng));
         }
 
