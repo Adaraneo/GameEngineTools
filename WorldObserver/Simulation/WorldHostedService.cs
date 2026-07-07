@@ -117,7 +117,7 @@ namespace WorldObserver.Simulation
                 ObjectSnapshotCache = ctx.ObjectCache,
                 WriteBuffer = ctx.WriteBuffer,
                 RespawnScheduler = ctx.Respawn,
-                NarrativeFormatter = new DefaultNarrativeFormatter(),
+                NarrativeFormatter = new WorldObserver.Narrative.WorldObserverNarrativeFormatter(),
                 ResolveCharacter = id => names.TryGetValue(id, out var info)
                     ? info
                     : new NarrativeCharacterInfo(id.Value.ToString()[..8], SexBiology.Unknown),
