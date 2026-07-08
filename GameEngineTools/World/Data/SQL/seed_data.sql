@@ -329,12 +329,16 @@ VALUES
 --   VitaminDGain — IU equivalent (0..100 scale)
 --   HydrationGain— hydration units (0..100 scale)
 --
--- VITAMIN D SCIENCE NOTE:
---   Mushrooms exposed to UV light contain ergocalciferol (D2) — 50–100 IU/serving.
---   Fish (herring, salmon) contain cholecalciferol (D3) — highest food source,
---   ~300–600 IU/serving. In a world with limited sun (winter, indoor NPCs),
---   mushrooms and fish are the only reliable dietary VitaminD sources.
---   Dairy (cheese) contains ~40 IU/serving. Meat is negligible.
+-- VITAMIN D SCIENCE NOTE (revised):
+--   Fish (D3/cholecalciferol) is the ceiling food source. UV-exposed mushrooms (D2/ergocalciferol)
+--   are scaled to ~1/3 of fish NOT because of lower raw IU content (raw content can be comparable)
+--   but because D2 is intrinsically less potent than D3 at raising serum 25(OH)D.
+--   Source: Armas LAG, Hollis BW, Heaney RP, J Clin Endocrinol Metab 2004;89(11):5387-5391,
+--   DOI 10.1210/jc.2004-0360 (D2 potency <1/3 of D3, single-bolus AUC).
+--   Corroboration: Heaney RP et al., JCEM 2011;96(3):E447-E452, DOI 10.1210/jc.2010-2230
+--   (D3 ~87% more potent over 12 weeks).
+--   Natural (unfortified) cheese/dairy is a LOW source (~0.2-1.8 ug/100g), not a moderate one.
+--   Source: Mattila P et al., J Agric Food Chem 1995;43(9):2394-2399, DOI 10.1021/jf00057a015.
 --
 -- IRON SCIENCE NOTE:
 --   Heme iron (meat, fish) is 2–3× more bioavailable than non-heme (plants).
@@ -355,7 +359,7 @@ VALUES
     ('tavern_pottage_03', 45.0, 12.0,  3.5, NULL,   30.0),
     ('tavern_roast_01',   70.0, 40.0,  8.0, NULL,    5.0),  -- chicken: high protein, good heme iron
     ('tavern_roast_02',   70.0, 40.0,  8.0, NULL,    5.0),
-    ('tavern_cheese_01',  35.0, 15.0,  1.0, 12.0,   5.0),  -- cheese: protein, VitD (dairy)
+    ('tavern_cheese_01',  35.0, 15.0,  1.0,  3.0,   5.0),  -- natural cheese: low VitD (Mattila 1995, ~0.2-1.8 ug/100g)
     ('tavern_water_01',    2.0, NULL,  NULL, NULL,   90.0),
     ('tavern_water_02',    2.0, NULL,  NULL, NULL,   90.0),
     ('tavern_ale_01', 20.0, NULL, NULL, NULL, 40.0),
@@ -397,7 +401,7 @@ VALUES
     --                  Cal   Prot  Iron  VitD  Hydrat
     ('market_bread_01', 48.0,  7.0,  3.5, NULL,   7.0),
     ('market_bread_02', 48.0,  7.0,  3.5, NULL,   7.0),
-    ('market_cheese_01',32.0, 14.0,  1.0, 10.0,   6.0),
+    ('market_cheese_01',32.0, 14.0,  1.0,  3.0,   6.0),  -- natural cheese: low VitD (Mattila 1995)
     ('market_dried_01', 38.0,  9.0,  5.0, NULL,   5.0),  -- dried peas: good protein and iron
     ('market_apple_01', 18.0,  0.5,  0.5, NULL,  15.0),
     ('market_apple_02', 18.0,  0.5,  0.5, NULL,  15.0),
