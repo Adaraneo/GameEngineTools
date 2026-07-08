@@ -276,6 +276,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double AgeSleepQualityPenaltyPerYear = 0.008,
         // Sunlight — vitamin D restoration
         /// <summary>
+        /// Passive hourly Vitamin D decay when not receiving outdoor sun exposure (0..100 scale).
+        /// Deliberately set to a fraction of <see cref="IronDecayPerHour"/>, reflecting Vitamin D's
+        /// much longer serum half-life relative to iron's turnover dynamics.
+        /// </summary>
+        /// <remarks>
+        /// Half-life basis: 25(OH)D3 half-life ~15.1 days.
+        /// Source: Jones KS et al., J Clin Endocrinol Metab 2014;99(9):3373-3381,
+        /// DOI 10.1210/jc.2014-1714 (primary study).
+        /// Ratio to IronDecayPerHour (0.05) is a design-tuning choice within the literature-supported
+        /// 3-5x range, not a directly measured constant.
+        /// </remarks>
+        double VitaminDDecayPerHour = 0.015,
+        /// <summary>
         /// Minimum <c>IrradianceFactor</c> from <see cref="CelestialContext"/> at which
         /// vitamin D is restored (below this value the radiation is insufficient for skin synthesis).
         /// </summary>
@@ -514,6 +527,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             AgeSleepQualityThreshold: 50.0,
             AgeSleepQualityPenaltyPerYear: 0.008,
             // ── Vitamin D ─────────────────────────────────────────────────────────────
+            VitaminDDecayPerHour: 0.015,
             VitaminDSunThreshold: 0.3,
             VitaminDRestorationPerHourPerIrradiance: 4.0,
             VitaminDMaxOutdoorRestorationPerHour: 6.0,

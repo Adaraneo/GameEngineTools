@@ -1367,20 +1367,20 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         private double ComputeVitaminD(double current, double h, CelestialContext? celestial, SurfaceKind surface)
         {
-            var net = -Config.NutritionDecayPerHour * h * 0.5;
-
-            if (celestial is { } cel && cel.IrradianceFactor > Config.VitaminDSunThreshold)
+            // Outdoors under sufficient irradiance: skin synthesis restores vitamin D.
+            if (celestial is { } cel
+                && cel.IrradianceFactor > Config.VitaminDSunThreshold
+                && surface is SurfaceKind.Public or SurfaceKind.Social)
             {
-                if (surface is SurfaceKind.Public or SurfaceKind.Social)
-                {
-                    var restoration = Math.Min(
-                        Config.VitaminDRestorationPerHourPerIrradiance * cel.IrradianceFactor * h,
-                        Config.VitaminDMaxOutdoorRestorationPerHour * h);
-                    net += restoration;
-                }
+                var restoration = Math.Min(
+                    Config.VitaminDRestorationPerHourPerIrradiance * cel.IrradianceFactor * h,
+                    Config.VitaminDMaxOutdoorRestorationPerHour * h);
+                return Clamp01p(current + restoration);
             }
 
-            return Clamp01p(current + net);
+            // No sufficient sun exposure: passive decay only, deliberately set to a fraction of
+            // IronDecayPerHour to reflect 25(OH)D's much longer serum half-life (~15 days).
+            return Clamp01p(current - Config.VitaminDDecayPerHour * h);
         }
 
         /// <inheritdoc/>

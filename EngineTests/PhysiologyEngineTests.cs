@@ -653,6 +653,24 @@ namespace EngineTests
                 $"Eating must restore Iron faster than idle. Eating={eatingEngine.State.Nutrition.Iron:F4}, Idle={idleEngine.State.Nutrition.Iron:F4}");
         }
 
+        [TestMethod]
+        public void Tick_Nutrition_VitaminDDecaysSlowerThanIron()
+        {
+            // Source: Jones KS et al., JCEM 2014;99(9):3373-3381 (25(OH)D3 half-life ~15 days,
+            // implying much slower depletion than iron's obligatory daily turnover).
+            var engine = BuildEngine(_now);
+            engine.RestoreState(engine.State with { Nutrition = new NutritionState(Iron: 50, VitaminD: 50) });
+
+            // No sun, no food, no sleep — pure passive decay over 24h indoors.
+            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), BuildContextWithAction(null), new EventCollector());
+
+            var ironLoss = 50 - engine.State.Nutrition!.Iron;
+            var vitDLoss = 50 - engine.State.Nutrition!.VitaminD;
+
+            Assert.IsTrue(vitDLoss < ironLoss,
+                $"VitaminD must decay slower than Iron. VitD loss={vitDLoss:F4}, Iron loss={ironLoss:F4}");
+        }
+
         #endregion Nutrition — Phase 4
 
         #region Injury — Phase 4
