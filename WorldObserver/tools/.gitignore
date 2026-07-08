@@ -1,0 +1,6 @@
+# Local seed generator for WorldObserver's SourceFiles/World/SQL/seed_data.sql.
+# Kept here (not in an ephemeral scratch dir) so it is easy to find and re-run, but
+# deliberately untracked — the committed artifact is the generated seed_data.sql itself.
+gen_seed.py
+__pycache__/
+*.pyc
