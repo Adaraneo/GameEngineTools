@@ -398,15 +398,14 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             (Chronotype.Neutral, spec.ChronotypeWeights.Neutral),
             (Chronotype.Owl, spec.ChronotypeWeights.Owl), rng);
 
-        var socio = hints.Sociosexuality ?? PickWeighted(
+        var socio = hints.Sociosexuality is { } fixedSocio 
+            ? fixedSocio    // explicit hint (baby/child/teenager) — unchanged, no jitter
+            : JitterSociosexuality(PickWeighted(
             (Sociosexuality.Restricted, spec.SociosexualityWeights.Restricted),
             (Sociosexuality.Intermediate, spec.SociosexualityWeights.Intermediate),
-            (Sociosexuality.Unrestricted, spec.SociosexualityWeights.Unrestricted), rng);
+            (Sociosexuality.Unrestricted, spec.SociosexualityWeights.Unrestricted), rng), rng);
 
         // Apply per-facet Behavior cap when a fixed Sociosexuality preset was NOT used.
-        // This allows Attitude and Desire to vary freely while hard-capping
-        // the experiential-history facet for life stages where high past behavior
-        // is biologically implausible (e.g. teenagers).
         if (hints.SociosexualityBehaviorMax is double behaviorMax)
         {
             socio = socio with { Behavior = Math.Min(socio.Behavior, behaviorMax) };
@@ -497,6 +496,28 @@ public sealed class PersonalityGenerator : IPersonalityGenerator
             A: MapToBoundedTrait(spec.A, y[3]),
             N: MapToBoundedTrait(spec.N, y[4])
         );
+    }
+
+    /// <summary>
+    /// Jitters Attitude and Desire around the picked preset using a shared latent
+    /// component (matches the SOI-R Attitude↔Desire correlation of ≈ 0.6–0.75,
+    /// Penke &amp; Asendorpf 2008), so the facets stay correlated but are no longer
+    /// identical. Behavior gets independent noise — it represents life history /
+    /// opportunity, not just orientation.
+    /// </summary>
+    private static Sociosexuality JitterSociosexuality(Sociosexuality center, IRandomSource rng)
+    {
+        const double sharedSigma = 0.10;   // shared component for Attitude/Desire
+        const double uniqueSigma = 0.07;   // independent residual per facet
+        const double behaviorSigma = 0.12; // Behavior — independent of Attitude/Desire
+
+        var shared = NextStandardNormal(rng) * sharedSigma;
+
+        var attitude = Clamp01(center.Attitude + shared + NextStandardNormal(rng) * uniqueSigma);
+        var desire = Clamp01(center.Desire + shared + NextStandardNormal(rng) * uniqueSigma);
+        var behavior = Clamp01(center.Behavior + NextStandardNormal(rng) * behaviorSigma);
+
+        return new Sociosexuality(behavior, attitude, desire);
     }
 
     private static double NextStandardNormal(IRandomSource rng)
