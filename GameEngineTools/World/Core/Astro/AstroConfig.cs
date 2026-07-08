@@ -23,7 +23,14 @@ public sealed record AstroConfig(
     /// Vernal-equinox phase as a fraction of the year [0, 1).
     /// <c>0.0</c> = vernal equinox on the first day of the year.
     /// </summary>
-    double VernalPhase = 0.0)
+    double VernalPhase = 0.0,
+    /// <summary>
+    /// Thermal lag of surface temperature behind insolation, as a fraction of the year.
+    /// Real oceans and soil warm slowly, so the hottest day trails the summer solstice by
+    /// roughly a month on Earth (≈ <c>0.08</c> of a year). <c>0.0</c> = no lag (temperature
+    /// peaks exactly at the solstice).
+    /// </summary>
+    double SeasonalThermalLagFraction = 0.08)
 {
     /// <summary>Default instance with Earth-like values.</summary>
     public AstroConfig() : this(new SunParamsConfig()) { }

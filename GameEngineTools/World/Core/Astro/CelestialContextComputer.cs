@@ -89,19 +89,30 @@ internal sealed class CelestialContextComputer
         var irradiance = _sunModel.IrradianceFactor(
             now, cfg.LatitudeDeg, cfg.LongitudeDeg, in sp, cfg.VernalPhase);
 
-        // SeasonFraction z Keplerovy rovnice (true anomaly → frakce roku)
+        // SeasonFraction anchored to the axial tilt (day-of-year) — the SAME clock that drives
+        // irradiance and day length. 0.0 = vernal equinox, 0.25 = summer solstice (N hemisphere).
+        // (The earlier Kepler true-anomaly season was anchored to periapsis, a different orbital
+        // reference than the tilt, so temperature and light could drift out of phase.)
         var dayIdx = now.WorldTicks / spec.TicksPerDay;
+        var (year, _, _) = spec.Calendar.DateFromDays(dayIdx);
+        var yearStart = spec.Calendar.DaysFromDate(year, 1, 1);
+        var yearLen = spec.Calendar.DaysInYear(year);
+        var seasonFrac = ((dayIdx - yearStart) / (double)yearLen + cfg.VernalPhase) % 1.0;
+        if (seasonFrac < 0) seasonFrac += 1.0;
+
+        // Distance from the star this instant (Kepler) → the genuine eccentric distance effect
+        // on the mean temperature (closer to periapsis = warmer). This is the minor real
+        // contribution of eccentricity, kept physical.
         var secondsPerWorldDay = (double)spec.HoursPerDay * spec.MinutesPerHour * spec.SecondsPerMinute;
         var tSinceEpochEarthDays = dayIdx * secondsPerWorldDay / 86_400.0;
         var (kx, ky) = KeplerSolver.OrbitalPositionAu(orbit, tSinceEpochEarthDays, star.GravitationalParameter);
-        var trueAnomaly = Math.Atan2(ky, kx);                              // −π..+π
-        var seasonFrac = ((trueAnomaly / (2.0 * Math.PI)) + 1.0) % 1.0;
-
-        // Temperature from the physical model + seasonal offset from AstroConfig
         var orbitAu = Math.Sqrt(kx * kx + ky * ky);
         var meanTempC = star.EquilibriumTempK(orbitAu, planet.Albedo) + planet.GreenhouseWarmingK - 273.15;
-        var tempC = meanTempC
-                      + cfg.SeasonalAmplitudeCelsius * Math.Sin(seasonFrac * 2.0 * Math.PI - Math.PI / 2.0);
+
+        // Seasonal temperature offset from the axial tilt — driven by the SAME solar declination
+        // as the light, so it is phase-locked to it and hemisphere-correct. A thermal lag models
+        // the slow warming of ocean/soil: temperature trails insolation by ~1 month on Earth.
+        var tempC = meanTempC + SeasonalTemperatureOffset(now, in sp, cfg, planet, spec, yearLen);
 
         // ── Primary moon — tidal phase ───────────────────────────────────────────
         double? tidalPhase = null;
@@ -148,5 +159,40 @@ internal sealed class CelestialContextComputer
             BaseAmbientTempCelsius: tempC,
             SurfaceGravityVsEarth: planet.SurfaceGravityVsEarth,
             TidalPhase: tidalPhase);
+    }
+
+    /// <summary>
+    /// Seasonal temperature offset (°C) driven by the solar declination — the same quantity that
+    /// governs day length and irradiance — so it is phase-locked to the light and hemisphere-correct.
+    /// The declination is sampled at an earlier instant (<see cref="AstroConfig.SeasonalThermalLagFraction"/>)
+    /// to model the thermal inertia of ocean and soil: the hottest day trails the summer solstice.
+    /// Returns <c>0</c> for a planet with no axial tilt (no seasons).
+    /// </summary>
+    private double SeasonalTemperatureOffset(
+        WDateTime now,
+        in SunParams sp,
+        AstroConfig cfg,
+        PlanetConfig planet,
+        WorldTimeSpec spec,
+        long yearLen)
+    {
+        if (planet.ObliquityDeg <= 0.01)
+            return 0.0;   // no tilt → no seasons
+
+        // Sample declination in the past by the thermal lag. Declination is annual-periodic, so we
+        // wrap by a whole year if the shift would run before the epoch (guards early-simulation ticks).
+        var yearTicks = yearLen * spec.TicksPerDay;
+        var lagTicks  = (long)(cfg.SeasonalThermalLagFraction * yearTicks);
+        var laggedTicks = now.WorldTicks - lagTicks;
+        if (laggedTicks < 0) laggedTicks += yearTicks;
+
+        var laggedTime = new WDateTime(laggedTicks);
+        var (_, _, declDeg) = _sunModel.SolarPosition(
+            laggedTime, cfg.LatitudeDeg, cfg.LongitudeDeg, in sp, cfg.VernalPhase);
+
+        // δ/ε ∈ [−1, +1], peaking at the solstice; the latitude sign makes summer land in the
+        // correct hemisphere (southern latitudes are warm when the northern sub-solar point is negative).
+        var seasonalUnit = declDeg / planet.ObliquityDeg * Math.Sign(cfg.LatitudeDeg);
+        return cfg.SeasonalAmplitudeCelsius * seasonalUnit;
     }
 }
