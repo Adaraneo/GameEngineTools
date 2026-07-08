@@ -319,10 +319,34 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// disengaging from a blocked one — the well-being benefit of adaptive goal adjustment.
         /// Source: Wrosch et al. 2003, <i>PSPB</i> 29(12). Default 4.0.
         /// </summary>
-        double GoalReengagementMoodRecovery = 4.0)
+        double GoalReengagementMoodRecovery = 4.0,
+        /// <summary>
+        /// Iron level (0..100 scale) below which low-iron psychological effects trigger
+        /// (Valence suppression). Mapped conceptually to the WHO ferritin deficiency cut-off.
+        /// </summary>
+        /// <remarks>
+        /// Source: WHO guideline on use of ferritin concentrations to assess iron status in
+        /// individuals and populations, Geneva: WHO; 2020 (official guideline; ferritin &lt;15 ug/L
+        /// adult deficiency threshold, scaled onto the engine's 0..100 nutrition axis).
+        /// </remarks>
+        double IronDeficiencyThreshold = 30,
+        /// <summary>
+        /// Vitamin D level (0..100 scale) below which low-VitaminD psychological effects trigger
+        /// (MoodBaseline suppression). Mapped conceptually to the IOM sufficiency cut-off.
+        /// </summary>
+        /// <remarks>
+        /// Source: Institute of Medicine, Dietary Reference Intakes for Calcium and Vitamin D,
+        /// National Academies Press, 2011 (official guideline; serum 25(OH)D &lt;50 nmol/L / 20 ng/mL
+        /// insufficiency threshold, scaled onto the engine's 0..100 nutrition axis).
+        /// Note: the Endocrine Society 2011 guideline (Holick MF et al., JCEM 96(7):1911-1930,
+        /// DOI 10.1210/jc.2011-0385) uses a stricter 30 ng/mL cut-off — this is a genuine unresolved
+        /// guideline conflict in the source literature, not an engine error. IOM's lower/looser
+        /// threshold was chosen as the default to avoid over-triggering deficiency effects.
+        /// </remarks>
+        double VitaminDDeficiencyThreshold = 20)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0, 0.57, 0.56, 0.42, 0.47, 0.25, 0.30, 0.5, 25.0, 4.0) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 14.0, 3.0, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0, 0.57, 0.56, 0.42, 0.47, 0.25, 0.30, 0.5, 25.0, 4.0, 30, 20) { }
     }
 
     /// <summary>

@@ -154,10 +154,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Nutritional impacts — low iron lowers valence; low vitamin D dampens mood
             if (ph.Nutrition is { } nutrition)
             {
-                if (nutrition.Iron < 30)
-                    s = s with { Valence = Clampm1p1(s.Valence - (30 - nutrition.Iron) * Config.LowIronValencePenaltyPerUnit * h) };
-                if (nutrition.VitaminD < 20)
-                    s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - (20 - nutrition.VitaminD) * Config.LowVitaminDMoodPenaltyPerHour / 20.0 * h, 0, 100) };
+                if (nutrition.Iron < Config.IronDeficiencyThreshold)
+                    s = s with { Valence = Clampm1p1(s.Valence - (Config.IronDeficiencyThreshold - nutrition.Iron) * Config.LowIronValencePenaltyPerUnit * h) };
+                if (nutrition.VitaminD < Config.VitaminDDeficiencyThreshold)
+                    s = s with { MoodBaseline = Math.Clamp(s.MoodBaseline - (Config.VitaminDDeficiencyThreshold - nutrition.VitaminD) * Config.LowVitaminDMoodPenaltyPerHour / Config.VitaminDDeficiencyThreshold * h, 0, 100) };
             }
 
             // Sickness behavior — immune load → social withdrawal + anhedonia + lethargy (Dantzer 2007)
