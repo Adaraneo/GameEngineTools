@@ -28,7 +28,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// <param name="NutritionDecayPerHour">Per-hour decay of nutrition stores while awake.</param>
     /// <param name="CaloriesEatingGainPerHour">Calories restored per hour while eating.</param>
     /// <param name="ProteinEatingGainPerHour">Protein restored per hour while eating.</param>
-    /// <param name="IronSleepRecoveryPerHour">Iron restored per hour of sleep (critical for post-menses recovery).</param>
+    /// <param name="IronDecayPerHour">Passive per-hour iron decay when not eating iron-rich food.</param>
+    /// <param name="IronEatingGainPerHour">Default per-hour iron gain while eating when the food's profile does not specify one.</param>
     /// <param name="InjuryRestRecoveryPerDay">Injury severity healed per day while resting.</param>
     /// <param name="InjuryActiveRecoveryPerDay">Injury severity healed per day while active.</param>
     /// <param name="InjuryInfectionImmuneLoadPerDay">Immune load added per day by an infected injury.</param>
@@ -147,7 +148,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double NutritionDecayPerHour = 1.0,
         double CaloriesEatingGainPerHour = 40.0,
         double ProteinEatingGainPerHour = 20.0,
-        double IronSleepRecoveryPerHour = 0.5,
+        /// <summary>
+        /// Passive hourly iron decay when not eating iron-rich food (0..100 scale).
+        /// Reflects obligatory basal iron loss (~1 mg/day in adults) mapped onto the engine's
+        /// normalized scale — NOT accelerated or decelerated by sleep/wake state.
+        /// </summary>
+        /// <remarks>
+        /// Source: Green R, Charlton R, Seftel H et al., Am J Med 1968;45(3):336-353,
+        /// DOI 10.1016/0002-9343(68)90069-7 (primary study; basal loss 0.9-1.0 mg/day, ~14 ug/kg/day).
+        /// </remarks>
+        double IronDecayPerHour = 0.05,
+        /// <summary>
+        /// Default iron gain per hour while eating, used when the consumed
+        /// <see cref="NutritionalProfile"/> does not specify <c>IronGain</c>.
+        /// </summary>
+        double IronEatingGainPerHour = 2.0,
         double InjuryRestRecoveryPerDay = 2.0,
         double InjuryActiveRecoveryPerDay = 0.5,
         double InjuryInfectionImmuneLoadPerDay = 5.0,
@@ -396,7 +411,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             NutritionDecayPerHour: 1.0,
             CaloriesEatingGainPerHour: 40.0,
             ProteinEatingGainPerHour: 20.0,
-            IronSleepRecoveryPerHour: 0.5,
+            IronDecayPerHour: 0.05,
+            IronEatingGainPerHour: 2.0,
             // ── Injury ────────────────────────────────────────────────────────────────
             InjuryRestRecoveryPerDay: 2.0,
             InjuryActiveRecoveryPerDay: 0.5,

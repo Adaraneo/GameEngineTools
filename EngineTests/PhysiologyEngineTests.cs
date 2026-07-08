@@ -619,25 +619,38 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void Tick_Nutrition_IronRestoredDuringSleep()
+        public void Tick_Nutrition_IronDoesNotGetSleepBonus()
         {
+            // Iron restoration must come from eating, not from the Sleep action.
+            // Source: Kemna EHJM et al., Clin Chem 2007;53(4):620-628; Schaap CCM et al.,
+            // Clin Chem 2013;59(3):527-535 (hepcidin circadian rhythm invalidates the sleep bonus).
             var sleepEngine = BuildEngine(_now);
-            sleepEngine.RestoreState(sleepEngine.State with
-            {
-                Nutrition = new NutritionState(Iron: 50)
-            });
+            sleepEngine.RestoreState(sleepEngine.State with { Nutrition = new NutritionState(Iron: 50) });
 
             var idleEngine = BuildEngine(_now);
-            idleEngine.RestoreState(idleEngine.State with
-            {
-                Nutrition = new NutritionState(Iron: 50)
-            });
+            idleEngine.RestoreState(idleEngine.State with { Nutrition = new NutritionState(Iron: 50) });
 
             sleepEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(Sleep), new EventCollector());
             idleEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(null), new EventCollector());
 
-            Assert.IsTrue(sleepEngine.State.Nutrition!.Iron > idleEngine.State.Nutrition!.Iron,
-                $"Sleep must restore Iron faster than idle. Sleep={sleepEngine.State.Nutrition.Iron:F4}, Idle={idleEngine.State.Nutrition.Iron:F4}");
+            Assert.AreEqual(sleepEngine.State.Nutrition!.Iron, idleEngine.State.Nutrition!.Iron, 0.0001,
+                $"Sleep must NOT restore Iron faster than idle. Sleep={sleepEngine.State.Nutrition.Iron:F4}, Idle={idleEngine.State.Nutrition.Iron:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_Nutrition_EatingRestoresIronFasterThanIdle()
+        {
+            var eatingEngine = BuildEngine(_now);
+            eatingEngine.RestoreState(eatingEngine.State with { Nutrition = new NutritionState(Iron: 50) });
+
+            var idleEngine = BuildEngine(_now);
+            idleEngine.RestoreState(idleEngine.State with { Nutrition = new NutritionState(Iron: 50) });
+
+            eatingEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(Eat), new EventCollector());
+            idleEngine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContextWithAction(null), new EventCollector());
+
+            Assert.IsTrue(eatingEngine.State.Nutrition!.Iron > idleEngine.State.Nutrition!.Iron,
+                $"Eating must restore Iron faster than idle. Eating={eatingEngine.State.Nutrition.Iron:F4}, Idle={idleEngine.State.Nutrition.Iron:F4}");
         }
 
         #endregion Nutrition — Phase 4

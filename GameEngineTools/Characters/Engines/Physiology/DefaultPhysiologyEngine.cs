@@ -282,14 +282,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
             };
 
             // Nutrition drift — Calories/Protein decline and are replenished by eating;
-            // Iron is restored by sleep; VitaminD declines slowly
+            // Iron is restored by eating iron-rich food and decays passively; VitaminD declines slowly
             if (s.Nutrition is { } nut)
             {
                 // Both Eat (world Food object) and EatStored (pantry/held food, Tier 1) count as a meal.
                 var isEating = action is Eat or EatStored;
                 var caloriesDelta = isEating ? (nutProfile?.CalorieGain ?? Config.CaloriesEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
                 var proteinDelta = isEating ? (nutProfile?.ProteinGain ?? Config.ProteinEatingGainPerHour) * h : -Config.NutritionDecayPerHour * h;
-                var ironDelta = action == Sleep ? Config.IronSleepRecoveryPerHour * h : -Config.NutritionDecayPerHour * h * 0.3;
+                // Iron is restored by eating iron-rich food (see NutritionalProfile.IronGain) and otherwise
+                // decays slowly at a fixed passive rate. There is NO scientific basis for faster iron
+                // restoration during sleep: hepcidin (the hormone that suppresses dietary iron absorption)
+                // is LOWEST in the early morning and RISES 2-6x by afternoon, meaning absorption capacity is
+                // highest in the morning, not overnight.
+                // Source: Kemna EHJM et al., Clin Chem 2007;53(4):620-628 (primary study)
+                // Source: Schaap CCM et al., Clin Chem 2013;59(3):527-535, DOI 10.1373/clinchem.2012.194977 (primary study)
+                var ironDelta = isEating
+                    ? (nutProfile?.IronGain ?? Config.IronEatingGainPerHour) * h
+                    : -Config.IronDecayPerHour * h;
                 // Glycemic state: a spike when eating, a rebound dip 1–2 h after a meal
                 var glucoseDelta = isEating ? Config.BloodGlucoseEatingGain * h : 0.0;
                 var postMealHours = isEating ? 0.0 : nut.PostMealHours + h;
