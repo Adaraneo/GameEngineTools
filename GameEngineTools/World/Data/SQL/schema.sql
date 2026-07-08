@@ -98,12 +98,14 @@ CREATE TABLE IF NOT EXISTS Affordances (
 -- All gain columns are nullable: NULL means "use engine config default".
 
 CREATE TABLE IF NOT EXISTS NutritionalProfiles (
-    ObjectId      TEXT PRIMARY KEY REFERENCES WorldObjects(Id) ON DELETE CASCADE,
-    CalorieGain   REAL DEFAULT NULL,
-    ProteinGain   REAL DEFAULT NULL,
-    IronGain      REAL DEFAULT NULL,
-    VitaminDGain  REAL DEFAULT NULL,
-    HydrationGain REAL DEFAULT NULL
+    ObjectId          TEXT PRIMARY KEY REFERENCES WorldObjects(Id) ON DELETE CASCADE,
+    CalorieGain       REAL DEFAULT NULL,
+    ProteinGain       REAL DEFAULT NULL,
+    IronGain          REAL DEFAULT NULL,
+    VitaminDGain      REAL DEFAULT NULL,
+    HydrationGain     REAL DEFAULT NULL,
+    HemeIronFraction  REAL DEFAULT NULL,
+    VitaminCMilligrams REAL DEFAULT NULL
 );
 
 -- ── Indexes ───────────────────────────────────────────────────────────────────

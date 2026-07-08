@@ -751,7 +751,8 @@ namespace GameEngineTools.World.Data
 
             using (var cmd = CreateCommand(
                 $"""
-                SELECT ObjectId, CalorieGain, ProteinGain, IronGain, VitaminDGain, HydrationGain
+                SELECT ObjectId, CalorieGain, ProteinGain, IronGain, VitaminDGain, HydrationGain,
+                       HemeIronFraction, VitaminCMilligrams
                 FROM NutritionalProfiles
                 WHERE ObjectId IN ({inClause})
                 """,
@@ -765,7 +766,9 @@ namespace GameEngineTools.World.Data
                         ProteinGain: reader.IsDBNull(2) ? null : reader.GetDouble(2),
                         IronGain: reader.IsDBNull(3) ? null : reader.GetDouble(3),
                         VitaminDGain: reader.IsDBNull(4) ? null : reader.GetDouble(4),
-                        HydrationGain: reader.IsDBNull(5) ? null : reader.GetDouble(5));
+                        HydrationGain: reader.IsDBNull(5) ? null : reader.GetDouble(5),
+                        HemeIronFraction: reader.IsDBNull(6) ? null : reader.GetDouble(6),
+                        VitaminCMilligrams: reader.IsDBNull(7) ? null : reader.GetDouble(7));
                 }
             }
 
@@ -844,9 +847,10 @@ namespace GameEngineTools.World.Data
 
             const string sql = """
                 INSERT OR REPLACE INTO NutritionalProfiles
-                    (ObjectId, CalorieGain, ProteinGain, IronGain, VitaminDGain, HydrationGain)
+                    (ObjectId, CalorieGain, ProteinGain, IronGain, VitaminDGain, HydrationGain,
+                     HemeIronFraction, VitaminCMilligrams)
                 VALUES
-                    (@id, @cal, @prot, @iron, @vitd, @hydra)
+                    (@id, @cal, @prot, @iron, @vitd, @hydra, @heme, @vitc)
                 """;
 
             ExecuteNonQuery(sql,
@@ -855,7 +859,9 @@ namespace GameEngineTools.World.Data
                 ("@prot", (object?)profile.ProteinGain ?? DBNull.Value),
                 ("@iron", (object?)profile.IronGain ?? DBNull.Value),
                 ("@vitd", (object?)profile.VitaminDGain ?? DBNull.Value),
-                ("@hydra", (object?)profile.HydrationGain ?? DBNull.Value));
+                ("@hydra", (object?)profile.HydrationGain ?? DBNull.Value),
+                ("@heme", (object?)profile.HemeIronFraction ?? DBNull.Value),
+                ("@vitc", (object?)profile.VitaminCMilligrams ?? DBNull.Value));
         }
 
         #endregion Private helpers — write operations

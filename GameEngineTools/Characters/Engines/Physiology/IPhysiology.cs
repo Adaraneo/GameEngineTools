@@ -919,7 +919,22 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Vitamin D restored per hour.</summary>
         double? VitaminDGain = null,
         /// <summary>Thirst reduced per hour (for drink objects).</summary>
-        double? HydrationGain = null);
+        double? HydrationGain = null,
+        /// <summary>
+        /// Fraction of <see cref="IronGain"/> that is heme iron (0..1). Heme iron absorption is not
+        /// enhanced by vitamin C. Defaults to 0 (fully non-heme) when unspecified — safe default for
+        /// plant-derived foods, which make up most of the current seed catalog.
+        /// </summary>
+        /// <remarks>
+        /// Source: Monsen ER, J Am Diet Assoc 1988;88(7):786-790, PMID 3290310 — heme iron is ~40% of
+        /// total iron in meat/fish/poultry tissue.
+        /// </remarks>
+        double? HemeIronFraction = null,
+        /// <summary>
+        /// Vitamin C content of this food item, in milligrams per serving. Used to compute the
+        /// single-meal non-heme iron absorption multiplier. Null/0 = no enhancement.
+        /// </summary>
+        double? VitaminCMilligrams = null);
 
     /// <summary>Category of a physical injury.</summary>
     public enum InjuryType

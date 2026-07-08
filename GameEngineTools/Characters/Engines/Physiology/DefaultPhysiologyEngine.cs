@@ -296,8 +296,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 // highest in the morning, not overnight.
                 // Source: Kemna EHJM et al., Clin Chem 2007;53(4):620-628 (primary study)
                 // Source: Schaap CCM et al., Clin Chem 2013;59(3):527-535, DOI 10.1373/clinchem.2012.194977 (primary study)
+                // Vitamin C co-ingested in the same meal boosts absorption of the non-heme iron
+                // portion only (single-meal effect; see NutritionMath). Heme iron is unaffected.
                 var ironDelta = isEating
-                    ? (nutProfile?.IronGain ?? Config.IronEatingGainPerHour) * h
+                    ? NutritionMath.ComputeEffectiveIronGain(
+                          nutProfile?.IronGain ?? Config.IronEatingGainPerHour,
+                          nutProfile?.HemeIronFraction ?? 0.0,
+                          nutProfile?.VitaminCMilligrams ?? 0.0) * h
                     : -Config.IronDecayPerHour * h;
                 // Glycemic state: a spike when eating, a rebound dip 1–2 h after a meal
                 var glucoseDelta = isEating ? Config.BloodGlucoseEatingGain * h : 0.0;

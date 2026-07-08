@@ -167,9 +167,11 @@ namespace GameEngineTools.World.Data
                 {
                     sb.AppendLine(
                         $"INSERT OR IGNORE INTO NutritionalProfiles " +
-                        $"(ObjectId, CalorieGain, ProteinGain, IronGain, VitaminDGain, HydrationGain) VALUES " +
+                        $"(ObjectId, CalorieGain, ProteinGain, IronGain, VitaminDGain, HydrationGain, " +
+                        $"HemeIronFraction, VitaminCMilligrams) VALUES " +
                         $"({Str(obj.Id)}, {N(np.CalorieGain)}, {N(np.ProteinGain)}, " +
-                        $"{N(np.IronGain)}, {N(np.VitaminDGain)}, {N(np.HydrationGain)});");
+                        $"{N(np.IronGain)}, {N(np.VitaminDGain)}, {N(np.HydrationGain)}, " +
+                        $"{N(np.HemeIronFraction)}, {N(np.VitaminCMilligrams)});");
                 }
             }
         }

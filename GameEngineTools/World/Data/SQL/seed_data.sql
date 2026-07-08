@@ -341,11 +341,14 @@ VALUES
 --   Source: Mattila P et al., J Agric Food Chem 1995;43(9):2394-2399, DOI 10.1021/jf00057a015.
 --
 -- IRON SCIENCE NOTE:
---   Heme iron (meat, fish) is 2–3× more bioavailable than non-heme (plants).
+--   Heme iron (meat, fish) is 2–3× more bioavailable than non-heme (plants) and is NOT
+--   enhanced by vitamin C — tracked via the HemeIronFraction column (~0.4 for animal tissue).
 --   Dark rye bread and legumes contain non-heme iron but also phytates that
 --   reduce absorption — modeled via lower IronGain despite similar raw content.
---   Vitamin C (berries, kale) enhances non-heme iron absorption — not yet
---   modeled in the engine but a candidate for future PhysiologyEngine work.
+--   Vitamin C (berries, kale, watercress) enhances single-meal non-heme iron absorption —
+--   now modeled via the VitaminCMilligrams column (see NutritionMath.ComputeEffectiveIronGain).
+--   The enhancement is a per-meal effect only; the chronic effect on iron stores is negligible.
+--   Source: Cook JD & Reddy MB, Am J Clin Nutr 2001;73(1):93-98.
 -- ══════════════════════════════════════════════════════════════════════════════
  
 INSERT OR IGNORE INTO NutritionalProfiles
@@ -415,7 +418,7 @@ VALUES
     ('forest_mushrooms_01', 10.0,  3.0,  2.5, 18.0,  10.0),  -- VitD: ergocalciferol (D2)
     ('forest_mushrooms_02', 10.0,  3.0,  2.5, 18.0,  10.0),
     ('forest_mushrooms_03', 10.0,  3.0,  2.5, 18.0,  10.0),
-    ('forest_berries_01',   15.0,  0.8,  1.5, NULL,  25.0),  -- berries: VitC (not modeled yet)
+    ('forest_berries_01',   15.0,  0.8,  1.5, NULL,  25.0),  -- berries: VitC set below (boosts non-heme iron)
     ('forest_berries_02',   15.0,  0.8,  1.5, NULL,  25.0),
     ('forest_nuts_01',      28.0,  5.0,  2.0, NULL,   3.0),  -- nuts: fat and protein
     ('forest_stream_01',     2.0, NULL,  NULL, NULL,  88.0),
@@ -446,6 +449,22 @@ VALUES
     ('mountain_jerky_02',  55.0, 42.0, 12.0, NULL,   1.0),
     ('mountain_berries_01',10.0,  0.5,  1.0, NULL,  18.0),
     ('mountain_snow_01',    1.0, NULL,  NULL, NULL,  80.0);  -- melted snow: cold but hydrating
+
+-- ── Heme iron fraction (meat/fish sources) ──────────────────────────────────────
+-- HemeIronFraction ~0.4: heme is ~40% of animal-tissue iron and is NOT enhanced by vitamin C.
+-- Source: Monsen ER, J Am Diet Assoc 1988;88(7):786-790, PMID 3290310
+UPDATE NutritionalProfiles SET HemeIronFraction = 0.4 WHERE ObjectId IN (
+    'tavern_roast_01','tavern_roast_02','castle_salted_meat_01','castle_salted_meat_02',
+    'castle_dried_fish_01','castle_dried_fish_02','river_fish_01','river_fish_02','river_fish_03',
+    'mountain_jerky_01','mountain_jerky_02'
+);
+
+-- ── Vitamin C content (enhances single-meal non-heme iron absorption) ────────────
+-- ⚠ VERIFY: these per-serving mg values are gameplay approximations, NOT peer-review-verified
+-- in this pass. Do not add to CoefficientAudit until a food-composition literature pass confirms them.
+UPDATE NutritionalProfiles SET VitaminCMilligrams = 15 WHERE ObjectId IN ('forest_berries_01','forest_berries_02','mountain_berries_01');  -- ⚠ VERIFY
+UPDATE NutritionalProfiles SET VitaminCMilligrams = 20 WHERE ObjectId IN ('herb_garden_kale_01','herb_garden_kale_02');  -- ⚠ VERIFY
+UPDATE NutritionalProfiles SET VitaminCMilligrams = 25 WHERE ObjectId = 'river_cress_01';  -- ⚠ VERIFY
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- NON-FOOD WORLD OBJECTS — Rest, Work, Entertainment, Warmth, MoodBoost
