@@ -69,6 +69,43 @@ namespace EngineTests
         }
 
         /// <summary>
+        /// An explicit month-length array and the Gregorian leap flag bind from config (including the
+        /// JSON array indices) and produce a faithful Earth calendar — February gains its leap day and
+        /// the 4/100/400 century rule applies.
+        /// </summary>
+        [TestMethod]
+        public void Calendar_GregorianEarth_BindsFromConfig()
+        {
+            var cfg = BuildConfig(new Dictionary<string, string?>
+            {
+                ["World:Universe:PlanetSiderealRotationHrs"] = "23.9345",
+                ["World:Calendar:UseGregorianLeap"]          = "true",
+                ["World:Calendar:LeapExtraDays"]             = "1",
+                ["World:Calendar:LeapMonth"]                 = "2",
+                ["World:Calendar:MonthLengths:0"]            = "31",
+                ["World:Calendar:MonthLengths:1"]            = "28",
+                ["World:Calendar:MonthLengths:2"]            = "31",
+                ["World:Calendar:MonthLengths:3"]            = "30",
+                ["World:Calendar:MonthLengths:4"]            = "31",
+                ["World:Calendar:MonthLengths:5"]            = "30",
+                ["World:Calendar:MonthLengths:6"]            = "31",
+                ["World:Calendar:MonthLengths:7"]            = "31",
+                ["World:Calendar:MonthLengths:8"]            = "30",
+                ["World:Calendar:MonthLengths:9"]            = "31",
+                ["World:Calendar:MonthLengths:10"]           = "30",
+                ["World:Calendar:MonthLengths:11"]           = "31",
+            });
+
+            var spec = GameEngineToolsRuntime.BuildSpecFromConfiguration(cfg);
+
+            Assert.AreEqual(24, spec.HoursPerDay);
+            Assert.AreEqual(28, spec.Calendar.DaysInMonth(2023, 2));
+            Assert.AreEqual(29, spec.Calendar.DaysInMonth(2024, 2));
+            Assert.AreEqual(365L, spec.Calendar.DaysInYear(1900));
+            Assert.AreEqual(366L, spec.Calendar.DaysInYear(2000));
+        }
+
+        /// <summary>
         /// Missing Universe and Calendar sections fall back to record defaults (Earth/Sol + 12-month
         /// year) rather than throwing — a safe baseline for a minimally-configured host.
         /// </summary>

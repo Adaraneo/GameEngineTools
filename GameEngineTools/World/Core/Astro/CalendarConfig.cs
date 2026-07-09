@@ -12,13 +12,16 @@ using GameEngineTools.Universe;
 /// how time is subdivided, and the leap rule.
 /// </summary>
 public sealed record CalendarConfig(
-    int  MonthCount       = 12,
-    int  TargetYearDays   = 0,            // 0 = derive the year length from the orbit
-    long TicksPerSecond   = 10_000_000,
-    int  MinutesPerHour   = 60,
-    int  SecondsPerMinute = 60,
-    int  LeapYearInterval = 0,            // 0 = no leap years
-    int  LeapExtraDays    = 0)
+    int    MonthCount       = 12,
+    int    TargetYearDays   = 0,          // 0 = derive the year length from the orbit
+    long   TicksPerSecond   = 10_000_000,
+    int    MinutesPerHour   = 60,
+    int    SecondsPerMinute = 60,
+    int    LeapYearInterval = 0,          // 0 = no interval-based leap years
+    int    LeapExtraDays    = 0,
+    int[]? MonthLengths     = null,       // null = derive months by even division
+    bool   UseGregorianLeap = false,      // true = Gregorian 4/100/400 rule
+    int    LeapMonth        = 0)          // 0 = last month; 2 = February (Gregorian)
 {
     /// <summary>Default constructor — a 12-month year derived from the orbit, no leap years.</summary>
     public CalendarConfig() : this(12) { }
@@ -31,5 +34,8 @@ public sealed record CalendarConfig(
         SecondsPerMinute: SecondsPerMinute,
         TicksPerSecond:   TicksPerSecond,
         LeapYearInterval: LeapYearInterval,
-        LeapExtraDays:    LeapExtraDays);
+        LeapExtraDays:    LeapExtraDays,
+        MonthLengths:     MonthLengths,
+        UseGregorianLeap: UseGregorianLeap,
+        LeapMonth:        LeapMonth > 0 ? LeapMonth : null);
 }

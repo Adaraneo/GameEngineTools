@@ -104,6 +104,36 @@ namespace EngineTests
             Assert.AreEqual(41, spec.Calendar.DaysInMonth(4, 10)); // last month, leap: 36 + 5
         }
 
+        /// <summary>
+        /// An explicit <see cref="CalendarOptions.MonthLengths"/> array with the Gregorian leap rule
+        /// and a February leap month reproduces the real Earth calendar: irregular month lengths, the
+        /// 4/100/400 century rule, and the leap day landing in February (not the last month).
+        /// </summary>
+        [TestMethod]
+        public void Build_WithGregorianCalendar_MatchesRealEarth()
+        {
+            var options = new CalendarOptions(
+                MonthLengths:     new[] { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 },
+                UseGregorianLeap: true,
+                LeapExtraDays:    1,
+                LeapMonth:        2);
+
+            var spec = PlanetaryCalendarFactory.Build(
+                PlanetConfig.Earth, OrbitalElements.Earth, StarPhysics.Sol, options);
+
+            Assert.AreEqual(24, spec.HoursPerDay);                    // Earth rotation 23.9345 → 24
+            Assert.AreEqual(12, spec.Calendar.MonthsInYear(1));
+            Assert.AreEqual(31, spec.Calendar.DaysInMonth(2023, 1)); // January
+            Assert.AreEqual(28, spec.Calendar.DaysInMonth(2023, 2)); // February, common year
+            Assert.AreEqual(29, spec.Calendar.DaysInMonth(2024, 2)); // February, leap year
+            Assert.AreEqual(31, spec.Calendar.DaysInMonth(2024, 12));// December unchanged in a leap year
+
+            Assert.AreEqual(365L, spec.Calendar.DaysInYear(2023));   // common
+            Assert.AreEqual(366L, spec.Calendar.DaysInYear(2024));   // leap (÷4)
+            Assert.AreEqual(365L, spec.Calendar.DaysInYear(1900));   // century, not ÷400 → common
+            Assert.AreEqual(366L, spec.Calendar.DaysInYear(2000));   // ÷400 → leap
+        }
+
         /// <summary>Time subdivisions flow through from <see cref="CalendarOptions"/> to the spec.</summary>
         [TestMethod]
         public void Build_CarriesTimeSubdivisions()

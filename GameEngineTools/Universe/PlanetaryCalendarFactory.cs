@@ -37,28 +37,36 @@ public static class PlanetaryCalendarFactory
         // Retrograde rotation (negative period) still yields a positive day length.
         var hoursPerDay = Math.Max(1, (int)Math.Round(Math.Abs(planet.SiderealRotationHrs)));
 
-        // ── Year length ────────────────────────────────────────────────────────
-        int daysInYear;
-        if (options.TargetYearDays is { } target)
+        // ── Months ─────────────────────────────────────────────────────────────
+        // An explicit month layout (e.g. Gregorian 31/28/31/…) wins; otherwise the year length
+        // (explicit or derived from the orbit) is divided evenly across MonthCount months.
+        int[] monthLengths;
+        if (options.MonthLengths is { Length: > 0 } explicitMonths)
         {
-            daysInYear = target;
+            monthLengths = explicitMonths;
         }
         else
         {
-            var secondsPerWorldDay = (double)hoursPerDay * options.MinutesPerHour * options.SecondsPerMinute;
-            var orbitalPeriodSec   = orbit.OrbitalPeriodSeconds(star.GravitationalParameter);
-            daysInYear = (int)Math.Round(orbitalPeriodSec / secondsPerWorldDay);
+            int daysInYear;
+            if (options.TargetYearDays is { } target)
+            {
+                daysInYear = target;
+            }
+            else
+            {
+                var secondsPerWorldDay = (double)hoursPerDay * options.MinutesPerHour * options.SecondsPerMinute;
+                var orbitalPeriodSec   = orbit.OrbitalPeriodSeconds(star.GravitationalParameter);
+                daysInYear = (int)Math.Round(orbitalPeriodSec / secondsPerWorldDay);
+            }
+
+            // A calendar needs at least one day per month; clamp degenerate inputs.
+            daysInYear   = Math.Max(options.MonthCount, daysInYear);
+            monthLengths = BuildMonthLengths(daysInYear, options.MonthCount);
         }
 
-        // A calendar needs at least one day per month; clamp degenerate inputs.
-        daysInYear = Math.Max(options.MonthCount, daysInYear);
-
-        // ── Months ─────────────────────────────────────────────────────────────
-        var monthLengths = BuildMonthLengths(daysInYear, options.MonthCount);
-        var leapExtra = options.LeapYearInterval > 0
-            ? new Func<int, int>(y => y % options.LeapYearInterval == 0 ? options.LeapExtraDays : 0)
-            : _ => 0;
-        var calendar = new FixedMonthsCalendar(monthLengths, leapExtra);
+        // ── Leap rule ────────────────────────────────────────────────────────────
+        var leapExtra = BuildLeapRule(options);
+        var calendar  = new FixedMonthsCalendar(monthLengths, leapExtra, options.LeapMonth);
 
         return new WorldTimeSpec(
             options.TicksPerSecond,
@@ -66,6 +74,21 @@ public static class PlanetaryCalendarFactory
             options.MinutesPerHour,
             hoursPerDay,
             calendar);
+    }
+
+    /// <summary>
+    /// Builds the per-year leap-day function: the Gregorian rule (every 4th year, except centuries
+    /// not divisible by 400) when requested, otherwise a fixed interval, otherwise none.
+    /// </summary>
+    private static Func<int, int> BuildLeapRule(CalendarOptions options)
+    {
+        if (options.UseGregorianLeap)
+            return y => (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? options.LeapExtraDays : 0;
+
+        if (options.LeapYearInterval > 0)
+            return y => y % options.LeapYearInterval == 0 ? options.LeapExtraDays : 0;
+
+        return _ => 0;
     }
 
     /// <summary>

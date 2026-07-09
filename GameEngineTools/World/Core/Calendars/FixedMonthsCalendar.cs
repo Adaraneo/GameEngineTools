@@ -5,21 +5,32 @@ namespace GameEngineTools.World.Core.Calendars
 {
     /// <summary>
     /// An <see cref="IWorldCalendar"/> with a fixed list of month lengths and an optional per-year
-    /// number of extra "epagomenal" leap days appended to the final month.
+    /// number of extra "epagomenal" leap days added to a chosen month (the last month by default,
+    /// or e.g. February for a Gregorian-style calendar).
     /// </summary>
     public sealed class FixedMonthsCalendar : IWorldCalendar
     {
         private readonly Func<int, int> _leapExtraDays;
         private readonly int[] _months;                // e.g. {36,36,36,36,36,36,36,36,36,36} (10×36)
                                                        // returns the number of leap ("epagomenal") days in the given year
+        private readonly int _leapMonth;               // 1-based month that receives the leap days
 
         /// <summary>Creates a calendar from fixed month lengths and a leap-day function.</summary>
         /// <param name="months">Length of each month (the array length is the months-per-year).</param>
-        /// <param name="leapExtraDays">Returns the number of extra days appended to the last month for a given year.</param>
-        public FixedMonthsCalendar(int[] months, Func<int, int> leapExtraDays)
+        /// <param name="leapExtraDays">Returns the number of extra days added to the leap month for a given year.</param>
+        /// <param name="leapMonth">
+        /// 1-based month that receives the leap days. <c>null</c> defaults to the last month
+        /// (epagomenal style); pass <c>2</c> for a Gregorian February leap day.
+        /// </param>
+        public FixedMonthsCalendar(int[] months, Func<int, int> leapExtraDays, int? leapMonth = null)
         {
             _months = (int[])months.Clone();
             _leapExtraDays = leapExtraDays;
+            _leapMonth = leapMonth ?? _months.Length;
+
+            if (_leapMonth < 1 || _leapMonth > _months.Length)
+                throw new ArgumentOutOfRangeException(nameof(leapMonth), _leapMonth,
+                    "Leap month must be between 1 and the number of months.");
         }
 
         /// <inheritdoc/>
@@ -95,7 +106,7 @@ namespace GameEngineTools.World.Core.Calendars
             }
 
             var days = _months[month - 1];
-            if (month == _months.Length)
+            if (month == _leapMonth)
             {
                 days += _leapExtraDays(year);
             }
