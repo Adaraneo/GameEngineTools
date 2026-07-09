@@ -47,7 +47,7 @@ namespace EngineTests
     /// <para>
     /// <b>DI dependency order:</b>
     /// <code>
-    /// InitWorldClockConfig (appsettings)
+    /// World:Universe + World:Calendar (appsettings.World.json)
     ///   → WorldTimeSpec      (singleton)
     ///   → IWorldClock        (singleton)
     ///   → IClock / TestClock (singleton — takes WorldTimeSpec directly)
@@ -226,30 +226,13 @@ namespace EngineTests
 
             // ── Configuration ─────────────────────────────────────────────────
             var cprovider = Config.ConfigProvider.Configuration;
-            var useWorldType = cprovider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             services.AddSingleton<IConfiguration>(cprovider);
 
-            services.AddOptionsWithValidateOnStart<InitWorldClockConfig>()
-                    .Configure<IConfiguration>((opt, cfg) =>
-                    {
-                        opt.DaysInMonths = Array.Empty<int>();
-                        cfg.GetSection($"InitWorldClock:{useWorldType}").Bind(opt);
-                    });
-
             // ── WorldTimeSpec — singleton ──────────────────────────────────────
-            services.AddSingleton<WorldTimeSpec>(sp =>
-            {
-                var opts = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
-                var calendar = new FixedMonthsCalendar(
-                    opts.DaysInMonths,
-                    y => y % opts.LeapYearInterval == 0 ? opts.LeapExtraDays : 0);
-                return new WorldTimeSpec(
-                    opts.TicksPerSecond,
-                    opts.SecondsPerMinute,
-                    opts.MinutesPerHour,
-                    opts.HoursPerDay,
-                    calendar);
-            });
+            // Derived from World:Universe (planet rotation → day length, orbit → year length) +
+            // World:Calendar (month/time/leap overlay), the same path the runtime uses.
+            services.AddSingleton<WorldTimeSpec>(
+                _ => GameEngineToolsRuntime.BuildSpecFromConfiguration(cprovider));
 
             services.AddSingleton<IWorldClock>(sp =>
             {

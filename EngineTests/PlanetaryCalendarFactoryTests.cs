@@ -80,10 +80,9 @@ namespace EngineTests
         }
 
         /// <summary>
-        /// Reproduces the hand-authored <c>InitWorldClock:VIWorld</c> calendar exactly (Vigilia
-        /// Insectianis: 26-hour day, ten 36-day months, 10M ticks/second, and a leap year every
-        /// fourth year adding five days to the last month). This is the guarantee that switching a
-        /// world onto the physics-derived spec keeps its calendar — and its persisted time — intact.
+        /// Produces the Vigilia Insectianis calendar the simulation runs on: a 26-hour day, ten
+        /// 36-day months, 10M ticks/second, and a leap year every fourth year adding five days to
+        /// the last month.
         /// </summary>
         [TestMethod]
         public void Build_ReproducesVigiliaInsectianisExactly()

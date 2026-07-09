@@ -56,19 +56,7 @@ public sealed record UniverseConfig(
     double RingInnerRadiusKm = 0.0,
     double RingOuterRadiusKm = 0.0,
     double RingMeanOpticalDepth = 1.0,
-    double RingAlbedo = 0.7,
-
-    // ── Calendar overlay ─────────────────────────────────────────────────────
-    // When UseAsCalendarSource is true, the runtime derives WorldTimeSpec from this section
-    // (via PlanetaryCalendarFactory) instead of the hand-authored InitWorldClock section.
-    bool UseAsCalendarSource   = false,
-    int  CalendarMonthCount    = 12,
-    int  CalendarTargetYearDays = 0,          // 0 = derive the year length from the orbit
-    long CalendarTicksPerSecond = 10_000_000,
-    int  CalendarMinutesPerHour = 60,
-    int  CalendarSecondsPerMinute = 60,
-    int  CalendarLeapYearInterval = 0,        // 0 = no leap years
-    int  CalendarLeapExtraDays  = 0)
+    double RingAlbedo = 0.7)
 {
     /// <summary>Default constructor — Earth/Sol values, with no moon or rings.</summary>
     public UniverseConfig() : this(
@@ -104,15 +92,7 @@ public sealed record UniverseConfig(
         RingInnerRadiusKm: 0.0,
         RingOuterRadiusKm: 0.0,
         RingMeanOpticalDepth: 1.0,
-        RingAlbedo: 0.7,
-        UseAsCalendarSource: false,
-        CalendarMonthCount: 12,
-        CalendarTargetYearDays: 0,
-        CalendarTicksPerSecond: 10_000_000,
-        CalendarMinutesPerHour: 60,
-        CalendarSecondsPerMinute: 60,
-        CalendarLeapYearInterval: 0,
-        CalendarLeapExtraDays: 0)
+        RingAlbedo: 0.7)
     { }
 
     /// <summary>Builds <see cref="StarPhysics"/> from the flat properties.</summary>
@@ -200,14 +180,4 @@ public sealed record UniverseConfig(
             new[] { new RingBand("Main", RingInnerRadiusKm, RingOuterRadiusKm,
                                  RingMeanOpticalDepth, RingAlbedo) });
     }
-
-    /// <summary>Builds the <see cref="CalendarOptions"/> cultural overlay from the flat properties.</summary>
-    public CalendarOptions ToCalendarOptions() => new(
-        MonthCount:       CalendarMonthCount,
-        TargetYearDays:   CalendarTargetYearDays > 0 ? CalendarTargetYearDays : null,
-        MinutesPerHour:   CalendarMinutesPerHour,
-        SecondsPerMinute: CalendarSecondsPerMinute,
-        TicksPerSecond:   CalendarTicksPerSecond,
-        LeapYearInterval: CalendarLeapYearInterval,
-        LeapExtraDays:    CalendarLeapExtraDays);
 }

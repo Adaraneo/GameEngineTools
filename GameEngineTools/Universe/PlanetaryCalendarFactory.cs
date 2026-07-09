@@ -7,10 +7,9 @@ using GameEngineTools.World.Core.Calendars;
 using GameEngineTools.World.Core.Time;
 
 /// <summary>
-/// Builds a <see cref="WorldTimeSpec"/> from the physical parameters of a planet and its star,
-/// replacing hand-authored <c>InitWorldClock</c> configuration. The day length comes from the
-/// planet's rotation, the year length from its orbit (or an explicit override), and the
-/// division into months from <see cref="CalendarOptions"/>.
+/// Builds a <see cref="WorldTimeSpec"/> from the physical parameters of a planet and its star.
+/// The day length comes from the planet's rotation, the year length from its orbit (or an explicit
+/// override), and the division into months from <see cref="CalendarOptions"/>.
 /// </summary>
 public static class PlanetaryCalendarFactory
 {
