@@ -16,6 +16,8 @@ using GameEngineTools.Config;
 using GameEngineTools.Constants;
 using GameEngineTools.FileSystem;
 using GameEngineTools.Logging;
+using GameEngineTools.Universe;
+using GameEngineTools.World.Core.Astro;
 using GameEngineTools.World.Core.Calendars;
 using GameEngineTools.World.Core.Time;
 using GameEngineTools.World.Data;
@@ -86,13 +88,47 @@ namespace GameEngineTools
         /// </remarks>
         /// <returns>A fully built <see cref="WorldTimeSpec"/> from the current configuration.</returns>
         public static WorldTimeSpec LoadSpec()
+            => BuildSpecFromConfiguration(ConfigProvider.Configuration);
+
+        /// <summary>
+        /// Builds a <see cref="WorldTimeSpec"/> from the physical parameters of a planetary system,
+        /// instead of hand-authored <c>InitWorldClock</c> values. The day length follows the planet's
+        /// rotation and the year length its orbit; <see cref="CalendarOptions"/> supplies the cultural
+        /// overlay (month count, time subdivisions, optional exact year length).
+        /// </summary>
+        /// <remarks>
+        /// Low-level entry point. In the running app the source is chosen automatically by
+        /// <see cref="BuildSpecFromConfiguration"/> based on the <c>World:Universe:UseAsCalendarSource</c> flag.
+        /// </remarks>
+        public static WorldTimeSpec BuildSpec(
+            PlanetConfig planet,
+            OrbitalElements orbit,
+            StarPhysics star,
+            CalendarOptions? options = null)
+            => PlanetaryCalendarFactory.Build(planet, orbit, star, options);
+
+        /// <summary>
+        /// Builds the world time specification from configuration, choosing the source automatically:
+        /// when <c>World:Universe:UseAsCalendarSource</c> is <c>true</c> the calendar is derived from the
+        /// planetary system (<see cref="PlanetaryCalendarFactory"/>); otherwise the hand-authored
+        /// <c>InitWorldClock</c> section is used. Shared by <see cref="LoadSpec"/> and the DI registration
+        /// so both always agree.
+        /// </summary>
+        internal static WorldTimeSpec BuildSpecFromConfiguration(IConfiguration cfg)
         {
-            // Load the configuration the same way as StartAsync,
-            // so the spec is guaranteed identical — no duplicated values.
-            var cfg = ConfigProvider.Configuration;
+            var universe = cfg.GetSection("World:Universe").Get<UniverseConfig>();
+            if (universe is { UseAsCalendarSource: true })
+            {
+                return BuildSpec(
+                    universe.ToPlanetConfig(),
+                    universe.ToOrbitalElements(),
+                    universe.ToStarPhysics(),
+                    universe.ToCalendarOptions());
+            }
+
+            // Fallback: hand-authored InitWorldClock section.
             var worldType = cfg.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
-            var opts = new InitWorldClockConfig();
-            opts.DaysInMonths = Array.Empty<int>();
+            var opts = new InitWorldClockConfig { DaysInMonths = Array.Empty<int>() };
             cfg.GetSection($"InitWorldClock:{worldType}").Bind(opts);
 
             var calendar = new FixedMonthsCalendar(
@@ -152,31 +188,12 @@ namespace GameEngineTools
 
             // ── Konfigurace ───────────────────────────────────────────────────
             var configProvider = ConfigProvider.Configuration;
-            var worldTypeConfig = configProvider.GetSection("InitWorldClock").GetValue<string>("UseWorldType");
             services.AddSingleton<IConfiguration>(configProvider);
 
-            services.AddOptionsWithValidateOnStart<InitWorldClockConfig>()
-                    .Configure<IConfiguration>((opt, cfg) =>
-                    {
-                        opt.DaysInMonths = Array.Empty<int>();
-                        cfg.GetSection($"InitWorldClock:{worldTypeConfig}").Bind(opt);
-                    });
-
             // ── WorldTimeSpec — singleton ─────────────────────────────────────
-            services.AddSingleton<WorldTimeSpec>(sp =>
-            {
-                var opts = sp.GetRequiredService<IOptions<InitWorldClockConfig>>().Value;
-                var calendar = new FixedMonthsCalendar(
-                    opts.DaysInMonths,
-                    y => y % opts.LeapYearInterval == 0 ? opts.LeapExtraDays : 0);
-
-                return new WorldTimeSpec(
-                    opts.TicksPerSecond,
-                    opts.SecondsPerMinute,
-                    opts.MinutesPerHour,
-                    opts.HoursPerDay,
-                    calendar);
-            });
+            // Source chosen by BuildSpecFromConfiguration: physics-derived (World:Universe) when
+            // UseAsCalendarSource is set, otherwise the hand-authored InitWorldClock section.
+            services.AddSingleton<WorldTimeSpec>(_ => BuildSpecFromConfiguration(configProvider));
 
             // ── IWorldClock — Earth time → World time mapping ─────────────────
             services.AddSingleton<IWorldClock>(sp =>
