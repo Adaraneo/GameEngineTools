@@ -348,9 +348,13 @@ Active `Characters:*` sections: `Physiology`, `MenstrualCycle`, `Psychology`, `B
 `SelfConcept`, `Interests`, `Lod` (decision cadence per LOD tier), `Fidelity` (memory/perception/
 social fidelity per tier).
 
-`World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude), `Universe` (full
-star/planet/moon/ring definition). The world clock/calendar is configured under `InitWorldClock`
-(default calendar — Vigilia Insectianis: 10 months × 36 days × 26 hours).
+`World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude & thermal lag),
+`Universe` (full star/planet/moon/ring definition), and `Calendar` (cultural overlay: month count,
+target year length, time subdivisions, leap rule). The world clock/calendar is **derived from
+physics** — `PlanetaryCalendarFactory` builds the `WorldTimeSpec` from `World:Universe` (planet
+sidereal rotation → hours-per-day, orbit → year length) plus the `World:Calendar` overlay; there is
+no separate `InitWorldClock` section. The default template is Earth; the sandbox ships an alternate
+"Vigilia Insectianis" world (26-hour day, 10 months, 360-day year, +5 leap days every 4 years).
 
 ---
 
