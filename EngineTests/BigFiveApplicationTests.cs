@@ -143,7 +143,7 @@ namespace EngineTests
             var proposer = new HumanId(Guid.NewGuid());
             for (var i = 0; i < 200; i++)
             {
-                var ev = new InteractionProposed(WDateTime.New(100, 1, 1), proposer, ctxHighA.Id, SpeechAct.SmallTalk, "test", null);
+                var ev = InteractionProposed.Of(WDateTime.New(100, 1, 1), proposer, ctxHighA.Id, RelationalActKind.SmallTalk);
                 engineHighA.Handle(ev, ctxHighA, outboxH);
                 engineLowA.Handle(ev, ctxLowA, outboxL);
             }

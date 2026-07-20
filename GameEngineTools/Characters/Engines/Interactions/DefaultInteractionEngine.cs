@@ -196,7 +196,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         ///   <item>Misattribution: stress causes misreading of intents</item>
         /// </list>
         /// <para>
-        /// <b>Important:</b> the <see cref="SpeechAct"/> is carried unchanged into the <see cref="InteractionOutcome"/>,
+        /// <b>Important:</b> the <see cref="RelationalActKind"/> is carried unchanged into the <see cref="InteractionOutcome"/>,
         /// so the <c>RelationshipsEngine</c> knows which domain to update.
         /// </para>
         /// </remarks>
@@ -212,7 +212,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
             var psych = ctx.Snapshot.Psychology;
             var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
-                .ExpectedAcceptance(p.From, p.Act, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
+                .ExpectedAcceptance(p.From, p.Content.SpeechAct.RelationalKind, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
 
             // Base acceptance probability — a linear combination of relationships and psychology
             // B4: Agreeableness modulates willingness to accept — high-A characters are more receptive
@@ -229,7 +229,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                         + (expectedAcceptance - 0.5) * 0.25
                         + agreeablenessBias;
 
-            if (p.Act == SpeechAct.Invite)
+            if (p.Content.SpeechAct.RelationalKind == RelationalActKind.Invite)
             {
                 baseP += SociosexualityBehaviorMath.InviteAcceptanceBias(
                     ctx.Personality.Sociosexuality,
@@ -248,7 +248,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             // Misattribution: higher stress + noise → greater chance of misreading the intent
             // E2: noise degrades social signal quality (harder to read intent correctly).
             var noise = double.IsNaN(State.Noise) ? 0.0 : State.Noise;
-            var misattrib = ComputeMisattributionPenalty(p.Act, psych.Stress, trust, comfort, State.HasPrivacy, noise);
+            var misattrib = ComputeMisattributionPenalty(p.Content.SpeechAct.RelationalKind, psych.Stress, trust, comfort, State.HasPrivacy, noise);
             baseP -= misattrib;
 
             // ── Norm violation appraisal (Sznycer 2016 / FAtiMA double-appraisal pattern) ─────────────
@@ -312,15 +312,15 @@ namespace GameEngineTools.Characters.Engines.Interactions
                     accepted ? "PŘIJATO" : "ODMÍTNUTO");
             }
 
-            // We carry p.Act — the RelationshipsEngine needs it for DomainBreakdown
-            var (peakVal, endVal) = ComputePeakEndValence(p.Act, accepted, misattrib);
+            // We carry p.Content.SpeechAct.RelationalKind — the RelationshipsEngine needs it for DomainBreakdown
+            var (peakVal, endVal) = ComputePeakEndValence(p.Content.SpeechAct.RelationalKind, accepted, misattrib);
             var outcome = new InteractionOutcome(
                 OccurredAt: p.OccurredAt,
                 From: p.From,
                 To: p.To,
                 Accepted: accepted,
                 Reason: accepted ? "accepted" : "declined",
-                Act: p.Act,
+                Act: p.Content.SpeechAct.RelationalKind,
                 FromBiology: p.FromBiology,
                 ToBiology: ctx.Biology,
                 PeakValence: peakVal,
@@ -387,7 +387,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 }
             }
 
-            if (accepted && p.Act == SpeechAct.Invite && HasSexualEncounterReadiness(p.OccurredAt, ctx, edge, expectedAcceptance))
+            if (accepted && p.Content.SpeechAct.RelationalKind == RelationalActKind.Invite && HasSexualEncounterReadiness(p.OccurredAt, ctx, edge, expectedAcceptance))
             {
                 var proposed = new SexualEncounterProposed(
                     p.OccurredAt,
@@ -409,7 +409,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         {
             ctx.Snapshot.Relationships.Edges.TryGetValue(proposed.From, out var edge);
             var expectedAcceptance = (ctx.Snapshot.SemanticMemory ?? SemanticMemoryState.Empty)
-                .ExpectedAcceptance(proposed.From, SpeechAct.Invite, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
+                .ExpectedAcceptance(proposed.From, RelationalActKind.Invite, edge, ctx.PsychologyProfile, ctx.Snapshot.Memory.Episodes);
             var accepted = ShouldResolveSexualEncounter(proposed.OccurredAt, ctx, edge, expectedAcceptance, proposed.FromBiology);
 
             outbox.Add(new SexualEncounterOutcome(
@@ -494,7 +494,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         }
 
         private double ComputeMisattributionPenalty(
-            SpeechAct act, double stress, double trust, double comfort, bool hasPrivacy,
+            RelationalActKind act, double stress, double trust, double comfort, bool hasPrivacy,
             double noise = 0.0)
         {
             var stressFactor = Math.Clamp(stress / 100.0, 0.0, 1.0);
@@ -502,10 +502,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var unsafeMultiplier = 0.45 + (1.0 - safety) * 1.10;
             var actMultiplier = act switch
             {
-                SpeechAct.Invite => 1.35,
-                SpeechAct.SelfDisclosure => 1.20,
-                SpeechAct.Meta => 1.10,
-                SpeechAct.SmallTalk or SpeechAct.Question => 0.70,
+                RelationalActKind.Invite => 1.35,
+                RelationalActKind.SelfDisclosure => 1.20,
+                RelationalActKind.Meta => 1.10,
+                RelationalActKind.SmallTalk or RelationalActKind.Question => 0.70,
                 _ => 1.0
             };
             var privacyRelief = hasPrivacy && safety >= 0.65 ? 0.78 : 1.0;
@@ -518,14 +518,14 @@ namespace GameEngineTools.Characters.Engines.Interactions
         }
 
         private static (double peak, double end) ComputePeakEndValence(
-            SpeechAct act, bool accepted, double misattribPenalty)
+            RelationalActKind act, bool accepted, double misattribPenalty)
         {
             if (accepted)
             {
                 var end = act switch
                 {
-                    SpeechAct.SelfDisclosure or SpeechAct.Validation or SpeechAct.Invite or SpeechAct.Meta => 0.85,
-                    SpeechAct.SmallTalk or SpeechAct.Humor or SpeechAct.Question => 0.50,
+                    RelationalActKind.SelfDisclosure or RelationalActKind.Validation or RelationalActKind.Invite or RelationalActKind.Meta => 0.85,
+                    RelationalActKind.SmallTalk or RelationalActKind.Humor or RelationalActKind.Question => 0.50,
                     _ => 0.40
                 };
                 return (1.0, end);

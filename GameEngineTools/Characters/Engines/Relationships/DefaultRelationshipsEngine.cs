@@ -407,9 +407,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         // Trust grows only through vulnerability and acknowledgement
                         var trustDelta = io.Act switch
                         {
-                            SpeechAct.SelfDisclosure => +2.5,   // sharing something personal → large trust jump
-                            SpeechAct.Validation => +1.5,   // feeling understood → medium jump
-                            SpeechAct.Meta => +0.5,   // comment about the relationship — slightly vulnerable
+                            RelationalActKind.SelfDisclosure => +2.5,   // sharing something personal → large trust jump
+                            RelationalActKind.Validation => +1.5,   // feeling understood → medium jump
+                            RelationalActKind.Meta => +0.5,   // comment about the relationship — slightly vulnerable
                             _ => 0.0    // SmallTalk, Humor etc. do not build trust
                         };
 
@@ -418,9 +418,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         // seriously; Question = genuine curiosity signals regard.
                         var respectDelta = io.Act switch
                         {
-                            SpeechAct.Validation => +1.5,   // acknowledging the other person's worth
-                            SpeechAct.Meta => +1.0,   // reflecting on the relationship shows regard
-                            SpeechAct.Question => +0.5,   // genuine curiosity signals respect
+                            RelationalActKind.Validation => +1.5,   // acknowledging the other person's worth
+                            RelationalActKind.Meta => +1.0,   // reflecting on the relationship shows regard
+                            RelationalActKind.Question => +0.5,   // genuine curiosity signals respect
                             _ => 0.0
                         };
 
@@ -455,15 +455,15 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             var closenessGain = +1.5 + stabilization * 0.35;
                             var closenessMax = 100.0 - ctx.Personality.Attachment.Avoidance * Config.ClosenessAvoidanceCap;
 
-                            // R3 — ExchangeStrength: Meta SpeechAct = explicit negotiation about
+                            // R3 — ExchangeStrength: Meta RelationalActKind = explicit negotiation about
                             // the relationship's terms → builds transactional equity norm.
-                            var exchangeGain = io.Act == SpeechAct.Meta ? 0.5 : 0.0;
+                            var exchangeGain = io.Act == RelationalActKind.Meta ? 0.5 : 0.0;
 
                             return e with
                             {
                                 Closeness = Math.Min(closenessMax, Bump(e.Closeness, closenessGain)),
                                 Like = Bump(e.Like, +0.5 + stabilization * 0.20),
-                                Comfort = Bump(e.Comfort, +0.8 + stabilization * 0.45 + (io.Act == SpeechAct.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
+                                Comfort = Bump(e.Comfort, +0.8 + stabilization * 0.45 + (io.Act == RelationalActKind.Invite ? SociosexualityBehaviorMath.ComfortInviteDelta(ctx.Personality.Sociosexuality) : 0.0)),
                                 IntimateAffinity = Bump(e.IntimateAffinity, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation + arLoyalty),
@@ -478,7 +478,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     : e.ExchangeStrength,
                                 // SelfDisclosure grants prestige to the discloser in the recipient's eyes
                                 // (emotional/intellectual courage is admirable — Cheng et al. 2013)
-                                PerceivedPrestige = io.Act == SpeechAct.SelfDisclosure && io.To == self
+                                PerceivedPrestige = io.Act == RelationalActKind.SelfDisclosure && io.To == self
                                     ? Clamp(e.PerceivedPrestige + Config.PrestigeGainPerSelfDisclosure)
                                     : e.PerceivedPrestige,
                                 Breakdown = ApplyDomainBoost(e.Breakdown, io.Act, accepted: true)
@@ -490,7 +490,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         now: io.OccurredAt);
 
                         // Jealousy: observers who witness an intimate act receive an IntimateAct signal.
-                        if (io.Act == SpeechAct.Invite && ctx.Snapshot.InteractionSurface.Observers is { Count: > 0 })
+                        if (io.Act == RelationalActKind.Invite && ctx.Snapshot.InteractionSurface.Observers is { Count: > 0 })
                         {
                             EmitThirdPartyEvents(io.OccurredAt, self, io.From, io.To,
                                 ThirdPartyObservationType.IntimateAct, valence: 0.0,
@@ -505,7 +505,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         // using GET's existing edge dimensions; the specific IntimateAffinity/
                         // SexualInterest crossover thresholds below are an architectural
                         // approximation, not literature-specified values.
-                        if (io.Act == SpeechAct.SelfDisclosure
+                        if (io.Act == RelationalActKind.SelfDisclosure
                             && ctx.Snapshot.InteractionSurface.Observers is { Count: > 0 }
                             && State.Edges.TryGetValue(otherId, out var eiaEdge)
                             && eiaEdge.IntimateAffinity >= Config.EmotionalIntimacyAffinityThreshold
@@ -527,8 +527,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                         // Rejected SelfDisclosure hurts more — vulnerability was turned away
                         var trustPenalty = io.Act switch
                         {
-                            SpeechAct.SelfDisclosure => -1.5,
-                            SpeechAct.Validation => -0.5,
+                            RelationalActKind.SelfDisclosure => -1.5,
+                            RelationalActKind.Validation => -0.5,
                             _ => 0.0
                         };
 
@@ -556,7 +556,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 var stingMultiplier = ComputeRejectionStingMultiplier(e, ctx.PsychologyProfile, ctx.Personality.Attachment);
 
                                 // TransgressionResidue for intimate rejection (InviteIntimacy).
-                                var residueDelta = io.Act == SpeechAct.Invite
+                                var residueDelta = io.Act == RelationalActKind.Invite
                                     ? Config.TransgressionRejectionGain
                                     : 0.0;
 
@@ -565,7 +565,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                     Like = Bump(e.Like, -1.5 * stingMultiplier),
                                     Comfort = Bump(e.Comfort, -2.0 * stingMultiplier),
                                     Trust = trustPenalty < 0 ? Bump(e.Trust, trustPenalty * stingMultiplier) : e.Trust,
-                                    IntimateAffinity = Bump(e.IntimateAffinity, (io.Act == SpeechAct.Invite ? -2.0 : -1.0) * stingMultiplier),
+                                    IntimateAffinity = Bump(e.IntimateAffinity, (io.Act == RelationalActKind.Invite ? -2.0 : -1.0) * stingMultiplier),
                                     AestheticAttraction = Bump(e.AestheticAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act)),
                                     PhysicalAttraction = Bump(e.PhysicalAttraction, ComputeAttractionPlasticity(e, positive: false, act: io.Act) * 0.65),
                                     TargetBiology = otherBiology ?? e.TargetBiology,
@@ -580,7 +580,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
                             // Williams' Temporal Need-Threat Model (Hartgerink et al. 2015, k=120, d > |1.4|):
                             // Intimate rejection threatens 4 needs simultaneously. Publish cross-engine event.
-                            if (io.Act == SpeechAct.Invite)
+                            if (io.Act == RelationalActKind.Invite)
                             {
                                 if (State.Edges.TryGetValue(otherId, out var rejEdge))
                                 {

@@ -804,10 +804,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
                                                - ctx.Personality.Attachment.Avoidance * 0.02;
                         var actSensitivity = io.Act switch
                         {
-                            SpeechAct.SelfDisclosure => 1.6,
-                            SpeechAct.Invite => 1.4,
-                            SpeechAct.Validation => 1.2,
-                            SpeechAct.Meta => 1.1,
+                            RelationalActKind.SelfDisclosure => 1.6,
+                            RelationalActKind.Invite => 1.4,
+                            RelationalActKind.Validation => 1.2,
+                            RelationalActKind.Meta => 1.1,
                             _ => 1.0
                         };
                         var impact = (0.05 + 0.10 * n + attachmentModifier) * actSensitivity;

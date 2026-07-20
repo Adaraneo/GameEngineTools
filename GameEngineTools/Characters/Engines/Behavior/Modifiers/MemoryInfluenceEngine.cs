@@ -85,14 +85,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                 ReachOut => new MemoryRecallQuery(
                     candidate.SocialTargeting?.TargetHuman,
                     ReachOut,
-                    candidate.SocialTargeting?.SpeechAct,
+                    candidate.SocialTargeting?.RelationalActKind,
                     null,
                     RecencyWindow: WTimeSpan.FromDays(14),
                     Take: 4),
                 InviteIntimacy => new MemoryRecallQuery(
                     candidate.SocialTargeting?.TargetHuman,
                     InviteIntimacy,
-                    candidate.SocialTargeting?.SpeechAct,
+                    candidate.SocialTargeting?.RelationalActKind,
                     null,
                     RecencyWindow: WTimeSpan.FromDays(21),
                     Take: 4),
@@ -118,7 +118,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
         private static string BuildWorkingSetKey(BehaviorCandidate candidate)
             => candidate.SocialTargeting is { } targeting
-                ? $"action={candidate.Name}|target={targeting.TargetHuman.Value:N}|act={targeting.SpeechAct}"
+                ? $"action={candidate.Name}|target={targeting.TargetHuman.Value:N}|act={targeting.RelationalActKind}"
                 : $"action={candidate.Name}|target=none|act=none";
 
         #endregion Query building
@@ -246,14 +246,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             var relationships = context.HumanContext.Snapshot.Relationships.Edges;
             var profile = context.HumanContext.PsychologyProfile;
             var episodes = context.HumanContext.Snapshot.Memory.Episodes;
-            var act = candidate.Name == InviteIntimacy ? SpeechAct.Invite : SpeechAct.SmallTalk;
+            var act = candidate.Name == InviteIntimacy ? RelationalActKind.Invite : RelationalActKind.SmallTalk;
 
             double expected;
             if (candidate.SocialTargeting is { } targeting)
             {
                 expected = semantic.ExpectedAcceptance(
                     targeting.TargetHuman,
-                    targeting.SpeechAct,
+                    targeting.RelationalActKind,
                     relationships.GetValueOrDefault(targeting.TargetHuman),
                     profile,
                     episodes);

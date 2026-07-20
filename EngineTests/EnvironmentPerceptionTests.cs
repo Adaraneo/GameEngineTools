@@ -119,8 +119,8 @@ namespace EngineTests
 
             for (var i = 0; i < 200; i++)
             {
-                var ev = new InteractionProposed(WDateTime.New(100, 1, 1), proposer, self,
-                    SpeechAct.Invite, null);
+                var ev = InteractionProposed.Of(WDateTime.New(100, 1, 1), proposer, self,
+                    RelationalActKind.Invite);
                 engineQuiet.Handle(ev, ctxQ, outboxQ);
                 engineNoisy.Handle(ev, ctxN, outboxN);
             }

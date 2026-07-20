@@ -945,7 +945,7 @@ namespace EngineTests
                 OccurredAt: WDateTime.New(100, 1, 1),
                 From: ctx.Id,
                 To: new HumanId(Guid.NewGuid()),
-                Act: SpeechAct.SmallTalk,
+                Act: RelationalActKind.SmallTalk,
                 Accepted: true,
                 Reason: string.Empty);
 
@@ -973,7 +973,7 @@ namespace EngineTests
                 OccurredAt: WDateTime.New(100, 1, 1),
                 From: ctx.Id,
                 To: new HumanId(Guid.NewGuid()),
-                Act: SpeechAct.SmallTalk,
+                Act: RelationalActKind.SmallTalk,
                 Accepted: false,
                 Reason: string.Empty);
 
@@ -998,8 +998,8 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
 
             var toId = new HumanId(Guid.NewGuid());
-            var ioSmall = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, SpeechAct.SmallTalk);
-            var ioSelf = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, SpeechAct.SelfDisclosure);
+            var ioSmall = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, RelationalActKind.SmallTalk);
+            var ioSelf = new InteractionOutcome(WDateTime.New(100, 1, 1), ctx.Id, toId, false, string.Empty, RelationalActKind.SelfDisclosure);
 
             // Act
             engineSmall.Handle(ioSmall, ctx, new EventCollector());
@@ -1028,7 +1028,7 @@ namespace EngineTests
                 OccurredAt: WDateTime.New(100, 1, 1),
                 From: new HumanId(Guid.NewGuid()),
                 To: ctx.Id,
-                Act: SpeechAct.SmallTalk,
+                Act: RelationalActKind.SmallTalk,
                 Accepted: false,
                 Reason: string.Empty);
 
@@ -1140,7 +1140,7 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
                 OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
-                Accepted: true, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+                Accepted: true, Reason: string.Empty, Act: RelationalActKind.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
 
@@ -1156,7 +1156,7 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
                 OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
-                Accepted: false, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+                Accepted: false, Reason: string.Empty, Act: RelationalActKind.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
 
@@ -1177,7 +1177,7 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
                 OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
-                Accepted: true, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+                Accepted: true, Reason: string.Empty, Act: RelationalActKind.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
 
@@ -1197,7 +1197,7 @@ namespace EngineTests
             var ctx = BuildContext(neuroticism: 0.5);
             var outcome = new InteractionOutcome(
                 OccurredAt: WDateTime.New(100, 1, 1), From: ctx.Id, To: new HumanId(Guid.NewGuid()),
-                Accepted: false, Reason: string.Empty, Act: SpeechAct.SmallTalk);
+                Accepted: false, Reason: string.Empty, Act: RelationalActKind.SmallTalk);
 
             engine.Handle(outcome, ctx, _outbox);
 

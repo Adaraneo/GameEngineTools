@@ -92,7 +92,14 @@ namespace WorldObserver.Simulation
                 {
                     if (c.LastOutbox[i] is InteractionProposed ip && ip.From == c.Id)
                     {
-                        interaction = new InteractionDto(ip.Act.ToString(), ip.To.Value.ToString(), ip.Content);
+                        // Characters exchange a structured SpeechAct, never text. Until the Czech
+                        // surface render lands (GM side), show a compact structured dump of the act.
+                        var sa = ip.Content.SpeechAct;
+                        var structured =
+                            $"{sa.Point}/{sa.RelationalKind} · {sa.Register}/{sa.Directness}/{sa.Polarity}"
+                            + $" · lemma='{sa.PredicateLemma}' · roles={sa.Roles.Count}"
+                            + (sa.ForceShift is { } fs ? $" · force→{fs.SurfacePoint}/{fs.SurfacePolarity}" : string.Empty);
+                        interaction = new InteractionDto(sa.RelationalKind.ToString(), ip.To.Value.ToString(), structured);
                         break;
                     }
                 }

@@ -31,7 +31,7 @@ namespace EngineTests
                 Episode(now, 1, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.75, other)
             });
 
-            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(7), 2), now);
+            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(7), 2), now);
 
             Assert.AreEqual(target, recall.Items[0].Episode.OtherPerson);
         }
@@ -45,7 +45,7 @@ namespace EngineTests
             var old = Episode(now, 48, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.60, target);
             var memory = new MemoryIndex(new List<EpisodicMemory> { old, recent });
 
-            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(7), 2), now);
+            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(7), 2), now);
 
             Assert.AreEqual(recent.Id, recall.Items[0].Episode.Id);
         }
@@ -59,7 +59,7 @@ namespace EngineTests
             var weaker = Episode(now, 6, "Interaction:Invite:Rejected|from=a|to=b", EmotionalTag.Negative, 0.45, target, salience: 0.55);
             var memory = new MemoryIndex(new List<EpisodicMemory> { weaker, stronger });
 
-            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, InviteIntimacy, SpeechAct.Invite, EmotionalTag.Negative, WTimeSpan.FromDays(7), 2), now);
+            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, InviteIntimacy, RelationalActKind.Invite, EmotionalTag.Negative, WTimeSpan.FromDays(7), 2), now);
 
             Assert.AreEqual(stronger.Id, recall.Items[0].Episode.Id);
         }
@@ -78,7 +78,7 @@ namespace EngineTests
                 Episode(now, 1, "Interaction:Invite:Rejected|from=a|to=b", EmotionalTag.Negative, 0.90, other, salience: 0.90)
             });
 
-            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(7), 3), now);
+            var recall = MemoryCognition.Recall(memory, new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(7), 3), now);
 
             Assert.AreEqual(2, recall.Items.Count);
             Assert.IsTrue(recall.Items.All(item => item.Episode.OtherPerson == target));
@@ -100,7 +100,7 @@ namespace EngineTests
                 Episode(now, 6, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.50, target)
             });
 
-            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, InviteIntimacy, SpeechAct.Invite, null, WTimeSpan.FromDays(14), 4), now);
+            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, InviteIntimacy, RelationalActKind.Invite, null, WTimeSpan.FromDays(14), 4), now);
             var summary = workingSet.Reflections.Single(r => r.Kind == ReflectionSummaryKind.RejectsIntimacy);
 
             Assert.AreEqual(2, summary.EvidenceCount);
@@ -121,7 +121,7 @@ namespace EngineTests
                 Episode(now, 6, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.60, target)
             });
 
-            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, InviteIntimacy, SpeechAct.Invite, null, WTimeSpan.FromDays(14), 4), now);
+            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, InviteIntimacy, RelationalActKind.Invite, null, WTimeSpan.FromDays(14), 4), now);
 
             Assert.IsFalse(workingSet.Reflections.Any(r => r.Kind == ReflectionSummaryKind.RejectsIntimacy));
         }
@@ -140,7 +140,7 @@ namespace EngineTests
                 Episode(now, 14, "Relation:MicroPositive|from=a|what=helped", EmotionalTag.Positive, 0.62, target)
             });
 
-            var query = new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(21), 3);
+            var query = new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(21), 3);
             var first = MemoryCognition.BuildWorkingSet(memory, query, now);
             var second = MemoryCognition.BuildWorkingSet(memory, query, now);
 
@@ -180,7 +180,7 @@ namespace EngineTests
                 Episode(now, 12, "Interaction:Validation:Accepted|from=a|to=b", EmotionalTag.Positive, 0.70, target)
             });
 
-            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 4), now);
+            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(14), 4), now);
 
             Assert.IsTrue(workingSet.Reflections.Any(r => r.Kind == ReflectionSummaryKind.WarmForCasualContact));
             Assert.IsTrue(workingSet.Reflections.Any(r => r.Kind == ReflectionSummaryKind.SafeForReachOut));
@@ -198,7 +198,7 @@ namespace EngineTests
                 Episode(now, 20, "Interaction:Question:Accepted|from=a|to=b", EmotionalTag.Positive, 0.62, target)
             });
 
-            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 4), now);
+            var workingSet = MemoryCognition.BuildWorkingSet(memory, new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(14), 4), now);
             var summary = workingSet.Reflections.Single(r => r.Kind == ReflectionSummaryKind.RecentSocialCost);
 
             Assert.AreEqual(target, summary.TargetHuman);
@@ -222,7 +222,7 @@ namespace EngineTests
             var context = BehaviorComponentTestFactory.Context(now: now, memory: memory);
             var candidates = new List<BehaviorCandidate>
             {
-                new(InviteIntimacy, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(target, SpeechAct.Invite, 0.5, 0.4, 0.6))
+                new(InviteIntimacy, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(target, RelationalActKind.Invite, 0.5, 0.4, 0.6))
             };
 
             new MemoryInfluenceEngine().Modify(context, candidates);
@@ -244,7 +244,7 @@ namespace EngineTests
             var context = BehaviorComponentTestFactory.Context(now: now, memory: memory);
             var candidates = new List<BehaviorCandidate>
             {
-                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(target, SpeechAct.SmallTalk, 0.5, 0.6, 0.3))
+                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(target, RelationalActKind.SmallTalk, 0.5, 0.6, 0.3))
             };
 
             new MemoryInfluenceEngine().Modify(context, candidates);
@@ -286,8 +286,8 @@ namespace EngineTests
             var context = BehaviorComponentTestFactory.Context(now: now, memory: memory);
             var candidates = new List<BehaviorCandidate>
             {
-                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(preferred, SpeechAct.SmallTalk, 0.5, 0.6, 0.3)),
-                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(avoided, SpeechAct.SmallTalk, 0.5, 0.4, 0.7))
+                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(preferred, RelationalActKind.SmallTalk, 0.5, 0.6, 0.3)),
+                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(avoided, RelationalActKind.SmallTalk, 0.5, 0.4, 0.7))
             };
 
             new MemoryInfluenceEngine().Modify(context, candidates);
@@ -325,8 +325,8 @@ namespace EngineTests
             var context = BehaviorComponentTestFactory.Context(now: now, memory: memory);
             var candidates = new List<BehaviorCandidate>
             {
-                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(first, SpeechAct.SmallTalk, 0.5, 0.6, 0.3)),
-                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(second, SpeechAct.SmallTalk, 0.5, 0.4, 0.7))
+                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(first, RelationalActKind.SmallTalk, 0.5, 0.6, 0.3)),
+                new(ReachOut, 10, WTimeSpan.FromHours(1), BehaviorDomain.Social, SocialTargeting: new SocialTargetingData(second, RelationalActKind.SmallTalk, 0.5, 0.4, 0.7))
             };
 
             new MemoryInfluenceEngine().Modify(context, candidates);
@@ -358,7 +358,7 @@ namespace EngineTests
             var memory = PositiveAndNegativeEpisodes(target, now);
 
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 2,
+                new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(14), 2,
                     CurrentValence: 0.6, NeuroticismScore: 0.5), now);
 
             Assert.IsTrue(RelevanceOf(recall, EmotionalTag.Positive) > RelevanceOf(recall, EmotionalTag.Negative),
@@ -373,7 +373,7 @@ namespace EngineTests
             var memory = PositiveAndNegativeEpisodes(target, now);
 
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 2,
+                new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(14), 2,
                     CurrentValence: -0.6, NeuroticismScore: 0.5), now);
 
             Assert.IsTrue(RelevanceOf(recall, EmotionalTag.Negative) > RelevanceOf(recall, EmotionalTag.Positive),
@@ -394,7 +394,7 @@ namespace EngineTests
             });
 
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(target, ReachOut, SpeechAct.SmallTalk, null, WTimeSpan.FromDays(14), 2,
+                new MemoryRecallQuery(target, ReachOut, RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(14), 2,
                     CurrentValence: 0.6, NeuroticismScore: 0.5), now);
 
             Assert.IsTrue(RelevanceOf(recall, EmotionalTag.Negative) > RelevanceOf(recall, EmotionalTag.Positive),

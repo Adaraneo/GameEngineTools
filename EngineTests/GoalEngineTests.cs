@@ -323,9 +323,9 @@ namespace EngineTests
             var context = BuildBehaviorContext(new GoalState(new[] { goal }));
 
             var targetCandidate = new BehaviorCandidate(ReachOut, 40.0, WTimeSpan.FromHours(1), BehaviorDomain.Social,
-                SocialTargeting: new SocialTargetingData(target, SpeechAct.SmallTalk, 0.7, 0.8, 0.2));
+                SocialTargeting: new SocialTargetingData(target, RelationalActKind.SmallTalk, 0.7, 0.8, 0.2));
             var otherCandidate = new BehaviorCandidate(ReachOut, 40.0, WTimeSpan.FromHours(1), BehaviorDomain.Social,
-                SocialTargeting: new SocialTargetingData(other, SpeechAct.SmallTalk, 0.7, 0.8, 0.2));
+                SocialTargeting: new SocialTargetingData(other, RelationalActKind.SmallTalk, 0.7, 0.8, 0.2));
 
             var candidates = new List<BehaviorCandidate> { targetCandidate, otherCandidate };
             modifier.Modify(context, candidates);

@@ -99,14 +99,14 @@ namespace WorldObserver.Narrative
             var to = resolve(io.To);
             var act = io.Act switch
             {
-                SpeechAct.SmallTalk => "nezávazný hovor",
-                SpeechAct.Question => "zvídavou otázku",
-                SpeechAct.SelfDisclosure => "osobní sdělení",
-                SpeechAct.Validation => "slova podpory",
-                SpeechAct.Boundary => "nastavení hranic",
-                SpeechAct.Humor => "vtip",
-                SpeechAct.Meta => "komentář o vztahu",
-                SpeechAct.Invite => "pozvání",
+                RelationalActKind.SmallTalk => "nezávazný hovor",
+                RelationalActKind.Question => "zvídavou otázku",
+                RelationalActKind.SelfDisclosure => "osobní sdělení",
+                RelationalActKind.Validation => "slova podpory",
+                RelationalActKind.Boundary => "nastavení hranic",
+                RelationalActKind.Humor => "vtip",
+                RelationalActKind.Meta => "komentář o vztahu",
+                RelationalActKind.Invite => "pozvání",
                 _ => "interakci",
             };
             var reaction = io.Accepted

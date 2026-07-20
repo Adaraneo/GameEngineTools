@@ -210,7 +210,7 @@ namespace EngineTests
 
             for (var i = 0; i < n; i++)
             {
-                var ev = new InteractionProposed(new WDateTime(i), proposer, self, SpeechAct.SmallTalk, null);
+                var ev = InteractionProposed.Of(new WDateTime(i), proposer, self, RelationalActKind.SmallTalk);
                 normalEngine.Handle(ev, ctx, normalOutbox);
                 funeralEngine.Handle(ev, ctx, funeralOutbox);
             }

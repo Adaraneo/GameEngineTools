@@ -38,7 +38,7 @@ namespace EngineTests
     ///     <b>RepairGain / RupturePenalty</b> — dříve hardcoded +4/-4, nyní z Config.
     ///   </item>
     ///   <item>
-    ///     <b>DomainBreakdown</b> — dříve se nikdy neměnil, nyní reaguje na <see cref="SpeechAct"/>.
+    ///     <b>DomainBreakdown</b> — dříve se nikdy neměnil, nyní reaguje na <see cref="RelationalActKind"/>.
     ///   </item>
     ///   <item>
     ///     <b>Odmítnutí InteractionOutcome</b> — dříve bez efektu, nyní pokles Like a Comfort.
@@ -189,10 +189,10 @@ namespace EngineTests
         #endregion RepairAttempt — Config hodnoty
 
         // ══════════════════════════════════════════════════════════════════════════════
-        // BUG 2 — DomainBreakdown musí reagovat na SpeechAct
+        // BUG 2 — DomainBreakdown musí reagovat na RelationalActKind
         // ══════════════════════════════════════════════════════════════════════════════
 
-        #region DomainBreakdown — aktualizace dle SpeechAct
+        #region DomainBreakdown — aktualizace dle RelationalActKind
 
         /// <summary>
         /// SmallTalk musí zvýšit Humor doménu, ostatní domény zůstávají nezměněné.
@@ -210,7 +210,7 @@ namespace EngineTests
             var humorBefore = engine.State.Edges[other].Breakdown.Humor;
 
             // Act — SmallTalk přijat
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.SmallTalk), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: RelationalActKind.SmallTalk), ctx, _outbox);
 
             // Assert
             var humorAfter = engine.State.Edges[other].Breakdown.Humor;
@@ -235,7 +235,7 @@ namespace EngineTests
             var intellectBefore = engine.State.Edges[other].Breakdown.Intellect;
 
             // Act
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.Question), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: RelationalActKind.Question), ctx, _outbox);
 
             // Assert
             Assert.IsTrue(
@@ -261,7 +261,7 @@ namespace EngineTests
             var humorStart = engine.State.Edges[other].Breakdown.Humor;
 
             // Jedno přijetí — referenční boost
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.Humor), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: RelationalActKind.Humor), ctx, _outbox);
             var humorAccepted = engine.State.Edges[other].Breakdown.Humor;
 
             // Resetujeme hranu na výchozí hodnotu
@@ -269,7 +269,7 @@ namespace EngineTests
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
 
             // Jedno odmítnutí — half boost
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: false, Reason: "nope", Act: SpeechAct.Humor), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: false, Reason: "nope", Act: RelationalActKind.Humor), ctx, _outbox);
             var humorRejected = engine.State.Edges[other].Breakdown.Humor;
 
             // Assert — přijetí musí dát větší boost než odmítnutí
@@ -285,7 +285,7 @@ namespace EngineTests
                 $"I odmítnutí musí mít nenulový domain boost (half boost). Boost byl: {boostRejected:F2}");
         }
 
-        #endregion DomainBreakdown — aktualizace dle SpeechAct
+        #endregion DomainBreakdown — aktualizace dle RelationalActKind
 
         // ══════════════════════════════════════════════════════════════════════════════
         // BUG 3 — Odmítnutá InteractionOutcome musí snižovat Like a Comfort
@@ -311,7 +311,7 @@ namespace EngineTests
             var comfortBefore = engine.State.Edges[other].Comfort;
 
             // Act — odmítnutá interakce
-            engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "declined", Act: SpeechAct.SmallTalk), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "declined", Act: RelationalActKind.SmallTalk), ctx, _outbox);
 
             // Assert
             Assert.IsTrue(
@@ -342,7 +342,7 @@ namespace EngineTests
             var comfortBefore = engine.State.Edges[other].Comfort;
 
             // Act
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "accepted", Act: SpeechAct.SmallTalk), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "accepted", Act: RelationalActKind.SmallTalk), ctx, _outbox);
 
             // Assert
             Assert.IsTrue(
@@ -372,7 +372,7 @@ namespace EngineTests
             engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 55, Attraction: 45), ctx, _outbox);
 
             var before = engine.State.Edges[other];
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.SmallTalk), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: RelationalActKind.SmallTalk), ctx, _outbox);
 
             var after = engine.State.Edges[other];
             Assert.IsTrue(after.Familiarity > before.Familiarity);
@@ -403,7 +403,7 @@ namespace EngineTests
             for (var i = 0; i < 8; i++)
             {
                 engine.Handle(
-                    new InteractionOutcome(_now + WTimeSpan.FromHours(i + 1), other, self, Accepted: true, Reason: "accepted", Act: SpeechAct.SmallTalk),
+                    new InteractionOutcome(_now + WTimeSpan.FromHours(i + 1), other, self, Accepted: true, Reason: "accepted", Act: RelationalActKind.SmallTalk),
                     ctx,
                     _outbox);
             }
@@ -415,7 +415,7 @@ namespace EngineTests
             Assert.IsTrue(stabilized.Closeness > initial.Closeness + 12.0);
 
             engine.Handle(
-                new InteractionOutcome(_now + WTimeSpan.FromHours(12), self, other, Accepted: false, Reason: "declined", Act: SpeechAct.SmallTalk),
+                new InteractionOutcome(_now + WTimeSpan.FromHours(12), self, other, Accepted: false, Reason: "declined", Act: RelationalActKind.SmallTalk),
                 ctx,
                 _outbox);
 
@@ -675,7 +675,7 @@ namespace EngineTests
             }));
 
             var before = engine.State.Edges[other].Breakdown.Physical;
-            engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "declined", Act: SpeechAct.Invite), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "declined", Act: RelationalActKind.Invite), ctx, _outbox);
 
             Assert.IsTrue(engine.State.Edges[other].Breakdown.Physical <= before);
         }
@@ -730,7 +730,7 @@ namespace EngineTests
             var beforePositive = engine.State.Edges[other];
             for (var i = 0; i < 5; i++)
             {
-                engine.Handle(new InteractionOutcome(_now + WTimeSpan.FromHours(i), other, self, Accepted: true, Reason: "accepted", Act: SpeechAct.Validation), ctx, _outbox);
+                engine.Handle(new InteractionOutcome(_now + WTimeSpan.FromHours(i), other, self, Accepted: true, Reason: "accepted", Act: RelationalActKind.Validation), ctx, _outbox);
             }
 
             var afterPositive = engine.State.Edges[other];
@@ -753,7 +753,7 @@ namespace EngineTests
 
             for (var i = 0; i < 5; i++)
             {
-                engine.Handle(new InteractionOutcome(_now + WTimeSpan.FromHours(i), self, other, Accepted: false, Reason: "declined", Act: SpeechAct.Invite), ctx, _outbox);
+                engine.Handle(new InteractionOutcome(_now + WTimeSpan.FromHours(i), self, other, Accepted: false, Reason: "declined", Act: RelationalActKind.Invite), ctx, _outbox);
             }
 
             var afterNegative = engine.State.Edges[other];
@@ -781,7 +781,7 @@ namespace EngineTests
 
             var recipientBefore = recipient.Snapshot.Relationships.Edges[initiator.Id];
 
-            recipient.ReceiveEvent(new InteractionProposed(now, initiator.Id, recipient.Id, SpeechAct.SmallTalk, "Ahoj"));
+            recipient.ReceiveEvent(InteractionProposed.Of(now, initiator.Id, recipient.Id, RelationalActKind.SmallTalk));
             recipient.Tick(now, dt);
 
             Assert.IsTrue(
@@ -873,7 +873,7 @@ namespace EngineTests
             for (var i = 0; i < 10; i++)
             {
                 engine.Handle(new InteractionOutcome(_now, self, other, Accepted: true, Reason: "ok",
-                    Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+                    Act: RelationalActKind.SelfDisclosure), ctx, _outbox);
             }
 
             var expectedCap = 100.0 - avoidance * DefaultCfg.ClosenessAvoidanceCap;
@@ -915,7 +915,7 @@ namespace EngineTests
             engineAnxious.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [other] = edge }));
 
             var rejection = new InteractionOutcome(_now, self, other, Accepted: false, Reason: "no",
-                Act: SpeechAct.Invite);
+                Act: RelationalActKind.Invite);
 
             engineSecure.Handle(rejection, ctxSecure, _outbox);
             engineAnxious.Handle(rejection, ctxAnxious, _outbox);
@@ -1158,7 +1158,7 @@ namespace EngineTests
 
             // Self = initiator, other = recipient who rejects
             engine.Handle(new InteractionOutcome(_now, self, other, Accepted: false, Reason: "no",
-                Act: SpeechAct.Invite), ctx, outbox);
+                Act: RelationalActKind.Invite), ctx, outbox);
 
             var events = outbox.Drain();
             var threat = events.OfType<RejectionNeedsThreat>().FirstOrDefault();
@@ -1324,7 +1324,7 @@ namespace EngineTests
 
             // Accepted Meta interaction → ExchangeStrength should increase
             engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok",
-                Act: SpeechAct.Meta), ctx, _outbox);
+                Act: RelationalActKind.Meta), ctx, _outbox);
 
             Assert.IsTrue(engine.State.Edges[other].ExchangeStrength > exchangeBefore,
                 $"ExchangeStrength should grow from Meta interaction (before={exchangeBefore:F1}, " +
@@ -1343,7 +1343,7 @@ namespace EngineTests
             var exchangeBefore = engine.State.Edges[other].ExchangeStrength;
 
             engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok",
-                Act: SpeechAct.SmallTalk), ctx, _outbox);
+                Act: RelationalActKind.SmallTalk), ctx, _outbox);
 
             Assert.AreEqual(exchangeBefore, engine.State.Edges[other].ExchangeStrength,
                 "ExchangeStrength should NOT change from SmallTalk");
@@ -2329,7 +2329,7 @@ namespace EngineTests
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
             }));
 
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: RelationalActKind.SelfDisclosure), ctx, _outbox);
 
             var emitted = _outbox.Drain().OfType<ThirdPartyActionObserved>()
                 .Where(e => e.Type == ThirdPartyObservationType.EmotionalIntimacyAct)
@@ -2358,7 +2358,7 @@ namespace EngineTests
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
             }));
 
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: RelationalActKind.SelfDisclosure), ctx, _outbox);
 
             var emitted = _outbox.Drain().OfType<ThirdPartyActionObserved>()
                 .Where(e => e.Type == ThirdPartyObservationType.EmotionalIntimacyAct)
@@ -2387,7 +2387,7 @@ namespace EngineTests
                     Breakdown: new DomainBreakdown(50, 50, 50, 50, 50))
             }));
 
-            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: SpeechAct.Invite), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, other, self, Accepted: true, Reason: "ok", Act: RelationalActKind.Invite), ctx, _outbox);
 
             var emitted = _outbox.Drain().OfType<ThirdPartyActionObserved>()
                 .Where(e => e.Type == ThirdPartyObservationType.IntimateAct)
@@ -2872,7 +2872,7 @@ namespace EngineTests
                 Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
                 PerceivedPrestige: 90);
 
-            var smallTalk = new InteractionOutcome(_now, superior, self, Accepted: true, Reason: "test", Act: SpeechAct.SmallTalk);
+            var smallTalk = new InteractionOutcome(_now, superior, self, Accepted: true, Reason: "test", Act: RelationalActKind.SmallTalk);
 
             // Baseline: no relational model on the surface.
             var baseEngine = BuildEngine();

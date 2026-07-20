@@ -13,7 +13,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     public sealed record MemoryRecallQuery(
         HumanId? TargetHuman = null,
         string? ActionName = null,
-        SpeechAct? InteractionAct = null,
+        RelationalActKind? InteractionAct = null,
         EmotionalTag? EmotionalValence = null,
         WTimeSpan? RecencyWindow = null,
         int Take = 4,
@@ -84,7 +84,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     public sealed record DecisionWorkingSet(
         HumanId? TargetHuman,
         string? ActionName,
-        SpeechAct? InteractionAct,
+        RelationalActKind? InteractionAct,
         IReadOnlyList<MemoryRecallItem> RecalledEpisodes,
         IReadOnlyList<ReflectionSummary> Reflections,
         bool IsSystem1 = false);

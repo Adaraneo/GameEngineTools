@@ -293,7 +293,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return;
             }
 
-            outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, targeting.SpeechAct, targeting.Reason, ctx.Biology));
+            var content = new InteractionContent(
+                SpeechAct.Relational(targeting.RelationalActKind, ctx.Id, targeting.TargetHuman, now));
+            outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, content, ctx.Biology));
         }
 
         private void ApplyDevelopmentGate(BehaviorContext context, List<BehaviorCandidate> candidates)

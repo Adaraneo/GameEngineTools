@@ -21,27 +21,27 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Updates <see cref="DomainBreakdown"/> based on the type of speech act.
         /// </summary>
         /// <remarks>
-        /// Each <see cref="SpeechAct"/> affects different domains.
+        /// Each <see cref="RelationalActKind"/> affects different domains.
         /// Rejected interactions have half the effect because the signal was registered but not welcomed.
         /// </remarks>
-        private static DomainBreakdown ApplyDomainBoost(DomainBreakdown bd, SpeechAct act, bool accepted)
+        private static DomainBreakdown ApplyDomainBoost(DomainBreakdown bd, RelationalActKind act, bool accepted)
         {
             var mul = accepted ? 1.0 : 0.5;
 
             return act switch
             {
-                SpeechAct.SmallTalk => bd with { Humor = BumpD(bd.Humor, +1.5 * mul) },
-                SpeechAct.Question => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
-                SpeechAct.SelfDisclosure => bd with { Values = BumpD(bd.Values, +2.0 * mul) },
-                SpeechAct.Validation => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
-                SpeechAct.Humor => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
-                SpeechAct.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
-                SpeechAct.Invite when accepted => bd with { Physical = BumpD(bd.Physical, +0.5) },
-                SpeechAct.Invite => bd,
+                RelationalActKind.SmallTalk => bd with { Humor = BumpD(bd.Humor, +1.5 * mul) },
+                RelationalActKind.Question => bd with { Intellect = BumpD(bd.Intellect, +2.0 * mul) },
+                RelationalActKind.SelfDisclosure => bd with { Values = BumpD(bd.Values, +2.0 * mul) },
+                RelationalActKind.Validation => bd with { Values = BumpD(bd.Values, +1.0 * mul) },
+                RelationalActKind.Humor => bd with { Humor = BumpD(bd.Humor, +2.5 * mul) },
+                RelationalActKind.Meta => bd with { Intellect = BumpD(bd.Intellect, +1.0 * mul) },
+                RelationalActKind.Invite when accepted => bd with { Physical = BumpD(bd.Physical, +0.5) },
+                RelationalActKind.Invite => bd,
                 // Accepted boundary: signals self-respect → raises Values alignment.
                 // Rejected boundary (mul = 0.5): values conflict → stronger penalty.
-                SpeechAct.Boundary when accepted => bd with { Values = BumpD(bd.Values, +0.8) },
-                SpeechAct.Boundary => bd with { Values = BumpD(bd.Values, -1.5 * mul) },
+                RelationalActKind.Boundary when accepted => bd with { Values = BumpD(bd.Values, +0.8) },
+                RelationalActKind.Boundary => bd with { Values = BumpD(bd.Values, -1.5 * mul) },
                 _ => bd
             };
         }
@@ -70,7 +70,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private static double ComputeRomanticInterestDelta(
             RelationshipEdge e,
-            SpeechAct act,
+            RelationalActKind act,
             Sociosexuality sociosexuality,
             AttractionProfile? attractionProfile,
             SexBiology? targetBiology)
@@ -83,16 +83,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             var delta = act switch
             {
-                SpeechAct.SelfDisclosure => context * 0.7,
-                SpeechAct.Validation => context * 0.45,
-                SpeechAct.Meta => context * 0.35,
-                SpeechAct.Invite => context * 0.3,
+                RelationalActKind.SelfDisclosure => context * 0.7,
+                RelationalActKind.Validation => context * 0.45,
+                RelationalActKind.Meta => context * 0.35,
+                RelationalActKind.Invite => context * 0.3,
                 _ => 0
             };
 
             var orientedDelta = delta * SexualOrientationBehaviorMath.RomanticInterestMultiplier(attractionProfile, targetBiology);
 
-            return act == SpeechAct.Invite
+            return act == RelationalActKind.Invite
                 ? orientedDelta * SociosexualityBehaviorMath.RomanticInviteDeltaMultiplier(sociosexuality)
                 : orientedDelta;
         }
@@ -103,7 +103,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// </summary>
         private static double ComputeSexualInterestDelta(
             RelationshipEdge e,
-            SpeechAct act,
+            RelationalActKind act,
             Sociosexuality sociosexuality,
             AttractionProfile? attractionProfile,
             SexBiology? targetBiology)
@@ -122,13 +122,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
             var delta = act switch
             {
-                SpeechAct.Invite => (context + gate) * 0.18 * noveltyMult,
+                RelationalActKind.Invite => (context + gate) * 0.18 * noveltyMult,
                 _ => 0
             };
 
             var orientedDelta = delta * SexualOrientationBehaviorMath.SexualInterestMultiplier(attractionProfile, targetBiology);
 
-            return act == SpeechAct.Invite
+            return act == RelationalActKind.Invite
                 ? orientedDelta * SociosexualityBehaviorMath.SexualInterestDeltaMultiplier(sociosexuality)
                 : orientedDelta;
         }
@@ -143,7 +143,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Produces small attraction plasticity from accumulated safe or costly relational experience.
         /// Attraction remains mostly stable; this only models repeated relational colouring.
         /// </summary>
-        private double ComputeAttractionPlasticity(RelationshipEdge edge, bool positive, SpeechAct act)
+        private double ComputeAttractionPlasticity(RelationshipEdge edge, bool positive, RelationalActKind act)
         {
             var amount = Math.Clamp(Config.AttractionPlasticityPerInteraction, 0.0, 1.0);
             var exposureDamping = 1.0 / Math.Sqrt(1.0 + Math.Max(0, edge.PositiveInteractionCount) * 0.15);
@@ -156,7 +156,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     + Math.Max(0.0, edge.Like - 45.0) / 55.0 * 0.20,
                     0.0,
                     1.0);
-                var actScale = act is SpeechAct.Validation or SpeechAct.SelfDisclosure ? 1.10 : 0.75;
+                var actScale = act is RelationalActKind.Validation or RelationalActKind.SelfDisclosure ? 1.10 : 0.75;
                 return amount * exposureDamping * safety * actScale;
             }
 
@@ -166,7 +166,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 + Math.Max(0.0, 50.0 - edge.Like) / 50.0 * 0.20,
                 0.20,
                 1.0);
-            var rejectionScale = act == SpeechAct.Invite ? 1.25 : 0.85;
+            var rejectionScale = act == RelationalActKind.Invite ? 1.25 : 0.85;
 
             return -amount * exposureDamping * cost * rejectionScale;
         }

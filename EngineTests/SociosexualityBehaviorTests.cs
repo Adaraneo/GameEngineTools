@@ -225,7 +225,7 @@ namespace EngineTests
                 LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
             engine.RestoreState(new InteractionSurface("private", true, 0.1, 0.1, SurfaceKind.Private));
             var outbox = new EventCollector();
-            engine.Handle(new InteractionProposed(new WDateTime(0), from, to, SpeechAct.Invite, null, fromBiology), ctx, outbox);
+            engine.Handle(InteractionProposed.Of(new WDateTime(0), from, to, RelationalActKind.Invite, fromBiology), ctx, outbox);
             return outbox.Drain();
         }
 
@@ -250,7 +250,7 @@ namespace EngineTests
                 biology: selfBiology,
                 attractionProfile: attractionProfile).HumanContext;
 
-            engine.Handle(new InteractionOutcome(new WDateTime(0), self, other, true, "accepted", SpeechAct.Invite, selfBiology, targetBiology), context, new EventCollector());
+            engine.Handle(new InteractionOutcome(new WDateTime(0), self, other, true, "accepted", RelationalActKind.Invite, selfBiology, targetBiology), context, new EventCollector());
             return engine.State.Edges[other];
         }
 

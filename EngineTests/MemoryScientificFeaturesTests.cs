@@ -41,7 +41,7 @@ namespace EngineTests
             var memory = new MemoryIndex(new List<EpisodicMemory> { casual, intimate });
 
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SelfDisclosure, null, WTimeSpan.FromDays(7), 2),
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SelfDisclosure, null, WTimeSpan.FromDays(7), 2),
                 now);
 
             Assert.IsTrue(recall.Items.Count >= 2, "Obě epizody musí projít threshold.");
@@ -60,7 +60,7 @@ namespace EngineTests
             var memory = new MemoryIndex(new List<EpisodicMemory> { lowSalience, highSalience });
 
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk, EmotionalTag.Negative, WTimeSpan.FromDays(7), 2),
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk, EmotionalTag.Negative, WTimeSpan.FromDays(7), 2),
                 now);
 
             Assert.IsTrue(recall.Items.Count >= 1, "Alespoň jedna epizoda musí projít threshold.");
@@ -219,7 +219,7 @@ namespace EngineTests
             var memory = new MemoryIndex(new List<EpisodicMemory> { lowSalience, highSalience });
 
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk, null,
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk, null,
                     WTimeSpan.FromDays(7), 2, CurrentValence: +0.5, NeuroticismScore: 0.9),
                 now);
 
@@ -241,7 +241,7 @@ namespace EngineTests
 
             // Starý query bez nových parametrů — musí se chovat identicky jako dříve
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk, null, WTimeSpan.FromDays(7), 2),
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk, null, WTimeSpan.FromDays(7), 2),
                 now);
 
             Assert.AreEqual(ep1.Id, recall.Items[0].Episode.Id,
@@ -277,7 +277,7 @@ namespace EngineTests
             var memory = BuildMemoryWithReflectable(now, target);
 
             var workingSet = MemoryCognition.BuildWorkingSet(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk,
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk,
                     null, WTimeSpan.FromDays(7), 4, CognitiveBurden: 0.80),
                 now);
 
@@ -294,7 +294,7 @@ namespace EngineTests
             var memory = BuildMemoryWithReflectable(now, target);
 
             var workingSet = MemoryCognition.BuildWorkingSet(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk,
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk,
                     null, WTimeSpan.FromDays(7), 4, CognitiveBurden: 0.85),
                 now);
 
@@ -310,7 +310,7 @@ namespace EngineTests
             var memory = BuildMemoryWithReflectable(now, target);
 
             var workingSet = MemoryCognition.BuildWorkingSet(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk,
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk,
                     null, WTimeSpan.FromDays(7), 4, CognitiveBurden: 0.40),
                 now);
 
@@ -328,7 +328,7 @@ namespace EngineTests
 
             // Původní query bez CognitiveBurden → vždy System 2 (backward compat)
             var workingSet = MemoryCognition.BuildWorkingSet(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk,
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk,
                     null, WTimeSpan.FromDays(7), 4),
                 now);
 
@@ -345,7 +345,7 @@ namespace EngineTests
 
             // default threshold = 0.65; burden = 0.66 → System 1
             var workingSet = MemoryCognition.BuildWorkingSet(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk,
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk,
                     null, WTimeSpan.FromDays(7), 4, CognitiveBurden: 0.66),
                 now);
 
@@ -360,7 +360,7 @@ namespace EngineTests
             var memory = BuildMemoryWithReflectable(now, target);
 
             var workingSet = MemoryCognition.BuildWorkingSet(memory,
-                new MemoryRecallQuery(target, "ReachOut", SpeechAct.SmallTalk,
+                new MemoryRecallQuery(target, "ReachOut", RelationalActKind.SmallTalk,
                     null, WTimeSpan.FromDays(7), 4, CognitiveBurden: 0.64),
                 now);
 
@@ -488,7 +488,7 @@ namespace EngineTests
             var memory = new MemoryIndex(new List<EpisodicMemory> { negative, positive });
 
             var recall = MemoryCognition.Recall(memory,
-                new MemoryRecallQuery(Target, "ReachOut", SpeechAct.SmallTalk, null,
+                new MemoryRecallQuery(Target, "ReachOut", RelationalActKind.SmallTalk, null,
                     WTimeSpan.FromDays(7), 2,
                     CurrentValence: +0.3, NeuroticismScore: 0.9, DaysInNegativeMood: 30.0),
                 now);
@@ -666,7 +666,7 @@ namespace EngineTests
                 To: self,
                 Accepted: true,
                 Reason: "ok",
-                Act: SpeechAct.SelfDisclosure);
+                Act: RelationalActKind.SelfDisclosure);
 
             // Act
             engine.Handle(@event, ctx, _outbox);
@@ -720,7 +720,7 @@ namespace EngineTests
             var engine = BuildMemoryEngine();
             var ctx = BuildMemoryContext(self);
 
-            engine.Handle(new InteractionOutcome(_now, actor, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure), ctx, _outbox);
+            engine.Handle(new InteractionOutcome(_now, actor, self, Accepted: true, Reason: "ok", Act: RelationalActKind.SelfDisclosure), ctx, _outbox);
 
             var initialConfidence = engine.ConfidenceAbout(actor, "SelfDisclosure");
 
@@ -747,7 +747,7 @@ namespace EngineTests
             var engine = BuildMemoryEngine();
             var ctx = BuildMemoryContext(self);
 
-            var @event = new InteractionOutcome(_now, actor, self, Accepted: true, Reason: "ok", Act: SpeechAct.SelfDisclosure);
+            var @event = new InteractionOutcome(_now, actor, self, Accepted: true, Reason: "ok", Act: RelationalActKind.SelfDisclosure);
 
             // Act — stejná událost dvakrát
             engine.Handle(@event, ctx, _outbox);

@@ -49,7 +49,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         /// Predicts the probability that a social approach is accepted by the given person.
         /// A shortened overload without relationship context or psychological profile.
         /// </summary>
-        public double ExpectedAcceptance(HumanId other, SpeechAct act)
+        public double ExpectedAcceptance(HumanId other, RelationalActKind act)
             => SemanticMemoryMath.ExpectedAcceptance(this, other, act);
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         /// </summary>
         public double ExpectedAcceptance(
             HumanId other,
-            SpeechAct act,
+            RelationalActKind act,
             RelationshipEdge? relationship,
             PsychologicalProfile? profile,
             IReadOnlyList<EpisodicMemory>? episodes = null)

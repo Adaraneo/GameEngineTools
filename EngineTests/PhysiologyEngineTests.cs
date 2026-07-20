@@ -1053,7 +1053,7 @@ namespace EngineTests
                 OccurredAt: _now,
                 From: ctx.Id,
                 To: new HumanId(Guid.NewGuid()),
-                Act: GameEngineTools.Characters.Engines.Interactions.SpeechAct.SmallTalk,
+                Act: RelationalActKind.SmallTalk,
                 Accepted: false,
                 Reason: string.Empty);
 

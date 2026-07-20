@@ -12,7 +12,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using GameEngineTools.Characters.Traits;
 
     /// <summary>
-    /// Social-approach intent — determines which SpeechAct is used and how strict
+    /// Social-approach intent — determines which RelationalActKind is used and how strict
     /// the psychological-blocking conditions are.
     /// </summary>
     public enum SocialTargetMode
@@ -37,8 +37,8 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         double Score,
         /// <summary>Predicted probability of the approach being accepted [0.05–0.95].</summary>
         double ExpectedAcceptance,
-        /// <summary>The SpeechAct used during evaluation.</summary>
-        SpeechAct EvaluatedAct,
+        /// <summary>The RelationalActKind used during evaluation.</summary>
+        RelationalActKind EvaluatedAct,
         /// <summary>Degree of safety for vulnerability [0.0–1.0].</summary>
         double VulnerabilitySafety,
         /// <summary>Estimated risk of rejection [0.0–1.0].</summary>
@@ -174,9 +174,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         {
             var act = mode switch
             {
-                SocialTargetMode.Intimacy => SpeechAct.Invite,
-                SocialTargetMode.Vulnerability => SpeechAct.SelfDisclosure,
-                _ => SpeechAct.SmallTalk
+                SocialTargetMode.Intimacy => RelationalActKind.Invite,
+                SocialTargetMode.Vulnerability => RelationalActKind.SelfDisclosure,
+                _ => RelationalActKind.SmallTalk
             };
 
             var relationship = relationships.Edges.GetValueOrDefault(target);

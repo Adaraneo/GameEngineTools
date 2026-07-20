@@ -321,13 +321,13 @@ namespace GameEngineTools.Characters.Engines.Memory
                 return outcome.Accepted
                     ? new PersonBeliefEvidence(
                         outcome.To,
-                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Validation or SpeechAct.Meta ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
-                        outcome.Act is SpeechAct.Invite ? 0.24 : 0.18,
+                        outcome.Act is RelationalActKind.SelfDisclosure or RelationalActKind.Validation or RelationalActKind.Meta ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
+                        outcome.Act is RelationalActKind.Invite ? 0.24 : 0.18,
                         $"interaction-accepted:{outcome.Act}")
                     : new PersonBeliefEvidence(
                         outcome.To,
-                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Validation ? PersonBeliefKind.Critical : PersonBeliefKind.Rejecting,
-                        outcome.Act is SpeechAct.SelfDisclosure or SpeechAct.Invite ? 0.24 : 0.18,
+                        outcome.Act is RelationalActKind.SelfDisclosure or RelationalActKind.Validation ? PersonBeliefKind.Critical : PersonBeliefKind.Rejecting,
+                        outcome.Act is RelationalActKind.SelfDisclosure or RelationalActKind.Invite ? 0.24 : 0.18,
                         $"interaction-rejected:{outcome.Act}");
             }
 
@@ -335,7 +335,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             {
                 return new PersonBeliefEvidence(
                     outcome.From,
-                    outcome.Act is SpeechAct.Validation or SpeechAct.SelfDisclosure ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
+                    outcome.Act is RelationalActKind.Validation or RelationalActKind.SelfDisclosure ? PersonBeliefKind.EmotionallySafe : PersonBeliefKind.Warm,
                     0.16,
                     $"interaction-received:{outcome.Act}");
             }
@@ -460,7 +460,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
                         // ToM L1+L2: record knowledge that the other party performed a SelfDisclosure.
                         // Both parties were present, so this is mutually known (common ground) — set L2.
-                        if (io.Act == SpeechAct.SelfDisclosure && io.Accepted)
+                        if (io.Act == RelationalActKind.SelfDisclosure && io.Accepted)
                         {
                             var otherId = io.From == ctx.Id ? io.To : io.From;
                             RecordKnowledge(otherId, ctx.Id, "SelfDisclosure", FactSource.DirectWitness, io.OccurredAt,

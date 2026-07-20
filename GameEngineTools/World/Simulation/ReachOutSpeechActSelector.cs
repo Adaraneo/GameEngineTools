@@ -14,7 +14,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Selects a concrete <see cref="SpeechAct"/> for a generic ReachOut action.
+    /// Selects a concrete <see cref="RelationalActKind"/> for a generic ReachOut action.
     /// </summary>
     /// <remarks>
     /// The selector keeps early contact safe and gradually unlocks warmer,
@@ -68,7 +68,7 @@ namespace GameEngineTools.World.Simulation
             => SelectSpeechAct(edge, surface, rng, null, null, null, null);
 
         /// <summary>
-        /// Selects a <see cref="SpeechAct"/> for a <c>ReachOut</c>, factoring in the relationship edge,
+        /// Selects a <see cref="RelationalActKind"/> for a <c>ReachOut</c>, factoring in the relationship edge,
         /// surface, semantic beliefs, recent episodes, and attraction context.
         /// </summary>
         /// <param name="edge">Directional relationship edge, or <c>null</c> for strangers.</param>
@@ -100,7 +100,7 @@ namespace GameEngineTools.World.Simulation
             var closeness = edge?.Closeness ?? 0.0;
             var romanticInterest = edge?.IntimateAffinity ?? 0.0;
             var expectedAcceptance = targetId is { } other
-                ? SemanticMemoryMath.ExpectedAcceptance(semanticMemory, other, SpeechAct.SmallTalk, edge, profile, episodes)
+                ? SemanticMemoryMath.ExpectedAcceptance(semanticMemory, other, RelationalActKind.SmallTalk, edge, profile, episodes)
                 : 0.5;
             var warmBelief = targetId is { } warmOther && semanticMemory is not null
                 ? semanticMemory.GetStrength(warmOther, PersonBeliefKind.Warm)
@@ -110,31 +110,31 @@ namespace GameEngineTools.World.Simulation
                 : 0.0;
             var orientationMultiplier = SexualOrientationBehaviorMath.IntimacyTargetScoreMultiplier(attractionProfile, targetBiology);
 
-            var weightedActs = new List<(SpeechAct Act, double Weight)>
+            var weightedActs = new List<(RelationalActKind Act, double Weight)>
             {
-                (SpeechAct.SmallTalk, ComputeSmallTalkWeight(familiarity, comfort, closeness, expectedAcceptance))
+                (RelationalActKind.SmallTalk, ComputeSmallTalkWeight(familiarity, comfort, closeness, expectedAcceptance))
             };
 
-            weightedActs.Add((SpeechAct.Question, ComputeQuestionWeight(familiarity, comfort, closeness, expectedAcceptance)));
+            weightedActs.Add((RelationalActKind.Question, ComputeQuestionWeight(familiarity, comfort, closeness, expectedAcceptance)));
 
             if (familiarity >= 10 || comfort >= 48 || warmBelief >= 0.35)
             {
-                weightedActs.Add((SpeechAct.Validation, ComputeValidationWeight(trust, comfort, closeness, warmBelief, safeBelief)));
+                weightedActs.Add((RelationalActKind.Validation, ComputeValidationWeight(trust, comfort, closeness, warmBelief, safeBelief)));
             }
 
             if ((trust >= 50 && comfort >= 50 && closeness >= 6) || safeBelief >= 0.42)
             {
-                weightedActs.Add((SpeechAct.SelfDisclosure, ComputeSelfDisclosureWeight(trust, comfort, closeness, safeBelief)));
+                weightedActs.Add((RelationalActKind.SelfDisclosure, ComputeSelfDisclosureWeight(trust, comfort, closeness, safeBelief)));
             }
 
             if ((trust >= 52 && comfort >= 52 && closeness >= 8) || safeBelief >= 0.48)
             {
-                weightedActs.Add((SpeechAct.Meta, ComputeMetaWeight(trust, comfort, closeness, safeBelief)));
+                weightedActs.Add((RelationalActKind.Meta, ComputeMetaWeight(trust, comfort, closeness, safeBelief)));
             }
 
             if (CanInvite(surface, comfort, closeness, romanticInterest, orientationMultiplier) || expectedAcceptance >= 0.66)
             {
-                weightedActs.Add((SpeechAct.Invite, ComputeInviteWeight(surface, comfort, closeness, romanticInterest, expectedAcceptance) * orientationMultiplier));
+                weightedActs.Add((RelationalActKind.Invite, ComputeInviteWeight(surface, comfort, closeness, romanticInterest, expectedAcceptance) * orientationMultiplier));
             }
 
             var chosen = PickWeightedRandom(weightedActs, rng);
@@ -230,12 +230,12 @@ namespace GameEngineTools.World.Simulation
                 + Math.Max(0.0, expectedAcceptance - 0.5) * 0.14;
         }
 
-        private static SpeechAct PickWeightedRandom(IReadOnlyList<(SpeechAct Act, double Weight)> weightedActs, Random rng)
+        private static RelationalActKind PickWeightedRandom(IReadOnlyList<(RelationalActKind Act, double Weight)> weightedActs, Random rng)
         {
             var filtered = weightedActs.Where(a => a.Weight > 0.0).ToList();
             if (filtered.Count == 0)
             {
-                return SpeechAct.SmallTalk;
+                return RelationalActKind.SmallTalk;
             }
 
             var totalWeight = filtered.Sum(a => a.Weight);
@@ -261,7 +261,7 @@ namespace GameEngineTools.World.Simulation
     /// Captures the selected speech act together with the relationship context used to choose it.
     /// </summary>
     public sealed record ReachOutSpeechActSelection(
-        SpeechAct Act,
+        RelationalActKind Act,
         double Familiarity,
         double Trust,
         double Comfort,

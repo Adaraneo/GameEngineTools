@@ -38,7 +38,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.15" />
+    <!-- Dialogue contracts (SpeechAct, RelationalActKind, EntityRef, …) are referenced pervasively
+         across the engines; expose them as a project-wide global using to avoid per-file imports. -->
+    <Using Include="GameEngineTools.Dialogue.Contracts" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="50PSoftware.GrammarModular.Core" Version="1.0.0-preview.16" />
+    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.16" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="10.0.9" />

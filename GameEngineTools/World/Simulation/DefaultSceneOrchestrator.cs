@@ -1366,7 +1366,7 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         /// <remarks>
         /// Target selection uses <see cref="SemanticTargeting.ChooseTarget"/> — characters with
-        /// warmer beliefs and higher expected acceptance are preferred. The chosen <see cref="SpeechAct"/>
+        /// warmer beliefs and higher expected acceptance are preferred. The chosen <see cref="RelationalActKind"/>
         /// is determined by <see cref="ReachOutSpeechActSelector"/> based on relationship depth.
         /// </remarks>
         /// <param name="now">Current simulation time.</param>
@@ -1418,8 +1418,10 @@ namespace GameEngineTools.World.Simulation
                         selection.Closeness, selection.RomanticInterest, selection.HasPrivacy);
                 }
 
+                var content = new InteractionContent(
+                    SpeechAct.Relational(selection.Act, character.Id, target.Id, now));
                 target.ReceiveEvent(new InteractionProposed(
-                    now, character.Id, target.Id, selection.Act, null, character.Biology));
+                    now, character.Id, target.Id, content, character.Biology));
 
                 TryTouch(now, character, target);
             }

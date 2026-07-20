@@ -134,7 +134,7 @@ namespace GameEngineTools.World.Simulation
         ///
         ///     // Scheduled scenario
         ///     if (now.Day is 2 or 6 or 12)
-        ///         npc.ReceiveEvent(new InteractionProposed(now, player.Id, npc.Id, SpeechAct.SmallTalk, "Hi!"));
+        ///         npc.ReceiveEvent(new InteractionProposed(now, player.Id, npc.Id, RelationalActKind.SmallTalk, "Hi!"));
         ///
         ///     // ReachOut routing — who wants to reach out?
         ///     foreach (var c in chars)
@@ -149,7 +149,7 @@ namespace GameEngineTools.World.Simulation
         ///                 &amp;&amp; x.Snapshot.InteractionSurface.Location == c.Snapshot.InteractionSurface.Location)
         ///             .FirstOrDefault();
         ///
-        ///         target?.ReceiveEvent(new InteractionProposed(now, c.Id, target.Id, SpeechAct.SmallTalk, null));
+        ///         target?.ReceiveEvent(new InteractionProposed(now, c.Id, target.Id, RelationalActKind.SmallTalk, null));
         ///     }
         /// }
         /// </code>

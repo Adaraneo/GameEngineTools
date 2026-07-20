@@ -8,7 +8,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
 
     /// <summary>
     /// Published by <see cref="DefaultRelationshipsEngine"/> when an intimate advance
-    /// (<see cref="GameEngineTools.Characters.Engines.Interactions.SpeechAct.Invite"/>) is rejected.
+    /// (<see cref="GameEngineTools.Characters.Engines.Interactions.RelationalActKind.Invite"/>) is rejected.
     /// </summary>
     /// <remarks>
     /// Williams' Temporal Need-Threat Model (Hartgerink et al. 2015, k=120 Cyberball studies,

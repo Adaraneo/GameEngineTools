@@ -389,7 +389,7 @@ namespace EngineTests
             var sit     = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
             var reachOut = MakeCandidate(ActionNames.ReachOut,         ActionSlotMask.Mouth,  utility: 50,
                 socialTargeting: new SocialTargetingData(
-                    new HumanId(Guid.NewGuid()), SpeechAct.SmallTalk, 0.7, 0.8, 0.2));
+                    new HumanId(Guid.NewGuid()), RelationalActKind.SmallTalk, 0.7, 0.8, 0.2));
 
             var result = DefaultBehaviorEngine.SelectSecondaryAction(
                 [sit, reachOut], primary: sit, alreadyOccupied: ActionSlotMask.None);

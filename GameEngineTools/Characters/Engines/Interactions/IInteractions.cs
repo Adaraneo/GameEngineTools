@@ -110,36 +110,6 @@ namespace GameEngineTools.Characters.Engines.Interactions
     public interface IInteractionEngine : IEngine<InteractionSurface, InteractionConfig>
     { }
 
-    /// <summary>
-    /// Type of speech act — determines the character of the interaction and which relationship domains it affects.
-    /// </summary>
-    public enum SpeechAct
-    {
-        /// <summary>Casual chat — builds Humor.</summary>
-        SmallTalk,
-
-        /// <summary>A question — shows interest, builds the Intellect domain.</summary>
-        Question,
-
-        /// <summary>Self-disclosure — sharing something personal — builds Values and Closeness.</summary>
-        SelfDisclosure,
-
-        /// <summary>Validation — affirming and supporting the other — builds Values and Comfort.</summary>
-        Validation,
-
-        /// <summary>Boundary — setting a limit in the interaction.</summary>
-        Boundary,
-
-        /// <summary>Humor — a joke, lightening the mood — strongly builds the Humor domain.</summary>
-        Humor,
-
-        /// <summary>Meta — commentary about the relationship or interaction itself — builds Intellect.</summary>
-        Meta,
-
-        /// <summary>Invite — social initiative — gently builds the Physical domain.</summary>
-        Invite
-    }
-
     /// <summary>Level of physical contact in a <see cref="TouchAttempted"/>.</summary>
     public enum TouchLevel
     {
@@ -156,15 +126,40 @@ namespace GameEngineTools.Characters.Engines.Interactions
         Intimate
     }
 
-    /// <summary>Event — character A proposes an interaction to character B.</summary>
+    /// <summary>
+    /// Event — character A proposes an interaction to character B. The semantic payload is the
+    /// structured <see cref="InteractionContent"/> (a <see cref="SpeechAct"/>); characters never
+    /// exchange text.
+    /// </summary>
     public sealed record InteractionProposed(
         WDateTime OccurredAt,
         HumanId From,
         HumanId To,
-        SpeechAct Act,
-        string? Content,
+        InteractionContent Content,
         SexBiology? FromBiology = null,
-        SexBiology? ToBiology = null) : IDomainEvent;
+        SexBiology? ToBiology = null) : IDomainEvent
+    {
+        /// <summary>
+        /// Builds an <see cref="InteractionProposed"/> from a relational act kind, wrapping a stub
+        /// <see cref="SpeechAct"/> (via <see cref="SpeechAct.Relational"/>) in an
+        /// <see cref="InteractionContent"/>. A convenience for producers and tests until the
+        /// <c>SpeechActPlanner</c> becomes the sole author of richly-specified speech acts.
+        /// </summary>
+        public static InteractionProposed Of(
+            WDateTime occurredAt,
+            HumanId from,
+            HumanId to,
+            RelationalActKind kind,
+            SexBiology? fromBiology = null,
+            SexBiology? toBiology = null)
+            => new(
+                occurredAt,
+                from,
+                to,
+                new InteractionContent(SpeechAct.Relational(kind, from, to, occurredAt)),
+                fromBiology,
+                toBiology);
+    }
 
     /// <summary>Event — character A attempts physical contact with character B.</summary>
     public sealed record TouchAttempted(
@@ -177,7 +172,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
     /// Event — the interaction was evaluated (accepted or declined).
     /// </summary>
     /// <param name="Act">
-    /// The speech-act type from the original <see cref="InteractionProposed"/>.
+    /// The relational act kind from the original <see cref="InteractionProposed"/>.
     /// We carry it here so the <c>RelationshipsEngine</c> knows which domain to update
     /// without having to correlate with the original event.
     /// </param>
@@ -187,7 +182,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
         HumanId To,
         bool Accepted,
         string Reason,
-        SpeechAct Act = SpeechAct.SmallTalk,
+        RelationalActKind Act = RelationalActKind.SmallTalk,
         SexBiology? FromBiology = null,
         SexBiology? ToBiology = null,
         double? PeakValence = null,

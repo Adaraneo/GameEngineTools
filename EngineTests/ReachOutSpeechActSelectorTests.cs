@@ -29,8 +29,8 @@ namespace EngineTests
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 256);
 
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.Question));
-            Assert.IsTrue(counts.Keys.Any(a => a != SpeechAct.SmallTalk));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.Question));
+            Assert.IsTrue(counts.Keys.Any(a => a != RelationalActKind.SmallTalk));
         }
 
         /// <summary>
@@ -45,9 +45,9 @@ namespace EngineTests
                 draws: 300);
 
             Assert.AreEqual(2, counts.Count);
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.SmallTalk));
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.Question));
-            Assert.IsTrue(counts[SpeechAct.SmallTalk] > counts[SpeechAct.Question]);
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.SmallTalk));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.Question));
+            Assert.IsTrue(counts[RelationalActKind.SmallTalk] > counts[RelationalActKind.Question]);
         }
 
         /// <summary>
@@ -61,8 +61,8 @@ namespace EngineTests
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 240);
 
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.Question));
-            Assert.IsTrue(counts[SpeechAct.Question] > 0);
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.Question));
+            Assert.IsTrue(counts[RelationalActKind.Question] > 0);
         }
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace EngineTests
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 320);
 
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.Validation));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.Validation));
         }
 
         /// <summary>
@@ -90,9 +90,9 @@ namespace EngineTests
                 new InteractionSurface("Room", true, 0.1, 0.1, SurfaceKind.Private),
                 draws: 600);
 
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.Validation));
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.SelfDisclosure));
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.Meta));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.Validation));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.SelfDisclosure));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.Meta));
         }
 
         /// <summary>
@@ -106,7 +106,7 @@ namespace EngineTests
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 320);
 
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.SelfDisclosure));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.SelfDisclosure));
         }
 
         /// <summary>
@@ -120,7 +120,7 @@ namespace EngineTests
                 new InteractionSurface("Room", true, 0.1, 0.1, SurfaceKind.Private),
                 draws: 360);
 
-            Assert.IsTrue(counts.ContainsKey(SpeechAct.Meta));
+            Assert.IsTrue(counts.ContainsKey(RelationalActKind.Meta));
         }
 
         /// <summary>
@@ -134,16 +134,16 @@ namespace EngineTests
                 new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social),
                 draws: 400);
 
-            Assert.IsFalse(weakCounts.ContainsKey(SpeechAct.Invite));
+            Assert.IsFalse(weakCounts.ContainsKey(RelationalActKind.Invite));
 
             var strongCounts = SampleActs(
                 BuildEdge(familiarity: 13, trust: 55, comfort: 56, closeness: 12.5, romanticInterest: 11),
                 new InteractionSurface("Room", true, 0.1, 0.1, SurfaceKind.Private),
                 draws: 800);
 
-            Assert.IsTrue(strongCounts.ContainsKey(SpeechAct.Invite));
-            Assert.IsTrue(strongCounts[SpeechAct.Invite] < strongCounts[SpeechAct.Question]);
-            Assert.IsTrue(strongCounts[SpeechAct.Invite] < strongCounts[SpeechAct.Validation]);
+            Assert.IsTrue(strongCounts.ContainsKey(RelationalActKind.Invite));
+            Assert.IsTrue(strongCounts[RelationalActKind.Invite] < strongCounts[RelationalActKind.Question]);
+            Assert.IsTrue(strongCounts[RelationalActKind.Invite] < strongCounts[RelationalActKind.Validation]);
         }
 
         #endregion ReachOut routing
@@ -185,13 +185,13 @@ namespace EngineTests
 
         #region Helpers
 
-        private static Dictionary<SpeechAct, int> SampleActs(
+        private static Dictionary<RelationalActKind, int> SampleActs(
             RelationshipEdge edge,
             InteractionSurface surface,
             int draws)
         {
             var rng = new Random(12345);
-            var counts = new Dictionary<SpeechAct, int>();
+            var counts = new Dictionary<RelationalActKind, int>();
 
             for (var i = 0; i < draws; i++)
             {

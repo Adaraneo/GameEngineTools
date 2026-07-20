@@ -215,16 +215,16 @@ namespace EngineTests
             var edge = new RelationshipEdge(default, default, 55, 55, 20, 50, 50, 15, 10, 18, 50, 50, new DomainBreakdown(50, 50, 50, 50, 50), 2);
             var surface = new InteractionSurface("Village", false, 0.2, 0.2, SurfaceKind.Social);
 
-            var warmAcceptance = semantic.ExpectedAcceptance(warmTarget, SpeechAct.SelfDisclosure);
-            var rejectingAcceptance = semantic.ExpectedAcceptance(rejectingTarget, SpeechAct.SelfDisclosure);
+            var warmAcceptance = semantic.ExpectedAcceptance(warmTarget, RelationalActKind.SelfDisclosure);
+            var rejectingAcceptance = semantic.ExpectedAcceptance(rejectingTarget, RelationalActKind.SelfDisclosure);
 
             Assert.IsTrue(warmAcceptance > rejectingAcceptance);
 
             var warmCounts = SampleActs(edge, surface, semantic, warmTarget, 300);
             var rejectingCounts = SampleActs(edge, surface, semantic, rejectingTarget, 300);
 
-            var warmVulnerable = Count(warmCounts, SpeechAct.Validation) + Count(warmCounts, SpeechAct.SelfDisclosure) + Count(warmCounts, SpeechAct.Meta);
-            var rejectingVulnerable = Count(rejectingCounts, SpeechAct.Validation) + Count(rejectingCounts, SpeechAct.SelfDisclosure) + Count(rejectingCounts, SpeechAct.Meta);
+            var warmVulnerable = Count(warmCounts, RelationalActKind.Validation) + Count(warmCounts, RelationalActKind.SelfDisclosure) + Count(warmCounts, RelationalActKind.Meta);
+            var rejectingVulnerable = Count(rejectingCounts, RelationalActKind.Validation) + Count(rejectingCounts, RelationalActKind.SelfDisclosure) + Count(rejectingCounts, RelationalActKind.Meta);
 
             Assert.IsTrue(warmVulnerable > rejectingVulnerable);
         }
@@ -249,8 +249,8 @@ namespace EngineTests
             var guarded = new PsychologicalProfile(CopingStyle.Avoidant, new SelfNarrative(0.5, 0.95, 0.25), 0.3, 0.7);
             var affiliative = new PsychologicalProfile(CopingStyle.PeoplePleasing, new SelfNarrative(0.5, 0.35, 0.95), 0.3, 0.7);
 
-            var guardedExpected = semantic.ExpectedAcceptance(other, SpeechAct.SelfDisclosure, edge, guarded);
-            var affiliativeExpected = semantic.ExpectedAcceptance(other, SpeechAct.SelfDisclosure, edge, affiliative);
+            var guardedExpected = semantic.ExpectedAcceptance(other, RelationalActKind.SelfDisclosure, edge, guarded);
+            var affiliativeExpected = semantic.ExpectedAcceptance(other, RelationalActKind.SelfDisclosure, edge, affiliative);
 
             Assert.IsTrue(affiliativeExpected > guardedExpected);
         }
@@ -281,8 +281,8 @@ namespace EngineTests
                 new(Guid.NewGuid(), new WDateTime(80), "Interaction:Invite:Rejected|from=a|to=b", 0.85, EmotionalTag.Negative, 0.70, OtherPerson: other)
             };
 
-            var withoutTrend = semantic.ExpectedAcceptance(other, SpeechAct.SelfDisclosure, null, profile, Array.Empty<EpisodicMemory>());
-            var withTrend = semantic.ExpectedAcceptance(other, SpeechAct.SelfDisclosure, edge, profile, episodes);
+            var withoutTrend = semantic.ExpectedAcceptance(other, RelationalActKind.SelfDisclosure, null, profile, Array.Empty<EpisodicMemory>());
+            var withTrend = semantic.ExpectedAcceptance(other, RelationalActKind.SelfDisclosure, edge, profile, episodes);
 
             Assert.IsTrue(withTrend > withoutTrend + 0.05);
         }
@@ -772,7 +772,7 @@ namespace EngineTests
                     entry => new PersonBelief(person, entry.Key, entry.Value, 0.5, 3, new WDateTime(0), "seed")));
         }
 
-        private static Dictionary<SpeechAct, int> SampleActs(
+        private static Dictionary<RelationalActKind, int> SampleActs(
             RelationshipEdge edge,
             InteractionSurface surface,
             SemanticMemoryState semantic,
@@ -780,7 +780,7 @@ namespace EngineTests
             int draws)
         {
             var rng = new Random(12345);
-            var counts = new Dictionary<SpeechAct, int>();
+            var counts = new Dictionary<RelationalActKind, int>();
 
             for (var i = 0; i < draws; i++)
             {
@@ -791,7 +791,7 @@ namespace EngineTests
             return counts;
         }
 
-        private static int Count(IReadOnlyDictionary<SpeechAct, int> counts, SpeechAct act)
+        private static int Count(IReadOnlyDictionary<RelationalActKind, int> counts, RelationalActKind act)
             => counts.TryGetValue(act, out var count) ? count : 0;
 
         private sealed class LocalHuman : IHuman

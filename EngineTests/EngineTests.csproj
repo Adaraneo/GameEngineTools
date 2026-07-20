@@ -35,6 +35,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="GameEngineTools.Dialogue.Contracts" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="appsettings.Characters.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

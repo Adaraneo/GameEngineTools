@@ -623,7 +623,7 @@ namespace EngineTests
                 OccurredAt: new WDateTime(0),
                 From: new HumanId(Guid.NewGuid()),
                 To: sickCtx.Id,
-                Act: GameEngineTools.Characters.Engines.Interactions.SpeechAct.SmallTalk,
+                Act: RelationalActKind.SmallTalk,
                 Accepted: true,
                 Reason: string.Empty);
 

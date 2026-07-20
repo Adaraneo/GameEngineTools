@@ -12,7 +12,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// </summary>
     internal sealed record SocialTargetingData(
         HumanId TargetHuman,
-        SpeechAct SpeechAct,
+        RelationalActKind RelationalActKind,
         double ExpectedAcceptance,
         double VulnerabilitySafety,
         double RejectionRisk,

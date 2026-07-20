@@ -208,10 +208,10 @@ namespace EngineTests
         private static WDateTime At(int year) => WDateOnly.New(year, 1, 1).ToDateTime();
 
         private InteractionOutcome Accepted(HumanId self)
-            => new(At(100), self, new HumanId(Guid.NewGuid()), Accepted: true, "ok", SpeechAct.SmallTalk);
+            => new(At(100), self, new HumanId(Guid.NewGuid()), Accepted: true, "ok", RelationalActKind.SmallTalk);
 
         private InteractionOutcome Rejected(HumanId self)
-            => new(At(100), self, new HumanId(Guid.NewGuid()), Accepted: false, "no", SpeechAct.SmallTalk);
+            => new(At(100), self, new HumanId(Guid.NewGuid()), Accepted: false, "no", RelationalActKind.SmallTalk);
 
         private (DefaultSelfConceptEngine engine, IHumanContext ctx, HumanId self) MakeEngine(SelfConceptConfig cfg)
         {

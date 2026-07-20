@@ -618,7 +618,7 @@ namespace EngineTests
         private static BehaviorCandidate ReachOutTo(HumanId target, double utility)
             => new(ReachOut, utility, WTimeSpan.FromHours(1), BehaviorDomain.Social,
                 new[] { "TargetedSocial" },
-                new SocialTargetingData(target, SpeechAct.SmallTalk, 0.5, 0.5, 0.3));
+                new SocialTargetingData(target, RelationalActKind.SmallTalk, 0.5, 0.5, 0.3));
 
         private static RelationshipEdge PartnerEdge(HumanId self, HumanId partner, double commitment, double alternativeQuality)
             => new(self, partner,

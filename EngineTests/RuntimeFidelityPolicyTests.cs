@@ -81,7 +81,7 @@ namespace EngineTests
 
             Assert.IsFalse(policy.ShouldStoreEvent(ctx, new ActionCommitted(new WDateTime(0), self, Drink, WTimeSpan.FromHours(0.1))));
             Assert.IsTrue(policy.ShouldStoreEvent(ctx, new ActionCommitted(new WDateTime(0), self, ReachOut, WTimeSpan.FromHours(0.5), other)));
-            Assert.IsTrue(policy.ShouldStoreEvent(ctx, new InteractionOutcome(new WDateTime(0), self, other, false, "rejected", SpeechAct.Invite)));
+            Assert.IsTrue(policy.ShouldStoreEvent(ctx, new InteractionOutcome(new WDateTime(0), self, other, false, "rejected", RelationalActKind.Invite)));
         }
 
         [TestMethod]
@@ -100,7 +100,7 @@ namespace EngineTests
 
             Assert.AreEqual(0, engine.State.Episodes.Count);
 
-            engine.Handle(new InteractionOutcome(new WDateTime(0), self, other, false, "rejected", SpeechAct.Invite), ctx, outbox);
+            engine.Handle(new InteractionOutcome(new WDateTime(0), self, other, false, "rejected", RelationalActKind.Invite), ctx, outbox);
 
             Assert.AreEqual(1, engine.State.Episodes.Count);
             Assert.AreEqual(other, engine.State.Episodes.Single().OtherPerson);

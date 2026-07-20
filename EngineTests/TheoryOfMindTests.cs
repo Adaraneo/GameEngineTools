@@ -40,7 +40,7 @@ namespace EngineTests
             engineB.RestoreState(new MemoryIndex(new List<EpisodicMemory>()));
 
             // An accepted self-disclosure A→B: both parties are present, so it is common ground.
-            var ev = new InteractionOutcome(At(100), a, b, Accepted: true, "ok", SpeechAct.SelfDisclosure);
+            var ev = new InteractionOutcome(At(100), a, b, Accepted: true, "ok", RelationalActKind.SelfDisclosure);
 
             engineA.Handle(ev, BuildCtx(a), new EventCollector());
             engineB.Handle(ev, BuildCtx(b), new EventCollector());
@@ -68,7 +68,7 @@ namespace EngineTests
             engineB.RestoreState(new MemoryIndex(new List<EpisodicMemory>()));
 
             var outbox = new EventCollector();
-            engineB.Handle(new InteractionOutcome(At(100), a, b, true, "ok", SpeechAct.SelfDisclosure),
+            engineB.Handle(new InteractionOutcome(At(100), a, b, true, "ok", RelationalActKind.SelfDisclosure),
                 BuildCtx(b), outbox);
 
             var formed = outbox.Drain().OfType<MutualKnowledgeFormed>().FirstOrDefault();

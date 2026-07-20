@@ -36,7 +36,7 @@ namespace EngineTests
             var outbox = new EventCollector();
 
             engine.Handle(
-                new InteractionProposed(WDateTime.New(100, 1, 1), from, to, SpeechAct.Invite, null, SexBiology.Male),
+                InteractionProposed.Of(WDateTime.New(100, 1, 1), from, to, RelationalActKind.Invite, SexBiology.Male),
                 ctx,
                 outbox);
 
@@ -60,7 +60,7 @@ namespace EngineTests
             var outbox = new EventCollector();
 
             engine.Handle(
-                new InteractionProposed(WDateTime.New(100, 1, 1), from, to, SpeechAct.Invite, null, SexBiology.Male),
+                InteractionProposed.Of(WDateTime.New(100, 1, 1), from, to, RelationalActKind.Invite, SexBiology.Male),
                 ctx,
                 outbox);
 
@@ -89,12 +89,12 @@ namespace EngineTests
             var highOutbox = new EventCollector();
 
             engine.Handle(
-                new InteractionProposed(WDateTime.New(100, 1, 1), from, lowTrustRecipient, SpeechAct.Invite, null, SexBiology.Male),
+                InteractionProposed.Of(WDateTime.New(100, 1, 1), from, lowTrustRecipient, RelationalActKind.Invite, SexBiology.Male),
                 AdultContext(lowTrustRecipient, SexBiology.Female, lowRelationships, new ThresholdRandom(0.45), stress: 85),
                 lowOutbox);
 
             engine.Handle(
-                new InteractionProposed(WDateTime.New(100, 1, 1), from, highTrustRecipient, SpeechAct.Invite, null, SexBiology.Male),
+                InteractionProposed.Of(WDateTime.New(100, 1, 1), from, highTrustRecipient, RelationalActKind.Invite, SexBiology.Male),
                 AdultContext(highTrustRecipient, SexBiology.Female, highRelationships, new ThresholdRandom(0.45), stress: 85),
                 highOutbox);
 

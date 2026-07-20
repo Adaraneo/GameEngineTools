@@ -23,7 +23,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         public static double ExpectedAcceptance(
             SemanticMemoryState? state,
             HumanId other,
-            SpeechAct act)
+            RelationalActKind act)
             => ExpectedAcceptance(state, other, act, null, null, null);
 
         /// <summary>
@@ -33,7 +33,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         public static double ExpectedAcceptance(
             SemanticMemoryState? state,
             HumanId other,
-            SpeechAct act,
+            RelationalActKind act,
             RelationshipEdge? relationship,
             PsychologicalProfile? profile,
             IReadOnlyList<EpisodicMemory>? episodes)
@@ -46,10 +46,10 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
             var vulnerabilityWeight = act switch
             {
-                SpeechAct.SelfDisclosure => 1.25,
-                SpeechAct.Meta => 1.10,
-                SpeechAct.Invite => 1.20,
-                SpeechAct.Validation => 1.0,
+                RelationalActKind.SelfDisclosure => 1.25,
+                RelationalActKind.Meta => 1.10,
+                RelationalActKind.Invite => 1.20,
+                RelationalActKind.Validation => 1.0,
                 _ => 0.8
             };
 
@@ -68,7 +68,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             RelationshipEdge? relationship,
             PsychologicalProfile? profile,
             IReadOnlyList<EpisodicMemory>? episodes,
-            SpeechAct act)
+            RelationalActKind act)
         {
             var expected = ExpectedAcceptance(state, other, act, relationship, profile, episodes);
             var familiarity = (relationship?.Familiarity ?? 0.0) / 100.0;
@@ -84,7 +84,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 1.0);
         }
 
-        private static double RelationshipBias(RelationshipEdge? relationship, SpeechAct act)
+        private static double RelationshipBias(RelationshipEdge? relationship, RelationalActKind act)
         {
             if (relationship is null)
             {
@@ -97,9 +97,9 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
             return act switch
             {
-                SpeechAct.SelfDisclosure or SpeechAct.Meta
+                RelationalActKind.SelfDisclosure or RelationalActKind.Meta
                     => trust * 0.12 + comfort * 0.08 + closeness * 0.06,
-                SpeechAct.Invite
+                RelationalActKind.Invite
                     => trust * 0.08 + comfort * 0.06 + closeness * 0.10,
                 _
                     => trust * 0.05 + comfort * 0.04
@@ -109,7 +109,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         private static double RecentEpisodeBias(
             IReadOnlyList<EpisodicMemory>? episodes,
             HumanId other,
-            SpeechAct act)
+            RelationalActKind act)
         {
             if (episodes is null || episodes.Count == 0)
             {
@@ -130,7 +130,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             var positive = recent.Sum(e => e.Emotion == EmotionalTag.Positive ? e.Strength : 0.0);
             var negative = recent.Sum(e => e.Emotion == EmotionalTag.Negative ? e.Strength : 0.0);
             var threatPenalty = recent.Count(e => (e.PerceivedWhat ?? e.What).StartsWith("PerceivedThreat:", StringComparison.Ordinal)) * 0.04;
-            var vulnerabilityMultiplier = act is SpeechAct.SelfDisclosure or SpeechAct.Meta or SpeechAct.Invite ? 1.25 : 0.85;
+            var vulnerabilityMultiplier = act is RelationalActKind.SelfDisclosure or RelationalActKind.Meta or RelationalActKind.Invite ? 1.25 : 0.85;
 
             return Math.Clamp((positive - negative) * 0.06 * vulnerabilityMultiplier - threatPenalty, -0.12, 0.12);
         }
@@ -139,7 +139,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             RelationshipEdge? relationship,
             IReadOnlyList<EpisodicMemory>? episodes,
             HumanId other,
-            SpeechAct act,
+            RelationalActKind act,
             PsychologicalProfile? profile)
         {
             var exposureBias = RelationshipExposureBias(relationship);
@@ -169,7 +169,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
         private static double MemoryTrendBias(
             IReadOnlyList<EpisodicMemory>? episodes,
             HumanId other,
-            SpeechAct act,
+            RelationalActKind act,
             PsychologicalProfile? profile)
         {
             if (episodes is null || episodes.Count == 0)
@@ -213,7 +213,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             }
 
             var trend = Math.Clamp(weighted / total, -1.0, 1.0);
-            var vulnerableAct = act is SpeechAct.SelfDisclosure or SpeechAct.Meta or SpeechAct.Invite;
+            var vulnerableAct = act is RelationalActKind.SelfDisclosure or RelationalActKind.Meta or RelationalActKind.Invite;
             var ambivalence = Math.Clamp(profile?.Ambivalence ?? PsychologicalProfile.Default.Ambivalence, 0.0, 1.0);
             var positiveScale = vulnerableAct ? 0.08 + ambivalence * 0.04 : 0.06 + ambivalence * 0.025;
             var negativeScale = vulnerableAct ? 0.08 + ambivalence * 0.035 : 0.06 + ambivalence * 0.02;
@@ -225,7 +225,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         private static double ProfileBias(
             PsychologicalProfile? profile,
-            SpeechAct act,
+            RelationalActKind act,
             double safe,
             double rejecting,
             double critical)
@@ -235,7 +235,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 return 0.0;
             }
 
-            var vulnerableAct = act is SpeechAct.SelfDisclosure or SpeechAct.Meta or SpeechAct.Invite;
+            var vulnerableAct = act is RelationalActKind.SelfDisclosure or RelationalActKind.Meta or RelationalActKind.Invite;
             var selfProtective = profile.Coping is CopingStyle.Avoidant or CopingStyle.AggressiveCompensation
                 ? 0.05 + profile.Narrative.ToughnessIdentity * 0.08
                 : 0.0;

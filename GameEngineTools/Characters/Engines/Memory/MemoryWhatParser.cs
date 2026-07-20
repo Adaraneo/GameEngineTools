@@ -50,7 +50,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         #region Build — sestavení What
 
         /// <summary>
-        /// Builds the <c>What</c> for an interaction (a SpeechAct between two characters).
+        /// Builds the <c>What</c> for an interaction (a RelationalActKind between two characters).
         /// </summary>
         /// <remarks>
         /// Resulting format: <c>Interaction:{Act}:{Accepted|Rejected}|from={id}|to={id}</c>
