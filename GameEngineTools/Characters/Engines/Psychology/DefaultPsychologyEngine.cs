@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology.Appraisal;
+    using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Objects;
@@ -52,6 +53,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
         private readonly Status.StatusConfig _statusConfig;
         private WDateTime? _stressAbove70Since;
         private double _previousAllostaticLoad;
+
+        /// <summary>
+        /// Listener-side interpreter (stateless): decodes an incoming <c>SpeechAct</c> into a
+        /// subjective <c>PerceivedMeaning</c> before it feeds the Scherer-CPM appraisal. Mirrors the
+        /// static <see cref="AppraisalEvaluator"/> usage — no constructor/DI change needed.
+        /// </summary>
+        private static readonly ISpeechActInterpreter Interpreter = new DefaultSpeechActInterpreter();
 
         /// <summary>
         /// Initialises the engine with a neutral resting state:
@@ -1179,9 +1187,71 @@ namespace GameEngineTools.Characters.Engines.Psychology
                         };
                         break;
                     }
+
+                // ── Listener-side interpretation of an incoming act (dialogue engine, Phase 4) ──
+                // Decode the SpeechAct subjectively, then let the *divergence* (hostile-attribution
+                // shift, mis/decoded irony) drive emotion through the existing CPM. Plainly-read acts
+                // add nothing here — the interaction/relationship paths own their base affect.
+                case Characters.Engines.Interactions.InteractionProposed p when p.To == ctx.Id:
+                    s = InterpretIncomingAct(p, s, ctx, outbox);
+                    break;
             }
 
             State = s;
+        }
+
+        /// <summary>
+        /// Interprets an incoming <see cref="Characters.Engines.Interactions.InteractionProposed"/> and,
+        /// when the reading diverges from the objective act, applies the resulting CPM emotion.
+        /// </summary>
+        private PsychologyState InterpretIncomingAct(
+            Characters.Engines.Interactions.InteractionProposed proposed,
+            PsychologyState s,
+            IHumanContext ctx,
+            IEventCollector outbox)
+        {
+            var act = proposed.Content.SpeechAct;
+            var edge = ctx.Snapshot.Relationships.Edges.GetValueOrDefault(proposed.From);
+            var familiarity = edge?.Familiarity ?? 0.0;
+            var trust = edge?.Trust ?? 50.0;
+            var darkCore = ctx.Personality.DarkCore?.DarkCore ?? 0.0;
+
+            // Hostility: low trust and a dark/paranoid disposition both raise hostile attribution.
+            // Only genuinely low trust (< 40) contributes, so ordinary relationships stay non-hostile.
+            var trustHostility = Math.Clamp((40.0 - trust) / 40.0, 0.0, 1.0);
+            var hostility = Math.Clamp(0.55 * darkCore + 0.55 * trustHostility, 0.0, 1.0);
+
+            // Theory-of-mind proxy: cognitive perspective-taking tracks Openness (no explicit ToM level).
+            var tomLevel = ctx.Personality.BigFive.Openness >= 0.5 ? 2 : 1;
+
+            var listener = new ListenerContext(tomLevel, familiarity, hostility);
+            var meaning = Interpreter.Appraise(act, listener);
+
+            var outcome = PerceivedActAppraiser.ToAppraisal(meaning, familiarity, s);
+            if (outcome is not { } o || !o.IsRelevant())
+            {
+                return s;
+            }
+
+            var result = AppraisalEmotionMap.Map(o, Config);
+            var previousEmotion = s.DominantEmotion;
+            s = s with
+            {
+                Valence = Math.Clamp(s.Valence + result.DeltaValence, -1, 1),
+                Arousal = Math.Clamp(s.Arousal + result.DeltaArousal, 0, 1),
+                Dominance = Math.Clamp(s.Dominance + result.DeltaDominance, 0, 1),
+                DominantEmotion = result.Emotion,
+            };
+
+            outbox.Add(new EmotionAppraised(
+                proposed.OccurredAt, ctx.Id, result.Emotion,
+                o.GoalConduciveness, result.DeltaValence, result.DeltaArousal, result.DeltaDominance));
+            if (result.Emotion != previousEmotion)
+            {
+                outbox.Add(new EmotionShifted(proposed.OccurredAt, ctx.Id, result.Emotion, s.Valence, s.Arousal, s.Dominance));
+            }
+
+            return s;
         }
 
         /// <summary>
