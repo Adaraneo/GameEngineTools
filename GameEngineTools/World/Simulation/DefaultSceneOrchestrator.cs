@@ -161,6 +161,13 @@ namespace GameEngineTools.World.Simulation
         private readonly RelationshipsConfig? _relationshipsConfig;
 
         /// <summary>
+        /// Speaker-side dialogue planner: turns a chosen relational act into a fully-specified
+        /// <see cref="SpeechAct"/> (register, directness, speaker/addressee) for the reach-out path.
+        /// Defaults to a <see cref="Dialogue.Planning.DefaultSpeechActPlanner"/> when not injected.
+        /// </summary>
+        private readonly Dialogue.Planning.ISpeechActPlanner _speechActPlanner;
+
+        /// <summary>
         /// Characters currently travelling between locations, keyed by id. Populated only when
         /// <see cref="SceneOrchestratorOptions.EnableTravelTime"/> is enabled: a <c>MoveTo:*</c>
         /// records the destination and arrival time here instead of relocating instantly, and the
@@ -217,7 +224,8 @@ namespace GameEngineTools.World.Simulation
             CommunityReputationLedger? reputationLedger = null,
             Characters.Engines.Status.StatusLedger? statusLedger = null,
             Objects.IMutableWorldObjectProvider? mutableObjects = null,
-            RelationshipsConfig? relationshipsConfig = null)
+            RelationshipsConfig? relationshipsConfig = null,
+            Dialogue.Planning.ISpeechActPlanner? speechActPlanner = null)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -234,6 +242,7 @@ namespace GameEngineTools.World.Simulation
             _statusLedger = statusLedger;
             _mutableObjects = mutableObjects;
             _relationshipsConfig = relationshipsConfig;
+            _speechActPlanner = speechActPlanner ?? new Dialogue.Planning.DefaultSpeechActPlanner();
         }
 
         #endregion Constructor
@@ -1418,8 +1427,19 @@ namespace GameEngineTools.World.Simulation
                         selection.Closeness, selection.RomanticInterest, selection.HasPrivacy);
                 }
 
-                var content = new InteractionContent(
-                    SpeechAct.Relational(selection.Act, character.Id, target.Id, now));
+                // Plan a fully-specified SpeechAct (register/directness/speaker/addressee) so the act can
+                // later be realised as a direct-address utterance, not only a third-person gloss.
+                var request = new Dialogue.Planning.SpeechActRequest(
+                    Intent: selection.Act,
+                    Speaker: EntityRef.ForHuman(character.Id, character.Identity.FirstName.Original),
+                    Addressee: EntityRef.ForHuman(target.Id, target.Identity.FirstName.Original),
+                    OccurredAt: now,
+                    Closeness: selection.Closeness,
+                    Familiarity: selection.Familiarity,
+                    Agreeableness: character.Personality.BigFive.Agreeableness,
+                    Style: character.Personality.Communication,
+                    Power: character.Snapshot.Psychology.Dominance);
+                var content = new InteractionContent(_speechActPlanner.Plan(request));
                 target.ReceiveEvent(new InteractionProposed(
                     now, character.Id, target.Id, content, character.Biology));
 
