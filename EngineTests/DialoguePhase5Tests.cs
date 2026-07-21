@@ -169,5 +169,73 @@ namespace EngineTests
             Assert.IsNotNull(hostileOutcome, "Hostile listener feels it as harsher.");
             Assert.IsTrue(hostileOutcome!.IntrinsicPleasantness < 0);
         }
+
+        [TestMethod]
+        public void Stability_ManyListenersOverManyDays_NoErrors_BoundedMemory()
+        {
+            const int ListenerCount = 12;
+            const int SpeakerCount = 6;
+            const int Days = 100;
+            const int ActsPerDay = 6;
+
+            var rng = new Random(1234);                 // fixed seed → deterministic run
+            var planner = new DefaultSpeechActPlanner();
+            var kinds = Enum.GetValues<RelationalActKind>();
+
+            var listeners = new List<(HumanId Id, DefaultMemoryEngine Memory, IHumanContext Ctx)>();
+            for (var i = 0; i < ListenerCount; i++)
+            {
+                var id = new HumanId(Guid.NewGuid());
+                var darkCore = i % 3 == 0 ? 1.0 : 0.0;  // a third are hostile → produce divergent traces
+                listeners.Add((id, MemoryEngine(), Listener(id, darkCore)));
+            }
+
+            var speakers = Enumerable.Range(0, SpeakerCount).Select(_ => new HumanId(Guid.NewGuid())).ToList();
+            var startTicks = WDateTime.New(WDateOnly.New(100, 1, 1)).WorldTicks;
+            var outbox = new EventCollector();
+            long step = 0;
+
+            for (var day = 0; day < Days; day++)
+            {
+                for (var a = 0; a < ActsPerDay; a++)
+                {
+                    var when = new WDateTime(startTicks + step++);
+                    var listener = listeners[rng.Next(ListenerCount)];
+                    var speaker = speakers[rng.Next(SpeakerCount)];
+                    var kind = kinds[rng.Next(kinds.Length)];
+
+                    // Agreeableness 0.8 + Direct style + power 0.5 → Neutral directness, so a hostile
+                    // listener's shift to Blunt is a genuine divergence (exercises the trace path).
+                    var request = new SpeechActRequest(
+                        kind,
+                        EntityRef.ForHuman(speaker, "S"),
+                        EntityRef.ForHuman(listener.Id, "L"),
+                        when,
+                        Closeness: 40, Familiarity: 40,
+                        Agreeableness: 0.8, Style: CommunicationStyle.Direct, Power: 0.5);
+                    var proposed = new InteractionProposed(when, speaker, listener.Id, new InteractionContent(planner.Plan(request)));
+
+                    listener.Memory.Handle(proposed, listener.Ctx, outbox);
+                    outbox.Drain();
+                }
+
+                // Advance memory (Ebbinghaus decay / pruning) once per simulated day.
+                foreach (var l in listeners)
+                {
+                    l.Memory.Tick(new WDateTime(startTicks + step++), WTimeSpan.FromDays(1), l.Ctx, outbox);
+                    outbox.Drain();
+                }
+            }
+
+            // Reinforcement keys growth per (speaker, act kind) — so a 100-day run cannot grow unbounded.
+            var cap = SpeakerCount * kinds.Length;
+            foreach (var l in listeners)
+            {
+                Assert.IsTrue(l.Memory.State.Episodes.Count <= cap,
+                    $"Memory grew unbounded: {l.Memory.State.Episodes.Count} episodes (cap {cap}).");
+                Assert.IsTrue(l.Memory.State.Episodes.All(e => e.Strength is >= 0.0 and <= 1.0),
+                    "Episode strength left the valid range during the run.");
+            }
+        }
     }
 }

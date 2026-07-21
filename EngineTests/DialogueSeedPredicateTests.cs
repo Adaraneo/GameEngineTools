@@ -45,13 +45,12 @@ namespace EngineTests
             }
         }
 
-        // Accusative / genitive / instrumental / no-argument cases the GM composer declines correctly.
-        // The dative-addressee predicates (svěřovat se, navrhovat) are covered separately below,
-        // because the GM composer currently mis-declines the feminine dative-ě stem (returns "Jaňe"
-        // instead of "Janě" — an orthographic ě-digraph bug on the Grammar side, not in this realizer).
+        // Full coverage across cases the GM composer declines: accusative, genitive, dative (the
+        // feminine dative-ě "Janě" was fixed in GrammarModular preview.17), instrumental, no-argument.
         [DataTestMethod]
         [DataRow("zvát", RelationalActKind.Invite, "Petr pozval Janu.")]
         [DataRow("ptát se", RelationalActKind.Question, "Petr se zeptal Jany.")]
+        [DataRow("svěřovat se", RelationalActKind.SelfDisclosure, "Petr se svěřil Janě.")]
         [DataRow("chválit", RelationalActKind.Validation, "Petr pochválil Janu.")]
         [DataRow("souhlasit", RelationalActKind.Validation, "Petr souhlasil s Janou.")]
         [DataRow("odmítat", RelationalActKind.Boundary, "Petr odmítl.")]
@@ -67,22 +66,6 @@ namespace EngineTests
                 new TemporaryCzechActRealizer.Person("Jana", IsFemale: true));
 
             Assert.AreEqual(expected, text);
-        }
-
-        [TestMethod]
-        public void TemporaryRealizer_DativeAddressee_RoutesThroughComposer()
-        {
-            var realizer = BuildRealizer();
-            var act = ActWithLemma("svěřovat se", RelationalActKind.SelfDisclosure);
-
-            var text = realizer.Realize(
-                act,
-                new TemporaryCzechActRealizer.Person("Petr", false),
-                new TemporaryCzechActRealizer.Person("Jana", true));
-
-            // Verb + reflexive clitic placement is correct; the declined addressee stem is present.
-            // Exact dative-ě orthography is pending a GM composer fix, so we don't pin it here.
-            StringAssert.StartsWith(text, "Petr se svěřil Ja");
         }
 
         [TestMethod]
