@@ -26,6 +26,11 @@ namespace GameEngineTools.Dialogue.Planning
     /// <param name="Power">Speaker's felt power/dominance over the addressee [0..1].</param>
     /// <param name="Urgency">How pressing the act is [0..1]; raises face-threat tolerance.</param>
     /// <param name="Ironic">When <c>true</c>, attach a <see cref="ForceShift"/> (opposite surface polarity).</param>
+    /// <param name="RespondingTo">
+    /// When set, the planner produces the adjacency-pair <i>response</i> to this prior act (e.g. an
+    /// answer to a question, validation of a disclosure) instead of a fresh <paramref name="Intent"/> —
+    /// this is what gives conversations turn-taking (model B). <c>null</c> = fresh initiating act.
+    /// </param>
     public sealed record SpeechActRequest(
         RelationalActKind Intent,
         EntityRef Speaker,
@@ -37,7 +42,8 @@ namespace GameEngineTools.Dialogue.Planning
         CommunicationStyle Style,
         double Power,
         double Urgency = 0.0,
-        bool Ironic = false);
+        bool Ironic = false,
+        SpeechAct? RespondingTo = null);
 
     /// <summary>
     /// Deterministic, pure speaker-side service that turns a <see cref="SpeechActRequest"/> into a fully
@@ -92,7 +98,14 @@ namespace GameEngineTools.Dialogue.Planning
         {
             System.ArgumentNullException.ThrowIfNull(request);
 
-            var predicate = SelectPredicate(request);
+            // Responding within a conversation ⇒ produce the adjacency-pair response rather than a fresh
+            // topic; the response carries feedback/turn-management dimensions (model B).
+            var response = request.RespondingTo is { } prior
+                ? Conversation.AdjacencyPairResolver.ResponseTo(prior)
+                : null;
+            var intent = response?.Kind ?? request.Intent;
+
+            var predicate = SelectPredicate(intent, request);
 
             var roles = ImmutableDictionary<FgdFunctor, EntityRef>.Empty
                 .Add(FgdFunctor.ACT, request.Speaker);
@@ -104,14 +117,14 @@ namespace GameEngineTools.Dialogue.Planning
             var register = ComputeRegister(request.Closeness, request.Familiarity);
             var directness = ComputeDirectness(request.Agreeableness, request.Style, request.Power, request.Urgency);
             var forceShift = request.Ironic ? new ForceShift(predicate.Point, Polarity.Negative) : null;
+            var dimensions = response?.Dimensions
+                ?? (intent == RelationalActKind.SmallTalk ? DialogueDimension.SocialObligation : DialogueDimension.None);
 
             return new SpeechAct
             {
                 Point = predicate.Point,
-                RelationalKind = request.Intent,
-                Dimensions = request.Intent == RelationalActKind.SmallTalk
-                    ? DialogueDimension.SocialObligation
-                    : DialogueDimension.None,
+                RelationalKind = intent,
+                Dimensions = dimensions,
                 PredicateLemma = predicate.LemmaImperfective,
                 Roles = roles,
                 Polarity = Polarity.Affirmative,
@@ -162,17 +175,17 @@ namespace GameEngineTools.Dialogue.Planning
             return score <= _config.IndirectThreshold ? Directness.Indirect : Directness.Neutral;
         }
 
-        /// <summary>Deterministically picks one candidate predicate for the requested act kind.</summary>
-        private static SeedPredicate SelectPredicate(SpeechActRequest request)
+        /// <summary>Deterministically picks one candidate predicate for the resolved act kind.</summary>
+        private static SeedPredicate SelectPredicate(RelationalActKind intent, SpeechActRequest request)
         {
-            var candidates = SeedPredicateLexicon.Predicates[request.Intent];
+            var candidates = SeedPredicateLexicon.Predicates[intent];
             if (candidates.Count == 1)
             {
                 return candidates[0];
             }
 
             var seed = StableHash(
-                $"{request.Speaker.Id.Value}|{request.Addressee.Id.Value}|{(int)request.Intent}|{request.OccurredAt.WorldTicks}");
+                $"{request.Speaker.Id.Value}|{request.Addressee.Id.Value}|{(int)intent}|{request.OccurredAt.WorldTicks}");
             return candidates[(int)(seed % (uint)candidates.Count)];
         }
 

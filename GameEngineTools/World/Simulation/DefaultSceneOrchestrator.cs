@@ -168,6 +168,12 @@ namespace GameEngineTools.World.Simulation
         private readonly Dialogue.Planning.ISpeechActPlanner _speechActPlanner;
 
         /// <summary>
+        /// Tracks ongoing conversations so a reach-out toward someone mid-exchange becomes a
+        /// turn-taking response (adjacency pair) rather than a fresh topic (dialogue model B).
+        /// </summary>
+        private readonly Dialogue.Conversation.ConversationCoordinator _conversation;
+
+        /// <summary>
         /// Characters currently travelling between locations, keyed by id. Populated only when
         /// <see cref="SceneOrchestratorOptions.EnableTravelTime"/> is enabled: a <c>MoveTo:*</c>
         /// records the destination and arrival time here instead of relocating instantly, and the
@@ -225,7 +231,8 @@ namespace GameEngineTools.World.Simulation
             Characters.Engines.Status.StatusLedger? statusLedger = null,
             Objects.IMutableWorldObjectProvider? mutableObjects = null,
             RelationshipsConfig? relationshipsConfig = null,
-            Dialogue.Planning.ISpeechActPlanner? speechActPlanner = null)
+            Dialogue.Planning.ISpeechActPlanner? speechActPlanner = null,
+            Dialogue.Conversation.ConversationCoordinator? conversation = null)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -243,6 +250,7 @@ namespace GameEngineTools.World.Simulation
             _mutableObjects = mutableObjects;
             _relationshipsConfig = relationshipsConfig;
             _speechActPlanner = speechActPlanner ?? new Dialogue.Planning.DefaultSpeechActPlanner();
+            _conversation = conversation ?? new Dialogue.Conversation.ConversationCoordinator();
         }
 
         #endregion Constructor
@@ -1427,6 +1435,10 @@ namespace GameEngineTools.World.Simulation
                         selection.Closeness, selection.RomanticInterest, selection.HasPrivacy);
                 }
 
+                // If the target spoke last in an active exchange, this reach-out becomes a turn-taking
+                // response (adjacency pair) instead of a fresh topic (dialogue model B).
+                _conversation.TryGetPendingResponse(character.Id, target.Id, now, out var respondingTo);
+
                 // Plan a fully-specified SpeechAct (register/directness/speaker/addressee) so the act can
                 // later be realised as a direct-address utterance, not only a third-person gloss.
                 var request = new Dialogue.Planning.SpeechActRequest(
@@ -1438,8 +1450,12 @@ namespace GameEngineTools.World.Simulation
                     Familiarity: selection.Familiarity,
                     Agreeableness: character.Personality.BigFive.Agreeableness,
                     Style: character.Personality.Communication,
-                    Power: character.Snapshot.Psychology.Dominance);
-                var content = new InteractionContent(_speechActPlanner.Plan(request));
+                    Power: character.Snapshot.Psychology.Dominance,
+                    RespondingTo: respondingTo);
+                var act = _speechActPlanner.Plan(request);
+                _conversation.Observe(act, character.Id, target.Id, now);
+
+                var content = new InteractionContent(act);
                 target.ReceiveEvent(new InteractionProposed(
                     now, character.Id, target.Id, content, character.Biology));
 
