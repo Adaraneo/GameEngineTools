@@ -15,6 +15,7 @@ namespace GameEngineTools.Characters.Engines.Memory
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Engines.ToM;
     using GameEngineTools.Characters.Hosting;
+    using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
@@ -51,6 +52,12 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         private readonly ILogger _log;
         private readonly IMemoryFidelityPolicy? _memoryFidelityPolicy;
+
+        /// <summary>
+        /// Listener-side interpreter (stateless): the character remembers its OWN reading of an
+        /// incoming act. Deterministic, so this reading matches the one Psychology used for emotion.
+        /// </summary>
+        private static readonly ISpeechActInterpreter Interpreter = new DefaultSpeechActInterpreter();
 
         #endregion Privátní pole
 
@@ -299,6 +306,67 @@ namespace GameEngineTools.Characters.Engines.Memory
         private static HumanId? ResolveOtherPerson(HumanId self, HumanId a, HumanId b)
             => self == a ? b : self == b ? a : b;
 
+        /// <summary>
+        /// Encodes the listener's subjective reading of an incoming act — but only when the
+        /// interpretation diverges from the objective act (hostile-attribution shift, mis/decoded
+        /// irony). The divergence is written into <c>PerceivedWhat</c> via the existing tone prefixes
+        /// so the memory reads as an "unreliable witness"; the objective <c>What</c> stays a stable
+        /// reinforcement key. Plainly-read acts leave no separate trace (bounded memory growth).
+        /// </summary>
+        private void EncodePerceivedAct(InteractionProposed proposed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var act = proposed.Content.SpeechAct;
+            var listener = Dialogue.ListenerContextFactory.For(ctx, proposed.From);
+            var meaning = Interpreter.Appraise(act, listener);
+
+            var feltHarsher = DirectnessRank(meaning.PerceivedDirectness) > DirectnessRank(act.Directness);
+            var ironyMisread = act.ForceShift is not null
+                && meaning.PerceivedPolarity == act.ForceShift.SurfacePolarity
+                && meaning.PerceivedPolarity != act.Polarity;
+            var ironyDecoded = act.ForceShift is not null && meaning.PerceivedPolarity == act.Polarity;
+
+            string tone;
+            EmotionalTag emotion;
+            if (feltHarsher || meaning.PerceivedPolarity == Polarity.Negative || ironyMisread)
+            {
+                tone = "PerceivedThreat";
+                emotion = EmotionalTag.Negative;
+            }
+            else if (ironyDecoded)
+            {
+                tone = "PerceivedWarmth";
+                emotion = EmotionalTag.Positive;
+            }
+            else
+            {
+                return;   // read plainly → no divergent trace to store
+            }
+
+            var what = $"Interaction:{act.RelationalKind}:Heard|from={proposed.From.Value:N}";
+            var perceivedWhat = $"{tone}:{act.RelationalKind}";
+            const double Salience = 0.5;
+
+            Encode(
+                new EpisodicMemory(
+                    Guid.NewGuid(),
+                    proposed.OccurredAt,
+                    what,
+                    Salience,
+                    emotion,
+                    Strength: ComputeInitialStrength(Salience, emotion),
+                    PerceivedWhat: perceivedWhat,
+                    OtherPerson: proposed.From),
+                ctx,
+                outbox);
+        }
+
+        private static int DirectnessRank(Directness directness) => directness switch
+        {
+            Directness.Indirect => 0,
+            Directness.Neutral => 1,
+            _ => 2,
+        };
+
         private static PersonBeliefEvidence? CreateFirstImpressionBeliefEvidence(HumanId self, FirstImpressionFormed impression)
         {
             var other = ResolveOtherPerson(self, impression.A, impression.B);
@@ -468,6 +536,15 @@ namespace GameEngineTools.Characters.Engines.Memory
                         }
                         break;
                     }
+
+                // ── Subjective trace of an incoming act (dialogue engine, Phase 5) ──────────
+                // The listener remembers its OWN interpretation. Only a reading that DIVERGES from
+                // the objective act (hostile-attribution shift, mis/decoded irony) leaves its own
+                // "unreliable witness" trace; plainly-read acts add nothing (the InteractionOutcome
+                // episode already covers the exchange), keeping memory growth bounded.
+                case InteractionProposed p when p.To == ctx.Id:
+                    EncodePerceivedAct(p, ctx, outbox);
+                    break;
 
                 // ── First impression ──────────────────────────────────────────────────────
                 case FirstImpressionFormed fi:

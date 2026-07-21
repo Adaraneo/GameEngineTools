@@ -1211,23 +1211,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
             IEventCollector outbox)
         {
             var act = proposed.Content.SpeechAct;
-            var edge = ctx.Snapshot.Relationships.Edges.GetValueOrDefault(proposed.From);
-            var familiarity = edge?.Familiarity ?? 0.0;
-            var trust = edge?.Trust ?? 50.0;
-            var darkCore = ctx.Personality.DarkCore?.DarkCore ?? 0.0;
-
-            // Hostility: low trust and a dark/paranoid disposition both raise hostile attribution.
-            // Only genuinely low trust (< 40) contributes, so ordinary relationships stay non-hostile.
-            var trustHostility = Math.Clamp((40.0 - trust) / 40.0, 0.0, 1.0);
-            var hostility = Math.Clamp(0.55 * darkCore + 0.55 * trustHostility, 0.0, 1.0);
-
-            // Theory-of-mind proxy: cognitive perspective-taking tracks Openness (no explicit ToM level).
-            var tomLevel = ctx.Personality.BigFive.Openness >= 0.5 ? 2 : 1;
-
-            var listener = new ListenerContext(tomLevel, familiarity, hostility);
+            var listener = Dialogue.ListenerContextFactory.For(ctx, proposed.From);
             var meaning = Interpreter.Appraise(act, listener);
 
-            var outcome = PerceivedActAppraiser.ToAppraisal(meaning, familiarity, s);
+            var outcome = PerceivedActAppraiser.ToAppraisal(meaning, listener.FamiliarityWithSpeaker, s);
             if (outcome is not { } o || !o.IsRelevant())
             {
                 return s;

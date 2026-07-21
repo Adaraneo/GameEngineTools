@@ -107,7 +107,9 @@ namespace WorldObserver.Dtos
         // ── Emergent social status (dominance + prestige axes, orthogonal) ────
         StatusDto? SocialStatus,
         // ── Pantry / inventory (food-economy Tier 1: items the character carries) ─
-        IReadOnlyList<PantryDto>? Pantry);
+        IReadOnlyList<PantryDto>? Pantry,
+        // ── Dialogue: latest subjective reading of an act heard (unreliable witness) ──
+        string? HeardInterpretation);
 
     /// <summary>One food/drink item the character is carrying, with its remaining freshness [0..1].</summary>
     public sealed record PantryDto(

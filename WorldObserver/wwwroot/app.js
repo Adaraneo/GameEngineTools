@@ -1077,6 +1077,12 @@ function renderDetail() {
             box.appendChild(section("Zvolená interakce", iRows));
         }
 
+        // Dialogue: how this character subjectively read an act said to it — shown only when its
+        // interpretation diverged from the objective act (the "unreliable witness").
+        if (c.heardInterpretation) {
+            box.appendChild(section("Slyšel a vyložil si", [row("Interpretace", c.heardInterpretation)]));
+        }
+
         // Movement
         const trailNames = (c.trail || []).map((id) => locNameById.get(id) || id);
         const trailRow = el("div", { class: "rel-dim wide" });

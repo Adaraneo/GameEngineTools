@@ -104,6 +104,24 @@ namespace WorldObserver.Simulation
                     }
                 }
 
+                // Dialogue: the character's latest *subjective* reading of an act said to it — present
+                // only when its interpretation diverged from the objective act (the "unreliable witness").
+                string? heardInterpretation = null;
+                var perceived = c.Snapshot.Memory.Episodes
+                    .Where(e => e.PerceivedWhat is not null && e.PerceivedWhat.StartsWith("Perceived", StringComparison.Ordinal))
+                    .OrderByDescending(e => e.When.WorldTicks)
+                    .FirstOrDefault();
+                if (perceived is not null)
+                {
+                    var pw = perceived.PerceivedWhat!;
+                    var tone = pw.StartsWith("PerceivedThreat", StringComparison.Ordinal) ? "vnímáno jako ohrožení"
+                             : pw.StartsWith("PerceivedWarmth", StringComparison.Ordinal) ? "vnímáno vřele"
+                             : "zkresleno";
+                    var colon = pw.IndexOf(':');
+                    var actKind = colon >= 0 && colon < pw.Length - 1 ? pw[(colon + 1)..] : "akt";
+                    heardInterpretation = $"{actKind} → {tone}";
+                }
+
                 // Biological cycles.
                 var cyc = phy.Cycle;
                 var nut = phy.Nutrition;
@@ -287,7 +305,8 @@ namespace WorldObserver.Simulation
                     Reproduction: reproduction,
                     Losses: losses,
                     SocialStatus: socialStatus,
-                    Pantry: pantry);
+                    Pantry: pantry,
+                    HeardInterpretation: heardInterpretation);
             }).ToList();
 
             // Dynamic map: list exactly the locations characters currently occupy (grouped from their
