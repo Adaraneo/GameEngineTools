@@ -9,6 +9,7 @@ namespace EngineTests
     using System.Text.Json.Serialization;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Dialogue.Contracts;
+    using GameEngineTools.Dialogue.Semantics;
     using GameEngineTools.World.Utils.Time;
     using Grammar.Core.Enums;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -126,6 +127,27 @@ namespace EngineTests
             Assert.AreEqual(original, restored);
             Assert.IsTrue(restored.TryAsHumanId(out var recovered));
             Assert.AreEqual(human, recovered);
+        }
+
+        [TestMethod]
+        public void LemmaAffectRecordRoundTrip_ThroughJson_PreservesFields()
+        {
+            var original = new LemmaAffectRecord(-0.35, 0.85, AffectSource.Curated);
+
+            var json = JsonSerializer.Serialize(original);
+            var restored = JsonSerializer.Deserialize<LemmaAffectRecord>(json);
+
+            Assert.AreEqual(original, restored);
+        }
+
+        [TestMethod]
+        public void ConnotationLexicon_UnknownLemma_FallsBackToNeutral()
+        {
+            var lexicon = new CuratedConnotationLexicon();
+
+            var record = lexicon.Lookup("neexistující_lemma");
+
+            Assert.AreEqual(new LemmaAffectRecord(0.0, 0.0, AffectSource.Curated), record);
         }
     }
 }

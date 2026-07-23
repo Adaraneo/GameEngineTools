@@ -5,6 +5,7 @@ namespace GameEngineTools.Dialogue.Hosting
 {
     using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.Dialogue.Planning;
+    using GameEngineTools.Dialogue.Semantics;
     using Microsoft.Extensions.DependencyInjection;
 
     /// <summary>DI registration for the dialogue engine's speaker- and listener-side services.</summary>
@@ -23,14 +24,18 @@ namespace GameEngineTools.Dialogue.Hosting
         }
 
         /// <summary>
-        /// Registers the <see cref="ISpeechActInterpreter"/> (stateless, singleton). Pass a
-        /// <paramref name="config"/> to override the default irony/hostility thresholds.
+        /// Registers the <see cref="ISpeechActInterpreter"/> (stateless, singleton) together with the
+        /// curated <see cref="IConnotationLexicon"/>. Pass a <paramref name="config"/> to override the
+        /// default irony/hostility calibration — the connotation layer stays opt-in
+        /// (<see cref="SpeechActInterpreterConfig.EnableConnotationLayer"/> defaults to <c>false</c>).
         /// </summary>
         public static IServiceCollection AddSpeechActInterpreter(
             this IServiceCollection services,
             SpeechActInterpreterConfig? config = null)
         {
-            services.AddSingleton<ISpeechActInterpreter>(_ => new DefaultSpeechActInterpreter(config));
+            services.AddSingleton<IConnotationLexicon, CuratedConnotationLexicon>();
+            services.AddSingleton<ISpeechActInterpreter>(
+                sp => new DefaultSpeechActInterpreter(config, sp.GetRequiredService<IConnotationLexicon>()));
             return services;
         }
     }

@@ -10,6 +10,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Psychology.Appraisal;
     using GameEngineTools.Dialogue.Interpretation;
+    using GameEngineTools.Dialogue.Semantics;
     using GameEngineTools.World.Utils.Time;
     using Grammar.Core.Enums;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -47,6 +48,21 @@ namespace EngineTests
             var interpreter = new DefaultSpeechActInterpreter();
             var pm = interpreter.Appraise(Act(Directness.Neutral), new ListenerContext(2, 60, Hostility: 0.8));
             Assert.AreEqual(Directness.Blunt, pm.PerceivedDirectness);
+        }
+
+        // Continuous "added negativity" (van den Berg & Lansu 2020): with gain 1.0 and an Indirect
+        // act, the perceived rank crosses two transition points across these samples — a graded,
+        // monotonically non-decreasing shift, not a binary jump at one configured threshold.
+        [DataTestMethod]
+        [DataRow(0.0, Directness.Indirect)]
+        [DataRow(0.3, Directness.Neutral)]
+        [DataRow(0.55, Directness.Neutral)]
+        [DataRow(0.9, Directness.Blunt)]
+        public void Appraise_HostilityShift_IsContinuousAndMonotonic(double hostility, Directness expected)
+        {
+            var interpreter = new DefaultSpeechActInterpreter(new SpeechActInterpreterConfig(HostilityGain: 1.0));
+            var pm = interpreter.Appraise(Act(Directness.Indirect), new ListenerContext(2, 60, hostility));
+            Assert.AreEqual(expected, pm.PerceivedDirectness);
         }
 
         [TestMethod]
@@ -95,6 +111,81 @@ namespace EngineTests
             Assert.AreSame(act, pm.Source);
             Assert.AreEqual(Directness.Indirect, pm.Source.Directness); // original never mutated
         }
+
+        #region Connotation layer (opt-in)
+
+        private static DefaultSpeechActInterpreter ConnotationInterpreter(bool enabled)
+            => new(new SpeechActInterpreterConfig(EnableConnotationLayer: enabled), new CuratedConnotationLexicon());
+
+        [TestMethod]
+        public void Appraise_ConnotationDisabled_IsIdenticalToBaseline()
+        {
+            // Regression guard: with the flag off, a wired lexicon must change NOTHING — zero tolerance.
+            var baseline = new DefaultSpeechActInterpreter();
+            var withLexicon = ConnotationInterpreter(enabled: false);
+            var acts = new[]
+            {
+                Act(Directness.Neutral) with { PredicateLemma = "chválit" },
+                Act(Directness.Indirect, IronicShift) with { PredicateLemma = "to se povedlo" },
+            };
+            var listeners = new[] { new ListenerContext(1, 10, 0.9), new ListenerContext(4, 80, 0.0) };
+
+            foreach (var act in acts)
+            {
+                foreach (var listener in listeners)
+                {
+                    var a = baseline.Appraise(act, listener);
+                    var b = withLexicon.Appraise(act, listener);
+                    Assert.AreEqual(a.PerceivedPoint, b.PerceivedPoint);
+                    Assert.AreEqual(a.PerceivedPolarity, b.PerceivedPolarity);
+                    Assert.AreEqual(a.PerceivedDirectness, b.PerceivedDirectness);
+                    Assert.AreEqual(a.Confidence, b.Confidence);
+                    Assert.AreEqual(0.0, a.ConnotationDelta);
+                    Assert.AreEqual(0.0, b.ConnotationDelta);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void Appraise_ConnotationEnabled_SameStructureDifferentLemma_DiffersInDelta()
+        {
+            // Phase-0 pair #1: praise vs assent — identical Point/Directness/Register, different warmth.
+            var interpreter = ConnotationInterpreter(enabled: true);
+            var listener = new ListenerContext(4, 60, 0.0);
+
+            var praise = interpreter.Appraise(Act(Directness.Neutral) with { PredicateLemma = "chválit" }, listener);
+            var assent = interpreter.Appraise(Act(Directness.Neutral) with { PredicateLemma = "souhlasit" }, listener);
+
+            Assert.IsTrue(praise.ConnotationDelta > assent.ConnotationDelta);
+            Assert.IsTrue(assent.ConnotationDelta > 0.0);
+        }
+
+        [TestMethod]
+        public void Appraise_ConventionalIronicPhrase_DecodedEvenByLowTomListener()
+        {
+            // Graded Salience bypass: "to se povedlo" (Conventionality 0.9) decodes below the ToM gate;
+            // a novel ironic act with the same listener stays literal.
+            var interpreter = ConnotationInterpreter(enabled: true);
+            var lowTom = new ListenerContext(TheoryOfMindLevel: 1, 10, 0.0);
+
+            var conventional = Act(forceShift: IronicShift) with { PredicateLemma = "to se povedlo" };
+            var novel = Act(forceShift: IronicShift) with { PredicateLemma = "chválit" };
+
+            Assert.AreEqual(Polarity.Affirmative, interpreter.Appraise(conventional, lowTom).PerceivedPolarity);
+            Assert.AreEqual(Polarity.Negative, interpreter.Appraise(novel, lowTom).PerceivedPolarity);
+        }
+
+        [TestMethod]
+        public void Appraise_ConnotationDelta_IsClampedBySmallWeight()
+        {
+            var interpreter = ConnotationInterpreter(enabled: true);
+            var pm = interpreter.Appraise(Act(Directness.Neutral) with { PredicateLemma = "oceňovat" }, new ListenerContext(4, 60, 0.0));
+
+            // 0.70 valence × 0.15 weight = 0.105 — small, additive, well inside the ±0.3 clamp.
+            Assert.AreEqual(0.105, pm.ConnotationDelta, 1e-9);
+        }
+
+        #endregion
 
         [TestMethod]
         public void Appraise_IsDeterministic()

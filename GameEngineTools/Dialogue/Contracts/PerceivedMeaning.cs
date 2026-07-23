@@ -31,5 +31,12 @@ namespace GameEngineTools.Dialogue.Contracts
 
         /// <summary>Deterministically derived confidence in this reading, [0..1].</summary>
         public double Confidence { get; init; }
+
+        /// <summary>
+        /// Additive connotation contribution from <see cref="SpeechAct.PredicateLemma"/>, [−1..1];
+        /// 0 when the connotation layer is disabled. Independent of the grammatical
+        /// <see cref="Polarity"/> — sentiment never leaks into sentence negation.
+        /// </summary>
+        public double ConnotationDelta { get; init; }
     }
 }
