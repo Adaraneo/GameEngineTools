@@ -53,11 +53,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         private readonly ILogger _log;
         private readonly IMemoryFidelityPolicy? _memoryFidelityPolicy;
 
-        /// <summary>
-        /// Listener-side interpreter (stateless): the character remembers its OWN reading of an
-        /// incoming act. Deterministic, so this reading matches the one Psychology used for emotion.
-        /// </summary>
-        private static readonly ISpeechActInterpreter Interpreter = new DefaultSpeechActInterpreter();
+        // Listener-side interpretation goes through the ambient SpeechActInterpretation.Current —
+        // the same instance Psychology uses, so the remembered reading matches the felt one.
 
         #endregion Privátní pole
 
@@ -317,7 +314,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         {
             var act = proposed.Content.SpeechAct;
             var listener = Dialogue.ListenerContextFactory.For(ctx, proposed.From);
-            var meaning = Interpreter.Appraise(act, listener);
+            var meaning = SpeechActInterpretation.Current.Appraise(act, listener);
 
             var feltHarsher = DirectnessRank(meaning.PerceivedDirectness) > DirectnessRank(act.Directness);
             var ironyMisread = act.ForceShift is not null

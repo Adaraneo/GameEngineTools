@@ -176,6 +176,29 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AmbientInterpretation_ConfigureEnablesConnotation_ResetRestoresDefault()
+        {
+            // The engine paths (Psychology, Memory) read SpeechActInterpretation.Current — this is the
+            // switch WorldObserver flips for the live experiment.
+            try
+            {
+                SpeechActInterpretation.Configure(
+                    new SpeechActInterpreterConfig(EnableConnotationLayer: true), new CuratedConnotationLexicon());
+                var on = SpeechActInterpretation.Current.Appraise(
+                    Act(Directness.Neutral) with { PredicateLemma = "chválit" }, new ListenerContext(4, 60, 0.0));
+                Assert.IsTrue(on.ConnotationDelta > 0.0);
+            }
+            finally
+            {
+                SpeechActInterpretation.Reset();
+            }
+
+            var off = SpeechActInterpretation.Current.Appraise(
+                Act(Directness.Neutral) with { PredicateLemma = "chválit" }, new ListenerContext(4, 60, 0.0));
+            Assert.AreEqual(0.0, off.ConnotationDelta);
+        }
+
+        [TestMethod]
         public void Appraise_ConnotationDelta_IsClampedBySmallWeight()
         {
             var interpreter = ConnotationInterpreter(enabled: true);

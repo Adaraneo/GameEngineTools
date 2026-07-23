@@ -19,6 +19,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Config;
+    using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.FileSystem;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Calendars;
@@ -111,6 +112,9 @@ namespace EngineTests
         {
             // Reset WWorld so ambient configuration does not leak between tests
             WWorld.Reset();
+
+            // Same for the ambient dialogue interpreter (connotation flag must not leak either)
+            SpeechActInterpretation.Reset();
 
             CharacterManager?.Characters.Clear();
             CharacterManager?.Items.Clear();

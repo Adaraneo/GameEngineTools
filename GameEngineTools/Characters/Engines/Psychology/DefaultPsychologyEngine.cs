@@ -54,12 +54,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
         private WDateTime? _stressAbove70Since;
         private double _previousAllostaticLoad;
 
-        /// <summary>
-        /// Listener-side interpreter (stateless): decodes an incoming <c>SpeechAct</c> into a
-        /// subjective <c>PerceivedMeaning</c> before it feeds the Scherer-CPM appraisal. Mirrors the
-        /// static <see cref="AppraisalEvaluator"/> usage — no constructor/DI change needed.
-        /// </summary>
-        private static readonly ISpeechActInterpreter Interpreter = new DefaultSpeechActInterpreter();
+        // Listener-side interpretation goes through the ambient SpeechActInterpretation.Current
+        // (WWorld-style): hosts can enable the connotation layer once at startup and Psychology +
+        // Memory automatically interpret with the same configuration.
 
         /// <summary>
         /// Initialises the engine with a neutral resting state:
@@ -1212,7 +1209,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
         {
             var act = proposed.Content.SpeechAct;
             var listener = Dialogue.ListenerContextFactory.For(ctx, proposed.From);
-            var meaning = Interpreter.Appraise(act, listener);
+            var meaning = SpeechActInterpretation.Current.Appraise(act, listener);
 
             var outcome = PerceivedActAppraiser.ToAppraisal(meaning, listener.FamiliarityWithSpeaker, s);
             if (outcome is not { } o || !o.IsRelevant())

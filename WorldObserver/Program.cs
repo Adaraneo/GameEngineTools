@@ -9,6 +9,16 @@ using WorldObserver.Simulation;
 // directory where appsettings*.json + SourceFiles\ live. Harmless when run as a console app from bin.
 Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
+// ── Connotation-layer live experiment (Phase-2 gate evaluation) ─────────────────────────────
+// WorldObserver is the experiment surface: enable the opt-in connotation layer with the curated
+// lexicon so word choice (chválit vs souhlasit, …) colours listeners' emotions and hostile
+// readings sting more. Engines read the ambient SpeechActInterpretation.Current, so Psychology
+// and Memory interpret with the same configuration. Remove/flip to fall back to byte-identical
+// pre-connotation behaviour.
+GameEngineTools.Dialogue.Interpretation.SpeechActInterpretation.Configure(
+    new GameEngineTools.Dialogue.Interpretation.SpeechActInterpreterConfig(EnableConnotationLayer: true),
+    new GameEngineTools.Dialogue.Semantics.CuratedConnotationLexicon());
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
