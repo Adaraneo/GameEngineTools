@@ -210,7 +210,8 @@ namespace EngineTests
 
         private static PsychologyState Neutral => new(0.0, 0.3, 0.5, 20.0, 10.0, DiscreteEmotion.Neutral);
 
-        private static PerceivedMeaning Perceived(SpeechAct source, Directness perceivedDirectness, Polarity perceivedPolarity)
+        private static PerceivedMeaning Perceived(
+            SpeechAct source, Directness perceivedDirectness, Polarity perceivedPolarity, double connotationDelta = 0.0)
             => new()
             {
                 Source = source,
@@ -219,6 +220,7 @@ namespace EngineTests
                 PerceivedDirectness = perceivedDirectness,
                 ResolvedRoles = ImmutableDictionary<FgdFunctor, EntityRef>.Empty,
                 Confidence = 0.8,
+                ConnotationDelta = connotationDelta,
             };
 
         [TestMethod]
@@ -253,6 +255,51 @@ namespace EngineTests
 
             Assert.IsNotNull(outcome);
             Assert.IsTrue(outcome!.IntrinsicPleasantness > 0);
+        }
+
+        [TestMethod]
+        public void ToAppraisal_ConnotationAlone_MakesPlainlyReadActRelevant()
+        {
+            // No divergence at all — the warm word itself carries the affect ("chválit": 0.6 × 0.15).
+            var act = Act(Directness.Neutral);
+            var pm = Perceived(act, Directness.Neutral, Polarity.Affirmative, connotationDelta: 0.09);
+
+            var outcome = PerceivedActAppraiser.ToAppraisal(pm, familiarity: 60, Neutral);
+
+            Assert.IsNotNull(outcome);
+            Assert.IsTrue(outcome!.IntrinsicPleasantness > 0);
+        }
+
+        [TestMethod]
+        public void ToAppraisal_NegativeConnotation_StacksWithHostileShift()
+        {
+            var act = Act(Directness.Neutral);
+            var shiftOnly = Perceived(act, Directness.Blunt, Polarity.Affirmative);
+            var shiftPlusSting = Perceived(act, Directness.Blunt, Polarity.Affirmative, connotationDelta: -0.075);
+
+            var a = PerceivedActAppraiser.ToAppraisal(shiftOnly, familiarity: 60, Neutral)!;
+            var b = PerceivedActAppraiser.ToAppraisal(shiftPlusSting, familiarity: 60, Neutral)!;
+
+            Assert.IsTrue(b.IntrinsicPleasantness < a.IntrinsicPleasantness, "The stinging word must deepen the hostile reading.");
+        }
+
+        [TestMethod]
+        public void EndToEnd_PraiseVsAssent_FlagOn_DivergesInEmotionalAppraisal()
+        {
+            // The measurable-benefit experiment surface for the Phase-2 gate: same structure, different
+            // lemma → different CPM appraisal. Flag off (default engine paths) stays inert.
+            var interpreter = ConnotationInterpreter(enabled: true);
+            var listener = new ListenerContext(4, 60, 0.0);
+
+            var praise = interpreter.Appraise(Act(Directness.Neutral) with { PredicateLemma = "chválit" }, listener);
+            var assent = interpreter.Appraise(Act(Directness.Neutral) with { PredicateLemma = "souhlasit" }, listener);
+
+            var praiseOutcome = PerceivedActAppraiser.ToAppraisal(praise, familiarity: 60, Neutral);
+            var assentOutcome = PerceivedActAppraiser.ToAppraisal(assent, familiarity: 60, Neutral);
+
+            Assert.IsNotNull(praiseOutcome);
+            Assert.IsNotNull(assentOutcome);
+            Assert.IsTrue(praiseOutcome!.IntrinsicPleasantness > assentOutcome!.IntrinsicPleasantness);
         }
 
         #endregion

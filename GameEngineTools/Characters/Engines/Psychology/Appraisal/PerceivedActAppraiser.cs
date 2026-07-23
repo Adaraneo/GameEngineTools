@@ -8,9 +8,12 @@ namespace GameEngineTools.Characters.Engines.Psychology.Appraisal
     /// <summary>
     /// Bridges a listener's <see cref="PerceivedMeaning"/> into the existing Scherer-CPM pipeline: it
     /// produces an <see cref="AppraisalOutcome"/> (consumed by <see cref="AppraisalEmotionMap"/>), it is
-    /// not a second appraisal engine. It deliberately fires only on interpretive <i>divergence</i> —
-    /// a hostile-attribution directness shift, or irony taken literally / decoded — so a plainly-read
-    /// act adds no affect here and the existing interaction paths keep owning the base emotion.
+    /// not a second appraisal engine. It fires on interpretive <i>divergence</i> — a hostile-attribution
+    /// directness shift, or irony taken literally / decoded — and, when the opt-in connotation layer is
+    /// enabled, on the lemma's connotative colouring (<see cref="PerceivedMeaning.ConnotationDelta"/>;
+    /// zero when the layer is off, so the divergence-only behaviour is preserved byte-identically).
+    /// A plainly-read act with a neutral lemma adds no affect here — the existing interaction paths
+    /// keep owning the base emotion.
     /// </summary>
     public static class PerceivedActAppraiser
     {
@@ -53,10 +56,16 @@ namespace GameEngineTools.Characters.Engines.Psychology.Appraisal
                 valence -= 0.10;
             }
 
+            // Opt-in connotation contribution of the word choice itself ("chválit" warms, "odmítat"
+            // stings) — additive and independent of divergence; exactly 0 when the layer is disabled.
+            valence += meaning.ConnotationDelta;
+
             if (Math.Abs(valence) < 0.05)
             {
-                return null;   // no meaningful divergence → base interaction paths own the affect
+                return null;   // neither divergence nor connotation reaches significance → base paths own the affect
             }
+
+            valence = Math.Clamp(valence, -1.0, 1.0);
 
             var familiarityNorm = Math.Clamp(familiarity / 100.0, 0.0, 1.0);
             var relevance = Math.Clamp(Math.Abs(valence) * (0.5 + 0.5 * familiarityNorm), 0.0, 1.0);
