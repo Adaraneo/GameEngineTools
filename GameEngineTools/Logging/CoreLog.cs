@@ -1018,6 +1018,33 @@ namespace GameEngineTools.Logging
 
         #endregion Behavior/Interaction — kontext
 
+        #region Dialogue — SpeechAct utterances — 1220
+
+        /// <summary>
+        /// A <see cref="Dialogue.Contracts.SpeechAct"/> was uttered by one character to another —
+        /// captures the act's relational/predicate/register/directness dimensions together with a
+        /// rough Czech gloss (see <c>TemporaryCzechActRealizer</c> — TEMPORARY preview only, never
+        /// re-enters simulation state).
+        /// </summary>
+        [LoggerMessage(
+            EventId = 1220,
+            Level = LogLevel.Information,
+            Message = "[DIALOGUE] {HumanId} {SpeakerName} → {AddresseeName}: „{Utterance}“ (kind={RelationalKind}, predikát={PredicateLemma}, register={Register}, directness={Directness})")]
+        public static partial void SpeechActUttered(
+            this ILogger logger,
+            string HumanId,
+            string SpeakerId,
+            string SpeakerName,
+            string AddresseeId,
+            string AddresseeName,
+            string RelationalKind,
+            string PredicateLemma,
+            string Register,
+            string Directness,
+            string Utterance);
+
+        #endregion Dialogue — SpeechAct utterances — 1220
+
         #region Memory — epizodická paměť
 
         /// <summary>

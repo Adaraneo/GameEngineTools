@@ -381,6 +381,16 @@ function renderVitals(characters) {
         if (c.travelingTo) sub += ` · 🚶 → ${c.travelingTo}`;
         e.sub.textContent = sub;
 
+        // TEMPORARY mode-1 Czech gloss of the chosen interaction (see TemporaryCzechActRealizer) —
+        // a one-line quote on the card when this character is initiating an interaction this tick.
+        if (!e.quote) {
+            e.quote = el("div", { class: "sub quote" });
+            e.card.insertBefore(e.quote, e.bars);
+        }
+        const utterance = c.interaction && typeof c.interaction.utterance === "string" ? c.interaction.utterance : "";
+        e.quote.textContent = utterance ? "» " + utterance + " «" : "";
+        e.quote.style.display = utterance ? "" : "none";
+
         clear(e.bars);
         for (const [lbl, val, fn] of [
             ["Stres", c.stress, heat],
@@ -1068,6 +1078,14 @@ function renderDetail() {
         if (c.interaction) {
             const tgt = c.interaction.targetId ? (nameById.get(c.interaction.targetId) || c.interaction.targetId.slice(0, 8)) : "—";
             const iRows = [row("Akt", c.interaction.act), row("S kým", tgt)];
+            // TEMPORARY mode-1 Czech gloss of the act (see TemporaryCzechActRealizer) — the sentence
+            // itself, shown above the structured dump.
+            if (typeof c.interaction.utterance === "string" && c.interaction.utterance) {
+                const ur = el("div", { class: "rel-dim wide" });
+                ur.appendChild(el("span", { class: "k", text: "Říká" }));
+                ur.appendChild(el("span", { class: "v", text: "»" + c.interaction.utterance + "«" }));
+                iRows.push(ur);
+            }
             if (c.interaction.content) {
                 const cr = el("div", { class: "rel-dim wide" });
                 cr.appendChild(el("span", { class: "k", text: "Obsah" }));

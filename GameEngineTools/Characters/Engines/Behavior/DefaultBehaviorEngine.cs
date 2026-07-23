@@ -281,6 +281,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
             _log.BehaviorCooldownSet(owner.Value.ToString(), chosen, hours);
         }
 
+        /// <summary>
+        /// Speaker-side planner (stateless, pure): even engine-emitted proposals carry a fully-planned
+        /// <see cref="SpeechAct"/> (real predicate lemma, register, directness) instead of an empty stub,
+        /// so the speaker's own outbox act matches what observers can realise/preview.
+        /// </summary>
+        private static readonly GameEngineTools.Dialogue.Planning.ISpeechActPlanner SpeechActPlanner =
+            new GameEngineTools.Dialogue.Planning.DefaultSpeechActPlanner();
+
         private static void EmitInteractionProposalIfNeeded(WDateTime now, IHumanContext ctx, IEventCollector outbox, BehaviorCandidate candidate)
         {
             if (candidate.SocialTargeting is not { } targeting)
@@ -293,8 +301,21 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 return;
             }
 
-            var content = new InteractionContent(
-                SpeechAct.Relational(targeting.RelationalActKind, ctx.Id, targeting.TargetHuman, now));
+            // Plan the full act from the speaker's live state (name lemmas are unknown at engine level
+            // and stay empty — REG is a GM concern; the predicate/register/directness are what matter).
+            var edge = ctx.Snapshot.Relationships.Edges.GetValueOrDefault(targeting.TargetHuman);
+            var request = new GameEngineTools.Dialogue.Planning.SpeechActRequest(
+                Intent: targeting.RelationalActKind,
+                Speaker: EntityRef.ForHuman(ctx.Id),
+                Addressee: EntityRef.ForHuman(targeting.TargetHuman),
+                OccurredAt: now,
+                Closeness: edge?.Closeness ?? 0.0,
+                Familiarity: edge?.Familiarity ?? 0.0,
+                Agreeableness: ctx.Personality.BigFive.Agreeableness,
+                Style: ctx.Personality.Communication,
+                Power: ctx.Snapshot.Psychology.Dominance);
+
+            var content = new InteractionContent(SpeechActPlanner.Plan(request));
             outbox.Add(new InteractionProposed(now, ctx.Id, targeting.TargetHuman, content, ctx.Biology));
         }
 

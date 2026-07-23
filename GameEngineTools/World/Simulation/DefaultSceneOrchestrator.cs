@@ -24,6 +24,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.World.Movement;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
@@ -172,6 +173,18 @@ namespace GameEngineTools.World.Simulation
         /// turn-taking response (adjacency pair) rather than a fresh topic (dialogue model B).
         /// </summary>
         private readonly Dialogue.Conversation.ConversationCoordinator _conversation;
+
+        /// <summary>
+        /// TEMPORARY — lazily-built stopgap Czech gloss renderer used only to preview an uttered
+        /// <see cref="Dialogue.Contracts.SpeechAct"/> in <see cref="CoreLog.SpeechActUttered"/>. Deleted
+        /// once the GM-side realization pipeline lands (see the file banner on
+        /// <c>TemporaryCzechActRealizer</c>); never influences simulation state.
+        /// </summary>
+        private static readonly Lazy<Dialogue.Temporary.TemporaryCzechActRealizer> LazyActRealizer = new(() =>
+            new Dialogue.Temporary.TemporaryCzechActRealizer(
+                Grammar.Czech.CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
+                    .BuildServiceProvider()
+                    .GetRequiredService<Grammar.Czech.Services.CzechWordFormComposer>()));
 
         /// <summary>
         /// Characters currently travelling between locations, keyed by id. Populated only when
@@ -1454,6 +1467,32 @@ namespace GameEngineTools.World.Simulation
                     RespondingTo: respondingTo);
                 var act = _speechActPlanner.Plan(request);
                 _conversation.Observe(act, character.Id, target.Id, now);
+
+                // TEMPORARY direct speech (mode 2: "Jano, nezajdeš se mnou?") — see the realizer's file
+                // banner. Preview-only string, never re-enters simulation state; never throws.
+                var utterance = LazyActRealizer.Value.RealizeDirectSpeech(
+                    act,
+                    new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
+                        character.Identity.FirstName.Original, character.Biology == SexBiology.Female),
+                    new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
+                        target.Identity.FirstName.Original, target.Biology == SexBiology.Female));
+
+                using (_log.BeginCharacterScope(
+                    character.Id.Value, "SceneOrchestrator",
+                    relatedPersonId: target.Id.Value, locationId: locationId))
+                {
+                    _log.SpeechActUttered(
+                        character.Id.Value.ToString(),
+                        character.Id.Value.ToString(),
+                        character.Identity.FirstName.Original,
+                        target.Id.Value.ToString(),
+                        target.Identity.FirstName.Original,
+                        act.RelationalKind.ToString(),
+                        act.PredicateLemma,
+                        act.Register.ToString(),
+                        act.Directness.ToString(),
+                        utterance);
+                }
 
                 var content = new InteractionContent(act);
                 target.ReceiveEvent(new InteractionProposed(

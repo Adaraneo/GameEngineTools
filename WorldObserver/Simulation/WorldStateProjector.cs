@@ -9,10 +9,14 @@ namespace WorldObserver.Simulation
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Status;
+    using GameEngineTools.Dialogue.Temporary;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
+    using Grammar.Czech;
+    using Grammar.Czech.Services;
+    using Microsoft.Extensions.DependencyInjection;
     using WorldObserver.Dtos;
 
     /// <summary>
@@ -23,6 +27,26 @@ namespace WorldObserver.Simulation
     {
         /// <summary>Edges weaker than this on both Like and Closeness are omitted to keep the graph readable.</summary>
         private const double EdgeThreshold = 1.0;
+
+        // TEMPORARY mode-1 Czech gloss of a chosen SpeechAct (see TemporaryCzechActRealizer's file
+        // banner) — built once and reused across pushes; never let its construction break projection.
+        private static readonly TemporaryCzechActRealizer? UtteranceRealizer = BuildUtteranceRealizer();
+
+        private static TemporaryCzechActRealizer? BuildUtteranceRealizer()
+        {
+            try
+            {
+                var composer = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
+                    .BuildServiceProvider()
+                    .GetRequiredService<CzechWordFormComposer>();
+                return new TemporaryCzechActRealizer(composer);
+            }
+            catch
+            {
+                // Preview-only — if the grammar services fail to boot, Utterance simply stays null.
+                return null;
+            }
+        }
 
         /// <summary>Builds the full world snapshot for one push.</summary>
         public static WorldStateDto Project(
@@ -43,6 +67,7 @@ namespace WorldObserver.Simulation
         {
             var idSet = characters.Select(c => c.Id).ToHashSet();
             var nameById = characters.ToDictionary(c => c.Id, c => c.Identity.FirstName.Original);
+            var humanById = characters.ToDictionary(c => c.Id, c => c);
 
             // Held items grouped by holder (the pantry/inventory), built once per push. Only the read
             // provider is available here, so we filter GetAllObjects rather than call GetHeldBy.
@@ -99,7 +124,31 @@ namespace WorldObserver.Simulation
                             $"{sa.Point}/{sa.RelationalKind} · {sa.Register}/{sa.Directness}/{sa.Polarity}"
                             + $" · lemma='{sa.PredicateLemma}' · roles={sa.Roles.Count}"
                             + (sa.ForceShift is { } fs ? $" · force→{fs.SurfacePoint}/{fs.SurfacePolarity}" : string.Empty);
-                        interaction = new InteractionDto(sa.RelationalKind.ToString(), ip.To.Value.ToString(), structured);
+
+                        // TEMPORARY mode-1 Czech gloss of the act (see TemporaryCzechActRealizer) — the
+                        // sentence a human would actually read; falls back to null if the addressee is
+                        // unresolvable or the realizer failed to boot.
+                        string? utterance = null;
+                        if (UtteranceRealizer is not null && humanById.TryGetValue(ip.To, out var addresseeHuman))
+                        {
+                            var speakerPerson = new TemporaryCzechActRealizer.Person(
+                                c.Identity.FirstName.Original, c.Biology == SexBiology.Female);
+                            var addresseePerson = new TemporaryCzechActRealizer.Person(
+                                addresseeHuman.Identity.FirstName.Original, addresseeHuman.Biology == SexBiology.Female);
+                            try
+                            {
+                                // Mode-2 direct speech ("Jano, nezajdeš se mnou?") — what the character
+                                // actually SAYS; the mode-1 narrative gloss stays in the structured dump.
+                                utterance = UtteranceRealizer.RealizeDirectSpeech(sa, speakerPerson, addresseePerson);
+                            }
+                            catch
+                            {
+                                // Preview-only — never let a realization edge case break projection.
+                                utterance = null;
+                            }
+                        }
+
+                        interaction = new InteractionDto(sa.RelationalKind.ToString(), ip.To.Value.ToString(), structured, utterance);
                         break;
                     }
                 }

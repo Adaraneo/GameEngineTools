@@ -87,6 +87,7 @@ body {
 .card .cid { font-weight: 400; font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .partner-badge { font-size: 0.7rem; color: #ff6fa5; font-weight: 600; margin-left: 0.4rem; white-space: nowrap; }
 .card .sub { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; }
+.card .sub.quote { font-style: italic; color: var(--text); }
 .card .emotion { float: right; font-size: 0.8rem; }
 .bar { height: 7px; border-radius: 4px; background: #2a2f3a; margin: 3px 0 6px; overflow: hidden; }
 .bar > span { display: block; height: 100%; }

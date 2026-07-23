@@ -95,6 +95,65 @@ namespace GameEngineTools.Dialogue.Temporary
             return $"{speaker.Name} {verb} {prefix}{declined}.";
         }
 
+        /// <summary>
+        /// <b>TEMPORARY.</b> Mode-2 render: the DIRECT SPEECH a speaker utters to the addressee —
+        /// vocative address + a per-lemma template with tykání/vykání per <see cref="Register"/>
+        /// (e.g. "Jano, nezajdeš se mnou?" vs "Jano, nezašla byste se mnou?"). Falls back to a
+        /// bracketed marker for lemmas outside the stopgap table. Like everything in this file it is
+        /// a preview until GM sentence planning lands and never re-enters simulation state.
+        /// </summary>
+        public string RealizeDirectSpeech(SpeechAct act, Person speaker, Person addressee)
+        {
+            ArgumentNullException.ThrowIfNull(act);
+
+            var vocative = Decline(addressee, Case.Vocative);
+            var formal = act.Register == Register.Formal;
+            var line = BuildDirectSpeech(act.PredicateLemma, vocative, formal, addressee.IsFemale);
+
+            return line ?? $"[{act.RelationalKind}] {speaker.Name} → {addressee.Name}";
+        }
+
+        /// <summary>TEMPORARY per-lemma direct-speech templates (informal ⇒ tykání, formal ⇒ vykání).</summary>
+        private static string? BuildDirectSpeech(string lemma, string voc, bool formal, bool addresseeFemale) => lemma switch
+        {
+            // SmallTalk
+            "povídat si" => formal ? $"{voc}, jak se máte?" : $"{voc}, jak se máš?",
+            "bavit se" => formal ? $"Co je u vás nového, {voc}?" : $"Tak co je nového, {voc}?",
+
+            // Question
+            "ptát se" => formal ? $"{voc}, smím se vás na něco zeptat?" : $"{voc}, můžu se tě na něco zeptat?",
+            "vyptávat se" => formal ? "A jak to bylo dál? Povídejte." : $"A jak to bylo dál, {voc}? Povídej.",
+
+            // SelfDisclosure
+            "svěřovat se" => formal ? $"{voc}, chci se vám s něčím svěřit." : $"{voc}, chci se ti s něčím svěřit.",
+            "přiznávat" => formal ? $"{voc}, musím vám něco přiznat." : $"{voc}, musím ti něco přiznat.",
+
+            // Validation
+            "chválit" => formal ? $"{voc}, tohle se vám opravdu povedlo." : $"{voc}, tohle se ti fakt povedlo.",
+            "oceňovat" => formal ? $"Vážím si vás, {voc}." : $"Vážím si tě, {voc}.",
+            "souhlasit" => formal ? $"Souhlasím s vámi, {voc}." : $"Souhlasím s tebou, {voc}.",
+
+            // Boundary
+            "odmítat" => formal ? $"Ne, {voc}. To musím odmítnout." : $"Ne, {voc}. Tohle nechci.",
+            "ohrazovat se" => formal ? "Proti tomu se musím ohradit." : $"Tak to teda ne, {voc}!",
+
+            // Humor
+            "žertovat" => formal ? $"Jen žertuji, {voc}." : $"Ale no tak, {voc}, dělám si legraci.",
+            "vtipkovat" => $"To mi připomíná jeden vtip, {voc}.",
+
+            // Meta
+            "rozebírat" => formal ? $"{voc}, měli bychom si promluvit." : $"{voc}, měli bychom si promluvit o nás.",
+            "mluvit" => formal ? $"Máte chvilku, {voc}?" : $"Máš chvilku, {voc}?",
+
+            // Invite
+            "zvát" => formal
+                ? (addresseeFemale ? $"{voc}, nezašla byste se mnou?" : $"{voc}, nezašel byste se mnou?")
+                : $"{voc}, nezajdeš se mnou?",
+            "navrhovat" => $"{voc}, co kdybychom se někdy sešli?",
+
+            _ => null,
+        };
+
         /// <summary>Declines a participant name into <paramref name="case"/> via a CzechWordRequest.</summary>
         private string Decline(Person person, Case @case)
         {

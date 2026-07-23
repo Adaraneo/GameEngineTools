@@ -209,7 +209,9 @@ namespace WorldObserver.Dtos
     public sealed record InteractionDto(
         string Act,
         string? TargetId,
-        string? Content);
+        string? Content,
+        // TEMPORARY mode-1 Czech gloss of the act (see TemporaryCzechActRealizer) — preview only.
+        string? Utterance);
 
     /// <summary>Biological cycle state — sub-objects are null when not applicable to the character.</summary>
     public sealed record BioDto(

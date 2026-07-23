@@ -68,6 +68,42 @@ namespace EngineTests
             Assert.AreEqual(expected, text);
         }
 
+        // Mode-2 direct speech: vocative address + tykání/vykání per Register — what the character SAYS,
+        // as opposed to the mode-1 narrative gloss above.
+        [DataTestMethod]
+        [DataRow("zvát", RelationalActKind.Invite, Register.Informal, "Jano, nezajdeš se mnou?")]
+        [DataRow("zvát", RelationalActKind.Invite, Register.Formal, "Jano, nezašla byste se mnou?")]
+        [DataRow("ptát se", RelationalActKind.Question, Register.Informal, "Jano, můžu se tě na něco zeptat?")]
+        [DataRow("chválit", RelationalActKind.Validation, Register.Formal, "Jano, tohle se vám opravdu povedlo.")]
+        [DataRow("souhlasit", RelationalActKind.Validation, Register.Informal, "Souhlasím s tebou, Jano.")]
+        public void TemporaryRealizer_DirectSpeech_UsesVocativeAndRegister(
+            string lemma, RelationalActKind kind, Register register, string expected)
+        {
+            var realizer = BuildRealizer();
+            var act = ActWithLemma(lemma, kind) with { Register = register };
+
+            var text = realizer.RealizeDirectSpeech(
+                act,
+                new TemporaryCzechActRealizer.Person("Petr", IsFemale: false),
+                new TemporaryCzechActRealizer.Person("Jana", IsFemale: true));
+
+            Assert.AreEqual(expected, text);
+        }
+
+        [TestMethod]
+        public void TemporaryRealizer_DirectSpeech_UnknownLemma_FallsBackToMarker()
+        {
+            var realizer = BuildRealizer();
+            var act = ActWithLemma("blábolit", RelationalActKind.SmallTalk);
+
+            var text = realizer.RealizeDirectSpeech(
+                act,
+                new TemporaryCzechActRealizer.Person("Petr", false),
+                new TemporaryCzechActRealizer.Person("Jana", true));
+
+            StringAssert.Contains(text, "SmallTalk");
+        }
+
         [TestMethod]
         public void TemporaryRealizer_UnknownLemma_FallsBackToMarker()
         {
