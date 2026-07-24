@@ -48,6 +48,31 @@ namespace WorldObserver.Simulation
             }
         }
 
+        /// <summary>
+        /// TEMPORARY mode-2 direct-speech gloss of an act ("Jano, nezajdeš se mnou?") — the sentence a
+        /// human reads. Returns <c>null</c> when the realizer failed to boot. Never throws.
+        /// Shared by the per-tick projection and the rolling dialogue log so both read the same text.
+        /// </summary>
+        public static string? RealizeUtterance(SpeechAct act, IHuman speaker, IHuman addressee)
+        {
+            if (UtteranceRealizer is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return UtteranceRealizer.RealizeDirectSpeech(
+                    act,
+                    new TemporaryCzechActRealizer.Person(speaker.Identity.FirstName.Original, speaker.Biology == SexBiology.Female),
+                    new TemporaryCzechActRealizer.Person(addressee.Identity.FirstName.Original, addressee.Biology == SexBiology.Female));
+            }
+            catch
+            {
+                return null;   // preview-only — never let a realization edge case break projection
+            }
+        }
+
         /// <summary>Builds the full world snapshot for one push.</summary>
         public static WorldStateDto Project(
             WDateTime now,
@@ -63,7 +88,8 @@ namespace WorldObserver.Simulation
             System.Func<HumanId, (string Origin, string Destination, double Progress)?>? transitOf = null,
             IReadOnlyDictionary<string, string>? regions = null,
             IWorldObjectProvider? objectProvider = null,
-            StatusLedger? statusLedger = null)
+            StatusLedger? statusLedger = null,
+            IReadOnlyDictionary<HumanId, IReadOnlyList<DialogueLineDto>>? recentDialogue = null)
         {
             var idSet = characters.Select(c => c.Id).ToHashSet();
             var nameById = characters.ToDictionary(c => c.Id, c => c.Identity.FirstName.Original);
@@ -125,28 +151,11 @@ namespace WorldObserver.Simulation
                             + $" · lemma='{sa.PredicateLemma}' · roles={sa.Roles.Count}"
                             + (sa.ForceShift is { } fs ? $" · force→{fs.SurfacePoint}/{fs.SurfacePolarity}" : string.Empty);
 
-                        // TEMPORARY mode-1 Czech gloss of the act (see TemporaryCzechActRealizer) — the
-                        // sentence a human would actually read; falls back to null if the addressee is
-                        // unresolvable or the realizer failed to boot.
-                        string? utterance = null;
-                        if (UtteranceRealizer is not null && humanById.TryGetValue(ip.To, out var addresseeHuman))
-                        {
-                            var speakerPerson = new TemporaryCzechActRealizer.Person(
-                                c.Identity.FirstName.Original, c.Biology == SexBiology.Female);
-                            var addresseePerson = new TemporaryCzechActRealizer.Person(
-                                addresseeHuman.Identity.FirstName.Original, addresseeHuman.Biology == SexBiology.Female);
-                            try
-                            {
-                                // Mode-2 direct speech ("Jano, nezajdeš se mnou?") — what the character
-                                // actually SAYS; the mode-1 narrative gloss stays in the structured dump.
-                                utterance = UtteranceRealizer.RealizeDirectSpeech(sa, speakerPerson, addresseePerson);
-                            }
-                            catch
-                            {
-                                // Preview-only — never let a realization edge case break projection.
-                                utterance = null;
-                            }
-                        }
+                        // Mode-2 direct speech ("Jano, nezajdeš se mnou?") — what the character actually
+                        // SAYS; null if the addressee is unresolvable or the realizer failed to boot.
+                        var utterance = humanById.TryGetValue(ip.To, out var addresseeHuman)
+                            ? RealizeUtterance(sa, c, addresseeHuman)
+                            : null;
 
                         interaction = new InteractionDto(sa.RelationalKind.ToString(), ip.To.Value.ToString(), structured, utterance);
                         break;
@@ -355,7 +364,8 @@ namespace WorldObserver.Simulation
                     Losses: losses,
                     SocialStatus: socialStatus,
                     Pantry: pantry,
-                    HeardInterpretation: heardInterpretation);
+                    HeardInterpretation: heardInterpretation,
+                    RecentDialogue: recentDialogue is not null && recentDialogue.TryGetValue(c.Id, out var dlog) ? dlog : null);
             }).ToList();
 
             // Dynamic map: list exactly the locations characters currently occupy (grouped from their

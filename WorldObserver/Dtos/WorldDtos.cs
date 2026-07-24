@@ -109,7 +109,16 @@ namespace WorldObserver.Dtos
         // ── Pantry / inventory (food-economy Tier 1: items the character carries) ─
         IReadOnlyList<PantryDto>? Pantry,
         // ── Dialogue: latest subjective reading of an act heard (unreliable witness) ──
-        string? HeardInterpretation);
+        string? HeardInterpretation,
+        // ── Dialogue: rolling conversation log (what this character said / heard, newest last) ──
+        IReadOnlyList<DialogueLineDto>? RecentDialogue);
+
+    /// <summary>One line of a character's conversation log — a direct-speech utterance said or heard.</summary>
+    /// <param name="Time">World time of the line (short display).</param>
+    /// <param name="Outgoing"><c>true</c> = this character said it; <c>false</c> = it was said to them.</param>
+    /// <param name="Other">Name of the other party.</param>
+    /// <param name="Text">The Czech direct-speech sentence (temporary mode-2 gloss).</param>
+    public sealed record DialogueLineDto(string Time, bool Outgoing, string Other, string Text);
 
     /// <summary>One food/drink item the character is carrying, with its remaining freshness [0..1].</summary>
     public sealed record PantryDto(

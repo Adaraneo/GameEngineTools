@@ -1095,6 +1095,19 @@ function renderDetail() {
             box.appendChild(section("Zvolená interakce", iRows));
         }
 
+        // Dialogue log — the running conversation: what this character said (→) and heard (←).
+        if (Array.isArray(c.recentDialogue) && c.recentDialogue.length) {
+            const feed = el("div", { class: "dialogue-feed" });
+            for (const line of c.recentDialogue) {
+                const ln = el("div", { class: "dlg-line " + (line.outgoing ? "dlg-out" : "dlg-in") });
+                ln.appendChild(el("span", { class: "dlg-who", text: (line.outgoing ? "→ " : "← ") + line.other }));
+                ln.appendChild(el("span", { class: "dlg-text", text: "»" + line.text + "«" }));
+                ln.appendChild(el("span", { class: "dlg-time", text: line.time }));
+                feed.appendChild(ln);
+            }
+            box.appendChild(section("Rozhovory", [feed]));
+        }
+
         // Dialogue: how this character subjectively read an act said to it — shown only when its
         // interpretation diverged from the objective act (the "unreliable witness").
         if (c.heardInterpretation) {

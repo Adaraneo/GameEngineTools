@@ -46,6 +46,12 @@ namespace WorldObserver.Simulation
         /// <summary>Per-character movement trail (oldest → newest distinct locations), updated every tick.</summary>
         private readonly Dictionary<HumanId, List<string>> _trails = new();
 
+        /// <summary>Rolling per-character conversation log (last few utterances said + heard).</summary>
+        private readonly Dictionary<HumanId, List<WorldObserver.Dtos.DialogueLineDto>> _dialogueLog = new();
+
+        /// <summary>Last interaction event recorded per speaker — dedups a lingering outbox.</summary>
+        private readonly Dictionary<HumanId, object> _lastRecordedAct = new();
+
         private long _lastPushTicks;
 
         /// <summary>Creates the service with the SignalR hub context, control state and options.</summary>
@@ -158,8 +164,9 @@ namespace WorldObserver.Simulation
                     // (3c) Push bereavement domain events as Czech narrative lines.
                     PushBereavementNarrative(now, chars, names);
 
-                    // (4) Record movement trails every tick (push is throttled, so do this here).
+                    // (4) Record movement trails + conversation lines every tick (push is throttled).
                     UpdateTrails(chars);
+                    RecordDialogue(now, chars);
 
                     // (5) Throttled world-state push.
                     PushStateThrottled(now, chars, ctx);
@@ -217,7 +224,10 @@ namespace WorldObserver.Simulation
                 transitOf: id => ctx.Orchestrator.GetTransit(id, now),
                 regions: ctx.Regions,
                 objectProvider: ctx.ObjectCache,
-                statusLedger: ctx.StatusLedger);
+                statusLedger: ctx.StatusLedger,
+                // Per-push copy so SendAsync serialization is not racing the sim thread's appends.
+                recentDialogue: _dialogueLog.ToDictionary(
+                    kv => kv.Key, kv => (IReadOnlyList<WorldObserver.Dtos.DialogueLineDto>)kv.Value.ToArray()));
             _ = _hub.Clients.All.SendAsync("Tick", dto);
         }
 
@@ -248,6 +258,57 @@ namespace WorldObserver.Simulation
                         trail.RemoveAt(0);
                 }
             }
+        }
+
+        /// <summary>
+        /// Appends this tick's uttered dialogue to a rolling per-character log — one line on the
+        /// speaker's side (outgoing) and one on the addressee's (incoming), both carrying the same
+        /// TEMPORARY mode-2 direct-speech gloss. Only fresh acts (this tick, initiated by the speaker)
+        /// are recorded; the last few lines per character are kept.
+        /// </summary>
+        private void RecordDialogue(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            const int MaxLines = 12;
+            var byId = chars.ToDictionary(c => c.Id, c => c);
+            var timeStr = $"{now.Day}. {now.Hour}h";
+
+            foreach (var c in chars)
+            {
+                var outbox = c.LastOutbox;
+                for (var i = 0; i < outbox.Count; i++)
+                {
+                    if (outbox[i] is not GameEngineTools.Characters.Engines.Interactions.InteractionProposed ip)
+                        continue;
+                    if (ip.From != c.Id)
+                        continue;
+                    // Dedup a lingering outbox (same event object across ticks) without a timestamp filter.
+                    if (_lastRecordedAct.TryGetValue(c.Id, out var prev) && ReferenceEquals(prev, ip))
+                        continue;
+                    _lastRecordedAct[c.Id] = ip;
+                    if (!byId.TryGetValue(ip.To, out var target))
+                        continue;
+
+                    var text = WorldStateProjector.RealizeUtterance(ip.Content.SpeechAct, c, target);
+                    if (string.IsNullOrEmpty(text))
+                        continue;
+
+                    AppendDialogue(c.Id, new WorldObserver.Dtos.DialogueLineDto(timeStr, true, target.Identity.FirstName.Original, text), MaxLines);
+                    AppendDialogue(ip.To, new WorldObserver.Dtos.DialogueLineDto(timeStr, false, c.Identity.FirstName.Original, text), MaxLines);
+                }
+            }
+        }
+
+        private void AppendDialogue(HumanId id, WorldObserver.Dtos.DialogueLineDto line, int cap)
+        {
+            if (!_dialogueLog.TryGetValue(id, out var list))
+            {
+                list = new List<WorldObserver.Dtos.DialogueLineDto>(cap);
+                _dialogueLog[id] = list;
+            }
+
+            list.Add(line);
+            while (list.Count > cap)
+                list.RemoveAt(0);
         }
 
         /// <summary>
@@ -362,6 +423,7 @@ namespace WorldObserver.Simulation
             scene.ResetCharacters();
             names.Clear();
             _trails.Clear();
+            _dialogueLog.Clear();
             _log.LogInformation("World reset for replace-import ({Count} characters removed).", current?.Count ?? 0);
         }
 
