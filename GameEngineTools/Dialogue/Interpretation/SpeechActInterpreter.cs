@@ -49,6 +49,11 @@ namespace GameEngineTools.Dialogue.Interpretation
     /// Lemma conventionality at/above which an ironic act is decoded even below the ToM/familiarity
     /// gate (Giora's Graded Salience — the ironic reading of a conventional phrase IS the salient one).
     /// </param>
+    /// <param name="PowerAgencyWeight">
+    /// Phase-2 weight applied to the lemma's Sap-2017 power/agency frames when producing the
+    /// <see cref="PerceivedMeaning.PerceivedPowerDelta"/> / <see cref="PerceivedMeaning.PerceivedAgencyDelta"/>
+    /// signals. Only computed when <see cref="EnableConnotationLayer"/> is on; no consumer yet.
+    /// </param>
     public sealed record SpeechActInterpreterConfig(
         int IronyToMLevelMin = 2,
         double IronyFamiliarityMin = 40.0,
@@ -56,7 +61,8 @@ namespace GameEngineTools.Dialogue.Interpretation
         double BaseConfidence = 0.5,
         bool EnableConnotationLayer = false,
         double ConnotationWeight = 0.15,
-        double IronyConventionalityBypassMin = 0.7);
+        double IronyConventionalityBypassMin = 0.7,
+        double PowerAgencyWeight = 0.15);
 
     /// <summary>
     /// Default interpreter. Irony (a <see cref="ForceShift"/>) is decoded only by a sufficiently
@@ -122,10 +128,16 @@ namespace GameEngineTools.Dialogue.Interpretation
             // ── Connotation layer (opt-in): additive lemma affect + conventional-irony bypass ──
             // Independent of grammatical Polarity — sentiment never leaks into sentence negation.
             var connotationDelta = 0.0;
+            var powerDelta = 0.0;
+            var agencyDelta = 0.0;
             if (_config.EnableConnotationLayer)
             {
                 var affect = _lexicon.Lookup(act.PredicateLemma);
                 connotationDelta = Math.Clamp(affect.Valence * _config.ConnotationWeight, -0.3, 0.3);
+
+                // Phase-2 power/agency frames (Sap 2017) — prepared signal, no consumer yet.
+                powerDelta = Math.Clamp(affect.PowerAgent * _config.PowerAgencyWeight, -0.3, 0.3);
+                agencyDelta = Math.Clamp(affect.AgencyAgent * _config.PowerAgencyWeight, -0.3, 0.3);
 
                 // Graded Salience (Giora): a conventionally ironic phrase is decoded even below the
                 // ToM/familiarity gate — its ironic reading IS the salient one.
@@ -157,6 +169,8 @@ namespace GameEngineTools.Dialogue.Interpretation
                 ResolvedRoles = resolvedRoles,
                 Confidence = confidence,
                 ConnotationDelta = connotationDelta,
+                PerceivedPowerDelta = powerDelta,
+                PerceivedAgencyDelta = agencyDelta,
             };
         }
 

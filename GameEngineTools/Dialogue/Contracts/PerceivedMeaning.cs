@@ -38,5 +38,20 @@ namespace GameEngineTools.Dialogue.Contracts
         /// <see cref="Polarity"/> — sentiment never leaks into sentence negation.
         /// </summary>
         public double ConnotationDelta { get; init; }
+
+        /// <summary>
+        /// Phase-2 power signal of the word choice (Sap 2017 connotation frames), [−1..1]: positive =
+        /// the speaker's verb claims power over the addressee ("vyžadovat"), negative = it casts the
+        /// speaker as subordinate ("žebrat"). 0 when the connotation layer is off. Carried for a later
+        /// gated consumer (Relationships/Status) — nothing reads it yet, so it is behaviourally inert.
+        /// </summary>
+        public double PerceivedPowerDelta { get; init; }
+
+        /// <summary>
+        /// Phase-2 agency signal of the word choice (Sap 2017), [−1..1]: positive = the verb portrays
+        /// the speaker as high-agency / in control, negative = passive. 0 when the layer is off. Also a
+        /// prepared, not-yet-consumed signal.
+        /// </summary>
+        public double PerceivedAgencyDelta { get; init; }
     }
 }

@@ -25,5 +25,19 @@ namespace GameEngineTools.Dialogue.Contracts
     /// a highly conventional ironic phrase is decoded even by low-ToM listeners).
     /// </param>
     /// <param name="Source">Where the entry came from.</param>
-    public sealed record LemmaAffectRecord(double Valence, double Conventionality, AffectSource Source);
+    /// <param name="PowerAgent">
+    /// Connotation frame of POWER (Sap et al. 2017), [−1..1]: does the verb imply the agent (speaker)
+    /// holds power OVER the theme (addressee)? <c>+1</c> dominant ("vyžadovat"), <c>−1</c> subordinate
+    /// ("žebrat o"), <c>0</c> neutral. Phase-2 signal — carried on the record, consumed later.
+    /// </param>
+    /// <param name="AgencyAgent">
+    /// Connotation frame of AGENCY (Sap et al. 2017), [−1..1]: does the verb portray the agent as
+    /// high-agency / in control (<c>+1</c>, "rozhodnout") or low-agency / passive (<c>−1</c>, "doufat")?
+    /// </param>
+    public sealed record LemmaAffectRecord(
+        double Valence,
+        double Conventionality,
+        AffectSource Source,
+        double PowerAgent = 0.0,
+        double AgencyAgent = 0.0);
 }

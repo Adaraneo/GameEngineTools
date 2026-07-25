@@ -132,12 +132,20 @@ namespace EngineTests
         [TestMethod]
         public void LemmaAffectRecordRoundTrip_ThroughJson_PreservesFields()
         {
-            var original = new LemmaAffectRecord(-0.35, 0.85, AffectSource.Curated);
+            var original = new LemmaAffectRecord(-0.35, 0.85, AffectSource.Curated, PowerAgent: 0.8, AgencyAgent: -0.5);
 
             var json = JsonSerializer.Serialize(original);
             var restored = JsonSerializer.Deserialize<LemmaAffectRecord>(json);
 
             Assert.AreEqual(original, restored);
+        }
+
+        [TestMethod]
+        public void LemmaAffectRecord_PowerAgency_DefaultToZero()
+        {
+            var record = new LemmaAffectRecord(0.5, 0.0, AffectSource.Curated);
+            Assert.AreEqual(0.0, record.PowerAgent);
+            Assert.AreEqual(0.0, record.AgencyAgent);
         }
 
         [TestMethod]

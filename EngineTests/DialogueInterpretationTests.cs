@@ -176,6 +176,52 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Appraise_PowerAgency_ZeroWhenLayerOff_NonZeroWhenOn()
+        {
+            var act = Act(Directness.Neutral) with { PredicateLemma = "vyžadovat" };
+            var listener = new ListenerContext(4, 60, 0.0);
+
+            Assert.AreEqual(0.0, ConnotationInterpreter(enabled: false).Appraise(act, listener).PerceivedPowerDelta);
+            Assert.AreEqual(0.0, ConnotationInterpreter(enabled: false).Appraise(act, listener).PerceivedAgencyDelta);
+
+            var on = ConnotationInterpreter(enabled: true).Appraise(act, listener);
+            Assert.IsTrue(on.PerceivedPowerDelta > 0.0, "A demand claims power over the addressee.");
+            Assert.IsTrue(on.PerceivedAgencyDelta > 0.0, "A demand is high-agency.");
+        }
+
+        [DataTestMethod]
+        [DataRow("vyžadovat", "požádat")]   // demand dominates a deferential request
+        [DataRow("vyžadovat", "žebrat o")]  // demand dominates begging
+        [DataRow("požádat", "žebrat o")]    // a request still outranks begging
+        public void Appraise_PowerFrame_OrdersDirectiveVerbsBySocialPower(string dominant, string subordinate)
+        {
+            var listener = new ListenerContext(4, 60, 0.0);
+            var interpreter = ConnotationInterpreter(enabled: true);
+
+            var hi = interpreter.Appraise(Act(Directness.Neutral) with { PredicateLemma = dominant }, listener);
+            var lo = interpreter.Appraise(Act(Directness.Neutral) with { PredicateLemma = subordinate }, listener);
+
+            Assert.IsTrue(hi.PerceivedPowerDelta > lo.PerceivedPowerDelta,
+                $"'{dominant}' must read as more powerful than '{subordinate}'.");
+        }
+
+        [TestMethod]
+        public void Appraise_PowerAgency_DoNotLeakIntoEmotionalAppraisal()
+        {
+            // "vyžadovat" carries a strong power signal (0.8 × 0.15 = 0.12) but only weak valence
+            // (−0.30 × 0.15 = −0.045, below the CPM's 0.05 significance gate). If power/agency fed the
+            // appraiser, the act would become emotionally relevant — it must stay null, proving the
+            // Phase-2 signals are prepared but NOT yet consumed by emotion.
+            var listener = new ListenerContext(4, 60, 0.0);
+            var pm = ConnotationInterpreter(enabled: true).Appraise(
+                Act(Directness.Neutral) with { PredicateLemma = "vyžadovat" }, listener);
+
+            Assert.IsTrue(pm.PerceivedPowerDelta > 0.1, "sanity: the strong power signal is present");
+            Assert.IsNull(PerceivedActAppraiser.ToAppraisal(pm, 60, Neutral),
+                "power/agency must not enter the CPM — only ConnotationDelta (valence) does.");
+        }
+
+        [TestMethod]
         public void AmbientInterpretation_ConfigureEnablesConnotation_ResetRestoresDefault()
         {
             // The engine paths (Psychology, Memory) read SpeechActInterpretation.Current — this is the
