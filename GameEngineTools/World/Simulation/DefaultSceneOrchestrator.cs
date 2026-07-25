@@ -174,6 +174,9 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private readonly Dialogue.Conversation.ConversationCoordinator _conversation;
 
+        /// <summary>Unmet need (0–100: care / hunger / thirst) at/above which a reach-out becomes a request (first heuristic).</summary>
+        private const double RequestNeedThreshold = 55.0;
+
         /// <summary>
         /// TEMPORARY — lazily-built stopgap Czech gloss renderer used only to preview an uttered
         /// <see cref="Dialogue.Contracts.SpeechAct"/> in <see cref="CoreLog.SpeechActUttered"/>. Deleted
@@ -1452,10 +1455,26 @@ namespace GameEngineTools.World.Simulation
                 // response (adjacency pair) instead of a fresh topic (dialogue model B).
                 _conversation.TryGetPendingResponse(character.Id, target.Id, now, out var respondingTo);
 
+                // Need-driven request: reaching out while a strong need is unmet (care, hunger, or thirst)
+                // turns the reach-out into an ask for help. The planner then picks požádat / vyžadovat /
+                // žebrat by the speaker's felt power, and urgency (how far above threshold) pushes a
+                // low-power speaker toward pleading. First heuristic trigger — a pending conversational
+                // response still wins (the planner prioritises it).
+                var intent = selection.Act;
+                var urgency = 0.0;
+                var neediness = Math.Max(
+                    character.Snapshot.Psychology.Motivations?.NeedCare ?? 0.0,
+                    Math.Max(character.Snapshot.Physiology.Hunger, character.Snapshot.Physiology.Thirst));
+                if (neediness >= RequestNeedThreshold)
+                {
+                    intent = RelationalActKind.Request;
+                    urgency = Math.Clamp((neediness - RequestNeedThreshold) / (100.0 - RequestNeedThreshold), 0.0, 1.0);
+                }
+
                 // Plan a fully-specified SpeechAct (register/directness/speaker/addressee) so the act can
                 // later be realised as a direct-address utterance, not only a third-person gloss.
                 var request = new Dialogue.Planning.SpeechActRequest(
-                    Intent: selection.Act,
+                    Intent: intent,
                     Speaker: EntityRef.ForHuman(character.Id, character.Identity.FirstName.Original),
                     Addressee: EntityRef.ForHuman(target.Id, target.Identity.FirstName.Original),
                     OccurredAt: now,
@@ -1464,6 +1483,7 @@ namespace GameEngineTools.World.Simulation
                     Agreeableness: character.Personality.BigFive.Agreeableness,
                     Style: character.Personality.Communication,
                     Power: character.Snapshot.Psychology.Dominance,
+                    Urgency: urgency,
                     RespondingTo: respondingTo);
                 var act = _speechActPlanner.Plan(request);
                 _conversation.Observe(act, character.Id, target.Id, now);
