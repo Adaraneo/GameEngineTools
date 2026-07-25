@@ -17,6 +17,8 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Generation;
+    using GameEngineTools.Dialogue.Interpretation;
+    using GameEngineTools.Dialogue.Semantics;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
@@ -2929,6 +2931,100 @@ namespace EngineTests
             // Flag on: a dominant word ("vyžadovat", +power) raises Respect; a subordinate one ("žebrat", −power) lowers it.
             Assert.IsTrue(RespectAfter(on, +0.12) > 50.0, "dominant word choice raises perceived Respect");
             Assert.IsTrue(RespectAfter(on, -0.12) < 50.0, "subordinate word choice lowers perceived Respect");
+        }
+
+        // ------------------------------------------------------------------
+        // Phase-2b scenario coverage: the LIVE world rarely produces Requests,
+        // so these deterministic scenarios (calibration + ordering + accepted-only)
+        // stand in for the observation the sparse world can't reliably deliver.
+        // Unlike the unit test above, these drive the power value through the REAL
+        // interpreter + curated lexicon (mirroring DefaultInteractionEngine), so the
+        // per-lemma power of the Directive family is exercised end-to-end.
+        // ------------------------------------------------------------------
+
+        /// <summary>Perceived power of a spoken predicate, derived exactly as <c>DefaultInteractionEngine</c> does.</summary>
+        private static double SpokenPower(string predicateLemma)
+        {
+            var interpreter = new DefaultSpeechActInterpreter(
+                new SpeechActInterpreterConfig(EnableConnotationLayer: true),
+                new CuratedConnotationLexicon());
+            var speaker = new HumanId(Guid.NewGuid());
+            var addressee = new HumanId(Guid.NewGuid());
+            var act = SpeechAct.Relational(RelationalActKind.SmallTalk, speaker, addressee, new WDateTime(1000))
+                with { PredicateLemma = predicateLemma, Directness = Directness.Neutral, Polarity = Polarity.Affirmative };
+            return interpreter.Appraise(act, new ListenerContext(4, 60, 0.0)).PerceivedPowerDelta;
+        }
+
+        private static RelationshipEdge SeedNeutralRespect(HumanId self, HumanId other) => new RelationshipEdge(
+            self, other, Like: 50, Trust: 50, Familiarity: 40,
+            AestheticAttraction: 50, PhysicalAttraction: 50, IntimateAffinity: 20, SexualInterest: 20,
+            Closeness: 50, Respect: 50, Comfort: 50,
+            Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
+
+        /// <summary>Runs <paramref name="n"/> identical (SmallTalk) interaction outcomes carrying <paramref name="power"/>, returns final Respect.</summary>
+        private double RespectAfterActs(RelationshipsConfig cfg, HumanId self, HumanId speaker, double power, int n, bool accepted = true)
+        {
+            var engine = BuildEngine(cfg);
+            engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [speaker] = SeedNeutralRespect(self, speaker) }));
+            var ctx = BuildCtx(self);
+            for (var i = 0; i < n; i++)
+            {
+                engine.Handle(
+                    new InteractionOutcome(_now, speaker, self, Accepted: accepted, Reason: "test",
+                        Act: RelationalActKind.SmallTalk, PerceivedPower: power),
+                    ctx, _outbox);
+            }
+            return engine.State.Edges[speaker].Respect;
+        }
+
+        [TestMethod]
+        public void PowerRespect_RepeatedDemands_MoveRespectPerceptiblyButConservatively()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var speaker = new HumanId(Guid.NewGuid());
+            // Default gain (4.0), only the flag flipped on.
+            var cfg = new RelationshipsConfig(DecayPerDay: 0.0) with { EnablePowerRespectPropagation = true };
+
+            var respect = RespectAfterActs(cfg, self, speaker, SpokenPower("vyžadovat"), n: 20);
+
+            // 20 accepted demands × (≈0.12 power × 4.0 gain) ≈ +9.6 → ~59.6 from a 50 baseline:
+            // clearly perceptible (a demanding speaker gains standing) yet far from saturating the [0,100] scale.
+            // The band guards the calibration: it fails if the default gain is later cranked into runaway territory.
+            Assert.IsTrue(respect > 54.0, $"20 demands should move Respect perceptibly (was {respect:F2}).");
+            Assert.IsTrue(respect < 70.0, $"default gain 4.0 must stay conservative, not blow past the scale (was {respect:F2}).");
+        }
+
+        [TestMethod]
+        public void PowerRespect_DirectiveFamily_OrdersRespectBySpokenPower()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var speaker = new HumanId(Guid.NewGuid());
+            var cfg = new RelationshipsConfig(DecayPerDay: 0.0) with { EnablePowerRespectPropagation = true, PowerRespectGain = 10.0 };
+
+            double Respect(string lemma) => RespectAfterActs(cfg, self, speaker, SpokenPower(lemma), n: 10);
+
+            var demand = Respect("vyžadovat");   // dominant   → power > 0
+            var request = Respect("požádat");    // deferential → mildly submissive
+            var beg = Respect("žebrat o");       // submissive  → strongest power loss
+
+            // The verb the speaker chooses ranks their standing in the listener's eyes.
+            Assert.IsTrue(demand > request, $"a demand out-ranks a polite request ({demand:F2} vs {request:F2}).");
+            Assert.IsTrue(request > beg, $"a polite request still out-ranks begging ({request:F2} vs {beg:F2}).");
+            Assert.IsTrue(demand > 50.0, $"demanding raises the speaker's Respect above baseline (was {demand:F2}).");
+            Assert.IsTrue(beg < 50.0, $"begging lowers the speaker's Respect below baseline (was {beg:F2}).");
+        }
+
+        [TestMethod]
+        public void PowerRespect_DeclinedInteraction_DoesNotMoveRespect()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var speaker = new HumanId(Guid.NewGuid());
+            var cfg = new RelationshipsConfig(DecayPerDay: 0.0) with { EnablePowerRespectPropagation = true, PowerRespectGain = 10.0 };
+
+            var respect = RespectAfterActs(cfg, self, speaker, SpokenPower("vyžadovat"), n: 10, accepted: false);
+
+            // Power propagation is wired only on the accepted path (Phase 2b); a declined act carries no power→Respect shift.
+            Assert.AreEqual(50.0, respect, 1e-9, "declined interactions must not propagate spoken power into Respect.");
         }
 
         // ------------------------------------------------------------------
