@@ -186,7 +186,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
         SexBiology? FromBiology = null,
         SexBiology? ToBiology = null,
         double? PeakValence = null,
-        double? EndValence = null) : IDomainEvent;
+        double? EndValence = null,
+        // ── Phase-2b: the recipient's perceived power of the speaker's word choice (Sap 2017), [−0.3..0.3];
+        //    0 when the connotation layer is off. Consumed by DefaultRelationshipsEngine (behind a flag). ──
+        double PerceivedPower = 0.0) : IDomainEvent;
 
     /// <summary>Intent regarding a potential pregnancy in an abstract sexual encounter.</summary>
     public enum ReproductiveIntent

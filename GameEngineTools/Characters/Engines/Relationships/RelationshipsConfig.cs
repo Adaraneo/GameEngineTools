@@ -362,7 +362,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// Facial-resemblance multiplier for male observers. Damped toward neutral (default 0.90, not
         /// the near-zero d=0.12 the raw effect size would imply) for the same extrapolation reason.
         /// </summary>
-        double FacialResemblanceWeightMale = 0.90)
+        double FacialResemblanceWeightMale = 0.90,
+        /// <summary>
+        /// Phase-2b (connotation power/agency): whether a listener's perceived power of the speaker's
+        /// word choice shifts Respect on the listener→speaker edge. Default <c>false</c> — opt-in,
+        /// invasive; with it off (and with the connotation layer off) behaviour is unchanged.
+        /// </summary>
+        bool EnablePowerRespectPropagation = false,
+        /// <summary>
+        /// Phase-2b: per-act Respect gain applied to the perceived power delta ([−0.3..0.3]). Small by
+        /// design — the decision spike used a larger placeholder; 4.0 keeps per-act shifts (~±0.5) in
+        /// line with the other interaction Respect deltas.
+        /// </summary>
+        double PowerRespectGain = 4.0)
     {
         /// <summary>
         /// Parameterless constructor required by DI options binding.
@@ -415,7 +427,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
             InvestmentGrowthPerDay: 0.02,
             RomanticEdgeIntimacyThreshold: 30.0,
             CommitmentDecayResistance: 0.6,
-            DissolutionCommitmentThreshold: 15.0)
+            DissolutionCommitmentThreshold: 15.0,
+            EnablePowerRespectPropagation: false,
+            PowerRespectGain: 4.0)
         { }
     }
 }

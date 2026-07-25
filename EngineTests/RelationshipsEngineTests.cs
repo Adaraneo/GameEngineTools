@@ -2893,6 +2893,45 @@ namespace EngineTests
         }
 
         // ------------------------------------------------------------------
+        // Phase-2b: perceived power of the speaker's WORD CHOICE shifts Respect
+        // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void PowerRespectPropagation_ShiftsRespectBySpokenPower_OnlyWhenEnabled()
+        {
+            var self = new HumanId(Guid.NewGuid());      // recipient — perceives the speaker's power
+            var speaker = new HumanId(Guid.NewGuid());
+
+            RelationshipEdge Seed() => new RelationshipEdge(
+                self, speaker, Like: 50, Trust: 50, Familiarity: 40,
+                AestheticAttraction: 50, PhysicalAttraction: 50, IntimateAffinity: 20, SexualInterest: 20,
+                Closeness: 50, Respect: 50, Comfort: 50,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
+
+            // SmallTalk carries no base respectDelta, so any Respect change is purely the power propagation.
+            InteractionOutcome Heard(double power) => new(
+                _now, speaker, self, Accepted: true, Reason: "test", Act: RelationalActKind.SmallTalk, PerceivedPower: power);
+
+            double RespectAfter(RelationshipsConfig cfg, double power)
+            {
+                var engine = BuildEngine(cfg);
+                engine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [speaker] = Seed() }));
+                engine.Handle(Heard(power), BuildCtx(self), _outbox);
+                return engine.State.Edges[speaker].Respect;
+            }
+
+            var off = new RelationshipsConfig(DecayPerDay: 0.0);   // flag off (default)
+            var on = off with { EnablePowerRespectPropagation = true, PowerRespectGain = 10.0 };
+
+            // Flag off: word-choice power must not touch Respect.
+            Assert.AreEqual(50.0, RespectAfter(off, +0.12), 1e-9, "flag off: power must not change Respect");
+
+            // Flag on: a dominant word ("vyžadovat", +power) raises Respect; a subordinate one ("žebrat", −power) lowers it.
+            Assert.IsTrue(RespectAfter(on, +0.12) > 50.0, "dominant word choice raises perceived Respect");
+            Assert.IsTrue(RespectAfter(on, -0.12) < 50.0, "subordinate word choice lowers perceived Respect");
+        }
+
+        // ------------------------------------------------------------------
         // Test 1: PositiveAct → PerceivedPrestige roste
         // ------------------------------------------------------------------
 

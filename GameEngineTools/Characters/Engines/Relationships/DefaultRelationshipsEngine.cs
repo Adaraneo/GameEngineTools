@@ -424,6 +424,16 @@ namespace GameEngineTools.Characters.Engines.Relationships
                             _ => 0.0
                         };
 
+                        // Phase-2b (connotation power/agency): the recipient's perceived power of the
+                        // speaker's WORD CHOICE shifts Respect on this listener→speaker edge — a dominant
+                        // word ("vyžadovat") reads as higher status (+Respect), a subordinate one
+                        // ("žebrat") lowers it. Recipient side only; opt-in and 0 when the connotation
+                        // layer / flag are off, so the baseline is byte-identical. StatusLedger.Fold then
+                        // reflects the shifted Respect into Dominance/Prestige downstream — no ledger poke.
+                        var powerRespectDelta = (self == io.To && Config.EnablePowerRespectPropagation)
+                            ? io.PerceivedPower * Config.PowerRespectGain
+                            : 0.0;
+
                         // Authority-Ranking relational context: interacting with a perceived superior
                         // builds deference (Respect) and loyalty (Trust) — the AR relational dynamic,
                         // orthogonal to the individual Dominance/Prestige routes to status (Cheng 2013).
@@ -467,7 +477,9 @@ namespace GameEngineTools.Characters.Engines.Relationships
                                 IntimateAffinity = Bump(e.IntimateAffinity, ComputeRomanticInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 SexualInterest = Bump(e.SexualInterest, ComputeSexualInterestDelta(e, io.Act, ctx.Personality.Sociosexuality, ctx.AttractionProfile, otherBiology ?? e.TargetBiology)),
                                 Trust = Bump(e.Trust, Math.Max(0.0, trustDelta) + trustConsolidation + arLoyalty),
-                                Respect = respectDelta + arDeference > 0 ? Bump(e.Respect, respectDelta + arDeference) : e.Respect,
+                                Respect = (respectDelta + arDeference + powerRespectDelta) != 0.0
+                                    ? Bump(e.Respect, respectDelta + arDeference + powerRespectDelta)
+                                    : e.Respect,
                                 Familiarity = Bump(e.Familiarity, familiarityDelta),
                                 AestheticAttraction = Bump(e.AestheticAttraction, attractionPlasticity),
                                 PhysicalAttraction = Bump(e.PhysicalAttraction, attractionPlasticity * 0.65),

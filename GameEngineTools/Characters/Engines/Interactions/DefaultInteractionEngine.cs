@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -314,6 +315,13 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
             // We carry p.Content.SpeechAct.RelationalKind — the RelationshipsEngine needs it for DomainBreakdown
             var (peakVal, endVal) = ComputePeakEndValence(p.Content.SpeechAct.RelationalKind, accepted, misattrib);
+
+            // Phase-2b: the recipient's subjective reading of the speaker's power (Sap 2017 word-choice
+            // frame). 0 when the connotation layer is off; carried on the outcome for RelationshipsEngine.
+            var perceivedPower = SpeechActInterpretation.Current
+                .Appraise(p.Content.SpeechAct, Dialogue.ListenerContextFactory.For(ctx, p.From))
+                .PerceivedPowerDelta;
+
             var outcome = new InteractionOutcome(
                 OccurredAt: p.OccurredAt,
                 From: p.From,
@@ -324,7 +332,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 FromBiology: p.FromBiology,
                 ToBiology: ctx.Biology,
                 PeakValence: peakVal,
-                EndValence: endVal);
+                EndValence: endVal,
+                PerceivedPower: perceivedPower);
 
             outbox.Add(outcome);
 
