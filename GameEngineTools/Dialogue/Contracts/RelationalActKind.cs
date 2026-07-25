@@ -38,6 +38,15 @@ namespace GameEngineTools.Dialogue.Contracts
         Meta,
 
         /// <summary>Invite — social initiative — gently builds the Physical domain.</summary>
-        Invite
+        Invite,
+
+        /// <summary>
+        /// Request — asking the addressee to do or give something (a directive). Its predicate is
+        /// chosen by the speaker's felt power (deferential "požádat" ↔ dominant "vyžadovat" ↔
+        /// subordinate "žebrat o"), so word choice carries the Sap-2017 power/agency frame.
+        /// New in the Directive expansion; falls through to the neutral default in relationship /
+        /// psychology routing until explicitly handled.
+        /// </summary>
+        Request
     }
 }

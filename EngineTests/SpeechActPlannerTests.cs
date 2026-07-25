@@ -80,6 +80,29 @@ namespace EngineTests
             Assert.AreEqual(expected, act.Point);
         }
 
+        [DataTestMethod]
+        [DataRow(0.95, 0.1, "vyžadovat")]   // powerful + disagreeable → demand
+        [DataRow(0.5, 0.5, "požádat")]      // neutral → deferential request
+        [DataRow(0.1, 0.9, "žebrat o")]     // powerless + agreeable → beg
+        public void Plan_Request_PredicateReflectsSpeakerPower(double power, double agreeableness, string expectedLemma)
+        {
+            var planner = new DefaultSpeechActPlanner();
+            var act = planner.Plan(Request(intent: RelationalActKind.Request, power: power, agreeableness: agreeableness));
+            Assert.AreEqual(expectedLemma, act.PredicateLemma);
+        }
+
+        [TestMethod]
+        public void Plan_Request_UrgencyPushesLowPowerSpeakerToBeg()
+        {
+            var planner = new DefaultSpeechActPlanner();
+            // A mildly low-power speaker requests politely when calm, but pleads when it is urgent.
+            var calm = planner.Plan(Request(intent: RelationalActKind.Request, power: 0.3, agreeableness: 0.7, urgency: 0.0));
+            var urgent = planner.Plan(Request(intent: RelationalActKind.Request, power: 0.3, agreeableness: 0.7, urgency: 1.0));
+
+            Assert.AreEqual("požádat", calm.PredicateLemma);
+            Assert.AreEqual("žebrat o", urgent.PredicateLemma);
+        }
+
         [TestMethod]
         public void Plan_FillsSpeakerAddresseeAndActorRole()
         {

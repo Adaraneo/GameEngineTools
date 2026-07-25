@@ -62,6 +62,10 @@ namespace GameEngineTools.Dialogue.Temporary
             ["mluvit"] = new("mluvil", "mluvila", "s", Case.Instrumental),
             ["zvát"] = new("pozval", "pozvala", null, Case.Accusative),
             ["navrhovat"] = new("navrhl", "navrhla", null, Case.Dative),
+            // Request (Directive) — power-graded synonyms.
+            ["požádat"] = new("požádal", "požádala", null, Case.Accusative),
+            ["vyžadovat"] = new("vyžadoval", "vyžadovala", "od", Case.Genitive),
+            ["žebrat o"] = new("žebral", "žebrala", "u", Case.Genitive),
         };
 
         private readonly CzechWordFormComposer _composer;
@@ -151,12 +155,18 @@ namespace GameEngineTools.Dialogue.Temporary
                 : $"{voc}, nezajdeš se mnou?",
             "navrhovat" => $"{voc}, co kdybychom se někdy sešli?",
 
+            // Request (Directive) — deferential ↔ dominant ↔ subordinate.
+            "požádat" => formal ? $"{voc}, mám na vás prosbu." : $"{voc}, mám na tebe prosbu.",
+            "vyžadovat" => formal ? $"{voc}, tohle od vás žádám." : $"{voc}, tohle po tobě chci.",
+            "žebrat o" => formal ? $"Snažně vás prosím, {voc}…" : $"Moc tě prosím, {voc}…",
+
             _ => null,
         };
 
         /// <summary>Declines a participant name into <paramref name="case"/> via a CzechWordRequest.</summary>
         private string Decline(Person person, Case @case)
         {
+            var pattern = GuessPattern(person);
             var request = new CzechWordRequest
             {
                 Lemma = person.Name,
@@ -165,7 +175,8 @@ namespace GameEngineTools.Dialogue.Temporary
                 Number = Number.Singular,
                 Gender = person.IsFemale ? Gender.Feminine : Gender.Masculine,
                 IsAnimate = true,
-                Pattern = GuessPattern(person),
+                Pattern = pattern,
+                IsIndeclinable = pattern is null
             };
 
             try
@@ -179,14 +190,14 @@ namespace GameEngineTools.Dialogue.Temporary
             }
         }
 
-        private static string GuessPattern(Person person) => person switch
+        private static string? GuessPattern(Person person) => person switch
         {
             { IsFemale: true, Name: var n } when n.EndsWith("a") || n.EndsWith("ia") => "žena",
             { IsFemale: true, Name: var n } when n.EndsWith("e") => "růže",
             { IsFemale: false, Name: var n } when n.EndsWith("us") => "muž",
-            { IsFemale: false, Name: var n } when n.EndsWith("tor") => "pán",
+            { IsFemale: false, Name: var n } when n.EndsWith("tor") || n.EndsWith("v") => "pán",
             { IsFemale: true } => "žena",
-            _ => "pán",
+            _ => null,
         };
     }
 }

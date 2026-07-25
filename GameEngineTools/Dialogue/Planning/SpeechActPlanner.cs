@@ -69,6 +69,8 @@ namespace GameEngineTools.Dialogue.Planning
     /// <param name="PowerWeight">Weight of speaker power on directness (high power ⇒ blunt).</param>
     /// <param name="StyleWeight">Weight of communication style on directness.</param>
     /// <param name="UrgencyWeight">Weight of urgency on directness (urgent ⇒ blunt).</param>
+    /// <param name="RequestPowerWeight">Weight of speaker power on request-verb dominance selection.</param>
+    /// <param name="RequestAgreeablenessWeight">Weight of (dis)agreeableness on request-verb dominance selection.</param>
     public sealed record SpeechActPlannerConfig(
         double IntimateClosenessMin = 60.0,
         double FormalFamiliarityMax = 15.0,
@@ -77,7 +79,9 @@ namespace GameEngineTools.Dialogue.Planning
         double AgreeablenessWeight = 1.0,
         double PowerWeight = 0.8,
         double StyleWeight = 0.6,
-        double UrgencyWeight = 0.7);
+        double UrgencyWeight = 0.7,
+        double RequestPowerWeight = 0.6,
+        double RequestAgreeablenessWeight = 0.4);
 
     /// <summary>
     /// Default <see cref="ISpeechActPlanner"/>. Register follows relationship closeness/familiarity;
@@ -175,8 +179,12 @@ namespace GameEngineTools.Dialogue.Planning
             return score <= _config.IndirectThreshold ? Directness.Indirect : Directness.Neutral;
         }
 
-        /// <summary>Deterministically picks one candidate predicate for the resolved act kind.</summary>
-        private static SeedPredicate SelectPredicate(RelationalActKind intent, SpeechActRequest request)
+        /// <summary>
+        /// Picks a candidate predicate for the resolved act kind. When the candidates carry a dominance
+        /// spread (e.g. Request: požádat/vyžadovat/žebrat), the speaker's felt power drives the choice —
+        /// so word choice reflects personality. Otherwise the choice is a deterministic hash.
+        /// </summary>
+        private SeedPredicate SelectPredicate(RelationalActKind intent, SpeechActRequest request)
         {
             var candidates = SeedPredicateLexicon.Predicates[intent];
             if (candidates.Count == 1)
@@ -184,9 +192,51 @@ namespace GameEngineTools.Dialogue.Planning
                 return candidates[0];
             }
 
+            // Power-driven selection when the predicates span a dominance range.
+            var hasDominanceSpread = false;
+            foreach (var candidate in candidates)
+            {
+                if (candidate.SelectionDominance != 0.0)
+                {
+                    hasDominanceSpread = true;
+                    break;
+                }
+            }
+
+            if (hasDominanceSpread)
+            {
+                var dominance = SpeakerDominance(request);
+                var best = candidates[0];
+                var bestDistance = double.MaxValue;
+                foreach (var candidate in candidates)
+                {
+                    var distance = Math.Abs(candidate.SelectionDominance - dominance);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        best = candidate;
+                    }
+                }
+
+                return best;
+            }
+
             var seed = StableHash(
                 $"{request.Speaker.Id.Value}|{request.Addressee.Id.Value}|{(int)intent}|{request.OccurredAt.WorldTicks}");
             return candidates[(int)(seed % (uint)candidates.Count)];
+        }
+
+        /// <summary>
+        /// The speaker's felt dominance for word choice, [−1..1]: high power and low agreeableness push
+        /// toward a domineering register; urgency widens the swing (an urgent low-power speaker pleads,
+        /// an urgent high-power speaker demands).
+        /// </summary>
+        private double SpeakerDominance(SpeechActRequest request)
+        {
+            var basePush = _config.RequestPowerWeight * (request.Power - 0.5) * 2.0
+                + _config.RequestAgreeablenessWeight * (0.5 - request.Agreeableness) * 2.0;
+            var withUrgency = basePush * (1.0 + request.Urgency);   // urgency amplifies the tendency
+            return Math.Clamp(withUrgency, -1.0, 1.0);
         }
 
         /// <summary>FNV-1a 32-bit — a stable hash (unlike string.GetHashCode) so choices reproduce across runs.</summary>

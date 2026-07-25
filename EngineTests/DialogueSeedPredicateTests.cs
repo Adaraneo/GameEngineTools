@@ -54,6 +54,9 @@ namespace EngineTests
         [DataRow("chválit", RelationalActKind.Validation, "Petr pochválil Janu.")]
         [DataRow("souhlasit", RelationalActKind.Validation, "Petr souhlasil s Janou.")]
         [DataRow("odmítat", RelationalActKind.Boundary, "Petr odmítl.")]
+        [DataRow("požádat", RelationalActKind.Request, "Petr požádal Janu.")]
+        [DataRow("vyžadovat", RelationalActKind.Request, "Petr vyžadoval od Jany.")]
+        [DataRow("žebrat o", RelationalActKind.Request, "Petr žebral u Jany.")]
         public void TemporaryRealizer_MaleSpeakerFemaleAddressee_ProducesDeclinedCzech(
             string lemma, RelationalActKind kind, string expected)
         {
@@ -76,6 +79,9 @@ namespace EngineTests
         [DataRow("ptát se", RelationalActKind.Question, Register.Informal, "Jano, můžu se tě na něco zeptat?")]
         [DataRow("chválit", RelationalActKind.Validation, Register.Formal, "Jano, tohle se vám opravdu povedlo.")]
         [DataRow("souhlasit", RelationalActKind.Validation, Register.Informal, "Souhlasím s tebou, Jano.")]
+        [DataRow("vyžadovat", RelationalActKind.Request, Register.Informal, "Jano, tohle po tobě chci.")]
+        [DataRow("žebrat o", RelationalActKind.Request, Register.Informal, "Moc tě prosím, Jano…")]
+        [DataRow("požádat", RelationalActKind.Request, Register.Formal, "Jano, mám na vás prosbu.")]
         public void TemporaryRealizer_DirectSpeech_UsesVocativeAndRegister(
             string lemma, RelationalActKind kind, Register register, string expected)
         {

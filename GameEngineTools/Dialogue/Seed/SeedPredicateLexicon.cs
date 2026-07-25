@@ -23,13 +23,20 @@ namespace GameEngineTools.Dialogue.Seed
     /// addressee is not a core argument (e.g. <c>odmítnout</c>, <c>vtipkovat</c>).
     /// </param>
     /// <param name="TakesDirection">Whether a DIR3 (<c>kam</c>) slot applies, e.g. <c>pozvat</c>.</param>
+    /// <param name="SelectionDominance">
+    /// Planner hint, [−1..1]: how domineering this word choice is. When an act kind's candidates carry
+    /// a spread (e.g. Request: požádat/vyžadovat/žebrat), the planner picks the predicate whose
+    /// dominance best matches the speaker's felt power — so a dominant NPC "vyžaduje" while a
+    /// subordinate one "žebrá". 0 (the default) means the choice is deterministic-hash, not power-driven.
+    /// </param>
     public sealed record SeedPredicate(
         string LemmaImperfective,
         string LemmaPerfective,
         IllocutionaryPoint Point,
         string? ReflexiveParticle,
         FgdFunctor? AddresseeRole,
-        bool TakesDirection = false);
+        bool TakesDirection = false,
+        double SelectionDominance = 0.0);
 
     /// <summary>
     /// Seed predicate vocabulary for the dialogue engine, grouped by <see cref="RelationalActKind"/>.
@@ -82,6 +89,14 @@ namespace GameEngineTools.Dialogue.Seed
                 {
                     new("zvát", "pozvat", IllocutionaryPoint.Directive, null, FgdFunctor.PAT, TakesDirection: true),
                     new("navrhovat", "navrhnout", IllocutionaryPoint.Directive, null, FgdFunctor.ADDR),
+                },
+                // Request (Directive) — the power/agency showcase: the planner picks by the speaker's
+                // felt power (SelectionDominance), so word choice reflects dominance/submission.
+                [RelationalActKind.Request] = new SeedPredicate[]
+                {
+                    new("žebrat o", "vyžebrat", IllocutionaryPoint.Directive, null, FgdFunctor.ADDR, SelectionDominance: -0.9),
+                    new("požádat", "požádat", IllocutionaryPoint.Directive, null, FgdFunctor.PAT, SelectionDominance: -0.2),
+                    new("vyžadovat", "vyžádat si", IllocutionaryPoint.Directive, null, FgdFunctor.ADDR, SelectionDominance: 0.8),
                 },
             };
     }
