@@ -60,15 +60,30 @@ namespace GameEngineTools.Characters.Engines.Psychology.Appraisal
             // stings) — additive and independent of divergence; exactly 0 when the layer is disabled.
             valence += meaning.ConnotationDelta;
 
-            if (Math.Abs(valence) < 0.05)
+            // Small epsilon, not a hard 0.05 cliff: connotation then reads as GRADED (a mildly warm
+            // word yields a mildly warm reaction) rather than on/off. Flag-off divergence always has
+            // |valence| ≥ 0.10 (hostile shift / irony), so this change is byte-identical when off — it
+            // only lets small connotation through when the layer is on. The emotion still scales
+            // continuously with Relevance downstream (AppraisalEmotionMap), so tiny valence ⇒ tiny effect.
+            if (Math.Abs(valence) < 0.01)
             {
-                return null;   // neither divergence nor connotation reaches significance → base paths own the affect
+                return null;   // effectively no affect (numerical floor) → base paths own it
             }
 
             valence = Math.Clamp(valence, -1.0, 1.0);
 
             var familiarityNorm = Math.Clamp(familiarity / 100.0, 0.0, 1.0);
             var relevance = Math.Clamp(Math.Abs(valence) * (0.5 + 0.5 * familiarityNorm), 0.0, 1.0);
+
+            // A word that carries connotation IS relevant — lift it just over AppraisalEmotionMap's
+            // relevance floor so mild warmth/coolness still registers (graded via IntrinsicPleasantness)
+            // instead of being zeroed by the floor. Only applies when the layer is on (ConnotationDelta ≠ 0),
+            // so the divergence-only, flag-off path keeps its original relevance byte-for-byte.
+            if (meaning.ConnotationDelta != 0.0)
+            {
+                relevance = Math.Max(relevance, 0.06);
+            }
+
             var coping = Math.Clamp(0.35 + 0.5 * current.Dominance - 0.3 * (current.Stress / 100.0), 0.0, 1.0);
 
             return new AppraisalOutcome(

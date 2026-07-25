@@ -1211,8 +1211,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var listener = Dialogue.ListenerContextFactory.For(ctx, proposed.From);
             var meaning = SpeechActInterpretation.Current.Appraise(act, listener);
 
+            // ToAppraisal already applies the significance floor and scales Relevance continuously, so
+            // there is no separate IsRelevant re-gate here — that second 0.05 gate was the cliff.
             var outcome = PerceivedActAppraiser.ToAppraisal(meaning, listener.FamiliarityWithSpeaker, s);
-            if (outcome is not { } o || !o.IsRelevant())
+            if (outcome is not { } o)
             {
                 return s;
             }

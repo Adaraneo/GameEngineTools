@@ -41,9 +41,11 @@ namespace EngineTests
             var sum = 0.0;
             for (var i = 0; i < n; i++)
             {
+                // Matches the production path (DefaultPsychologyEngine): ToAppraisal is the single gate,
+                // the emotion then scales continuously with Relevance — no separate IsRelevant re-gate.
                 var pm = interpreter.Appraise(Act(lemma), listener);
                 var outcome = PerceivedActAppraiser.ToAppraisal(pm, 60, current);
-                if (outcome is { } o && o.IsRelevant())
+                if (outcome is { } o)
                 {
                     sum += AppraisalEmotionMap.Map(o, config).DeltaValence;
                 }
@@ -68,20 +70,18 @@ namespace EngineTests
                 $"connotation must move emotion meaningfully to justify Phase 2 — measured {warmOn:F2} over 20 acts");
         }
 
-        // ── DECISION 2 — CHARACTERIZATION: the current calibration is a CLIFF, not graded. ──
-        // A warm-but-below-threshold verb (souhlasit, 0.06 valence → relevance 0.048 < 0.05) is inert,
-        // while a stronger one (chválit, 0.09) fires fully. This is the finding that decides whether the
-        // relevance gate needs smoothing before word choice reads as *graded* rather than on/off.
-        // If this test starts FAILING, the calibration changed — revisit whether graded connotation is wanted.
+        // ── DECISION 2 — the calibration is now GRADED (the earlier cliff was smoothed). ──
+        // A milder warm verb (souhlasit, 0.06 valence) produces a real but SMALLER emotional pull than a
+        // stronger one (chválit, 0.09) — word choice reads as a continuum, not on/off. If nearThreshold
+        // ever returns to 0 the relevance cliff is back; if it approaches strong the weight is too flat.
         [TestMethod]
-        public void Decision_ConnotationCalibration_IsAThresholdCliff_NotGraded()
+        public void Decision_ConnotationCalibration_IsGraded_NotACliff()
         {
-            var strong = CumulativeValencePull("chválit", flagOn: true, n: 20);   // 0.09 valence → fires
-            var nearThreshold = CumulativeValencePull("souhlasit", flagOn: true, n: 20); // 0.06 → inert today
+            var strong = CumulativeValencePull("chválit", flagOn: true, n: 20);
+            var mild = CumulativeValencePull("souhlasit", flagOn: true, n: 20);
 
-            Assert.IsTrue(strong > 1.0, "the strong warm verb fires");
-            Assert.AreEqual(0.0, nearThreshold,
-                "near-threshold warm verb is currently INERT — cliff. Smooth the relevance gate for graded connotation.");
+            Assert.IsTrue(mild > 0.0, "a mild warm verb must now register (no cliff)");
+            Assert.IsTrue(strong > mild, "a stronger warm verb must still pull harder (graded)");
         }
 
         // ── DECISION 3 — does the power frame give Phase 2b a clean, separable signal? ──

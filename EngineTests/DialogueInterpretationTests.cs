@@ -208,17 +208,18 @@ namespace EngineTests
         [TestMethod]
         public void Appraise_PowerAgency_DoNotLeakIntoEmotionalAppraisal()
         {
-            // "vyžadovat" carries a strong power signal (0.8 × 0.15 = 0.12) but only weak valence
-            // (−0.30 × 0.15 = −0.045, below the CPM's 0.05 significance gate). If power/agency fed the
-            // appraiser, the act would become emotionally relevant — it must stay null, proving the
-            // Phase-2 signals are prepared but NOT yet consumed by emotion.
+            // "vyžadovat" carries a strong power signal (0.8 × 0.15 = 0.12) and a weak negative valence
+            // (−0.30 × 0.15 = −0.045). The CPM appraisal must be driven by valence ALONE — its pleasantness
+            // equals the connotation valence, with power/agency contributing nothing.
             var listener = new ListenerContext(4, 60, 0.0);
             var pm = ConnotationInterpreter(enabled: true).Appraise(
                 Act(Directness.Neutral) with { PredicateLemma = "vyžadovat" }, listener);
 
             Assert.IsTrue(pm.PerceivedPowerDelta > 0.1, "sanity: the strong power signal is present");
-            Assert.IsNull(PerceivedActAppraiser.ToAppraisal(pm, 60, Neutral),
-                "power/agency must not enter the CPM — only ConnotationDelta (valence) does.");
+            var outcome = PerceivedActAppraiser.ToAppraisal(pm, 60, Neutral);
+            Assert.IsNotNull(outcome);
+            Assert.AreEqual(pm.ConnotationDelta, outcome!.IntrinsicPleasantness, 1e-9,
+                "the appraisal must equal the connotation valence — power/agency did not enter the CPM.");
         }
 
         [TestMethod]
