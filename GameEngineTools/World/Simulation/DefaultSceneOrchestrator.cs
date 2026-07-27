@@ -184,10 +184,15 @@ namespace GameEngineTools.World.Simulation
         /// <c>TemporaryCzechActRealizer</c>); never influences simulation state.
         /// </summary>
         private static readonly Lazy<Dialogue.Temporary.TemporaryCzechActRealizer> LazyActRealizer = new(() =>
-            new Dialogue.Temporary.TemporaryCzechActRealizer(
-                Grammar.Czech.CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
-                    .BuildServiceProvider()
-                    .GetRequiredService<Grammar.Czech.Services.CzechWordFormComposer>()));
+        {
+            var grammar = Grammar.Czech.CzechGrammarServiceFactory
+                .AddCzechGrammarServices(new ServiceCollection())
+                .BuildServiceProvider();
+
+            return new Dialogue.Temporary.TemporaryCzechActRealizer(
+                grammar.GetRequiredService<Grammar.Czech.Services.CzechSentenceBuilder>(),
+                grammar.GetRequiredService<Grammar.Czech.Services.CzechWordFormComposer>());
+        });
 
         /// <summary>
         /// Characters currently travelling between locations, keyed by id. Populated only when

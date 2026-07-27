@@ -36,10 +36,11 @@ namespace WorldObserver.Simulation
         {
             try
             {
-                var composer = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
-                    .BuildServiceProvider()
-                    .GetRequiredService<CzechWordFormComposer>();
-                return new TemporaryCzechActRealizer(composer);
+                var grammar = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
+                    .BuildServiceProvider();
+                return new TemporaryCzechActRealizer(
+                    grammar.GetRequiredService<CzechSentenceBuilder>(),
+                    grammar.GetRequiredService<CzechWordFormComposer>());
             }
             catch
             {

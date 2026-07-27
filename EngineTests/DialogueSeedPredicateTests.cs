@@ -23,11 +23,12 @@ namespace EngineTests
     {
         private static TemporaryCzechActRealizer BuildRealizer()
         {
-            var composer = CzechGrammarServiceFactory
+            var grammar = CzechGrammarServiceFactory
                 .AddCzechGrammarServices(new ServiceCollection())
-                .BuildServiceProvider()
-                .GetRequiredService<CzechWordFormComposer>();
-            return new TemporaryCzechActRealizer(composer);
+                .BuildServiceProvider();
+            return new TemporaryCzechActRealizer(
+                grammar.GetRequiredService<CzechSentenceBuilder>(),
+                grammar.GetRequiredService<CzechWordFormComposer>());
         }
 
         private static SpeechAct ActWithLemma(string imperfectiveLemma, RelationalActKind kind)
@@ -122,6 +123,88 @@ namespace EngineTests
                 new TemporaryCzechActRealizer.Person("Jana", true));
 
             StringAssert.Contains(text, "SmallTalk");
+        }
+
+        // ------------------------------------------------------------------
+        // Mode 1 is built as a GM CzechClause, so the sentence layer — not this repo — owns verb
+        // conjugation, gender agreement, name declension and clitic placement. These lock that down.
+        // ------------------------------------------------------------------
+
+        // The mirrored direction of the table above: the predicate must agree with a FEMALE speaker
+        // and the MALE addressee must decline. Masculine addressees previously fell out of the
+        // realizer entirely (they resolved to an indeclinable request, which GM's clause path throws on).
+        [DataTestMethod]
+        [DataRow("zvát", RelationalActKind.Invite, "Jana pozvala Petra.")]
+        [DataRow("ptát se", RelationalActKind.Question, "Jana se zeptala Petra.")]
+        [DataRow("svěřovat se", RelationalActKind.SelfDisclosure, "Jana se svěřila Petrovi.")]
+        [DataRow("chválit", RelationalActKind.Validation, "Jana pochválila Petra.")]
+        [DataRow("souhlasit", RelationalActKind.Validation, "Jana souhlasila s Petrem.")]
+        [DataRow("odmítat", RelationalActKind.Boundary, "Jana odmítla.")]
+        [DataRow("vyžadovat", RelationalActKind.Request, "Jana vyžadovala od Petra.")]
+        [DataRow("žebrat o", RelationalActKind.Request, "Jana žebrala u Petra.")]
+        public void TemporaryRealizer_FemaleSpeakerMaleAddressee_AgreesAndDeclines(
+            string lemma, RelationalActKind kind, string expected)
+        {
+            var realizer = BuildRealizer();
+
+            var text = realizer.Realize(
+                ActWithLemma(lemma, kind),
+                new TemporaryCzechActRealizer.Person("Jana", IsFemale: true),
+                new TemporaryCzechActRealizer.Person("Petr", IsFemale: false));
+
+            Assert.AreEqual(expected, text);
+        }
+
+        // The world's names are invented (Ignifer, Ventus, Arbmov, …), not dictionary Czech. Each must
+        // still decline into a sentence rather than degrade to the bracketed fallback marker.
+        [DataTestMethod]
+        [DataRow("Mendominátor", "Jana se zeptala Mendominátora.")]
+        [DataRow("Ventus", "Jana se zeptala Ventuse.")]
+        [DataRow("Ignifer", "Jana se zeptala Ignifera.")]
+        [DataRow("Arbmov", "Jana se zeptala Arbmova.")]
+        [DataRow("Stellir", "Jana se zeptala Stellira.")]
+        public void TemporaryRealizer_InventedWorldName_DeclinesInsteadOfFallingBack(string name, string expected)
+        {
+            var realizer = BuildRealizer();
+
+            var text = realizer.Realize(
+                ActWithLemma("ptát se", RelationalActKind.Question),
+                new TemporaryCzechActRealizer.Person("Jana", IsFemale: true),
+                new TemporaryCzechActRealizer.Person(name, IsFemale: false));
+
+            Assert.AreEqual(expected, text);
+        }
+
+        // Sweep guard: every seed predicate must realize in BOTH gender directions. Catches a clause
+        // spec whose verb class or case sends GM down the fallback path, which a spot-check would miss.
+        [TestMethod]
+        public void TemporaryRealizer_EverySeedPredicate_RealizesInBothDirections()
+        {
+            var realizer = BuildRealizer();
+            var jana = new TemporaryCzechActRealizer.Person("Jana", IsFemale: true);
+            var petr = new TemporaryCzechActRealizer.Person("Petr", IsFemale: false);
+
+            foreach (var (kind, candidates) in SeedPredicateLexicon.Predicates)
+            {
+                foreach (var candidate in candidates)
+                {
+                    var act = ActWithLemma(candidate.LemmaImperfective, kind);
+
+                    foreach (var (speaker, addressee) in new[] { (petr, jana), (jana, petr) })
+                    {
+                        var narrative = realizer.Realize(act, speaker, addressee);
+                        Assert.IsFalse(
+                            narrative.StartsWith('['),
+                            $"'{candidate.LemmaImperfective}' ({speaker.Name}→{addressee.Name}) fell back to the marker: {narrative}");
+                        StringAssert.EndsWith(narrative, ".", $"'{candidate.LemmaImperfective}' is not a finished sentence: {narrative}");
+
+                        var spoken = realizer.RealizeDirectSpeech(act, speaker, addressee);
+                        Assert.IsFalse(
+                            spoken.StartsWith('['),
+                            $"'{candidate.LemmaImperfective}' has no direct-speech skeleton ({speaker.Name}→{addressee.Name}).");
+                    }
+                }
+            }
         }
     }
 }
