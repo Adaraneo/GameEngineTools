@@ -93,9 +93,23 @@ namespace GameEngineTools.Dialogue.Planning
     {
         private readonly SpeechActPlannerConfig _config;
 
+        /// <summary>The speaker's vocabulary, or null when the acquisition layer is not wired.</summary>
+        private readonly Characters.Engines.Language.ILexicalAcquisitionStore? _acquisition;
+
         /// <summary>Creates the planner with the given config (defaults when omitted).</summary>
-        public DefaultSpeechActPlanner(SpeechActPlannerConfig? config = null)
-            => _config = config ?? new SpeechActPlannerConfig();
+        /// <param name="config">Register/directness calibration.</param>
+        /// <param name="acquisition">
+        /// Per-character vocabulary. Optional: without it — and with an empty one — every candidate
+        /// scores the same lexically, so predicate choice is decided by dominance and the stable hash
+        /// exactly as before.
+        /// </param>
+        public DefaultSpeechActPlanner(
+            SpeechActPlannerConfig? config = null,
+            Characters.Engines.Language.ILexicalAcquisitionStore? acquisition = null)
+        {
+            _config = config ?? new SpeechActPlannerConfig();
+            _acquisition = acquisition;
+        }
 
         /// <inheritdoc/>
         public SpeechAct Plan(SpeechActRequest request)
@@ -203,27 +217,49 @@ namespace GameEngineTools.Dialogue.Planning
                 }
             }
 
+            var seed = StableHash(
+                $"{request.Speaker.Id.Value}|{request.Addressee.Id.Value}|{(int)intent}|{request.OccurredAt.WorldTicks}");
+
+            // Without a vocabulary to consult, the two original branches stand exactly as they were.
+            if (_acquisition is null)
+            {
+                return hasDominanceSpread
+                    ? NearestByDominance(candidates, SpeakerDominance(request))
+                    : candidates[(int)(seed % (uint)candidates.Count)];
+            }
+
+            // The two signals compose rather than compete, and they are not the same kind of signal:
+            // dominance says which word the speaker WANTS, acquisition only says whether they can reach
+            // for it. So acquisition filters, it does not outvote — blending them proportionally would
+            // let a domineering speaker come out pleading, losing behaviour that is deliberate and tested.
             if (hasDominanceSpread)
             {
                 var dominance = SpeakerDominance(request);
-                var best = candidates[0];
-                var bestDistance = double.MaxValue;
+                var producible = new List<SeedPredicate>();
+
                 foreach (var candidate in candidates)
                 {
-                    var distance = Math.Abs(candidate.SelectionDominance - dominance);
-                    if (distance < bestDistance)
+                    if (CanProduce(candidate.LemmaImperfective, request))
                     {
-                        bestDistance = distance;
-                        best = candidate;
+                        producible.Add(candidate);
                     }
                 }
 
-                return best;
+                // A domineering character still demands — but only if "vyžadovat" is a word they have.
+                // Knowing none of them (an empty vocabulary included) falls back to the plain choice,
+                // which is what keeps the pre-acquisition behaviour intact.
+                return NearestByDominance(producible.Count > 0 ? producible : candidates, dominance);
             }
 
-            var seed = StableHash(
-                $"{request.Speaker.Id.Value}|{request.Addressee.Id.Value}|{(int)intent}|{request.OccurredAt.WorldTicks}");
-            return candidates[(int)(seed % (uint)candidates.Count)];
+            // Elsewhere there is no "right" word to want, so availability alone shapes the choice: a
+            // lemma the speaker uses readily comes out more often than one they barely have.
+            var weights = new double[candidates.Count];
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                weights[i] = ProductiveAvailability(candidates[i].LemmaImperfective, request);
+            }
+
+            return WeightedStableChoice(candidates, weights, seed);
         }
 
         /// <summary>
@@ -238,6 +274,114 @@ namespace GameEngineTools.Dialogue.Planning
             var withUrgency = basePush * (1.0 + request.Urgency);   // urgency amplifies the tendency
             return Math.Clamp(withUrgency, -1.0, 1.0);
         }
+
+        /// <summary>The candidate whose dominance sits closest to what the speaker feels.</summary>
+        private static SeedPredicate NearestByDominance(IReadOnlyList<SeedPredicate> candidates, double dominance)
+        {
+            var best = candidates[0];
+            var bestDistance = double.MaxValue;
+
+            foreach (var candidate in candidates)
+            {
+                var distance = Math.Abs(candidate.SelectionDominance - dominance);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = candidate;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// How readily the speaker can produce <paramref name="lemma"/> right now.
+        /// </summary>
+        /// <remarks>
+        /// Production is harder than recognition — you understand a word long after you would still
+        /// think to reach for it — so the familiarity is re-read against a shortened effective half-life
+        /// before being compared to θ_P. Below that threshold a candidate keeps a small floor weight
+        /// rather than zero: <c>SeedPredicateLexicon</c> is a small closed set, not an open dictionary,
+        /// and a character must always have something to say.
+        /// </remarks>
+        private double ProductiveAvailability(string lemma, SpeechActRequest request)
+        {
+            // A non-human speaker has no vocabulary to consult; treat every candidate alike.
+            if (!request.Speaker.Id.TryAsHumanId(out var speakerId))
+            {
+                return FloorWeight;
+            }
+
+            var config = _acquisition!.Config;
+            var entry = _acquisition.TryGet(speakerId, lemma);
+            if (entry is null)
+            {
+                return FloorWeight;
+            }
+
+            // Same decay curve, shorter half-life: p = 2^(−Δ/(h·factor)).
+            var scaled = entry with { HalfLifeDays = entry.HalfLifeDays * config.ProductiveHalfLifeFactor };
+            var productive = scaled.LexicalFamiliarity(request.OccurredAt);
+
+            return productive >= config.ProductiveThreshold ? productive : FloorWeight;
+        }
+
+        /// <summary>
+        /// Deterministic weighted choice: the seed is mapped into [0,1) and walked across the cumulative
+        /// weights. No RNG — the same request always yields the same predicate.
+        /// </summary>
+        /// <remarks>
+        /// With equal weights this reduces to <c>seed % count</c>, the pre-acquisition selection, so a
+        /// character whose vocabulary says nothing about these candidates chooses exactly as before.
+        /// </remarks>
+        private static SeedPredicate WeightedStableChoice(
+            IReadOnlyList<SeedPredicate> candidates,
+            IReadOnlyList<double> weights,
+            uint seed)
+        {
+            var total = 0.0;
+            foreach (var weight in weights)
+            {
+                total += Math.Max(0.0, weight);
+            }
+
+            if (total <= 0.0)
+            {
+                return candidates[(int)(seed % (uint)candidates.Count)];
+            }
+
+            // Bucket the hash exactly as the modulo did, then place the draw INSIDE that bucket using
+            // the bits the modulo threw away. Two properties fall out, and both are needed:
+            //
+            //   • equal weights ⇒ the winner is always the bucket itself, whatever the offset, so the
+            //     pre-acquisition selection is reproduced candidate for candidate;
+            //   • unequal weights ⇒ the draw ranges over the whole [0, total) span rather than sitting
+            //     at one point per bucket, so a strong candidate takes a proportional share instead of
+            //     swallowing every bucket. With only a handful of candidates the bucket midpoint alone
+            //     is far too coarse — one well-drilled word would crowd out all the others entirely.
+            var bucket = seed % (uint)candidates.Count;
+            var offset = (seed / (uint)candidates.Count % 65536) / 65536.0;
+            var position = ((bucket + offset) / candidates.Count) * total;
+
+            var cumulative = 0.0;
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                cumulative += Math.Max(0.0, weights[i]);
+                if (position < cumulative)
+                {
+                    return candidates[i];
+                }
+            }
+
+            return candidates[candidates.Count - 1];
+        }
+
+        /// <summary>True when the speaker's grip on <paramref name="lemma"/> clears the production threshold θ_P.</summary>
+        private bool CanProduce(string lemma, SpeechActRequest request)
+            => ProductiveAvailability(lemma, request) > FloorWeight;
+
+        /// <summary>Floor weight for a lemma the speaker cannot readily produce — never zero.</summary>
+        private const double FloorWeight = 0.05;
 
         /// <summary>FNV-1a 32-bit — a stable hash (unlike string.GetHashCode) so choices reproduce across runs.</summary>
         private static uint StableHash(string value)

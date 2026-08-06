@@ -14,11 +14,17 @@ namespace GameEngineTools.Dialogue.Interpretation
     /// <param name="FamiliarityWithSpeaker">Directed familiarity toward the speaker, [0..100].</param>
     /// <param name="Hostility">Relationship hostility + paranoid/dark disposition, [0..1].</param>
     /// <param name="Resolver">Optional per-listener knowledge base for resolving referents.</param>
+    /// <param name="ListenerId">
+    /// Who is listening, when their personal vocabulary matters. Optional and null by default: without
+    /// it the interpreter cannot look a listener up, so it falls back to population-level decoding —
+    /// which is exactly the behaviour before the acquisition layer existed.
+    /// </param>
     public sealed record ListenerContext(
         int TheoryOfMindLevel,
         double FamiliarityWithSpeaker,
         double Hostility,
-        IEntityResolver? Resolver = null);
+        IEntityResolver? Resolver = null,
+        Characters.Core.HumanId? ListenerId = null);
 
     /// <summary>
     /// Turns an objective <see cref="SpeechAct"/> into a listener-relative <see cref="PerceivedMeaning"/>.
@@ -75,6 +81,9 @@ namespace GameEngineTools.Dialogue.Interpretation
         private readonly SpeechActInterpreterConfig _config;
         private readonly Semantics.IConnotationLexicon _lexicon;
 
+        /// <summary>The listener's personal vocabulary, or null when the acquisition layer is not wired.</summary>
+        private readonly Characters.Engines.Language.ILexicalAcquisitionStore? _acquisition;
+
         /// <summary>
         /// Creates the interpreter with the given config (defaults when omitted). Without a
         /// <paramref name="connotationLexicon"/> a neutral no-op lexicon is used, so existing
@@ -82,10 +91,12 @@ namespace GameEngineTools.Dialogue.Interpretation
         /// </summary>
         public DefaultSpeechActInterpreter(
             SpeechActInterpreterConfig? config = null,
-            Semantics.IConnotationLexicon? connotationLexicon = null)
+            Semantics.IConnotationLexicon? connotationLexicon = null,
+            Characters.Engines.Language.ILexicalAcquisitionStore? acquisition = null)
         {
             _config = config ?? new SpeechActInterpreterConfig();
             _lexicon = connotationLexicon ?? Semantics.NeutralConnotationLexicon.Instance;
+            _acquisition = acquisition;
         }
 
         /// <inheritdoc/>
@@ -141,7 +152,15 @@ namespace GameEngineTools.Dialogue.Interpretation
 
                 // Graded Salience (Giora): a conventionally ironic phrase is decoded even below the
                 // ToM/familiarity gate — its ironic reading IS the salient one.
-                if (act.ForceShift is not null && affect.Conventionality >= _config.IronyConventionalityBypassMin)
+                //
+                // But salience is a property of a phrase FOR SOMEONE. A stock ironic turn is only
+                // pre-packaged for a listener who actually knows it; to someone meeting the words for
+                // the first time there is nothing conventional about them, and they read it literally.
+                // The receptive gate scales the population-level conventionality by this listener's own
+                // grip on the lemma, so an unknown word cannot ride the bypass however common it is.
+                var conventionality = affect.Conventionality * ReceptiveGate(act, listener);
+
+                if (act.ForceShift is not null && conventionality >= _config.IronyConventionalityBypassMin)
                 {
                     perceivedPoint = act.Point;
                     perceivedPolarity = act.Polarity;
@@ -172,6 +191,36 @@ namespace GameEngineTools.Dialogue.Interpretation
                 PerceivedPowerDelta = powerDelta,
                 PerceivedAgencyDelta = agencyDelta,
             };
+        }
+
+        /// <summary>
+        /// How much of a phrase's population-level conventionality is available to <i>this</i> listener,
+        /// in [0, 1].
+        /// </summary>
+        /// <remarks>
+        /// Returns 1 — full conventionality, i.e. exactly the pre-acquisition behaviour — whenever the
+        /// layer cannot speak: no store wired, or no listener identity in the context. Otherwise the
+        /// listener's familiarity with the lemma is rescaled from the receptive threshold θ_R upward, so
+        /// a word below θ_R contributes nothing and one known perfectly contributes everything. The act's
+        /// own timestamp is the evaluation instant, so decay is measured against when it was said.
+        /// </remarks>
+        private double ReceptiveGate(SpeechAct act, ListenerContext listener)
+        {
+            if (_acquisition is null || listener.ListenerId is not { } listenerId)
+            {
+                return 1.0;
+            }
+
+            var known = _acquisition.LexicalFamiliarity(listenerId, act.PredicateLemma, act.OccurredAt);
+            var threshold = _acquisition.Config.ReceptiveThreshold;
+
+            // Guard the degenerate configuration rather than dividing by zero.
+            if (threshold >= 1.0)
+            {
+                return known >= 1.0 ? 1.0 : 0.0;
+            }
+
+            return Math.Clamp((known - threshold) / (1.0 - threshold), 0.0, 1.0);
         }
 
         /// <summary>

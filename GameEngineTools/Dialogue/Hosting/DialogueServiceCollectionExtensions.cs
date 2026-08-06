@@ -35,8 +35,13 @@ namespace GameEngineTools.Dialogue.Hosting
             SpeechActInterpreterConfig? config = null)
         {
             services.AddSingleton<IConnotationLexicon, CuratedConnotationLexicon>();
-            services.AddSingleton<ISpeechActInterpreter>(
-                sp => new DefaultSpeechActInterpreter(config, sp.GetRequiredService<IConnotationLexicon>()));
+            services.AddSingleton<ISpeechActInterpreter>(sp => new DefaultSpeechActInterpreter(
+                config,
+                sp.GetRequiredService<IConnotationLexicon>(),
+
+                // Optional: present only when AddLexicalAcquisition() was also called, which is what
+                // keeps per-listener vocabulary gating opt-in.
+                sp.GetService<ILexicalAcquisitionStore>()));
             return services;
         }
 

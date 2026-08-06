@@ -33,7 +33,10 @@ namespace GameEngineTools.Characters.Engines.Dialogue
             var hostility = Math.Clamp(0.55 * darkCore + 0.55 * trustHostility, 0.0, 1.0);
 
             // The character's own Theory-of-Mind recursion ceiling (Kinderman 1998; default 4).
-            return new ListenerContext(ctx.Personality.ToMCeiling, familiarity, hostility);
+            // ListenerId lets the interpreter consult THIS listener's vocabulary — without it, decoding
+            // falls back to what the population knows on average.
+            return new ListenerContext(
+                ctx.Personality.ToMCeiling, familiarity, hostility, Resolver: null, ListenerId: ctx.Id);
         }
     }
 }
