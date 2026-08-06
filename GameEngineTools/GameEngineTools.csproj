@@ -38,14 +38,26 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- GrammarModular's lexicon/valency database. From preview.23 the package no longer embeds it:
+         AddCzechGrammarServices() resolves 'grammar.czech.lexicon.db' from the directory the app runs
+         out of, and throws when it is missing. Copied to the output root (Link) so it lands next to
+         every referencing executable and test host. Source of truth is the Grammar repo
+         (Grammar.Czech\Data\Lexicon\); refresh this copy when that lexicon grows. -->
+    <Content Include="Grammar\grammar.czech.lexicon.db">
+      <Link>grammar.czech.lexicon.db</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Dialogue contracts (SpeechAct, RelationalActKind, EntityRef, …) are referenced pervasively
          across the engines; expose them as a project-wide global using to avoid per-file imports. -->
     <Using Include="GameEngineTools.Dialogue.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="50PSoftware.GrammarModular.Core" Version="1.0.0-preview.19" />
-    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.19" />
+    <PackageReference Include="50PSoftware.GrammarModular.Core" Version="1.0.0-preview.23" />
+    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.23" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="10.0.9" />

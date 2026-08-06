@@ -77,11 +77,18 @@ namespace GameEngineTools.Dialogue.Temporary
         // Keyed by SpeechAct.PredicateLemma. Verb classes were verified empirically against
         // CzechWordFormComposer — GuessVerbClass is documented as unreliable, so they are pinned here
         // and locked down by tests rather than guessed at runtime.
+        //
+        // Functor choice matters as the lexicon grows: GM licenses the inner participants (ACT, PAT,
+        // ADDR, ORIG, EFF) only through a valency frame and throws otherwise, whereas free
+        // modifications combine with any verb. A companion introduced by "s" + instrumental is
+        // accompaniment, so it takes ACMP rather than ADDR — which is both the right analysis and the
+        // stable one. ("mluvit" acquired a frame licensing only ACT in the preview.23 lexicon; as ADDR
+        // it threw and the act degraded to the bracketed marker.)
         private static readonly IReadOnlyDictionary<string, ClauseSpec> Specs = new Dictionary<string, ClauseSpec>
         {
             // SmallTalk
-            ["povídat si"] = new("povídat", "trida5", VerbAspect.Imperfective, ReflexiveType.ReflexivumTantum_Si, FgdFunctor.ADDR, Case.Instrumental, "s"),
-            ["bavit se"] = new("bavit", "trida4", VerbAspect.Imperfective, ReflexiveType.DerivedReflexive_Se, FgdFunctor.ADDR, Case.Instrumental, "s"),
+            ["povídat si"] = new("povídat", "trida5", VerbAspect.Imperfective, ReflexiveType.ReflexivumTantum_Si, FgdFunctor.ACMP, Case.Instrumental, "s"),
+            ["bavit se"] = new("bavit", "trida4", VerbAspect.Imperfective, ReflexiveType.DerivedReflexive_Se, FgdFunctor.ACMP, Case.Instrumental, "s"),
 
             // Question
             ["ptát se"] = new("zeptat", "trida5", VerbAspect.Perfective, ReflexiveType.ReflexivumTantum_Se, FgdFunctor.ADDR, Case.Genitive, null),
@@ -94,19 +101,19 @@ namespace GameEngineTools.Dialogue.Temporary
             // Validation
             ["chválit"] = new("pochválit", "trida4", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.PAT, Case.Accusative, null),
             ["oceňovat"] = new("ocenit", "trida4", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.PAT, Case.Accusative, null),
-            ["souhlasit"] = new("souhlasit", "trida4", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Instrumental, "s"),
+            ["souhlasit"] = new("souhlasit", "trida4", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ACMP, Case.Instrumental, "s"),
 
             // Boundary
             ["odmítat"] = new("odmítnout", "trida2", VerbAspect.Perfective, ReflexiveType.None, null, null, null),
             ["ohrazovat se"] = new("ohradit", "trida4", VerbAspect.Perfective, ReflexiveType.DerivedReflexive_Se, null, null, null),
 
             // Humor
-            ["žertovat"] = new("žertovat", "trida3", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Instrumental, "s"),
+            ["žertovat"] = new("žertovat", "trida3", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ACMP, Case.Instrumental, "s"),
             ["vtipkovat"] = new("vtipkovat", "trida3", VerbAspect.Imperfective, ReflexiveType.None, null, null, null),
 
             // Meta
-            ["rozebírat"] = new("rozebrat", "trida5", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Instrumental, "s"),
-            ["mluvit"] = new("mluvit", "trida4", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Instrumental, "s"),
+            ["rozebírat"] = new("rozebrat", "trida5", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.ACMP, Case.Instrumental, "s"),
+            ["mluvit"] = new("mluvit", "trida4", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ACMP, Case.Instrumental, "s"),
 
             // Invite
             ["zvát"] = new("pozvat", "trida5", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.PAT, Case.Accusative, null),
