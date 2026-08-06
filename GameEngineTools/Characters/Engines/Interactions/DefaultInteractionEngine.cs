@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
 {
     using System;
     using Characters.Core;
+    using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
@@ -51,6 +52,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
         private readonly ILogger _log;
 
+        /// <summary>Per-character vocabulary, or null when the acquisition layer is not wired.</summary>
+        private readonly ILexicalAcquisitionStore? _lexicon;
+
         #endregion Privátní pole
 
         #region Konstruktor
@@ -60,9 +64,28 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// The initial environment state is neutral — unknown location, medium noise and crowd.
         /// </summary>
         public DefaultInteractionEngine(IOptions<InteractionConfig> cfg, ILoggerFactory loggerFactory)
+            : this(cfg, loggerFactory, lexicon: null)
+        {
+        }
+
+        /// <summary>
+        /// Creates the engine with a vocabulary store, so speaking and hearing a word also teach it.
+        /// </summary>
+        /// <param name="cfg">Interaction tunables.</param>
+        /// <param name="loggerFactory">Logger factory.</param>
+        /// <param name="lexicon">
+        /// Per-character vocabulary. Optional: without it the engine behaves exactly as before, which is
+        /// what keeps the acquisition layer opt-in. DI selects this constructor only when an
+        /// <see cref="ILexicalAcquisitionStore"/> is registered (see <c>AddLexicalAcquisition</c>).
+        /// </param>
+        public DefaultInteractionEngine(
+            IOptions<InteractionConfig> cfg,
+            ILoggerFactory loggerFactory,
+            ILexicalAcquisitionStore? lexicon)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultInteractionEngine>();
+            _lexicon = lexicon;
 
             // Safe default state — until the game sets the real context via ContextChanged
             State = new InteractionSurface(Location: "Unknown", HasPrivacy: false, Noise: 0.5, Crowding: 0.5, Kind: SurfaceKind.Unknown);
@@ -318,9 +341,15 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
             // Phase-2b: the recipient's subjective reading of the speaker's power (Sap 2017 word-choice
             // frame). 0 when the connotation layer is off; carried on the outcome for RelationshipsEngine.
-            var perceivedPower = SpeechActInterpretation.Current
-                .Appraise(p.Content.SpeechAct, Dialogue.ListenerContextFactory.For(ctx, p.From))
-                .PerceivedPowerDelta;
+            var perceived = SpeechActInterpretation.Current
+                .Appraise(p.Content.SpeechAct, Dialogue.ListenerContextFactory.For(ctx, p.From));
+            var perceivedPower = perceived.PerceivedPowerDelta;
+
+            // Saying a word and hearing one both teach it. This is the single place either happens: the
+            // case above is guarded on p.To == ctx.Id, so it runs exactly once per utterance, for both
+            // parties. (The listener-side interpreters — Psychology and Memory — each appraise the act
+            // independently, so reinforcing from there would count one utterance twice.)
+            ReinforceVocabulary(p, ctx, accepted, perceived);
 
             var outcome = new InteractionOutcome(
                 OccurredAt: p.OccurredAt,
@@ -410,6 +439,103 @@ namespace GameEngineTools.Characters.Engines.Interactions
 
                 outbox.Add(proposed);
             }
+        }
+
+        /// <summary>
+        /// Teaches both parties the word that was just used: the speaker practises it, the listener
+        /// picks it up.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A no-op without a store, which is what keeps the layer opt-in.
+        /// </para>
+        /// <para>
+        /// The two sides differ in what counts as success and in provenance. For the speaker, the word
+        /// landed if the interaction was accepted — a predicate that keeps drawing rebuffs is retained
+        /// less well than one that works. For the listener, success is comprehension rather than
+        /// approval: an act can be understood perfectly and still declined, so it keys off the
+        /// interpreter's confidence, not the outcome. Only the listener records
+        /// <c>LearnedFrom</c>, because only the listener is receiving the word from someone.
+        /// </para>
+        /// <para>
+        /// Cadence-independent: familiarity is a lazy function of elapsed time, so a Background-tier
+        /// character reinforced rarely decays exactly like a Player-tier one, and no two-speed
+        /// population emerges.
+        /// </para>
+        /// </remarks>
+        private void ReinforceVocabulary(
+            InteractionProposed p,
+            IHumanContext ctx,
+            bool accepted,
+            PerceivedMeaning perceived)
+        {
+            if (_lexicon is null)
+            {
+                return;
+            }
+
+            var lemma = p.Content.SpeechAct.PredicateLemma;
+            if (string.IsNullOrWhiteSpace(lemma))
+            {
+                return;
+            }
+
+            // Speaker — production. Knows the word already; using it is practice, not learning.
+            _lexicon.Reinforce(
+                owner: p.From,
+                lemma: lemma,
+                now: p.OccurredAt,
+                successfulUse: accepted,
+                learnedFrom: null);
+
+            // Listener — perception. Understood is not the same as agreed with.
+            var understood = perceived.Confidence >= _lexicon.Config.ComprehensionConfidenceMin;
+
+            _lexicon.Reinforce(
+                owner: p.To,
+                lemma: lemma,
+                now: p.OccurredAt,
+                successfulUse: understood,
+                learnedFrom: p.From,
+                gainMultiplier: ComputeGainMultiplier(ctx, p.From, _lexicon.Config));
+        }
+
+        /// <summary>
+        /// How much harder a word sticks because of <i>who</i> said it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Two effects, multiplied. Closeness: words from people we are close to are taken up faster.
+        /// Standing: the listener's <c>PerceivedDominance</c> of the speaker stands in for the "echoes of
+        /// power" finding that people converge upward — toward those they see as above them. Perceived
+        /// dominance is used rather than the speaker's own felt <c>Power</c>, because accommodation
+        /// follows the listener's reading of the speaker, not the speaker's self-image.
+        /// </para>
+        /// <para>
+        /// Capped at <see cref="LexicalAcquisitionConfig.CatOverAccommodationCap"/>: Communication
+        /// Accommodation Theory treats unbounded convergence as over-accommodation, and without a
+        /// ceiling one admired speaker would flood the population's vocabulary.
+        /// </para>
+        /// <para>
+        /// Deliberately excludes <c>PerceivedPrestige</c>. Prestige (freely given admiration) and
+        /// dominance (coercive standing) have different motivational mechanisms (Cheng et al. 2013);
+        /// folding both into one coefficient would make neither testable.
+        /// </para>
+        /// </remarks>
+        private static double ComputeGainMultiplier(IHumanContext ctx, HumanId speaker, LexicalAcquisitionConfig config)
+        {
+            if (!ctx.Snapshot.Relationships.Edges.TryGetValue(speaker, out var edge))
+            {
+                return 1.0;   // a stranger's word carries no social amplification either way
+            }
+
+            var closenessFactor = 1.0 + ((edge.Closeness / 100.0) * config.ClosenessGainWeight);
+
+            // −1 (speaker read as far below) … +1 (far above); 50 is neutral standing.
+            var statusDiff = (edge.PerceivedDominance - 50.0) / 50.0;
+            var powerFactor = 1.0 + (statusDiff * config.DominanceGainWeight);
+
+            return Math.Min(closenessFactor * powerFactor, config.CatOverAccommodationCap);
         }
 
         #endregion Handle — zpracování doménových událostí
