@@ -1023,8 +1023,8 @@ namespace GameEngineTools.Logging
         /// <summary>
         /// A <see cref="Dialogue.Contracts.SpeechAct"/> was uttered by one character to another —
         /// captures the act's relational/predicate/register/directness dimensions together with a
-        /// rough Czech gloss (see <c>TemporaryCzechActRealizer</c> — TEMPORARY preview only, never
-        /// re-enters simulation state).
+        /// Czech rendering of what was said (see <c>CzechSpeechActRealizer</c> — player-facing only,
+        /// never re-enters simulation state).
         /// </summary>
         /// <remarks>
         /// <paramref name="IsResponse"/> and <paramref name="RespondingToKind"/> separate the two halves

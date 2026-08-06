@@ -178,18 +178,20 @@ namespace GameEngineTools.World.Simulation
         private const double RequestNeedThreshold = 55.0;
 
         /// <summary>
-        /// TEMPORARY — lazily-built stopgap Czech gloss renderer used only to preview an uttered
-        /// <see cref="Dialogue.Contracts.SpeechAct"/> in <see cref="CoreLog.SpeechActUttered"/>. Deleted
-        /// once the GM-side realization pipeline lands (see the file banner on
-        /// <c>TemporaryCzechActRealizer</c>); never influences simulation state.
+        /// Renders the words a character says, for <see cref="CoreLog.SpeechActUttered"/> and the
+        /// observer UI. Player-facing only — the text never re-enters simulation state.
         /// </summary>
-        private static readonly Lazy<Dialogue.Temporary.TemporaryCzechActRealizer> LazyActRealizer = new(() =>
+        /// <remarks>
+        /// Built lazily and shared: the realizer is stateless, and standing up GM's grammar services is
+        /// worth doing once rather than per utterance.
+        /// </remarks>
+        private static readonly Lazy<Dialogue.Realization.ISpeechActRealizer> LazyActRealizer = new(() =>
         {
             var grammar = Grammar.Czech.CzechGrammarServiceFactory
                 .AddCzechGrammarServices(new ServiceCollection())
                 .BuildServiceProvider();
 
-            return new Dialogue.Temporary.TemporaryCzechActRealizer(
+            return new Dialogue.Realization.CzechSpeechActRealizer(
                 grammar.GetRequiredService<Grammar.Czech.Services.CzechSentenceBuilder>(),
                 grammar.GetRequiredService<Grammar.Czech.Services.CzechWordFormComposer>());
         });
@@ -1585,13 +1587,13 @@ namespace GameEngineTools.World.Simulation
             var act = _speechActPlanner.Plan(request);
             _conversation.Observe(act, speaker.Id, addressee.Id, now);
 
-            // TEMPORARY direct speech (mode 2: "Jano, nezajdeš se mnou?") — see the realizer's file
-            // banner. Preview-only string, never re-enters simulation state; never throws.
-            var utterance = LazyActRealizer.Value.RealizeDirectSpeech(
+            // The words actually said ("Jano, nezajdeš se mnou?") — player-facing, never read back into
+            // simulation state, and never throws.
+            var utterance = LazyActRealizer.Value.Utter(
                 act,
-                new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
+                new Dialogue.Realization.Participant(
                     speaker.Identity.FirstName.Original, speaker.Biology == SexBiology.Female),
-                new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
+                new Dialogue.Realization.Participant(
                     addressee.Identity.FirstName.Original, addressee.Biology == SexBiology.Female));
 
             using (_log.BeginCharacterScope(

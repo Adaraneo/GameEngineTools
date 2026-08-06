@@ -6,6 +6,7 @@ namespace GameEngineTools.Dialogue.Hosting
     using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.Dialogue.Planning;
+    using GameEngineTools.Dialogue.Realization;
     using GameEngineTools.Dialogue.Semantics;
     using Microsoft.Extensions.DependencyInjection;
 
@@ -55,6 +56,23 @@ namespace GameEngineTools.Dialogue.Hosting
         /// not an <c>IEngine</c>. Registering it does not by itself change any behaviour — consumers
         /// take it as an optional dependency and fall back to their pre-acquisition path without it.
         /// </remarks>
+        /// <summary>
+        /// Registers the Czech <see cref="ISpeechActRealizer"/> together with the GrammarModular
+        /// services it renders through.
+        /// </summary>
+        /// <remarks>
+        /// Player-facing only: the text it produces never re-enters simulation state, so no engine may
+        /// take a dependency on it.
+        /// </remarks>
+        public static IServiceCollection AddSpeechActRealizer(this IServiceCollection services)
+        {
+            Grammar.Czech.CzechGrammarServiceFactory.AddCzechGrammarServices(services);
+            services.AddSingleton<ISpeechActRealizer>(sp => new CzechSpeechActRealizer(
+                sp.GetRequiredService<Grammar.Czech.Services.CzechSentenceBuilder>(),
+                sp.GetRequiredService<Grammar.Czech.Services.CzechWordFormComposer>()));
+            return services;
+        }
+
         public static IServiceCollection AddLexicalAcquisition(
             this IServiceCollection services,
             LexicalAcquisitionConfig? config = null)

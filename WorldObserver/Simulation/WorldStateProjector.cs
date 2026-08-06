@@ -9,7 +9,7 @@ namespace WorldObserver.Simulation
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Status;
-    using GameEngineTools.Dialogue.Temporary;
+    using GameEngineTools.Dialogue.Realization;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
@@ -28,17 +28,16 @@ namespace WorldObserver.Simulation
         /// <summary>Edges weaker than this on both Like and Closeness are omitted to keep the graph readable.</summary>
         private const double EdgeThreshold = 1.0;
 
-        // TEMPORARY mode-1 Czech gloss of a chosen SpeechAct (see TemporaryCzechActRealizer's file
-        // banner) — built once and reused across pushes; never let its construction break projection.
-        private static readonly TemporaryCzechActRealizer? UtteranceRealizer = BuildUtteranceRealizer();
+        // Built once and reused across pushes; never let its construction break projection.
+        private static readonly ISpeechActRealizer? UtteranceRealizer = BuildUtteranceRealizer();
 
-        private static TemporaryCzechActRealizer? BuildUtteranceRealizer()
+        private static ISpeechActRealizer? BuildUtteranceRealizer()
         {
             try
             {
                 var grammar = CzechGrammarServiceFactory.AddCzechGrammarServices(new ServiceCollection())
                     .BuildServiceProvider();
-                return new TemporaryCzechActRealizer(
+                return new CzechSpeechActRealizer(
                     grammar.GetRequiredService<CzechSentenceBuilder>(),
                     grammar.GetRequiredService<CzechWordFormComposer>());
             }
@@ -50,8 +49,7 @@ namespace WorldObserver.Simulation
         }
 
         /// <summary>
-        /// TEMPORARY mode-2 direct-speech gloss of an act ("Jano, nezajdeš se mnou?") — the sentence a
-        /// human reads. Returns <c>null</c> when the realizer failed to boot. Never throws.
+        /// The words a character says ("Jano, nezajdeš se mnou?") — the sentence a human reads. Returns <c>null</c> when the realizer failed to boot. Never throws.
         /// Shared by the per-tick projection and the rolling dialogue log so both read the same text.
         /// </summary>
         public static string? RealizeUtterance(SpeechAct act, IHuman speaker, IHuman addressee)
@@ -63,10 +61,10 @@ namespace WorldObserver.Simulation
 
             try
             {
-                return UtteranceRealizer.RealizeDirectSpeech(
+                return UtteranceRealizer.Utter(
                     act,
-                    new TemporaryCzechActRealizer.Person(speaker.Identity.FirstName.Original, speaker.Biology == SexBiology.Female),
-                    new TemporaryCzechActRealizer.Person(addressee.Identity.FirstName.Original, addressee.Biology == SexBiology.Female));
+                    new Participant(speaker.Identity.FirstName.Original, speaker.Biology == SexBiology.Female),
+                    new Participant(addressee.Identity.FirstName.Original, addressee.Biology == SexBiology.Female));
             }
             catch
             {
