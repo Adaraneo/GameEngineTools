@@ -175,6 +175,28 @@ namespace EngineTests
             Assert.AreEqual(expected, text);
         }
 
+        // 'mluvit' is the first predicate whose valency frame lives in GM's lexicon (ACT / ADDR s+7 /
+        // PAT o+6), so its clause spec names only the functor and leaves case and preposition null —
+        // GM fills both from the frame. If the lexicon regresses, this produces "Petr mluvil." (the
+        // addressee silently vanishing) or the fallback marker, rather than a wrong-looking sentence.
+        [DataTestMethod]
+        [DataRow(false, "Petr mluvil s Janou.")]
+        [DataRow(true, "Jana mluvila s Petrem.")]
+        public void TemporaryRealizer_FramedPredicate_TakesCaseAndPrepositionFromValencyFrame(
+            bool femaleSpeaker, string expected)
+        {
+            var realizer = BuildRealizer();
+            var jana = new TemporaryCzechActRealizer.Person("Jana", IsFemale: true);
+            var petr = new TemporaryCzechActRealizer.Person("Petr", IsFemale: false);
+
+            var text = realizer.Realize(
+                ActWithLemma("mluvit", RelationalActKind.Meta),
+                femaleSpeaker ? jana : petr,
+                femaleSpeaker ? petr : jana);
+
+            Assert.AreEqual(expected, text);
+        }
+
         // Sweep guard: every seed predicate must realize in BOTH gender directions. Catches a clause
         // spec whose verb class or case sends GM down the fallback path, which a spot-check would miss.
         [TestMethod]

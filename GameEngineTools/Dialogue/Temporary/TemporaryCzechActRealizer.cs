@@ -80,10 +80,12 @@ namespace GameEngineTools.Dialogue.Temporary
         //
         // Functor choice matters as the lexicon grows: GM licenses the inner participants (ACT, PAT,
         // ADDR, ORIG, EFF) only through a valency frame and throws otherwise, whereas free
-        // modifications combine with any verb. A companion introduced by "s" + instrumental is
-        // accompaniment, so it takes ACMP rather than ADDR — which is both the right analysis and the
-        // stable one. ("mluvit" acquired a frame licensing only ACT in the preview.23 lexicon; as ADDR
-        // it threw and the act degraded to the bracketed marker.)
+        // modifications combine with any verb. Two shapes therefore live here:
+        //   • predicate WITH a frame — name the functor and leave case/preposition null, so GM fills
+        //     them from the frame ("mluvit": ACT / ADDR s+7 / PAT o+6);
+        //   • predicate WITHOUT one — supply the case, and prefer a free modification for the
+        //     companion. A partner introduced by "s" + instrumental is accompaniment, so ACMP is both
+        //     the right analysis and the one that cannot start throwing when a frame appears.
         private static readonly IReadOnlyDictionary<string, ClauseSpec> Specs = new Dictionary<string, ClauseSpec>
         {
             // SmallTalk
@@ -113,7 +115,10 @@ namespace GameEngineTools.Dialogue.Temporary
 
             // Meta
             ["rozebírat"] = new("rozebrat", "trida5", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.ACMP, Case.Instrumental, "s"),
-            ["mluvit"] = new("mluvit", "trida4", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ACMP, Case.Instrumental, "s"),
+            // 'mluvit' is the first predicate here with a real valency frame (ACT / ADDR s+7 / PAT o+6),
+            // so it names only the functor: GM reads the case and the preposition off the frame. This is
+            // the shape every row moves to as the lexicon grows.
+            ["mluvit"] = new("mluvit", "trida4", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ADDR, null, null),
 
             // Invite
             ["zvát"] = new("pozvat", "trida5", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.PAT, Case.Accusative, null),
@@ -160,10 +165,11 @@ namespace GameEngineTools.Dialogue.Temporary
                     ClauseElement.Of(NameOf(speaker, Case.Nominative), FgdFunctor.ACT, InformationStatus.Given),
                 };
 
-                if (spec.AddresseeCase is { } addresseeCase)
+                if (spec.AddresseeFunctor is { } functor)
                 {
-                    var word = NameOf(addressee, addresseeCase);
-                    var functor = spec.AddresseeFunctor ?? FgdFunctor.ADDR;
+                    // A null case means the predicate has a valency frame: GM reads the case AND the
+                    // preposition off the frame, which is where this belongs.
+                    var word = NameOf(addressee, spec.AddresseeCase);
 
                     // A prepositional phrase is one constituent; GM vocalizes the preposition itself.
                     elements.Add(spec.Preposition is null
@@ -221,8 +227,11 @@ namespace GameEngineTools.Dialogue.Temporary
             ReflexiveType = spec.Reflexive,
         };
 
-        /// <summary>Builds the word request for a participant's name in <paramref name="case"/>.</summary>
-        private static CzechWordRequest NameOf(Person person, Case @case) => new()
+        /// <summary>
+        /// Builds the word request for a participant's name in <paramref name="case"/>; a null case
+        /// leaves the slot for the predicate's valency frame to fill.
+        /// </summary>
+        private static CzechWordRequest NameOf(Person person, Case? @case) => new()
         {
             Lemma = person.Name,
             WordCategory = WordCategory.Noun,
