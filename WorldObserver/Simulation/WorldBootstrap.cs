@@ -103,6 +103,21 @@ namespace WorldObserver.Simulation
                 person.ChangeOccupation(ModernOccupations[i % ModernOccupations.Length]);
             }
 
+            // ── Lexical acquisition ──────────────────────────────────────────────────
+            // Registered in WorldHostedService. The store reaches the interaction engine through DI on
+            // its own, but the two consumers that GATE on vocabulary are reached by other routes: the
+            // interpreter is ambient (SpeechActInterpretation.Current, so Psychology and Memory share
+            // one configuration) and the planner is constructed by the orchestrator. Both are threaded
+            // explicitly here — without this the characters would learn words but never act on them.
+            var acquisition = services.GetService<GameEngineTools.Characters.Engines.Language.ILexicalAcquisitionStore>();
+
+            GameEngineTools.Dialogue.Interpretation.SpeechActInterpretation.Configure(
+                new GameEngineTools.Dialogue.Interpretation.SpeechActInterpreterConfig(EnableConnotationLayer: true),
+                new GameEngineTools.Dialogue.Semantics.CuratedConnotationLexicon(),
+                acquisition);
+
+            var planner = new GameEngineTools.Dialogue.Planning.DefaultSpeechActPlanner(null, acquisition);
+
             // ── Scene orchestrator ───────────────────────────────────────────────────
             var orchestrator = new DefaultSceneOrchestrator(
                 services.GetRequiredService<IAttractionCalculator>(),
@@ -121,7 +136,8 @@ namespace WorldObserver.Simulation
                 new SceneOrchestratorOptions { EnableTravelTime = true, CemeteryLocationId = "cemetery" },
                 services.GetService<CommunityReputationLedger>(),
                 services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>(),
-                services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>());
+                services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>(),
+                speechActPlanner: planner);
 
             // Undirected connection list (the seed stores both directions) for the realistic map layout.
             var connections = db.GetAllConnections()

@@ -25,8 +25,17 @@ namespace GameEngineTools.Dialogue.Interpretation
         public static ISpeechActInterpreter Current => _current;
 
         /// <summary>Replaces the ambient interpreter (call once at startup, before ticking).</summary>
-        public static void Configure(SpeechActInterpreterConfig config, IConnotationLexicon? connotationLexicon = null)
-            => _current = new DefaultSpeechActInterpreter(config, connotationLexicon);
+        /// <param name="config">Irony/hostility/connotation calibration.</param>
+        /// <param name="connotationLexicon">Lemma affect data; neutral no-op when omitted.</param>
+        /// <param name="acquisition">
+        /// Per-character vocabulary. Supplying it lets decoding depend on whether <i>this</i> listener
+        /// knows the word; without it, decoding falls back to what the population knows on average.
+        /// </param>
+        public static void Configure(
+            SpeechActInterpreterConfig config,
+            IConnotationLexicon? connotationLexicon = null,
+            Characters.Engines.Language.ILexicalAcquisitionStore? acquisition = null)
+            => _current = new DefaultSpeechActInterpreter(config, connotationLexicon, acquisition);
 
         /// <summary>Restores the default (connotation off, neutral lexicon) — test isolation.</summary>
         public static void Reset() => _current = new DefaultSpeechActInterpreter();

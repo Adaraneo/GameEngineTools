@@ -54,5 +54,21 @@ namespace GameEngineTools.Characters.Engines.Language
 
         /// <summary>Recall probability in [0, 1]; 0 for a word this character has never met.</summary>
         double LexicalFamiliarity(HumanId owner, string lemma, WDateTime now);
+
+        /// <summary>
+        /// Everything <paramref name="owner"/> knows, for saving. Empty when they know nothing.
+        /// </summary>
+        /// <remarks>
+        /// The store is shared across characters and is not an <c>IEngine</c>, so it has no
+        /// <c>State</c>/<c>RestoreState</c> of its own — persistence goes through this pair instead.
+        /// </remarks>
+        LexicalVocabulary SnapshotFor(HumanId owner);
+
+        /// <summary>
+        /// Replaces <paramref name="owner"/>'s vocabulary with a saved one, discarding anything held for
+        /// them already. A null or empty vocabulary leaves them knowing nothing, which is exactly how a
+        /// save written before this field existed reads.
+        /// </summary>
+        void Restore(HumanId owner, LexicalVocabulary? vocabulary);
     }
 }

@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Persistence
 {
     using GameEngineTools.Armory;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Traits;
 
@@ -61,5 +62,19 @@ namespace GameEngineTools.Characters.Persistence
         /// daily schedule on import. <c>null</c> means no fixed occupation.
         /// </summary>
         public string? Occupation { get; init; }
+
+        /// <summary>
+        /// Gets the words this character knows, and how well.
+        /// </summary>
+        /// <remarks>
+        /// Lives here rather than on <see cref="EnginesSnapshot"/> deliberately: the snapshot is rebuilt
+        /// from engine state several times per tick, and nothing in the tick loop reads vocabulary from
+        /// it — consumers ask the store directly. Projecting it there would be pure per-tick waste.
+        /// <para>
+        /// Nullable for backwards compatibility with saves that pre-date this field; <c>null</c> restores
+        /// as an empty vocabulary, which reads exactly like a character who has not learned anything yet.
+        /// </para>
+        /// </remarks>
+        public LexicalVocabulary? Vocabulary { get; init; }
     }
 }

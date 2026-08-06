@@ -7,6 +7,7 @@ namespace GameEngineTools.FileSystem
     using System.Text.Json.Serialization;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Persistence;
@@ -26,6 +27,9 @@ namespace GameEngineTools.FileSystem
         private readonly IHumanFactory _humanFactory;
         private readonly JsonSerializerOptions _jsonOptions;
 
+        /// <summary>Vocabulary store, or null when the acquisition layer is not wired.</summary>
+        private readonly ILexicalAcquisitionStore? _lexicon;
+
         #endregion Soukromá pole
 
         #region Konstrukce
@@ -37,15 +41,21 @@ namespace GameEngineTools.FileSystem
         /// <param name="characterManager">Character manager (for bulk export/import).</param>
         /// <param name="humanFactory">Factory for reconstructing characters on import.</param>
         /// <param name="options">Optional configuration of directories for exported files.</param>
+        /// <param name="lexicon">
+        /// Per-character vocabulary store. Optional: without it exports simply carry no vocabulary and
+        /// imports restore none, which is the behaviour from before the acquisition layer existed.
+        /// </param>
         public GeneratedFile(
             IClock clock,
             IGameEngineToolsManager characterManager,
             IHumanFactory humanFactory,
-            IOptions<GeneratedFileOptions>? options = null)
+            IOptions<GeneratedFileOptions>? options = null,
+            ILexicalAcquisitionStore? lexicon = null)
         {
             _clock = clock;
             _characterManager = characterManager;
             _humanFactory = humanFactory;
+            _lexicon = lexicon;
 
             if (options is not null)
             {
@@ -136,6 +146,7 @@ namespace GameEngineTools.FileSystem
             var data = ReadJson(ResolveFileUnderRoot(NPCDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile, Occupation: data.Occupation);
             var person = _humanFactory.Load(blueprint, data.Snapshot);
+            _lexicon?.Restore(data.Id, data.Vocabulary);
 
             return new NPC
             {
@@ -157,6 +168,7 @@ namespace GameEngineTools.FileSystem
             var data = ReadJson(ResolveFileUnderRoot(PlayerDirectory, filename));
             var blueprint = new HumanBlueprint(data.Id, data.Identity, data.Biology, data.Personality, data.GeneticBlueprint, data.AttractionProfile, Occupation: data.Occupation);
             var person = _humanFactory.Load(blueprint, data.Snapshot);
+            _lexicon?.Restore(data.Id, data.Vocabulary);
 
             return new PC
             {
@@ -188,8 +200,9 @@ namespace GameEngineTools.FileSystem
         #region Privátní pomocné metody
 
         /// <summary>Builds a <see cref="CharacterData"/> from any game character.</summary>
-        private static CharacterData BuildCharacterData(CharacterBase character) => new()
+        private CharacterData BuildCharacterData(CharacterBase character) => new()
         {
+            Vocabulary = _lexicon?.SnapshotFor(character.Person.Id),
             Id = character.Person.Id,
             Identity = character.Person.Identity,
             Biology = character.Person.Biology,

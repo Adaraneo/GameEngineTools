@@ -145,7 +145,8 @@ namespace GameEngineTools
             string? logsRoot = null,
             bool writeJsonLines = true,
             bool writeTextLogs = true,
-            GeneratedFileOptions? generatedFileOptions = null)
+            GeneratedFileOptions? generatedFileOptions = null,
+            Action<IServiceCollection>? configureServices = null)
         {
             var services = new ServiceCollection();
 
@@ -269,6 +270,11 @@ namespace GameEngineTools
                 opt.UseConsoleLogging = consoleLogs;
                 opt.LogsRoot = logsRoot;
             });
+
+            // ── Host-supplied registrations ───────────────────────────────────
+            // Last, so a host can add optional subsystems (or override a default) without the runtime
+            // having to know about them — e.g. WorldObserver switching on lexical acquisition.
+            configureServices?.Invoke(services);
 
             // ── Building the DI container ─────────────────────────────────────
             var provider = services.BuildServiceProvider();

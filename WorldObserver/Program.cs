@@ -9,15 +9,12 @@ using WorldObserver.Simulation;
 // directory where appsettings*.json + SourceFiles\ live. Harmless when run as a console app from bin.
 Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
-// ── Connotation-layer live experiment (Phase-2 gate evaluation) ─────────────────────────────
-// WorldObserver is the experiment surface: enable the opt-in connotation layer with the curated
-// lexicon so word choice (chválit vs souhlasit, …) colours listeners' emotions and hostile
-// readings sting more. Engines read the ambient SpeechActInterpretation.Current, so Psychology
-// and Memory interpret with the same configuration. Remove/flip to fall back to byte-identical
-// pre-connotation behaviour.
-GameEngineTools.Dialogue.Interpretation.SpeechActInterpretation.Configure(
-    new GameEngineTools.Dialogue.Interpretation.SpeechActInterpreterConfig(EnableConnotationLayer: true),
-    new GameEngineTools.Dialogue.Semantics.CuratedConnotationLexicon());
+// ── Connotation layer + lexical acquisition ─────────────────────────────────────────────────
+// Both are configured in WorldBootstrap rather than here, because the ambient interpreter now also
+// takes the per-character vocabulary store — and that only exists once the runtime's DI container is
+// built. Configuring here as well would win by ordering and silently hand the engines an interpreter
+// with no vocabulary, so word choice would colour emotions but nobody would ever fail to understand
+// a word. To fall back to pre-connotation behaviour, flip the flag in WorldBootstrap.
 
 var builder = WebApplication.CreateBuilder(args);
 

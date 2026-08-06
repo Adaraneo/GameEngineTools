@@ -12,6 +12,7 @@ namespace WorldObserver.Simulation
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
+    using GameEngineTools.Dialogue.Hosting;
     using GameEngineTools.FileSystem;
     using GameEngineTools.Narrative;
     using GameEngineTools.World.Simulation;
@@ -88,7 +89,12 @@ namespace WorldObserver.Simulation
             await using var runtime = await GameEngineToolsRuntime.StartAsync(
                 consoleLogs: false,
                 writeJsonLines: false,
-                writeTextLogs: false);
+                writeTextLogs: false,
+
+                // Lexical acquisition: characters build their own vocabularies from what they hear, and
+                // those vocabularies are saved with them. Registering the store is what switches the
+                // layer on — WorldBootstrap then threads it into the interpreter and the planner.
+                configureServices: static s => s.AddLexicalAcquisition());
 
             var characterCount = Math.Max(1, _options.CharacterCount);
             var ctx = WorldBootstrap.Build(runtime, characterCount);

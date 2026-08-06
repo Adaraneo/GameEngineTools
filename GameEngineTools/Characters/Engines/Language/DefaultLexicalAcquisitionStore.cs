@@ -42,6 +42,56 @@ namespace GameEngineTools.Characters.Engines.Language
             => TryGet(owner, lemma)?.LexicalFamiliarity(now) ?? 0.0;
 
         /// <inheritdoc/>
+        public LexicalVocabulary SnapshotFor(HumanId owner)
+        {
+            var entries = new List<LexicalAcquisition>();
+            foreach (var ((entryOwner, _), entry) in _entries)
+            {
+                if (entryOwner == owner)
+                {
+                    entries.Add(entry);
+                }
+            }
+
+            // Stable order so a re-exported save is byte-comparable with the one before it.
+            entries.Sort(static (a, b) => string.CompareOrdinal(a.Lemma, b.Lemma));
+            return new LexicalVocabulary(entries);
+        }
+
+        /// <inheritdoc/>
+        public void Restore(HumanId owner, LexicalVocabulary? vocabulary)
+        {
+            // Drop whatever is held for this character first, so restoring is a replacement rather than
+            // a merge — importing a save must not leave traces of the world that was loaded before it.
+            var stale = new List<(HumanId, string)>();
+            foreach (var key in _entries.Keys)
+            {
+                if (key.Owner == owner)
+                {
+                    stale.Add(key);
+                }
+            }
+
+            foreach (var key in stale)
+            {
+                _entries.Remove(key);
+            }
+
+            if (vocabulary is null)
+            {
+                return;
+            }
+
+            foreach (var entry in vocabulary.Entries)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.Lemma))
+                {
+                    _entries[(owner, entry.Lemma)] = entry;
+                }
+            }
+        }
+
+        /// <inheritdoc/>
         public void Reinforce(
             HumanId owner,
             string lemma,
