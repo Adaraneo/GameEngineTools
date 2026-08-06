@@ -32,17 +32,44 @@ namespace GameEngineTools.Dialogue.Conversation
     {
         private readonly Dictionary<(Guid, Guid), ConversationContext> _active = new();
         private readonly WTimeSpan? _idleTimeout;
+        private readonly WTimeSpan? _replyWindow;
         private long? _idleTicks;
+        private long? _replyTicks;
 
         /// <summary>Creates a coordinator; a conversation is dropped after <paramref name="idleTimeout"/> of silence.</summary>
         /// <remarks>
-        /// The default timeout is resolved lazily (on first use, not in the constructor) so the
-        /// coordinator can be constructed before <see cref="World.Core.Time.WWorld"/> is configured.
+        /// Both timeouts are resolved lazily (on first use, not in the constructor) so the coordinator
+        /// can be constructed before <see cref="World.Core.Time.WWorld"/> is configured.
         /// </remarks>
-        public ConversationCoordinator(WTimeSpan? idleTimeout = null) => _idleTimeout = idleTimeout;
+        /// <param name="idleTimeout">Silence after which the exchange is forgotten entirely.</param>
+        /// <param name="replyWindow">
+        /// How long an owed response stays owed. Shorter than <paramref name="idleTimeout"/>: an
+        /// unanswered question stops demanding an answer long before the pair stop counting as having
+        /// talked, so nobody answers an hour late.
+        /// </param>
+        public ConversationCoordinator(WTimeSpan? idleTimeout = null, WTimeSpan? replyWindow = null)
+        {
+            _idleTimeout = idleTimeout;
+            _replyWindow = replyWindow;
+        }
 
         // Two game-hours of silence ends a conversation; resolved lazily (needs WWorld.Spec).
         private long IdleTicks => _idleTicks ??= (_idleTimeout ?? WTimeSpan.FromHours(2)).Ticks;
+
+        // A response is owed for a quarter of a game-hour — past that the moment to answer has passed.
+        private long ReplyTicks => _replyTicks ??= (_replyWindow ?? WTimeSpan.FromMinutes(15)).Ticks;
+
+        /// <summary>
+        /// Hard ceiling on how many turns an exchange can be driven by obligation alone.
+        /// </summary>
+        /// <remarks>
+        /// A safety net, not the mechanism that ends conversations — pairs close because a
+        /// second-pair-part obliges nothing further (see <see cref="AdjacencyPairResolver"/>). It exists
+        /// because obligation-driven replies turn any symmetric pair into an unbounded loop, which is a
+        /// failure mode worth making structurally impossible rather than relying on every future pair
+        /// being asymmetric. Generous enough not to truncate real exchanges (the longest today is three).
+        /// </remarks>
+        private const int MaxObligationTurns = 8;
 
         /// <summary>Records an act between <paramref name="speaker"/> and <paramref name="addressee"/>.</summary>
         public void Observe(SpeechAct act, HumanId speaker, HumanId addressee, WDateTime now)
@@ -85,6 +112,86 @@ namespace GameEngineTools.Dialogue.Conversation
 
             pending = convo.LastAct;
             return true;
+        }
+
+        /// <summary>
+        /// Finds a partner <paramref name="responder"/> currently owes an answer to — the same condition
+        /// as <see cref="TryGetPendingResponse"/>, but searched by responder alone rather than asked
+        /// about a partner already chosen.
+        /// </summary>
+        /// <remarks>
+        /// This is what turns a question into an obligation. <see cref="TryGetPendingResponse"/> can only
+        /// answer "is this the person I owe?" — it presumes the responder already decided to speak and to
+        /// whom, so a reply happened only when the answerer independently felt like socialising and
+        /// happened to pick the asker. Searching by responder lets the caller deliver the reply because it
+        /// is owed. Bounded by <see cref="ReplyTicks"/>, so a lapsed obligation is simply not returned.
+        /// </remarks>
+        /// <param name="responder">The character that may owe a response.</param>
+        /// <param name="now">Current simulation time.</param>
+        /// <param name="other">The partner owed a response.</param>
+        /// <param name="pending">The act to respond to.</param>
+        /// <returns>True when a response is owed and still timely.</returns>
+        public bool TryGetObligation(HumanId responder, WDateTime now, out HumanId other, out SpeechAct pending)
+        {
+            other = default;
+            pending = null!;
+
+            // Most recent first: when two people are both owed an answer, the freshest question wins.
+            var bestActivity = long.MinValue;
+            var found = false;
+
+            foreach (var (key, convo) in _active)
+            {
+                if (convo.LastSpeaker == responder)
+                {
+                    continue;              // the responder holds the floor here — nothing owed
+                }
+
+                var (a, b) = key;
+                HumanId partner;
+                if (a == responder.Value)
+                {
+                    partner = new HumanId(b);
+                }
+                else if (b == responder.Value)
+                {
+                    partner = new HumanId(a);
+                }
+                else
+                {
+                    continue;              // not a participant
+                }
+
+                if (convo.LastSpeaker != partner)
+                {
+                    continue;              // the pending act is not the partner's
+                }
+
+                if (now.WorldTicks - convo.LastActivity.WorldTicks > ReplyTicks)
+                {
+                    continue;              // the moment to answer has passed
+                }
+
+                if (convo.TurnCount >= MaxObligationTurns)
+                {
+                    continue;              // safety net — an exchange cannot be driven forever
+                }
+
+                if (AdjacencyPairResolver.ResponseTo(convo.LastAct) is null)
+                {
+                    continue;              // the act does not oblige a response
+                }
+
+                if (convo.LastActivity.WorldTicks > bestActivity)
+                {
+                    bestActivity = convo.LastActivity.WorldTicks;
+                    other = partner;
+                    pending = convo.LastAct;
+                    found = true;
+                }
+            }
+
+            return found;
         }
 
         /// <summary>Number of currently-tracked conversations (diagnostics/tests).</summary>

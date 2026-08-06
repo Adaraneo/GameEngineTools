@@ -1411,6 +1411,10 @@ namespace GameEngineTools.World.Simulation
         /// <param name="chars">LOD-filtered character subset (Nearby / Player only).</param>
         private void DynamicReachOutRouting(WDateTime now, IReadOnlyList<IHuman> chars)
         {
+            // A question is answered because it was asked — before, and independently of, whoever
+            // happens to feel like socialising this tick.
+            DeliverObligatedReplies(now, chars);
+
             foreach (var character in chars)
             {
                 var reachOut = character.LastOutbox
@@ -1476,55 +1480,140 @@ namespace GameEngineTools.World.Simulation
                     urgency = Math.Clamp((neediness - RequestNeedThreshold) / (100.0 - RequestNeedThreshold), 0.0, 1.0);
                 }
 
-                // Plan a fully-specified SpeechAct (register/directness/speaker/addressee) so the act can
-                // later be realised as a direct-address utterance, not only a third-person gloss.
-                var request = new Dialogue.Planning.SpeechActRequest(
-                    Intent: intent,
-                    Speaker: EntityRef.ForHuman(character.Id, character.Identity.FirstName.Original),
-                    Addressee: EntityRef.ForHuman(target.Id, target.Identity.FirstName.Original),
-                    OccurredAt: now,
-                    Closeness: selection.Closeness,
-                    Familiarity: selection.Familiarity,
-                    Agreeableness: character.Personality.BigFive.Agreeableness,
-                    Style: character.Personality.Communication,
-                    Power: character.Snapshot.Psychology.Dominance,
-                    Urgency: urgency,
-                    RespondingTo: respondingTo);
-                var act = _speechActPlanner.Plan(request);
-                _conversation.Observe(act, character.Id, target.Id, now);
-
-                // TEMPORARY direct speech (mode 2: "Jano, nezajdeš se mnou?") — see the realizer's file
-                // banner. Preview-only string, never re-enters simulation state; never throws.
-                var utterance = LazyActRealizer.Value.RealizeDirectSpeech(
-                    act,
-                    new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
-                        character.Identity.FirstName.Original, character.Biology == SexBiology.Female),
-                    new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
-                        target.Identity.FirstName.Original, target.Biology == SexBiology.Female));
-
-                using (_log.BeginCharacterScope(
-                    character.Id.Value, "SceneOrchestrator",
-                    relatedPersonId: target.Id.Value, locationId: locationId))
-                {
-                    _log.SpeechActUttered(
-                        character.Id.Value.ToString(),
-                        character.Id.Value.ToString(),
-                        character.Identity.FirstName.Original,
-                        target.Id.Value.ToString(),
-                        target.Identity.FirstName.Original,
-                        act.RelationalKind.ToString(),
-                        act.PredicateLemma,
-                        act.Register.ToString(),
-                        act.Directness.ToString(),
-                        utterance);
-                }
-
-                var content = new InteractionContent(act);
-                target.ReceiveEvent(new InteractionProposed(
-                    now, character.Id, target.Id, content, character.Biology));
+                UtterSpeechAct(
+                    now, character, target, locationId, intent, urgency,
+                    selection.Closeness, selection.Familiarity, respondingTo);
 
                 TryTouch(now, character, target);
             }
+        }
+
+        /// <summary>
+        /// Delivers the responses characters owe: where a co-present partner spoke last with an act that
+        /// invites a second-pair-part, the response is produced because it is owed.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Without this, a reply required the answerer to independently commit a <c>ReachOut</c> action
+        /// AND to independently pick the asker out of everyone it could see — so a question was answered
+        /// only by coincidence. Turn-taking existed but almost never ran.
+        /// </para>
+        /// <para>
+        /// Runs before the reach-out loop and therefore only ever sees obligations recorded on earlier
+        /// ticks, which gives a reply a natural one-tick latency and keeps the pass independent of the
+        /// order of <paramref name="chars"/>. Answering also flips the floor in the coordinator, so the
+        /// reach-out loop below cannot deliver the same reply twice.
+        /// </para>
+        /// <para>
+        /// An obligation still needs the partner to be co-present and perceivable — someone who walked
+        /// off mid-question is not answered — and it lapses on the coordinator's reply window.
+        /// </para>
+        /// </remarks>
+        private void DeliverObligatedReplies(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            foreach (var responder in chars)
+            {
+                if (!_conversation.TryGetObligation(responder.Id, now, out var otherId, out var pending))
+                    continue;
+
+                var locationId = _locationService.GetLocation(responder.Id);
+                if (locationId is null)
+                    continue;
+
+                // The partner has to still be there to be answered — and perceivable, so the same
+                // perception rules that gate reaching out gate replying.
+                var candidates = CharacterPerceptionResolver.GetPerceivedCharacters(
+                    responder, chars, _locationService, _perceptionPolicy, _perceptionOptions);
+
+                IHuman? other = null;
+                foreach (var candidate in candidates)
+                {
+                    if (candidate.Id == otherId)
+                    {
+                        other = candidate;
+                        break;
+                    }
+                }
+
+                if (other is null)
+                    continue;
+
+                // Relationship state for register/directness; the selector's own act choice is discarded
+                // because the adjacency pair decides the kind (the planner prioritises RespondingTo).
+                var selection = ReachOutSpeechActSelector.SelectSpeechAct(responder, other, now, _rng);
+
+                UtterSpeechAct(
+                    now, responder, other, locationId,
+                    intent: selection.Act,
+                    urgency: 0.0,
+                    closeness: selection.Closeness,
+                    familiarity: selection.Familiarity,
+                    respondingTo: pending);
+            }
+        }
+
+        /// <summary>
+        /// Plans, logs and delivers one speech act from <paramref name="speaker"/> to
+        /// <paramref name="addressee"/>. Shared by the reach-out path and the obligated-reply pass so
+        /// both produce acts through identical machinery.
+        /// </summary>
+        private void UtterSpeechAct(
+            WDateTime now,
+            IHuman speaker,
+            IHuman addressee,
+            string locationId,
+            RelationalActKind intent,
+            double urgency,
+            double closeness,
+            double familiarity,
+            SpeechAct? respondingTo)
+        {
+            // Plan a fully-specified SpeechAct (register/directness/speaker/addressee) so the act can
+            // later be realised as a direct-address utterance, not only a third-person gloss.
+            var request = new Dialogue.Planning.SpeechActRequest(
+                Intent: intent,
+                Speaker: EntityRef.ForHuman(speaker.Id, speaker.Identity.FirstName.Original),
+                Addressee: EntityRef.ForHuman(addressee.Id, addressee.Identity.FirstName.Original),
+                OccurredAt: now,
+                Closeness: closeness,
+                Familiarity: familiarity,
+                Agreeableness: speaker.Personality.BigFive.Agreeableness,
+                Style: speaker.Personality.Communication,
+                Power: speaker.Snapshot.Psychology.Dominance,
+                Urgency: urgency,
+                RespondingTo: respondingTo);
+            var act = _speechActPlanner.Plan(request);
+            _conversation.Observe(act, speaker.Id, addressee.Id, now);
+
+            // TEMPORARY direct speech (mode 2: "Jano, nezajdeš se mnou?") — see the realizer's file
+            // banner. Preview-only string, never re-enters simulation state; never throws.
+            var utterance = LazyActRealizer.Value.RealizeDirectSpeech(
+                act,
+                new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
+                    speaker.Identity.FirstName.Original, speaker.Biology == SexBiology.Female),
+                new Dialogue.Temporary.TemporaryCzechActRealizer.Person(
+                    addressee.Identity.FirstName.Original, addressee.Biology == SexBiology.Female));
+
+            using (_log.BeginCharacterScope(
+                speaker.Id.Value, "SceneOrchestrator",
+                relatedPersonId: addressee.Id.Value, locationId: locationId))
+            {
+                _log.SpeechActUttered(
+                    speaker.Id.Value.ToString(),
+                    speaker.Id.Value.ToString(),
+                    speaker.Identity.FirstName.Original,
+                    addressee.Id.Value.ToString(),
+                    addressee.Identity.FirstName.Original,
+                    act.RelationalKind.ToString(),
+                    act.PredicateLemma,
+                    act.Register.ToString(),
+                    act.Directness.ToString(),
+                    utterance);
+            }
+
+            var content = new InteractionContent(act);
+            addressee.ReceiveEvent(new InteractionProposed(
+                now, speaker.Id, addressee.Id, content, speaker.Biology));
         }
 
         /// <summary>

@@ -54,6 +54,20 @@ namespace EngineTests
             Assert.IsTrue(r.Dimensions.HasFlag(DialogueDimension.SocialObligation));
         }
 
+        // Greeting is the one symmetric pair, so it is the one that can run away: if a return greeting
+        // obliged another greeting, obligation-driven replies would ping-pong until the window expired.
+        [TestMethod]
+        public void ResponseTo_ReturnGreeting_ClosesThePair()
+        {
+            var returnGreeting = Act(
+                RelationalActKind.SmallTalk, B, A, 2,
+                DialogueDimension.SocialObligation | DialogueDimension.Feedback);
+
+            Assert.IsNull(
+                AdjacencyPairResolver.ResponseTo(returnGreeting),
+                "a greeting already given back is a second-pair-part — it must not demand a third");
+        }
+
         [TestMethod]
         public void ResponseTo_PlainSmallTalk_HasNoObligedResponse()
             => Assert.IsNull(AdjacencyPairResolver.ResponseTo(Act(RelationalActKind.SmallTalk, A, B, 1)));
@@ -105,6 +119,105 @@ namespace EngineTests
             var muchLater = new WDateTime(start.WorldTicks + WTimeSpan.FromHours(3).Ticks);
             Assert.IsFalse(coord.TryGetPendingResponse(B, A, muchLater, out _));
             Assert.AreEqual(0, coord.ActiveCount);   // stale conversation dropped
+        }
+
+        #endregion
+
+        #region Response obligation (search by responder)
+
+        // TryGetPendingResponse can only answer "is THIS the person I owe?", which presumes the responder
+        // already decided to speak and to whom. TryGetObligation searches by responder alone — that is
+        // what lets a reply be delivered because it is owed rather than by coincidence.
+
+        [TestMethod]
+        public void Coordinator_TryGetObligation_FindsPartnerWithoutBeingToldWho()
+        {
+            var coord = new ConversationCoordinator();
+            var now = WDateTime.New(WDateOnly.New(100, 1, 1));
+            coord.Observe(Act(RelationalActKind.Question, A, B, now.WorldTicks), A, B, now);
+
+            Assert.IsTrue(coord.TryGetObligation(B, now, out var other, out var pending));
+            Assert.AreEqual(A, other);
+            Assert.AreEqual(RelationalActKind.Question, pending.RelationalKind);
+        }
+
+        [TestMethod]
+        public void Coordinator_TryGetObligation_AskerOwesNothing()
+        {
+            var coord = new ConversationCoordinator();
+            var now = WDateTime.New(WDateOnly.New(100, 1, 1));
+            coord.Observe(Act(RelationalActKind.Question, A, B, now.WorldTicks), A, B, now);
+
+            // A holds the floor — the obligation runs the other way.
+            Assert.IsFalse(coord.TryGetObligation(A, now, out _, out _));
+        }
+
+        [TestMethod]
+        public void Coordinator_TryGetObligation_NonObligingAct_OwesNothing()
+        {
+            var coord = new ConversationCoordinator();
+            var now = WDateTime.New(WDateOnly.New(100, 1, 1));
+            coord.Observe(Act(RelationalActKind.Boundary, A, B, now.WorldTicks), A, B, now);
+
+            Assert.IsFalse(coord.TryGetObligation(B, now, out _, out _));
+        }
+
+        [TestMethod]
+        public void Coordinator_TryGetObligation_LapsesAfterReplyWindow()
+        {
+            var coord = new ConversationCoordinator(
+                idleTimeout: WTimeSpan.FromHours(2), replyWindow: WTimeSpan.FromMinutes(15));
+            var start = WDateTime.New(WDateOnly.New(100, 1, 1));
+            coord.Observe(Act(RelationalActKind.Question, A, B, start.WorldTicks), A, B, start);
+
+            var withinWindow = new WDateTime(start.WorldTicks + WTimeSpan.FromMinutes(10).Ticks);
+            Assert.IsTrue(coord.TryGetObligation(B, withinWindow, out _, out _));
+
+            // The moment to answer passes well before the conversation itself is forgotten: nobody
+            // answers a question half an hour late, but the pair still count as having talked.
+            var afterWindow = new WDateTime(start.WorldTicks + WTimeSpan.FromMinutes(30).Ticks);
+            Assert.IsFalse(coord.TryGetObligation(B, afterWindow, out _, out _));
+            Assert.IsTrue(coord.TryGetPendingResponse(B, A, afterWindow, out _));
+        }
+
+        [TestMethod]
+        public void Coordinator_TryGetObligation_TwoPendingQuestions_AnswersFreshest()
+        {
+            var c = new HumanId(Guid.Parse("cccccccc-0000-0000-0000-000000000003"));
+            var coord = new ConversationCoordinator();
+            var t0 = WDateTime.New(WDateOnly.New(100, 1, 1));
+            var t1 = new WDateTime(t0.WorldTicks + WTimeSpan.FromMinutes(5).Ticks);
+
+            coord.Observe(Act(RelationalActKind.Question, A, B, t0.WorldTicks), A, B, t0);
+            coord.Observe(Act(RelationalActKind.Question, c, B, t1.WorldTicks), c, B, t1);
+
+            Assert.IsTrue(coord.TryGetObligation(B, t1, out var other, out _));
+            Assert.AreEqual(c, other, "the freshest question is the one still hanging in the air");
+        }
+
+        [TestMethod]
+        public void Coordinator_TryGetObligation_UninvolvedCharacter_OwesNothing()
+        {
+            var c = new HumanId(Guid.Parse("cccccccc-0000-0000-0000-000000000003"));
+            var coord = new ConversationCoordinator();
+            var now = WDateTime.New(WDateOnly.New(100, 1, 1));
+            coord.Observe(Act(RelationalActKind.Question, A, B, now.WorldTicks), A, B, now);
+
+            Assert.IsFalse(coord.TryGetObligation(c, now, out _, out _));
+        }
+
+        [TestMethod]
+        public void Coordinator_AnsweringFlipsTheFloor_SoTheReplyIsNotDeliveredTwice()
+        {
+            var coord = new ConversationCoordinator();
+            var now = WDateTime.New(WDateOnly.New(100, 1, 1));
+            coord.Observe(Act(RelationalActKind.Question, A, B, now.WorldTicks), A, B, now);
+            Assert.IsTrue(coord.TryGetObligation(B, now, out _, out _));
+
+            // B answers: the reply is itself observed, so B now holds the floor and owes nothing.
+            coord.Observe(Act(RelationalActKind.SmallTalk, B, A, now.WorldTicks, DialogueDimension.Feedback), B, A, now);
+
+            Assert.IsFalse(coord.TryGetObligation(B, now, out _, out _));
         }
 
         #endregion

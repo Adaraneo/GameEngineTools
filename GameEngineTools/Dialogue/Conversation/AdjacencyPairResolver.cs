@@ -26,7 +26,13 @@ namespace GameEngineTools.Dialogue.Conversation
             return received.RelationalKind switch
             {
                 // Greeting (small talk carrying a social obligation) ⇒ return the greeting.
+                // Greeting is the one SYMMETRIC pair — its response is another greeting — so the return
+                // greeting must not demand a third. Feedback marks an act as a second-pair-part (only a
+                // response ever carries it), and greeting–greeting is complete at two. Without this the
+                // pair is self-perpetuating: once replies are delivered because they are owed rather than
+                // by coincidence, two characters greet each other until they run out of window.
                 RelationalActKind.SmallTalk when received.Dimensions.HasFlag(DialogueDimension.SocialObligation)
+                                                 && !received.Dimensions.HasFlag(DialogueDimension.Feedback)
                     => new AdjacencyResponse(RelationalActKind.SmallTalk, DialogueDimension.SocialObligation | DialogueDimension.Feedback),
 
                 // Question ⇒ answer (given as ordinary talk, marked as feedback/uptake).
