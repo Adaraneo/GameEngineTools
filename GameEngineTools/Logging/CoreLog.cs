@@ -1026,10 +1026,16 @@ namespace GameEngineTools.Logging
         /// rough Czech gloss (see <c>TemporaryCzechActRealizer</c> — TEMPORARY preview only, never
         /// re-enters simulation state).
         /// </summary>
+        /// <remarks>
+        /// <paramref name="IsResponse"/> and <paramref name="RespondingToKind"/> separate the two halves
+        /// of an exchange: a fresh act the speaker initiated versus a second-pair-part it owed. Without
+        /// them a reply is indistinguishable from an opening move in the log, so turn-taking cannot be
+        /// measured at all — only the total number of utterances.
+        /// </remarks>
         [LoggerMessage(
             EventId = 1220,
             Level = LogLevel.Information,
-            Message = "[DIALOGUE] {HumanId} {SpeakerName} → {AddresseeName}: „{Utterance}“ (kind={RelationalKind}, predikát={PredicateLemma}, register={Register}, directness={Directness})")]
+            Message = "[DIALOGUE] {HumanId} {SpeakerName} → {AddresseeName}: „{Utterance}“ (kind={RelationalKind}, predikát={PredicateLemma}, register={Register}, directness={Directness}, odpověď={IsResponse}, naAkt={RespondingToKind})")]
         public static partial void SpeechActUttered(
             this ILogger logger,
             string HumanId,
@@ -1041,7 +1047,9 @@ namespace GameEngineTools.Logging
             string PredicateLemma,
             string Register,
             string Directness,
-            string Utterance);
+            string Utterance,
+            bool IsResponse,
+            string RespondingToKind);
 
         #endregion Dialogue — SpeechAct utterances — 1220
 

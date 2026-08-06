@@ -1608,7 +1608,9 @@ namespace GameEngineTools.World.Simulation
                     act.PredicateLemma,
                     act.Register.ToString(),
                     act.Directness.ToString(),
-                    utterance);
+                    utterance,
+                    respondingTo is not null,
+                    respondingTo?.RelationalKind.ToString() ?? "None");
             }
 
             var content = new InteractionContent(act);
