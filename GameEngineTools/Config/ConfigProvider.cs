@@ -15,7 +15,8 @@ namespace GameEngineTools.Config
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json")
                 .AddJsonFile("appsettings.Characters.json")
-                .AddJsonFile("appsettings.World.json");
+                .AddJsonFile("appsettings.World.json")
+                .AddJsonFile("appsettings.Economy.json");
             return builder.Build();
         });
 

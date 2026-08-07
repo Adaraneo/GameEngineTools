@@ -35,6 +35,9 @@
     <None Update="appsettings.World.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="appsettings.Economy.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="SourceFiles\Armory\ArmorParts.csv">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

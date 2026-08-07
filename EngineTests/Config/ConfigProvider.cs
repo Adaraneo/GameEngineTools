@@ -10,7 +10,8 @@ namespace EngineTests.Config
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.Test.json")
                 .AddJsonFile("appsettings.Characters.json")
-                .AddJsonFile("appsettings.World.json");
+                .AddJsonFile("appsettings.World.json")
+                .AddJsonFile("appsettings.Economy.json");
             return builder.Build();
         });
 

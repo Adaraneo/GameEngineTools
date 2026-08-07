@@ -42,6 +42,9 @@
     <Content Update="appsettings.World.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Update="appsettings.Economy.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <!-- Reference default-config files copied to output so the defaults are available alongside the app. -->
     <Content Update="*.Default.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

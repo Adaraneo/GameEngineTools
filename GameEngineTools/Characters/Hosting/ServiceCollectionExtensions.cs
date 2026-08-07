@@ -118,7 +118,8 @@ namespace GameEngineTools.Characters.Hosting
             bereavementOb.BindConfiguration("Characters:Bereavement");
 
             var economyOb = services.AddOptions<Engines.Economy.EconomyConfig>();
-            economyOb.BindConfiguration("Characters:Economy");
+            // Economy is world-level, not a character trait — it lives in its own appsettings.Economy.json root section.
+            economyOb.BindConfiguration("Economy");
 
             var lodOb = services.AddOptions<CognitiveResolutionLevelConfig>();
             lodOb.BindConfiguration("Characters:Lod");

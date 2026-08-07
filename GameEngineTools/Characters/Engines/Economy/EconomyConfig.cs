@@ -7,7 +7,7 @@ namespace GameEngineTools.Characters.Engines.Economy
 
     /// <summary>
     /// Tuning configuration for the Tier 2 food economy: posted-price stock feedback, wages, and the
-    /// willingness-to-pay shaping used by the provisioning bridge. Bound from <c>Characters:Economy</c>.
+    /// willingness-to-pay shaping used by the provisioning bridge. Bound from the <c>Economy</c> root section of <c>appsettings.Economy.json</c>.
     /// </summary>
     /// <remarks>
     /// The price-formation coefficients here are <b>tuned game-balance parameters, not citable economic
