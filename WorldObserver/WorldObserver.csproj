@@ -33,6 +33,9 @@
     included explicitly. world.db self-seeds on first run.
   -->
   <ItemGroup>
+    <Content Update="appsettings.Economy.Default.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
