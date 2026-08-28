@@ -12,11 +12,13 @@ namespace GameEngineTools.Characters.Engines.Language
     /// In-memory half-life-regression store (Settles &amp; Meeder 2016).
     /// </summary>
     /// <remarks>
-    /// <b>Not persisted.</b> The state lives outside <c>EnginesSnapshot</c>, so an exported and
-    /// re-imported world comes back with every vocabulary empty. That is tolerable while the layer only
-    /// observes — an empty store reads as "nobody knows anything yet", which is exactly the starting
-    /// state — but it stops being tolerable once word choice depends on it, because characters would
-    /// silently forget how they speak on load. Decide that before wiring production selection.
+    /// <b>Not part of <c>EnginesSnapshot</c>.</b> The state lives outside the per-character engine
+    /// snapshot in its own <see cref="SnapshotFor"/>/<see cref="Restore"/> pair, threaded through
+    /// <c>GeneratedFile</c>'s per-character export/import when <c>AddLexicalAcquisition()</c> is
+    /// registered — that round trip carries the vocabulary with it (see
+    /// <c>LexicalPersistenceTests</c>). It is not, however, wired into any automatic whole-world
+    /// save/load: a process restart without going through that export/import path still comes back
+    /// with every vocabulary empty, and characters would silently forget how they speak.
     /// </remarks>
     public sealed class DefaultLexicalAcquisitionStore : ILexicalAcquisitionStore
     {
