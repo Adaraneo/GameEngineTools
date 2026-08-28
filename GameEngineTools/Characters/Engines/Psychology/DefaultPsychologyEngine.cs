@@ -1425,8 +1425,20 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var n = ctx.Personality.BigFive.Neuroticism;
             var attachment = ctx.Personality.Attachment;
 
+            // The emitter (DefaultInteractionEngine) can't see this observer's private relationship
+            // graph, so onr.ReactionKind is only a fallback (always MoralOutrage for non-victims).
+            // Recompute here, where ctx.Snapshot.Relationships is THIS character's own edge set —
+            // a stable KinRole edge to the actor is exactly the "shared identity" Lickel et al. 2005
+            // require for vicarious shame.
+            var sharesIdentityWithActor =
+                ctx.Snapshot.Relationships.Edges.TryGetValue(onr.Actor, out var actorEdge)
+                && actorEdge.KinRole != Characters.Engines.Relationships.KinRole.None;
+
+            var reactionKind = Characters.Engines.Interactions.NormViolationMath.RouteObserverReaction(
+                ctx.Id, onr.Actor, onr.Victim, sharesIdentityWithActor);
+
             // Route by reaction kind with distinct VAD signatures
-            var (dv, da, dd, stressDelta) = onr.ReactionKind switch
+            var (dv, da, dd, stressDelta) = reactionKind switch
             {
                 Characters.Engines.Interactions.ObserverReactionKind.Anger =>
                     ComputeAngerResponse(onr.ViolationScore, n),
@@ -1466,7 +1478,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             {
                 _log.ObserverNormReactionRouted(
                     ctx.Id.Value.ToString(),
-                    onr.ReactionKind.ToString(),
+                    reactionKind.ToString(),
                     onr.NormKind.ToString(),
                     onr.ViolationScore);
             }

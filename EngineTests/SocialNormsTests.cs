@@ -5,6 +5,7 @@ namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
@@ -287,6 +288,122 @@ namespace EngineTests
 
         #endregion Test 10 — PsychologyEngine: NormViolationOccurred applies shame spike
 
+        #region Test 11 — PsychologyEngine: ObserverNormReaction routes VicariousShame only for kin
+
+        [TestMethod]
+        public void PsychologyEngine_ObserverNormReaction_KinToActor_RoutesToVicariousShame()
+        {
+            // Arrange — a third party (not the victim) with a Sibling edge to the actor.
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var victim = new HumanId(Guid.NewGuid());
+            var personality = MakePersonality(neuroticism: 0.5, extraversion: 0.5);
+
+            var kinEdges = new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = new RelationshipEdge(
+                    A: self, B: actor, Like: 50, Trust: 50, Familiarity: 50,
+                    AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: 50, Respect: 50, Comfort: 50, Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    KinRole: KinRole.Sibling)
+            };
+
+            var kinCtx = BuildPsychologyContext(self, personality, kinEdges);
+            var strangerCtx = BuildPsychologyContext(self, personality, new Dictionary<HumanId, RelationshipEdge>());
+
+            var onr = new ObserverNormReaction(
+                OccurredAt: new WDateTime(100),
+                Observer: self,
+                Actor: actor,
+                Victim: victim, // not self, so a blind emitter always defaults to MoralOutrage
+                NormKind: SocialNormKind.RitualContext,
+                ReactionKind: ObserverReactionKind.MoralOutrage, // the emitter's necessarily-blind guess
+                ViolationScore: 0.8);
+
+            var kinEngine = BuildPsychologyEngineAtNeutral();
+            var strangerEngine = BuildPsychologyEngineAtNeutral();
+            var kinOutbox = new EventCollector();
+            var strangerOutbox = new EventCollector();
+
+            // Act
+            kinEngine.Handle(onr, kinCtx, kinOutbox);
+            strangerEngine.Handle(onr, strangerCtx, strangerOutbox);
+
+            // Assert — VicariousShame's Dominance delta (-0.43*attachMult, Secure attachMult=1.0) is
+            // clearly larger in magnitude than MoralOutrage's fixed -0.18, both scaled by ViolationScore
+            // 0.8: vicarious ≈ -0.344, outrage ≈ -0.144. A hardcoded sharesIdentityWithActor:false would
+            // route BOTH through MoralOutrage, making this assertion fail.
+            Assert.IsTrue(kinEngine.State.Dominance < 0.5 - 0.30,
+                $"Kin observer must get the larger VicariousShame Dominance drop. Got: {kinEngine.State.Dominance:F3}");
+            Assert.IsTrue(strangerEngine.State.Dominance > 0.5 - 0.20,
+                $"Non-kin observer must stay on the smaller MoralOutrage Dominance drop. Got: {strangerEngine.State.Dominance:F3}");
+        }
+
+        #endregion Test 11 — PsychologyEngine: ObserverNormReaction routes VicariousShame only for kin
+
+        #region Test 12 — RelationshipsEngine: ObserverNormReaction routes VicariousShame only for kin
+
+        [TestMethod]
+        public void RelationshipsEngine_ObserverNormReaction_KinToActor_RoutesToVicariousShame()
+        {
+            // Arrange
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var victim = new HumanId(Guid.NewGuid());
+            var personality = MakePersonality(neuroticism: 0.5, extraversion: 0.5);
+
+            var kinEngine = new DefaultRelationshipsEngine(
+                Options.Create(new RelationshipsConfig()),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new FixedSocialFidelityPolicy(SocialFidelityLevel.Full));
+            kinEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = new RelationshipEdge(
+                    A: self, B: actor, Like: 50, Trust: 50, Familiarity: 50,
+                    AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: 50, Respect: 50, Comfort: 50, Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    KinRole: KinRole.Sibling)
+            }));
+
+            var strangerEngine = new DefaultRelationshipsEngine(
+                Options.Create(new RelationshipsConfig()),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new FixedSocialFidelityPolicy(SocialFidelityLevel.Full));
+            strangerEngine.RestoreState(new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+            {
+                [actor] = new RelationshipEdge(
+                    A: self, B: actor, Like: 50, Trust: 50, Familiarity: 50,
+                    AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: 50, Respect: 50, Comfort: 50, Breakdown: new DomainBreakdown(50, 50, 50, 50, 50),
+                    KinRole: KinRole.None)
+            }));
+
+            var ctx = BuildPsychologyContext(self, personality); // Relationships engine only reads ctx.Id/Personality here
+
+            var onr = new ObserverNormReaction(
+                OccurredAt: new WDateTime(100),
+                Observer: self,
+                Actor: actor,
+                Victim: victim,
+                NormKind: SocialNormKind.RitualContext,
+                ReactionKind: ObserverReactionKind.MoralOutrage, // the emitter's necessarily-blind guess
+                ViolationScore: 0.8);
+
+            // Act
+            kinEngine.Handle(onr, ctx, new EventCollector());
+            strangerEngine.Handle(onr, ctx, new EventCollector());
+
+            // Assert — expected exact deltas from Bump(50, ·) starting at Respect=50 (CreateDefaultEdge):
+            // vicarious: 50 - 6.5*attachMult(1.0)*closenessAmp(1.0)*gossipScale(0.35)*0.8 = 48.18
+            // outrage:   50 - 8.0*neuMult(1.0)*gossipScale(0.40)*0.8                       = 47.44
+            Assert.AreEqual(48.18, kinEngine.State.Edges[actor].Respect, 0.01,
+                "Sibling observer must route through the vicarious-shame formula.");
+            Assert.AreEqual(47.44, strangerEngine.State.Edges[actor].Respect, 0.01,
+                "Non-kin observer must route through the moral-outrage formula.");
+        }
+
+        #endregion Test 12 — RelationshipsEngine: ObserverNormReaction routes VicariousShame only for kin
+
         #region Pomocné metody
 
         private static SocialNormContext FuneralContext()
@@ -344,13 +461,19 @@ namespace EngineTests
         }
 
         private static IHumanContext BuildPsychologyContext(HumanId self, Personality personality)
+            => BuildPsychologyContext(self, personality, new Dictionary<HumanId, RelationshipEdge>());
+
+        /// <summary>Overload that seeds the observer's own relationship graph — needed to test
+        /// KinRole-based routing, since that data must come from ctx.Snapshot.Relationships.</summary>
+        private static IHumanContext BuildPsychologyContext(
+            HumanId self, Personality personality, Dictionary<HumanId, RelationshipEdge> relationships)
         {
             var physio = new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null);
             var psych = new PsychologyState(0.0, 0.4, 0.5, 0, 10, DiscreteEmotion.Neutral);
             var snapshot = new EnginesSnapshot(physio, psych,
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
                 new InteractionSurface(null, false, 0.1, 0.1, SurfaceKind.Social),
-                new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
+                new RelationshipState(relationships),
                 new MemoryIndex(new List<EpisodicMemory>()));
             return new HumanContext
             {
@@ -364,6 +487,27 @@ namespace EngineTests
                 EventBus = new NullEventBus(),
                 Scheduler = new NullScheduler()
             };
+        }
+
+        /// <summary>A psychology engine at neutral Valence/Dominance=0.5, no baseline drift/noise —
+        /// isolates the ObserverNormReaction delta being tested.</summary>
+        private static DefaultPsychologyEngine BuildPsychologyEngineAtNeutral()
+        {
+            var cfg = new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: false);
+
+            var engine = new DefaultPsychologyEngine(
+                Options.Create(cfg),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                new ZeroRandom());
+
+            engine.RestoreState(new PsychologyState(
+                Valence: 0.0, Arousal: 0.4, Dominance: 0.5,
+                Stress: 0, CognitiveLoad: 10, DominantEmotion: DiscreteEmotion.Neutral));
+
+            return engine;
         }
 
         #endregion Pomocné metody

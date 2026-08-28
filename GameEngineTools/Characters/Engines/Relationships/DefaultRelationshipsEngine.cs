@@ -1254,7 +1254,19 @@ namespace GameEngineTools.Characters.Engines.Relationships
             IHumanContext ctx,
             IEventCollector outbox)
         {
-            switch (onr.ReactionKind)
+            // The emitter (DefaultInteractionEngine) ticks for the recipient of the interaction, not
+            // for this observer, so it can't see this observer's own relationship graph — onr.ReactionKind
+            // is only ever its blind fallback (MoralOutrage for anyone but the direct victim). This engine
+            // IS that graph, so recompute using our own live edge to the actor: a stable KinRole (set once
+            // by FamilyBuilder, never mutated at runtime) is exactly the "shared identity" Lickel et al.
+            // 2005 require for vicarious shame instead of third-party outrage.
+            var sharesIdentityWithActor =
+                State.Edges.TryGetValue(onr.Actor, out var actorEdge) && actorEdge.KinRole != KinRole.None;
+
+            var reactionKind = Interactions.NormViolationMath.RouteObserverReaction(
+                self, onr.Actor, onr.Victim, sharesIdentityWithActor);
+
+            switch (reactionKind)
             {
                 case Interactions.ObserverReactionKind.Anger:
                     // Victim reacting to actor
@@ -1342,7 +1354,7 @@ namespace GameEngineTools.Characters.Engines.Relationships
             IHumanContext ctx,
             IEventCollector outbox)
         {
-            // In-group member (observer shares identity with victim)
+            // In-group member (observer shares identity with the actor, not the victim — Lickel 2005)
             var attachment = ctx.Personality.Attachment;
             var attachMult = 1.0 + (attachment.Anxiety - attachment.Avoidance) * 0.40;
             attachMult = Math.Max(0.65, Math.Min(1.40, attachMult));

@@ -392,8 +392,12 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 }
 
                 // Observer cascade: one ObserverNormReaction per witness.
-                // Identity sharing is unknown at this layer → default to MoralOutrage for third parties.
-                // When RelationshipsEngine gains group-membership data, route VicariousShame there.
+                // This engine ticks for the interaction's recipient, not for each observer, so it cannot
+                // see any observer's private relationship graph — the kinship check that distinguishes
+                // VicariousShame from MoralOutrage needs the observer's own edges. ReactionKind here is
+                // therefore only a blind fallback (never VicariousShame); DefaultPsychologyEngine and
+                // DefaultRelationshipsEngine each recompute the real routing on their own tick, using
+                // their own KinRole edge to the actor.
                 if (State.Observers is { Count: > 0 } observers)
                 {
                     foreach (var observer in observers)
@@ -402,7 +406,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
                             observer,
                             actor: p.From,
                             victim: p.To,
-                            sharesIdentityWithActor: false); // TODO: wire group membership when available
+                            sharesIdentityWithActor: false);
 
                         outbox.Add(new ObserverNormReaction(
                             p.OccurredAt,
