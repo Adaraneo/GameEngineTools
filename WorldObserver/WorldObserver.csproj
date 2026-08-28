@@ -10,7 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\GameEngineTools\GameEngineTools.csproj" />
     <!-- Czech grammar composer for the custom narrative formatter (same version as the core lib). -->
-    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.24" />
+    <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.32" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
 
