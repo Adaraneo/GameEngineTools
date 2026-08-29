@@ -140,6 +140,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// <list type="bullet">
         ///   <item>Hartsough, Ginther &amp; Marois (2020): moral outrage &gt; anger for third-party violations.</item>
         ///   <item>Lickel, Schmader, Curtis, Scarnier &amp; Ames (2005): vicarious shame requires shared identity with the actor.</item>
+        ///   <item>Welten, Zeelenberg &amp; Breugelmans (2012, <i>Cognition and Emotion</i> 26:5): a second,
+        ///   independent empathy/perspective-taking route produces the same shame-like response for
+        ///   observers with <b>no</b> shared identity with the actor — found for unfamiliar transgressors,
+        ///   where the group-identity route does not apply.</item>
         /// </list>
         /// When in-group identity cannot be determined, <see cref="ObserverReactionKind.MoralOutrage"/>
         /// is the safe fallback.
@@ -149,14 +153,22 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// <param name="victim">The direct victim of the act, if any.</param>
         /// <param name="sharesIdentityWithActor">
         /// True if the observer shares a group/family identity with the actor.
-        /// When unknown, pass <c>false</c> (defaults to MoralOutrage).
+        /// When unknown, pass <c>false</c> (defaults to MoralOutrage, or EmpathicShame if that route applies).
+        /// </param>
+        /// <param name="hasEmpathicRoute">
+        /// True if the observer's own trait empathy/perspective-taking capacity clears
+        /// <see cref="EmpathicPerspectiveTakingThreshold"/> (see <see cref="ObserverReactionKind.EmpathicShame"/>).
+        /// Only consulted when <paramref name="sharesIdentityWithActor"/> is false — the group-identity
+        /// route takes precedence when both apply, per Welten et al. (2012)'s "familiar → identity,
+        /// unfamiliar → empathy" split. Default <c>false</c> when unknown.
         /// </param>
         /// <returns>The observer's reaction kind.</returns>
         internal static ObserverReactionKind RouteObserverReaction(
             HumanId observer,
             HumanId actor,
             HumanId? victim,
-            bool sharesIdentityWithActor)
+            bool sharesIdentityWithActor,
+            bool hasEmpathicRoute = false)
         {
             // Direct victim → anger (second-party reaction).
             if (victim.HasValue && observer == victim.Value)
@@ -166,9 +178,27 @@ namespace GameEngineTools.Characters.Engines.Interactions
             if (sharesIdentityWithActor)
                 return ObserverReactionKind.VicariousShame;
 
+            // No shared identity, but high enough trait empathy → the second route (Welten et al. 2012).
+            if (hasEmpathicRoute)
+                return ObserverReactionKind.EmpathicShame;
+
             // Everyone else → moral outrage (third-party; Hartsough et al. 2020).
             return ObserverReactionKind.MoralOutrage;
         }
+
+        /// <summary>
+        /// Trait-empathy threshold (proxied by Big Five Agreeableness, [0,1]) above which the empathy
+        /// route to vicarious shame applies for an observer with no shared identity with the actor.
+        /// </summary>
+        /// <remarks>
+        /// Agreeableness is used as the proxy because it is the Big Five dimension most consistently
+        /// linked to trait empathy and perspective-taking (Habashi, Graziano &amp; Hoover 2016,
+        /// <i>Journal of Personality and Social Psychology</i> 111:1296 — "the prosocial personality").
+        /// 0.65 is an unvalidated calibration choice (top ~1/3 of the trait distribution under a
+        /// roughly normal 0–1 scaling); revisit if population testing shows the empathy route firing
+        /// too rarely or too often relative to Welten et al.'s reported prevalence.
+        /// </remarks>
+        internal const double EmpathicPerspectiveTakingThreshold = 0.65;
 
         #endregion Observer reaction routing
 

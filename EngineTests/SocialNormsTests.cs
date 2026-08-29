@@ -165,6 +165,46 @@ namespace EngineTests
 
         #endregion Test 7 — Observer routing: third party gets MoralOutrage
 
+        #region Test 7b — Observer routing: high-empathy stranger gets EmpathicShame
+
+        [TestMethod]
+        public void NormViolationMath_ObserverRouting_HighEmpathyStrangerGetsEmpathicShame()
+        {
+            var observer = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var victim = new HumanId(Guid.NewGuid());
+
+            var reaction = NormViolationMath.RouteObserverReaction(
+                observer: observer,
+                actor: actor,
+                victim: victim,
+                sharesIdentityWithActor: false,
+                hasEmpathicRoute: true);
+
+            Assert.AreEqual(ObserverReactionKind.EmpathicShame, reaction);
+        }
+
+        [TestMethod]
+        public void NormViolationMath_ObserverRouting_SharedIdentityTakesPrecedenceOverEmpathy()
+        {
+            // Welten et al. (2012): familiar transgressors route through group identity, not empathy —
+            // when both signals are present, the identity route must win.
+            var observer = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var victim = new HumanId(Guid.NewGuid());
+
+            var reaction = NormViolationMath.RouteObserverReaction(
+                observer: observer,
+                actor: actor,
+                victim: victim,
+                sharesIdentityWithActor: true,
+                hasEmpathicRoute: true);
+
+            Assert.AreEqual(ObserverReactionKind.VicariousShame, reaction);
+        }
+
+        #endregion Test 7b — Observer routing: high-empathy stranger gets EmpathicShame
+
         #region Test 8 — IsShameChannel: Greeting and PublicConduct return false
 
         [TestMethod]
@@ -404,6 +444,50 @@ namespace EngineTests
 
         #endregion Test 12 — RelationshipsEngine: ObserverNormReaction routes VicariousShame only for kin
 
+        #region Test 13 — PsychologyEngine: ObserverNormReaction empathy route for strangers
+
+        [TestMethod]
+        public void PsychologyEngine_ObserverNormReaction_HighEmpathyStranger_RoutesToEmpathicShame()
+        {
+            // Arrange — two true strangers (no relationship edge at all to the actor), differing only
+            // in Agreeableness, which proxies trait empathy/perspective-taking (Welten et al. 2012).
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var victim = new HumanId(Guid.NewGuid());
+
+            var empathicPersonality = MakePersonality(neuroticism: 0.5, extraversion: 0.5, agreeableness: 0.9);
+            var callousPersonality = MakePersonality(neuroticism: 0.5, extraversion: 0.5, agreeableness: 0.3);
+
+            var empathicCtx = BuildPsychologyContext(self, empathicPersonality, new Dictionary<HumanId, RelationshipEdge>());
+            var callousCtx = BuildPsychologyContext(self, callousPersonality, new Dictionary<HumanId, RelationshipEdge>());
+
+            var onr = new ObserverNormReaction(
+                OccurredAt: new WDateTime(100),
+                Observer: self,
+                Actor: actor,
+                Victim: victim, // not self — a blind emitter always defaults to MoralOutrage
+                NormKind: SocialNormKind.RitualContext,
+                ReactionKind: ObserverReactionKind.MoralOutrage, // the emitter's necessarily-blind guess
+                ViolationScore: 0.8);
+
+            var empathicEngine = BuildPsychologyEngineAtNeutral();
+            var callousEngine = BuildPsychologyEngineAtNeutral();
+
+            // Act
+            empathicEngine.Handle(onr, empathicCtx, new EventCollector());
+            callousEngine.Handle(onr, callousCtx, new EventCollector());
+
+            // Assert — MoralOutrage: dv = -0.45*neuMult(1.0)*0.8 = -0.36.
+            // EmpathicShame: dv = -0.25*empathyMult(1.2 at A=0.9)*0.8 = -0.24.
+            // A missing empathy route would give both strangers the same, harsher outrage drop.
+            Assert.IsTrue(empathicEngine.State.Valence > -0.30,
+                $"High-Agreeableness stranger must get the milder EmpathicShame Valence drop. Got: {empathicEngine.State.Valence:F3}");
+            Assert.IsTrue(callousEngine.State.Valence < -0.30,
+                $"Low-Agreeableness stranger must stay on the harsher MoralOutrage Valence drop. Got: {callousEngine.State.Valence:F3}");
+        }
+
+        #endregion Test 13 — PsychologyEngine: ObserverNormReaction empathy route for strangers
+
         #region Pomocné metody
 
         private static SocialNormContext FuneralContext()
@@ -423,12 +507,15 @@ namespace EngineTests
         }
 
         private static Personality MakePersonality(double neuroticism, double extraversion)
+            => MakePersonality(neuroticism, extraversion, agreeableness: 0.5);
+
+        private static Personality MakePersonality(double neuroticism, double extraversion, double agreeableness)
             => new Personality(
                 BigFive: new BigFive(
                     Openness: 0.5,
                     Conscientiousness: 0.5,
                     Extraversion: extraversion,
-                    Agreeableness: 0.5,
+                    Agreeableness: agreeableness,
                     Neuroticism: neuroticism),
                 Attachment: AttachmentProfile.Secure,
                 Communication: CommunicationStyle.Direct,

@@ -15,6 +15,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
     ///   <item><term><see cref="Anger"/></term><description>Direct victim or addressee — second-party reaction.</description></item>
     ///   <item><term><see cref="MoralOutrage"/></term><description>Uninvolved third party — drives altruistic punishment.</description></item>
     ///   <item><term><see cref="VicariousShame"/></term><description>Observer who shares group identity with the actor — distancing motivation.</description></item>
+    ///   <item><term><see cref="EmpathicShame"/></term><description>No shared identity, but the observer imagines themselves in the actor's place — Welten, Zeelenberg &amp; Breugelmans (2012)'s second, independent route to vicarious shame.</description></item>
     /// </list>
     /// </remarks>
     public enum ObserverReactionKind
@@ -26,7 +27,14 @@ namespace GameEngineTools.Characters.Engines.Interactions
         MoralOutrage,
 
         /// <summary>Observer shares in-group identity with the violating actor — vicarious shame, distancing.</summary>
-        VicariousShame
+        VicariousShame,
+
+        /// <summary>
+        /// Observer shares no identity with the actor, but empathic perspective-taking still produces a
+        /// self-conscious shame-like response — the route Welten et al. (2012) found operates for
+        /// unfamiliar transgressors, independent of the group-identity route.
+        /// </summary>
+        EmpathicShame
     }
 
     /// <summary>

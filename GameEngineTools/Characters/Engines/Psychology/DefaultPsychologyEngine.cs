@@ -1423,6 +1423,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 return s;
 
             var n = ctx.Personality.BigFive.Neuroticism;
+            var agreeableness = ctx.Personality.BigFive.Agreeableness;
             var attachment = ctx.Personality.Attachment;
 
             // The emitter (DefaultInteractionEngine) can't see this observer's private relationship
@@ -1434,8 +1435,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 ctx.Snapshot.Relationships.Edges.TryGetValue(onr.Actor, out var actorEdge)
                 && actorEdge.KinRole != Characters.Engines.Relationships.KinRole.None;
 
+            // Welten et al. (2012)'s second route: no shared identity, but high enough trait empathy
+            // (Agreeableness proxy) still produces a shame-like response via perspective-taking.
+            var hasEmpathicRoute = agreeableness >= Characters.Engines.Interactions.NormViolationMath.EmpathicPerspectiveTakingThreshold;
+
             var reactionKind = Characters.Engines.Interactions.NormViolationMath.RouteObserverReaction(
-                ctx.Id, onr.Actor, onr.Victim, sharesIdentityWithActor);
+                ctx.Id, onr.Actor, onr.Victim, sharesIdentityWithActor, hasEmpathicRoute);
 
             // Route by reaction kind with distinct VAD signatures
             var (dv, da, dd, stressDelta) = reactionKind switch
@@ -1448,6 +1453,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                 Characters.Engines.Interactions.ObserverReactionKind.VicariousShame =>
                     ComputeVicariousShameResponse(onr.ViolationScore, attachment),
+
+                Characters.Engines.Interactions.ObserverReactionKind.EmpathicShame =>
+                    ComputeEmpathicShameResponse(onr.ViolationScore, agreeableness),
 
                 _ => (0.0, 0.0, 0.0, 0.0)
             };
@@ -1592,6 +1600,27 @@ namespace GameEngineTools.Characters.Engines.Psychology
             var da = +0.15 * attachMult;  // +0.10 to +0.20 range
             var dd = -0.43 * attachMult;  // -0.35 to -0.50 range (group status threatened)
             var stressDelta = (3.0 + attachment.Anxiety * 2.0) * attachMult;  // 2–5 range
+
+            return (dv, da, dd, stressDelta);
+        }
+
+        /// <summary>
+        /// Welten, Zeelenberg &amp; Breugelmans (2012): a strangers-only shame route via empathic
+        /// perspective-taking, not group identity. Deliberately weaker on Dominance than
+        /// <see cref="ComputeVicariousShameResponse"/> — there is no shared group status to threaten,
+        /// only the discomfort of imagining oneself in the actor's place.
+        /// </summary>
+        private static (double deltaValence, double deltaArousal, double deltaDominance, double stressDelta)
+        ComputeEmpathicShameResponse(double violationScore, double agreeableness)
+        {
+            // Higher trait empathy → more vivid perspective-taking → stronger response.
+            var empathyMult = 1.0 + (agreeableness - 0.5) * 0.5;
+            empathyMult = Math.Max(0.75, Math.Min(1.30, empathyMult));
+
+            var dv = -0.25 * empathyMult;  // milder than group-identity shame (-0.32) — no stake in it
+            var da = +0.10 * empathyMult;  // mild vicarious discomfort, not confrontational arousal
+            var dd = -0.15 * empathyMult;  // small dip — personal secondhand embarrassment, not group-status threat
+            var stressDelta = 2.0 * empathyMult;
 
             return (dv, da, dd, stressDelta);
         }

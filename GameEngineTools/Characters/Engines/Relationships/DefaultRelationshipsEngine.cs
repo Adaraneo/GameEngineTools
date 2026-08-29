@@ -1263,8 +1263,13 @@ namespace GameEngineTools.Characters.Engines.Relationships
             var sharesIdentityWithActor =
                 State.Edges.TryGetValue(onr.Actor, out var actorEdge) && actorEdge.KinRole != KinRole.None;
 
+            // Welten et al. (2012)'s second route: no shared identity, but high enough trait empathy
+            // (Agreeableness proxy) still produces a shame-like response via perspective-taking.
+            var hasEmpathicRoute = ctx.Personality.BigFive.Agreeableness
+                >= Interactions.NormViolationMath.EmpathicPerspectiveTakingThreshold;
+
             var reactionKind = Interactions.NormViolationMath.RouteObserverReaction(
-                self, onr.Actor, onr.Victim, sharesIdentityWithActor);
+                self, onr.Actor, onr.Victim, sharesIdentityWithActor, hasEmpathicRoute);
 
             switch (reactionKind)
             {
@@ -1274,7 +1279,11 @@ namespace GameEngineTools.Characters.Engines.Relationships
                     break;
 
                 case Interactions.ObserverReactionKind.MoralOutrage:
-                    // Third-party observer reacting to actor
+                case Interactions.ObserverReactionKind.EmpathicShame:
+                    // Third-party observer reacting to actor. EmpathicShame is a distinct INTERNAL
+                    // experience for the observer (see DefaultPsychologyEngine), but there is no shared
+                    // group identity here to protect — the interpersonal judgment of the actor is the
+                    // same third-party disapproval as moral outrage, so it reuses that relational path.
                     HandleOutrageReaction(onr, self, ctx, outbox);
                     break;
 
