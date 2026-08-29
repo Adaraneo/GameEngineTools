@@ -41,7 +41,9 @@ namespace GameEngineTools.World.Data
                 Terrain         TEXT NOT NULL DEFAULT 'Indoor',
                 DangerLevel     REAL NOT NULL DEFAULT 0.0,
                 AllowsPickup    INTEGER NOT NULL DEFAULT 1,
-                NormId          TEXT    REFERENCES SocialNorms(Id)
+                NormId          TEXT    REFERENCES SocialNorms(Id),
+                X               REAL NOT NULL DEFAULT 0.0,
+                Y               REAL NOT NULL DEFAULT 0.0
             );
 
             -- ── Connections ───────────────────────────────────────────────────────

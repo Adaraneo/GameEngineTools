@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS Locations (
     Terrain         TEXT    NOT NULL DEFAULT 'Indoor',
     DangerLevel     REAL    NOT NULL DEFAULT 0.0,
     AllowsPickup    INTEGER NOT NULL DEFAULT 1,  -- 0 = false, 1 = true
-    NormId          TEXT    REFERENCES SocialNorms(Id)  -- nullable
+    NormId          TEXT    REFERENCES SocialNorms(Id),  -- nullable
+    X               REAL    NOT NULL DEFAULT 0.0,  -- local 2D world-space position, meters
+    Y               REAL    NOT NULL DEFAULT 0.0
 );
 
 -- ── Connections ───────────────────────────────────────────────────────────────

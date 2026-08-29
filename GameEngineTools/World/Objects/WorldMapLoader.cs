@@ -120,10 +120,12 @@ namespace GameEngineTools.World.Objects
         private sealed record ConnectionRow(string FromId, string TargetLocationId, double DistanceMeters);
 
         /// <summary>
+        /// <summary>
         /// Parses a single row from Locations.csv.
         /// Expected columns (0-indexed):
         /// 0=Id, 1=DisplayName, 2=Type, 3=Region,
-        /// 4=BaseNoise, 5=NoisePerPerson, 6=Capacity, 7=AllowsPrivacy
+        /// 4=BaseNoise, 5=NoisePerPerson, 6=Capacity, 7=AllowsPrivacy,
+        /// optionally 8=Terrain, 9=DangerLevel, 10=AllowsPickup, 11=X, 12=Y
         /// </summary>
         private static LocationRow ParseLocationRow(string[] v)
         {
@@ -137,7 +139,9 @@ namespace GameEngineTools.World.Objects
                 AllowsPrivacy: bool.Parse(v[7].Trim()),
                 Terrain: v.Length > 8 ? Enum.Parse<TerrainType>(v[8].Trim(), ignoreCase: true) : TerrainType.Indoor,
                 DangerLevel: v.Length > 9 ? double.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0.0,
-                AllowsPickup: v.Length > 10 ? bool.Parse(v[10].Trim()) : true);
+                AllowsPickup: v.Length > 10 ? bool.Parse(v[10].Trim()) : true,
+                X: v.Length > 11 ? double.Parse(v[11].Trim(), CultureInfo.InvariantCulture) : 0.0,
+                Y: v.Length > 12 ? double.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 0.0);
 
             return new LocationRow(descriptor, Region: v[3].Trim());
         }

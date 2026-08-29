@@ -57,6 +57,11 @@ namespace GameEngineTools.World.Data
             var schemaSql = SqlScriptLoader.Load(SchemaScript);
             db.ExecuteScript(schemaSql);
 
+            // Migrate databases created before spatial coordinates existed — CREATE TABLE
+            // IF NOT EXISTS above is a no-op on an existing Locations table, so older
+            // databases need an explicit ALTER TABLE to gain the X/Y columns.
+            db.MigrateLocationCoordinateColumns();
+
             // ── Step 2: Seed data (only when Locations table is empty) ────────
             // This guard prevents re-seeding on every startup and allows the
             // database to be populated externally (e.g. via the NPC Watcher or

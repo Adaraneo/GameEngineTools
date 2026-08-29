@@ -380,7 +380,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Type, Region,
                        BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy,
-                       Terrain, DangerLevel, AllowsPickup, NormId
+                       Terrain, DangerLevel, AllowsPickup, NormId, X, Y
                 FROM Locations
                 """;
 
@@ -404,7 +404,9 @@ namespace GameEngineTools.World.Data
                         Terrain: Enum.Parse<TerrainType>(reader.GetString(8), ignoreCase: true),
                         DangerLevel: reader.GetDouble(9),
                         AllowsPickup: reader.GetInt32(10) != 0,
-                        NormId: reader.IsDBNull(11) ? null : reader.GetString(11));
+                        NormId: reader.IsDBNull(11) ? null : reader.GetString(11),
+                        X: reader.GetDouble(12),
+                        Y: reader.GetDouble(13));
 
                     results.Add((descriptor, reader.GetString(3)));
                 }
@@ -431,6 +433,33 @@ namespace GameEngineTools.World.Data
                     results.Add((reader.GetString(0), reader.GetString(1), reader.GetDouble(2)));
 
                 return results;
+            }
+        }
+
+        /// <summary>
+        /// One-time migration: adds the <c>X</c>/<c>Y</c> coordinate columns to
+        /// <c>Locations</c> if a database created before spatial coordinates existed is
+        /// missing them. No-op on a fresh database, whose schema already includes them.
+        /// </summary>
+        public void MigrateLocationCoordinateColumns()
+        {
+            lock (_sync)
+            {
+                var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var cmd = CreateCommand("PRAGMA table_info(Locations)"))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                        existingColumns.Add(reader.GetString(1)); // column 1 = "name"
+                }
+
+                if (existingColumns.Count == 0)
+                    return; // Locations table doesn't exist yet — nothing to migrate.
+
+                if (!existingColumns.Contains("X"))
+                    Execute("ALTER TABLE Locations ADD COLUMN X REAL NOT NULL DEFAULT 0.0;");
+                if (!existingColumns.Contains("Y"))
+                    Execute("ALTER TABLE Locations ADD COLUMN Y REAL NOT NULL DEFAULT 0.0;");
             }
         }
 
@@ -526,10 +555,10 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 INSERT OR IGNORE INTO Locations
                     (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson,
-                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId)
+                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y)
                 VALUES
                     (@id, @name, @type, @region, @noise, @npp,
-                     @cap, @priv, @terrain, @danger, @pickup, @normId)
+                     @cap, @priv, @terrain, @danger, @pickup, @normId, @x, @y)
                 """;
 
             lock (_sync)
@@ -545,7 +574,9 @@ namespace GameEngineTools.World.Data
                     ("@terrain", d.Terrain.ToString()),
                     ("@danger", d.DangerLevel),
                     ("@pickup", d.AllowsPickup ? 1 : 0),
-                    ("@normId", (object?)d.NormId ?? DBNull.Value));
+                    ("@normId", (object?)d.NormId ?? DBNull.Value),
+                    ("@x", d.X),
+                    ("@y", d.Y));
         }
 
         /// <summary>

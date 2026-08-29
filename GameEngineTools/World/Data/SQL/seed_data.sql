@@ -36,29 +36,31 @@ VALUES
 
 -- ── Locations ─────────────────────────────────────────────────────────────────
 
+-- X/Y (meters, local Cartesian world-space) computed via a deterministic force-directed
+-- layout from Region + Connections.DistanceMeters — see the "geographic map" feature plan.
 INSERT OR IGNORE INTO Locations
     (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson,
-     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId)
+     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y)
 VALUES
-    ('castle_hall',     'Castle Hall',      'Social',  'Castle',  0.20, 0.05, 20, 0, 'Indoor',    0.0, 1, NULL),
-    ('library',         'Library',          'Private', 'Castle',  0.05, 0.02,  5, 1, 'Indoor',    0.0, 1, NULL),
-    ('courtyard',       'Courtyard',        'Public',  'Castle',  0.30, 0.04, 30, 0, 'Courtyard', 0.0, 1, NULL),
-    ('throne_room',     'Throne Room',      'Social',  'Castle',  0.10, 0.03, 15, 0, 'Indoor',    0.0, 1, NULL),
-    ('stables',         'Stables',          'Work',    'Castle',  0.40, 0.06, 10, 0, 'Indoor',    0.0, 1, NULL),
-    ('dungeon_entrance','Dungeon Entrance',  'Public',  'Castle',  0.05, 0.02, 10, 0, 'Indoor',    0.4, 0, NULL),
-    ('dungeon_cell',    'Dungeon Cell',      'Private', 'Castle',  0.02, 0.01,  2, 1, 'Indoor',    0.6, 1, NULL),
-    ('crypt',           'Ancient Crypt',     'Private', 'Castle',  0.01, 0.01,  4, 1, 'Indoor',    0.7, 0, NULL),
-    ('tavern',          'Tavern',            'Social',  'Village', 0.50, 0.08, 25, 0, 'Indoor',    0.0, 1, NULL),
-    ('market_square',   'Market Square',     'Public',  'Village', 0.60, 0.07, 50, 0, 'Courtyard', 0.0, 1, NULL),
-    ('blacksmith',      'Blacksmith',        'Work',    'Village', 0.70, 0.05,  8, 0, 'Indoor',    0.0, 1, NULL),
-    ('inn_room',        'Inn Room',          'Rest',    'Village', 0.05, 0.03,  3, 1, 'Indoor',    0.0, 1, NULL),
-    ('chapel',          'Chapel',            'Private', 'Village', 0.05, 0.01, 20, 0, 'Indoor',    0.0, 1, 'norm_funeral'),
-    ('herb_garden',     'Herb Garden',       'Work',    'Village', 0.05, 0.03,  8, 0, 'Courtyard', 0.0, 1, NULL),
-    ('abandoned_mill',  'Abandoned Mill',    'Work',    'Village', 0.05, 0.03,  6, 0, 'Indoor',    0.2, 1, NULL),
-    ('forest',          'Forest',            'Public',  'Forest',  0.05, 0.06,1000,1, 'Forest',    0.1, 1, NULL),
-    ('forest_clearing', 'Forest Clearing',   'Public',  'Wilds',   0.10, 0.05, 20, 0, 'Forest',    0.2, 1, NULL),
-    ('river_crossing',  'River Crossing',    'Public',  'Wilds',   0.15, 0.05, 10, 0, 'Water',     0.3, 0, NULL),
-    ('mountain_pass',   'Mountain Pass',     'Public',  'Wilds',   0.05, 0.02,  8, 0, 'Mountain',  0.5, 0, NULL);
+    ('castle_hall',     'Castle Hall',      'Social',  'Castle',  0.20, 0.05, 20, 0, 'Indoor',    0.0, 1, NULL, -127.0,    8.5),
+    ('library',         'Library',          'Private', 'Castle',  0.05, 0.02,  5, 1, 'Indoor',    0.0, 1, NULL,  -83.0,  -17.6),
+    ('courtyard',       'Courtyard',        'Public',  'Castle',  0.30, 0.04, 30, 0, 'Courtyard', 0.0, 1, NULL, -122.3,  -32.2),
+    ('throne_room',     'Throne Room',      'Social',  'Castle',  0.10, 0.03, 15, 0, 'Indoor',    0.0, 1, NULL, -152.9,   28.4),
+    ('stables',         'Stables',          'Work',    'Castle',  0.40, 0.06, 10, 0, 'Indoor',    0.0, 1, NULL, -138.8,  -90.0),
+    ('dungeon_entrance','Dungeon Entrance',  'Public',  'Castle',  0.05, 0.02, 10, 0, 'Indoor',    0.4, 0, NULL, -191.8,  -38.4),
+    ('dungeon_cell',    'Dungeon Cell',      'Private', 'Castle',  0.02, 0.01,  2, 1, 'Indoor',    0.6, 1, NULL, -201.0,  -69.4),
+    ('crypt',           'Ancient Crypt',     'Private', 'Castle',  0.01, 0.01,  4, 1, 'Indoor',    0.7, 0, NULL, -211.6,    7.9),
+    ('tavern',          'Tavern',            'Social',  'Village', 0.50, 0.08, 25, 0, 'Indoor',    0.0, 1, NULL,   82.8,  189.1),
+    ('market_square',   'Market Square',     'Public',  'Village', 0.60, 0.07, 50, 0, 'Courtyard', 0.0, 1, NULL,  155.8,  154.7),
+    ('blacksmith',      'Blacksmith',        'Work',    'Village', 0.70, 0.05,  8, 0, 'Indoor',    0.0, 1, NULL,  115.8,  145.0),
+    ('inn_room',        'Inn Room',          'Rest',    'Village', 0.05, 0.03,  3, 1, 'Indoor',    0.0, 1, NULL,   87.1,  214.0),
+    ('chapel',          'Chapel',            'Private', 'Village', 0.05, 0.01, 20, 0, 'Indoor',    0.0, 1, 'norm_funeral', 60.6, 123.8),
+    ('herb_garden',     'Herb Garden',       'Work',    'Village', 0.05, 0.03,  8, 0, 'Courtyard', 0.0, 1, NULL,   36.8,  176.3),
+    ('abandoned_mill',  'Abandoned Mill',    'Work',    'Village', 0.05, 0.03,  6, 0, 'Indoor',    0.2, 1, NULL,  -25.9,  230.1),
+    ('forest',          'Forest',            'Public',  'Forest',  0.05, 0.06,1000,1, 'Forest',    0.1, 1, NULL,   68.3, -210.9),
+    ('forest_clearing', 'Forest Clearing',   'Public',  'Wilds',   0.10, 0.05, 20, 0, 'Forest',    0.2, 1, NULL,  194.1, -292.8),
+    ('river_crossing',  'River Crossing',    'Public',  'Wilds',   0.15, 0.05, 10, 0, 'Water',     0.3, 0, NULL,   44.1, -426.8),
+    ('mountain_pass',   'Mountain Pass',     'Public',  'Wilds',   0.05, 0.02,  8, 0, 'Mountain',  0.5, 0, NULL,  408.8,  -99.9);
 
 -- ── Connections ───────────────────────────────────────────────────────────────
 -- Doplň podle skutečné topologie svého světa.

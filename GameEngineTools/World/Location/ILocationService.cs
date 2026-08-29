@@ -54,6 +54,11 @@ namespace GameEngineTools.World.Location
     /// Whether this location can ever be considered private.
     /// A public square never allows privacy regardless of character count.
     /// </param>
+    /// <param name="X">
+    /// Position in a local 2D Cartesian world-space, in meters. <c>0.0</c> (the default) means
+    /// unpositioned. Roughly consistent with connected locations' <c>DistanceMeters</c>.
+    /// </param>
+    /// <param name="Y">See <paramref name="X"/>.</param>
     public sealed record LocationDescriptor(
         string Id,
         string DisplayName,
@@ -69,7 +74,9 @@ namespace GameEngineTools.World.Location
         /// Optional social norm context id referencing <c>SocialNorms.Id</c> in the world database.
         /// <c>null</c> means no active norm constraint at this location.
         /// </summary>
-        string? NormId = null);
+        string? NormId = null,
+        double X = 0.0,
+        double Y = 0.0);
 
     #endregion Location data types
 
