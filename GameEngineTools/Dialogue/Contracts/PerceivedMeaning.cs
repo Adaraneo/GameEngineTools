@@ -42,15 +42,19 @@ namespace GameEngineTools.Dialogue.Contracts
         /// <summary>
         /// Phase-2 power signal of the word choice (Sap 2017 connotation frames), [−1..1]: positive =
         /// the speaker's verb claims power over the addressee ("vyžadovat"), negative = it casts the
-        /// speaker as subordinate ("žebrat"). 0 when the connotation layer is off. Carried for a later
-        /// gated consumer (Relationships/Status) — nothing reads it yet, so it is behaviourally inert.
+        /// speaker as subordinate ("žebrat"). 0 when the connotation layer is off. Consumed by
+        /// <see cref="GameEngineTools.Characters.Engines.Relationships.DefaultRelationshipsEngine"/>
+        /// (recipient-side Respect shift), gated behind
+        /// <see cref="GameEngineTools.Characters.Engines.Relationships.RelationshipsConfig.EnablePowerRespectPropagation"/>
+        /// (default <c>false</c>, so the baseline stays byte-identical until opted in).
         /// </summary>
         public double PerceivedPowerDelta { get; init; }
 
         /// <summary>
         /// Phase-2 agency signal of the word choice (Sap 2017), [−1..1]: positive = the verb portrays
-        /// the speaker as high-agency / in control, negative = passive. 0 when the layer is off. Also a
-        /// prepared, not-yet-consumed signal.
+        /// the speaker as high-agency / in control, negative = passive. 0 when the layer is off.
+        /// Unlike <see cref="PerceivedPowerDelta"/>, still a prepared, not-yet-consumed signal as of
+        /// 2026-08-29 — checked against the current call graph, no engine reads it yet.
         /// </summary>
         public double PerceivedAgencyDelta { get; init; }
     }

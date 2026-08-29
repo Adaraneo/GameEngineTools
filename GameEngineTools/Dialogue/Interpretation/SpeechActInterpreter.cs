@@ -58,7 +58,9 @@ namespace GameEngineTools.Dialogue.Interpretation
     /// <param name="PowerAgencyWeight">
     /// Phase-2 weight applied to the lemma's Sap-2017 power/agency frames when producing the
     /// <see cref="PerceivedMeaning.PerceivedPowerDelta"/> / <see cref="PerceivedMeaning.PerceivedAgencyDelta"/>
-    /// signals. Only computed when <see cref="EnableConnotationLayer"/> is on; no consumer yet.
+    /// signals. Only computed when <see cref="EnableConnotationLayer"/> is on. PowerDelta now feeds
+    /// <see cref="GameEngineTools.Characters.Engines.Relationships.DefaultRelationshipsEngine"/> (gated
+    /// behind its own <c>EnablePowerRespectPropagation</c> flag); AgencyDelta still has no consumer.
     /// </param>
     public sealed record SpeechActInterpreterConfig(
         int IronyToMLevelMin = 2,

@@ -37,19 +37,26 @@ namespace GameEngineTools.Characters.Traits
 
         // Promotion: + Extraversion (ρ≈.36, verified), + Openness, + Conscientiousness,
         // + Agreeableness, − Neuroticism.
-        // NOTE: only PromotionExtraversionWeight (.36) and the promotion–prevention intercorrelation
-        // (.11) were verified to exact value during research; the remaining weights below are
-        // PROVISIONAL directions pending verification against Lanaj et al. (2012) Tables 2–3.
+        // NOTE (2026-08-29): full-text Table 2–3 access is blocked by an APA/Figshare paywall
+        // (checked PsycNet, ResearchGate, Academia.edu, and Figshare's own "open access" record,
+        // which turned out to still be under file embargo despite the metadata flag). A secondary
+        // source citing the same meta-analysis independently confirmed the DIRECTIONS below
+        // (Promotion: +E/+O/+A/+C; Prevention: +N/+C; Promotion–Prevention near-orthogonal) — that
+        // secondary source did not list Neuroticism among Promotion's antecedents at all, so
+        // PromotionNeuroticismWeight is the one term without even secondary corroboration.
+        // The magnitudes were separately corroborated by the user's own prior research of the
+        // source (2026-08-29) — not a primary-source table check, but independent enough to lift
+        // this from "provisional, direction-only" to "corroborated, pending a primary-source read."
         private const double PromotionExtraversionWeight = 0.36;      // Source: Lanaj et al. 2012 (verified)
-        private const double PromotionOpennessWeight = 0.15;          // Source: Lanaj et al. 2012 (provisional — verify)
-        private const double PromotionConscientiousnessWeight = 0.15; // Source: Lanaj et al. 2012 (provisional — verify)
-        private const double PromotionAgreeablenessWeight = 0.10;     // Source: Lanaj et al. 2012 (provisional — verify)
-        private const double PromotionNeuroticismWeight = -0.15;      // Source: Lanaj et al. 2012 (provisional — verify)
+        private const double PromotionOpennessWeight = 0.15;          // Source: Lanaj et al. 2012 (corroborated — see note above)
+        private const double PromotionConscientiousnessWeight = 0.15; // Source: Lanaj et al. 2012 (corroborated — see note above)
+        private const double PromotionAgreeablenessWeight = 0.10;     // Source: Lanaj et al. 2012 (corroborated — see note above)
+        private const double PromotionNeuroticismWeight = -0.15;      // Source: Lanaj et al. 2012 (corroborated, but absent from the secondary source's antecedent list — verify first if revisiting)
 
         // Prevention: + Neuroticism/BIS, + Conscientiousness (Gorman et al. 2012 — both foci are
         // elevated by Conscientiousness, NOT differentially related to it).
-        private const double PreventionNeuroticismWeight = 0.25;      // Source: Lanaj et al. 2012 (provisional — verify)
-        private const double PreventionConscientiousnessWeight = 0.15; // Source: Gorman et al. 2012 (provisional — verify)
+        private const double PreventionNeuroticismWeight = 0.25;      // Source: Lanaj et al. 2012 (corroborated — see note above)
+        private const double PreventionConscientiousnessWeight = 0.15; // Source: Gorman et al. 2012 (corroborated — see note above)
 
         #endregion
 
