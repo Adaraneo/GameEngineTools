@@ -1,0 +1,183 @@
+using GameEngineTools.World.Data;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using TerraGen.Generation;
+
+namespace TerraGenTests;
+
+[TestClass]
+public class TileGeneratorTests
+{
+    private static string TempDbPath() => Path.Combine(Path.GetTempPath(), $"terragen_test_{Guid.NewGuid():N}.db");
+
+    [TestMethod]
+    public void Run_AdjacentTiles_AgreeExactlyAlongSharedEdge_AfterErosion()
+    {
+        // The real end-to-end proof of the whole feature: two SEPARATELY-eroded tiles (each run
+        // through TileErosion.Erode independently) must still agree exactly along their shared
+        // border, because the later tile locks its margin to the earlier tile's actual saved
+        // values before eroding — not just to fresh, independently-sampled noise.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 7, AmplitudeMeters: 200.0);
+            var erosionParams = new TileErosion.Parameters(Seed: 7, DropletCount: 800, MaxDropletLifetime: 6);
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.006,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams, ErosionParams: erosionParams,
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters);
+
+            var results = TileGenerator.Run(db, settings);
+
+            var rowWithMultipleCols = results.GroupBy(r => r.Row).First(g => g.Count() >= 2);
+            var ordered = rowWithMultipleCols.OrderBy(r => r.Col).ToList();
+            Assert.IsTrue(ordered.Count >= 2, "Test setup needs at least 2 tiles in one row.");
+
+            var west = db.LoadHeightmap(ordered[0].Id)!;
+            var east = db.LoadHeightmap(ordered[1].Id)!;
+            Assert.IsNotNull(west);
+            Assert.IsNotNull(east);
+            Assert.AreEqual(west.Height, east.Height);
+
+            for (var y = 0; y < west.Height; y++)
+            {
+                var westEdge = west.Values[y * west.Width + (west.Width - 1)];
+                var eastEdge = east.Values[y * east.Width + 0];
+                Assert.AreEqual(westEdge, eastEdge, 1e-3f,
+                    $"Row {y}: west tile's east edge ({westEdge}) doesn't match east tile's west edge ({eastEdge}).");
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
+    public void Run_SeparateInvocations_ForAdjacentRegions_StillAgreeAtSharedEdge()
+    {
+        // The actual point of the fixed planet-wide reference point: two ENTIRELY SEPARATE
+        // TileGenerator.Run calls (simulating "come back later and generate the region next
+        // door") must still connect, not just tiles within one Run call. Both invocations use the
+        // same default MountainOriginLatDeg/LonDeg (0,0) — that's what makes this work.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 9, AmplitudeMeters: 200.0);
+            var erosionParams = new TileErosion.Parameters(Seed: 9, DropletCount: 800, MaxDropletLifetime: 6);
+            var radius = PlanetNoise.EarthRadiusMeters;
+
+            var settings1 = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.003,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams, ErosionParams: erosionParams, PlanetRadiusMeters: radius);
+            var results1 = TileGenerator.Run(db, settings1);
+
+            var row0 = results1.Where(r => r.Row == 0).OrderBy(r => r.Col).ToList();
+            Assert.IsTrue(row0.Count > 0, "First run produced no tiles.");
+            var westTile = db.LoadHeightmap(row0[^1].Id)!;
+            var boundaryX = westTile.OriginX + westTile.Width * westTile.CellSizeMeters;
+            var (_, boundaryLon) = PlanetNoise.OffsetToLatLon(boundaryX, 0.0, 0.0, 0.0, radius);
+
+            // Second, ENTIRELY SEPARATE invocation for the region immediately east of the first.
+            var settings2 = settings1 with { LonMin = boundaryLon, LonMax = boundaryLon + 0.003 };
+            var results2 = TileGenerator.Run(db, settings2);
+
+            var row0b = results2.Where(r => r.Row == 0).OrderBy(r => r.Col).ToList();
+            Assert.IsTrue(row0b.Count > 0, "Second run produced no tiles.");
+            var eastTile = db.LoadHeightmap(row0b[0].Id)!;
+
+            Assert.AreEqual(westTile.Height, eastTile.Height);
+            for (var y = 0; y < westTile.Height; y++)
+            {
+                var westEdge = westTile.Values[y * westTile.Width + (westTile.Width - 1)];
+                var eastEdge = eastTile.Values[y * eastTile.Width + 0];
+                Assert.AreEqual(westEdge, eastEdge, 1e-3f,
+                    $"Row {y}: tile from run #1's east edge ({westEdge}) doesn't match run #2's west edge ({eastEdge}).");
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
+    public void Run_ProducesExpectedNumberOfTiles()
+    {
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.006,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 1, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 1, DropletCount: 500, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters);
+
+            var results = TileGenerator.Run(db, settings);
+
+            Assert.IsTrue(results.Count > 0);
+            foreach (var r in results)
+                Assert.IsNotNull(db.LoadHeightmap(r.Id), $"Tile {r.Id} wasn't actually persisted.");
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
+    public void Run_SameSettings_IsDeterministic()
+    {
+        var dbPath1 = TempDbPath();
+        var dbPath2 = TempDbPath();
+        try
+        {
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.002,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 42, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 42, DropletCount: 500, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters);
+
+            IReadOnlyList<TileGenerator.TileResult> results1, results2;
+            using (var db1 = new SqliteWorldDatabase(dbPath1))
+            {
+                WorldDatabaseSeeder.InitializeTerrainDatabase(db1);
+                results1 = TileGenerator.Run(db1, settings);
+            }
+            using (var db2 = new SqliteWorldDatabase(dbPath2))
+            {
+                WorldDatabaseSeeder.InitializeTerrainDatabase(db2);
+                results2 = TileGenerator.Run(db2, settings);
+            }
+
+            Assert.AreEqual(results1.Count, results2.Count);
+            using var readDb1 = new SqliteWorldDatabase(dbPath1);
+            using var readDb2 = new SqliteWorldDatabase(dbPath2);
+            foreach (var r1 in results1)
+            {
+                var tile1 = readDb1.LoadHeightmap(r1.Id);
+                var tile2 = readDb2.LoadHeightmap(r1.Id);
+                Assert.IsNotNull(tile1);
+                Assert.IsNotNull(tile2);
+                CollectionAssert.AreEqual(tile1!.Values, tile2!.Values, $"Tile {r1.Id} differed between two identical runs.");
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPath1)) File.Delete(dbPath1);
+            if (File.Exists(dbPath2)) File.Delete(dbPath2);
+        }
+    }
+}

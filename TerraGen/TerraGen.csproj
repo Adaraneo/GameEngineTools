@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <!-- Packaged as a .NET tool (see the plan/readme for the install command) so it can be
+       invoked as terragen from anywhere, without remembering the build output path.
+       PackAsTool needs the project to actually be publishable — unlike GameSandbox (whose
+       Debug/Release blocks this csproj was originally copied from), a tool package genuinely
+       needs dotnet pack, which packs the publish output, to work. -->
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>terragen</ToolCommandName>
+    <PackageId>TerraGen</PackageId>
+    <Version>1.0.0-preview.2</Version>
+    <Authors>50PSoftware</Authors>
+    <Description>Dávkový generátor sousedících dlaždic planety pro GameEngineTools/TerrainEditor.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameEngineTools\GameEngineTools.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,117 @@
+<Window x:Class="TerrainEditor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Terrain Editor" Height="800" Width="1200"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+
+        <ToolBarTray DockPanel.Dock="Top">
+            <ToolBar>
+                <Button Content="New World…" Command="{Binding NewWorldCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Vytvoří úplně prázdný svět (jen schéma, žádné výchozí lokace) — postavíš ho celý přes tento editor" />
+                <Button Content="Open World DB…" Command="{Binding OpenDatabaseCommand}" Margin="2" Padding="6,2" />
+                <Button Content="Save" Command="{Binding SaveCommand}" Margin="2" Padding="6,2" />
+                <Button Content="Export to seed_data.sql…" Command="{Binding ExportSeedCommand}" Margin="2" Padding="6,2" />
+                <Button Content="Generate Roads" Command="{Binding GenerateRoadsCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Terrain-aware cesty pro všechny Connections — nahradí rovné čáry klikatými, respektujícími sklon terénu" />
+                <Separator />
+                <ToggleButton Content="Add Location" IsChecked="{Binding IsAddingLocation}"
+                              Margin="2" Padding="6,2"
+                              ToolTip="Zapni a klikni na mapu — vytvoří tam novou lokaci (zeptá se na název). Uloží se přes Save." />
+                <ToggleButton Content="Connect Locations" IsChecked="{Binding IsConnectingLocations}"
+                              Margin="2" Padding="6,2"
+                              ToolTip="Zapni, pak klikni na dvě lokace za sebou — vytvoří mezi nimi obousměrné spojení (Connections) na přímou vzdálenost. Zůstane zapnuté pro víc spojení; Generate Roads pak nahradí přímku terén-vědomou cestou." />
+                <Separator />
+                <TextBlock Text="Region:" VerticalAlignment="Center" Margin="4,0,4,0"
+                           ToolTip="Klikni na lokaci na mapě, pak sem napiš vlastní Region — přepíše to, co dřív navrhlo Assign Regions" />
+                <TextBlock Text="{Binding SelectedMarker.DisplayName, TargetNullValue='(žádná lokace nevybrána)'}"
+                           VerticalAlignment="Center" FontStyle="Italic" Opacity="0.7" Margin="0,0,6,0" Width="120" />
+                <TextBox Text="{Binding SelectedMarker.Region, UpdateSourceTrigger=PropertyChanged}"
+                         Width="100" VerticalAlignment="Center" />
+                <Separator />
+                <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="6,0,4,0" />
+                <Button Content="−" Command="{Binding ZoomOutCommand}" Width="24" Margin="2" Padding="0" />
+                <TextBlock Text="{Binding Zoom, StringFormat={}{0:P0}}" VerticalAlignment="Center" Width="48" TextAlignment="Center" />
+                <Button Content="+" Command="{Binding ZoomInCommand}" Width="24" Margin="2" Padding="0" />
+                <Button Content="Reset" Command="{Binding ZoomResetCommand}" Margin="4,2" Padding="6,2"
+                        ToolTip="Reset zoom to 100% (Ctrl+kolečko myši = přiblížení na pozici kurzoru)" />
+            </ToolBar>
+            <ToolBar Band="2" BandIndex="0">
+                <TextBlock Text="Terén:" VerticalAlignment="Center" Margin="2,0,8,0" FontWeight="Bold" />
+                <Button Content="Dlaždice…" Command="{Binding OpenTileBrowserCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Seznam všech uložených dlaždic v otevřené world.db (např. z dávkového TerraGen) — vyber a načti jednu" />
+                <Separator />
+                <Button Content="Generate Lakes" Command="{Binding GenerateLakesCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Najde pánve v aktuálním terénu a zaplaví je vodou (stejná vrstva jako řeky)" />
+                <Separator />
+                <Button Content="Assign Regions" Command="{Binding AssignRegionsCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Navrhne Region pro každou lokaci podle terénu (výška, blízkost vody) — jde přepsat ručně" />
+            </ToolBar>
+            <ToolBar Band="3" BandIndex="0">
+                <TextBlock Text="Planeta (legacy):" VerticalAlignment="Center" Margin="2,0,8,0" FontWeight="Bold"
+                           ToolTip="Starší jednorázový generátor jednoho okna — nenavazuje bezešvě na sousední okna. Pro skutečné, navazující dlaždice použij TerraGen a načti je přes „Dlaždice…“." />
+                <TextBlock Text="Max. výška (m):" VerticalAlignment="Center" Margin="2,0,2,0"
+                           ToolTip="Celkový výškový rozpočet, ze kterého generátor čerpá (strop, ne průměr) — jak dramatický má terén celkově být, ne fyzikální vlastnost planety" />
+                <Slider Minimum="10" Maximum="1000" Width="90" Value="{Binding TerrainAmplitude}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding TerrainAmplitude, StringFormat={}{0:0}}" VerticalAlignment="Center" Width="36" />
+                <TextBlock Text="Eroze:" VerticalAlignment="Center" Margin="8,0,2,0"
+                           ToolTip="Síla hydraulické eroze pouštěné po vygenerování terénu — 0 nechá surový terén pevniny+pohoří, 100 ho pořádně vymele (údolí, sedimenty)" />
+                <Slider Minimum="0" Maximum="100" Width="90" Value="{Binding ErosionStrength}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ErosionStrength, StringFormat={}{0:0}}" VerticalAlignment="Center" Width="28" />
+                <Separator />
+                <TextBlock Text="Šířka:" VerticalAlignment="Center" Margin="4,0,2,0" />
+                <TextBox Text="{Binding TargetLatitude, UpdateSourceTrigger=PropertyChanged}" Width="50" VerticalAlignment="Center"
+                          ToolTip="Zeměpisná šířka, -90 až 90" />
+                <TextBlock Text="Délka:" VerticalAlignment="Center" Margin="8,0,2,0" />
+                <TextBox Text="{Binding TargetLongitude, UpdateSourceTrigger=PropertyChanged}" Width="50" VerticalAlignment="Center"
+                          ToolTip="Zeměpisná délka, -180 až 180" />
+                <TextBlock Text="Velikost (km):" VerticalAlignment="Center" Margin="8,0,2,0" />
+                <TextBox Text="{Binding TargetMapSizeKm, UpdateSourceTrigger=PropertyChanged}" Width="50" VerticalAlignment="Center"
+                          ToolTip="Šířka/výška okna, které se na dané pozici postaví a rovnou vygeneruje — jedním kliknutím, žádný samostatný Expand+Generate krok" />
+                <Button Content="Go to Lat/Long" Command="{Binding GoToLatLonCommand}" Margin="6,2,2,2" Padding="6,2"
+                        ToolTip="Postaví okno terénu o zadané velikosti se středem na zadané zeměpisné pozici a rovnou ho vygeneruje (destruktivní — přepíše aktuální okno)" />
+                <Separator />
+                <TextBlock Text="Aktuální pozice:" VerticalAlignment="Center" Margin="4,0,4,0" />
+                <TextBlock Text="{Binding CurrentCenterLabel}" VerticalAlignment="Center" FontStyle="Italic" Opacity="0.7" />
+            </ToolBar>
+        </ToolBarTray>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusText}" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{Binding CursorWorldPosition}" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <DockPanel DockPanel.Dock="Right" Width="240" LastChildFill="True" Margin="4,4,4,4">
+            <TextBlock DockPanel.Dock="Top" Text="Lokace" FontWeight="Bold" Margin="2,0,0,4" />
+            <ListBox x:Name="LocationListBox" DisplayMemberPath="DisplayText"
+                     MouseDoubleClick="LocationListBox_MouseDoubleClick"
+                     ToolTip="Všechny lokace v otevřené world.db — dvojklik vybere a vycentruje na mapě" />
+        </DockPanel>
+
+        <ScrollViewer x:Name="MapScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                      Background="#FF202020" PreviewMouseWheel="MapScrollViewer_PreviewMouseWheel"
+                      PreviewMouseDown="MapScrollViewer_PreviewMouseDown"
+                      MouseMove="MapScrollViewer_MouseMove"
+                      PreviewMouseUp="MapScrollViewer_PreviewMouseUp"
+                      ToolTip="Prostřední tlačítko myši = táhnutím posunout mapu">
+            <Grid HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Grid.LayoutTransform>
+                    <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
+                </Grid.LayoutTransform>
+                <Image x:Name="HeightmapImage"
+                       Stretch="None"
+                       HorizontalAlignment="Left" VerticalAlignment="Top"
+                       SnapsToDevicePixels="True"
+                       MouseLeftButtonDown="HeightmapImage_MouseLeftButtonDown"
+                       MouseMove="HeightmapImage_MouseMove" />
+                <Canvas x:Name="OverlayCanvas"
+                        HorizontalAlignment="Left" VerticalAlignment="Top" />
+            </Grid>
+        </ScrollViewer>
+
+    </DockPanel>
+</Window>
