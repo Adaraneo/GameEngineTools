@@ -44,6 +44,7 @@ namespace EngineTests
 
             Assert.AreEqual(0.0, descriptor.X);
             Assert.AreEqual(0.0, descriptor.Y);
+            Assert.AreEqual(0.0, descriptor.AltitudeMeters);
         }
 
         #endregion Defaults
@@ -65,7 +66,8 @@ namespace EngineTests
                 AllowsPrivacy: false,
                 LocationType.Public,
                 X: 123.5,
-                Y: -47.25);
+                Y: -47.25,
+                AltitudeMeters: 812.0);
 
             db.InsertLocation(descriptor, region: "City");
 
@@ -73,6 +75,105 @@ namespace EngineTests
 
             Assert.AreEqual(123.5, stored.Descriptor.X);
             Assert.AreEqual(-47.25, stored.Descriptor.Y);
+            Assert.AreEqual(812.0, stored.Descriptor.AltitudeMeters);
+        }
+
+        [TestMethod]
+        public void UpdateLocationPosition_ExistingLocation_OverwritesXYAndAltitude()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            db.InsertLocation(
+                new LocationDescriptor(
+                    Id: "tavern",
+                    DisplayName: "Tavern",
+                    BaseNoise: 0.4,
+                    NoisePerPerson: 0.05,
+                    Capacity: 20,
+                    AllowsPrivacy: false,
+                    LocationType.Social,
+                    X: 0.0,
+                    Y: 0.0,
+                    AltitudeMeters: 0.0),
+                region: "Village");
+
+            var updated = db.UpdateLocationPosition("tavern", x: 55.0, y: -12.5, altitudeMeters: 340.0);
+
+            Assert.IsTrue(updated);
+            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "tavern");
+            Assert.AreEqual(55.0, stored.Descriptor.X);
+            Assert.AreEqual(-12.5, stored.Descriptor.Y);
+            Assert.AreEqual(340.0, stored.Descriptor.AltitudeMeters);
+            // Non-spatial fields untouched by the position-only update.
+            Assert.AreEqual("Tavern", stored.Descriptor.DisplayName);
+        }
+
+        [TestMethod]
+        public void UpdateLocationPosition_UnknownLocation_ReturnsFalse()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            var updated = db.UpdateLocationPosition("does_not_exist", 1.0, 2.0, 3.0);
+
+            Assert.IsFalse(updated);
+        }
+
+        [TestMethod]
+        public void UpdateLocationRegion_ExistingLocation_Overwrites()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+            db.InsertLocation(
+                new LocationDescriptor("tavern", "Tavern", 0.4, 0.05, 20, false, LocationType.Social),
+                region: "Village");
+
+            var updated = db.UpdateLocationRegion("tavern", "Mountains");
+
+            Assert.IsTrue(updated);
+            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "tavern");
+            Assert.AreEqual("Mountains", stored.Region);
+        }
+
+        [TestMethod]
+        public void UpdateLocationRegion_UnknownLocation_ReturnsFalse()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            Assert.IsFalse(db.UpdateLocationRegion("does_not_exist", "Coast"));
+        }
+
+        [TestMethod]
+        public void UpdateConnectionDistance_ExistingConnection_Overwrites()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+            db.InsertLocation(
+                new LocationDescriptor("tavern", "Tavern", 0.4, 0.05, 20, false, LocationType.Social),
+                region: "Village");
+            db.InsertLocation(
+                new LocationDescriptor("market", "Market", 0.5, 0.05, 30, false, LocationType.Public),
+                region: "Village");
+            db.InsertConnection("tavern", "market", 80.0);
+
+            var updated = db.UpdateConnectionDistance("tavern", "market", 132.4);
+
+            Assert.IsTrue(updated);
+            var conn = db.GetAllConnections().Single(c => c.FromId == "tavern" && c.ToId == "market");
+            Assert.AreEqual(132.4, conn.DistanceMeters);
+        }
+
+        [TestMethod]
+        public void UpdateConnectionDistance_UnknownConnection_ReturnsFalse()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            var updated = db.UpdateConnectionDistance("a", "b", 10.0);
+
+            Assert.IsFalse(updated);
         }
 
         [TestMethod]
@@ -143,6 +244,48 @@ namespace EngineTests
             // New columns backfill to the documented "unpositioned" default.
             Assert.AreEqual(0.0, stored.Descriptor.X);
             Assert.AreEqual(0.0, stored.Descriptor.Y);
+            Assert.AreEqual(0.0, stored.Descriptor.AltitudeMeters);
+        }
+
+        /// <summary>
+        /// Locations table shape as it existed after X/Y were added but before AltitudeMeters —
+        /// verifies the migration also backfills a database that's only "half migrated".
+        /// </summary>
+        private const string PreAltitudeLocationsSchema = """
+            CREATE TABLE Locations (
+                Id              TEXT    PRIMARY KEY,
+                DisplayName     TEXT    NOT NULL,
+                Type            TEXT    NOT NULL,
+                Region          TEXT    NOT NULL DEFAULT '',
+                BaseNoise       REAL    NOT NULL DEFAULT 0.1,
+                NoisePerPerson  REAL    NOT NULL DEFAULT 0.02,
+                Capacity        INTEGER NOT NULL DEFAULT 20,
+                AllowsPrivacy   INTEGER NOT NULL DEFAULT 0,
+                Terrain         TEXT    NOT NULL DEFAULT 'Indoor',
+                DangerLevel     REAL    NOT NULL DEFAULT 0.0,
+                AllowsPickup    INTEGER NOT NULL DEFAULT 1,
+                NormId          TEXT,
+                X               REAL    NOT NULL DEFAULT 0.0,
+                Y               REAL    NOT NULL DEFAULT 0.0
+            );
+            """;
+
+        [TestMethod]
+        public void MigrateLocationCoordinateColumns_PreAltitudeSchema_BackfillsAltitudeOnly()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            db.ExecuteScript(PreAltitudeLocationsSchema);
+            db.ExecuteScript("""
+                INSERT INTO Locations (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy, X, Y)
+                VALUES ('hilltop', 'Hilltop', 'Public', 'Wilds', 0.1, 0.02, 10, 0, 200.0, 400.0);
+                """);
+
+            db.MigrateLocationCoordinateColumns();
+
+            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "hilltop");
+            Assert.AreEqual(200.0, stored.Descriptor.X);
+            Assert.AreEqual(400.0, stored.Descriptor.Y);
+            Assert.AreEqual(0.0, stored.Descriptor.AltitudeMeters);
         }
 
         [TestMethod]

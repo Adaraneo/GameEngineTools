@@ -47,6 +47,7 @@ namespace GameEngineTools.World.Data
             AppendSocialNorms(sb, db);
             AppendLocations(sb, db);
             AppendConnections(sb, db);
+            AppendTerrainHeightmap(sb, db);
             AppendWorldObjects(sb, db);
 
             return sb.ToString();
@@ -103,13 +104,30 @@ namespace GameEngineTools.World.Data
                 sb.AppendLine(
                     $"INSERT OR IGNORE INTO Locations " +
                     $"(Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, " +
-                    $"Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y) VALUES " +
+                    $"Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters) VALUES " +
                     $"({Str(d.Id)}, {Str(d.DisplayName)}, {Str(d.Type.ToString())}, {Str(region)}, " +
                     $"{R(d.BaseNoise)}, {R(d.NoisePerPerson)}, " +
                     $"{d.Capacity}, {B(d.AllowsPrivacy)}, {Str(d.Terrain.ToString())}, " +
-                    $"{R(d.DangerLevel)}, {B(d.AllowsPickup)}, {Str(d.NormId)}, {R(d.X)}, {R(d.Y)});");
+                    $"{R(d.DangerLevel)}, {B(d.AllowsPickup)}, {Str(d.NormId)}, {R(d.X)}, {R(d.Y)}, {R(d.AltitudeMeters)});");
             }
 
+            sb.AppendLine();
+        }
+
+        private static void AppendTerrainHeightmap(StringBuilder sb, SqliteWorldDatabase db)
+        {
+            // Single default grid for now — see project plan for the multi-grid extension point.
+            var grid = db.LoadHeightmap("default");
+            if (grid is null) return;
+
+            sb.AppendLine("-- ── Terrain Heightmap ───────────────────────────────────────────────────────");
+            sb.AppendLine();
+            sb.AppendLine(
+                $"INSERT OR IGNORE INTO TerrainHeightmap " +
+                $"(Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask) VALUES " +
+                $"({Str(grid.Id)}, {R(grid.OriginX)}, {R(grid.OriginY)}, {R(grid.CellSizeMeters)}, " +
+                $"{grid.Width}, {grid.Height}, {Blob(grid.ToBytes())}, " +
+                $"{(grid.RiverMask is null ? "NULL" : Blob(grid.RiverMask))});");
             sb.AppendLine();
         }
 
@@ -195,6 +213,10 @@ namespace GameEngineTools.World.Data
         /// <summary>Formats a nullable double as NULL or a REAL literal.</summary>
         private static string N(double? value)
             => value.HasValue ? R(value.Value) : "NULL";
+
+        /// <summary>Formats a byte array as a SQLite BLOB literal (<c>X'...'</c>).</summary>
+        private static string Blob(byte[] bytes)
+            => "X'" + Convert.ToHexString(bytes) + "'";
 
         #endregion Private — SQL value formatters
     }

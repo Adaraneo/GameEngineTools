@@ -59,6 +59,14 @@ namespace GameEngineTools.World.Location
     /// unpositioned. Roughly consistent with connected locations' <c>DistanceMeters</c>.
     /// </param>
     /// <param name="Y">See <paramref name="X"/>.</param>
+    /// <param name="AltitudeMeters">
+    /// Elevation above sea level, in meters. <c>0.0</c> (the default) means sea level / unset.
+    /// Authored by the terrain heightmap tool (see <c>TerrainHeightmap</c>), sampled at
+    /// (<paramref name="X"/>, <paramref name="Y"/>). Mirrors
+    /// <see cref="GameEngineTools.Characters.Core.EnginesSnapshot.AltitudeMeters"/>, which the
+    /// simulation layer is expected to populate from this field per character's current
+    /// location (not yet wired — see project plan).
+    /// </param>
     public sealed record LocationDescriptor(
         string Id,
         string DisplayName,
@@ -76,7 +84,8 @@ namespace GameEngineTools.World.Location
         /// </summary>
         string? NormId = null,
         double X = 0.0,
-        double Y = 0.0);
+        double Y = 0.0,
+        double AltitudeMeters = 0.0);
 
     #endregion Location data types
 

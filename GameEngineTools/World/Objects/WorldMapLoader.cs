@@ -125,7 +125,7 @@ namespace GameEngineTools.World.Objects
         /// Expected columns (0-indexed):
         /// 0=Id, 1=DisplayName, 2=Type, 3=Region,
         /// 4=BaseNoise, 5=NoisePerPerson, 6=Capacity, 7=AllowsPrivacy,
-        /// optionally 8=Terrain, 9=DangerLevel, 10=AllowsPickup, 11=X, 12=Y
+        /// optionally 8=Terrain, 9=DangerLevel, 10=AllowsPickup, 11=X, 12=Y, 13=AltitudeMeters
         /// </summary>
         private static LocationRow ParseLocationRow(string[] v)
         {
@@ -141,7 +141,8 @@ namespace GameEngineTools.World.Objects
                 DangerLevel: v.Length > 9 ? double.Parse(v[9].Trim(), CultureInfo.InvariantCulture) : 0.0,
                 AllowsPickup: v.Length > 10 ? bool.Parse(v[10].Trim()) : true,
                 X: v.Length > 11 ? double.Parse(v[11].Trim(), CultureInfo.InvariantCulture) : 0.0,
-                Y: v.Length > 12 ? double.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 0.0);
+                Y: v.Length > 12 ? double.Parse(v[12].Trim(), CultureInfo.InvariantCulture) : 0.0,
+                AltitudeMeters: v.Length > 13 ? double.Parse(v[13].Trim(), CultureInfo.InvariantCulture) : 0.0);
 
             return new LocationRow(descriptor, Region: v[3].Trim());
         }

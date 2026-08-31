@@ -52,17 +52,9 @@ namespace GameEngineTools.World.Data
         public static void Initialize(SqliteWorldDatabase db)
         {
             ArgumentNullException.ThrowIfNull(db);
+            InitializeSchema(db);
 
-            // ── Step 1: Schema (always — idempotent) ──────────────────────────
-            var schemaSql = SqlScriptLoader.Load(SchemaScript);
-            db.ExecuteScript(schemaSql);
-
-            // Migrate databases created before spatial coordinates existed — CREATE TABLE
-            // IF NOT EXISTS above is a no-op on an existing Locations table, so older
-            // databases need an explicit ALTER TABLE to gain the X/Y columns.
-            db.MigrateLocationCoordinateColumns();
-
-            // ── Step 2: Seed data (only when Locations table is empty) ────────
+            // ── Seed data (only when Locations table is empty) ────────────────
             // This guard prevents re-seeding on every startup and allows the
             // database to be populated externally (e.g. via the NPC Watcher or
             // a Unity editor tool) without being overwritten.
@@ -71,6 +63,33 @@ namespace GameEngineTools.World.Data
 
             var seedSql = SqlScriptLoader.Load(SeedDataScript);
             db.ExecuteScript(seedSql);
+        }
+
+        /// <summary>
+        /// Applies schema + migrations only — deliberately skips <c>seed_data.sql</c>, leaving
+        /// <c>Locations</c>/<c>Connections</c>/<c>TerrainHeightmap</c> empty. For callers (e.g.
+        /// TerrainEditor's "New World") that want a genuinely blank world authored entirely from
+        /// scratch instead of the built-in default locations.
+        /// </summary>
+        /// <param name="db">Target database to initialise.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="db"/> is null.</exception>
+        public static void InitializeSchemaOnly(SqliteWorldDatabase db)
+        {
+            ArgumentNullException.ThrowIfNull(db);
+            InitializeSchema(db);
+        }
+
+        private static void InitializeSchema(SqliteWorldDatabase db)
+        {
+            // Schema is always idempotent (IF NOT EXISTS / INSERT OR IGNORE) — safe to re-run.
+            var schemaSql = SqlScriptLoader.Load(SchemaScript);
+            db.ExecuteScript(schemaSql);
+
+            // Migrate databases created before spatial coordinates existed — CREATE TABLE
+            // IF NOT EXISTS above is a no-op on an existing Locations table, so older
+            // databases need an explicit ALTER TABLE to gain the X/Y columns.
+            db.MigrateLocationCoordinateColumns();
+            db.MigrateTerrainHeightmapColumns();
         }
 
         #endregion Public API

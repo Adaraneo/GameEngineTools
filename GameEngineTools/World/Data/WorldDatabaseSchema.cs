@@ -43,7 +43,22 @@ namespace GameEngineTools.World.Data
                 AllowsPickup    INTEGER NOT NULL DEFAULT 1,
                 NormId          TEXT    REFERENCES SocialNorms(Id),
                 X               REAL NOT NULL DEFAULT 0.0,
-                Y               REAL NOT NULL DEFAULT 0.0
+                Y               REAL NOT NULL DEFAULT 0.0,
+                AltitudeMeters  REAL NOT NULL DEFAULT 0.0
+            );
+
+            -- ── Terrain Heightmap ─────────────────────────────────────────────────
+            -- Authored by the standalone TerrainEditor tool. Data is a packed row-major
+            -- array of 32-bit floats, Width*Height entries.
+            CREATE TABLE IF NOT EXISTS TerrainHeightmap (
+                Id              TEXT    PRIMARY KEY,
+                OriginX         REAL    NOT NULL,
+                OriginY         REAL    NOT NULL,
+                CellSizeMeters  REAL    NOT NULL,
+                Width           INTEGER NOT NULL,
+                Height          INTEGER NOT NULL,
+                Data            BLOB    NOT NULL,
+                RiverMask       BLOB
             );
 
             -- ── Connections ───────────────────────────────────────────────────────

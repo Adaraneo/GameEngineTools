@@ -73,7 +73,13 @@ namespace GameEngineTools.World.Data
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
 
-            _connection = new SqliteConnection($"Data Source={databasePath}");
+            // Pooling=false: this app opens one connection per database and keeps it for the
+            // whole session, so pooling buys nothing — but Microsoft.Data.Sqlite pools by
+            // default, which means Dispose() alone does NOT release the OS-level file lock (the
+            // native handle just returns to the pool). That silently breaks "close, then let
+            // something else touch the file" scenarios (a fresh Open() of the same path, an
+            // external tool inspecting it, a test cleaning up a temp file) until the process exits.
+            _connection = new SqliteConnection($"Data Source={databasePath};Pooling=false");
             _connection.Open();
 
             // WAL mode: multiple concurrent readers + one writer, no full-table locks.
@@ -380,7 +386,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Type, Region,
                        BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy,
-                       Terrain, DangerLevel, AllowsPickup, NormId, X, Y
+                       Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters
                 FROM Locations
                 """;
 
@@ -406,13 +412,85 @@ namespace GameEngineTools.World.Data
                         AllowsPickup: reader.GetInt32(10) != 0,
                         NormId: reader.IsDBNull(11) ? null : reader.GetString(11),
                         X: reader.GetDouble(12),
-                        Y: reader.GetDouble(13));
+                        Y: reader.GetDouble(13),
+                        AltitudeMeters: reader.GetDouble(14));
 
                     results.Add((descriptor, reader.GetString(3)));
                 }
 
                 return results;
             }
+        }
+
+        /// <summary>
+        /// Updates an existing location's spatial position (X, Y, altitude) in place.
+        /// Unlike <see cref="InsertLocation"/> (which is <c>INSERT OR IGNORE</c> and never
+        /// overwrites an existing row), this always writes — used by the TerrainEditor tool
+        /// after a designer drags a location or repaints the heightmap under it.
+        /// </summary>
+        /// <returns><c>true</c> if a row was updated, <c>false</c> if no location with this id exists.</returns>
+        public bool UpdateLocationPosition(string locationId, double x, double y, double altitudeMeters)
+        {
+            const string sql = """
+                UPDATE Locations
+                SET X = @x, Y = @y, AltitudeMeters = @alt
+                WHERE Id = @id
+                """;
+
+            lock (_sync)
+                return ExecuteNonQuery(sql,
+                    ("@x", x),
+                    ("@y", y),
+                    ("@alt", altitudeMeters),
+                    ("@id", locationId)) > 0;
+        }
+
+        /// <summary>
+        /// Updates an existing location's Region label in place — used by the TerrainEditor
+        /// tool's terrain-based region classifier.
+        /// </summary>
+        /// <returns><c>true</c> if a row was updated, <c>false</c> if no such location exists.</returns>
+        public bool UpdateLocationRegion(string locationId, string region)
+        {
+            const string sql = """
+                UPDATE Locations
+                SET Region = @region
+                WHERE Id = @id
+                """;
+
+            lock (_sync)
+                return ExecuteNonQuery(sql,
+                    ("@region", region),
+                    ("@id", locationId)) > 0;
+        }
+
+        /// <summary>
+        /// Updates an existing location's name and the rest of its social/physical descriptor
+        /// fields (type, terrain, noise, capacity, privacy) in place — position/region have their
+        /// own dedicated Update methods already. Unlike <see cref="InsertLocation"/> (INSERT OR
+        /// IGNORE), this always writes — used by TerrainEditor's location-edit dialog.
+        /// </summary>
+        /// <returns><c>true</c> if a row was updated, <c>false</c> if no such location exists.</returns>
+        public bool UpdateLocationDetails(string locationId, string displayName, LocationType type,
+            TerrainType terrain, double baseNoise, double noisePerPerson, int capacity, bool allowsPrivacy)
+        {
+            const string sql = """
+                UPDATE Locations
+                SET DisplayName = @name, Type = @type, Terrain = @terrain, BaseNoise = @noise,
+                    NoisePerPerson = @npp, Capacity = @cap, AllowsPrivacy = @priv
+                WHERE Id = @id
+                """;
+
+            lock (_sync)
+                return ExecuteNonQuery(sql,
+                    ("@name", displayName),
+                    ("@type", type.ToString()),
+                    ("@terrain", terrain.ToString()),
+                    ("@noise", baseNoise),
+                    ("@npp", noisePerPerson),
+                    ("@cap", capacity),
+                    ("@priv", allowsPrivacy ? 1 : 0),
+                    ("@id", locationId)) > 0;
         }
 
         /// <summary>
@@ -437,9 +515,9 @@ namespace GameEngineTools.World.Data
         }
 
         /// <summary>
-        /// One-time migration: adds the <c>X</c>/<c>Y</c> coordinate columns to
-        /// <c>Locations</c> if a database created before spatial coordinates existed is
-        /// missing them. No-op on a fresh database, whose schema already includes them.
+        /// One-time migration: adds the <c>X</c>/<c>Y</c>/<c>AltitudeMeters</c> spatial columns
+        /// to <c>Locations</c> if a database created before they existed is missing them.
+        /// No-op on a fresh database, whose schema already includes them.
         /// </summary>
         public void MigrateLocationCoordinateColumns()
         {
@@ -460,8 +538,128 @@ namespace GameEngineTools.World.Data
                     Execute("ALTER TABLE Locations ADD COLUMN X REAL NOT NULL DEFAULT 0.0;");
                 if (!existingColumns.Contains("Y"))
                     Execute("ALTER TABLE Locations ADD COLUMN Y REAL NOT NULL DEFAULT 0.0;");
+                if (!existingColumns.Contains("AltitudeMeters"))
+                    Execute("ALTER TABLE Locations ADD COLUMN AltitudeMeters REAL NOT NULL DEFAULT 0.0;");
             }
         }
+
+        /// <summary>
+        /// One-time migration: adds the <c>RiverMask</c> column to <c>TerrainHeightmap</c> if a
+        /// database created before rivers existed is missing it. No-op on a fresh database.
+        /// </summary>
+        public void MigrateTerrainHeightmapColumns()
+        {
+            lock (_sync)
+            {
+                var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var cmd = CreateCommand("PRAGMA table_info(TerrainHeightmap)"))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                        existingColumns.Add(reader.GetString(1));
+                }
+
+                if (existingColumns.Count == 0)
+                    return; // TerrainHeightmap table doesn't exist yet — nothing to migrate.
+
+                if (!existingColumns.Contains("RiverMask"))
+                    Execute("ALTER TABLE TerrainHeightmap ADD COLUMN RiverMask BLOB;");
+            }
+        }
+
+        #region Terrain heightmap
+
+        /// <summary>
+        /// Inserts or replaces a named heightmap grid.
+        /// </summary>
+        public void SaveHeightmap(TerrainHeightmap grid)
+        {
+            ArgumentNullException.ThrowIfNull(grid);
+
+            const string sql = """
+                INSERT OR REPLACE INTO TerrainHeightmap
+                    (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask)
+                VALUES
+                    (@id, @originX, @originY, @cellSize, @width, @height, @data, @riverMask)
+                """;
+
+            lock (_sync)
+                ExecuteNonQuery(sql,
+                    ("@id", grid.Id),
+                    ("@originX", grid.OriginX),
+                    ("@originY", grid.OriginY),
+                    ("@cellSize", grid.CellSizeMeters),
+                    ("@width", grid.Width),
+                    ("@height", grid.Height),
+                    ("@data", grid.ToBytes()),
+                    ("@riverMask", (object?)grid.RiverMask ?? DBNull.Value));
+        }
+
+        /// <summary>Loads a named heightmap grid, or <c>null</c> if none exists with that id.</summary>
+        public TerrainHeightmap? LoadHeightmap(string id)
+        {
+            const string sql = """
+                SELECT Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask
+                FROM TerrainHeightmap
+                WHERE Id = @id
+                """;
+
+            lock (_sync)
+            {
+                using var cmd = CreateCommand(sql, ("@id", id));
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read())
+                    return null;
+
+                var width = reader.GetInt32(4);
+                var height = reader.GetInt32(5);
+                var data = (byte[])reader.GetValue(6);
+                var riverMask = reader.IsDBNull(7) ? null : (byte[])reader.GetValue(7);
+
+                return new TerrainHeightmap(
+                    Id: reader.GetString(0),
+                    OriginX: reader.GetDouble(1),
+                    OriginY: reader.GetDouble(2),
+                    CellSizeMeters: reader.GetDouble(3),
+                    Width: width,
+                    Height: height,
+                    Values: TerrainHeightmap.ValuesFromBytes(data, width, height),
+                    RiverMask: riverMask);
+            }
+        }
+
+        /// <summary>Lists every saved heightmap's metadata (id, position, size), ordered by id —
+        /// cheap, doesn't unpack any grid's <c>Data</c> BLOB. Used by browsers that let a user pick
+        /// one of potentially many saved grids (e.g. tiles from a batch planet generator) before
+        /// paying to <see cref="LoadHeightmap"/> the one they actually want.</summary>
+        public IReadOnlyList<TerrainHeightmapSummary> ListHeightmaps()
+        {
+            const string sql = """
+                SELECT Id, OriginX, OriginY, CellSizeMeters, Width, Height
+                FROM TerrainHeightmap
+                ORDER BY Id
+                """;
+
+            var results = new List<TerrainHeightmapSummary>();
+            lock (_sync)
+            {
+                using var cmd = CreateCommand(sql);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    results.Add(new TerrainHeightmapSummary(
+                        Id: reader.GetString(0),
+                        OriginX: reader.GetDouble(1),
+                        OriginY: reader.GetDouble(2),
+                        CellSizeMeters: reader.GetDouble(3),
+                        Width: reader.GetInt32(4),
+                        Height: reader.GetInt32(5)));
+                }
+            }
+            return results;
+        }
+
+        #endregion Terrain heightmap
 
         #endregion Location + Connection queries
 
@@ -555,10 +753,10 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 INSERT OR IGNORE INTO Locations
                     (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson,
-                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y)
+                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters)
                 VALUES
                     (@id, @name, @type, @region, @noise, @npp,
-                     @cap, @priv, @terrain, @danger, @pickup, @normId, @x, @y)
+                     @cap, @priv, @terrain, @danger, @pickup, @normId, @x, @y, @alt)
                 """;
 
             lock (_sync)
@@ -576,7 +774,8 @@ namespace GameEngineTools.World.Data
                     ("@pickup", d.AllowsPickup ? 1 : 0),
                     ("@normId", (object?)d.NormId ?? DBNull.Value),
                     ("@x", d.X),
-                    ("@y", d.Y));
+                    ("@y", d.Y),
+                    ("@alt", d.AltitudeMeters));
         }
 
         /// <summary>
@@ -596,6 +795,28 @@ namespace GameEngineTools.World.Data
                     ("@dist", distanceMeters));
         }
 
+        /// <summary>
+        /// Updates an existing connection's distance in place. Unlike <see cref="InsertConnection"/>
+        /// (INSERT OR IGNORE, never overwrites), this always writes — used by the TerrainEditor
+        /// tool after generating a terrain-aware road path whose real length differs from the
+        /// straight-line distance the connection was seeded with.
+        /// </summary>
+        /// <returns><c>true</c> if a row was updated, <c>false</c> if no such connection exists.</returns>
+        public bool UpdateConnectionDistance(string fromId, string toId, double distanceMeters)
+        {
+            const string sql = """
+                UPDATE Connections
+                SET DistanceMeters = @dist
+                WHERE FromId = @from AND ToId = @to
+                """;
+
+            lock (_sync)
+                return ExecuteNonQuery(sql,
+                    ("@dist", distanceMeters),
+                    ("@from", fromId),
+                    ("@to", toId)) > 0;
+        }
+
         #endregion Seed helpers (used by WorldDatabaseSeeder)
 
         #region IDisposable
@@ -605,6 +826,14 @@ namespace GameEngineTools.World.Data
         {
             if (_disposed) return;
             _disposed = true;
+
+            // Flush WAL contents into the main .db file and truncate the -wal/-shm side files
+            // before closing — otherwise recently-committed writes can sit in the WAL file only,
+            // invisible to anything that doesn't open the file through SQLite's own WAL-aware
+            // connection (a separate inspection tool, or this process if it's ever force-killed
+            // before a clean checkpoint would otherwise have happened).
+            try { Execute("PRAGMA wal_checkpoint(TRUNCATE);"); } catch (SqliteException) { /* best-effort */ }
+
             _connection.Dispose();
         }
 

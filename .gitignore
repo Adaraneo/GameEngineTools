@@ -371,6 +371,10 @@ FodyWeavers.xsd
 /PHASE4_IMPLEMENTATION_REPORT.md
 /CLAUDE.md
 /LogReader
+/TerrainEditor
+/TerrainEditorTests
+/TerraGen
+/TerraGenTests
 /PLAN_PersistentGoalEngine.md
 /regenerateEventLogs.ps1
 /WorldObserver/Properties/launchSettings.json
