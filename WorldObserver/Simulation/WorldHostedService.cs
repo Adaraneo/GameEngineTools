@@ -40,6 +40,7 @@ namespace WorldObserver.Simulation
         private readonly ILogger<WorldHostedService> _log;
         private readonly WorldObserverOptions _options;
         private readonly CharacterPort _port;
+        private readonly RoadMapService _roadMap;
         private WDateTime _startTime; // world clock captured at launch
         private long _realStartTicks; // Environment.TickCount64 at launch — basis for real wall-clock elapsed
         private volatile IReadOnlyList<IHuman>? _liveChars; // latest per-tick character list (for export)
@@ -61,13 +62,15 @@ namespace WorldObserver.Simulation
             SimulationControl control,
             ILogger<WorldHostedService> log,
             Microsoft.Extensions.Options.IOptions<WorldObserverOptions> options,
-            CharacterPort port)
+            CharacterPort port,
+            RoadMapService roadMap)
         {
             _hub = hub;
             _control = control;
             _log = log;
             _options = options.Value;
             _port = port;
+            _roadMap = roadMap;
         }
 
         /// <inheritdoc/>
@@ -101,6 +104,15 @@ namespace WorldObserver.Simulation
             _startTime = ctx.Clock.Now; // world clock at launch — basis for game "elapsed since start"
             _realStartTicks = Environment.TickCount64; // wall-clock basis for real run time
             _log.LogInformation("World ready: {Count} characters.", ctx.Characters.Count);
+
+            // Kick off background terrain-aware road pathfinding for every connection — see
+            // RoadMapService's remarks for why this isn't inline in the tick loop. Connections
+            // render as straight lines (WorldStateProjector's fallback) until each one lands.
+            var locationPositions = ctx.KnownLocations
+                .Select(id => (Id: id, Descriptor: ctx.Locations.GetDescriptor(id)))
+                .Where(x => x.Descriptor is not null)
+                .ToDictionary(x => x.Id, x => (x.Descriptor!.X, x.Descriptor.Y));
+            _roadMap.EnsureQueued(ctx.Connections, locationPositions);
 
             // Character export/import (folder chosen in the browser; import applied on the sim thread).
             var genFile = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
@@ -227,6 +239,7 @@ namespace WorldObserver.Simulation
                 realElapsed: FormatRealElapsed(Environment.TickCount64 - _realStartTicks),
                 mapLocationIds: ctx.KnownLocations,
                 mapConnections: ctx.Connections,
+                roadMap: _roadMap,
                 transitOf: id => ctx.Orchestrator.GetTransit(id, now),
                 regions: ctx.Regions,
                 objectProvider: ctx.ObjectCache,

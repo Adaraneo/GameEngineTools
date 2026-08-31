@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GameEngineTools\GameEngineTools.csproj" />
+    <!-- On-demand terrain tile generation for the real geographic map (see TerrainMapService). -->
+    <ProjectReference Include="..\TerraGen\TerraGen.csproj" />
     <!-- Czech grammar composer for the custom narrative formatter (same version as the core lib). -->
     <PackageReference Include="50PSoftware.GrammarModular.Czech" Version="1.0.0-preview.32" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />

@@ -88,7 +88,8 @@ namespace WorldObserver.Simulation
             IReadOnlyDictionary<string, string>? regions = null,
             IWorldObjectProvider? objectProvider = null,
             StatusLedger? statusLedger = null,
-            IReadOnlyDictionary<HumanId, IReadOnlyList<DialogueLineDto>>? recentDialogue = null)
+            IReadOnlyDictionary<HumanId, IReadOnlyList<DialogueLineDto>>? recentDialogue = null,
+            RoadMapService? roadMap = null)
         {
             var idSet = characters.Select(c => c.Id).ToHashSet();
             var nameById = characters.ToDictionary(c => c.Id, c => c.Identity.FirstName.Original);
@@ -450,13 +451,24 @@ namespace WorldObserver.Simulation
                 Elapsed: FormatElapsed(now - startTime),
                 RealElapsed: realElapsed,
                 MapLocations: (mapLocationIds ?? System.Array.Empty<string>())
-                    .Select(id => new MapLocationDto(
-                        id,
-                        locationService.GetDescriptor(id)?.DisplayName ?? id,
-                        regions is not null && regions.TryGetValue(id, out var r) ? r : ""))
+                    .Select(id =>
+                    {
+                        var descriptor = locationService.GetDescriptor(id);
+                        return new MapLocationDto(
+                            id,
+                            descriptor?.DisplayName ?? id,
+                            regions is not null && regions.TryGetValue(id, out var r) ? r : "",
+                            descriptor?.X ?? 0.0,
+                            descriptor?.Y ?? 0.0);
+                    })
                     .ToList(),
                 MapConnections: (mapConnections ?? System.Array.Empty<(string, string, double)>())
-                    .Select(c => new MapConnectionDto(c.From, c.To, c.Dist))
+                    .Select(c =>
+                    {
+                        var path = roadMap?.TryGetPath(c.From, c.To);
+                        double[]? flat = path is null ? null : path.SelectMany(p => new[] { p.X, p.Y }).ToArray();
+                        return new MapConnectionDto(c.From, c.To, c.Dist, flat);
+                    })
                     .ToList(),
                 Graves: graveMarkers);
         }

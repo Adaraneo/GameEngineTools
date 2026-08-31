@@ -56,16 +56,18 @@
         </section>
 
         <section class="panel" id="panel-map">
-            <h2>Mapa / pohyb postav
+            <h2>Mapa terénu / pohyb postav
                 <select id="mapMode" class="map-mode" title="Režim mapy">
-                    <option value="graph">Realistická (síť cest)</option>
-                    <option value="grid">Mřížka</option>
+                    <option value="terrain">Terén (reálná mapa)</option>
                     <option value="list">Seznam lokací</option>
                 </select>
+                <button id="btnMapReset" class="map-reset" title="Vystředit a přiblížit na výchozí pohled">⟲</button>
             </h2>
-            <svg id="mapsvg" viewBox="0 0 800 560" preserveAspectRatio="xMidYMid meet"></svg>
+            <div id="mapcanvas-wrap">
+                <canvas id="mapcanvas" width="800" height="560"></canvas>
+            </div>
             <div id="maplist" hidden></div>
-            <div class="legend">Tečka = postava (jede po cestě) · uzel = lokace (<span style="color:#6da3ff">město</span>/<span style="color:var(--good)">příroda</span>) · čára = cesta · ✝ = mrtvá</div>
+            <div class="legend">Tečka = postava (jede po cestě) · uzel = lokace (<span style="color:#6da3ff">město</span>/<span style="color:var(--good)">příroda</span>) · čára = cesta · ✝ = mrtvá · tažením posun, kolečkem přiblížení</div>
         </section>
 
         <section class="panel" id="panel-feed">

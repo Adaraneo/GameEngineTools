@@ -52,22 +52,6 @@ CREATE TABLE IF NOT EXISTS Locations (
     AltitudeMeters  REAL    NOT NULL DEFAULT 0.0   -- elevation above sea level; authored by TerrainEditor
 );
 
--- ── Terrain Heightmap ─────────────────────────────────────────────────────────
--- Authored by the standalone TerrainEditor tool (paints elevation, derives contour lines).
--- One row per named heightmap grid — 'default' for the world's single terrain today.
--- Data is a packed row-major array of 32-bit floats, Width*Height entries.
-
-CREATE TABLE IF NOT EXISTS TerrainHeightmap (
-    Id              TEXT    PRIMARY KEY,
-    OriginX         REAL    NOT NULL,
-    OriginY         REAL    NOT NULL,
-    CellSizeMeters  REAL    NOT NULL,
-    Width           INTEGER NOT NULL,
-    Height          INTEGER NOT NULL,
-    Data            BLOB    NOT NULL,
-    RiverMask       BLOB            -- nullable: 0/1 byte per cell, painted separately from elevation
-);
-
 -- ── Connections ───────────────────────────────────────────────────────────────
 -- Directed adjacency graph. For a bidirectional edge, declare both directions.
 

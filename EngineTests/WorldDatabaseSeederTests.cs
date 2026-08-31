@@ -15,14 +15,14 @@ namespace EngineTests
     public class WorldDatabaseSeederTests
     {
         [TestMethod]
-        public void Initialize_FreshDatabase_SeedsDefaultLocations()
+        public void Initialize_FreshDatabase_SeedsNoLocations()
         {
             using var db = new SqliteWorldDatabase(":memory:");
 
             WorldDatabaseSeeder.Initialize(db);
 
-            Assert.IsTrue(db.GetAllLocations().Count > 0,
-                "Initialize() on a fresh database is expected to populate the built-in seed_data.sql locations.");
+            Assert.AreEqual(0, db.GetAllLocations().Count,
+                "The default seed_data.sql no longer ships any locations — worlds start empty and are authored by their own bootstrap code (e.g. GameSandbox).");
         }
 
         [TestMethod]
@@ -44,9 +44,9 @@ namespace EngineTests
             WorldDatabaseSeeder.InitializeSchemaOnly(db);
 
             // Schema (CREATE TABLE) must still have run — querying every relevant table must not throw.
+            // TerrainHeightmap is no longer part of this schema at all (see InitializeTerrainDatabase).
             Assert.AreEqual(0, db.GetAllLocations().Count);
             Assert.AreEqual(0, db.GetAllConnections().Count);
-            Assert.IsNull(db.LoadHeightmap("default"));
         }
 
         [TestMethod]

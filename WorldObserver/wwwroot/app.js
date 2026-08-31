@@ -409,85 +409,235 @@ function renderVitals(characters) {
     }
 }
 
-// ── Map (switchable: realistic road-network graph / grid / list) ────────────────
-const MAP_W = 800, MAP_H = 560;
-let mapLayout = new Map();     // locationId -> {x, y}
-let mapStaticKey = "";         // "<mode>|<locationKey>" — rebuilds the static layer when it changes
-const mapDots = new Map();     // characterId -> <g> dot element (reused so CSS transitions animate)
-let mapMode = localStorage.getItem("wo.mapMode") || "graph";
+// ── Map (real geographic terrain, canvas-based / pannable / zoomable — or a plain location list) ──
+let mapMode = localStorage.getItem("wo.mapMode") || "terrain";
+let mapLocById = new Map(); // locationId -> {id, displayName, region, x, y} (world meters)
 
-// Grid layout: locations sorted by id into a stable grid.
-function gridLayout(locs) {
-    const layout = new Map();
-    const n = locs.length || 1;
-    const cols = Math.max(1, Math.ceil(Math.sqrt(n * (MAP_W / MAP_H))));
-    const mx = 60, my = 30;
-    const cw = (MAP_W - 2 * mx) / Math.max(1, cols - 1 || 1);
-    const ch = (MAP_H - 2 * my) / Math.max(1, Math.ceil(n / cols) - 1 || 1);
-    locs.forEach((l, i) => {
-        layout.set(l.id, { x: mx + (cols > 1 ? (i % cols) * cw : (MAP_W - 2 * mx) / 2), y: my + Math.floor(i / cols) * ch });
-    });
-    return layout;
+// -- Elevation → color ramp (same stops as TerrainEditor's TerrainColorRamp.cs, ported to JS) --
+const LAND_STOPS = [
+    [0.00, [0xE8, 0xDC, 0xAE]], // beach
+    [0.08, [0x7F, 0xAE, 0x5E]], // lowland green
+    [0.30, [0xA8, 0xB2, 0x5A]], // upland green / olive
+    [0.55, [0xB9, 0x8A, 0x55]], // brown hills
+    [0.78, [0x8F, 0x83, 0x78]], // gray-brown mountains
+    [0.92, [0xC9, 0xC5, 0xC0]], // bare rock
+    [1.00, [0xF5, 0xF5, 0xF5]], // snow
+];
+const DEEP_WATER = [0x0A, 0x1A, 0x4F];
+const SHORE_WATER = [0x4F, 0x9B, 0xC9];
+const LAND_CEILING_FLOOR_M = 150.0;
+
+function lerpColor(a, b, t) {
+    t = Math.max(0, Math.min(1, t));
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+function sampleLandStops(t) {
+    for (let i = 1; i < LAND_STOPS.length; i++) {
+        if (t <= LAND_STOPS[i][0]) {
+            const [t0, c0] = LAND_STOPS[i - 1], [t1, c1] = LAND_STOPS[i];
+            return lerpColor(c0, c1, t1 > t0 ? (t - t0) / (t1 - t0) : 0);
+        }
+    }
+    return LAND_STOPS[LAND_STOPS.length - 1][1];
+}
+function elevationColor(h, gridMin, gridMax) {
+    if (h < 0) {
+        const floor = Math.min(gridMin, -10.0);
+        const t = floor < 0 ? (h - floor) / (0 - floor) : 0;
+        return lerpColor(DEEP_WATER, SHORE_WATER, t);
+    }
+    const ceiling = Math.max(gridMax, LAND_CEILING_FLOOR_M);
+    return sampleLandStops(h / ceiling);
 }
 
-// Realistic layout: force-directed from the road network (edge length follows real distance),
-// computed once. Connected locations cluster; the city packs around its hubs, nature radiates out.
-function graphLayout(locs, conns) {
-    const ids = locs.map((l) => l.id);
-    const n = ids.length || 1;
-    const idx = new Map(ids.map((id, i) => [id, i]));
-    const pos = ids.map((_, i) => ({ x: 400 + 250 * Math.cos((i / n) * 2 * Math.PI), y: 280 + 250 * Math.sin((i / n) * 2 * Math.PI) }));
-    const edges = conns.filter((c) => idx.has(c.from) && idx.has(c.to)).map((c) => ({ a: idx.get(c.from), b: idx.get(c.to), d: c.dist }));
-    const maxD = Math.max(1, ...edges.map((e) => e.d));
-    const iters = 320;
-    for (let it = 0; it < iters; it++) {
-        const disp = pos.map(() => ({ x: 0, y: 0 }));
-        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-            let dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y; const dist = Math.hypot(dx, dy) || 0.01;
-            const rep = 5000 / dist; dx /= dist; dy /= dist;
-            disp[i].x += dx * rep; disp[i].y += dy * rep; disp[j].x -= dx * rep; disp[j].y -= dy * rep;
+// -- Tile cache: server tile (elevation grid, Int16 meters) -> offscreen canvas (1px/cell) --
+const tileCache = new Map(); // tileId -> { originX, originY, cellSizeMeters, width, height, canvas }
+let tileFetchTimer = null;
+
+function buildTileCanvas(tile) {
+    const w = tile.width, h = tile.height;
+    const off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    const octx = off.getContext("2d");
+    const img = octx.createImageData(w, h);
+    let gridMin = Infinity, gridMax = -Infinity;
+    for (const v of tile.elevations) { if (v < gridMin) gridMin = v; if (v > gridMax) gridMax = v; }
+    if (!isFinite(gridMin)) { gridMin = 0; gridMax = 0; }
+    for (let row = 0; row < h; row++) {
+        // Source row 0 = southernmost sample (OriginY); flip vertically so the image reads north-up.
+        const imgRow = h - 1 - row;
+        for (let col = 0; col < w; col++) {
+            const [r, g, b] = elevationColor(tile.elevations[row * w + col], gridMin, gridMax);
+            const di = (imgRow * w + col) * 4;
+            img.data[di] = r; img.data[di + 1] = g; img.data[di + 2] = b; img.data[di + 3] = 255;
         }
-        for (const e of edges) {
-            let dx = pos[e.a].x - pos[e.b].x, dy = pos[e.a].y - pos[e.b].y; const dist = Math.hypot(dx, dy) || 0.01;
-            const ideal = 45 + (e.d / maxD) * 170;
-            const att = (dist - ideal) * 0.06; dx /= dist; dy /= dist;
-            disp[e.a].x -= dx * att; disp[e.a].y -= dy * att; disp[e.b].x += dx * att; disp[e.b].y += dy * att;
-        }
-        const cool = 1 - it / iters;
-        for (let i = 0; i < n; i++) { pos[i].x += disp[i].x * 0.08 * cool; pos[i].y += disp[i].y * 0.08 * cool; }
     }
-    // Fit to the viewBox with margins.
-    const xs = pos.map((p) => p.x), ys = pos.map((p) => p.y);
+    octx.putImageData(img, 0, 0);
+    return off;
+}
+
+function currentWorldBounds() {
+    const halfW = mapCanvas.width / 2 / mapView.scale;
+    const halfH = mapCanvas.height / 2 / mapView.scale;
+    return { minX: mapView.x - halfW, maxX: mapView.x + halfW, minY: mapView.y - halfH, maxY: mapView.y + halfH };
+}
+
+function scheduleTileFetch() {
+    clearTimeout(tileFetchTimer);
+    tileFetchTimer = setTimeout(fetchVisibleTiles, 250);
+}
+
+async function fetchVisibleTiles() {
+    const b = currentWorldBounds();
+    const url = `/api/terrain/tiles?minX=${b.minX.toFixed(1)}&minY=${b.minY.toFixed(1)}&maxX=${b.maxX.toFixed(1)}&maxY=${b.maxY.toFixed(1)}`;
+    let tiles;
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        tiles = await res.json();
+    } catch (e) { return; } // transient — the next viewport change retries
+    let added = false;
+    for (const t of tiles || []) {
+        if (tileCache.has(t.id)) continue;
+        tileCache.set(t.id, { originX: t.originX, originY: t.originY, cellSizeMeters: t.cellSizeMeters, width: t.width, height: t.height, canvas: buildTileCanvas(t) });
+        added = true;
+    }
+    if (added) drawMap();
+}
+
+// -- Viewport (world-meters center + pixels-per-meter scale) --
+const mapCanvas = $("mapcanvas");
+const mapCtx = mapCanvas.getContext("2d");
+let mapView = { x: 0, y: 0, scale: 1 };
+let mapViewInit = false;
+let mapDragging = false;
+let mapDragStart = null;
+let mapDragMoved = false;
+let lastCharScreenPos = []; // [{id, sx, sy}] — populated by drawMap, used for click hit-testing
+
+function resizeCanvasToDisplay() {
+    const rect = mapCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(rect.width * dpr));
+    const h = Math.max(1, Math.round(rect.height * dpr));
+    if (mapCanvas.width !== w || mapCanvas.height !== h) { mapCanvas.width = w; mapCanvas.height = h; }
+}
+function worldToScreen(x, y) {
+    const cx = mapCanvas.width / 2, cy = mapCanvas.height / 2;
+    return { x: cx + (x - mapView.x) * mapView.scale, y: cy - (y - mapView.y) * mapView.scale };
+}
+function screenToWorld(sx, sy) {
+    const cx = mapCanvas.width / 2, cy = mapCanvas.height / 2;
+    return { x: mapView.x + (sx - cx) / mapView.scale, y: mapView.y - (sy - cy) / mapView.scale };
+}
+
+function initMapView() {
+    const locs = (lastState && lastState.mapLocations) || [];
+    resizeCanvasToDisplay();
+    if (!locs.length) { mapView = { x: 0, y: 0, scale: 1 }; mapViewInit = true; return; }
+    const xs = locs.map((l) => l.x), ys = locs.map((l) => l.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-    const m = 40, sx = (MAP_W - 2 * m) / Math.max(1, maxX - minX), sy = (MAP_H - 2 * m) / Math.max(1, maxY - minY);
-    const layout = new Map();
-    ids.forEach((id, i) => layout.set(id, { x: m + (pos[i].x - minX) * sx, y: m + (pos[i].y - minY) * sy }));
-    return layout;
+    mapView.x = (minX + maxX) / 2;
+    mapView.y = (minY + maxY) / 2;
+    const spanX = Math.max(80, (maxX - minX) * 1.4), spanY = Math.max(80, (maxY - minY) * 1.4);
+    mapView.scale = Math.max(0.01, Math.min(mapCanvas.width / spanX, mapCanvas.height / spanY));
+    mapViewInit = true;
 }
 
-// (Re)builds the static SVG layer (roads + location nodes) for the current mode + location set.
-function buildMapStatic(svg, locs, conns, drawRoads) {
-    clear(svg);
-    mapDots.clear();
-    if (drawRoads) {
-        const roadLayer = svgEl("g", {});
-        for (const c of conns) {
-            const a = mapLayout.get(c.from), b = mapLayout.get(c.to);
-            if (a && b) roadLayer.appendChild(svgEl("line", { class: "map-road", x1: a.x, y1: a.y, x2: b.x, y2: b.y }));
+function drawMap() {
+    resizeCanvasToDisplay();
+    // Resizing the canvas (inside resizeCanvasToDisplay, whenever the display size actually
+    // changed) resets 2D context state per spec — including imageSmoothingEnabled — so this has
+    // to be re-asserted every draw, not just once at startup.
+    mapCtx.imageSmoothingEnabled = false;
+    mapCtx.fillStyle = "#0a1a2f";
+    mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+    for (const tile of tileCache.values()) {
+        const topLeft = worldToScreen(tile.originX, tile.originY + tile.height * tile.cellSizeMeters);
+        const w = tile.width * tile.cellSizeMeters * mapView.scale;
+        const h = tile.height * tile.cellSizeMeters * mapView.scale;
+        mapCtx.drawImage(tile.canvas, topLeft.x, topLeft.y, w, h);
+    }
+
+    lastCharScreenPos = [];
+    if (!lastState) return;
+
+    mapCtx.strokeStyle = "rgba(220,220,230,0.55)";
+    mapCtx.lineWidth = 1;
+    for (const c of lastState.mapConnections || []) {
+        const a = mapLocById.get(c.from), b = mapLocById.get(c.to);
+        if (!a || !b) continue;
+        mapCtx.beginPath();
+        if (c.path && c.path.length >= 4) {
+            // Terrain-aware route from RoadMapService — flat x,y,x,y,... world-meters pairs.
+            const p0 = worldToScreen(c.path[0], c.path[1]);
+            mapCtx.moveTo(p0.x, p0.y);
+            for (let i = 2; i < c.path.length; i += 2) {
+                const p = worldToScreen(c.path[i], c.path[i + 1]);
+                mapCtx.lineTo(p.x, p.y);
+            }
+        } else {
+            // Path not computed yet (or pathfinding failed) — straight line until it lands.
+            const pa = worldToScreen(a.x, a.y), pb = worldToScreen(b.x, b.y);
+            mapCtx.moveTo(pa.x, pa.y); mapCtx.lineTo(pb.x, pb.y);
         }
-        svg.appendChild(roadLayer);
+        mapCtx.stroke();
     }
-    const nodeLayer = svgEl("g", {});
-    for (const l of locs) {
-        const p = mapLayout.get(l.id); if (!p) continue;
-        const region = (l.region || "").toLowerCase();
-        nodeLayer.appendChild(svgEl("circle", { class: "map-node " + (region === "nature" ? "nature" : "city"), cx: p.x, cy: p.y, r: 3 }));
-        const label = svgEl("text", { class: "map-node-label", x: p.x, y: p.y - 6, "text-anchor": "middle" });
-        label.textContent = l.displayName.length > 14 ? l.displayName.slice(0, 13) + "…" : l.displayName;
-        nodeLayer.appendChild(label);
+
+    mapCtx.font = "9px sans-serif";
+    mapCtx.textAlign = "center";
+    for (const l of lastState.mapLocations || []) {
+        const p = worldToScreen(l.x, l.y);
+        mapCtx.fillStyle = (l.region || "").toLowerCase() === "nature" ? "#4caf6a" : "#6da3ff";
+        mapCtx.beginPath(); mapCtx.arc(p.x, p.y, 3, 0, Math.PI * 2); mapCtx.fill();
+        mapCtx.fillStyle = "#e7ebf3";
+        const label = l.displayName.length > 16 ? l.displayName.slice(0, 15) + "…" : l.displayName;
+        mapCtx.fillText(label, p.x, p.y - 6);
     }
-    svg.appendChild(nodeLayer);
-    svg.appendChild(svgEl("g", { id: "map-dot-layer" }));
+
+    mapCtx.font = "11px sans-serif";
+    for (const gr of lastState.graves || []) {
+        const loc = mapLocById.get(gr.locationId);
+        if (!loc) continue;
+        const p = worldToScreen(loc.x, loc.y);
+        mapCtx.fillStyle = gr.isGrave ? "#c9c5c0" : "#e05555";
+        mapCtx.fillText(gr.isGrave ? "+" : "☠", p.x, p.y + 16);
+    }
+
+    // Cluster co-located characters so their dots don't fully overlap.
+    const byLoc = new Map();
+    for (const c of lastState.characters) { const arr = byLoc.get(c.location) || []; arr.push(c.id); byLoc.set(c.location, arr); }
+
+    for (const c of lastState.characters) {
+        let wx, wy;
+        const from = c.travelFromId && mapLocById.get(c.travelFromId);
+        const to = c.travelToId && mapLocById.get(c.travelToId);
+        if (c.travelProgress != null && from && to) {
+            const t = c.travelProgress;
+            wx = from.x + (to.x - from.x) * t;
+            wy = from.y + (to.y - from.y) * t;
+        } else {
+            const loc = mapLocById.get(c.location);
+            if (!loc) continue;
+            const peers = byLoc.get(c.location) || [c.id];
+            const i = peers.indexOf(c.id);
+            const ring = peers.length > 1 ? 4 : 0; // meters
+            const ang = peers.length > 1 ? (i / peers.length) * Math.PI * 2 : 0;
+            wx = loc.x + Math.cos(ang) * ring;
+            wy = loc.y + Math.sin(ang) * ring;
+        }
+        const p = worldToScreen(wx, wy);
+        lastCharScreenPos.push({ id: c.id, sx: p.x, sy: p.y });
+
+        mapCtx.beginPath();
+        mapCtx.arc(p.x, p.y, c.id === selectedId ? 6 : 4.5, 0, Math.PI * 2);
+        mapCtx.fillStyle = c.status === "Dead" ? "#c0392b" : (c.sex === "Female" ? "#ff6fa5" : "#5aa9ff");
+        mapCtx.globalAlpha = c.status === "Dead" ? 0.55 : 1;
+        mapCtx.fill();
+        mapCtx.globalAlpha = 1;
+        if (c.id === selectedId) { mapCtx.strokeStyle = "#fff"; mapCtx.lineWidth = 2; mapCtx.stroke(); }
+    }
 }
 
 // Text fallback: locations and who is standing in each (from the dynamic occupied list).
@@ -507,109 +657,86 @@ function renderMapList(state) {
 }
 
 function renderMap(state) {
-    const svg = $("mapsvg"), list = $("maplist");
+    mapLocById = new Map((state.mapLocations || []).map((l) => [l.id, l]));
     if (mapMode === "list") {
-        svg.hidden = true; list.hidden = false; renderMapList(state); return;
+        $("mapcanvas-wrap").hidden = true;
+        $("maplist").hidden = false;
+        renderMapList(state);
+        return;
     }
-    svg.hidden = false; list.hidden = true;
-
-    const locs = (state.mapLocations || []).slice().sort((a, b) => a.id.localeCompare(b.id));
-    const conns = state.mapConnections || [];
-    const staticKey = mapMode + "|" + locs.map((l) => l.id).join(",");
-    if (staticKey !== mapStaticKey) {
-        mapStaticKey = staticKey;
-        mapLayout = mapMode === "graph" ? graphLayout(locs, conns) : gridLayout(locs);
-        buildMapStatic(svg, locs, conns, mapMode === "graph");
-    }
-    const dotLayer = svg.querySelector("#map-dot-layer");
-    if (!dotLayer) return;
-
-    // Cluster co-located characters so their dots don't fully overlap.
-    const byLoc = new Map();
-    for (const c of state.characters) {
-        const arr = byLoc.get(c.location) || []; arr.push(c.id); byLoc.set(c.location, arr);
-    }
-
-    // Render grave / corpse markers: stable SVG elements keyed by objectId.
-    const gravesSeen = new Set();
-    for (const gr of (state.graves || [])) {
-        gravesSeen.add(gr.objectId);
-        const pos = mapLayout.get(gr.locationId);
-        if (!pos) continue;
-        let ge = mapDots.get("grave:" + gr.objectId);
-        if (!ge) {
-            const g = svgEl("g", { class: "map-grave" });
-            const sym = svgEl("text", { class: gr.isGrave ? "grave-sym" : "corpse-sym", x: 0, y: 0, "text-anchor": "middle", "dominant-baseline": "central" });
-            sym.textContent = gr.isGrave ? "+" : "☠";
-            const title = svgEl("title", {});
-            g.appendChild(sym); g.appendChild(title);
-            dotLayer.appendChild(g);
-            ge = { g, sym, title };
-            mapDots.set("grave:" + gr.objectId, ge);
-        }
-        ge.title.textContent = (gr.isGrave ? "Hrob: " : "Mrtvola: ") + gr.deceasedName;
-        ge.g.setAttribute("transform", `translate(${pos.x.toFixed(1)},${pos.y.toFixed(1)})`);
-    }
-    // Remove stale grave markers.
-    for (const [key, ge] of mapDots) {
-        if (key.startsWith("grave:") && !gravesSeen.has(key.slice(6))) {
-            ge.g.remove();
-            mapDots.delete(key);
-        }
-    }
-
-    const seen = new Set();
-    for (const c of state.characters) {
-        seen.add(c.id);
-        let e = mapDots.get(c.id);
-        if (!e) {
-            const g = svgEl("g", { class: "map-dot" });
-            const dot = svgEl("circle", { r: 5 });
-            const title = svgEl("title", {});
-            g.appendChild(dot); g.appendChild(title);
-            g.addEventListener("click", () => selectNode(c.id));
-            dotLayer.appendChild(g);
-            e = { g, dot, title };
-            mapDots.set(c.id, e);
-        }
-        e.dot.setAttribute("class", c.status === "Dead" ? "dead" : (c.sex === "Female" ? "female" : "male"));
-        e.g.classList.toggle("selected", c.id === selectedId);
-        e.title.textContent = `${c.name} ${c.surname || ""}`.trim();
-
-        // In transit → interpolate ALONG the road (origin→destination by progress). Otherwise sit at
-        // the location node (+ small cluster offset). Unknown position → keep last (or center first time).
-        const from = c.travelFromId && mapLayout.get(c.travelFromId);
-        const to = c.travelToId && mapLayout.get(c.travelToId);
-        if (c.travelProgress != null && from && to) {
-            const t = c.travelProgress;
-            e.g.setAttribute("transform", `translate(${(from.x + (to.x - from.x) * t).toFixed(1)},${(from.y + (to.y - from.y) * t).toFixed(1)})`);
-        } else {
-            const pos = mapLayout.get(c.location);
-            if (pos) {
-                const peers = byLoc.get(c.location) || [c.id];
-                const i = peers.indexOf(c.id);
-                const ring = peers.length > 1 ? 9 : 0;
-                const ang = peers.length > 1 ? (i / peers.length) * Math.PI * 2 : 0;
-                e.g.setAttribute("transform", `translate(${(pos.x + Math.cos(ang) * ring).toFixed(1)},${(pos.y + Math.sin(ang) * ring).toFixed(1)})`);
-            } else if (!e.g.hasAttribute("transform")) {
-                e.g.setAttribute("transform", `translate(${MAP_W / 2},${MAP_H / 2})`);
-            }
-        }
-    }
-
-    for (const [id, e] of mapDots) {
-        if (!seen.has(id)) { e.g.remove(); mapDots.delete(id); }
-    }
+    $("mapcanvas-wrap").hidden = false;
+    $("maplist").hidden = true;
+    if (!mapViewInit) { initMapView(); scheduleTileFetch(); }
+    drawMap();
 }
 
-// Mode switch (persisted). Reset the static key so the next render rebuilds in the new mode.
+// -- Pan (drag) + zoom (wheel) --
+mapCanvas.addEventListener("mousedown", (ev) => {
+    mapDragging = true;
+    mapDragMoved = false;
+    mapCanvas.classList.add("dragging");
+    mapDragStart = { sx: ev.clientX, sy: ev.clientY, vx: mapView.x, vy: mapView.y };
+});
+window.addEventListener("mousemove", (ev) => {
+    if (!mapDragging) return;
+    const dxPx = ev.clientX - mapDragStart.sx, dyPx = ev.clientY - mapDragStart.sy;
+    if (Math.abs(dxPx) + Math.abs(dyPx) > 3) mapDragMoved = true;
+    const dpr = window.devicePixelRatio || 1;
+    mapView.x = mapDragStart.vx - (dxPx * dpr) / mapView.scale;
+    mapView.y = mapDragStart.vy + (dyPx * dpr) / mapView.scale;
+    drawMap();
+});
+window.addEventListener("mouseup", () => {
+    if (!mapDragging) return;
+    mapDragging = false;
+    mapCanvas.classList.remove("dragging");
+    if (mapDragMoved) scheduleTileFetch();
+});
+mapCanvas.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    resizeCanvasToDisplay();
+    const rect = mapCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const sx = (ev.clientX - rect.left) * dpr, sy = (ev.clientY - rect.top) * dpr;
+    const before = screenToWorld(sx, sy);
+    mapView.scale = Math.max(0.002, Math.min(50, mapView.scale * Math.exp(-ev.deltaY * 0.001)));
+    const after = screenToWorld(sx, sy);
+    mapView.x += before.x - after.x;
+    mapView.y += before.y - after.y;
+    drawMap();
+    scheduleTileFetch();
+}, { passive: false });
+mapCanvas.addEventListener("click", (ev) => {
+    if (mapDragMoved) return;
+    const rect = mapCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const sx = (ev.clientX - rect.left) * dpr, sy = (ev.clientY - rect.top) * dpr;
+    let best = null, bestDist = 14 * dpr;
+    for (const p of lastCharScreenPos) {
+        const d = Math.hypot(p.sx - sx, p.sy - sy);
+        if (d < bestDist) { bestDist = d; best = p; }
+    }
+    if (best) selectNode(best.id);
+});
+window.addEventListener("resize", () => {
+    if (mapMode === "list") return;
+    resizeCanvasToDisplay();
+    drawMap();
+});
+$("btnMapReset").addEventListener("click", () => {
+    mapViewInit = false;
+    initMapView();
+    drawMap();
+    scheduleTileFetch();
+});
+
+// Mode switch (persisted).
 (function wireMapMode() {
     const sel = $("mapMode");
     sel.value = mapMode;
     sel.addEventListener("change", () => {
         mapMode = sel.value;
         localStorage.setItem("wo.mapMode", mapMode);
-        mapStaticKey = "";
         if (lastState) renderMap(lastState);
     });
 })();

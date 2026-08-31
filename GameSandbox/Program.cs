@@ -225,6 +225,11 @@ var db = runtime.Services.GetRequiredService<SqliteWorldDatabase>();
 var worldMap = SqliteWorldMapLoader.Load(db);
 var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
 
+// The default seed_data.sql no longer ships any locations (see WorldDatabaseSeeder.Initialize) —
+// GameSandbox now self-authors the Castle/Village/Forest/Wilds content that used to live there,
+// same as it already does for village_house_01..25/cemetery below.
+GameSandbox.CastleVillageSeed.SeedLocations(worldMap, locationService);
+
 {
     for (int index = 0; index < 25; index++)
     {
@@ -272,6 +277,10 @@ worldMap.RegisterAllLocations(locationService);
 var objectProvider = runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
 var objectRespawner = runtime.Services.GetRequiredService<ObjectRespawnScheduler>();
+
+// Faithful port of the food/furniture objects that used to live in seed_data.sql, tied to the
+// locations added by CastleVillageSeed.SeedLocations above.
+GameSandbox.CastleVillageSeed.SeedObjects(objectProvider);
 
 // ── Tavern (Village / Social) ─────────────────────────────────────────────────
 // 35 apples — primary food source for Village NPCs

@@ -39,6 +39,10 @@ namespace GameEngineTools.World.Data
         /// <summary>DML script — default world data (locations, objects, connections).</summary>
         private const string SeedDataScript = "seed_data.sql";
 
+        /// <summary>DDL script for a DEDICATED terrain database — just the TerrainHeightmap
+        /// table, no Locations/Connections/WorldObjects. See <see cref="InitializeTerrainDatabase"/>.</summary>
+        private const string TerrainSchemaScript = "terrain_schema.sql";
+
         #endregion Script filenames
 
         #region Public API
@@ -67,9 +71,9 @@ namespace GameEngineTools.World.Data
 
         /// <summary>
         /// Applies schema + migrations only — deliberately skips <c>seed_data.sql</c>, leaving
-        /// <c>Locations</c>/<c>Connections</c>/<c>TerrainHeightmap</c> empty. For callers (e.g.
-        /// TerrainEditor's "New World") that want a genuinely blank world authored entirely from
-        /// scratch instead of the built-in default locations.
+        /// <c>Locations</c>/<c>Connections</c> empty. For callers (e.g. TerrainEditor's
+        /// "New World") that want a genuinely blank world authored entirely from scratch instead
+        /// of the built-in default locations.
         /// </summary>
         /// <param name="db">Target database to initialise.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="db"/> is null.</exception>
@@ -79,6 +83,27 @@ namespace GameEngineTools.World.Data
             InitializeSchema(db);
         }
 
+        /// <summary>
+        /// Applies the DEDICATED terrain schema (just <c>TerrainHeightmap</c> — no Locations/
+        /// Connections/WorldObjects) to <paramref name="db"/>. For callers that only ever store
+        /// heightmap tiles, never world/location data: WorldObserver's <c>TerrainMapService</c>,
+        /// TerraGen's CLI output, and TerrainEditor's sibling terrain.db (opened alongside its
+        /// main world.db, which no longer carries a <c>TerrainHeightmap</c> table at all — see
+        /// <see cref="InitializeSchema"/>'s remarks).
+        /// </summary>
+        /// <param name="db">Target database to initialise.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="db"/> is null.</exception>
+        public static void InitializeTerrainDatabase(SqliteWorldDatabase db)
+        {
+            ArgumentNullException.ThrowIfNull(db);
+            var schemaSql = SqlScriptLoader.Load(TerrainSchemaScript);
+            db.ExecuteScript(schemaSql);
+            db.MigrateTerrainHeightmapColumns(); // idempotent; protects very old terrain.db files
+        }
+
+        /// <summary>Applies the main world schema (Locations/Connections/WorldObjects/... — no
+        /// longer <c>TerrainHeightmap</c>, which moved to its own dedicated database, see
+        /// <see cref="InitializeTerrainDatabase"/>) and runs migrations.</summary>
         private static void InitializeSchema(SqliteWorldDatabase db)
         {
             // Schema is always idempotent (IF NOT EXISTS / INSERT OR IGNORE) — safe to re-run.
@@ -89,7 +114,6 @@ namespace GameEngineTools.World.Data
             // IF NOT EXISTS above is a no-op on an existing Locations table, so older
             // databases need an explicit ALTER TABLE to gain the X/Y columns.
             db.MigrateLocationCoordinateColumns();
-            db.MigrateTerrainHeightmapColumns();
         }
 
         #endregion Public API

@@ -16,7 +16,9 @@ namespace EngineTests
     {
         private static void SeedSchema(SqliteWorldDatabase db)
         {
-            var schemaSql = SqlScriptLoader.Load("schema.sql");
+            // TerrainHeightmap now lives in the dedicated terrain schema, not the main world
+            // schema.sql — see WorldDatabaseSeeder.InitializeTerrainDatabase.
+            var schemaSql = SqlScriptLoader.Load("terrain_schema.sql");
             db.ExecuteScript(schemaSql);
         }
 

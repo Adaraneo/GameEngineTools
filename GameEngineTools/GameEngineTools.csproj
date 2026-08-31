@@ -35,6 +35,7 @@
        Disk overrides in SourceFiles\World\SQL\ take precedence at runtime. -->
     <EmbeddedResource Include="World\Data\SQL\schema.sql" />
     <EmbeddedResource Include="World\Data\SQL\seed_data.sql" />
+    <EmbeddedResource Include="World\Data\SQL\terrain_schema.sql" />
   </ItemGroup>
 
   <ItemGroup>

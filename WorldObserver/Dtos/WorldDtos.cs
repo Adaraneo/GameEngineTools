@@ -30,11 +30,25 @@ namespace WorldObserver.Dtos
         string DeceasedName,
         bool IsGrave);
 
-    /// <summary>A location on the spatial map (stable across ticks — used to lay out the movement view).</summary>
-    public sealed record MapLocationDto(string Id, string DisplayName, string Region);
+    /// <summary>A location on the spatial map (stable across ticks — used to lay out the movement view).
+    /// X/Y are the location's real authoritative world-space coordinates in meters (same flat frame
+    /// TerraGen's terrain tiles use), not a synthetic layout position.</summary>
+    public sealed record MapLocationDto(string Id, string DisplayName, string Region, double X, double Y);
 
-    /// <summary>An undirected road between two locations, with distance (for the realistic graph layout).</summary>
-    public sealed record MapConnectionDto(string From, string To, double Dist);
+    /// <summary>One generated terrain tile's elevation grid, for the real geographic map. Elevation
+    /// samples are meters rounded to the nearest whole meter and packed as Int16 (halves payload size
+    /// vs. float32; plenty of precision for map rendering) — row-major, same layout as
+    /// <c>TerrainHeightmap.Values</c>.</summary>
+    public sealed record TerrainTileDto(
+        string Id, double OriginX, double OriginY, double CellSizeMeters, int Width, int Height,
+        IReadOnlyList<short> Elevations);
+
+    /// <summary>An undirected road between two locations, with distance (for the realistic graph
+    /// layout). <c>Path</c> (flat x,y,x,y,... meters pairs — cheaper to serialize/consume than an
+    /// array of point objects at ~200ms push cadence) is the terrain-aware route once
+    /// <c>RoadMapService</c>'s background pathfinding has computed it; <c>null</c> until then (or
+    /// if pathfinding ever fails), in which case the client falls back to a straight line.</summary>
+    public sealed record MapConnectionDto(string From, string To, double Dist, double[]? Path = null);
 
     /// <summary>
     /// Per-character state projected from <c>IHuman.Snapshot</c>. The first block is the at-a-glance

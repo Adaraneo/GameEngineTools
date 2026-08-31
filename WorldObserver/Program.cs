@@ -29,6 +29,8 @@ builder.Services.AddSingleton(sp =>
     return new SimulationControl(opt.DefaultDelayMs, opt.TickStepMinutes);
 });
 builder.Services.AddSingleton<CharacterPort>();
+builder.Services.AddSingleton<TerrainMapService>();
+builder.Services.AddSingleton<RoadMapService>();
 builder.Services.AddHostedService<WorldHostedService>();
 
 var app = builder.Build();
@@ -44,5 +46,9 @@ app.MapGet("/api/characters/export", (CharacterPort port) =>
 
 app.MapPost("/api/characters/import", (CharacterPort port, List<WorldObserver.Dtos.CharacterFileDto> files, bool replace = false, long worldTimeTicks = 0) =>
     Results.Json(new { accepted = port.QueueImport(files ?? new List<WorldObserver.Dtos.CharacterFileDto>(), replace, worldTimeTicks) }));
+
+// ── Real geographic terrain map (on-demand TerraGen tile generation, see TerrainMapService) ──
+app.MapGet("/api/terrain/tiles", (TerrainMapService terrain, double minX, double minY, double maxX, double maxY) =>
+    Results.Json(terrain.GetTiles(minX, minY, maxX, maxY)));
 
 app.Run();

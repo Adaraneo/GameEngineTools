@@ -36,8 +36,14 @@ namespace GameEngineTools.World.Data
         /// The output is ready to be saved as <c>seed_data.sql</c>.
         /// </summary>
         /// <param name="db">Source database to export from.</param>
+        /// <param name="terrainDb">
+        /// Database to read the heightmap from — terrain now lives in its own dedicated database
+        /// (see <see cref="WorldDatabaseSeeder.InitializeTerrainDatabase"/>), separate from
+        /// <paramref name="db"/>'s Locations/Connections/WorldObjects. Defaults to <paramref name="db"/>
+        /// itself for backward compatibility with callers that still keep both in one file.
+        /// </param>
         /// <returns>Complete SQL seed script as a UTF-8 string.</returns>
-        public static string ExportSeedSql(SqliteWorldDatabase db)
+        public static string ExportSeedSql(SqliteWorldDatabase db, SqliteWorldDatabase? terrainDb = null)
         {
             ArgumentNullException.ThrowIfNull(db);
 
@@ -47,7 +53,7 @@ namespace GameEngineTools.World.Data
             AppendSocialNorms(sb, db);
             AppendLocations(sb, db);
             AppendConnections(sb, db);
-            AppendTerrainHeightmap(sb, db);
+            AppendTerrainHeightmap(sb, terrainDb ?? db);
             AppendWorldObjects(sb, db);
 
             return sb.ToString();
