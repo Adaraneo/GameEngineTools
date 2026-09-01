@@ -51,12 +51,24 @@ WorldDatabaseSeeder.Initialize(worldDb);
 
 var rng = options.Seed is { } seed ? new Random(seed) : new Random();
 
+// Reads the SAME appsettings.World.json TerraGen reads for this planet, so the tectonic plate
+// layout WorldGen samples for danger weighting is automatically the exact one the terrain being
+// placed on was generated with — no matching CLI flags to keep in sync by hand across two tools.
+var planet = WorldGen.PlanetSettings.Load(options.TerrainDbPath);
+var tectonicPlateCount = options.TectonicPlateCount ?? planet.TectonicPlateCount;
+if (tectonicPlateCount > 0)
+    Console.WriteLine($"Tektonické desky: {tectonicPlateCount} (seed={planet.Seed}, poloměr={planet.PlanetRadiusMeters / 1000.0:0.0} km).");
+
 var genOptions = new WorldContentGenerator.Options(
     Count: options.Count,
     Region: options.Region,
     MinDistanceMeters: options.MinDistanceMeters,
     ConnectionsPerLocation: options.ConnectionsPerLocation,
-    MountainThresholdMeters: options.MountainThresholdMeters);
+    MountainThresholdMeters: options.MountainThresholdMeters,
+    CoastRadiusMeters: options.CoastRadiusMeters,
+    TectonicPlateCount: tectonicPlateCount,
+    TectonicSeed: planet.Seed,
+    PlanetRadiusMeters: planet.PlanetRadiusMeters);
 
 Console.WriteLine($"Generuji {options.Count} lokací v regionu '{options.Region}'...");
 
@@ -80,6 +92,11 @@ internal sealed class CliOptions
     public double MinDistanceMeters { get; init; } = 150.0;
     public int ConnectionsPerLocation { get; init; } = 2;
     public double MountainThresholdMeters { get; init; } = 300.0;
+    public double CoastRadiusMeters { get; init; } = 60.0;
+    /// <summary><c>null</c> means "use the planet's own appsettings.World.json tectonic plate
+    /// count" (whatever TerraGen was run with) — same override convention as TerraGen's own
+    /// <c>--tectonic-plates</c>.</summary>
+    public int? TectonicPlateCount { get; init; }
     public int? Seed { get; init; }
     /// <summary>Disk override for the food/drink/rest catalog. Defaults to <c>.\Nutrition.csv</c>
     /// in the current directory when present, else <c>null</c> (embedded default catalog is used).</summary>
@@ -98,6 +115,8 @@ internal sealed class CliOptions
                         [--min-distance <metry, výchozí 150>]
                         [--connections <počet nejbližších sousedů, výchozí 2>]
                         [--mountain-threshold <metry nadmořské výšky, výchozí 300>]
+                        [--coast-radius <metry, výchozí 60>]
+                        [--tectonic-plates <počet, výchozí = hodnota z appsettings.World.json>]
                         [--seed <celé číslo, výchozí náhodné>]
                         [--nutrition-csv <cesta>, výchozí .\Nutrition.csv v aktuální složce,
                                             jinak vestavěný výchozí katalog]
@@ -106,9 +125,20 @@ internal sealed class CliOptions
             (spusť napřed terragen) — nikdy negeneruje nový terén. --world-db se VYTVOŘÍ, pokud
             ještě neexistuje (na rozdíl od TerraGenu, který se world.db nikdy nedotýká).
 
+            Každá lokace se klasifikuje jako Mountain (nad --mountain-threshold) / Coastline (do
+            --coast-radius od vody) / Plains (plochý terén) / Forest (zbytek) a dostane náhodně
+            jednu ze tří úrovní osídlení — tábor/vesnice/město — váženou podle biomu (hory =
+            skoro vždy tábor, pobřeží/planiny = častěji vesnice nebo město). Spojení mezi
+            lokacemi ve stejné dlaždici počítá RoadPathfinder (vyhýbá se prudkým svahům a řekám),
+            měst navíc navzájem propojuje páteřní síť.
+
+            --tectonic-plates > 0 (čte se automaticky z appsettings.World.json, stejně jako v
+            TerraGenu — přepínač jen přebíjí hodnotu pro tento běh) zvyšuje DangerLevel lokací
+            blízko sbíhavých/rozbíhavých hranic desek.
+
             Jídlo/pití/odpočinek pro každou lokaci se vybírá z katalogu v Nutrition.csv podle
-            biomu dané lokace (Forest/Mountain/Any) — zkopíruj vestavěný soubor vedle databází
-            a uprav/přidej řádky, žádná změna kódu není potřeba.
+            biomu dané lokace (Forest/Mountain/Plains/Coastline/Any) — zkopíruj vestavěný soubor
+            vedle databází a uprav/přidej řádky, žádná změna kódu není potřeba.
             """);
     }
 
@@ -121,6 +151,8 @@ internal sealed class CliOptions
         var minDistance = 150.0;
         var connections = 2;
         var mountainThreshold = 300.0;
+        var coastRadius = 60.0;
+        int? tectonicPlateCount = null;
         int? seed = null;
         string? nutritionCsvPath = null;
 
@@ -149,6 +181,12 @@ internal sealed class CliOptions
                 case "--mountain-threshold" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var mt):
                     mountainThreshold = mt;
                     break;
+                case "--coast-radius" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var cr):
+                    coastRadius = cr;
+                    break;
+                case "--tectonic-plates" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tp):
+                    tectonicPlateCount = tp;
+                    break;
                 case "--seed" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var s):
                     seed = s;
                     break;
@@ -176,6 +214,16 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--min-distance a --connections nesmí být záporné.");
             return null;
         }
+        if (coastRadius < 0)
+        {
+            Console.Error.WriteLine("--coast-radius nesmí být záporné.");
+            return null;
+        }
+        if (tectonicPlateCount < 0)
+        {
+            Console.Error.WriteLine("--tectonic-plates nesmí být záporné.");
+            return null;
+        }
 
         worldDbPath ??= Path.Combine(Directory.GetCurrentDirectory(), "world.db");
         terrainDbPath ??= Path.Combine(Directory.GetCurrentDirectory(), "terrain.db");
@@ -193,6 +241,8 @@ internal sealed class CliOptions
             MinDistanceMeters = minDistance,
             ConnectionsPerLocation = connections,
             MountainThresholdMeters = mountainThreshold,
+            CoastRadiusMeters = coastRadius,
+            TectonicPlateCount = tectonicPlateCount,
             Seed = seed,
             NutritionCsvPath = nutritionCsvPath,
         };

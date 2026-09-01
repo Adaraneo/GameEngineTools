@@ -26,5 +26,11 @@ public enum TerrainType
     Water,
 
     /// <summary>Highland terrain with altitude effects.</summary>
-    Mountain
+    Mountain,
+
+    /// <summary>Open, flat, low-lying land — fields and grassland away from any settlement.</summary>
+    Plains,
+
+    /// <summary>Land bordering open water — beaches, cliffs, harbor fronts.</summary>
+    Coastline
 }

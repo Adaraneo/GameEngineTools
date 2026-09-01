@@ -23,7 +23,7 @@ public class NutritionCatalogLoaderTests
     {
         var catalog = NutritionCatalogLoader.Load();
 
-        foreach (var biome in new[] { "Forest", "Mountain" })
+        foreach (var biome in new[] { "Forest", "Mountain", "Plains", "Coastline" })
         {
             foreach (var need in new[] { AffordanceType.Hunger, AffordanceType.Thirst, AffordanceType.Rest })
             {

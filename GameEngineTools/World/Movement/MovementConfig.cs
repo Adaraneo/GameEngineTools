@@ -89,6 +89,10 @@ namespace GameEngineTools.World.Movement
                 [TerrainType.Mountain] = 0.74, // ⚠️ PLACEHOLDER — gradient/altitude effects are
                                                // NOT covered by flat-terrain velocity coefficients
                                                // at all; see "Explicitně mimo rozsah".
+                [TerrainType.Plains] = 1.03, // analog: open/mown grassland, the fastest surface
+                                             // in the source dataset besides pavement itself.
+                [TerrainType.Coastline] = 0.81, // analog: disturbed/uneven ground (sand, shingle,
+                                                // tideline debris) — not directly tested.
             };
     }
 }

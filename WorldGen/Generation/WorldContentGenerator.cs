@@ -12,10 +12,18 @@ namespace WorldGen.Generation;
 /// Populates a world.db with procedurally-placed locations, the connections between them, and a
 /// small set of usable objects/affordances at each — all positioned on ground that TerraGen has
 /// ALREADY generated in terrain.db (never invents new terrain itself). Independent of TerraGen's
-/// own generation code — only consumes <see cref="TerrainHeightmap"/>, the shared read format.
+/// own generation code — only consumes <see cref="TerrainHeightmap"/>, the shared read format
+/// (plus independent ports of TerraGen's <see cref="TectonicPlates"/> and
+/// <see cref="RoadPathfinder"/> — see those files for why).
 /// </summary>
 public static class WorldContentGenerator
 {
+    /// <summary>How developed a placed location is — drives capacity, object density, and how
+    /// aggressively it gets linked into the road network. Picked per-location by
+    /// <see cref="PickTier"/>, weighted by the location's <see cref="TerrainType"/> biome (a
+    /// mountain candidate is far more likely to end up a lone camp than a town).</summary>
+    public enum SettlementTier { Camp, Village, Town }
+
     public sealed record Options(
         int Count,
         string Region = "Wilds",
@@ -27,11 +35,49 @@ public static class WorldContentGenerator
         /// instead of Forest — same threshold TerrainEditor's RegionClassifier uses.</summary>
         double MountainThresholdMeters = 300.0,
         /// <summary>How many random candidate points to try before giving up on one location.</summary>
-        int MaxPlacementAttempts = 50);
+        int MaxPlacementAttempts = 50,
+        /// <summary>A below-mountain candidate within this distance (meters) of any underwater
+        /// sample is classified Coastline instead of Plains/Forest.</summary>
+        double CoastRadiusMeters = 60.0,
+        /// <summary>Local slope (rise/run, dimensionless) at/below which a below-mountain,
+        /// non-coastal candidate is classified Plains instead of Forest.</summary>
+        double PlainsSlopeThreshold = 0.03,
+        /// <summary>Tectonic plate count for weighting danger near plate boundaries — 0 (default)
+        /// disables tectonic weighting entirely. Pass the SAME seed/count/radius TerraGen used to
+        /// generate this terrain (see <see cref="WorldGen.PlanetSettings"/>, which Program.cs
+        /// reads automatically from the same appsettings.World.json TerraGen reads), or the
+        /// boundary classification is meaningless noise against the wrong plate layout.</summary>
+        int TectonicPlateCount = 0,
+        int TectonicSeed = 0,
+        double PlanetRadiusMeters = 6_378_100.0,
+        /// <summary>Skips <see cref="PickTier"/>'s per-biome weighted roll and always uses this
+        /// tier instead — mainly for deterministic tests; leave <c>null</c> for real generation.</summary>
+        SettlementTier? ForcedTier = null);
 
     public sealed record Result(int LocationsPlaced, int ConnectionsCreated, int ObjectsCreated);
 
-    private sealed record Placed(string Id, double X, double Y);
+    private sealed record Placed(string Id, double X, double Y, TerrainHeightmap Tile, SettlementTier Tier);
+
+    private static readonly AffordanceType[] BaseNeeds =
+        [AffordanceType.Hunger, AffordanceType.Thirst, AffordanceType.Rest];
+
+    /// <summary>Nominative-singular adjective forms agreeing with each tier noun's grammatical
+    /// gender (tábor = masc., vesnice = fem., město = neut.) — <c>-ní</c> adjectives (Forest,
+    /// Coastline) are gender-invariant so all three columns repeat the same word.</summary>
+    private static readonly Dictionary<TerrainType, (string Masc, string Fem, string Neut)> BiomeAdjectives = new()
+    {
+        [TerrainType.Mountain] = ("Horský", "Horská", "Horské"),
+        [TerrainType.Forest] = ("Lesní", "Lesní", "Lesní"),
+        [TerrainType.Plains] = ("Planinský", "Planinská", "Planinské"),
+        [TerrainType.Coastline] = ("Pobřežní", "Pobřežní", "Pobřežní"),
+    };
+
+    private static readonly Dictionary<SettlementTier, string> TierNoun = new()
+    {
+        [SettlementTier.Camp] = "tábor",
+        [SettlementTier.Village] = "vesnice",
+        [SettlementTier.Town] = "město",
+    };
 
     public static Result Generate(
         SqliteWorldDatabase worldDb, IReadOnlyList<TerrainHeightmap> tiles, Options options, Random rng,
@@ -44,6 +90,12 @@ public static class WorldContentGenerator
         if (tiles.Count == 0)
             throw new ArgumentException("No terrain tiles to place locations on — generate some with TerraGen first.", nameof(tiles));
 
+        // Pure function of (seed, count) — built once per run and reused for every candidate's
+        // boundary sample, the same convention TerraGen's own TileGenerator follows.
+        var plates = options.TectonicPlateCount > 0
+            ? TectonicPlates.Generate(options.TectonicSeed, options.TectonicPlateCount)
+            : null;
+
         // Distinguishes ids across separate worldgen runs against the same world.db — without it,
         // a second run would pick the exact same "forest_001"/"mountain_001" ids as the first and
         // INSERT OR IGNORE would silently add nothing.
@@ -55,26 +107,29 @@ public static class WorldContentGenerator
 
         for (var i = 0; i < options.Count; i++)
         {
-            if (!TryFindCandidate(tiles, placed, options, rng, out var x, out var y, out var height))
+            if (!TryFindCandidate(tiles, placed, options, rng, out var x, out var y, out var height, out var tile))
                 continue; // couldn't find a valid spot after MaxPlacementAttempts — skip this one
 
             placedIndex++;
-            var category = height >= options.MountainThresholdMeters ? "mountain" : "forest";
-            var id = $"{category}_{runToken}_{placedIndex:D3}";
-            var displayName = category == "mountain"
-                ? $"Horský tábor {placedIndex:D2}"
-                : $"Lesní tábor {placedIndex:D2}";
+            var biome = ClassifyBiome(tiles, tile, x, y, height, options);
+            var tier = options.ForcedTier ?? PickTier(biome, rng);
+            var categoryPrefix = biome.ToString().ToLowerInvariant();
+            var id = $"{categoryPrefix}_{runToken}_{placedIndex:D3}";
+            var displayName = $"{DisplayName(biome, tier)} {placedIndex:D2}";
+
+            var (capacity, allowsPrivacy, baseNoise, noisePerPerson) = TierProfile(tier);
+            var dangerLevel = BaseDangerLevel(biome) + TectonicDangerBonus(plates, x, y, options.PlanetRadiusMeters);
 
             var descriptor = new LocationDescriptor(
                 Id: id,
                 DisplayName: displayName,
-                BaseNoise: 0.10,
-                NoisePerPerson: 0.03,
-                Capacity: 6,
-                AllowsPrivacy: false,
+                BaseNoise: baseNoise,
+                NoisePerPerson: noisePerPerson,
+                Capacity: capacity,
+                AllowsPrivacy: allowsPrivacy,
                 Type: LocationType.Public,
-                Terrain: category == "mountain" ? TerrainType.Mountain : TerrainType.Forest,
-                DangerLevel: category == "mountain" ? 0.30 : 0.15,
+                Terrain: biome,
+                DangerLevel: Math.Clamp(dangerLevel, 0.0, 1.0),
                 AllowsPickup: true,
                 NormId: null,
                 X: x,
@@ -82,25 +137,25 @@ public static class WorldContentGenerator
                 AltitudeMeters: height);
             worldDb.InsertLocation(descriptor, options.Region);
 
-            objectsCreated += AddCatalogObjects(worldDb, id, category, catalog, rng);
-            placed.Add(new Placed(id, x, y));
+            objectsCreated += AddCatalogObjects(worldDb, id, biome, tier, catalog, rng);
+            placed.Add(new Placed(id, x, y, tile, tier));
         }
 
-        var connectionsCreated = ConnectNearestNeighbors(worldDb, placed, options.ConnectionsPerLocation);
+        var connectionsCreated = ConnectNearestNeighbors(worldDb, placed, options);
 
         return new Result(placed.Count, connectionsCreated, objectsCreated);
     }
 
     private static bool TryFindCandidate(
         IReadOnlyList<TerrainHeightmap> tiles, List<Placed> placed, Options options, Random rng,
-        out double x, out double y, out double height)
+        out double x, out double y, out double height, out TerrainHeightmap tile)
     {
         for (var attempt = 0; attempt < options.MaxPlacementAttempts; attempt++)
         {
-            var tile = tiles[rng.Next(tiles.Count)];
-            var candidateX = tile.OriginX + rng.NextDouble() * tile.Width * tile.CellSizeMeters;
-            var candidateY = tile.OriginY + rng.NextDouble() * tile.Height * tile.CellSizeMeters;
-            var candidateHeight = tile.SampleAt(candidateX, candidateY);
+            var candidateTile = tiles[rng.Next(tiles.Count)];
+            var candidateX = candidateTile.OriginX + rng.NextDouble() * candidateTile.Width * candidateTile.CellSizeMeters;
+            var candidateY = candidateTile.OriginY + rng.NextDouble() * candidateTile.Height * candidateTile.CellSizeMeters;
+            var candidateHeight = candidateTile.SampleAt(candidateX, candidateY);
 
             if (candidateHeight < 0.0) continue; // underwater — don't place a camp in the sea
 
@@ -116,41 +171,190 @@ public static class WorldContentGenerator
             x = candidateX;
             y = candidateY;
             height = candidateHeight;
+            tile = candidateTile;
             return true;
         }
 
         x = y = height = 0;
+        tile = tiles[0];
         return false;
     }
 
+    /// <summary>Classifies a candidate's biome: Mountain by raw elevation (unchanged, existing
+    /// threshold), else Coastline when land within <see cref="Options.CoastRadiusMeters"/> touches
+    /// water, else Plains when locally flat, else Forest as the remaining (hilly, dry, inland)
+    /// default.</summary>
+    private static TerrainType ClassifyBiome(
+        IReadOnlyList<TerrainHeightmap> tiles, TerrainHeightmap tile, double x, double y, double height, Options options)
+    {
+        if (height >= options.MountainThresholdMeters) return TerrainType.Mountain;
+        if (IsNearWater(tiles, tile, x, y, options.CoastRadiusMeters)) return TerrainType.Coastline;
+        return EstimateSlope(tile, x, y) <= options.PlainsSlopeThreshold ? TerrainType.Plains : TerrainType.Forest;
+    }
+
+    /// <summary>Finite-difference gradient magnitude (rise/run) at (x,y), sampled one cell-width
+    /// out in each axis.</summary>
+    private static double EstimateSlope(TerrainHeightmap tile, double x, double y)
+    {
+        var d = tile.CellSizeMeters;
+        var gx = (tile.SampleAt(x + d, y) - tile.SampleAt(x - d, y)) / (2 * d);
+        var gy = (tile.SampleAt(x, y + d) - tile.SampleAt(x, y - d)) / (2 * d);
+        return Math.Sqrt(gx * gx + gy * gy);
+    }
+
+    /// <summary>Casts a ring of sample rays out to <paramref name="radiusMeters"/> looking for any
+    /// underwater elevation — samples against WHICHEVER tile in <paramref name="tiles"/> actually
+    /// contains each ray point (falling back to <paramref name="fallbackTile"/>, which clamps to
+    /// its own edge) so a candidate near a tile border still sees its true neighbor, not a
+    /// repeated edge value.</summary>
+    private static bool IsNearWater(IReadOnlyList<TerrainHeightmap> tiles, TerrainHeightmap fallbackTile, double x, double y, double radiusMeters)
+    {
+        const int rays = 8;
+        for (var i = 0; i < rays; i++)
+        {
+            var angle = i * (2 * Math.PI / rays);
+            var sx = x + Math.Cos(angle) * radiusMeters;
+            var sy = y + Math.Sin(angle) * radiusMeters;
+            if (SampleHeightAt(tiles, fallbackTile, sx, sy) < 0.0) return true;
+        }
+        return false;
+    }
+
+    private static double SampleHeightAt(IReadOnlyList<TerrainHeightmap> tiles, TerrainHeightmap fallbackTile, double x, double y)
+    {
+        foreach (var t in tiles)
+        {
+            if (x >= t.OriginX && x <= t.OriginX + t.Width * t.CellSizeMeters &&
+                y >= t.OriginY && y <= t.OriginY + t.Height * t.CellSizeMeters)
+                return t.SampleAt(x, y);
+        }
+        return fallbackTile.SampleAt(x, y);
+    }
+
+    /// <summary>Weighted random tier by biome — mountains are overwhelmingly lone camps, while
+    /// flat/coastal land (the historically real siting for towns: flat building ground plus water
+    /// access) is far likelier to hold a village or town.</summary>
+    private static SettlementTier PickTier(TerrainType biome, Random rng)
+    {
+        var (campWeight, villageWeight, townWeight) = biome switch
+        {
+            TerrainType.Mountain => (0.75, 0.22, 0.03),
+            TerrainType.Coastline => (0.20, 0.45, 0.35),
+            TerrainType.Plains => (0.20, 0.50, 0.30),
+            _ => (0.55, 0.38, 0.07), // Forest
+        };
+
+        var roll = rng.NextDouble() * (campWeight + villageWeight + townWeight);
+        if (roll < campWeight) return SettlementTier.Camp;
+        return roll < campWeight + villageWeight ? SettlementTier.Village : SettlementTier.Town;
+    }
+
+    private static string DisplayName(TerrainType biome, SettlementTier tier)
+    {
+        var adjectives = BiomeAdjectives[biome];
+        var adjective = tier switch
+        {
+            SettlementTier.Camp => adjectives.Masc,
+            SettlementTier.Village => adjectives.Fem,
+            SettlementTier.Town => adjectives.Neut,
+            _ => adjectives.Masc,
+        };
+        return $"{adjective} {TierNoun[tier]}";
+    }
+
+    private static (int Capacity, bool AllowsPrivacy, double BaseNoise, double NoisePerPerson) TierProfile(SettlementTier tier) => tier switch
+    {
+        SettlementTier.Camp => (6, false, 0.10, 0.03),
+        SettlementTier.Village => (18, true, 0.18, 0.025),
+        SettlementTier.Town => (40, true, 0.30, 0.02),
+        _ => (6, false, 0.10, 0.03),
+    };
+
+    private static double BaseDangerLevel(TerrainType biome) => biome switch
+    {
+        TerrainType.Mountain => 0.30,
+        TerrainType.Coastline => 0.12,
+        TerrainType.Plains => 0.08,
+        _ => 0.15, // Forest
+    };
+
+    /// <summary>Extra danger near a convergent (collision — earthquakes/volcanism) or divergent
+    /// (rift) plate boundary. Cubed influence to match the same "band, not a gradient spanning
+    /// half the plate" shaping TerraGen's own PlanetNoise applies to boundary uplift.</summary>
+    private static double TectonicDangerBonus(TectonicPlates.Plate[]? plates, double x, double y, double planetRadiusMeters)
+    {
+        if (plates is null) return 0.0;
+
+        var (lat, lon) = PlanetGeometry.OffsetToLatLon(x, y, planetRadiusMeters);
+        var (ux, uy, uz) = PlanetGeometry.LatLonToUnitVector(lat, lon);
+        var sample = TectonicPlates.Sample(plates, ux, uy, uz);
+        var belt = Math.Pow(sample.BoundaryInfluence, 3.0);
+
+        return sample.Boundary switch
+        {
+            TectonicPlates.BoundaryType.Convergent => belt * 0.25,
+            TectonicPlates.BoundaryType.Divergent => belt * 0.15,
+            _ => 0.0,
+        };
+    }
+
     /// <summary>Connects each placed location to its <see cref="Options.ConnectionsPerLocation"/>
-    /// nearest OTHER placed locations, both directions, with the real straight-line distance.
+    /// nearest OTHER placed locations, both directions, using a terrain-aware walking distance
+    /// (see <see cref="RoadDistance"/>) rather than a straight line. Town-tier locations
+    /// additionally reach their nearest other Town beyond that budget, so the handful of major
+    /// hubs stay linked into one backbone even when they aren't each other's closest neighbor.
     /// Doesn't touch any pre-existing locations already in world.db.</summary>
-    private static int ConnectNearestNeighbors(SqliteWorldDatabase worldDb, List<Placed> placed, int connectionsPerLocation)
+    private static int ConnectNearestNeighbors(SqliteWorldDatabase worldDb, List<Placed> placed, Options options)
     {
         var madePairs = new HashSet<string>();
         var created = 0;
+
+        void Connect(Placed from, Placed to)
+        {
+            var pairKey = string.CompareOrdinal(from.Id, to.Id) <= 0 ? $"{from.Id}|{to.Id}" : $"{to.Id}|{from.Id}";
+            if (!madePairs.Add(pairKey)) return;
+
+            var distance = RoadDistance(from, to);
+            worldDb.InsertConnection(from.Id, to.Id, distance);
+            worldDb.InsertConnection(to.Id, from.Id, distance);
+            created++;
+        }
 
         foreach (var from in placed)
         {
             var nearest = placed
                 .Where(p => p.Id != from.Id)
                 .OrderBy(p => DistanceSquared(from, p))
-                .Take(Math.Max(0, connectionsPerLocation));
+                .Take(Math.Max(0, options.ConnectionsPerLocation));
 
-            foreach (var to in nearest)
+            foreach (var to in nearest) Connect(from, to);
+        }
+
+        if (options.ConnectionsPerLocation > 0)
+        {
+            var towns = placed.Where(p => p.Tier == SettlementTier.Town).ToList();
+            foreach (var from in towns)
             {
-                var pairKey = string.CompareOrdinal(from.Id, to.Id) <= 0 ? $"{from.Id}|{to.Id}" : $"{to.Id}|{from.Id}";
-                if (!madePairs.Add(pairKey)) continue;
-
-                var distance = Math.Sqrt(DistanceSquared(from, to));
-                worldDb.InsertConnection(from.Id, to.Id, distance);
-                worldDb.InsertConnection(to.Id, from.Id, distance);
-                created++;
+                var nearestTown = towns.Where(p => p.Id != from.Id).OrderBy(p => DistanceSquared(from, p)).FirstOrDefault();
+                if (nearestTown is not null) Connect(from, nearestTown);
             }
         }
 
         return created;
+    }
+
+    /// <summary>Terrain-aware walking distance via <see cref="RoadPathfinder"/> when both
+    /// locations share the same tile (the pathfinder only ever sees one tile's own grid); a
+    /// straight line otherwise — WorldGen doesn't stitch tiles into one grid for pathfinding, so a
+    /// cross-tile road cost is necessarily an approximation.</summary>
+    private static double RoadDistance(Placed from, Placed to)
+    {
+        if (ReferenceEquals(from.Tile, to.Tile))
+        {
+            var path = RoadPathfinder.FindPath(from.Tile, from.X, from.Y, to.X, to.Y);
+            if (path is not null) return path.LengthMeters;
+        }
+        return Math.Sqrt(DistanceSquared(from, to));
     }
 
     private static double DistanceSquared(Placed a, Placed b)
@@ -160,52 +364,88 @@ public static class WorldContentGenerator
         return dx * dx + dy * dy;
     }
 
-    /// <summary>Adds one object per need (Hunger/Thirst/Rest) so a procedurally-placed location
+    /// <summary>Adds up to <see cref="Options.ForcedTier"/>-driven object depth per need (1 for
+    /// Camp, 2 for Village, 3 for Town — see <see cref="ObjectDepthForTier"/>) so a settlement
     /// isn't a dead end for NPC need-satisfaction — same role CastleVillageSeed's hand-authored
-    /// objects play for the Castle/Village content. Which object gets used is picked at random
-    /// from <see cref="FoodTemplate"/> rows whose <see cref="FoodTemplate.Biome"/> matches this
-    /// location's classification (or is <c>"Any"</c>) — a need with no matching template in the
-    /// catalog is simply skipped, not an error.</summary>
+    /// objects play for the Castle/Village content. Town tier also gets one Social object (a
+    /// market/gathering-place affordance) when the catalog has one. Objects come from
+    /// <see cref="FoodTemplate"/> rows whose <see cref="FoodTemplate.Biome"/> matches this
+    /// location's biome (or is <c>"Any"</c>) — a need with no matching template in the catalog is
+    /// simply skipped, not an error.</summary>
     private static int AddCatalogObjects(
-        SqliteWorldDatabase worldDb, string locationId, string biome,
+        SqliteWorldDatabase worldDb, string locationId, TerrainType biome, SettlementTier tier,
         IReadOnlyList<FoodTemplate> catalog, Random rng)
     {
         var created = 0;
+        var biomeName = biome.ToString();
+        var depth = ObjectDepthForTier(tier);
+        AffordanceType[] needs = tier == SettlementTier.Town
+            ? [.. BaseNeeds, AffordanceType.Social]
+            : BaseNeeds;
 
-        foreach (var need in new[] { AffordanceType.Hunger, AffordanceType.Thirst, AffordanceType.Rest })
+        foreach (var need in needs)
         {
             var candidates = catalog
                 .Where(t => t.AffordanceType == need &&
-                    (string.Equals(t.Biome, biome, StringComparison.OrdinalIgnoreCase) ||
+                    (string.Equals(t.Biome, biomeName, StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(t.Biome, "Any", StringComparison.OrdinalIgnoreCase)))
                 .ToList();
             if (candidates.Count == 0) continue;
 
-            var template = candidates[rng.Next(candidates.Count)];
-            worldDb.AddObject(new WorldObject
+            var take = need == AffordanceType.Social ? 1 : depth;
+            var slot = 0;
+            foreach (var template in PickDistinct(candidates, Math.Min(take, candidates.Count), rng))
             {
-                Category = CategoryFor(template.AffordanceType),
-                Id = $"{locationId}_{template.TemplateId}_01",
-                DisplayName = template.DisplayName,
-                LocationId = locationId,
-                IsAvailable = true,
-                IsPickable = template.Pickable,
-                ItemKind = template.ItemKind,
-                Respawns = template.RespawnMinutes > 0,
-                RespawnMinutes = template.RespawnMinutes,
-                WeightGrams = template.WeightGrams,
-                Affordances = [new WorldObjectAffordance(template.AffordanceType, template.Satisfaction)],
-                NutritionalProfile = template.AffordanceType is AffordanceType.Hunger or AffordanceType.Thirst
-                    ? new NutritionalProfile(
-                        template.CalorieGain, template.ProteinGain, template.IronGain,
-                        template.VitaminDGain, template.HydrationGain,
-                        template.HemeIronFraction, template.VitaminCMilligrams)
-                    : null,
-            });
-            created++;
+                slot++;
+                worldDb.AddObject(new WorldObject
+                {
+                    Category = CategoryFor(template.AffordanceType),
+                    Id = $"{locationId}_{template.TemplateId}_{slot:D2}",
+                    DisplayName = template.DisplayName,
+                    LocationId = locationId,
+                    IsAvailable = true,
+                    IsPickable = template.Pickable,
+                    ItemKind = template.ItemKind,
+                    Respawns = template.RespawnMinutes > 0,
+                    RespawnMinutes = template.RespawnMinutes,
+                    WeightGrams = template.WeightGrams,
+                    Affordances = [new WorldObjectAffordance(template.AffordanceType, template.Satisfaction)],
+                    NutritionalProfile = template.AffordanceType is AffordanceType.Hunger or AffordanceType.Thirst
+                        ? new NutritionalProfile(
+                            template.CalorieGain, template.ProteinGain, template.IronGain,
+                            template.VitaminDGain, template.HydrationGain,
+                            template.HemeIronFraction, template.VitaminCMilligrams)
+                        : null,
+                });
+                created++;
+            }
         }
 
         return created;
+    }
+
+    private static int ObjectDepthForTier(SettlementTier tier) => tier switch
+    {
+        SettlementTier.Camp => 1,
+        SettlementTier.Village => 2,
+        SettlementTier.Town => 3,
+        _ => 1,
+    };
+
+    /// <summary>Picks up to <paramref name="count"/> DISTINCT templates from
+    /// <paramref name="candidates"/> without replacement — fewer than <paramref name="count"/>
+    /// candidates simply returns all of them.</summary>
+    private static List<FoodTemplate> PickDistinct(List<FoodTemplate> candidates, int count, Random rng)
+    {
+        var pool = new List<FoodTemplate>(candidates);
+        var result = new List<FoodTemplate>(count);
+        for (var i = 0; i < count && pool.Count > 0; i++)
+        {
+            var idx = rng.Next(pool.Count);
+            result.Add(pool[idx]);
+            pool.RemoveAt(idx);
+        }
+        return result;
     }
 
     private static WorldObjectCategory CategoryFor(AffordanceType affordanceType) => affordanceType switch
