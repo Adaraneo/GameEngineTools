@@ -34,11 +34,15 @@ public partial class MainWindow : Window
     /// of writing one throwaway "combined" row. Empty whenever <see cref="_grid"/> is a single
     /// tile (its own id) or the hand-painted "default" canvas — nothing to split there.</summary>
     private IReadOnlyList<TerrainHeightmap> _combinedSources = [];
+    /// <summary>The LOD stride <see cref="_grid"/> was actually built at (see
+    /// <see cref="TileStitcher.BuildCombinedGrid"/>'s <c>stride</c> param) — 1 for every
+    /// non-stitch-pipeline grid (a single loaded tile, a hand-painted "default"/legacy canvas).
+    /// &gt; 1 means <see cref="_grid"/> is a decimated BROWSING view: <see cref="EnsureViewportCoverage"/>
+    /// compares this against what the current zoom wants to detect a grid that's spatially fine
+    /// but missing resolution, and <see cref="SaveGrid"/> refuses to split-save it back into
+    /// <see cref="_combinedSources"/> (would corrupt them — see that method's stride note).</summary>
+    private int _gridStride = 1;
     private WriteableBitmap? _bitmap;
-    /// <summary>Applied to <see cref="OverlayCanvas"/> so markers/contours/connections track a
-    /// mid-drag grid-origin shift cheaply (see <see cref="SwapGridPreservingViewport"/>) without a
-    /// full rebuild — reset to (0,0) whenever a full <see cref="RenderOverlay"/> runs.</summary>
-    private readonly TranslateTransform _overlayShift = new();
     private readonly List<LocationMarkerViewModel> _markers = [];
     private readonly Dictionary<string, Ellipse> _markerShapes = [];
     private readonly Dictionary<string, TextBlock> _markerLabels = [];
@@ -67,7 +71,6 @@ public partial class MainWindow : Window
         _vm = vm;
         _contourGen = contourGen;
         DataContext = _vm;
-        OverlayCanvas.RenderTransform = _overlayShift;
 
         _vm.PropertyChanged += (_, e) =>
         {
@@ -76,19 +79,21 @@ public partial class MainWindow : Window
 
             if (e.PropertyName == nameof(ShellViewModel.Zoom))
             {
-                // Re-render only if zoom actually crossed into a different LOD bracket (see
-                // ComputeDownsampleFactor) — most individual Ctrl+wheel notches don't, so this
-                // skips rebuilding the bitmap on every single one of them.
-                if (ComputeDownsampleFactor(_vm.Zoom) != _lastRenderedDownsample)
-                    RenderGrid();
-
-                // Zooming OUT (buttons, Reset, or Ctrl+wheel) can reveal area beyond whatever was
-                // last stitched by a pan — panning is the only other thing that re-checks coverage,
-                // so without this a zoomed-out view can show a black "nothing here" gap at the
-                // edges even though real tiles exist there, just not pulled in yet. Deferred to
-                // Loaded priority so the ScaleTransform's layout pass (which the Zoom binding
-                // drives) has already run — reading ViewportWidth/Height synchronously here would
-                // still see the pre-zoom numbers.
+                // RenderGrid renders _grid at its own native resolution — it no longer does any
+                // zoom-dependent downsampling itself (see RenderGrid's doc comment for why: that
+                // used to double-count against the LOD decimation TileStitcher now bakes into the
+                // stitched grid). So a zoom change doesn't need its own explicit re-render call —
+                // EnsureViewportCoverage below detects a stale LOD level (current _grid's stride
+                // vs. what the new zoom wants) the same way it detects insufficient spatial
+                // coverage, and re-stitches (which ends in a real RenderGrid) when needed.
+                //
+                // Zooming OUT (buttons, Reset, or Ctrl+wheel) can also reveal area beyond whatever
+                // was last stitched by a pan — panning is the only other thing that re-checks
+                // coverage, so without this a zoomed-out view can show a black "nothing here" gap
+                // at the edges even though real tiles exist there, just not pulled in yet.
+                // Deferred to Loaded priority so the ScaleTransform's layout pass (which the Zoom
+                // binding drives) has already run — reading ViewportWidth/Height synchronously
+                // here would still see the pre-zoom numbers.
                 Dispatcher.BeginInvoke(new Action(() => EnsureViewportCoverage()), DispatcherPriority.Loaded);
             }
         };
@@ -567,7 +572,19 @@ public partial class MainWindow : Window
         if (_grid is null) return;
 
         if (_grid.Id == "combined" && _combinedSources.Count > 0)
+        {
+            if (_gridStride > 1)
+            {
+                // A decimated browsing view (see _gridStride's doc comment) has no cell-for-cell
+                // correspondence with _combinedSources anymore — SplitAndSave would write corrupt,
+                // wrong-resolution data back into the real tiles. Terrain edits made while zoomed
+                // out this far wouldn't be precise anyway; just skip the heightmap write (location/
+                // connection saves above this call still go through) and say why.
+                _vm.StatusText = "Terén se v tomto přiblížení neuložil (zobrazení je zjednodušené kvůli oddálení) — přibliž a ulož znovu.";
+                return;
+            }
             TileStitcher.SplitAndSave(_grid, _combinedSources, _vm.WorldDb.SaveHeightmap);
+        }
         else
             _vm.WorldDb.SaveHeightmap(_grid);
     }
@@ -683,33 +700,31 @@ public partial class MainWindow : Window
 
     #region Heightmap rendering
 
-    /// <summary>How many grid cells the bitmap skips per sampled pixel when zoomed out — 1 at
-    /// 100%+ zoom (full resolution), growing as zoom shrinks, capped at <see cref="MaxDownsample"/>
-    /// so an extreme zoom-out doesn't collapse the bitmap to a handful of pixels. Colouring is the
-    /// hot loop in <see cref="RenderGrid"/>, and at low zoom most of that detail lands on less than
-    /// a screen pixel anyway — WPF's own upscale (see <c>Stretch="Fill"</c> on HeightmapImage in
-    /// XAML) fills back in the logical size, just blurrier, which is the expected LOD tradeoff.</summary>
+    /// <summary>How many source grid cells one decimated cell represents when the background
+    /// stitch pipeline builds a combined grid for the current zoom — 1 at 100%+ zoom (full
+    /// resolution), growing as zoom shrinks, capped at <see cref="MaxDownsample"/> so an extreme
+    /// zoom-out doesn't collapse the grid to a handful of cells. This used to ALSO be reapplied at
+    /// render/contour time on top of whatever the grid already was — double-counting the
+    /// reduction, and (worse) not actually shrinking what was held in memory, since a stitched
+    /// grid was always built at full resolution regardless of zoom. Baking it into the grid itself
+    /// (see <see cref="TileStitcher.BuildCombinedGrid"/>'s <c>stride</c> parameter and
+    /// <see cref="EnsureViewportCoverage"/>) means RenderGrid/RenderOverlay can just render
+    /// whatever <see cref="_grid"/> actually is, 1:1, and a heavily zoomed-out combined grid stays
+    /// proportionally small in memory instead of retaining tens of millions of full-resolution
+    /// cells only to throw most of them away at render time.</summary>
     private static int ComputeDownsampleFactor(double zoom)
         => Math.Clamp((int)Math.Ceiling(1.0 / Math.Max(zoom, 0.01)), 1, MaxDownsample);
 
     private const int MaxDownsample = 8;
 
-    /// <summary>The downsample factor <see cref="_bitmap"/> was actually built at — lets the
-    /// Zoom-changed handler skip re-rendering when zoom moved but stayed within the same LOD
-    /// bracket (e.g. Ctrl+wheel ticks that don't cross a <see cref="ComputeDownsampleFactor"/>
-    /// boundary), instead of rebuilding the bitmap on every single zoom notch.</summary>
-    private int _lastRenderedDownsample = 1;
-
     private unsafe void RenderGrid()
     {
         if (_grid is null) return;
 
-        var downsample = ComputeDownsampleFactor(_vm.Zoom);
-        _lastRenderedDownsample = downsample;
-        var bitmapWidth = Math.Max(1, (_grid.Width + downsample - 1) / downsample);
-        var bitmapHeight = Math.Max(1, (_grid.Height + downsample - 1) / downsample);
+        var bitmapWidth = Math.Max(1, _grid.Width);
+        var bitmapHeight = Math.Max(1, _grid.Height);
         using var perfScope = PerfLog.Scope("RenderGrid",
-            $"grid {_grid.Width}x{_grid.Height} (id={_grid.Id}) -> bitmap {bitmapWidth}x{bitmapHeight} (downsample {downsample}x)");
+            $"grid {_grid.Width}x{_grid.Height} (id={_grid.Id})");
 
         if (_bitmap is null || _bitmap.PixelWidth != bitmapWidth || _bitmap.PixelHeight != bitmapHeight)
         {
@@ -718,9 +733,9 @@ public partial class MainWindow : Window
         }
 
         // The LOGICAL size (what the ScrollViewer scrolls over, what WorldToCanvas/CanvasToWorld
-        // assume 1 unit = 1 grid cell against) always matches the grid's true cell count, whatever
-        // the bitmap's own (possibly downsampled) pixel resolution is — Stretch="Fill" is what
-        // makes WPF stretch a smaller bitmap back up to fill this same box.
+        // assume 1 unit = 1 grid cell against) matches the grid's cell count 1:1 — the grid itself
+        // is already at whatever resolution EnsureViewportCoverage's stitch decided was right for
+        // the current zoom (see ComputeDownsampleFactor's doc comment).
         HeightmapImage.Width = _grid.Width;
         HeightmapImage.Height = _grid.Height;
         OverlayCanvas.Width = _grid.Width;
@@ -746,17 +761,14 @@ public partial class MainWindow : Window
         // Each pixel only reads its own cell and writes its own 4 bytes — no shared mutable state
         // between rows, so this is safe to parallelize across cores. TerrainColorRamp.ForCell is a
         // pure function over static readonly data. Worthwhile because this is the actual hot loop:
-        // up to bitmapWidth*bitmapHeight TerrainColorRamp calls every time the grid is (re)rendered
-        // (== grid.Width*grid.Height only when downsample is 1, i.e. at 100%+ zoom).
+        // bitmapWidth*bitmapHeight TerrainColorRamp calls every time the grid is (re)rendered.
         Parallel.For(0, bitmapHeight, by =>
         {
             var rowPtr = backBuffer + by * stride;
-            var gy = Math.Min(by * downsample, grid.Height - 1);
-            var rowStart = gy * grid.Width;
+            var rowStart = by * grid.Width;
             for (var bx = 0; bx < bitmapWidth; bx++)
             {
-                var gx = Math.Min(bx * downsample, grid.Width - 1);
-                var i = rowStart + gx;
+                var i = rowStart + bx;
                 var isRiver = grid.RiverMask is { } mask && mask[i] != 0;
                 var color = TerrainColorRamp.ForCell(grid.Values[i], min, max, isRiver);
                 var pixelPtr = rowPtr + bx * 4;
@@ -771,21 +783,38 @@ public partial class MainWindow : Window
         _bitmap.Unlock();
     }
 
-    /// <summary>Rebuilds contour lines + location markers. Contours are recomputed here only —
-    /// on stroke end, not every mouse-move — because marching squares over the whole grid is
-    /// too expensive to run per pixel-drag. During a live pan drag, this whole method is skipped
-    /// entirely instead (see <see cref="SwapGridPreservingViewport"/>).</summary>
+    /// <summary>Rebuilds contour lines + location markers, computing contours (marching squares
+    /// over the whole grid) itself first. Used by every call site EXCEPT the background-stitch
+    /// pan pipeline, which precomputes contours off the UI thread instead — see the
+    /// <see cref="RenderOverlay(IReadOnlyList{ContourSegment})"/> overload and
+    /// <see cref="EnsureViewportCoverage"/>.</summary>
     private void RenderOverlay()
     {
         if (_grid is null) return;
         using var perfScope = PerfLog.Scope("RenderOverlay",
-            $"grid {_grid.Width}x{_grid.Height}, {_markers.Count} markerů, {_connections.Count} spojení (marching squares)");
+            $"grid {_grid.Width}x{_grid.Height} — počítám kontury na UI vlákně (marching squares)");
+        RenderOverlay(_contourGen.Generate(_grid));
+    }
+
+    /// <summary>Rebuilds contour lines + location markers from ALREADY-COMPUTED contour segments
+    /// (see <see cref="ContourGenerator.Generate"/>) — the marching-squares pass itself is pure
+    /// data (no WPF objects) and was the single biggest cost of a full overlay rebuild (up to ~2s
+    /// on a large stitched grid, per a real Perf Log capture), so the background-stitch pipeline
+    /// computes it on the thread pool ALONGSIDE the tile stitch instead of on the UI thread here.
+    /// What's left — creating WPF <see cref="Line"/> objects from an already-known segment list,
+    /// plus markers/connections (a few hundred, not millions) — is cheap enough to run on every
+    /// settled pan swap, not just on drag-end, which is what fixed the "half the map has no
+    /// contours" artifact a long continuous drag used to leave behind (see git history/commit
+    /// message for the before/after).</summary>
+    private void RenderOverlay(IReadOnlyList<ContourSegment> precomputedContours)
+    {
+        if (_grid is null) return;
 
         OverlayCanvas.Children.Clear();
         _markerShapes.Clear();
         _markerLabels.Clear();
 
-        foreach (var seg in _contourGen.Generate(_grid))
+        foreach (var seg in precomputedContours)
         {
             var isCoastline = seg.Level == 0f;
             var (x1, y1) = WorldToCanvas(seg.X1, seg.Y1);
@@ -993,6 +1022,66 @@ public partial class MainWindow : Window
         EnsureViewportCoverage();
     }
 
+    /// <summary>True while a background prefetch (see <see cref="PrefetchAroundViewport"/>) is
+    /// running — one at a time, same reasoning as <see cref="_stitchInFlight"/>: no point queuing
+    /// more than one, the next throttled coverage check will just issue a fresher one anyway.</summary>
+    private bool _prefetchInFlight;
+
+    /// <summary>
+    /// Warms <see cref="WorldDatabaseService"/>'s heightmap LRU cache for a HALO well beyond the
+    /// current viewport — pure cache-warming (SQL loads only), no stitching or rendering — so that
+    /// by the time the user actually pans far enough to trigger a real <see cref="EnsureViewportCoverage"/>
+    /// re-stitch, the tiles it needs are already cache hits instead of fresh disk loads. Directly
+    /// answers the "waits for the not-yet-loaded ones" freeze a real Perf Log capture showed:
+    /// <see cref="EnsureViewportCoverage"/> only starts loading once the user has already crossed
+    /// the loaded edge — this runs continuously, on every throttled coverage check (not gated on
+    /// whether a real re-stitch is needed), reaching well past what's currently visible.
+    /// </summary>
+    private void PrefetchAroundViewport(double minWorldX, double minWorldY, double maxWorldX, double maxWorldY)
+    {
+        if (_prefetchInFlight || !_vm.WorldDb.IsOpen) return;
+
+        // A much wider halo than the ~0.5x-viewport padding EnsureViewportCoverage uses for the
+        // actual visible stitch — this one never has to be rendered, so it can afford to look
+        // further ahead without making any single frame's real work bigger.
+        const double PrefetchPaddingFraction = 2.0;
+        var padX = (maxWorldX - minWorldX) * PrefetchPaddingFraction;
+        var padY = (maxWorldY - minWorldY) * PrefetchPaddingFraction;
+        var boxMinX = minWorldX - padX;
+        var boxMinY = minWorldY - padY;
+        var boxMaxX = maxWorldX + padX;
+        var boxMaxY = maxWorldY + padY;
+
+        var worldDb = _vm.WorldDb;
+        _prefetchInFlight = true;
+        Task.Run(() =>
+        {
+            using var scope = PerfLog.Scope("Prefetch", "Zahřívání cache dlaždic v širokém okolí (mimo UI vlákno, bez stitche/renderu)");
+            try
+            {
+                var summaries = worldDb.ListHeightmaps();
+                var warmed = 0;
+                foreach (var s in summaries)
+                {
+                    if (TileStitcher.Overlaps(s, boxMinX, boxMinY, boxMaxX, boxMaxY))
+                    {
+                        worldDb.LoadHeightmap(s.Id); // populates the LRU cache as a side effect; result unused here
+                        warmed++;
+                    }
+                }
+                PerfLog.Log("Prefetch", $"Zahřáto {warmed} dlaždic v okolí.");
+            }
+            catch
+            {
+                // Best-effort — e.g. database closed mid-flight. Never worth crashing over.
+            }
+            finally
+            {
+                _prefetchInFlight = false;
+            }
+        });
+    }
+
     /// <summary>
     /// Middle-mouse panning across a continuous terrain.db surface: if the visible viewport has
     /// panned close to (or past) the currently-loaded <see cref="_grid"/>'s edge, re-stitches a
@@ -1021,6 +1110,10 @@ public partial class MainWindow : Window
         var (minWorldX, minWorldY) = CanvasToWorld(viewportCanvasLeft, viewportCanvasTop);
         var (maxWorldX, maxWorldY) = CanvasToWorld(viewportCanvasRight, viewportCanvasBottom);
 
+        // Runs on every throttled coverage check, independent of whether a real stitch+swap is
+        // needed right now — see PrefetchAroundViewport's own doc comment for why.
+        PrefetchAroundViewport(minWorldX, minWorldY, maxWorldX, maxWorldY);
+
         // Small slack so a reload doesn't fire from a single pixel of scroll jitter right at the edge.
         var margin = 20.0 * _grid.CellSizeMeters;
         var gridMinX = _grid.OriginX;
@@ -1030,13 +1123,39 @@ public partial class MainWindow : Window
 
         var needsExtend = minWorldX < gridMinX + margin || minWorldY < gridMinY + margin
             || maxWorldX > gridMaxX - margin || maxWorldY > gridMaxY - margin;
-        if (!needsExtend)
+
+        // _grid may also just be stale in RESOLUTION, not area — e.g. the user zoomed in on a
+        // grid that was decimated for a much-more-zoomed-out view (see TileStitcher.BuildCombinedGrid's
+        // stride parameter). Re-stitching is the only way to get the missing detail back, since
+        // it was never loaded in the first place, not merely downsampled at render time.
+        var desiredStride = ComputeDownsampleFactor(_vm.Zoom);
+        var lodStale = desiredStride != _gridStride;
+
+        if (!needsExtend && !lodStale)
         {
             if (!isLiveDrag)
                 PerfLog.Log("Coverage", "Kontrola pokrytí: aktuální dlaždice stačí, nic se nenačítá.");
             return;
         }
-        PerfLog.Log("Coverage", $"Kontrola pokrytí: hranice dosažena (liveDrag={isLiveDrag}), spouštím re-stitch na pozadí.");
+        // A fast drag fires many throttled coverage checks in quick succession (each one crosses
+        // the 40px threshold independently). A real Perf Log capture showed that trying to fix
+        // this with a CancellationTokenSource cancelled-before-start didn't help at all (0 actual
+        // skips logged) — on a multi-core machine the thread pool starts a queued Task.Run almost
+        // immediately, so by the time the next check cancels the previous token, that previous
+        // stitch has usually already started running its SQL. The only thing that actually
+        // prevents the wasted concurrent SQL+decode work (visible in the log as the same tile
+        // loaded twice within milliseconds, and working-set growth that never came back down) is
+        // never letting two stitches run at once: if one is already in flight, this call doesn't
+        // start a second — it just remembers to re-check coverage (with then-current viewport
+        // position) the moment the in-flight one finishes.
+        if (_stitchInFlight)
+        {
+            _stitchPending = true;
+            _stitchPendingIsLiveDrag = isLiveDrag;
+            return;
+        }
+
+        PerfLog.Log("Coverage", $"Kontrola pokrytí: hranice dosažena (liveDrag={isLiveDrag}, lodStale={lodStale}), spouštím re-stitch na pozadí.");
 
         // Pad a bit beyond the visible box so a follow-up pan in the same direction doesn't
         // immediately need yet another reload. Deliberately half the viewport, not a full one —
@@ -1058,8 +1177,15 @@ public partial class MainWindow : Window
         // touches _grid/_bitmap/OverlayCanvas) has to stay on the UI thread; the loading/stitching
         // itself doesn't touch any UI object, so it runs on the thread pool instead.
         var worldDb = _vm.WorldDb;
+        // Zoom is UI-thread state — snapshot it now, not from the background thread. Used both to
+        // decimate the stitched grid itself (TileStitcher's stride param — see its doc comment)
+        // and, since the grid comes back already at that resolution, to remember what stride it
+        // was built at (_gridStride) so a later zoom-IN can detect the detail is missing and
+        // trigger a fresh re-stitch instead of just re-rendering stale coarse data.
+        var stride = desiredStride;
         var token = new object();
         _pendingStitchToken = token;
+        _stitchInFlight = true;
 
         Task.Run(() =>
         {
@@ -1067,11 +1193,28 @@ public partial class MainWindow : Window
             try
             {
                 var summaries = worldDb.ListHeightmaps();
-                var result = TileStitcher.BuildCombinedGrid(summaries, worldDb.LoadHeightmap, boxMinX, boxMinY, boxMaxX, boxMaxY);
-                PerfLog.Log("Stitch", result.Combined is { } c
-                    ? $"Výsledek: {result.Sources.Count} zdrojových dlaždic -> combined {c.Width}x{c.Height}"
+                var (combined, sources) = TileStitcher.BuildCombinedGrid(summaries, worldDb.LoadHeightmap, boxMinX, boxMinY, boxMaxX, boxMaxY, stride: stride);
+                PerfLog.Log("Stitch", combined is { } c
+                    ? $"Výsledek: {sources.Count} zdrojových dlaždic -> combined {c.Width}x{c.Height} (stride {stride}x)"
                     : "Výsledek: žádné dlaždice v oblasti, combined = null");
-                return result;
+
+                // Marching squares is pure data (no WPF objects) — computing it here, alongside
+                // the stitch, means the UI-thread swap below only has to build cheap WPF Line
+                // objects from an already-known segment list instead of running the expensive
+                // pass itself. That's what lets every settled swap do a FULL overlay rebuild
+                // instead of the old shift-only shortcut during a live drag — the shift-only
+                // approach left long continuous drags with large swaths of newly-revealed terrain
+                // showing no contour lines at all (confirmed via a real Perf Log + screenshot).
+                // stride: 1 here — combined is ALREADY decimated by TileStitcher above, so
+                // reapplying the same stride against it would double-reduce the detail.
+                IReadOnlyList<ContourSegment> contours = [];
+                if (combined is not null)
+                {
+                    using var contourScope = PerfLog.Scope("Contours", $"Marching squares na pozadí pro combined {combined.Width}x{combined.Height} (grid už decimovaná stitchem)");
+                    contours = _contourGen.Generate(combined);
+                }
+
+                return (Combined: combined, Sources: sources, Contours: contours);
             }
             catch (Exception ex)
             {
@@ -1079,33 +1222,75 @@ public partial class MainWindow : Window
                 // The token check below would likely have discarded the result anyway; this just
                 // keeps a lost race from crashing the background thread.
                 PerfLog.Log("Stitch", $"Chyba při skládání (ignorováno, race s zavřením db?): {ex.GetType().Name}: {ex.Message}");
-                return (Combined: null, Sources: (IReadOnlyList<TerrainHeightmap>)[]);
+                return (Combined: null, Sources: (IReadOnlyList<TerrainHeightmap>)[], Contours: (IReadOnlyList<ContourSegment>)[]);
             }
         }).ContinueWith(t =>
         {
-            // Superseded by a newer coverage check (further panning, a zoom, a totally different
-            // database opened) that started after this one — its own result (or lack of one) wins.
-            if (!ReferenceEquals(_pendingStitchToken, token))
+            _stitchInFlight = false;
+
+            // A newer coverage check already arrived WHILE this stitch was running (the viewport
+            // kept moving) — this result was built from an already-stale box. Applying it anyway
+            // was the actual cause of the "weird" behavior a real capture surfaced: during a
+            // sustained fast drag, every single throttled trigger got its own real (serialized,
+            // no longer concurrent) stitch, and EVERY one of them got rendered — so instead of
+            // jumping straight to where the mouse currently is, the view visibly stepped through
+            // a whole queue of stale intermediate tile combinations, one RenderGrid/RenderOverlay
+            // at a time, lagging behind the actual drag. Skipping the render here and chaining
+            // straight to the next (fresher) check means only the result from a stitch that
+            // completed without being superseded — i.e. one that reflects where the view actually
+            // settled — ever gets drawn.
+            var supersededByNewerRequest = _stitchPending;
+            if (supersededByNewerRequest)
+            {
+                PerfLog.Log("Coverage", "Výsledek zastaralý (přišel novější požadavek během běhu) — vykreslení přeskočeno, řetězím na další kontrolu.");
+            }
+            // Superseded by a newer coverage check that also started AFTER this one already
+            // finished (e.g. the database was closed/reopened mid-flight) — its own result wins.
+            else if (!ReferenceEquals(_pendingStitchToken, token))
             {
                 PerfLog.Log("Coverage", "Výsledek zahozen — mezitím spuštěná novější kontrola pokrytí ho nahradila.");
-                return;
             }
-            if (_grid is null) return; // database was closed while this was in flight
-
-            var (combined, sources) = t.Result;
-            if (combined is null) return;
-
-            var unchanged = Math.Abs(combined.OriginX - _grid.OriginX) < 1e-6 && Math.Abs(combined.OriginY - _grid.OriginY) < 1e-6
-                && combined.Width == _grid.Width && combined.Height == _grid.Height;
-            if (unchanged)
+            else if (_grid is null)
             {
-                PerfLog.Log("Coverage", "Nová combined mřížka je shodná s aktuální — swap přeskočen.");
-                return;
+                // database was closed while this was in flight
+            }
+            else
+            {
+                var (combined, sources, contours) = t.Result;
+                if (combined is not null)
+                {
+                    var unchanged = Math.Abs(combined.OriginX - _grid.OriginX) < 1e-6 && Math.Abs(combined.OriginY - _grid.OriginY) < 1e-6
+                        && combined.Width == _grid.Width && combined.Height == _grid.Height;
+                    if (unchanged)
+                        PerfLog.Log("Coverage", "Nová combined mřížka je shodná s aktuální — swap přeskočen.");
+                    else
+                    {
+                        SwapGridPreservingViewport(combined, sources, contours);
+                        _gridStride = stride;
+                    }
+                }
             }
 
-            SwapGridPreservingViewport(combined, sources, isLiveDrag);
+            // A pan that arrived while this stitch was running didn't start its own — re-check
+            // coverage now, against the CURRENT viewport (not the stale box captured above), so
+            // it isn't lost.
+            if (_stitchPending)
+            {
+                _stitchPending = false;
+                EnsureViewportCoverage(_stitchPendingIsLiveDrag);
+            }
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
+
+    /// <summary>True while a background stitch (see <see cref="EnsureViewportCoverage"/>) is
+    /// running — gates out concurrent stitches instead of letting them race (see
+    /// <see cref="_stitchPending"/>).</summary>
+    private bool _stitchInFlight;
+
+    /// <summary>Set when a coverage check arrives while <see cref="_stitchInFlight"/> — re-run
+    /// once the in-flight stitch's continuation finishes, using the viewport as it is by then.</summary>
+    private bool _stitchPending;
+    private bool _stitchPendingIsLiveDrag;
 
     /// <summary>Identifies the most recently STARTED background stitch (see
     /// <see cref="EnsureViewportCoverage"/>) — its continuation is the only one allowed to apply
@@ -1116,39 +1301,24 @@ public partial class MainWindow : Window
     /// keeping whatever world-space point was centered in the viewport still centered afterward —
     /// the new grid's OriginX/OriginY generally differ from the old one's, so the raw scroll
     /// offsets would otherwise land on the wrong spot.</summary>
-    private void SwapGridPreservingViewport(TerrainHeightmap newGrid, IReadOnlyList<TerrainHeightmap> sources, bool isLiveDrag)
+    private void SwapGridPreservingViewport(TerrainHeightmap newGrid, IReadOnlyList<TerrainHeightmap> sources, IReadOnlyList<ContourSegment> contours)
     {
         var viewportCenterCanvasX = (MapScrollViewer.HorizontalOffset + MapScrollViewer.ViewportWidth / 2.0) / _vm.Zoom;
         var viewportCenterCanvasY = (MapScrollViewer.VerticalOffset + MapScrollViewer.ViewportHeight / 2.0) / _vm.Zoom;
         var (worldCenterX, worldCenterY) = CanvasToWorld(viewportCenterCanvasX, viewportCenterCanvasY);
 
-        var oldGrid = _grid;
         _grid = newGrid;
         _combinedSources = sources;
         RenderGrid();
 
-        // Full overlay rebuild (contours via marching squares over a possibly million-plus-cell
-        // grid, plus every marker/connection) is too expensive to run on every intermediate swap
-        // during a live drag. Earlier this just SKIPPED the overlay during a drag instead — but
-        // losing every location marker/contour mid-pan is exactly what made panning feel
-        // disorienting ("don't know where I am"). Cheaper middle ground: shift the EXISTING overlay
-        // visuals by the exact canvas-space delta the grid's own origin just moved (one
-        // TranslateTransform on the whole OverlayCanvas — O(1), not O(markers)) so they track the
-        // new grid correctly without a full rebuild, then do the real rebuild once the drag ends
-        // (MapScrollViewer_PreviewMouseUp always calls this with isLiveDrag=false).
-        if (isLiveDrag && oldGrid is not null)
-        {
-            var deltaCanvasX = (oldGrid.OriginX - newGrid.OriginX) / newGrid.CellSizeMeters;
-            var deltaCanvasY = (oldGrid.OriginY - newGrid.OriginY) / newGrid.CellSizeMeters;
-            _overlayShift.X += deltaCanvasX;
-            _overlayShift.Y += deltaCanvasY;
-        }
-        else
-        {
-            RenderOverlay();
-            _overlayShift.X = 0;
-            _overlayShift.Y = 0;
-        }
+        // Contours were already computed on the background thread alongside the stitch (see
+        // EnsureViewportCoverage) — this is now just cheap WPF Line/marker/connection creation
+        // from an already-known segment list, so every settled swap gets a FULL overlay rebuild,
+        // not just drag-end. The previous "shift the old overlay, only rebuild when the drag
+        // ends" shortcut left long continuous drags with large areas showing no contour lines at
+        // all (confirmed via a real Perf Log capture + screenshot) — always rebuilding now that
+        // it's cheap avoids that entirely.
+        RenderOverlay(contours);
 
         Dispatcher.BeginInvoke(new Action(() =>
         {

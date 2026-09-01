@@ -23,10 +23,22 @@ public static class TileStitcher
     /// <see cref="SplitAndSave"/> to write edits back to those same tiles instead of one big
     /// "combined" blob.
     /// </summary>
+    /// <param name="stride">When &gt; 1, the combined grid is decimated (nearest-neighbor, every
+    /// <paramref name="stride"/>-th cell) before being returned — <c>CellSizeMeters</c> scales up
+    /// by the same factor so world-space positioning stays correct, only the cell COUNT shrinks.
+    /// Lets a heavily zoomed-out view build a proportionally small grid instead of a full-resolution
+    /// one that gets thrown away at render time anyway — a real capture showed a 126-tile,
+    /// 20-million-cell combined grid at low zoom, retained in memory and iterated over in full by
+    /// every subsequent render/contour pass. <c>Sources</c> still lists the ORIGINAL full-resolution
+    /// tiles regardless of <paramref name="stride"/> — a decimated <c>Combined</c> is a browsing
+    /// view only; <see cref="SplitAndSave"/> assumes cell-for-cell correspondence with
+    /// <c>Sources</c> and would corrupt them if run against a decimated grid, so callers editing
+    /// terrain (not just panning) must use <c>stride: 1</c>.</param>
     public static (TerrainHeightmap? Combined, IReadOnlyList<TerrainHeightmap> Sources) BuildCombinedGrid(
         IReadOnlyList<TerrainHeightmapSummary> summaries,
         Func<string, TerrainHeightmap?> loadTile,
-        double minX, double minY, double maxX, double maxY)
+        double minX, double minY, double maxX, double maxY,
+        int stride = 1)
     {
         var overlapping = summaries.Where(s => Overlaps(s, minX, minY, maxX, maxY)).ToList();
         if (overlapping.Count == 0) return (null, []);
@@ -37,11 +49,11 @@ public static class TileStitcher
             .Select(t => t!)
             .ToList();
         if (tiles.Count == 0) return (null, []);
-        if (tiles.Count == 1) return (tiles[0], tiles);
+        if (tiles.Count == 1) return (ApplyStride(tiles[0], stride), tiles);
 
         var cellSize = tiles[0].CellSizeMeters;
         if (tiles.Any(t => Math.Abs(t.CellSizeMeters - cellSize) > 1e-6))
-            return (tiles[0], [tiles[0]]); // mixed cell sizes — can't index-copy safely, fall back to one tile
+            return (ApplyStride(tiles[0], stride), [tiles[0]]); // mixed cell sizes — can't index-copy safely, fall back to one tile
 
         var combinedOriginX = tiles.Min(t => t.OriginX);
         var combinedOriginY = tiles.Min(t => t.OriginY);
@@ -49,7 +61,7 @@ public static class TileStitcher
         var combinedMaxY = tiles.Max(t => t.OriginY + t.Height * t.CellSizeMeters);
         var combinedWidth = (int)Math.Round((combinedMaxX - combinedOriginX) / cellSize);
         var combinedHeight = (int)Math.Round((combinedMaxY - combinedOriginY) / cellSize);
-        if (combinedWidth <= 0 || combinedHeight <= 0) return (tiles[0], [tiles[0]]);
+        if (combinedWidth <= 0 || combinedHeight <= 0) return (ApplyStride(tiles[0], stride), [tiles[0]]);
 
         var values = new float[combinedWidth * combinedHeight];
         byte[]? riverMask = tiles.Any(t => t.RiverMask is not null) ? new byte[combinedWidth * combinedHeight] : null;
@@ -59,7 +71,39 @@ public static class TileStitcher
 
         var combined = new TerrainHeightmap("combined", combinedOriginX, combinedOriginY, cellSize,
             combinedWidth, combinedHeight, values, riverMask);
-        return (combined, tiles);
+        return (ApplyStride(combined, stride), tiles);
+    }
+
+    private static TerrainHeightmap ApplyStride(TerrainHeightmap grid, int stride)
+        => stride > 1 ? Decimate(grid, stride) : grid;
+
+    /// <summary>Nearest-neighbor decimation — samples every <paramref name="stride"/>-th cell,
+    /// keeping the same world-space origin but scaling <c>CellSizeMeters</c> up so each remaining
+    /// cell still represents the correct amount of world space.</summary>
+    private static TerrainHeightmap Decimate(TerrainHeightmap grid, int stride)
+    {
+        var newWidth = Math.Max(1, (grid.Width + stride - 1) / stride);
+        var newHeight = Math.Max(1, (grid.Height + stride - 1) / stride);
+        var values = new float[newWidth * newHeight];
+        byte[]? riverMask = grid.RiverMask is not null ? new byte[newWidth * newHeight] : null;
+
+        for (var y = 0; y < newHeight; y++)
+        {
+            var gy = Math.Min(y * stride, grid.Height - 1);
+            var srcRow = gy * grid.Width;
+            var dstRow = y * newWidth;
+            for (var x = 0; x < newWidth; x++)
+            {
+                var gx = Math.Min(x * stride, grid.Width - 1);
+                var srcIdx = srcRow + gx;
+                values[dstRow + x] = grid.Values[srcIdx];
+                if (riverMask is not null)
+                    riverMask[dstRow + x] = grid.RiverMask![srcIdx];
+            }
+        }
+
+        return new TerrainHeightmap(grid.Id, grid.OriginX, grid.OriginY, grid.CellSizeMeters * stride,
+            newWidth, newHeight, values, riverMask);
     }
 
     /// <summary>
@@ -119,7 +163,10 @@ public static class TileStitcher
         }
     }
 
-    private static bool Overlaps(TerrainHeightmapSummary s, double minX, double minY, double maxX, double maxY)
+    /// <summary>Whether a tile's saved bounds overlap a world-meters box — exposed so callers can
+    /// test overlap (e.g. to warm the heightmap cache ahead of an actual stitch) without pulling
+    /// in a full <see cref="BuildCombinedGrid"/> call.</summary>
+    public static bool Overlaps(TerrainHeightmapSummary s, double minX, double minY, double maxX, double maxY)
     {
         var sMaxX = s.OriginX + s.Width * s.CellSizeMeters;
         var sMaxY = s.OriginY + s.Height * s.CellSizeMeters;

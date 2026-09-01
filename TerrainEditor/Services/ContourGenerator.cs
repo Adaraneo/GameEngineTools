@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using GameEngineTools.World.Data;
 
 namespace TerrainEditor.Services;
@@ -18,41 +19,65 @@ public sealed class ContourGenerator
     /// land meets water) is never missed; the caller can pick it out via
     /// <see cref="ContourSegment.Level"/> == 0 to render it as a distinct coastline.
     /// </summary>
-    public IReadOnlyList<ContourSegment> Generate(TerrainHeightmap grid, int levelCount = 10)
+    /// <param name="stride">Samples every <paramref name="stride"/>-th grid cell instead of
+    /// every cell — the marching-squares cost is O(Width*Height), so on a large stitched combined
+    /// grid at low zoom this cuts it by <c>stride²</c> at the cost of coarser contour geometry the
+    /// user can't actually resolve on-screen at that zoom anyway. Pass the same factor used for
+    /// the heightmap bitmap's own LOD downsampling so both degrade together.</param>
+    public IReadOnlyList<ContourSegment> Generate(TerrainHeightmap grid, int levelCount = 10, int stride = 1)
     {
-        var segments = new List<ContourSegment>();
         if (grid.Width < 2 || grid.Height < 2)
-            return segments;
+            return [];
 
         var min = grid.Values.Min();
         var max = grid.Values.Max();
         if (max - min < 1e-6f)
-            return segments; // flat terrain — no meaningful contours
+            return []; // flat terrain — no meaningful contours
 
         var levels = new float[levelCount + 1];
         for (var i = 0; i < levelCount; i++)
             levels[i] = min + (max - min) * (i + 1) / (levelCount + 1);
         levels[levelCount] = 0f; // coastline — harmless no-op if the grid never crosses 0
 
-        for (var gy = 0; gy < grid.Height - 1; gy++)
+        stride = Math.Max(1, stride);
+        // Each row of cells is independent (marching squares only reads that row's own two
+        // corners-rows) — a stitched combined grid at full zoom can be several million cells, and
+        // this loop was the single biggest contributor to RenderOverlay blocking the UI thread for
+        // 1-2 seconds on every tile-boundary crossing. Parallel.For with a thread-local segment
+        // list (merged once at the end) cuts that by roughly the core count, same technique as
+        // RenderGrid's own Parallel.For over pixel rows.
+        var rowCount = (grid.Height - 1 + stride - 1) / stride;
+        var rowResults = new List<ContourSegment>?[rowCount];
+        Parallel.For(0, rowCount, rowIndex =>
         {
-            for (var gx = 0; gx < grid.Width - 1; gx++)
+            var gy = rowIndex * stride;
+            var gy2 = Math.Min(gy + stride, grid.Height - 1);
+            var rowSegments = new List<ContourSegment>();
+
+            for (var gx = 0; gx < grid.Width - 1; gx += stride)
             {
+                var gx2 = Math.Min(gx + stride, grid.Width - 1);
                 var v00 = grid.Values[gy * grid.Width + gx];
-                var v10 = grid.Values[gy * grid.Width + gx + 1];
-                var v01 = grid.Values[(gy + 1) * grid.Width + gx];
-                var v11 = grid.Values[(gy + 1) * grid.Width + gx + 1];
+                var v10 = grid.Values[gy * grid.Width + gx2];
+                var v01 = grid.Values[gy2 * grid.Width + gx];
+                var v11 = grid.Values[gy2 * grid.Width + gx2];
 
                 var x0 = grid.OriginX + gx * grid.CellSizeMeters;
                 var y0 = grid.OriginY + gy * grid.CellSizeMeters;
-                var x1 = x0 + grid.CellSizeMeters;
-                var y1 = y0 + grid.CellSizeMeters;
+                var x1 = grid.OriginX + gx2 * grid.CellSizeMeters;
+                var y1 = grid.OriginY + gy2 * grid.CellSizeMeters;
 
                 foreach (var level in levels)
-                    AddCellSegments(segments, level, x0, y0, x1, y1, v00, v10, v01, v11);
+                    AddCellSegments(rowSegments, level, x0, y0, x1, y1, v00, v10, v01, v11);
             }
-        }
 
+            rowResults[rowIndex] = rowSegments.Count > 0 ? rowSegments : null;
+        });
+
+        var segments = new List<ContourSegment>();
+        foreach (var row in rowResults)
+            if (row is not null)
+                segments.AddRange(row);
         return segments;
     }
 

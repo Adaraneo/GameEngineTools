@@ -150,6 +150,59 @@ public class TileStitcherTests
     }
 
     [TestMethod]
+    public void BuildCombinedGrid_StrideGreaterThanOne_DecimatesDimensionsAndCellSize()
+    {
+        var west = MakeTile("west", 0, 0, 1f);
+        var east = MakeTile("east", 40, 0, 2f);
+        var summaries = new[] { SummaryOf(west), SummaryOf(east) };
+
+        var (combined, sources) = TileStitcher.BuildCombinedGrid(summaries, id => id == "west" ? west : east, -5, -5, 75, 45, stride: 2);
+
+        Assert.IsNotNull(combined);
+        Assert.AreEqual(4, combined!.Width); // 8 full-res cells / stride 2
+        Assert.AreEqual(2, combined.Height); // 4 full-res cells / stride 2
+        Assert.AreEqual(20.0, combined.CellSizeMeters, 1e-9); // 10m * stride 2
+        Assert.AreEqual(0.0, combined.OriginX, 1e-9); // origin unaffected by decimation
+        Assert.AreEqual(0.0, combined.OriginY, 1e-9);
+
+        // Sources must stay full-resolution — SplitAndSave relies on cell-for-cell correspondence
+        // with them, which a decimated Combined no longer has (see BuildCombinedGrid's stride doc).
+        Assert.AreEqual(2, sources.Count);
+        Assert.AreEqual(4, sources[0].Width);
+        Assert.AreEqual(4, sources[1].Width);
+    }
+
+    [TestMethod]
+    public void BuildCombinedGrid_StrideGreaterThanOne_SamplesNearestSourceCellPerDecimatedCell()
+    {
+        var west = MakeTile("west", 0, 0, 1f);
+        var east = MakeTile("east", 40, 0, 2f);
+        var summaries = new[] { SummaryOf(west), SummaryOf(east) };
+
+        var (combined, _) = TileStitcher.BuildCombinedGrid(summaries, id => id == "west" ? west : east, -5, -5, 75, 45, stride: 2);
+
+        Assert.IsNotNull(combined);
+        // Decimated grid is 4x2 at 20m cells — first two decimated columns still land in the west
+        // tile's original region, the last two in the east tile's.
+        CollectionAssert.AreEqual(new[] { 1f, 1f, 2f, 2f }, combined!.Values[..4]);
+    }
+
+    [TestMethod]
+    public void BuildCombinedGrid_StrideOne_BehavesLikeNoDecimation()
+    {
+        var west = MakeTile("west", 0, 0, 1f);
+        var east = MakeTile("east", 40, 0, 2f);
+        var summaries = new[] { SummaryOf(west), SummaryOf(east) };
+
+        var (implicitDefault, _) = TileStitcher.BuildCombinedGrid(summaries, id => id == "west" ? west : east, -5, -5, 75, 45);
+        var (explicitOne, _) = TileStitcher.BuildCombinedGrid(summaries, id => id == "west" ? west : east, -5, -5, 75, 45, stride: 1);
+
+        Assert.AreEqual(implicitDefault!.Width, explicitOne!.Width);
+        Assert.AreEqual(implicitDefault.CellSizeMeters, explicitOne.CellSizeMeters, 1e-9);
+        CollectionAssert.AreEqual(implicitDefault.Values, explicitOne.Values);
+    }
+
+    [TestMethod]
     public void SplitAndSave_SingleTileSource_RoundTripsUnchanged()
     {
         var tile = MakeTile("solo", 0, 0, 7f);
