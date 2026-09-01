@@ -287,8 +287,9 @@ public static class PlanetNoise
 
     /// <summary>True (lat,lon) → unit-sphere position — shared by <see cref="SampleLandmass"/> and
     /// the tectonic-plate lookup in <see cref="SampleCombined"/> so both agree on the exact same
-    /// point.</summary>
-    private static (double x, double y, double z) LatLonToUnitVector(double latDeg, double lonDeg)
+    /// point. Internal (not private) so <see cref="PlanetScanner"/> can reuse it for its own
+    /// global boundary lookup instead of a third duplicate of this trig.</summary>
+    internal static (double x, double y, double z) LatLonToUnitVector(double latDeg, double lonDeg)
     {
         var latRad = latDeg * Math.PI / 180.0;
         var lonRad = lonDeg * Math.PI / 180.0;
