@@ -1,0 +1,200 @@
+using System.Globalization;
+using GameEngineTools.World.Data;
+using WorldGen;
+using WorldGen.Generation;
+
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+var options = CliOptions.Parse(args);
+if (options is null)
+{
+    CliOptions.PrintUsage();
+    return 1;
+}
+
+if (!File.Exists(options.TerrainDbPath))
+{
+    Console.Error.WriteLine($"terrain.db nenalezena: {options.TerrainDbPath}");
+    Console.Error.WriteLine("Spusť napřed terragen — worldgen umísťuje lokace jen na už vygenerovaný terén.");
+    return 1;
+}
+
+using var terrainDb = new SqliteWorldDatabase(options.TerrainDbPath);
+WorldDatabaseSeeder.InitializeTerrainDatabase(terrainDb);
+
+var summaries = terrainDb.ListHeightmaps();
+if (summaries.Count == 0)
+{
+    Console.Error.WriteLine($"V {options.TerrainDbPath} nejsou žádné vygenerované dlaždice.");
+    Console.Error.WriteLine("Spusť napřed terragen — worldgen umísťuje lokace jen na už vygenerovaný terén.");
+    return 1;
+}
+
+var tiles = summaries
+    .Select(s => terrainDb.LoadHeightmap(s.Id))
+    .Where(t => t is not null)
+    .Select(t => t!)
+    .ToList();
+
+Console.WriteLine($"Nalezeno {tiles.Count} dlaždic terénu v {options.TerrainDbPath}.");
+
+var catalog = NutritionCatalogLoader.Load(options.NutritionCsvPath);
+var catalogSource = options.NutritionCsvPath is not null && File.Exists(options.NutritionCsvPath)
+    ? options.NutritionCsvPath
+    : "vestavěný výchozí katalog";
+Console.WriteLine($"Katalog jídla/pití/odpočinku: {catalog.Count} vzorů ({catalogSource}).");
+
+// worldgen genuinely creates world.db when it doesn't exist yet — unlike TerraGen (which stays
+// terrain-only), adding locations/connections/objects to a world.db is its entire purpose.
+using var worldDb = new SqliteWorldDatabase(options.WorldDbPath);
+WorldDatabaseSeeder.Initialize(worldDb);
+
+var rng = options.Seed is { } seed ? new Random(seed) : new Random();
+
+var genOptions = new WorldContentGenerator.Options(
+    Count: options.Count,
+    Region: options.Region,
+    MinDistanceMeters: options.MinDistanceMeters,
+    ConnectionsPerLocation: options.ConnectionsPerLocation,
+    MountainThresholdMeters: options.MountainThresholdMeters);
+
+Console.WriteLine($"Generuji {options.Count} lokací v regionu '{options.Region}'...");
+
+var result = WorldContentGenerator.Generate(worldDb, tiles, genOptions, rng, catalog);
+
+Console.WriteLine($"Hotovo — {result.LocationsPlaced}/{options.Count} lokací, {result.ConnectionsCreated} spojení, " +
+                   $"{result.ObjectsCreated} objektů uloženo do {options.WorldDbPath}.");
+if (result.LocationsPlaced < options.Count)
+    Console.WriteLine($"Poznámka: {options.Count - result.LocationsPlaced} lokací se nepodařilo umístit " +
+                       "(nedostatek volné souše, nebo moc málo místa při zadaném --min-distance).");
+
+return 0;
+
+/// <summary>Parsed and validated CLI arguments for one WorldGen run.</summary>
+internal sealed class CliOptions
+{
+    public required string WorldDbPath { get; init; }
+    public required string TerrainDbPath { get; init; }
+    public required int Count { get; init; }
+    public string Region { get; init; } = "Wilds";
+    public double MinDistanceMeters { get; init; } = 150.0;
+    public int ConnectionsPerLocation { get; init; } = 2;
+    public double MountainThresholdMeters { get; init; } = 300.0;
+    public int? Seed { get; init; }
+    /// <summary>Disk override for the food/drink/rest catalog. Defaults to <c>.\Nutrition.csv</c>
+    /// in the current directory when present, else <c>null</c> (embedded default catalog is used).</summary>
+    public string? NutritionCsvPath { get; init; }
+
+    public static void PrintUsage()
+    {
+        Console.WriteLine("""
+            WorldGen — generátor lokací, spojení a affordances do world.db
+
+            Použití (spouštěj přímo ve složce s databázemi, --world-db/--terrain-db se obvykle nezadávají):
+              WorldGen --count <N>
+                        [--world-db <cesta>, výchozí .\world.db v aktuální složce]
+                        [--terrain-db <cesta>, výchozí .\terrain.db v aktuální složce]
+                        [--region <název, výchozí "Wilds">]
+                        [--min-distance <metry, výchozí 150>]
+                        [--connections <počet nejbližších sousedů, výchozí 2>]
+                        [--mountain-threshold <metry nadmořské výšky, výchozí 300>]
+                        [--seed <celé číslo, výchozí náhodné>]
+                        [--nutrition-csv <cesta>, výchozí .\Nutrition.csv v aktuální složce,
+                                            jinak vestavěný výchozí katalog]
+
+            Lokace umisťuje výhradně na pozice pokryté už vygenerovanými dlaždicemi v terrain.db
+            (spusť napřed terragen) — nikdy negeneruje nový terén. --world-db se VYTVOŘÍ, pokud
+            ještě neexistuje (na rozdíl od TerraGenu, který se world.db nikdy nedotýká).
+
+            Jídlo/pití/odpočinek pro každou lokaci se vybírá z katalogu v Nutrition.csv podle
+            biomu dané lokace (Forest/Mountain/Any) — zkopíruj vestavěný soubor vedle databází
+            a uprav/přidej řádky, žádná změna kódu není potřeba.
+            """);
+    }
+
+    public static CliOptions? Parse(string[] args)
+    {
+        string? worldDbPath = null;
+        string? terrainDbPath = null;
+        int? count = null;
+        var region = "Wilds";
+        var minDistance = 150.0;
+        var connections = 2;
+        var mountainThreshold = 300.0;
+        int? seed = null;
+        string? nutritionCsvPath = null;
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--world-db" when i + 1 < args.Length:
+                    worldDbPath = args[++i];
+                    break;
+                case "--terrain-db" when i + 1 < args.Length:
+                    terrainDbPath = args[++i];
+                    break;
+                case "--count" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var c):
+                    count = c;
+                    break;
+                case "--region" when i + 1 < args.Length:
+                    region = args[++i];
+                    break;
+                case "--min-distance" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var md):
+                    minDistance = md;
+                    break;
+                case "--connections" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var conn):
+                    connections = conn;
+                    break;
+                case "--mountain-threshold" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var mt):
+                    mountainThreshold = mt;
+                    break;
+                case "--seed" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var s):
+                    seed = s;
+                    break;
+                case "--nutrition-csv" when i + 1 < args.Length:
+                    nutritionCsvPath = args[++i];
+                    break;
+                default:
+                    Console.Error.WriteLine($"Neznámý nebo neúplný argument: {args[i]}");
+                    return null;
+            }
+        }
+
+        if (count is null)
+        {
+            Console.Error.WriteLine("Chybí povinný argument --count.");
+            return null;
+        }
+        if (count <= 0)
+        {
+            Console.Error.WriteLine("--count musí být kladné.");
+            return null;
+        }
+        if (minDistance < 0 || connections < 0)
+        {
+            Console.Error.WriteLine("--min-distance a --connections nesmí být záporné.");
+            return null;
+        }
+
+        worldDbPath ??= Path.Combine(Directory.GetCurrentDirectory(), "world.db");
+        terrainDbPath ??= Path.Combine(Directory.GetCurrentDirectory(), "terrain.db");
+        // No --nutrition-csv given: fall back to a conventional Nutrition.csv in the current
+        // directory if present, same disk-override spirit as appsettings.World.json's search —
+        // NutritionCatalogLoader itself falls back further to the embedded default catalog.
+        nutritionCsvPath ??= Path.Combine(Directory.GetCurrentDirectory(), "Nutrition.csv");
+
+        return new CliOptions
+        {
+            WorldDbPath = worldDbPath,
+            TerrainDbPath = terrainDbPath,
+            Count = count.Value,
+            Region = region,
+            MinDistanceMeters = minDistance,
+            ConnectionsPerLocation = connections,
+            MountainThresholdMeters = mountainThreshold,
+            Seed = seed,
+            NutritionCsvPath = nutritionCsvPath,
+        };
+    }
+}

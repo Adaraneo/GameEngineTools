@@ -8,7 +8,7 @@ using TerrainEditor.Rendering;
 namespace TerrainEditor;
 
 /// <summary>
-/// Non-modal browser over every heightmap saved in the open world.db — renders a composite map
+/// Non-modal browser over every heightmap saved in the open terrain.db — renders a composite map
 /// stitched from the tiles' ACTUAL saved elevation data (positioned by their real OriginX/OriginY,
 /// e.g. tiles from a TerraGen batch run), not a fresh noise preview like the old Planet Overview
 /// was. Pick a tile by clicking the map or the list, then "Načíst" loads it into the main window's

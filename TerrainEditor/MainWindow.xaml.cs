@@ -80,7 +80,7 @@ public partial class MainWindow : Window
         _vm.OpenTileBrowserRequested += (_, _) => OpenTileBrowser();
     }
 
-    /// <summary>Opens a non-modal list of every heightmap saved in the open world.db (e.g. tiles
+    /// <summary>Opens a non-modal list of every heightmap saved in the open terrain.db (e.g. tiles
     /// from a TerraGen batch run) — picking one loads it straight into the editing surface,
     /// replacing whatever <see cref="_grid"/> currently holds. Unlike <see cref="GoToLatLon"/>,
     /// this doesn't know (and doesn't claim) a real-world lat/long for the loaded tile — TerraGen
@@ -360,6 +360,27 @@ public partial class MainWindow : Window
 
     private void LoadFromDatabase()
     {
+        // Terrain-only mode (OpenTerrainOnly) has no world.db at all — Locations/Connections
+        // aren't available, so skip them entirely and just load the heightmap.
+        if (_vm.WorldDb.IsTerrainOnly)
+        {
+            _markers.Clear();
+            _existingLocationIds.Clear();
+            _vm.SelectedMarker = null;
+
+            _connections = [];
+            _existingConnectionKeys.Clear();
+            _connectFromMarker = null;
+            _roadPaths.Clear();
+
+            _grid = _vm.WorldDb.LoadHeightmap() ?? CreateDefaultGrid([]);
+
+            RenderGrid();
+            RenderOverlay();
+            RefreshLocationList();
+            return;
+        }
+
         var locations = _vm.WorldDb.GetLocations();
         _markers.Clear();
         _markers.AddRange(locations.Select(l => new LocationMarkerViewModel(l)));
@@ -383,6 +404,14 @@ public partial class MainWindow : Window
     private void SaveToDatabase()
     {
         if (_grid is null) return;
+
+        // Terrain-only mode has no world.db to write locations/connections into — just save the
+        // heightmap itself (InsertLocation/InsertConnection would throw, see RequireWorldOpen).
+        if (_vm.WorldDb.IsTerrainOnly)
+        {
+            _vm.WorldDb.SaveHeightmap(_grid);
+            return;
+        }
 
         foreach (var marker in _markers)
         {

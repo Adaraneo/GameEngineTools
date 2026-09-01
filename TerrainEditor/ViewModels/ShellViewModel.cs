@@ -21,17 +21,19 @@ public sealed class ShellViewModel : ViewModelBase
 
         OpenDatabaseCommand = new RelayCommand(OpenDatabase);
         NewWorldCommand = new RelayCommand(NewWorld);
+        OpenTerrainOnlyCommand = new RelayCommand(OpenTerrainOnly);
         SaveCommand = new RelayCommand(Save, () => WorldDb.IsOpen);
-        ExportSeedCommand = new RelayCommand(ExportSeed, () => WorldDb.IsOpen);
+        // Locations/Connections don't exist in terrain-only mode (OpenTerrainOnly) — no world.db.
+        ExportSeedCommand = new RelayCommand(ExportSeed, () => WorldDb.IsOpen && !WorldDb.IsTerrainOnly);
         GenerateRoadsCommand = new RelayCommand(
             () => GenerateRoadsRequested?.Invoke(this, EventArgs.Empty),
-            () => WorldDb.IsOpen);
+            () => WorldDb.IsOpen && !WorldDb.IsTerrainOnly);
         GenerateLakesCommand = new RelayCommand(
             () => GenerateLakesRequested?.Invoke(this, EventArgs.Empty),
             () => WorldDb.IsOpen);
         AssignRegionsCommand = new RelayCommand(
             () => AssignRegionsRequested?.Invoke(this, EventArgs.Empty),
-            () => WorldDb.IsOpen);
+            () => WorldDb.IsOpen && !WorldDb.IsTerrainOnly);
         GoToLatLonCommand = new RelayCommand(
             () => GoToLatLonRequested?.Invoke(this, EventArgs.Empty),
             () => WorldDb.IsOpen);
@@ -48,6 +50,7 @@ public sealed class ShellViewModel : ViewModelBase
 
     public RelayCommand OpenDatabaseCommand { get; }
     public RelayCommand NewWorldCommand { get; }
+    public RelayCommand OpenTerrainOnlyCommand { get; }
     public RelayCommand SaveCommand { get; }
     public RelayCommand ExportSeedCommand { get; }
     public RelayCommand GenerateRoadsCommand { get; }
@@ -128,13 +131,14 @@ public sealed class ShellViewModel : ViewModelBase
         set => SetProperty(ref _zoom, Math.Clamp(value, MinZoom, MaxZoom));
     }
 
-    private string _statusText = "Otevři world.db tlačítkem „Open World DB…“.";
+    private string _statusText = "Otevři world.db tlačítkem „Open World DB…“, nebo jen terrain.db tlačítkem „Open Terrain Only…“.";
     public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
 
     private string _cursorWorldPosition = string.Empty;
     public string CursorWorldPosition { get => _cursorWorldPosition; set => SetProperty(ref _cursorWorldPosition, value); }
 
-    /// <summary>Raised after a database is (re)opened — MainWindow (re)loads the heightmap + locations.</summary>
+    /// <summary>Raised after a database is (re)opened — MainWindow (re)loads the heightmap, and
+    /// also the locations/connections unless <see cref="Services.WorldDatabaseService.IsTerrainOnly"/> is true.</summary>
     public event EventHandler? DatabaseOpened;
 
     /// <summary>Raised when Save is requested — MainWindow writes its current in-memory state back.</summary>
@@ -160,7 +164,7 @@ public sealed class ShellViewModel : ViewModelBase
     public event EventHandler? GoToLatLonRequested;
 
     /// <summary>Raised when "Dlaždice…" is clicked — MainWindow opens a list of every heightmap
-    /// saved in the current world.db (e.g. tiles from a TerraGen batch run) to pick one to load.</summary>
+    /// saved in the current terrain.db (e.g. tiles from a TerraGen batch run) to pick one to load.</summary>
     public event EventHandler? OpenTileBrowserRequested;
 
     private void OpenDatabase()
@@ -227,7 +231,37 @@ public sealed class ShellViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Shared post-open bookkeeping for both <see cref="OpenDatabase"/> and <see cref="NewWorld"/>.</summary>
+    /// <summary>
+    /// Opens ONLY a <c>terrain.db</c> — no paired world.db is created or required. For working
+    /// purely with heightmap tiles (e.g. inspecting/editing a standalone terrain.db produced by
+    /// TerraGen or WorldObserver) without a world to go with it. Location/road/region/export
+    /// commands are disabled while this mode is active — see <see cref="WorldDatabaseService.IsTerrainOnly"/>.
+    /// </summary>
+    private void OpenTerrainOnly()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Open terrain.db (only)",
+            Filter = "SQLite database (*.db)|*.db|All files (*.*)|*.*",
+            CheckFileExists = false, // a not-yet-existing path is fine — it gets created and seeded
+        };
+        if (dlg.ShowDialog() != true)
+            return;
+
+        try
+        {
+            WorldDb.OpenTerrainOnly(dlg.FileName);
+            OnDatabaseOpened($"Otevřeno pouze terén (bez world.db): {dlg.FileName}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Nepodařilo se otevřít terénní databázi:\n{ex.Message}", "Chyba",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>Shared post-open bookkeeping for <see cref="OpenDatabase"/>, <see cref="NewWorld"/>,
+    /// and <see cref="OpenTerrainOnly"/>.</summary>
     private void OnDatabaseOpened(string statusText)
     {
         StatusText = statusText;

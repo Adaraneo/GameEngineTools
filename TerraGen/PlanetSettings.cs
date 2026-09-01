@@ -5,9 +5,12 @@ using Microsoft.Extensions.Configuration;
 namespace TerraGen;
 
 /// <summary>
-/// Loads a planet's physical parameters for a given <c>world.db</c> and derives the same
-/// deterministic seed/gravity TerrainEditor computes for it — an independent implementation (no
-/// shared code with TerrainEditor) so TerraGen has no project dependency on the WPF editor.
+/// Loads a planet's physical parameters for a given database file path (in practice, the
+/// <c>terrain.db</c> TerraGen is pointed at via <c>--db</c> — this never opens the database
+/// itself, it only uses the path to search nearby for <c>appsettings.World.json</c>) and derives
+/// the same deterministic seed/gravity TerrainEditor computes for it — an independent
+/// implementation (no shared code with TerrainEditor) so TerraGen has no project dependency on
+/// the WPF editor.
 /// </summary>
 public static class PlanetSettings
 {

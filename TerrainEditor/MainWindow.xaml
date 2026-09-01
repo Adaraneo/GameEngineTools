@@ -9,7 +9,10 @@
             <ToolBar>
                 <Button Content="New World…" Command="{Binding NewWorldCommand}" Margin="2" Padding="6,2"
                         ToolTip="Vytvoří úplně prázdný svět (jen schéma, žádné výchozí lokace) — postavíš ho celý přes tento editor" />
-                <Button Content="Open World DB…" Command="{Binding OpenDatabaseCommand}" Margin="2" Padding="6,2" />
+                <Button Content="Open World DB…" Command="{Binding OpenDatabaseCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Otevře world.db (lokace/spojení) a zároveň sesterskou terrain.db ve stejné složce (vytvoří ji, pokud tam ještě není)" />
+                <Button Content="Open Terrain Only…" Command="{Binding OpenTerrainOnlyCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Otevře jen terrain.db, bez párového world.db — pro čistou práci s dlaždicemi terénu (malování/generování/prohlížeč dlaždic); ukládání lokací/spojení a export nejsou v tomto režimu dostupné" />
                 <Button Content="Save" Command="{Binding SaveCommand}" Margin="2" Padding="6,2" />
                 <Button Content="Export to seed_data.sql…" Command="{Binding ExportSeedCommand}" Margin="2" Padding="6,2" />
                 <Button Content="Generate Roads" Command="{Binding GenerateRoadsCommand}" Margin="2" Padding="6,2"
@@ -39,7 +42,7 @@
             <ToolBar Band="2" BandIndex="0">
                 <TextBlock Text="Terén:" VerticalAlignment="Center" Margin="2,0,8,0" FontWeight="Bold" />
                 <Button Content="Dlaždice…" Command="{Binding OpenTileBrowserCommand}" Margin="2" Padding="6,2"
-                        ToolTip="Seznam všech uložených dlaždic v otevřené world.db (např. z dávkového TerraGen) — vyber a načti jednu" />
+                        ToolTip="Seznam všech uložených dlaždic v otevřené terrain.db (např. z dávkového TerraGen) — vyber a načti jednu" />
                 <Separator />
                 <Button Content="Generate Lakes" Command="{Binding GenerateLakesCommand}" Margin="2" Padding="6,2"
                         ToolTip="Najde pánve v aktuálním terénu a zaplaví je vodou (stejná vrstva jako řeky)" />

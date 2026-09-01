@@ -23,7 +23,7 @@
                 <Grid>
                     <Image x:Name="MapImage" Stretch="Uniform" SnapsToDevicePixels="True" Cursor="Cross"
                            MouseLeftButtonDown="MapImage_MouseLeftButtonDown" />
-                    <TextBlock x:Name="MapEmptyLabel" Text="Zatím žádné dlaždice v této world.db."
+                    <TextBlock x:Name="MapEmptyLabel" Text="Zatím žádné dlaždice v této terrain.db."
                                HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" Visibility="Collapsed" />
                 </Grid>
             </Border>

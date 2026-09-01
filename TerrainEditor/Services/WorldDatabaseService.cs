@@ -7,11 +7,18 @@ using TerrainEditor.Models;
 namespace TerrainEditor.Services;
 
 /// <summary>
-/// Thin wrapper around <see cref="SqliteWorldDatabase"/> for the TerrainEditor UI — opens a
-/// world.db file, exposes locations/heightmap as UI-friendly shapes, and writes edits back.
-/// Heightmap storage lives in a SEPARATE sibling <c>terrain.db</c> next to the opened world.db
-/// (same convention WorldObserver's <c>TerrainMapService</c> already uses) — <c>world.db</c>'s
-/// own schema no longer has a <c>TerrainHeightmap</c> table at all.
+/// Thin wrapper around <see cref="SqliteWorldDatabase"/> for the TerrainEditor UI — exposes
+/// locations/heightmap as UI-friendly shapes and writes edits back. Heightmap storage always
+/// lives in a dedicated <c>terrain.db</c> (same convention WorldObserver's <c>TerrainMapService</c>
+/// already uses) — <c>world.db</c>'s own schema no longer has a <c>TerrainHeightmap</c> table at
+/// all. Three ways to open it, mirrored by <see cref="IsTerrainOnly"/>:
+/// <list type="bullet">
+///   <item><see cref="Open"/> / <see cref="OpenBlank"/> — a world.db file, which auto-opens its
+///   sibling <c>terrain.db</c> in the same folder alongside it. Locations, connections, and the
+///   heightmap are all available.</item>
+///   <item><see cref="OpenTerrainOnly"/> — just a terrain.db, no paired world.db at all. Only
+///   heightmap operations work; location/connection/export methods throw.</item>
+/// </list>
 /// </summary>
 public sealed class WorldDatabaseService : IDisposable
 {
@@ -23,7 +30,15 @@ public sealed class WorldDatabaseService : IDisposable
     private SqliteWorldDatabase? _db;
     private SqliteWorldDatabase? _terrainDb;
 
-    public bool IsOpen => _db is not null;
+    /// <summary>True once either database is open — world.db+terrain.db (<see cref="Open"/>/
+    /// <see cref="OpenBlank"/>) or terrain.db alone (<see cref="OpenTerrainOnly"/>).</summary>
+    public bool IsOpen => _db is not null || _terrainDb is not null;
+
+    /// <summary>True when only <c>terrain.db</c> is open (via <see cref="OpenTerrainOnly"/>) —
+    /// no world.db, so location/connection/export operations aren't available. UI should disable
+    /// those commands and only offer heightmap generation/painting + the tile browser.</summary>
+    public bool IsTerrainOnly => _terrainDb is not null && _db is null;
+
     public string? DatabasePath { get; private set; }
 
     /// <summary>
@@ -82,6 +97,24 @@ public sealed class WorldDatabaseService : IDisposable
         MigrateLegacyTerrainIfPresent();
     }
 
+    /// <summary>
+    /// Opens (creating if necessary) ONLY the terrain database at <paramref name="path"/> — no
+    /// world.db is opened or created at all. For working purely with heightmap tiles (e.g. a
+    /// standalone <c>terrain.db</c> produced by TerraGen, or WorldObserver's persistent one)
+    /// without needing a paired world.db alongside it. Location/connection/export operations throw
+    /// while in this mode — see <see cref="IsTerrainOnly"/>; only heightmap generation/painting and
+    /// the tile browser are available.
+    /// </summary>
+    public void OpenTerrainOnly(string path)
+    {
+        Close();
+        _terrainDb = new SqliteWorldDatabase(path);
+        WorldDatabaseSeeder.InitializeTerrainDatabase(_terrainDb);
+        DatabasePath = path;
+        CosmologyConfig = WorldSettingsLoader.TryLoadAstroConfig(path);
+        PlanetConfig = WorldSettingsLoader.TryLoadUniverseConfig(path);
+    }
+
     /// <summary>Opens (or creates) the sibling <c>terrain.db</c> next to <paramref name="worldDbPath"/>.</summary>
     private void OpenTerrainDatabase(string worldDbPath)
     {
@@ -137,7 +170,7 @@ public sealed class WorldDatabaseService : IDisposable
 
     public IReadOnlyList<LocationInfo> GetLocations()
     {
-        RequireOpen();
+        RequireWorldOpen();
         return _db!.GetAllLocations()
             .Select(l => new LocationInfo(l.Descriptor.Id, l.Descriptor.DisplayName, l.Region,
                 l.Descriptor.X, l.Descriptor.Y, l.Descriptor.AltitudeMeters,
@@ -149,7 +182,7 @@ public sealed class WorldDatabaseService : IDisposable
     /// <summary>Loads the default heightmap grid, or <c>null</c> if none has been saved yet.</summary>
     public TerrainHeightmap? LoadHeightmap()
     {
-        RequireOpen();
+        RequireTerrainOpen();
         return _terrainDb!.LoadHeightmap(DefaultHeightmapId);
     }
 
@@ -157,7 +190,7 @@ public sealed class WorldDatabaseService : IDisposable
     /// <c>null</c> if no row exists with that id.</summary>
     public TerrainHeightmap? LoadHeightmap(string id)
     {
-        RequireOpen();
+        RequireTerrainOpen();
         return _terrainDb!.LoadHeightmap(id);
     }
 
@@ -166,13 +199,13 @@ public sealed class WorldDatabaseService : IDisposable
     /// potentially many saved grids (e.g. tiles from a batch planet generator).</summary>
     public IReadOnlyList<TerrainHeightmapSummary> ListHeightmaps()
     {
-        RequireOpen();
+        RequireTerrainOpen();
         return _terrainDb!.ListHeightmaps();
     }
 
     public void SaveHeightmap(TerrainHeightmap grid)
     {
-        RequireOpen();
+        RequireTerrainOpen();
         _terrainDb!.SaveHeightmap(grid);
     }
 
@@ -183,7 +216,7 @@ public sealed class WorldDatabaseService : IDisposable
     /// </summary>
     public void InsertLocation(LocationInfo info)
     {
-        RequireOpen();
+        RequireWorldOpen();
         var descriptor = new LocationDescriptor(
             Id: info.Id,
             DisplayName: info.DisplayName,
@@ -201,13 +234,13 @@ public sealed class WorldDatabaseService : IDisposable
 
     public bool UpdateLocationPosition(string locationId, double x, double y, double altitudeMeters)
     {
-        RequireOpen();
+        RequireWorldOpen();
         return _db!.UpdateLocationPosition(locationId, x, y, altitudeMeters);
     }
 
     public bool UpdateLocationRegion(string locationId, string region)
     {
-        RequireOpen();
+        RequireWorldOpen();
         return _db!.UpdateLocationRegion(locationId, region);
     }
 
@@ -215,14 +248,14 @@ public sealed class WorldDatabaseService : IDisposable
     /// noise, capacity, privacy) — used by the location-edit dialog (double-click a marker).</summary>
     public bool UpdateLocationDetails(LocationInfo info)
     {
-        RequireOpen();
+        RequireWorldOpen();
         return _db!.UpdateLocationDetails(info.Id, info.DisplayName, info.Type, info.Terrain,
             info.BaseNoise, info.NoisePerPerson, info.Capacity, info.AllowsPrivacy);
     }
 
     public IReadOnlyList<ConnectionInfo> GetConnections()
     {
-        RequireOpen();
+        RequireWorldOpen();
         return _db!.GetAllConnections()
             .Select(c => new ConnectionInfo(c.FromId, c.ToId, c.DistanceMeters))
             .ToList();
@@ -230,7 +263,7 @@ public sealed class WorldDatabaseService : IDisposable
 
     public bool UpdateConnectionDistance(string fromId, string toId, double distanceMeters)
     {
-        RequireOpen();
+        RequireWorldOpen();
         return _db!.UpdateConnectionDistance(fromId, toId, distanceMeters);
     }
 
@@ -239,21 +272,33 @@ public sealed class WorldDatabaseService : IDisposable
     /// locations needs this called once per direction.</summary>
     public void InsertConnection(string fromId, string toId, double distanceMeters)
     {
-        RequireOpen();
+        RequireWorldOpen();
         _db!.InsertConnection(fromId, toId, distanceMeters);
     }
 
     /// <summary>Regenerates a seed_data.sql-compatible script from the database's current contents.</summary>
     public string ExportSeedSql()
     {
-        RequireOpen();
+        RequireWorldOpen();
         return WorldDatabaseExporter.ExportSeedSql(_db!, _terrainDb);
     }
 
-    private void RequireOpen()
+    /// <summary>Guards location/connection/export operations, which need world.db — not available
+    /// in terrain-only mode (<see cref="OpenTerrainOnly"/>).</summary>
+    private void RequireWorldOpen()
     {
         if (_db is null)
-            throw new InvalidOperationException("No world database is open. Call Open() first.");
+            throw new InvalidOperationException(IsTerrainOnly
+                ? "Only a terrain-only database is open (OpenTerrainOnly) — location/connection/export operations need a world.db. Call Open() or OpenBlank() instead."
+                : "No world database is open. Call Open() first.");
+    }
+
+    /// <summary>Guards heightmap operations, which only need terrain.db — available in every open
+    /// mode (<see cref="Open"/>, <see cref="OpenBlank"/>, and <see cref="OpenTerrainOnly"/>).</summary>
+    private void RequireTerrainOpen()
+    {
+        if (_terrainDb is null)
+            throw new InvalidOperationException("No terrain database is open. Call Open(), OpenBlank(), or OpenTerrainOnly() first.");
     }
 
     public void Dispose() => Close();

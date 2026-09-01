@@ -195,6 +195,43 @@ public class WorldDatabaseServicePersistenceTests
     }
 
     [TestMethod]
+    public void OpenTerrainOnly_NoWorldDbCreated_HeightmapStillWorks()
+    {
+        var terrainPath = Path.Combine(_tempDir, "standalone_terrain.db");
+
+        using var svc = new WorldDatabaseService();
+        svc.OpenTerrainOnly(terrainPath);
+
+        Assert.IsTrue(svc.IsOpen);
+        Assert.IsTrue(svc.IsTerrainOnly);
+        Assert.IsFalse(File.Exists(Path.Combine(_tempDir, "world.db")),
+            "OpenTerrainOnly must not create a paired world.db anywhere.");
+
+        var grid = new GameEngineTools.World.Data.TerrainHeightmap(
+            "default", OriginX: 0.0, OriginY: 0.0, CellSizeMeters: 5.0,
+            Width: 2, Height: 2, Values: [1f, 2f, 3f, 4f]);
+        svc.SaveHeightmap(grid);
+
+        var loaded = svc.LoadHeightmap();
+        Assert.IsNotNull(loaded);
+        CollectionAssert.AreEqual(grid.Values, loaded!.Values);
+    }
+
+    [TestMethod]
+    public void OpenTerrainOnly_LocationOperations_Throw()
+    {
+        var terrainPath = Path.Combine(_tempDir, "standalone_terrain2.db");
+
+        using var svc = new WorldDatabaseService();
+        svc.OpenTerrainOnly(terrainPath);
+
+        Assert.Throws<InvalidOperationException>(() => svc.GetLocations());
+        Assert.Throws<InvalidOperationException>(() =>
+            svc.InsertLocation(new LocationInfo("x", "X", "", 0, 0, 0)));
+        Assert.Throws<InvalidOperationException>(() => svc.ExportSeedSql());
+    }
+
+    [TestMethod]
     public void Open_LegacyFileWithTerrainHeightmapTable_MigratesIntoSiblingTerrainDb()
     {
         // Simulates a world.db saved before terrain moved to its own database: the file still

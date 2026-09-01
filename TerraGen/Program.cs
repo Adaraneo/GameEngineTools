@@ -70,10 +70,15 @@ internal sealed class CliOptions
         Console.WriteLine("""
             TerraGen — dávkový generátor sousedících dlaždic planety
 
-            Použití:
-              TerraGen --db <cesta k world.db> --lat-range <min>:<max> --lon-range <min>:<max>
+            Použití (spouštěj přímo ve složce s databázemi, --db se obvykle nezadává):
+              TerraGen --lat-range <min>:<max> --lon-range <min>:<max>
+                        [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
                         [--erosion <0-100, výchozí 50>]
+
+            --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
+            ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
+            v aktuálním pracovním adresáři (vytvoří se, pokud tam ještě není).
 
             appsettings.World.json (planeta: gravitace, poloměr, seed) se hledá ve stejné
             složce jako --db, nebo v některém z jejích rodičovských adresářů.
@@ -116,9 +121,14 @@ internal sealed class CliOptions
             }
         }
 
-        if (dbPath is null || latMin is null || lonMin is null)
+        // --db is optional — TerraGen is meant to be run from inside the folder that holds the
+        // databases, so it defaults to a terrain.db right there (created if missing) instead of
+        // requiring the path to be spelled out every time.
+        dbPath ??= Path.Combine(Directory.GetCurrentDirectory(), "terrain.db");
+
+        if (latMin is null || lonMin is null)
         {
-            Console.Error.WriteLine("Chybí povinné argumenty --db, --lat-range, --lon-range.");
+            Console.Error.WriteLine("Chybí povinné argumenty --lat-range, --lon-range.");
             return null;
         }
         if (tileKm <= 0 || cellMeters <= 0)
