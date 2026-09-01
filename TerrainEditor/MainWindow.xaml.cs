@@ -8,6 +8,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Threading.Tasks;
+using SkiaSharp;
+using SkiaSharp.Views.Desktop;
 using GameEngineTools.World.Data;
 using TerrainEditor.Diagnostics;
 using TerrainEditor.Models;
@@ -79,6 +81,10 @@ public partial class MainWindow : Window
 
             if (e.PropertyName == nameof(ShellViewModel.Zoom))
             {
+                // Cheap and synchronous (unlike the re-stitch below) — keeps contours crisp the
+                // instant zoom changes, without waiting on a background LOD-refresh round-trip.
+                UpdateContourSupersampling();
+
                 // RenderGrid renders _grid at its own native resolution — it no longer does any
                 // zoom-dependent downsampling itself (see RenderGrid's doc comment for why: that
                 // used to double-count against the LOD decimation TileStitcher now bakes into the
@@ -717,6 +723,37 @@ public partial class MainWindow : Window
 
     private const int MaxDownsample = 8;
 
+    /// <summary>How many raster pixels <see cref="ContourSurface"/> builds per grid cell — 1 at
+    /// 100% zoom or below, growing as the user zooms in, capped at <see cref="MaxContourSupersample"/>.
+    /// Keeps the SkiaSharp contour surface crisp under WPF's Zoom LayoutTransform instead of being
+    /// stretched from a fixed-resolution raster (the tradeoff the old WPF-Line-per-segment overlay
+    /// didn't have — vector lines re-render at whatever final resolution WPF needs, but at the real
+    /// cost of one retained object per segment; see git history for the before/after this traded).</summary>
+    private int _lastContourSupersample = 1;
+
+    private const int MaxContourSupersample = 4;
+
+    /// <summary>Resizes <see cref="ContourSurface"/> to <see cref="_lastContourSupersample"/>×
+    /// <c>_grid</c>'s own cell count for the CURRENT zoom, with a compensating LayoutTransform (see
+    /// XAML) so its footprint in the shared, Zoom-transformed parent <c>Grid</c> stays exactly
+    /// <c>_grid.Width</c>×<c>_grid.Height</c> — matching <c>HeightmapImage</c>/<c>OverlayCanvas</c>,
+    /// so markers/mouse coordinates/scrolling stay correctly aligned. A no-op when the target
+    /// supersample factor hasn't changed, so this is cheap to call on every zoom tick.</summary>
+    private void UpdateContourSupersampling()
+    {
+        if (_grid is null) return;
+
+        var supersample = Math.Clamp((int)Math.Ceiling(_vm.Zoom), 1, MaxContourSupersample);
+        ContourSurface.Width = _grid.Width * supersample;
+        ContourSurface.Height = _grid.Height * supersample;
+        ContourSupersampleCompensation.ScaleX = 1.0 / supersample;
+        ContourSupersampleCompensation.ScaleY = 1.0 / supersample;
+
+        if (supersample == _lastContourSupersample) return;
+        _lastContourSupersample = supersample;
+        ContourSurface.InvalidateVisual();
+    }
+
     private unsafe void RenderGrid()
     {
         if (_grid is null) return;
@@ -740,6 +777,7 @@ public partial class MainWindow : Window
         HeightmapImage.Height = _grid.Height;
         OverlayCanvas.Width = _grid.Width;
         OverlayCanvas.Height = _grid.Height;
+        UpdateContourSupersampling();
 
         var min = _grid.Values.Min();
         var max = _grid.Values.Max();
@@ -801,11 +839,14 @@ public partial class MainWindow : Window
     /// data (no WPF objects) and was the single biggest cost of a full overlay rebuild (up to ~2s
     /// on a large stitched grid, per a real Perf Log capture), so the background-stitch pipeline
     /// computes it on the thread pool ALONGSIDE the tile stitch instead of on the UI thread here.
-    /// What's left — creating WPF <see cref="Line"/> objects from an already-known segment list,
-    /// plus markers/connections (a few hundred, not millions) — is cheap enough to run on every
-    /// settled pan swap, not just on drag-end, which is what fixed the "half the map has no
-    /// contours" artifact a long continuous drag used to leave behind (see git history/commit
-    /// message for the before/after).</summary>
+    /// Contours themselves are drawn by <see cref="ContourSurface_PaintSurface"/> (SkiaSharp,
+    /// immediate-mode) rather than one WPF <see cref="Line"/> per segment — a real Perf Log capture
+    /// found thousands of retained Line objects were themselves a meaningful cost on top of the
+    /// marching-squares pass. Markers/connections (a few hundred, not thousands, and need mouse
+    /// hit-testing) stay on <see cref="OverlayCanvas"/> as regular WPF shapes. Cheap enough overall
+    /// to run on every settled pan swap, not just on drag-end, which is what fixed the "half the
+    /// map has no contours" artifact a long continuous drag used to leave behind (see git history
+    /// for the before/after).</summary>
     private void RenderOverlay(IReadOnlyList<ContourSegment> precomputedContours)
     {
         if (_grid is null) return;
@@ -814,26 +855,63 @@ public partial class MainWindow : Window
         _markerShapes.Clear();
         _markerLabels.Clear();
 
-        foreach (var seg in precomputedContours)
-        {
-            var isCoastline = seg.Level == 0f;
-            var (x1, y1) = WorldToCanvas(seg.X1, seg.Y1);
-            var (x2, y2) = WorldToCanvas(seg.X2, seg.Y2);
-            var line = new Line
-            {
-                X1 = x1, Y1 = y1, X2 = x2, Y2 = y2,
-                Stroke = isCoastline ? new SolidColorBrush(TerrainColorRamp.CoastlineColor) : Brushes.SaddleBrown,
-                StrokeThickness = isCoastline ? 1.4 : 0.6,
-                Opacity = isCoastline ? 0.9 : 0.7,
-                IsHitTestVisible = false,
-            };
-            OverlayCanvas.Children.Add(line);
-        }
+        _currentContours = precomputedContours;
+        ContourSurface.InvalidateVisual();
 
         RenderConnections();
 
         foreach (var marker in _markers)
             AddMarkerVisual(marker);
+    }
+
+    /// <summary>Contour segments most recently handed to <see cref="RenderOverlay(IReadOnlyList{ContourSegment})"/>
+    /// — read by <see cref="ContourSurface_PaintSurface"/> whenever WPF asks the Skia surface to
+    /// repaint (e.g. after <c>InvalidateVisual</c>, or a resize).</summary>
+    private IReadOnlyList<ContourSegment> _currentContours = [];
+
+    /// <summary>Draws <see cref="_currentContours"/> as two batched paths (regular contours,
+    /// coastline) instead of one WPF element per segment — see <see cref="RenderOverlay(IReadOnlyList{ContourSegment})"/>'s
+    /// doc comment for why. Runs every time WPF repaints this surface; SkiaSharp is immediate-mode,
+    /// so unlike the old Line-per-segment approach there's no retained per-segment object to build
+    /// or tear down — the cost is purely proportional to segment count for the one draw call.</summary>
+    private void ContourSurface_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+    {
+        var canvas = e.Surface.Canvas;
+        canvas.Clear(SKColors.Transparent);
+        if (_grid is null || _currentContours.Count == 0) return;
+
+        // The surface is rasterized at _lastContourSupersample× the grid's own cell count (see
+        // UpdateContourSupersampling) so it stays crisp once WPF's Zoom transform scales it back
+        // up on screen — WorldToCanvas below still returns plain canvas-unit coordinates (1 unit =
+        // 1 grid cell), so this Scale is what maps them onto the bigger raster. Stroke widths are
+        // specified in that same pre-Scale canvas-unit space, so they end up the correct ON-SCREEN
+        // thickness regardless of supersample — Skia scales stroke width along with geometry.
+        canvas.Scale(_lastContourSupersample);
+
+        using var contourPath = new SKPath();
+        using var coastlinePath = new SKPath();
+        foreach (var seg in _currentContours)
+        {
+            var (x1, y1) = WorldToCanvas(seg.X1, seg.Y1);
+            var (x2, y2) = WorldToCanvas(seg.X2, seg.Y2);
+            var path = seg.Level == 0f ? coastlinePath : contourPath;
+            path.MoveTo((float)x1, (float)y1);
+            path.LineTo((float)x2, (float)y2);
+        }
+
+        using var contourPaint = new SKPaint
+        {
+            Color = new SKColor(0x8B, 0x45, 0x13, (byte)(0.7 * 255)), // SaddleBrown, matches the old Brushes.SaddleBrown @ 70% opacity
+            StrokeWidth = 0.6f, IsAntialias = true, Style = SKPaintStyle.Stroke,
+        };
+        using var coastlinePaint = new SKPaint
+        {
+            Color = new SKColor(TerrainColorRamp.CoastlineColor.R, TerrainColorRamp.CoastlineColor.G,
+                TerrainColorRamp.CoastlineColor.B, (byte)(0.9 * 255)),
+            StrokeWidth = 1.4f, IsAntialias = true, Style = SKPaintStyle.Stroke,
+        };
+        canvas.DrawPath(contourPath, contourPaint);
+        canvas.DrawPath(coastlinePath, coastlinePaint);
     }
 
     /// <summary>Draws each Connection: a generated terrain-aware road (dashed, if one has been
