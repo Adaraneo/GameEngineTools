@@ -40,6 +40,10 @@ public sealed record UniverseConfig(
     string PlanetAtmosphere = "EarthLike",
     string PlanetArchetype = "RockyTerrestrial",
     double PlanetMagneticFieldStrengthVsEarth = 1.0,
+    /// <summary>TerraGen tectonic-plate mountain/rift placement — see
+    /// <c>PlanetNoise.Parameters.TectonicPlateCount</c>'s doc comment for what this drives. 0
+    /// falls back to TerraGen's original single fixed mountain-belt layer.</summary>
+    int PlanetTectonicPlateCount = 10,
 
     // ── Primary moon — default: Luna ─────────────────────────────────────────
     bool HasMoon = false,
@@ -80,6 +84,7 @@ public sealed record UniverseConfig(
         PlanetAtmosphere: "EarthLike",
         PlanetArchetype: "RockyTerrestrial",
         PlanetMagneticFieldStrengthVsEarth: 1.0,
+        PlanetTectonicPlateCount: 10,
         HasMoon: false,
         MoonMassKg: 7.342e22,
         MoonMeanRadiusKm: 1_737.4,

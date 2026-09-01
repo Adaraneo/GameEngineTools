@@ -13,15 +13,20 @@ if (options is null)
 }
 
 var planet = PlanetSettings.Load(options.DbPath);
+// --tectonic-plates overrides the planet's own appsettings.World.json setting when given;
+// otherwise every run against this planet uses the same plate count without having to repeat it.
+var tectonicPlateCount = options.TectonicPlateCount ?? planet.TectonicPlateCount;
 Console.WriteLine($"Planeta: {planet.PlanetName}  gravitace={planet.GravityMs2:0.00} m/s²  " +
-                   $"poloměr={planet.PlanetRadiusMeters / 1000.0:0.0} km  seed={planet.Seed}");
+                   $"poloměr={planet.PlanetRadiusMeters / 1000.0:0.0} km  seed={planet.Seed}  " +
+                   $"tektonické desky={(tectonicPlateCount > 0 ? tectonicPlateCount.ToString() : "vypnuto")}");
 
 // TerraGen only ever stores terrain tiles — never Locations/Connections/WorldObjects — so it
 // applies the dedicated terrain schema, not the full world schema.
 using var db = new SqliteWorldDatabase(options.DbPath);
 WorldDatabaseSeeder.InitializeTerrainDatabase(db);
 
-var noiseParams = new PlanetNoise.Parameters(Seed: planet.Seed, GravityMs2: planet.GravityMs2);
+var noiseParams = new PlanetNoise.Parameters(Seed: planet.Seed, GravityMs2: planet.GravityMs2,
+    TectonicPlateCount: tectonicPlateCount);
 var erosionParams = new TileErosion.Parameters(Seed: planet.Seed, DropletCount: options.DropletsPerTile);
 
 var runSettings = new TileGenerator.RunSettings(
@@ -53,6 +58,13 @@ internal sealed class CliOptions
     public double CellMeters { get; init; } = 2.5;
     public double ErosionStrength { get; init; } = 50.0;
 
+    /// <summary><c>null</c> (default — not passed on the command line) means "use whatever
+    /// <c>appsettings.World.json</c>'s <c>PlanetTectonicPlateCount</c> says for this planet" (see
+    /// <see cref="PlanetSettings"/>). Passing <c>--tectonic-plates</c> explicitly overrides that
+    /// for just this one run, including passing <c>0</c> to fall back to the original
+    /// single-global-belt mountain layer for a planet whose config otherwise has tectonics on.</summary>
+    public int? TectonicPlateCount { get; init; }
+
     /// <summary>Same droplet-count-scales-with-cell-count convention TerrainEditor uses, applied
     /// to one tile's own (unpadded) cell count.</summary>
     public int DropletsPerTile
@@ -74,14 +86,21 @@ internal sealed class CliOptions
               TerraGen --lat-range <min>:<max> --lon-range <min>:<max>
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
-                        [--erosion <0-100, výchozí 50>]
+                        [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
+
+            --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
+            desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
+            Typická hodnota pro planetu podobnou Zemi je 8-16. Existující dlaždice vygenerované
+            bez tohoto přepínače musí dál generovat identicky, proto je výchozí hodnota 0.
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
             v aktuálním pracovním adresáři (vytvoří se, pokud tam ještě není).
 
-            appsettings.World.json (planeta: gravitace, poloměr, seed) se hledá ve stejné
-            složce jako --db, nebo v některém z jejích rodičovských adresářů.
+            appsettings.World.json (planeta: gravitace, poloměr, seed, tektonické desky —
+            World:Universe:PlanetTectonicPlateCount) se hledá ve stejné složce jako --db, nebo
+            v některém z jejích rodičovských adresářů. --tectonic-plates přebije hodnotu z configu
+            jen pro tento běh.
             """);
     }
 
@@ -92,6 +111,7 @@ internal sealed class CliOptions
         var tileKm = 1.0;
         var cellMeters = 2.5;
         var erosion = 50.0;
+        int? tectonicPlateCount = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -115,6 +135,9 @@ internal sealed class CliOptions
                 case "--erosion" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var e):
                     erosion = e;
                     break;
+                case "--tectonic-plates" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tp):
+                    tectonicPlateCount = tp;
+                    break;
                 default:
                     Console.Error.WriteLine($"Neznámý nebo neúplný argument: {args[i]}");
                     return null;
@@ -136,6 +159,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--tile-km a --cell-m musí být kladné.");
             return null;
         }
+        if (tectonicPlateCount < 0)
+        {
+            Console.Error.WriteLine("--tectonic-plates nesmí být záporné.");
+            return null;
+        }
 
         return new CliOptions
         {
@@ -143,6 +171,7 @@ internal sealed class CliOptions
             LatMin = latMin.Value, LatMax = latMax!.Value,
             LonMin = lonMin.Value, LonMax = lonMax!.Value,
             TileKm = tileKm, CellMeters = cellMeters, ErosionStrength = Math.Clamp(erosion, 0, 100),
+            TectonicPlateCount = tectonicPlateCount,
         };
     }
 

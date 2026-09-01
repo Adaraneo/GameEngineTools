@@ -20,7 +20,7 @@ public static class PlanetSettings
     private const double EarthRadiusMeters = 6_378_100.0;
 
     public sealed record Resolved(string PlanetName, double PlanetMassKg, double PlanetRadiusMeters,
-        double GravityMs2, int Seed);
+        double GravityMs2, int Seed, int TectonicPlateCount);
 
     /// <summary>Searches upward from <paramref name="dbFilePath"/>'s folder for
     /// <see cref="SettingsFileName"/>, binds its <c>World:Universe</c> section (falling back to
@@ -41,7 +41,8 @@ public static class PlanetSettings
 
         var seed = ComputeSeed(planet.PlanetName, planet.PlanetMassKg, planet.PlanetEquatorialRadiusKm);
 
-        return new Resolved(planet.PlanetName, planet.PlanetMassKg, radiusMeters, gravityMs2, seed);
+        return new Resolved(planet.PlanetName, planet.PlanetMassKg, radiusMeters, gravityMs2, seed,
+            Math.Max(0, planet.PlanetTectonicPlateCount));
     }
 
     /// <summary>Stable FNV-1a hash of the planet's identity — NOT <c>string.GetHashCode()</c>,

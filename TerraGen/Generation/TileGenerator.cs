@@ -57,6 +57,14 @@ public static class TileGenerator
         var refLatDeg = s.MountainOriginLatDeg;
         var refLonDeg = s.MountainOriginLonDeg;
 
+        // Built ONCE for the whole run (pure function of Seed+count — see TectonicPlates.Generate)
+        // and reused for every grid cell below, rather than rebuilt per cell. Also what makes tiles
+        // from separate runs/invocations agree on the same plates, the same way the fixed mountain
+        // reference point above does for the non-tectonic layer.
+        var plates = s.NoiseParams.TectonicPlateCount > 0
+            ? TectonicPlates.Generate(s.NoiseParams.Seed, s.NoiseParams.TectonicPlateCount)
+            : null;
+
         // The requested region's corners, converted into the FIXED reference frame — not derived
         // from the region's own center, so the same physical corner always lands at the same flat
         // offset regardless of what other region a future run happens to request. See the
@@ -101,7 +109,7 @@ public static class TileGenerator
                     {
                         var worldX = paddedOriginX + gx * s.CellSizeMeters;
                         paddedValues[gy * paddedSize + gx] = (float)PlanetNoise.SampleCombined(
-                            worldX, worldY, refLatDeg, refLonDeg, s.NoiseParams, s.PlanetRadiusMeters);
+                            worldX, worldY, refLatDeg, refLonDeg, s.NoiseParams, s.PlanetRadiusMeters, plates);
                     }
                 }
 

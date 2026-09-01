@@ -57,6 +57,54 @@ public class TileGeneratorTests
     }
 
     [TestMethod]
+    public void Run_WithTectonicPlates_AdjacentTilesStillAgreeExactlyAlongSharedEdge()
+    {
+        // Same proof as the non-tectonic test above, but with TectonicPlateCount > 0 — confirms
+        // that switching the mountain layer onto TectonicPlates.Sample (instead of the single fixed
+        // belt) doesn't break the tile-boundary agreement everything else here depends on. It only
+        // works because TileGenerator builds the Plate[] array ONCE per run and reuses it for every
+        // cell, so both tiles' SampleCombined calls consult the exact same plate positions.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 7, AmplitudeMeters: 200.0, TectonicPlateCount: 10);
+            var erosionParams = new TileErosion.Parameters(Seed: 7, DropletCount: 800, MaxDropletLifetime: 6);
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.006,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams, ErosionParams: erosionParams,
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters);
+
+            var results = TileGenerator.Run(db, settings);
+
+            var rowWithMultipleCols = results.GroupBy(r => r.Row).First(g => g.Count() >= 2);
+            var ordered = rowWithMultipleCols.OrderBy(r => r.Col).ToList();
+            Assert.IsTrue(ordered.Count >= 2, "Test setup needs at least 2 tiles in one row.");
+
+            var west = db.LoadHeightmap(ordered[0].Id)!;
+            var east = db.LoadHeightmap(ordered[1].Id)!;
+            Assert.IsNotNull(west);
+            Assert.IsNotNull(east);
+            Assert.AreEqual(west.Height, east.Height);
+
+            for (var y = 0; y < west.Height; y++)
+            {
+                var westEdge = west.Values[y * west.Width + (west.Width - 1)];
+                var eastEdge = east.Values[y * east.Width + 0];
+                Assert.AreEqual(westEdge, eastEdge, 1e-3f,
+                    $"Row {y}: west tile's east edge ({westEdge}) doesn't match east tile's west edge ({eastEdge}).");
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
     public void Run_SeparateInvocations_ForAdjacentRegions_StillAgreeAtSharedEdge()
     {
         // The actual point of the fixed planet-wide reference point: two ENTIRELY SEPARATE

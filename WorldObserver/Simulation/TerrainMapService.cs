@@ -69,7 +69,8 @@ namespace WorldObserver.Simulation
             WorldDatabaseSeeder.InitializeTerrainDatabase(_db);
 
             _planet = PlanetSettings.Load(dbPath);
-            _noiseParams = new PlanetNoise.Parameters(Seed: _planet.Seed, GravityMs2: _planet.GravityMs2);
+            _noiseParams = new PlanetNoise.Parameters(Seed: _planet.Seed, GravityMs2: _planet.GravityMs2,
+                TectonicPlateCount: _planet.TectonicPlateCount);
 
             var cellsPerSide = Math.Max(1, (int)Math.Round(TileSizeMeters / CellSizeMeters));
             var droplets = Math.Min(150_000, cellsPerSide * cellsPerSide); // ~same convention as TerraGen's CLI (50% erosion)

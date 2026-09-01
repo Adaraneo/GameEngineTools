@@ -44,7 +44,16 @@ public static class PlanetNoise
         int MountainOctaves = 4,
         double MountainPersistence = 0.55,
         double MountainLacunarity = 2.0,
-        double GravityMs2 = EarthSurfaceGravityMs2)
+        double GravityMs2 = EarthSurfaceGravityMs2,
+        /// <summary>0 (default) keeps the original single-global-belt mountain layer, unchanged —
+        /// existing worlds/tiles generated before this option existed must keep regenerating
+        /// identically. &gt; 0 switches <see cref="SampleCombined"/> onto <see cref="TectonicPlates"/>-
+        /// driven placement instead: mountain ranges form at convergent plate boundaries, rifts at
+        /// divergent ones, rather than along one fixed planet-wide direction. Callers must build the
+        /// matching <see cref="TectonicPlates.Plate"/>[] via <see cref="TectonicPlates.Generate"/>
+        /// ONCE per run (same Seed, this count) and pass it into every <see cref="SampleCombined"/>
+        /// call — see <see cref="TileGenerator"/>.</summary>
+        int TectonicPlateCount = 0)
     {
         /// <summary>Resolves <see cref="MountainBeltDirectionDeg"/>, deriving a deterministic
         /// direction from <see cref="Seed"/> when unset — same value for every tile in a run since
@@ -82,12 +91,7 @@ public static class PlanetNoise
     /// </summary>
     public static double SampleLandmass(double latDeg, double lonDeg, Parameters p, double planetRadiusMeters)
     {
-        var latRad = latDeg * Math.PI / 180.0;
-        var lonRad = lonDeg * Math.PI / 180.0;
-        var cosLat = Math.Cos(latRad);
-        var x = cosLat * Math.Cos(lonRad);
-        var y = cosLat * Math.Sin(lonRad);
-        var z = Math.Sin(latRad);
+        var (x, y, z) = LatLonToUnitVector(latDeg, lonDeg);
 
         var continentWavelengthMeters = p.ContinentWavelengthMeters
             ?? 2.0 * Math.PI * Math.Max(planetRadiusMeters, 1.0) / 6.0; // ~a sixth of the circumference
@@ -225,21 +229,71 @@ public static class PlanetNoise
     /// computed from the SAME reference point, which is why <c>TileGenerator</c> always uses one
     /// fixed planet-wide reference rather than a different one per run (see its remarks).
     /// </summary>
+    /// <param name="plates">Pass when <see cref="Parameters.TectonicPlateCount"/> &gt; 0 — see
+    /// that property's doc comment. Ignored (and safe to leave null) otherwise.</param>
     public static double SampleCombined(double offsetXMeters, double offsetYMeters,
-        double refLatDeg, double refLonDeg, Parameters p, double planetRadiusMeters)
+        double refLatDeg, double refLonDeg, Parameters p, double planetRadiusMeters,
+        TectonicPlates.Plate[]? plates = null)
     {
         var (lat, lon) = OffsetToLatLon(offsetXMeters, offsetYMeters, refLatDeg, refLonDeg, planetRadiusMeters);
         var landmassElevation = SampleLandmass(lat, lon, p, planetRadiusMeters);
 
-        var mountainNoise = SampleMountainRidge(offsetXMeters, offsetYMeters, p);
         var landmassShare = Math.Clamp(p.LandmassAmplitudeFraction, 0.0, 1.0);
         var mountainShare = 1.0 - landmassShare;
         var gravityScale = Math.Clamp(EarthSurfaceGravityMs2 / Math.Max(p.GravityMs2, 1e-6), 0.1, 10.0);
         var mountainMaxAmplitude = p.AmplitudeMeters * mountainShare * gravityScale;
-        var suppression = MountainSuppression(landmassElevation, mountainMaxAmplitude);
-        var mountainElevation = mountainNoise * mountainMaxAmplitude * suppression;
+
+        // The ridged-multifractal noise itself still supplies local roughness/texture either way —
+        // what changes is what MASKS it: the original single fixed planet-wide belt direction, or
+        // (when plates is supplied) proximity to a tectonic plate boundary and its type.
+        var mountainNoise = SampleMountainRidge(offsetXMeters, offsetYMeters, p);
+
+        double mountainElevation;
+        if (plates is { Length: > 0 })
+        {
+            var (x, y, z) = LatLonToUnitVector(lat, lon);
+            var boundary = TectonicPlates.Sample(plates, x, y, z);
+            // Cubed so the belt reads as a band near the boundary line, not a gradient spanning
+            // half the plate — Sample's BoundaryInfluence falls off roughly linearly with distance.
+            var belt = Math.Pow(boundary.BoundaryInfluence, 3.0);
+
+            mountainElevation = boundary.Boundary switch
+            {
+                // Continent-continent collision (Himalaya-style) pushes higher than a margin with
+                // an oceanic plate (Andes-style); either still uses the same ridged noise texture.
+                TectonicPlates.BoundaryType.Convergent =>
+                    mountainNoise * mountainMaxAmplitude * belt * (boundary.IsContinental ? 1.3 : 0.85),
+                // Rifting apart — a valley (or, on an oceanic plate, a mid-ocean ridge trough) —
+                // NOT run through MountainSuppression below, since a rift is expected to show up
+                // even under water, unlike stray uplift noise.
+                TectonicPlates.BoundaryType.Divergent => -mountainMaxAmplitude * 0.5 * belt,
+                _ => 0.0,
+            };
+
+            if (mountainElevation > 0)
+            {
+                var suppression = MountainSuppression(landmassElevation, mountainMaxAmplitude);
+                mountainElevation *= suppression;
+            }
+        }
+        else
+        {
+            var suppression = MountainSuppression(landmassElevation, mountainMaxAmplitude);
+            mountainElevation = mountainNoise * mountainMaxAmplitude * suppression;
+        }
 
         return landmassElevation + mountainElevation;
+    }
+
+    /// <summary>True (lat,lon) → unit-sphere position — shared by <see cref="SampleLandmass"/> and
+    /// the tectonic-plate lookup in <see cref="SampleCombined"/> so both agree on the exact same
+    /// point.</summary>
+    private static (double x, double y, double z) LatLonToUnitVector(double latDeg, double lonDeg)
+    {
+        var latRad = latDeg * Math.PI / 180.0;
+        var lonRad = lonDeg * Math.PI / 180.0;
+        var cosLat = Math.Cos(latRad);
+        return (cosLat * Math.Cos(lonRad), cosLat * Math.Sin(lonRad), Math.Sin(latRad));
     }
 
     private static double DeriveBeltDirectionDeg(int seed)

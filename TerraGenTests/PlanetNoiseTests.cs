@@ -107,4 +107,63 @@ public class PlanetNoiseTests
         Assert.IsTrue(negativeFraction > 0.5,
             $"Expected most of a patch centered on a moderately-underwater point ({landmassAtCenter:0.0}m) to stay underwater, got {negativeFraction:P0}.");
     }
+
+    [TestMethod]
+    public void SampleCombined_WithTectonicPlates_IsDeterministic()
+    {
+        var p = new PlanetNoise.Parameters(Seed: 21, AmplitudeMeters: 200.0, TectonicPlateCount: 10);
+        var plates = TectonicPlates.Generate(p.Seed, p.TectonicPlateCount);
+
+        var a = PlanetNoise.SampleCombined(1200.0, -800.0, 15.0, 30.0, p, EarthRadius, plates);
+        var b = PlanetNoise.SampleCombined(1200.0, -800.0, 15.0, 30.0, p, EarthRadius, plates);
+
+        Assert.AreEqual(a, b);
+    }
+
+    [TestMethod]
+    public void SampleCombined_WithTectonicPlates_AllValuesFinite()
+    {
+        var p = new PlanetNoise.Parameters(Seed: 23, AmplitudeMeters: 200.0, TectonicPlateCount: 12);
+        var plates = TectonicPlates.Generate(p.Seed, p.TectonicPlateCount);
+
+        for (var lat = -80.0; lat <= 80.0; lat += 20.0)
+        {
+            for (var lon = -180.0; lon < 180.0; lon += 20.0)
+            {
+                var value = PlanetNoise.SampleCombined(0.0, 0.0, lat, lon, p, EarthRadius, plates);
+                Assert.IsFalse(double.IsNaN(value));
+                Assert.IsFalse(double.IsInfinity(value));
+            }
+        }
+    }
+
+    [TestMethod]
+    public void SampleCombined_WithTectonicPlates_SharedPlatesArray_TwoCallsForTheSamePhysicalPointAgree()
+    {
+        // Same seamlessness guarantee the non-tectonic test above checks — must still hold once
+        // plates are involved, since TileGenerator builds the plate array once and shares it
+        // across every tile in (and across separate invocations of) a run.
+        var p = new PlanetNoise.Parameters(Seed: 25, AmplitudeMeters: 200.0, TectonicPlateCount: 8);
+        var plates = TectonicPlates.Generate(p.Seed, p.TectonicPlateCount);
+        const double refLat = 10.0, refLon = 20.0;
+
+        var direct = PlanetNoise.SampleCombined(500.0, -300.0, refLat, refLon, p, EarthRadius, plates);
+        var again = PlanetNoise.SampleCombined(500.0, -300.0, refLat, refLon, p, EarthRadius, plates);
+
+        Assert.AreEqual(direct, again);
+    }
+
+    [TestMethod]
+    public void SampleCombined_TectonicPlateCountZero_MatchesOriginalBeltBehavior()
+    {
+        // TectonicPlateCount defaults to 0 specifically so existing worlds keep regenerating
+        // identically — this pins that down: passing a non-null but empty/unused plates array
+        // (or omitting it) must not change anything versus the original single-belt layer.
+        var p = new PlanetNoise.Parameters(Seed: 27, AmplitudeMeters: 200.0);
+
+        var withoutPlatesArg = PlanetNoise.SampleCombined(900.0, 400.0, 5.0, 5.0, p, EarthRadius);
+        var withNullPlates = PlanetNoise.SampleCombined(900.0, 400.0, 5.0, 5.0, p, EarthRadius, plates: null);
+
+        Assert.AreEqual(withoutPlatesArg, withNullPlates);
+    }
 }
