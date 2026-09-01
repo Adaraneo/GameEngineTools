@@ -7,7 +7,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Threading.Tasks;
 using GameEngineTools.World.Data;
+using TerrainEditor.Diagnostics;
 using TerrainEditor.Models;
 using TerrainEditor.Rendering;
 using TerrainEditor.Services;
@@ -26,7 +28,17 @@ public partial class MainWindow : Window
     private readonly ContourGenerator _contourGen;
 
     private TerrainHeightmap? _grid;
+    /// <summary>When <see cref="_grid"/>.Id is <c>"combined"</c> (a multi-tile stitched view, see
+    /// <see cref="EnsureViewportCoverage"/>), the exact original terrain.db tiles it was built
+    /// from — so <see cref="SaveToDatabase"/> can split edits back into each source tile instead
+    /// of writing one throwaway "combined" row. Empty whenever <see cref="_grid"/> is a single
+    /// tile (its own id) or the hand-painted "default" canvas — nothing to split there.</summary>
+    private IReadOnlyList<TerrainHeightmap> _combinedSources = [];
     private WriteableBitmap? _bitmap;
+    /// <summary>Applied to <see cref="OverlayCanvas"/> so markers/contours/connections track a
+    /// mid-drag grid-origin shift cheaply (see <see cref="SwapGridPreservingViewport"/>) without a
+    /// full rebuild — reset to (0,0) whenever a full <see cref="RenderOverlay"/> runs.</summary>
+    private readonly TranslateTransform _overlayShift = new();
     private readonly List<LocationMarkerViewModel> _markers = [];
     private readonly Dictionary<string, Ellipse> _markerShapes = [];
     private readonly Dictionary<string, TextBlock> _markerLabels = [];
@@ -55,12 +67,36 @@ public partial class MainWindow : Window
         _vm = vm;
         _contourGen = contourGen;
         DataContext = _vm;
+        OverlayCanvas.RenderTransform = _overlayShift;
 
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ShellViewModel.IsConnectingLocations) && !_vm.IsConnectingLocations)
                 _connectFromMarker = null;
+
+            if (e.PropertyName == nameof(ShellViewModel.Zoom))
+            {
+                // Re-render only if zoom actually crossed into a different LOD bracket (see
+                // ComputeDownsampleFactor) — most individual Ctrl+wheel notches don't, so this
+                // skips rebuilding the bitmap on every single one of them.
+                if (ComputeDownsampleFactor(_vm.Zoom) != _lastRenderedDownsample)
+                    RenderGrid();
+
+                // Zooming OUT (buttons, Reset, or Ctrl+wheel) can reveal area beyond whatever was
+                // last stitched by a pan — panning is the only other thing that re-checks coverage,
+                // so without this a zoomed-out view can show a black "nothing here" gap at the
+                // edges even though real tiles exist there, just not pulled in yet. Deferred to
+                // Loaded priority so the ScaleTransform's layout pass (which the Zoom binding
+                // drives) has already run — reading ViewportWidth/Height synchronously here would
+                // still see the pre-zoom numbers.
+                Dispatcher.BeginInvoke(new Action(() => EnsureViewportCoverage()), DispatcherPriority.Loaded);
+            }
         };
+
+        // A window resize/maximize also grows the visible viewport without any pan or zoom change
+        // — same "might now reach beyond what's stitched" risk as zooming out.
+        MapScrollViewer.SizeChanged += (_, _) =>
+            Dispatcher.BeginInvoke(new Action(() => EnsureViewportCoverage()), DispatcherPriority.Loaded);
 
         _vm.DatabaseOpened += (_, _) => LoadFromDatabase();
         _vm.SaveRequested += (_, _) => SaveToDatabase();
@@ -78,6 +114,25 @@ public partial class MainWindow : Window
         _vm.AssignRegionsRequested += (_, _) => AssignRegions();
         _vm.GoToLatLonRequested += (_, _) => GoToLatLon(_vm.TargetLatitude, _vm.TargetLongitude);
         _vm.OpenTileBrowserRequested += (_, _) => OpenTileBrowser();
+        _vm.OpenPerfLogRequested += (_, _) => OpenPerfLog();
+    }
+
+    private PerfLogWindow? _perfLogWindow;
+
+    /// <summary>Opens the perf log window, or just focuses it if one is already open — a second
+    /// independent window watching the same static <see cref="Diagnostics.PerfLog"/> would just be
+    /// confusing (two windows, same data, out of sync scroll position).</summary>
+    private void OpenPerfLog()
+    {
+        if (_perfLogWindow is not null)
+        {
+            _perfLogWindow.Activate();
+            return;
+        }
+
+        _perfLogWindow = new PerfLogWindow { Owner = this };
+        _perfLogWindow.Closed += (_, _) => _perfLogWindow = null;
+        _perfLogWindow.Show();
     }
 
     /// <summary>Opens a non-modal list of every heightmap saved in the open terrain.db (e.g. tiles
@@ -108,6 +163,7 @@ public partial class MainWindow : Window
         }
 
         _grid = tile;
+        _combinedSources = [];
         _roadPaths.Clear();
         _vm.CurrentCenterLatitude = null;
         _vm.CurrentCenterLongitude = null;
@@ -135,6 +191,7 @@ public partial class MainWindow : Window
         if (_grid is null) return;
 
         _grid = CreateGridForLatLon(_vm.TargetMapSizeKm);
+        _combinedSources = [];
         _roadPaths.Clear();
 
         var seed = ComputePlanetSeed();
@@ -373,11 +430,12 @@ public partial class MainWindow : Window
             _connectFromMarker = null;
             _roadPaths.Clear();
 
-            _grid = _vm.WorldDb.LoadHeightmap() ?? CreateDefaultGrid([]);
+            LoadInitialGrid([]);
 
             RenderGrid();
             RenderOverlay();
             RefreshLocationList();
+            Dispatcher.BeginInvoke(new Action(() => { FitZoomToWindow(); EnsureViewportCoverage(); }), DispatcherPriority.Loaded);
             return;
         }
 
@@ -394,11 +452,55 @@ public partial class MainWindow : Window
         _connectFromMarker = null;
         _roadPaths.Clear();
 
-        _grid = _vm.WorldDb.LoadHeightmap() ?? CreateDefaultGrid(locations);
+        LoadInitialGrid(locations);
 
         RenderGrid();
         RenderOverlay();
         RefreshLocationList();
+        Dispatcher.BeginInvoke(new Action(() => { FitZoomToWindow(); EnsureViewportCoverage(); }), DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// Picks what to load as the initial <see cref="_grid"/>. If terrain.db actually has TerraGen-
+    /// style tiles (anything other than the legacy single "default" canvas), starts from whichever
+    /// tile is closest to the loaded locations (or the world origin, with none) — NOT the
+    /// "default" id, which usually doesn't exist at all once a world is tile-based; loading it
+    /// would silently fall back to a blank <see cref="CreateDefaultGrid"/> canvas that shares no
+    /// coordinate frame with the real tiles, so <see cref="EnsureViewportCoverage"/> would never
+    /// find anything beyond it — the bug behind "only one tile ever renders, panning never
+    /// extends". Falls back to the legacy single "default" grid (or a blank canvas) only when
+    /// there are no tiles at all.
+    /// </summary>
+    private void LoadInitialGrid(IReadOnlyList<LocationInfo> locations)
+    {
+        var summaries = _vm.WorldDb.ListHeightmaps();
+        var tiles = summaries.Where(s => s.Id != WorldDatabaseService.DefaultHeightmapId).ToList();
+
+        if (tiles.Count > 0)
+        {
+            var startX = locations.Count > 0 ? locations.Average(l => l.X) : 0.0;
+            var startY = locations.Count > 0 ? locations.Average(l => l.Y) : 0.0;
+            var nearest = tiles.OrderBy(s => DistanceSquaredToCenter(s, startX, startY)).First();
+            var tile = _vm.WorldDb.LoadHeightmap(nearest.Id);
+            if (tile is not null)
+            {
+                _grid = tile;
+                _combinedSources = [tile];
+                return;
+            }
+        }
+
+        _grid = _vm.WorldDb.LoadHeightmap() ?? CreateDefaultGrid(locations);
+        _combinedSources = [];
+    }
+
+    private static double DistanceSquaredToCenter(TerrainHeightmapSummary s, double x, double y)
+    {
+        var cx = s.OriginX + s.Width * s.CellSizeMeters / 2.0;
+        var cy = s.OriginY + s.Height * s.CellSizeMeters / 2.0;
+        var dx = cx - x;
+        var dy = cy - y;
+        return dx * dx + dy * dy;
     }
 
     private void SaveToDatabase()
@@ -409,7 +511,7 @@ public partial class MainWindow : Window
         // heightmap itself (InsertLocation/InsertConnection would throw, see RequireWorldOpen).
         if (_vm.WorldDb.IsTerrainOnly)
         {
-            _vm.WorldDb.SaveHeightmap(_grid);
+            SaveGrid();
             return;
         }
 
@@ -450,7 +552,24 @@ public partial class MainWindow : Window
             }
         }
 
-        _vm.WorldDb.SaveHeightmap(_grid);
+        SaveGrid();
+    }
+
+    /// <summary>
+    /// Saves <see cref="_grid"/> — but if it's currently a multi-tile stitched view (see
+    /// <see cref="EnsureViewportCoverage"/>), splits it back into <see cref="_combinedSources"/>'s
+    /// original tiles and saves each of THOSE instead, so painting/erosion/lakes done while
+    /// panning across a "combined" view lands back in the individual TerraGen tiles it spans
+    /// rather than one throwaway "combined" row.
+    /// </summary>
+    private void SaveGrid()
+    {
+        if (_grid is null) return;
+
+        if (_grid.Id == "combined" && _combinedSources.Count > 0)
+            TileStitcher.SplitAndSave(_grid, _combinedSources, _vm.WorldDb.SaveHeightmap);
+        else
+            _vm.WorldDb.SaveHeightmap(_grid);
     }
 
     /// <summary>Runs terrain-aware pathfinding (see <see cref="RoadGenerator"/>) for every loaded
@@ -564,48 +683,103 @@ public partial class MainWindow : Window
 
     #region Heightmap rendering
 
-    private void RenderGrid()
+    /// <summary>How many grid cells the bitmap skips per sampled pixel when zoomed out — 1 at
+    /// 100%+ zoom (full resolution), growing as zoom shrinks, capped at <see cref="MaxDownsample"/>
+    /// so an extreme zoom-out doesn't collapse the bitmap to a handful of pixels. Colouring is the
+    /// hot loop in <see cref="RenderGrid"/>, and at low zoom most of that detail lands on less than
+    /// a screen pixel anyway — WPF's own upscale (see <c>Stretch="Fill"</c> on HeightmapImage in
+    /// XAML) fills back in the logical size, just blurrier, which is the expected LOD tradeoff.</summary>
+    private static int ComputeDownsampleFactor(double zoom)
+        => Math.Clamp((int)Math.Ceiling(1.0 / Math.Max(zoom, 0.01)), 1, MaxDownsample);
+
+    private const int MaxDownsample = 8;
+
+    /// <summary>The downsample factor <see cref="_bitmap"/> was actually built at — lets the
+    /// Zoom-changed handler skip re-rendering when zoom moved but stayed within the same LOD
+    /// bracket (e.g. Ctrl+wheel ticks that don't cross a <see cref="ComputeDownsampleFactor"/>
+    /// boundary), instead of rebuilding the bitmap on every single zoom notch.</summary>
+    private int _lastRenderedDownsample = 1;
+
+    private unsafe void RenderGrid()
     {
         if (_grid is null) return;
 
-        if (_bitmap is null || _bitmap.PixelWidth != _grid.Width || _bitmap.PixelHeight != _grid.Height)
+        var downsample = ComputeDownsampleFactor(_vm.Zoom);
+        _lastRenderedDownsample = downsample;
+        var bitmapWidth = Math.Max(1, (_grid.Width + downsample - 1) / downsample);
+        var bitmapHeight = Math.Max(1, (_grid.Height + downsample - 1) / downsample);
+        using var perfScope = PerfLog.Scope("RenderGrid",
+            $"grid {_grid.Width}x{_grid.Height} (id={_grid.Id}) -> bitmap {bitmapWidth}x{bitmapHeight} (downsample {downsample}x)");
+
+        if (_bitmap is null || _bitmap.PixelWidth != bitmapWidth || _bitmap.PixelHeight != bitmapHeight)
         {
-            _bitmap = new WriteableBitmap(_grid.Width, _grid.Height, 96, 96, PixelFormats.Bgr32, null);
+            _bitmap = new WriteableBitmap(bitmapWidth, bitmapHeight, 96, 96, PixelFormats.Bgr32, null);
             HeightmapImage.Source = _bitmap;
-            HeightmapImage.Width = _grid.Width;
-            HeightmapImage.Height = _grid.Height;
-            OverlayCanvas.Width = _grid.Width;
-            OverlayCanvas.Height = _grid.Height;
         }
+
+        // The LOGICAL size (what the ScrollViewer scrolls over, what WorldToCanvas/CanvasToWorld
+        // assume 1 unit = 1 grid cell against) always matches the grid's true cell count, whatever
+        // the bitmap's own (possibly downsampled) pixel resolution is — Stretch="Fill" is what
+        // makes WPF stretch a smaller bitmap back up to fill this same box.
+        HeightmapImage.Width = _grid.Width;
+        HeightmapImage.Height = _grid.Height;
+        OverlayCanvas.Width = _grid.Width;
+        OverlayCanvas.Height = _grid.Height;
 
         var min = _grid.Values.Min();
         var max = _grid.Values.Max();
+        var grid = _grid; // local capture — Parallel.For bodies below run on other threads
 
         // Bgr32: 4 bytes/pixel (B, G, R, unused), elevation-tinted — blue below sea level (0m),
         // beach/green/brown/gray/snow above it, river cells overridden to freshwater teal.
         // See TerrainColorRamp for the exact bands.
-        var stride = _grid.Width * 4;
-        var pixels = new byte[stride * _grid.Height];
-        for (var i = 0; i < _grid.Values.Length; i++)
-        {
-            var isRiver = _grid.RiverMask is { } mask && mask[i] != 0;
-            var color = TerrainColorRamp.ForCell(_grid.Values[i], min, max, isRiver);
-            var offset = i * 4;
-            pixels[offset] = color.B;
-            pixels[offset + 1] = color.G;
-            pixels[offset + 2] = color.R;
-            pixels[offset + 3] = 255;
-        }
+        //
+        // Writes straight into the bitmap's own native back buffer instead of building a managed
+        // byte[] and handing it to WritePixels — WritePixels would just copy that array into this
+        // same native memory anyway, so for a combined grid that can be well over a million pixels
+        // this skips one whole extra full-size copy (and the array allocation that used to go with
+        // it) on every pan/zoom-triggered re-render.
+        _bitmap.Lock();
+        var backBuffer = (byte*)_bitmap.BackBuffer;
+        var stride = _bitmap.BackBufferStride;
 
-        _bitmap.WritePixels(new Int32Rect(0, 0, _grid.Width, _grid.Height), pixels, stride, 0);
+        // Each pixel only reads its own cell and writes its own 4 bytes — no shared mutable state
+        // between rows, so this is safe to parallelize across cores. TerrainColorRamp.ForCell is a
+        // pure function over static readonly data. Worthwhile because this is the actual hot loop:
+        // up to bitmapWidth*bitmapHeight TerrainColorRamp calls every time the grid is (re)rendered
+        // (== grid.Width*grid.Height only when downsample is 1, i.e. at 100%+ zoom).
+        Parallel.For(0, bitmapHeight, by =>
+        {
+            var rowPtr = backBuffer + by * stride;
+            var gy = Math.Min(by * downsample, grid.Height - 1);
+            var rowStart = gy * grid.Width;
+            for (var bx = 0; bx < bitmapWidth; bx++)
+            {
+                var gx = Math.Min(bx * downsample, grid.Width - 1);
+                var i = rowStart + gx;
+                var isRiver = grid.RiverMask is { } mask && mask[i] != 0;
+                var color = TerrainColorRamp.ForCell(grid.Values[i], min, max, isRiver);
+                var pixelPtr = rowPtr + bx * 4;
+                pixelPtr[0] = color.B;
+                pixelPtr[1] = color.G;
+                pixelPtr[2] = color.R;
+                pixelPtr[3] = 255;
+            }
+        });
+
+        _bitmap.AddDirtyRect(new Int32Rect(0, 0, bitmapWidth, bitmapHeight));
+        _bitmap.Unlock();
     }
 
     /// <summary>Rebuilds contour lines + location markers. Contours are recomputed here only —
     /// on stroke end, not every mouse-move — because marching squares over the whole grid is
-    /// too expensive to run per pixel-drag.</summary>
+    /// too expensive to run per pixel-drag. During a live pan drag, this whole method is skipped
+    /// entirely instead (see <see cref="SwapGridPreservingViewport"/>).</summary>
     private void RenderOverlay()
     {
         if (_grid is null) return;
+        using var perfScope = PerfLog.Scope("RenderOverlay",
+            $"grid {_grid.Width}x{_grid.Height}, {_markers.Count} markerů, {_connections.Count} spojení (marching squares)");
 
         OverlayCanvas.Children.Clear();
         _markerShapes.Clear();
@@ -764,6 +938,12 @@ public partial class MainWindow : Window
     private Point? _panStartMousePos;
     private double _panStartHOffset;
     private double _panStartVOffset;
+    /// <summary>Screen position <see cref="EnsureViewportCoverage"/> last ran from during the
+    /// current drag — <c>null</c> means "not checked yet this drag". Throttles the check to once
+    /// per <see cref="CoverageCheckThresholdPixels"/> of mouse movement instead of every single
+    /// MouseMove event (which fires far more often than the view can actually need re-stitching).</summary>
+    private Point? _lastCoverageCheckPos;
+    private const double CoverageCheckThresholdPixels = 40.0;
 
     /// <summary>Middle-mouse-button drag pans the map — doesn't collide with left-click, which
     /// is already spoken for (select/drag a marker, place a location, wire up a connection).
@@ -775,6 +955,7 @@ public partial class MainWindow : Window
         _panStartMousePos = e.GetPosition(MapScrollViewer);
         _panStartHOffset = MapScrollViewer.HorizontalOffset;
         _panStartVOffset = MapScrollViewer.VerticalOffset;
+        _lastCoverageCheckPos = null;
         MapScrollViewer.CaptureMouse();
         Mouse.OverrideCursor = Cursors.ScrollAll;
         e.Handled = true;
@@ -787,6 +968,15 @@ public partial class MainWindow : Window
         var pos = e.GetPosition(MapScrollViewer);
         MapScrollViewer.ScrollToHorizontalOffset(_panStartHOffset - (pos.X - start.X));
         MapScrollViewer.ScrollToVerticalOffset(_panStartVOffset - (pos.Y - start.Y));
+
+        // Re-stitching (SQL round-trips, tile decode, a full RenderGrid) is comparatively
+        // expensive — checking on every MouseMove during a fast drag would run it far more often
+        // than the visible area actually changes enough to need it.
+        if (_lastCoverageCheckPos is not { } lastCheck || (pos - lastCheck).Length >= CoverageCheckThresholdPixels)
+        {
+            _lastCoverageCheckPos = pos;
+            EnsureViewportCoverage(isLiveDrag: true);
+        }
     }
 
     private void MapScrollViewer_PreviewMouseUp(object sender, MouseButtonEventArgs e)
@@ -797,6 +987,176 @@ public partial class MainWindow : Window
         MapScrollViewer.ReleaseMouseCapture();
         Mouse.OverrideCursor = null;
         e.Handled = true;
+
+        // Unconditional (not throttled) — guarantees the final drag position is covered even if
+        // the last few pixels of movement didn't cross the throttle threshold above.
+        EnsureViewportCoverage();
+    }
+
+    /// <summary>
+    /// Middle-mouse panning across a continuous terrain.db surface: if the visible viewport has
+    /// panned close to (or past) the currently-loaded <see cref="_grid"/>'s edge, re-stitches a
+    /// wider combined view from whichever ADJACENT tiles are already saved in terrain.db (see
+    /// <see cref="TileStitcher"/>) — never generates new terrain, only pulls in what TerraGen has
+    /// already produced. A no-op when there's nothing beyond the current grid (a single hand-
+    /// painted "default" canvas, or panning still safely inside the loaded area).
+    /// </summary>
+    private void EnsureViewportCoverage(bool isLiveDrag = false)
+    {
+        if (_grid is null || !_vm.WorldDb.IsOpen) return;
+
+        // Forces ViewportWidth/Height/HorizontalOffset etc. to reflect any pending layout change
+        // (e.g. a Zoom update from FitZoomToWindow moments earlier in the same dispatch) instead
+        // of stale pre-layout numbers — a no-op, and cheap, when layout is already clean (the
+        // common case during a live pan, which only changes scroll offsets, not layout).
+        MapScrollViewer.UpdateLayout();
+
+        var viewportCanvasLeft = MapScrollViewer.HorizontalOffset / _vm.Zoom;
+        var viewportCanvasTop = MapScrollViewer.VerticalOffset / _vm.Zoom;
+        var viewportCanvasRight = viewportCanvasLeft + MapScrollViewer.ViewportWidth / _vm.Zoom;
+        var viewportCanvasBottom = viewportCanvasTop + MapScrollViewer.ViewportHeight / _vm.Zoom;
+        if (viewportCanvasRight <= viewportCanvasLeft || viewportCanvasBottom <= viewportCanvasTop)
+            return; // viewport not laid out yet
+
+        var (minWorldX, minWorldY) = CanvasToWorld(viewportCanvasLeft, viewportCanvasTop);
+        var (maxWorldX, maxWorldY) = CanvasToWorld(viewportCanvasRight, viewportCanvasBottom);
+
+        // Small slack so a reload doesn't fire from a single pixel of scroll jitter right at the edge.
+        var margin = 20.0 * _grid.CellSizeMeters;
+        var gridMinX = _grid.OriginX;
+        var gridMinY = _grid.OriginY;
+        var gridMaxX = _grid.OriginX + _grid.Width * _grid.CellSizeMeters;
+        var gridMaxY = _grid.OriginY + _grid.Height * _grid.CellSizeMeters;
+
+        var needsExtend = minWorldX < gridMinX + margin || minWorldY < gridMinY + margin
+            || maxWorldX > gridMaxX - margin || maxWorldY > gridMaxY - margin;
+        if (!needsExtend)
+        {
+            if (!isLiveDrag)
+                PerfLog.Log("Coverage", "Kontrola pokrytí: aktuální dlaždice stačí, nic se nenačítá.");
+            return;
+        }
+        PerfLog.Log("Coverage", $"Kontrola pokrytí: hranice dosažena (liveDrag={isLiveDrag}), spouštím re-stitch na pozadí.");
+
+        // Pad a bit beyond the visible box so a follow-up pan in the same direction doesn't
+        // immediately need yet another reload. Deliberately half the viewport, not a full one —
+        // a bigger pad means fewer re-stitches but a much bigger (and more expensive to build and
+        // render) combined grid each time; half a viewport is enough slack for the pixel-jitter
+        // scroll deltas a live drag actually produces between throttled coverage checks.
+        const double PaddingFraction = 0.5;
+        var padX = (maxWorldX - minWorldX) * PaddingFraction;
+        var padY = (maxWorldY - minWorldY) * PaddingFraction;
+        var boxMinX = minWorldX - padX;
+        var boxMinY = minWorldY - padY;
+        var boxMaxX = maxWorldX + padX;
+        var boxMaxY = maxWorldY + padY;
+
+        // The actual work here — a SQL round-trip (ListHeightmaps) plus decoding and index-copying
+        // however many tiles overlap the box — used to run synchronously on the UI thread, which
+        // is exactly why panning stuttered: every throttled coverage check blocked mouse-move
+        // handling until it finished. Only the WPF part at the end (SwapGridPreservingViewport —
+        // touches _grid/_bitmap/OverlayCanvas) has to stay on the UI thread; the loading/stitching
+        // itself doesn't touch any UI object, so it runs on the thread pool instead.
+        var worldDb = _vm.WorldDb;
+        var token = new object();
+        _pendingStitchToken = token;
+
+        Task.Run(() =>
+        {
+            using var scope = PerfLog.Scope("Stitch", "Načítání + skládání dlaždic z terrain.db (SQL + dekódování, mimo UI vlákno)");
+            try
+            {
+                var summaries = worldDb.ListHeightmaps();
+                var result = TileStitcher.BuildCombinedGrid(summaries, worldDb.LoadHeightmap, boxMinX, boxMinY, boxMaxX, boxMaxY);
+                PerfLog.Log("Stitch", result.Combined is { } c
+                    ? $"Výsledek: {result.Sources.Count} zdrojových dlaždic -> combined {c.Width}x{c.Height}"
+                    : "Výsledek: žádné dlaždice v oblasti, combined = null");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                // Best-effort: e.g. the database was closed/reopened while this was in flight.
+                // The token check below would likely have discarded the result anyway; this just
+                // keeps a lost race from crashing the background thread.
+                PerfLog.Log("Stitch", $"Chyba při skládání (ignorováno, race s zavřením db?): {ex.GetType().Name}: {ex.Message}");
+                return (Combined: null, Sources: (IReadOnlyList<TerrainHeightmap>)[]);
+            }
+        }).ContinueWith(t =>
+        {
+            // Superseded by a newer coverage check (further panning, a zoom, a totally different
+            // database opened) that started after this one — its own result (or lack of one) wins.
+            if (!ReferenceEquals(_pendingStitchToken, token))
+            {
+                PerfLog.Log("Coverage", "Výsledek zahozen — mezitím spuštěná novější kontrola pokrytí ho nahradila.");
+                return;
+            }
+            if (_grid is null) return; // database was closed while this was in flight
+
+            var (combined, sources) = t.Result;
+            if (combined is null) return;
+
+            var unchanged = Math.Abs(combined.OriginX - _grid.OriginX) < 1e-6 && Math.Abs(combined.OriginY - _grid.OriginY) < 1e-6
+                && combined.Width == _grid.Width && combined.Height == _grid.Height;
+            if (unchanged)
+            {
+                PerfLog.Log("Coverage", "Nová combined mřížka je shodná s aktuální — swap přeskočen.");
+                return;
+            }
+
+            SwapGridPreservingViewport(combined, sources, isLiveDrag);
+        }, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    /// <summary>Identifies the most recently STARTED background stitch (see
+    /// <see cref="EnsureViewportCoverage"/>) — its continuation is the only one allowed to apply
+    /// its result, so a slow earlier request that finishes after a newer one can't overwrite it.</summary>
+    private object? _pendingStitchToken;
+
+    /// <summary>Replaces <see cref="_grid"/> (and <see cref="_combinedSources"/>) and re-renders,
+    /// keeping whatever world-space point was centered in the viewport still centered afterward —
+    /// the new grid's OriginX/OriginY generally differ from the old one's, so the raw scroll
+    /// offsets would otherwise land on the wrong spot.</summary>
+    private void SwapGridPreservingViewport(TerrainHeightmap newGrid, IReadOnlyList<TerrainHeightmap> sources, bool isLiveDrag)
+    {
+        var viewportCenterCanvasX = (MapScrollViewer.HorizontalOffset + MapScrollViewer.ViewportWidth / 2.0) / _vm.Zoom;
+        var viewportCenterCanvasY = (MapScrollViewer.VerticalOffset + MapScrollViewer.ViewportHeight / 2.0) / _vm.Zoom;
+        var (worldCenterX, worldCenterY) = CanvasToWorld(viewportCenterCanvasX, viewportCenterCanvasY);
+
+        var oldGrid = _grid;
+        _grid = newGrid;
+        _combinedSources = sources;
+        RenderGrid();
+
+        // Full overlay rebuild (contours via marching squares over a possibly million-plus-cell
+        // grid, plus every marker/connection) is too expensive to run on every intermediate swap
+        // during a live drag. Earlier this just SKIPPED the overlay during a drag instead — but
+        // losing every location marker/contour mid-pan is exactly what made panning feel
+        // disorienting ("don't know where I am"). Cheaper middle ground: shift the EXISTING overlay
+        // visuals by the exact canvas-space delta the grid's own origin just moved (one
+        // TranslateTransform on the whole OverlayCanvas — O(1), not O(markers)) so they track the
+        // new grid correctly without a full rebuild, then do the real rebuild once the drag ends
+        // (MapScrollViewer_PreviewMouseUp always calls this with isLiveDrag=false).
+        if (isLiveDrag && oldGrid is not null)
+        {
+            var deltaCanvasX = (oldGrid.OriginX - newGrid.OriginX) / newGrid.CellSizeMeters;
+            var deltaCanvasY = (oldGrid.OriginY - newGrid.OriginY) / newGrid.CellSizeMeters;
+            _overlayShift.X += deltaCanvasX;
+            _overlayShift.Y += deltaCanvasY;
+        }
+        else
+        {
+            RenderOverlay();
+            _overlayShift.X = 0;
+            _overlayShift.Y = 0;
+        }
+
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            MapScrollViewer.UpdateLayout();
+            var (cx, cy) = WorldToCanvas(worldCenterX, worldCenterY);
+            MapScrollViewer.ScrollToHorizontalOffset(cx * _vm.Zoom - MapScrollViewer.ViewportWidth / 2.0);
+            MapScrollViewer.ScrollToVerticalOffset(cy * _vm.Zoom - MapScrollViewer.ViewportHeight / 2.0);
+        }), DispatcherPriority.Loaded);
     }
 
     #endregion Panning

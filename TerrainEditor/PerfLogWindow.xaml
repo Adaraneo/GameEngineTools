@@ -1,0 +1,33 @@
+<Window x:Class="TerrainEditor.PerfLogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Perf Log" Height="520" Width="880"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+            <TextBlock x:Name="MemoryLabel" Text="Spravovaná halda: — · Working set: —" VerticalAlignment="Center" FontWeight="Bold" />
+            <TextBlock Text="  (aktualizuje se dvakrát za sekundu)" VerticalAlignment="Center" Opacity="0.6" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
+            <Button Content="Vyčistit" Padding="10,3" Click="ClearButton_Click" />
+            <CheckBox x:Name="AutoScrollCheckBox" Content="Automaticky rolovat na konec" IsChecked="True"
+                      VerticalAlignment="Center" Margin="12,0,0,0" />
+            <Button Content="Vynutit GC.Collect" Padding="10,3" Margin="12,0,0,0" Click="ForceGcButton_Click"
+                    ToolTip="Pro odlišení 'paměť opravdu drží data' od 'GC to ještě jen neuklidil' — po kliknutí sleduj, jestli spravovaná halda klesne." />
+        </StackPanel>
+
+        <ListView x:Name="LogListView">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Čas" Width="90" DisplayMemberBinding="{Binding TimeText}" />
+                    <GridViewColumn Header="Kategorie" Width="110" DisplayMemberBinding="{Binding Category}" />
+                    <GridViewColumn Header="Zpráva" Width="360" DisplayMemberBinding="{Binding Message}" />
+                    <GridViewColumn Header="Trvání" Width="80" DisplayMemberBinding="{Binding DurationText}" />
+                    <GridViewColumn Header="Halda (MB)" Width="80" DisplayMemberBinding="{Binding ManagedMbText}" />
+                    <GridViewColumn Header="Working set (MB)" Width="110" DisplayMemberBinding="{Binding WorkingSetMbText}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </DockPanel>
+</Window>

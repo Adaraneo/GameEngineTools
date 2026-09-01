@@ -7,21 +7,17 @@
 
         <ToolBarTray DockPanel.Dock="Top">
             <ToolBar>
-                <Button Content="New World…" Command="{Binding NewWorldCommand}" Margin="2" Padding="6,2"
-                        ToolTip="Vytvoří úplně prázdný svět (jen schéma, žádné výchozí lokace) — postavíš ho celý přes tento editor" />
-                <Button Content="Open World DB…" Command="{Binding OpenDatabaseCommand}" Margin="2" Padding="6,2"
-                        ToolTip="Otevře world.db (lokace/spojení) a zároveň sesterskou terrain.db ve stejné složce (vytvoří ji, pokud tam ještě není)" />
-                <Button Content="Open Terrain Only…" Command="{Binding OpenTerrainOnlyCommand}" Margin="2" Padding="6,2"
-                        ToolTip="Otevře jen terrain.db, bez párového world.db — pro čistou práci s dlaždicemi terénu (malování/generování/prohlížeč dlaždic); ukládání lokací/spojení a export nejsou v tomto režimu dostupné" />
+                <Button Content="Open Folder…" Command="{Binding OpenFolderCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Vyber složku se world.db / terrain.db. Je-li tam world.db, otevře se i sesterská terrain.db. Bez world.db se otevře jen terrain.db. Bez obojího nahlásí, že je potřeba je nejdřív vygenerovat (terragen/worldgen)." />
                 <Button Content="Save" Command="{Binding SaveCommand}" Margin="2" Padding="6,2" />
                 <Button Content="Export to seed_data.sql…" Command="{Binding ExportSeedCommand}" Margin="2" Padding="6,2" />
                 <Button Content="Generate Roads" Command="{Binding GenerateRoadsCommand}" Margin="2" Padding="6,2"
                         ToolTip="Terrain-aware cesty pro všechny Connections — nahradí rovné čáry klikatými, respektujícími sklon terénu" />
                 <Separator />
-                <ToggleButton Content="Add Location" IsChecked="{Binding IsAddingLocation}"
+                <ToggleButton Content="Add Location" IsChecked="{Binding IsAddingLocation}" IsEnabled="{Binding CanEditWorldLocations}"
                               Margin="2" Padding="6,2"
                               ToolTip="Zapni a klikni na mapu — vytvoří tam novou lokaci (zeptá se na název). Uloží se přes Save." />
-                <ToggleButton Content="Connect Locations" IsChecked="{Binding IsConnectingLocations}"
+                <ToggleButton Content="Connect Locations" IsChecked="{Binding IsConnectingLocations}" IsEnabled="{Binding CanEditWorldLocations}"
                               Margin="2" Padding="6,2"
                               ToolTip="Zapni, pak klikni na dvě lokace za sebou — vytvoří mezi nimi obousměrné spojení (Connections) na přímou vzdálenost. Zůstane zapnuté pro víc spojení; Generate Roads pak nahradí přímku terén-vědomou cestou." />
                 <Separator />
@@ -38,6 +34,9 @@
                 <Button Content="+" Command="{Binding ZoomInCommand}" Width="24" Margin="2" Padding="0" />
                 <Button Content="Reset" Command="{Binding ZoomResetCommand}" Margin="4,2" Padding="6,2"
                         ToolTip="Reset zoom to 100% (Ctrl+kolečko myši = přiblížení na pozici kurzoru)" />
+                <Separator />
+                <Button Content="Perf Log…" Command="{Binding OpenPerfLogCommand}" Margin="2" Padding="6,2"
+                        ToolTip="Živý log toho, co se skutečně děje na pozadí při posunu/zoomu (přeskládání dlaždic, vykreslování, cache) + spotřeba paměti" />
             </ToolBar>
             <ToolBar Band="2" BandIndex="0">
                 <TextBlock Text="Terén:" VerticalAlignment="Center" Margin="2,0,8,0" FontWeight="Bold" />
@@ -99,16 +98,14 @@
                       Background="#FF202020" PreviewMouseWheel="MapScrollViewer_PreviewMouseWheel"
                       PreviewMouseDown="MapScrollViewer_PreviewMouseDown"
                       MouseMove="MapScrollViewer_MouseMove"
-                      PreviewMouseUp="MapScrollViewer_PreviewMouseUp"
-                      ToolTip="Prostřední tlačítko myši = táhnutím posunout mapu">
+                      PreviewMouseUp="MapScrollViewer_PreviewMouseUp">
             <Grid HorizontalAlignment="Left" VerticalAlignment="Top">
                 <Grid.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
                 </Grid.LayoutTransform>
                 <Image x:Name="HeightmapImage"
-                       Stretch="None"
+                       Stretch="Fill"
                        HorizontalAlignment="Left" VerticalAlignment="Top"
-                       SnapsToDevicePixels="True"
                        MouseLeftButtonDown="HeightmapImage_MouseLeftButtonDown"
                        MouseMove="HeightmapImage_MouseMove" />
                 <Canvas x:Name="OverlayCanvas"

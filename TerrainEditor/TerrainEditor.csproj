@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- RenderGrid writes straight into WriteableBitmap.BackBuffer via a raw pointer to avoid an
+         extra full-frame managed-array copy (see MainWindow.RenderGrid). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

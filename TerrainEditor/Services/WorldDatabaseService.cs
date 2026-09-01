@@ -2,6 +2,7 @@ using System.IO;
 using GameEngineTools.World.Core.Astro;
 using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
+using TerrainEditor.Diagnostics;
 using TerrainEditor.Models;
 
 namespace TerrainEditor.Services;
@@ -29,6 +30,28 @@ public sealed class WorldDatabaseService : IDisposable
 
     private SqliteWorldDatabase? _db;
     private SqliteWorldDatabase? _terrainDb;
+
+    /// <summary>Bounds how many decoded tiles <see cref="_heightmapCache"/> holds at once — without
+    /// a cap, a long session panning across many tiles would accumulate every one of them
+    /// (a 400×400 tile is ~640KB just for the elevation floats) for the rest of the session.</summary>
+    private const int HeightmapCacheCapacity = 40;
+
+    /// <summary>
+    /// In-memory cache of decoded heightmaps, keyed by id — avoids re-hitting SQLite and
+    /// re-decoding the BLOB every time the same tile is revisited (e.g. panning back and forth
+    /// across a tile boundary, or <see cref="Services.TileStitcher"/> re-stitching a viewport that
+    /// still includes tiles from the previous combined view). Kept consistent with what's on disk
+    /// by <see cref="SaveHeightmap"/> (updates the entry) and <see cref="Close"/> (clears it
+    /// entirely — ids aren't guaranteed unique across different terrain.db files).
+    /// </summary>
+    private readonly LruCache<string, TerrainHeightmap> _heightmapCache = new(HeightmapCacheCapacity);
+
+    /// <summary>Guards <see cref="_heightmapCache"/> — MainWindow's continuous-tile-panning feature
+    /// loads/stitches tiles on a background thread (see <c>EnsureViewportCoverage</c>) while the UI
+    /// thread can still call <see cref="LoadHeightmap(string)"/>/<see cref="SaveHeightmap"/> at the
+    /// same time (e.g. Save while a pan-triggered background stitch is in flight); the cache itself
+    /// has no internal locking, unlike <c>SqliteWorldDatabase</c>'s own connection access.</summary>
+    private readonly object _cacheSync = new();
 
     /// <summary>True once either database is open — world.db+terrain.db (<see cref="Open"/>/
     /// <see cref="OpenBlank"/>) or terrain.db alone (<see cref="OpenTerrainOnly"/>).</summary>
@@ -166,6 +189,8 @@ public sealed class WorldDatabaseService : IDisposable
         DatabasePath = null;
         CosmologyConfig = null;
         PlanetConfig = null;
+        lock (_cacheSync)
+            _heightmapCache.Clear();
     }
 
     public IReadOnlyList<LocationInfo> GetLocations()
@@ -180,18 +205,32 @@ public sealed class WorldDatabaseService : IDisposable
     }
 
     /// <summary>Loads the default heightmap grid, or <c>null</c> if none has been saved yet.</summary>
-    public TerrainHeightmap? LoadHeightmap()
-    {
-        RequireTerrainOpen();
-        return _terrainDb!.LoadHeightmap(DefaultHeightmapId);
-    }
+    public TerrainHeightmap? LoadHeightmap() => LoadHeightmap(DefaultHeightmapId);
 
     /// <summary>Loads a specific heightmap grid by id (e.g. a tile saved by TerraGen), or
-    /// <c>null</c> if no row exists with that id.</summary>
+    /// <c>null</c> if no row exists with that id. Cached — see <see cref="_heightmapCache"/>.</summary>
     public TerrainHeightmap? LoadHeightmap(string id)
     {
         RequireTerrainOpen();
-        return _terrainDb!.LoadHeightmap(id);
+
+        lock (_cacheSync)
+        {
+            if (_heightmapCache.TryGetValue(id, out var cached))
+            {
+                PerfLog.Log("Cache", $"Heightmap cache HIT: {id}");
+                return cached;
+            }
+        }
+
+        TerrainHeightmap? loaded;
+        using (PerfLog.Scope("Cache", $"Heightmap cache MISS: {id} — načítám z terrain.db"))
+            loaded = _terrainDb!.LoadHeightmap(id); // SqliteWorldDatabase locks its own connection internally
+        if (loaded is not null)
+        {
+            lock (_cacheSync)
+                _heightmapCache.Set(id, loaded);
+        }
+        return loaded;
     }
 
     /// <summary>Lists every saved heightmap's metadata (id, position, size) — cheap, doesn't load
@@ -207,6 +246,8 @@ public sealed class WorldDatabaseService : IDisposable
     {
         RequireTerrainOpen();
         _terrainDb!.SaveHeightmap(grid);
+        lock (_cacheSync)
+            _heightmapCache.Set(grid.Id, grid); // keep the cache consistent with what was just written
     }
 
     /// <summary>

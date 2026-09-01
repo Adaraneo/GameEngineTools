@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TerrainEditor.Models;
 using TerrainEditor.Services;
@@ -192,6 +193,100 @@ public class WorldDatabaseServicePersistenceTests
         Assert.IsNotNull(loaded);
         Assert.AreEqual(1100.0, loaded!.OriginX, 1e-9);
         Assert.IsNull(svc.LoadHeightmap("tile_does_not_exist"));
+    }
+
+    [TestMethod]
+    public void LoadHeightmap_CalledTwice_ReturnsSameCachedInstance()
+    {
+        var dbPath = Path.Combine(_tempDir, "cache_world.db");
+        using var svc = new WorldDatabaseService();
+        svc.OpenBlank(dbPath);
+        svc.SaveHeightmap(new GameEngineTools.World.Data.TerrainHeightmap(
+            "tile_a", 0.0, 0.0, 2.5, 4, 4, new float[16]));
+
+        var first = svc.LoadHeightmap("tile_a");
+        var second = svc.LoadHeightmap("tile_a");
+
+        Assert.IsNotNull(first);
+        Assert.AreSame(first, second, "Second LoadHeightmap should return the cached instance, not decode the BLOB again.");
+    }
+
+    [TestMethod]
+    public void SaveHeightmap_UpdatesCache_SoSubsequentLoadReflectsNewValues()
+    {
+        var dbPath = Path.Combine(_tempDir, "cache_update_world.db");
+        using var svc = new WorldDatabaseService();
+        svc.OpenBlank(dbPath);
+
+        var v1 = new GameEngineTools.World.Data.TerrainHeightmap("tile_a", 0.0, 0.0, 2.5, 2, 2, [1f, 1f, 1f, 1f]);
+        svc.SaveHeightmap(v1);
+        Assert.AreEqual(1f, svc.LoadHeightmap("tile_a")!.Values[0]);
+
+        var v2 = v1 with { Values = [2f, 2f, 2f, 2f] };
+        svc.SaveHeightmap(v2);
+
+        var reloaded = svc.LoadHeightmap("tile_a");
+        Assert.AreEqual(2f, reloaded!.Values[0], "Cache must reflect the newly saved values, not the stale first-loaded ones.");
+    }
+
+    [TestMethod]
+    public void Close_ClearsCache_SoReopenedDatabaseReadsFreshFromDisk()
+    {
+        var dbPath = Path.Combine(_tempDir, "cache_close_world.db");
+
+        using (var svc = new WorldDatabaseService())
+        {
+            svc.OpenBlank(dbPath);
+            svc.SaveHeightmap(new GameEngineTools.World.Data.TerrainHeightmap("tile_a", 0.0, 0.0, 2.5, 2, 2, [1f, 1f, 1f, 1f]));
+            svc.LoadHeightmap("tile_a"); // populate the cache
+        } // Dispose -> Close() -> cache cleared
+
+        // Modify the tile directly on disk, bypassing WorldDatabaseService entirely, to prove a
+        // fresh Open() doesn't serve a stale cached instance from the previous session.
+        var terrainDbPath = Path.Combine(Path.GetDirectoryName(dbPath)!, "terrain.db");
+        using (var raw = new GameEngineTools.World.Data.SqliteWorldDatabase(terrainDbPath))
+        {
+            raw.SaveHeightmap(new GameEngineTools.World.Data.TerrainHeightmap("tile_a", 0.0, 0.0, 2.5, 2, 2, [9f, 9f, 9f, 9f]));
+        }
+
+        using var reopened = new WorldDatabaseService();
+        reopened.OpenBlank(dbPath);
+        var loaded = reopened.LoadHeightmap("tile_a");
+
+        Assert.AreEqual(9f, loaded!.Values[0]);
+    }
+
+    [TestMethod]
+    public void LoadHeightmap_ConcurrentCallsFromMultipleThreads_DoNotThrowOrCorruptTheCache()
+    {
+        // MainWindow's continuous-tile-panning feature loads/stitches tiles on a background thread
+        // while the UI thread can still call LoadHeightmap/SaveHeightmap at the same time — this
+        // exercises exactly that shape of concurrent access against the (now-locked) cache.
+        var dbPath = Path.Combine(_tempDir, "concurrent_world.db");
+        using var svc = new WorldDatabaseService();
+        svc.OpenBlank(dbPath);
+
+        var ids = Enumerable.Range(0, 8).Select(i => $"tile_{i}").ToList();
+        foreach (var id in ids)
+            svc.SaveHeightmap(new GameEngineTools.World.Data.TerrainHeightmap(id, 0.0, 0.0, 2.5, 2, 2, [1f, 1f, 1f, 1f]));
+
+        var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+        Parallel.For(0, 200, i =>
+        {
+            try
+            {
+                var id = ids[i % ids.Count];
+                svc.LoadHeightmap(id);
+                if (i % 20 == 0)
+                    svc.SaveHeightmap(new GameEngineTools.World.Data.TerrainHeightmap(id, 0.0, 0.0, 2.5, 2, 2, [2f, 2f, 2f, 2f]));
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
+        });
+
+        Assert.AreEqual(0, exceptions.Count, string.Join("; ", exceptions.Select(e => e.Message)));
     }
 
     [TestMethod]

@@ -19,9 +19,7 @@ public sealed class ShellViewModel : ViewModelBase
     {
         WorldDb = worldDb;
 
-        OpenDatabaseCommand = new RelayCommand(OpenDatabase);
-        NewWorldCommand = new RelayCommand(NewWorld);
-        OpenTerrainOnlyCommand = new RelayCommand(OpenTerrainOnly);
+        OpenFolderCommand = new RelayCommand(OpenFolder);
         SaveCommand = new RelayCommand(Save, () => WorldDb.IsOpen);
         // Locations/Connections don't exist in terrain-only mode (OpenTerrainOnly) — no world.db.
         ExportSeedCommand = new RelayCommand(ExportSeed, () => WorldDb.IsOpen && !WorldDb.IsTerrainOnly);
@@ -40,6 +38,9 @@ public sealed class ShellViewModel : ViewModelBase
         OpenTileBrowserCommand = new RelayCommand(
             () => OpenTileBrowserRequested?.Invoke(this, EventArgs.Empty),
             () => WorldDb.IsOpen);
+        // No WorldDb.IsOpen gate — a diagnostic window, useful even before anything is opened
+        // (e.g. to watch memory during the open itself).
+        OpenPerfLogCommand = new RelayCommand(() => OpenPerfLogRequested?.Invoke(this, EventArgs.Empty));
 
         ZoomInCommand = new RelayCommand(() => Zoom *= 1.25);
         ZoomOutCommand = new RelayCommand(() => Zoom /= 1.25);
@@ -48,9 +49,7 @@ public sealed class ShellViewModel : ViewModelBase
 
     public WorldDatabaseService WorldDb { get; }
 
-    public RelayCommand OpenDatabaseCommand { get; }
-    public RelayCommand NewWorldCommand { get; }
-    public RelayCommand OpenTerrainOnlyCommand { get; }
+    public RelayCommand OpenFolderCommand { get; }
     public RelayCommand SaveCommand { get; }
     public RelayCommand ExportSeedCommand { get; }
     public RelayCommand GenerateRoadsCommand { get; }
@@ -58,6 +57,13 @@ public sealed class ShellViewModel : ViewModelBase
     public RelayCommand AssignRegionsCommand { get; }
     public RelayCommand GoToLatLonCommand { get; }
     public RelayCommand OpenTileBrowserCommand { get; }
+    public RelayCommand OpenPerfLogCommand { get; }
+
+    private bool _canEditWorldLocations;
+    /// <summary>True once a world.db is open (i.e. not <see cref="Services.WorldDatabaseService.IsTerrainOnly"/>
+    /// mode) — gates "Add Location"/"Connect Locations", which need somewhere to persist a
+    /// Locations/Connections row.</summary>
+    public bool CanEditWorldLocations { get => _canEditWorldLocations; private set => SetProperty(ref _canEditWorldLocations, value); }
 
     private bool _isAddingLocation;
     /// <summary>Arms "click the map to place a new location" mode — MainWindow checks this on the
@@ -131,7 +137,7 @@ public sealed class ShellViewModel : ViewModelBase
         set => SetProperty(ref _zoom, Math.Clamp(value, MinZoom, MaxZoom));
     }
 
-    private string _statusText = "Otevři world.db tlačítkem „Open World DB…“, nebo jen terrain.db tlačítkem „Open Terrain Only…“.";
+    private string _statusText = "Otevři složku se world.db / terrain.db tlačítkem „Open Folder…“.";
     public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
 
     private string _cursorWorldPosition = string.Empty;
@@ -167,24 +173,58 @@ public sealed class ShellViewModel : ViewModelBase
     /// saved in the current terrain.db (e.g. tiles from a TerraGen batch run) to pick one to load.</summary>
     public event EventHandler? OpenTileBrowserRequested;
 
-    private void OpenDatabase()
+    /// <summary>Raised when "Perf Log…" is clicked — MainWindow opens (or focuses, if already
+    /// open) the live performance/memory log window.</summary>
+    public event EventHandler? OpenPerfLogRequested;
+
+    /// <summary>
+    /// Opens whichever database(s) are actually present in a chosen folder — one button instead
+    /// of picking "Open World DB…" vs. "Open Terrain Only…" up front, since the answer is just a
+    /// file-existence check the tool can make itself:
+    /// <list type="number">
+    ///   <item><c>world.db</c> present → full <see cref="WorldDatabaseService.Open"/> (which
+    ///   auto-opens the sibling terrain.db too).</item>
+    ///   <item>only <c>terrain.db</c> present → <see cref="WorldDatabaseService.OpenTerrainOnly"/>.</item>
+    ///   <item>neither present → nothing is opened or created; the designer needs to generate
+    ///   one first (TerraGen/WorldGen), so this reports the problem instead of silently seeding
+    ///   an empty database in a folder that wasn't meant to hold one yet.</item>
+    /// </list>
+    /// </summary>
+    private void OpenFolder()
     {
-        var dlg = new OpenFileDialog
+        var dlg = new OpenFolderDialog
         {
-            Title = "Open world.db",
-            Filter = "SQLite database (*.db)|*.db|All files (*.*)|*.*",
-            CheckFileExists = false, // a not-yet-existing path is fine — it gets created and seeded
+            Title = "Vyber složku s world.db / terrain.db",
         };
         if (dlg.ShowDialog() != true)
             return;
 
+        var folder = dlg.FolderName;
+        var worldDbPath = Path.Combine(folder, "world.db");
+        var terrainDbPath = Path.Combine(folder, "terrain.db");
+
         try
         {
-            WorldDb.Open(dlg.FileName);
-            var cosmologyNote = WorldDb.CosmologyConfig is not null
-                ? $"kosmologie načtena z {WorldSettingsLoader.FileName}"
-                : $"{WorldSettingsLoader.FileName} nenalezen ve složce databáze ani jejích rodičích, používají se výchozí hodnoty";
-            OnDatabaseOpened($"Otevřeno: {dlg.FileName} ({cosmologyNote})");
+            if (File.Exists(worldDbPath))
+            {
+                WorldDb.Open(worldDbPath);
+                var cosmologyNote = WorldDb.CosmologyConfig is not null
+                    ? $"kosmologie načtena z {WorldSettingsLoader.FileName}"
+                    : $"{WorldSettingsLoader.FileName} nenalezen ve složce databáze ani jejích rodičích, používají se výchozí hodnoty";
+                OnDatabaseOpened($"Otevřeno: {folder} ({cosmologyNote})");
+            }
+            else if (File.Exists(terrainDbPath))
+            {
+                WorldDb.OpenTerrainOnly(terrainDbPath);
+                OnDatabaseOpened($"Otevřeno pouze terén (world.db v této složce není): {folder}");
+            }
+            else
+            {
+                MessageBox.Show(
+                    $"V této složce nebyla nalezena ani world.db, ani terrain.db:\n{folder}\n\n" +
+                    "Nejdřív je potřeba nějakou vygenerovat (terragen pro terrain.db, worldgen pro world.db).",
+                    "Žádná databáze v této složce", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
         catch (Exception ex)
         {
@@ -193,75 +233,7 @@ public sealed class ShellViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// Creates a brand-new, entirely empty world (schema only, no default castle/village
-    /// locations) and opens it — for building a custom world from scratch using the editor's own
-    /// tools (Add Location, Generate Terrain, ...) instead of starting from the built-in seed.
-    /// </summary>
-    private void NewWorld()
-    {
-        var dlg = new SaveFileDialog
-        {
-            Title = "Nový svět (world.db)",
-            Filter = "SQLite database (*.db)|*.db|All files (*.*)|*.*",
-            FileName = "world.db",
-        };
-        if (dlg.ShowDialog() != true)
-            return;
-
-        try
-        {
-            // SaveFileDialog already asked the user to confirm overwriting an existing file at
-            // this path — deleting it (plus WAL/SHM side files from any previous SQLite session)
-            // is what makes "New World" an actually clean slate rather than just attaching to
-            // whatever schema-idempotent tables were already there.
-            foreach (var candidate in new[] { dlg.FileName, dlg.FileName + "-wal", dlg.FileName + "-shm" })
-            {
-                if (File.Exists(candidate))
-                    File.Delete(candidate);
-            }
-
-            WorldDb.OpenBlank(dlg.FileName);
-            OnDatabaseOpened($"Nový prázdný svět vytvořen: {dlg.FileName}");
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Nepodařilo se vytvořit nový svět:\n{ex.Message}", "Chyba",
-                MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    /// <summary>
-    /// Opens ONLY a <c>terrain.db</c> — no paired world.db is created or required. For working
-    /// purely with heightmap tiles (e.g. inspecting/editing a standalone terrain.db produced by
-    /// TerraGen or WorldObserver) without a world to go with it. Location/road/region/export
-    /// commands are disabled while this mode is active — see <see cref="WorldDatabaseService.IsTerrainOnly"/>.
-    /// </summary>
-    private void OpenTerrainOnly()
-    {
-        var dlg = new OpenFileDialog
-        {
-            Title = "Open terrain.db (only)",
-            Filter = "SQLite database (*.db)|*.db|All files (*.*)|*.*",
-            CheckFileExists = false, // a not-yet-existing path is fine — it gets created and seeded
-        };
-        if (dlg.ShowDialog() != true)
-            return;
-
-        try
-        {
-            WorldDb.OpenTerrainOnly(dlg.FileName);
-            OnDatabaseOpened($"Otevřeno pouze terén (bez world.db): {dlg.FileName}");
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Nepodařilo se otevřít terénní databázi:\n{ex.Message}", "Chyba",
-                MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    /// <summary>Shared post-open bookkeeping for <see cref="OpenDatabase"/>, <see cref="NewWorld"/>,
-    /// and <see cref="OpenTerrainOnly"/>.</summary>
+    /// <summary>Shared post-open bookkeeping for <see cref="OpenFolder"/>.</summary>
     private void OnDatabaseOpened(string statusText)
     {
         StatusText = statusText;
@@ -274,6 +246,14 @@ public sealed class ShellViewModel : ViewModelBase
         OpenTileBrowserCommand.RaiseCanExecuteChanged();
         CurrentCenterLatitude = null;
         CurrentCenterLongitude = null;
+
+        CanEditWorldLocations = WorldDb.IsOpen && !WorldDb.IsTerrainOnly;
+        if (!CanEditWorldLocations)
+        {
+            IsAddingLocation = false;
+            IsConnectingLocations = false;
+        }
+
         DatabaseOpened?.Invoke(this, EventArgs.Empty);
     }
 
