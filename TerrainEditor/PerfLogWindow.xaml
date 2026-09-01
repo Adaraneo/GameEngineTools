@@ -15,6 +15,8 @@
                       VerticalAlignment="Center" Margin="12,0,0,0" />
             <Button Content="Vynutit GC.Collect" Padding="10,3" Margin="12,0,0,0" Click="ForceGcButton_Click"
                     ToolTip="Pro odlišení 'paměť opravdu drží data' od 'GC to ještě jen neuklidil' — po kliknutí sleduj, jestli spravovaná halda klesne." />
+            <Button Content="Export do TXT…" Padding="10,3" Margin="12,0,0,0" Click="ExportButton_Click"
+                    ToolTip="Uloží aktuálně zobrazený log (od Vyčistit, max posledních 1000 řádků) do textového souboru s časovým razítkem v názvu." />
         </StackPanel>
 
         <ListView x:Name="LogListView">

@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using TerrainEditor.Diagnostics;
 
 namespace TerrainEditor;
@@ -80,6 +82,36 @@ public partial class PerfLogWindow : Window
         var after = GC.GetTotalMemory(true);
         PerfLog.Log("GC", $"Vynucený GC.Collect: {before / 1024.0 / 1024.0:0.0} MB -> {after / 1024.0 / 1024.0:0.0} MB");
         UpdateMemoryLabel();
+    }
+
+    private void ExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new SaveFileDialog
+        {
+            Title = "Export Perf Logu",
+            Filter = "Textový soubor (*.txt)|*.txt",
+            FileName = $"perflog_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt",
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        try
+        {
+            using var writer = new StreamWriter(dlg.FileName, append: false);
+            writer.WriteLine($"Perf Log export — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            writer.WriteLine();
+            foreach (var entry in PerfLog.Snapshot())
+            {
+                var duration = entry.DurationMs is { } ms ? $"{ms:0.0} ms" : "";
+                writer.WriteLine(
+                    $"{entry.Timestamp:yyyy-MM-dd HH:mm:ss.fff}\t{entry.Category}\t{entry.Message}\t{duration}\t" +
+                    $"halda={entry.ManagedMemoryBytes / (1024.0 * 1024.0):0.0}MB\t" +
+                    $"working set={entry.WorkingSetBytes / (1024.0 * 1024.0):0.0}MB");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Export se nezdařil: {ex.Message}", "Perf Log", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private static Row ToRow(PerfLog.Entry entry) => new(
