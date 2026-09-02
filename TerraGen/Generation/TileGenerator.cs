@@ -38,7 +38,13 @@ public static class TileGenerator
         /// a different reference to NOT connect to tiles generated with this one (they won't,
         /// since their flat mountain offsets would no longer agree).</summary>
         double MountainOriginLatDeg = 0.0,
-        double MountainOriginLonDeg = 0.0);
+        double MountainOriginLonDeg = 0.0,
+        /// <summary><c>null</c> (default) skips river extraction entirely — existing worlds/tiles
+        /// generated before this option existed must keep regenerating identically. Non-null
+        /// derives <see cref="TerrainHeightmap.RiverMask"/> from the tile's own drainage pattern
+        /// (see <see cref="TileHydrology"/>) right after erosion, instead of leaving it null for
+        /// TerrainEditor's manual painting to be the only way it's ever set.</summary>
+        TileHydrology.Parameters? HydrologyParams = null);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -151,21 +157,32 @@ public static class TileGenerator
 
                 TileErosion.Erode(padded, s.ErosionParams, locked);
 
+                // Computed AFTER erosion, on the eroded elevations — a river follows the terrain
+                // erosion actually carved, not the pre-erosion noise.
+                var paddedRiverMask = s.HydrologyParams is { } hydrologyParams
+                    ? TileHydrology.ComputeRiverMask(padded, hydrologyParams)
+                    : null;
+
                 var interior = new float[cellsPerTile * cellsPerTile];
+                var riverMaskInterior = paddedRiverMask is null ? null : new byte[cellsPerTile * cellsPerTile];
                 for (var iy = 0; iy < cellsPerTile; iy++)
                 {
                     var py = iy + margin;
                     for (var ix = 0; ix < cellsPerTile; ix++)
                     {
                         var px = ix + margin;
-                        interior[iy * cellsPerTile + ix] = padded.Values[py * paddedSize + px];
+                        var paddedIdx = py * paddedSize + px;
+                        var interiorIdx = iy * cellsPerTile + ix;
+                        interior[interiorIdx] = padded.Values[paddedIdx];
+                        if (riverMaskInterior is not null)
+                            riverMaskInterior[interiorIdx] = paddedRiverMask![paddedIdx];
                     }
                 }
 
                 var (centerLat, centerLon) = TileCenter(row, col);
                 var id = TileId(s.NoiseParams.Seed, centerLat, centerLon);
                 var tile = new TerrainHeightmap(id, tileOriginX, tileOriginY, s.CellSizeMeters,
-                    cellsPerTile, cellsPerTile, interior);
+                    cellsPerTile, cellsPerTile, interior, riverMaskInterior);
                 db.SaveHeightmap(tile);
 
                 var result = new TileResult(row, col, id, centerLat, centerLon);

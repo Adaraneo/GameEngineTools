@@ -228,4 +228,65 @@ public class TileGeneratorTests
             if (File.Exists(dbPath2)) File.Delete(dbPath2);
         }
     }
+
+    [TestMethod]
+    public void Run_WithoutHydrologyParams_LeavesRiverMaskNull()
+    {
+        // Backward compatibility: existing worlds generated before --rivers existed must keep
+        // getting a null RiverMask (the same as no river data ever having been painted).
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.002,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 5, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 5, DropletCount: 500, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters);
+
+            var results = TileGenerator.Run(db, settings);
+            foreach (var r in results)
+                Assert.IsNull(db.LoadHeightmap(r.Id)!.RiverMask);
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
+    public void Run_WithHydrologyParams_PopulatesRiverMaskOfCorrectLength()
+    {
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.002,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 5, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 5, DropletCount: 500, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                HydrologyParams: new TileHydrology.Parameters(FlowAccumulationThreshold: 30));
+
+            var results = TileGenerator.Run(db, settings);
+            Assert.IsTrue(results.Count > 0);
+            foreach (var r in results)
+            {
+                var tile = db.LoadHeightmap(r.Id)!;
+                Assert.IsNotNull(tile.RiverMask);
+                Assert.AreEqual(tile.Width * tile.Height, tile.RiverMask!.Length);
+                Assert.IsTrue(tile.RiverMask.All(b => b is 0 or 1), "RiverMask must only ever contain 0/1 bytes.");
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
 }

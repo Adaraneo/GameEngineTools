@@ -129,6 +129,10 @@ var noiseParams = new PlanetNoise.Parameters(Seed: planet.Seed, GravityMs2: plan
     TectonicPlateCount: tectonicPlateCount);
 var erosionParams = new TileErosion.Parameters(Seed: planet.Seed, DropletCount: options.DropletsPerTile);
 
+var hydrologyParams = options.Rivers
+    ? new TileHydrology.Parameters(FlowAccumulationThreshold: options.RiverThreshold)
+    : null;
+
 var runSettings = new TileGenerator.RunSettings(
     LatMin: options.LatMin, LatMax: options.LatMax,
     LonMin: options.LonMin, LonMax: options.LonMax,
@@ -136,7 +140,8 @@ var runSettings = new TileGenerator.RunSettings(
     CellSizeMeters: options.CellMeters,
     NoiseParams: noiseParams,
     ErosionParams: erosionParams,
-    PlanetRadiusMeters: planet.PlanetRadiusMeters);
+    PlanetRadiusMeters: planet.PlanetRadiusMeters,
+    HydrologyParams: hydrologyParams);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -160,6 +165,13 @@ internal sealed class CliOptions
     public double TileKm { get; init; } = 1.0;
     public double CellMeters { get; init; } = 2.5;
     public double ErosionStrength { get; init; } = 50.0;
+
+    /// <summary>Off by default — existing tiles must keep regenerating identically without it.
+    /// Derives <see cref="GameEngineTools.World.Data.TerrainHeightmap.RiverMask"/> from the
+    /// tile's own post-erosion drainage pattern (see <see cref="TerraGen.Generation.TileHydrology"/>)
+    /// instead of leaving it null (TerrainEditor's manual painting is otherwise the only way it's ever set).</summary>
+    public bool Rivers { get; init; }
+    public int RiverThreshold { get; init; } = 50;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -221,11 +233,20 @@ internal sealed class CliOptions
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
+                        [--rivers [--river-threshold <počet buněk, výchozí 50>]]
 
             --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
             desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
             Typická hodnota pro planetu podobnou Zemi je 8-16. Existující dlaždice vygenerované
             bez tohoto přepínače musí dál generovat identicky, proto je výchozí hodnota 0.
+
+            --rivers (vypnuto výchozí, ze stejného důvodu jako --tectonic-plates) po erozi
+            spočítá D8 flow-accumulation (odtokový model) na vygenerovaném terénu a podle toho
+            naplní RiverMask dlaždice řekami — místo aby zůstal prázdný a řeky se daly jen ručně
+            malovat v TerrainEditoru. --river-threshold určuje, kolik buněk musí do daného místa
+            odtékat, aby se stalo řekou — nižší hodnota = hustší síť i s malými potůčky, vyšší =
+            jen pár velkých řek. RoadPathfinder (ve WorldGenu) už teď umí penalizovat křížení
+            řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby to mělo co penalizovat.
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -298,6 +319,8 @@ internal sealed class CliOptions
         var cellMeters = 2.5;
         var erosion = 50.0;
         int? tectonicPlateCount = null;
+        var rivers = false;
+        var riverThreshold = 50;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -332,6 +355,12 @@ internal sealed class CliOptions
                     break;
                 case "--tectonic-plates" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tp):
                     tectonicPlateCount = tp;
+                    break;
+                case "--rivers":
+                    rivers = true;
+                    break;
+                case "--river-threshold" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rt):
+                    riverThreshold = rt;
                     break;
                 case "--scan":
                     scan = true;
@@ -421,6 +450,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--scan-zoom musí být > 1 (jinak by se okno mezi úrovněmi nezmenšovalo).");
             return null;
         }
+        if (riverThreshold <= 0)
+        {
+            Console.Error.WriteLine("--river-threshold musí být kladné.");
+            return null;
+        }
 
         return new CliOptions
         {
@@ -429,6 +463,7 @@ internal sealed class CliOptions
             LonMin = lonMin.Value, LonMax = lonMax!.Value,
             TileKm = tileKm, CellMeters = cellMeters, ErosionStrength = Math.Clamp(erosion, 0, 100),
             TectonicPlateCount = tectonicPlateCount,
+            Rivers = rivers, RiverThreshold = riverThreshold,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
