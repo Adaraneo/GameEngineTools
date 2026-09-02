@@ -224,16 +224,15 @@ var db = runtime.Services.GetRequiredService<SqliteWorldDatabase>();
 var worldMap = SqliteWorldMapLoader.Load(db);
 var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
 
-// Locations/connections/objects now come entirely from WorldGen (run TerraGen, then WorldGen
-// --region Village, against SourceFiles\World\{terrain.db,world.db} before running GameSandbox) —
-// it places Camp/Village/Town settlements plus houses (LocationType.Rest), a cemetery at the
-// deterministic "<region>_cemetery" id, and a field->mill->bakery production chain. GameSandbox
-// no longer self-authors any of this (see the retired CastleVillageSeed.cs).
-const string worldRegion = "Village";
+// Locations/connections/objects now come entirely from WorldGen (run TerraGen, then WorldGen,
+// against SourceFiles\World\{terrain.db,world.db} before running GameSandbox) — it places
+// Camp/Village/Town settlements plus houses (LocationType.Rest), a cemetery at the deterministic
+// "<region>_cemetery" id, and a field->mill->bakery production chain. GameSandbox no longer
+// self-authors any of this (see the retired CastleVillageSeed.cs).
 if (worldMap.Locations.Count == 0)
 {
     Console.Error.WriteLine("world.db neobsahuje žádné lokace.");
-    Console.Error.WriteLine($"Spusť napřed TerraGen a pak WorldGen (--region {worldRegion}) proti SourceFiles\\World\\{{terrain.db,world.db}}.");
+    Console.Error.WriteLine("Spusť napřed TerraGen a pak WorldGen proti SourceFiles\\World\\{terrain.db,world.db}.");
     return;
 }
 
@@ -241,6 +240,13 @@ worldMap.RegisterAllLocations(locationService);
 var objectProvider = runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
 var objectRespawner = runtime.Services.GetRequiredService<ObjectRespawnScheduler>();
+
+// Don't assume a fixed region name — pick whichever region WorldGen actually populated (the one
+// with LocationType.Rest houses in it), so this works regardless of what --region was passed.
+var worldRegion = worldMap.AllRegions
+    .FirstOrDefault(r => worldMap.GetLocationsInRegion(r).Any(id => locationService.GetDescriptor(id)?.Type == LocationType.Rest))
+    ?? worldMap.AllRegions.FirstOrDefault()
+    ?? "Wilds";
 
 // Route burials + grave visits to the cemetery WorldGen generated for this region.
 sceneOrchestratorOptions = sceneOrchestratorOptions with { CemeteryLocationId = $"{worldRegion}_cemetery" };
@@ -271,6 +277,7 @@ var homeLocationsIds = worldMap.GetLocationsInRegion(worldRegion)
 if (homeLocationsIds.Count == 0)
 {
     Console.Error.WriteLine($"world.db neobsahuje žádné domy (LocationType.Rest) v regionu '{worldRegion}'.");
+    Console.Error.WriteLine($"Dostupné regiony v world.db: {string.Join(", ", worldMap.AllRegions)}.");
     Console.Error.WriteLine("Spusť WorldGen bez --no-houses, aby vygeneroval domy k přiřazení postavám.");
     return;
 }
