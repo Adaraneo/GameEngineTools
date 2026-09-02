@@ -5,6 +5,7 @@ using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Objects;
+using GameEngineTools.World.Objects.Production;
 
 namespace WorldGen.Generation;
 
@@ -52,9 +53,26 @@ public static class WorldContentGenerator
         double PlanetRadiusMeters = 6_378_100.0,
         /// <summary>Skips <see cref="PickTier"/>'s per-biome weighted roll and always uses this
         /// tier instead — mainly for deterministic tests; leave <c>null</c> for real generation.</summary>
-        SettlementTier? ForcedTier = null);
+        SettlementTier? ForcedTier = null,
+        /// <summary>Whether Village/Town-tier settlements get <see cref="LocationType.Rest"/>
+        /// house sub-locations (see <see cref="HousesPerVillage"/>/<see cref="HousesPerTown"/>) —
+        /// GameSandbox uses these for character home assignment. Opt-in at this library level
+        /// (existing callers/tests expect exactly the locations they asked for); WorldGen's own
+        /// CLI (<c>WorldGen/Program.cs</c>) turns this on by default for real runs.</summary>
+        bool GenerateHouses = false,
+        int HousesPerVillage = 4,
+        int HousesPerTown = 10,
+        /// <summary>Whether a single cemetery location is created at a deterministic id
+        /// (<c>"{Region}_cemetery"</c>) so callers can wire it into
+        /// <c>SceneOrchestratorOptions.CemeteryLocationId</c> without inspecting <see cref="Result"/>.
+        /// Opt-in here for the same reason as <see cref="GenerateHouses"/>.</summary>
+        bool GenerateCemetery = false,
+        /// <summary>Whether a field→mill→bakery production-fixture chain (see
+        /// <see cref="ProductionSiteFactory"/>) is attached to the largest settlement placed this
+        /// run. Opt-in here for the same reason as <see cref="GenerateHouses"/>.</summary>
+        bool GenerateProductionChain = false);
 
-    public sealed record Result(int LocationsPlaced, int ConnectionsCreated, int ObjectsCreated);
+    public sealed record Result(int LocationsPlaced, int ConnectionsCreated, int ObjectsCreated, string? CemeteryLocationId = null);
 
     private sealed record Placed(string Id, double X, double Y, TerrainHeightmap Tile, SettlementTier Tier);
 
@@ -143,7 +161,21 @@ public static class WorldContentGenerator
 
         var connectionsCreated = ConnectNearestNeighbors(worldDb, placed, options);
 
-        return new Result(placed.Count, connectionsCreated, objectsCreated);
+        if (options.GenerateHouses)
+            connectionsCreated += AddHouses(worldDb, placed, options, rng);
+
+        string? cemeteryLocationId = null;
+        if (options.GenerateCemetery)
+        {
+            var (id, cemeteryConnections) = AddCemetery(worldDb, placed, options, rng);
+            cemeteryLocationId = id;
+            connectionsCreated += cemeteryConnections;
+        }
+
+        if (options.GenerateProductionChain)
+            objectsCreated += AddProductionChain(worldDb, placed);
+
+        return new Result(placed.Count, connectionsCreated, objectsCreated, cemeteryLocationId);
     }
 
     private static bool TryFindCandidate(
@@ -362,6 +394,127 @@ public static class WorldContentGenerator
         var dx = a.X - b.X;
         var dy = a.Y - b.Y;
         return dx * dx + dy * dy;
+    }
+
+    /// <summary>Adds <see cref="Options.HousesPerVillage"/>/<see cref="Options.HousesPerTown"/>
+    /// <see cref="LocationType.Rest"/> sub-locations around each placed Village/Town settlement
+    /// (Camp tier is too small/transient to bother) and connects each straight back to its parent.
+    /// Returns the number of connections created.</summary>
+    private static int AddHouses(SqliteWorldDatabase worldDb, List<Placed> placed, Options options, Random rng)
+    {
+        var created = 0;
+        foreach (var parent in placed)
+        {
+            var houseCount = parent.Tier switch
+            {
+                SettlementTier.Village => options.HousesPerVillage,
+                SettlementTier.Town => options.HousesPerTown,
+                _ => 0,
+            };
+
+            for (var n = 1; n <= houseCount; n++)
+            {
+                var angle = rng.NextDouble() * 2 * Math.PI;
+                var radius = 15.0 + rng.NextDouble() * 35.0;
+                var hx = parent.X + Math.Cos(angle) * radius;
+                var hy = parent.Y + Math.Sin(angle) * radius;
+                var houseId = $"{parent.Id}_house_{n:D2}";
+
+                var descriptor = new LocationDescriptor(
+                    Id: houseId,
+                    DisplayName: $"Dům {n:D2}",
+                    BaseNoise: 0.05,
+                    NoisePerPerson: 0.03,
+                    Capacity: 3,
+                    AllowsPrivacy: true,
+                    Type: LocationType.Rest,
+                    Terrain: TerrainType.Indoor,
+                    DangerLevel: 0.0,
+                    AllowsPickup: true,
+                    NormId: null,
+                    X: hx,
+                    Y: hy,
+                    AltitudeMeters: parent.Tile.SampleAt(hx, hy));
+                worldDb.InsertLocation(descriptor, options.Region);
+
+                var distance = radius;
+                worldDb.InsertConnection(houseId, parent.Id, distance);
+                worldDb.InsertConnection(parent.Id, houseId, distance);
+                created++;
+            }
+        }
+        return created;
+    }
+
+    /// <summary>Creates a single <see cref="LocationType.Public"/> cemetery location at a
+    /// deterministic id (<c>"{Region}_cemetery"</c>, so callers can wire
+    /// <c>SceneOrchestratorOptions.CemeteryLocationId</c> without inspecting <see cref="Result"/>),
+    /// positioned near whichever placed settlement is largest-tier, and connected to its
+    /// <see cref="Options.ConnectionsPerLocation"/> nearest settlements (always including that
+    /// anchor). Returns <c>(null, 0)</c> when nothing was placed this run.</summary>
+    private static (string? Id, int ConnectionsCreated) AddCemetery(
+        SqliteWorldDatabase worldDb, List<Placed> placed, Options options, Random rng)
+    {
+        if (placed.Count == 0) return (null, 0);
+
+        var anchor = placed.OrderByDescending(p => (int)p.Tier).First();
+        var angle = rng.NextDouble() * 2 * Math.PI;
+        var radius = 80.0 + rng.NextDouble() * 70.0;
+        var cx = anchor.X + Math.Cos(angle) * radius;
+        var cy = anchor.Y + Math.Sin(angle) * radius;
+        var cemeteryId = $"{options.Region}_cemetery";
+
+        var descriptor = new LocationDescriptor(
+            Id: cemeteryId,
+            DisplayName: "Hřbitov",
+            BaseNoise: 0.05,
+            NoisePerPerson: 0.0,
+            Capacity: 200,
+            AllowsPrivacy: false,
+            Type: LocationType.Public,
+            Terrain: TerrainType.Courtyard,
+            DangerLevel: 0.0,
+            AllowsPickup: true,
+            NormId: null,
+            X: cx,
+            Y: cy,
+            AltitudeMeters: anchor.Tile.SampleAt(cx, cy));
+        worldDb.InsertLocation(descriptor, options.Region);
+
+        var cemeteryPlaced = new Placed(cemeteryId, cx, cy, anchor.Tile, anchor.Tier);
+        var nearest = placed
+            .OrderBy(p => DistanceSquared(cemeteryPlaced, p))
+            .Take(Math.Max(1, options.ConnectionsPerLocation))
+            .ToHashSet();
+        nearest.Add(anchor); // always reachable from its own anchor settlement
+
+        var created = 0;
+        foreach (var target in nearest)
+        {
+            var distance = RoadDistance(cemeteryPlaced, target);
+            worldDb.InsertConnection(cemeteryId, target.Id, distance);
+            worldDb.InsertConnection(target.Id, cemeteryId, distance);
+            created++;
+        }
+
+        return (cemeteryId, created);
+    }
+
+    /// <summary>Attaches the field→mill→bakery <see cref="ProductionSiteFactory"/> fixture chain to
+    /// the single largest-tier settlement placed this run (Town preferred, else Village) — skipped
+    /// entirely when only Camps were placed (too small to support a production chain).</summary>
+    private static int AddProductionChain(SqliteWorldDatabase worldDb, List<Placed> placed)
+    {
+        var anchor = placed
+            .Where(p => p.Tier is SettlementTier.Town or SettlementTier.Village)
+            .OrderByDescending(p => (int)p.Tier)
+            .FirstOrDefault();
+        if (anchor is null) return 0;
+
+        worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_field", anchor.Id, PickupItemKind.Grain, "Obilné pole"));
+        worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_mill", anchor.Id, PickupItemKind.Flour, "Mlýn"));
+        worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_bakery", anchor.Id, PickupItemKind.Bread, "Pekárna"));
+        return 3;
     }
 
     /// <summary>Adds up to <see cref="Options.ForcedTier"/>-driven object depth per need (1 for

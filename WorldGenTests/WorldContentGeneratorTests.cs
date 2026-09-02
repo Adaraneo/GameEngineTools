@@ -404,6 +404,123 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
+    public void Generate_HousesEnabled_VillageGetsRestHousesConnectedToParent()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Village,
+            GenerateHouses: true, HousesPerVillage: 3);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(50), Catalog);
+
+        var locations = db.GetAllLocations();
+        var parent = locations.Single(l => !l.Descriptor.Id.Contains("_house_"));
+        var houses = locations.Where(l => l.Descriptor.Id.StartsWith(parent.Descriptor.Id + "_house_", StringComparison.Ordinal)).ToList();
+
+        Assert.AreEqual(3, houses.Count);
+        Assert.IsTrue(houses.All(h => h.Descriptor.Type == LocationType.Rest));
+
+        var connections = db.GetAllConnections();
+        foreach (var house in houses)
+            Assert.IsTrue(connections.Any(c => c.FromId == house.Descriptor.Id && c.ToId == parent.Descriptor.Id),
+                $"Expected a connection from {house.Descriptor.Id} back to its parent settlement.");
+    }
+
+    [TestMethod]
+    public void Generate_HousesEnabled_CampTierGetsNoHouses()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Camp,
+            GenerateHouses: true, HousesPerVillage: 3, HousesPerTown: 5);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(51), Catalog);
+
+        Assert.AreEqual(1, db.GetAllLocations().Count, "Camp tier should not get any house sub-locations.");
+    }
+
+    [TestMethod]
+    public void Generate_HousesDisabledByDefault_NoHousesCreated()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(52), Catalog);
+
+        Assert.AreEqual(1, db.GetAllLocations().Count, "GenerateHouses defaults to false — existing callers should see exactly what they asked for.");
+    }
+
+    [TestMethod]
+    public void Generate_CemeteryEnabled_CreatedAtDeterministicIdAndConnected()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 3, MinDistanceMeters: 20.0, Region: "Village", ConnectionsPerLocation: 2,
+            GenerateCemetery: true);
+
+        var result = WorldContentGenerator.Generate(db, tiles, options, new Random(53), Catalog);
+
+        Assert.AreEqual("Village_cemetery", result.CemeteryLocationId);
+        var cemetery = db.GetAllLocations().Single(l => l.Descriptor.Id == "Village_cemetery");
+        Assert.AreEqual(LocationType.Public, cemetery.Descriptor.Type);
+
+        var connections = db.GetAllConnections();
+        Assert.IsTrue(connections.Any(c => c.FromId == "Village_cemetery"), "Expected the cemetery to be connected to at least one settlement.");
+    }
+
+    [TestMethod]
+    public void Generate_CemeteryDisabledByDefault_NoCemeteryCreated()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(Count: 3, MinDistanceMeters: 20.0);
+
+        var result = WorldContentGenerator.Generate(db, tiles, options, new Random(54), Catalog);
+
+        Assert.IsNull(result.CemeteryLocationId);
+        Assert.IsFalse(db.GetAllLocations().Any(l => l.Descriptor.Id.EndsWith("_cemetery", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public void Generate_ProductionChainEnabled_AttachedToLargestSettlementOnly()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
+            GenerateProductionChain: true);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        var itemKinds = db.GetAllObjectsAt(descriptor.Id).Select(o => o.ItemKind).ToHashSet();
+        Assert.IsTrue(itemKinds.Contains(PickupItemKind.Grain));
+        Assert.IsTrue(itemKinds.Contains(PickupItemKind.Flour));
+        Assert.IsTrue(itemKinds.Contains(PickupItemKind.Bread));
+    }
+
+    [TestMethod]
+    public void Generate_ProductionChainEnabled_CampOnlySkipsChain()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Camp,
+            GenerateProductionChain: true);
+
+        var result = WorldContentGenerator.Generate(db, tiles, options, new Random(56), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        var itemKinds = db.GetAllObjectsAt(descriptor.Id).Select(o => o.ItemKind).ToHashSet();
+        Assert.IsFalse(itemKinds.Contains(PickupItemKind.Grain), "Camp tier is too small to host a production chain.");
+    }
+
+    [TestMethod]
     public void Generate_EmptyTileList_Throws()
     {
         using var db = NewWorldDb();

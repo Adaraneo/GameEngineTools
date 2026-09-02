@@ -22,7 +22,6 @@ using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Movement;
 using GameEngineTools.World.Objects;
-using GameEngineTools.World.Objects.Production;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
 using Microsoft.Extensions.Configuration;
@@ -225,121 +224,30 @@ var db = runtime.Services.GetRequiredService<SqliteWorldDatabase>();
 var worldMap = SqliteWorldMapLoader.Load(db);
 var locationService = (DefaultLocationService)runtime.Services.GetRequiredService<ILocationService>();
 
-// The default seed_data.sql no longer ships any locations (see WorldDatabaseSeeder.Initialize) —
-// GameSandbox now self-authors the Castle/Village/Forest/Wilds content that used to live there,
-// same as it already does for village_house_01..25/cemetery below.
-GameSandbox.CastleVillageSeed.SeedLocations(worldMap, locationService);
-
+// Locations/connections/objects now come entirely from WorldGen (run TerraGen, then WorldGen
+// --region Village, against SourceFiles\World\{terrain.db,world.db} before running GameSandbox) —
+// it places Camp/Village/Town settlements plus houses (LocationType.Rest), a cemetery at the
+// deterministic "<region>_cemetery" id, and a field->mill->bakery production chain. GameSandbox
+// no longer self-authors any of this (see the retired CastleVillageSeed.cs).
+const string worldRegion = "Village";
+if (worldMap.Locations.Count == 0)
 {
-    for (int index = 0; index < 25; index++)
-    {
-        var locationDescr = new LocationDescriptor($"village_house_{(index + 1):D2}", $"Village House {(index + 1):D2}", 0.2, 0.5, 3, true, LocationType.Rest, TerrainType.Indoor, 0, true, null);
-        worldMap.AddLocation(locationDescr, "Village", locationService);
-
-        var villagelocations = worldMap.GetLocationsInRegion("Village");
-
-        // Napoj nově přidaný dům na každou ostatní vesnickou lokaci obousměrnou
-        // hranou se symetrickou náhodnou pěší vzdáleností. Každá dvojice se zpracuje
-        // jen jednou (později přidané domy navazují na ty dřívější), takže nevznikají
-        // duplicitní hrany.
-        foreach (var villageLocation in villagelocations)
-        {
-            if (villageLocation == locationDescr.Id) continue;
-
-            var distanceMeters = rng.Next(6, 120) + rng.NextDouble();
-            worldMap.AddConnection(locationDescr.Id, villageLocation, distanceMeters);
-            worldMap.AddConnection(villageLocation, locationDescr.Id, distanceMeters);
-        }
-
-        Console.WriteLine("Location updated");
-    }
+    Console.Error.WriteLine("world.db neobsahuje žádné lokace.");
+    Console.Error.WriteLine($"Spusť napřed TerraGen a pak WorldGen (--region {worldRegion}) proti SourceFiles\\World\\{{terrain.db,world.db}}.");
+    return;
 }
-
-// ── Cemetery (Village / Public) — where the dead are interred and mourned ─────
-{
-    var cemetery = new LocationDescriptor("cemetery", "Hřbitov", 0.05, 0.0, 200, false, LocationType.Public, TerrainType.Courtyard, 0, true, null);
-    worldMap.AddLocation(cemetery, "Village", locationService);
-
-    foreach (var villageLocation in worldMap.GetLocationsInRegion("Village"))
-    {
-        if (villageLocation == cemetery.Id) continue;
-
-        var distanceMeters = rng.Next(40, 200) + rng.NextDouble();
-        worldMap.AddConnection(cemetery.Id, villageLocation, distanceMeters);
-        worldMap.AddConnection(villageLocation, cemetery.Id, distanceMeters);
-    }
-}
-
-// Route burials + grave visits to the cemetery instead of interring in place.
-sceneOrchestratorOptions = sceneOrchestratorOptions with { CemeteryLocationId = "cemetery" };
 
 worldMap.RegisterAllLocations(locationService);
 var objectProvider = runtime.Services.GetRequiredService<IWorldObjectProvider>();
 var speedProvider = runtime.Services.GetRequiredService<DefaultMovementSpeedProvider>();
 var objectRespawner = runtime.Services.GetRequiredService<ObjectRespawnScheduler>();
 
-// Faithful port of the food/furniture objects that used to live in seed_data.sql, tied to the
-// locations added by CastleVillageSeed.SeedLocations above.
-GameSandbox.CastleVillageSeed.SeedObjects(objectProvider);
+// Route burials + grave visits to the cemetery WorldGen generated for this region.
+sceneOrchestratorOptions = sceneOrchestratorOptions with { CemeteryLocationId = $"{worldRegion}_cemetery" };
 
-// ── Tavern (Village / Social) ─────────────────────────────────────────────────
-// 35 apples — primary food source for Village NPCs
-for (int index = 0; index < 35; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"apple_{(index + 1):D2}", DisplayName = "Jablko", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 15, WeightGrams = 45, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.5)], NutritionalProfile = new NutritionalProfile(CalorieGain: 18, ProteinGain: 2, IronGain: 3, VitaminDGain: 0, HydrationGain: 18) });
-// 20 beer mugs — drink for Village NPCs
-for (int index = 0; index < 20; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"beer_{(index + 1):D2}", DisplayName = "Džbán piva", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0.1, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 20, WeightGrams = 600, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.6)], NutritionalProfile = new NutritionalProfile(CalorieGain: 28, ProteinGain: 3, IronGain: 2, VitaminDGain: 0, HydrationGain: 25) });
-// 10 water jugs — also available in tavern
-for (int index = 0; index < 100; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_tavern_{(index + 1):D2}", DisplayName = "Džbán vody", LocationId = "tavern", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 30, WeightGrams = 500, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.8)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
-
-// ── Market Square (Village / Public) ──────────────────────────────────────────
-for (int index = 0; index < 20; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"bread_market_{(index + 1):D2}", DisplayName = "Bochánek chleba", LocationId = "market_square", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 60, WeightGrams = 200, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.6)], NutritionalProfile = new NutritionalProfile(CalorieGain: 48, ProteinGain: 14, IronGain: 8, VitaminDGain: 0, HydrationGain: 5) });
-for (int index = 0; index < 10; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"well_market_{(index + 1):D2}", DisplayName = "Studniční voda", LocationId = "market_square", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 10, WeightGrams = 300, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.9)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
-
-// ── Food-economy Tier 1 production sites (Village / Market Square) ─────────────
-// Non-respawning fixtures: a field yields raw grain (Produce), the mill turns grain→flour
-// and the bakery turns flour→bread (Process). With free respawning food nearby these are a
-// fallback — production is meant to matter once scarcity (Tier 2) removes the free stock.
-objectProvider.AddObject(ProductionSiteFactory.Create("field_market", "market_square", PickupItemKind.Grain, "Obilné pole"));
-objectProvider.AddObject(ProductionSiteFactory.Create("mill_market", "market_square", PickupItemKind.Flour, "Mlýn"));
-objectProvider.AddObject(ProductionSiteFactory.Create("bakery_market", "market_square", PickupItemKind.Bread, "Pekárna"));
-
-// ── Inn Room (Village / Rest) ─────────────────────────────────────────────────
-for (int index = 0; index < 5; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_inn_{(index + 1):D2}", DisplayName = "Konvice vody", LocationId = "inn_room", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 60, WeightGrams = 400, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.8)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
-
-// ── Castle Hall (Castle / Social) ─────────────────────────────────────────────
-for (int index = 0; index < 15; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"bread_hall_{(index + 1):D2}", DisplayName = "Chléb", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 60, WeightGrams = 250, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.55)], NutritionalProfile = new NutritionalProfile(CalorieGain: 48, ProteinGain: 14, IronGain: 8, VitaminDGain: 0, HydrationGain: 5) });
-for (int index = 0; index < 10; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"meat_hall_{(index + 1):D2}", DisplayName = "Pečené maso", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0.2, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 120, WeightGrams = 350, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.8)], NutritionalProfile = new NutritionalProfile(CalorieGain: 62, ProteinGain: 45, IronGain: 20, VitaminDGain: 12, HydrationGain: 3) });
-for (int index = 0; index < 15; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"wine_hall_{(index + 1):D2}", DisplayName = "Pohár vína", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 45, WeightGrams = 350, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.65)], NutritionalProfile = new NutritionalProfile(CalorieGain: 22, ProteinGain: 1, IronGain: 3, VitaminDGain: 0, HydrationGain: 22) });
-for (int index = 0; index < 10; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_hall_{(index + 1):D2}", DisplayName = "Džbán vody", LocationId = "castle_hall", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 30, WeightGrams = 500, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.85)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
-
-// ── Library (Castle / Private) ────────────────────────────────────────────────
-for (int index = 0; index < 5; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Food, Id = $"fruit_library_{(index + 1):D2}", DisplayName = "Sušené ovoce", LocationId = "library", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Food, Respawns = true, RespawnMinutes = 120, WeightGrams = 80, Affordances = [new WorldObjectAffordance(AffordanceType.Hunger, 0.3)], NutritionalProfile = new NutritionalProfile(CalorieGain: 32, ProteinGain: 4, IronGain: 6, VitaminDGain: 0, HydrationGain: 4) });
-for (int index = 0; index < 5; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"tea_library_{(index + 1):D2}", DisplayName = "Šálek bylinkového čaje", LocationId = "library", AmbientNoise = 0, HeatSignature = 0.3, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 60, WeightGrams = 200, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.6), new WorldObjectAffordance(AffordanceType.MoodBoost, 0.15)], NutritionalProfile = new NutritionalProfile(CalorieGain: 3, ProteinGain: 0, IronGain: 3, VitaminDGain: 0, HydrationGain: 62) });
-
-// ── Courtyard (Castle / Public) ───────────────────────────────────────────────
-for (int index = 0; index < 250; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_courtyard_{(index + 1):D2}", DisplayName = "Voda ze studny", LocationId = "courtyard", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 10, WeightGrams = 300, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.9)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
-
-// ── Throne Room (Castle / Social) ─────────────────────────────────────────────
-for (int index = 0; index < 8; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"wine_throne_{(index + 1):D2}", DisplayName = "Karafa vína", LocationId = "throne_room", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 90, WeightGrams = 700, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.7)], NutritionalProfile = new NutritionalProfile(CalorieGain: 25, ProteinGain: 2, IronGain: 4, VitaminDGain: 0, HydrationGain: 25) });
-
-// ── Stables (Castle / Work) ───────────────────────────────────────────────────
-for (int index = 0; index < 5; index++)
-    objectProvider.AddObject(new WorldObject { Category = WorldObjectCategory.Drink, Id = $"water_stables_{(index + 1):D2}", DisplayName = "Kbelík vody", LocationId = "stables", AmbientNoise = 0, HeatSignature = 0, IsAvailable = true, IsPickable = true, BlocksLineOfSight = false, ItemKind = PickupItemKind.Drink, Respawns = true, RespawnMinutes = 45, WeightGrams = 400, Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.75)], NutritionalProfile = new NutritionalProfile(CalorieGain: 0, ProteinGain: 0, IronGain: 0, VitaminDGain: 0, HydrationGain: 80) });
-
-var mainCharactersLocations = worldMap.GetLocationsInRegion("Castle");
+var mainCharactersLocations = worldMap.GetLocationsInRegion(worldRegion)
+    .Where(id => locationService.GetDescriptor(id)?.Type != LocationType.Rest)
+    .ToList();
 
 var mainCharactersQuery = from mainCharacters in manager.Characters
                           //where mainCharacters.Person.Id.Value == playerPerson.Id.Value || mainCharacters.Person.Id.Value == soid || mainCharacters.Person.Id.Value == friendId || mainCharacters.Person.Id.Value == friendSOId
@@ -356,10 +264,16 @@ var locationQuery = from locations in mainCharactersPersonQuery
                     where locations.Snapshot.InteractionSurface.Location != "Unknown"
                     select locations;
 
-var hlq = from locs in worldMap.GetLocationsInRegion("Village")
-          select locs;
+var homeLocationsIds = worldMap.GetLocationsInRegion(worldRegion)
+    .Where(id => locationService.GetDescriptor(id)?.Type == LocationType.Rest)
+    .ToList();
 
-var homeLocationsIds = hlq.Where(loc => loc.Contains("house")).ToList();
+if (homeLocationsIds.Count == 0)
+{
+    Console.Error.WriteLine($"world.db neobsahuje žádné domy (LocationType.Rest) v regionu '{worldRegion}'.");
+    Console.Error.WriteLine("Spusť WorldGen bez --no-houses, aby vygeneroval domy k přiřazení postavám.");
+    return;
+}
 
 foreach (var personToMove in unknownLocationQuery)
 {
@@ -378,16 +292,10 @@ Console.WriteLine($"{nameof(mainCharactersPersonQuery)}: {mainCharactersPersonQu
 
 foreach (var mainCharacter in mainCharactersPersonQuery.ToList())
 {
-    string slotId = $"idle_in_stables";
-    var slot = new ScheduleSlot(slotId, 13, ActionNames.SelfCare, "stables");
-    mainCharacter.ReceiveEvent(new ScheduleSlotTriggered(startNow.AddDays(1), mainCharacter.Id, slotId, ActionNames.SelfCare, "stables", 0.65));
-
     if (mainCharacter.Snapshot.Schedule.Occupation is null)
     {
         mainCharacter.ChangeOccupation("farmer");
     }
-
-    Console.WriteLine("Slot: {0}", slotId);
 }
 
 Console.WriteLine("Press any key to continue...");

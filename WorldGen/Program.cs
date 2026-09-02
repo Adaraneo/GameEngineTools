@@ -72,7 +72,10 @@ var genOptions = new WorldContentGenerator.Options(
     CoastRadiusMeters: options.CoastRadiusMeters,
     TectonicPlateCount: tectonicPlateCount,
     TectonicSeed: planet.Seed,
-    PlanetRadiusMeters: planet.PlanetRadiusMeters);
+    PlanetRadiusMeters: planet.PlanetRadiusMeters,
+    GenerateHouses: options.GenerateHouses,
+    GenerateCemetery: options.GenerateCemetery,
+    GenerateProductionChain: options.GenerateProductionChain);
 
 Console.WriteLine($"Generuji {options.Count} lokací v regionu '{options.Region}'...");
 
@@ -80,6 +83,8 @@ var result = WorldContentGenerator.Generate(worldDb, tiles, genOptions, rng, cat
 
 Console.WriteLine($"Hotovo — {result.LocationsPlaced}/{options.Count} lokací, {result.ConnectionsCreated} spojení, " +
                    $"{result.ObjectsCreated} objektů uloženo do {options.WorldDbPath}.");
+if (result.CemeteryLocationId is not null)
+    Console.WriteLine($"Hřbitov: {result.CemeteryLocationId}");
 if (result.LocationsPlaced < options.Count)
     Console.WriteLine($"Poznámka: {options.Count - result.LocationsPlaced} lokací se nepodařilo umístit " +
                        "(nedostatek volné souše, nebo moc málo místa při zadaném --min-distance).");
@@ -105,6 +110,16 @@ internal sealed class CliOptions
     /// <summary>Disk override for the food/drink/rest catalog. Defaults to <c>.\Nutrition.csv</c>
     /// in the current directory when present, else <c>null</c> (embedded default catalog is used).</summary>
     public string? NutritionCsvPath { get; init; }
+    /// <summary>Whether Village/Town settlements get Rest-type house sub-locations
+    /// (<c>--no-houses</c> disables). On by default so a plain run is ready for a character
+    /// simulation (e.g. GameSandbox) to assign homes from.</summary>
+    public bool GenerateHouses { get; init; } = true;
+    /// <summary>Whether a single deterministic-id cemetery location is created
+    /// (<c>--no-cemetery</c> disables).</summary>
+    public bool GenerateCemetery { get; init; } = true;
+    /// <summary>Whether a field→mill→bakery production chain is attached to the largest placed
+    /// settlement (<c>--no-production</c> disables).</summary>
+    public bool GenerateProductionChain { get; init; } = true;
 
     public static void PrintUsage()
     {
@@ -124,6 +139,14 @@ internal sealed class CliOptions
                         [--seed <celé číslo, výchozí náhodné>]
                         [--nutrition-csv <cesta>, výchozí .\Nutrition.csv v aktuální složce,
                                             jinak vestavěný výchozí katalog]
+                        [--no-houses] [--no-cemetery] [--no-production]
+
+            Kromě samotných osad (ve výchozím nastavení) přidá ke každé vesnici/městu pár
+            obytných Rest lokací ("domů"), jeden hřbitov na deterministickém id
+            "<region>_cemetery" a řetězec pole→mlýn→pekárna u největší vygenerované osady —
+            přesně to, co potřebuje simulace postav (např. GameSandbox) k přiřazení domovů,
+            pohřbívání a potravinové ekonomiky bez ručně psaného obsahu. Kterýkoli z --no-*
+            přepínačů daný krok vypne.
 
             Lokace umisťuje výhradně na pozice pokryté už vygenerovanými dlaždicemi v terrain.db
             (spusť napřed terragen) — nikdy negeneruje nový terén. --world-db se VYTVOŘÍ, pokud
@@ -159,6 +182,9 @@ internal sealed class CliOptions
         int? tectonicPlateCount = null;
         int? seed = null;
         string? nutritionCsvPath = null;
+        var generateHouses = true;
+        var generateCemetery = true;
+        var generateProductionChain = true;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -196,6 +222,15 @@ internal sealed class CliOptions
                     break;
                 case "--nutrition-csv" when i + 1 < args.Length:
                     nutritionCsvPath = args[++i];
+                    break;
+                case "--no-houses":
+                    generateHouses = false;
+                    break;
+                case "--no-cemetery":
+                    generateCemetery = false;
+                    break;
+                case "--no-production":
+                    generateProductionChain = false;
                     break;
                 default:
                     Console.Error.WriteLine($"Neznámý nebo neúplný argument: {args[i]}");
@@ -249,6 +284,9 @@ internal sealed class CliOptions
             TectonicPlateCount = tectonicPlateCount,
             Seed = seed,
             NutritionCsvPath = nutritionCsvPath,
+            GenerateHouses = generateHouses,
+            GenerateCemetery = generateCemetery,
+            GenerateProductionChain = generateProductionChain,
         };
     }
 }
