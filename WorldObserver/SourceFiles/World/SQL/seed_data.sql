@@ -1,8 +1,7 @@
 -- seed_data.sql (WorldObserver) — large modern city surrounded by nature, richly equipped.
 -- Generated; disk override for the engine seeder. INSERT OR IGNORE throughout.
-
-INSERT OR IGNORE INTO SocialNorms (Id, DisplayName, Kind, Severity, EnforcementProbability, RelationalModel) VALUES
-    ('norm_formal_work', 'Formal Workplace', 'Authority', 0.55, 0.70, 'AuthorityRanking');
+-- SocialNorms now come from SourceFiles\World\SocialNorms.csv instead of an INSERT here (see
+-- SocialNormCatalogLoader) — keep that file in sync if gen_seed.py's norm list ever changes.
 
 INSERT OR IGNORE INTO Locations
     (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y)
