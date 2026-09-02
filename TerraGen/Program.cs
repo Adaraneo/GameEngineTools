@@ -97,6 +97,29 @@ static string LevelOutputPath(string basePath, int level)
     return string.IsNullOrEmpty(dir) ? fileName : Path.Combine(dir, fileName);
 }
 
+if (options.ExportDir is { } exportDir)
+{
+    using var exportDb = new SqliteWorldDatabase(options.DbPath);
+    WorldDatabaseSeeder.InitializeTerrainDatabase(exportDb);
+
+    var summaries = exportDb.ListHeightmaps();
+    if (summaries.Count == 0)
+    {
+        Console.Error.WriteLine($"V {options.DbPath} nejsou žádné vygenerované dlaždice — spusť napřed skutečné generování (bez --export).");
+        return 1;
+    }
+
+    Console.WriteLine($"Exportuji {summaries.Count} dlaždic do {exportDir} (float32 + 16bit PNG + JSON metadata)...");
+    foreach (var summary in summaries)
+    {
+        var tile = exportDb.LoadHeightmap(summary.Id)!;
+        var result = HeightmapExporter.Export(tile, exportDir, planet.PlanetName, planet.Seed);
+        Console.WriteLine($"  {result.TileId}: {Path.GetFileName(result.RawPath)}, {Path.GetFileName(result.PngPath)}, {Path.GetFileName(result.MetadataPath)}");
+    }
+    Console.WriteLine($"Hotovo — {summaries.Count} dlaždic exportováno do {exportDir}.");
+    return 0;
+}
+
 // TerraGen only ever stores terrain tiles — never Locations/Connections/WorldObjects — so it
 // applies the dedicated terrain schema, not the full world schema.
 using var db = new SqliteWorldDatabase(options.DbPath);
@@ -162,6 +185,12 @@ internal sealed class CliOptions
     /// <summary>Each progressive level's window is this many times narrower than the previous
     /// one. Only used when ScanLevels &gt; 1.</summary>
     public double ScanZoomFactor { get; init; } = 4.0;
+
+    /// <summary>Switches to export mode: reads every tile ALREADY in --db (no generation, no
+    /// --lat-range/--lon-range needed) and writes each as float32 + 16-bit PNG + JSON metadata
+    /// via <see cref="TerraGen.Generation.HeightmapExporter"/> — e.g. for a Blender Python import
+    /// script to consume.</summary>
+    public string? ExportDir { get; init; }
 
     /// <summary><c>null</c> (default — not passed on the command line) means "use whatever
     /// <c>appsettings.World.json</c>'s <c>PlanetTectonicPlateCount</c> says for this planet" (see
@@ -244,6 +273,20 @@ internal sealed class CliOptions
             --lat-range/--lon-range. Každá úroveň se vypíše zvlášť (a s --scan-output uloží do
             samostatného souboru s příponou _level0, _level1, ...). Když v okně žádné pobřeží
             není (celé moře/celá pevnina), další úroveň se přiblíží jen ke středu okna.
+
+            ── Export (pro Blender / jiné 3D nástroje) ─────────────────────────────────────
+              TerraGen --export <cesta ke složce> [--db <cesta k terrain.db>]
+
+            Bere VŠECHNY dlaždice už uložené v --db (žádné --lat-range/--lon-range, žádná nová
+            generace) a pro každou zapíše trojici souborů <tileId>.f32 + .png + .json:
+              .f32  — přesná float32 data beze ztráty (little-endian, po řádcích, řádek 0 první;
+                      stejné bajty jako v DB) — pro přesný import, žádná kvantizace.
+              .png  — 16bitová šedotónová PNG, lineárně škálovaná mezi min/max výškou dlaždice —
+                      pro rychlý vizuální náhled v čemkoli, co PNG umí otevřít.
+              .json — origin/cellSize/rozměry/min-max výška, ať .f32/.png umíš správně umístit
+                      a přeškálovat zpátky na metry.
+            Blender python skript pro import je v TerraGen/blender/import_heightmap.py — čte
+            přímo .f32 (žádný PIL/numpy potřeba), vytvoří mesh přes bmesh.
             """);
     }
 
@@ -263,6 +306,7 @@ internal sealed class CliOptions
         var scanDetail = false;
         var scanLevels = 1;
         var scanZoomFactor = 4.0;
+        string? exportDir = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -313,6 +357,9 @@ internal sealed class CliOptions
                 case "--scan-zoom" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var sz):
                     scanZoomFactor = sz;
                     break;
+                case "--export" when i + 1 < args.Length:
+                    exportDir = args[++i];
+                    break;
                 default:
                     Console.Error.WriteLine($"Neznámý nebo neúplný argument: {args[i]}");
                     return null;
@@ -327,13 +374,15 @@ internal sealed class CliOptions
 
         if (latMin is null || lonMin is null)
         {
-            if (!scan)
+            if (!scan && exportDir is null)
             {
                 Console.Error.WriteLine("Chybí povinné argumenty --lat-range, --lon-range.");
                 return null;
             }
             // --scan without an explicit window previews the whole planet — that's the point of
-            // running it before deciding which range is even worth generating for real.
+            // running it before deciding which range is even worth generating for real. --export
+            // doesn't use these at all (it just reads whatever tiles are already in --db), but
+            // CliOptions.LatMin etc. are non-nullable, so something must still be filled in.
             latMin = -90.0; latMax = 90.0;
             lonMin = -180.0; lonMax = 180.0;
         }
@@ -383,6 +432,7 @@ internal sealed class CliOptions
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
+            ExportDir = exportDir,
         };
     }
 
