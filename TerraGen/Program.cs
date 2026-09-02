@@ -35,10 +35,11 @@ if (options.Scan)
                        $"{options.ScanWidth}x{options.ScanHeight} buněk (bez eroze, nic se neukládá)...");
 
     var scanResult = PlanetScanner.Scan(scanNoiseParams, planet.PlanetRadiusMeters, scanPlates, scanOptions);
-    ScanRenderer.RenderToConsole(scanResult);
+    var landmasses = LandmassDetector.Detect(scanResult, planet.PlanetRadiusMeters);
+    ScanRenderer.RenderToConsole(scanResult, landmasses);
     if (options.ScanOutputPath is { } outputPath)
     {
-        ScanRenderer.SaveToFile(scanResult, outputPath);
+        ScanRenderer.SaveToFile(scanResult, landmasses, outputPath);
         Console.WriteLine($"Mapa uložena do {outputPath}.");
     }
     return 0;
@@ -150,10 +151,14 @@ internal sealed class CliOptions
 
             --scan vypíše ASCII mapu do konzole (barevně) přímým vzorkováním kontinentálního
             šumu (bez eroze, bez dlaždic, bez zápisu do DB) — použij ho PŘED skutečným
-            generováním, ať víš, kam vůbec mířit --lat-range/--lon-range. '.' = souš, '~' =
-            oceán; s aktivními --tectonic-plates navíc '^' = sbíhavá hranice (pohoří), 'v' =
-            rozbíhavá (prolomenina/rift), 'x' = transformní. Mapa ukazuje kde vzniknou hory/
-            prolomeniny, ne jak přesně budou vypadat zblízka — to je práce skutečné eroze.
+            generováním, ať víš, kam vůbec mířit --lat-range/--lon-range. Souš je značená
+            číslem/písmenem podle toho, ke které souvislé pevnině patří (viz tabulka pod mapou);
+            '~' = oceán; s aktivními --tectonic-plates navíc '^' = sbíhavá hranice (pohoří), 'v'
+            = rozbíhavá (prolomenina/rift), 'x' = transformní. Pod mapou je tabulka VŠECH
+            nalezených pevnin seřazená podle plochy — u každé je odhad km², střed a rovnou
+            hotový --lat-range/--lon-range k vložení do skutečného běhu. Mapa ukazuje kde
+            vzniknou hory/prolomeniny, ne jak přesně budou vypadat zblízka — to je práce
+            skutečné eroze.
             """);
     }
 

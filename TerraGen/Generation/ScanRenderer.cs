@@ -1,13 +1,18 @@
 namespace TerraGen.Generation;
 
-/// <summary>Renders a <see cref="PlanetScanner.Result"/> as a colored ASCII map to the console,
-/// or as a plain-text file with a legend — kept separate from <see cref="PlanetScanner"/> itself
-/// so the scan logic stays presentation-free (testable without a console).</summary>
+/// <summary>Renders a <see cref="PlanetScanner.Result"/> (plus its <see cref="LandmassDetector.Detection"/>)
+/// as a colored ASCII map to the console, or as a plain-text file with a legend and a ranked
+/// landmass table — kept separate from <see cref="PlanetScanner"/>/<see cref="LandmassDetector"/>
+/// themselves so the scan/detection logic stays presentation-free (testable without a console).</summary>
 public static class ScanRenderer
 {
-    public static void RenderToConsole(PlanetScanner.Result result)
+    /// <summary>Per-landmass map label, indexed by <c>Rank - 1</c> — ranks beyond this fall back
+    /// to '#' rather than throwing (still shown correctly in the table either way).</summary>
+    private const string LandmassLabels = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private const int MaxDetailedLandmasses = 20;
+
+    public static void RenderToConsole(PlanetScanner.Result result, LandmassDetector.Detection detection)
     {
-        var options = result.Options;
         var height = result.Cells.GetLength(0);
         var width = result.Cells.GetLength(1);
 
@@ -23,20 +28,23 @@ public static class ScanRenderer
                     PlanetScanner.Cell.Land => ConsoleColor.Green,
                     _ => ConsoleColor.Cyan,
                 };
-                Console.Write(result.Symbol(row, col));
+                Console.Write(LabeledSymbol(result, detection, row, col));
             }
             Console.ResetColor();
             Console.WriteLine();
         }
         Console.ResetColor();
 
+        var options = result.Options;
         Console.WriteLine($"lat [{options.LatMax:0.0} nahoře .. {options.LatMin:0.0} dole]  " +
                            $"lon [{options.LonMin:0.0} vlevo .. {options.LonMax:0.0} vpravo]");
-        Console.WriteLine("Legenda: . = souš   ~ = oceán   ^ = sbíhavá hranice (pohoří)   " +
-                           "v = rozbíhavá (rift)   x = transformní");
+        Console.WriteLine("Legenda: 1-9/A-Z = souš, číslo/písmeno = ID pevniny (viz tabulka níže)   " +
+                           "~ = oceán   ^ = sbíhavá hranice (pohoří)   v = rozbíhavá (rift)   x = transformní");
+
+        WriteLandmassTable(Console.Out, detection);
     }
 
-    public static void SaveToFile(PlanetScanner.Result result, string path)
+    public static void SaveToFile(PlanetScanner.Result result, LandmassDetector.Detection detection, string path)
     {
         var options = result.Options;
         var height = result.Cells.GetLength(0);
@@ -49,10 +57,46 @@ public static class ScanRenderer
         {
             var line = new char[width];
             for (var col = 0; col < width; col++)
-                line[col] = result.Symbol(row, col);
+                line[col] = LabeledSymbol(result, detection, row, col);
             writer.WriteLine(line);
         }
-        writer.WriteLine("Legenda: . = souš   ~ = oceán   ^ = sbíhavá hranice (pohoří)   " +
-                          "v = rozbíhavá (rift)   x = transformní");
+        writer.WriteLine("Legenda: 1-9/A-Z = souš, číslo/písmeno = ID pevniny (viz tabulka níže)   " +
+                          "~ = oceán   ^ = sbíhavá hranice (pohoří)   v = rozbíhavá (rift)   x = transformní");
+
+        WriteLandmassTable(writer, detection);
+    }
+
+    /// <summary>Land cells show their owning landmass's label instead of a flat '.'; ocean and
+    /// plate-boundary markers are unaffected — those already carry their own meaning.</summary>
+    private static char LabeledSymbol(PlanetScanner.Result result, LandmassDetector.Detection detection, int row, int col)
+    {
+        if (result.Cells[row, col] != PlanetScanner.Cell.Land) return result.Symbol(row, col);
+
+        var rank = detection.LandmassRankByCell[row, col];
+        if (rank <= 0) return result.Symbol(row, col); // shouldn't happen, but never crash a preview tool over it
+        return rank <= LandmassLabels.Length ? LandmassLabels[rank - 1] : '#';
+    }
+
+    private static void WriteLandmassTable(TextWriter writer, LandmassDetector.Detection detection)
+    {
+        writer.WriteLine();
+        writer.WriteLine($"Nalezeno {detection.Landmasses.Count} souvislých pevnin (řazeno podle plochy):");
+
+        foreach (var lm in detection.Landmasses.Take(MaxDetailedLandmasses))
+        {
+            var label = lm.Rank <= LandmassLabels.Length ? LandmassLabels[lm.Rank - 1].ToString() : "#";
+            writer.WriteLine($"  [{label}] {lm.AreaKm2:N0} km²  ({lm.CellCount} buněk skenu)  " +
+                              $"střed lat={lm.CentroidLatDeg:0.00} lon={lm.CentroidLonDeg:0.00}   " +
+                              $"--lat-range {lm.LatMin:0.###}:{lm.LatMax:0.###} --lon-range {lm.LonMin:0.###}:{lm.LonMax:0.###}");
+        }
+
+        if (detection.Landmasses.Count > MaxDetailedLandmasses)
+        {
+            var rest = detection.Landmasses.Skip(MaxDetailedLandmasses).ToList();
+            writer.WriteLine($"  ... a dalších {rest.Count} menších (souhrnná plocha {rest.Sum(l => l.AreaKm2):N0} km²)");
+        }
+
+        writer.WriteLine("Rozsahy jsou hrubé (odhad ze skenu, ne přesná hranice pobřeží) — před skutečným");
+        writer.WriteLine("generováním --lat-range/--lon-range mírně přidej rezervu na okraje.");
     }
 }
