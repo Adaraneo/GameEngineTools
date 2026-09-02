@@ -1,3 +1,4 @@
+using GameEngineTools.World.Data;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TerraGen.Generation;
 
@@ -64,6 +65,67 @@ public class PlanetScannerTests
         for (var row = 0; row < 6; row++)
             for (var col = 0; col < 12; col++)
                 Assert.AreEqual(a.ElevationsMeters[row, col], b.ElevationsMeters[row, col], 1e-9);
+    }
+
+    [TestMethod]
+    public void ScanDetail_CenteredAtOrigin_MatchesRealGenerationPipeline_WithErosionDisabled()
+    {
+        // The real end-to-end proof that --scan-detail isn't just "runs without crashing": with
+        // the scan window centered EXACTLY at (0,0) — the one point where PlanetScanner's ad-hoc
+        // detail reference coincides with TileGenerator's own fixed global reference — the two
+        // completely independent code paths (PlanetScanner.Scan vs. the real
+        // TileGenerator.Run → SqliteWorldDatabase pipeline) must agree on elevation at the same
+        // physical point, modulo erosion (disabled here via DropletCount: 0) and a little
+        // bilinear-interpolation slack from TerrainHeightmap.SampleAt.
+        const int seed = 123;
+        const int plateCount = 6;
+        const double radius = PlanetNoise.EarthRadiusMeters;
+        var noiseParams = new PlanetNoise.Parameters(Seed: seed, TectonicPlateCount: plateCount);
+        var plates = TectonicPlates.Generate(seed, plateCount);
+
+        var scanOptions = new PlanetScanner.Options(Width: 21, Height: 21, LatMin: -1, LatMax: 1, LonMin: -1, LonMax: 1, Detail: true);
+        var scanResult = PlanetScanner.Scan(noiseParams, radius, plates, scanOptions);
+
+        var runSettings = new TileGenerator.RunSettings(
+            LatMin: -1, LatMax: 1, LonMin: -1, LonMax: 1,
+            TileSizeMeters: 60_000, CellSizeMeters: 500,
+            NoiseParams: noiseParams,
+            ErosionParams: new TileErosion.Parameters(Seed: seed, DropletCount: 0), // no erosion — pure noise, same as the scan
+            PlanetRadiusMeters: radius);
+
+        using var db = new SqliteWorldDatabase(":memory:");
+        WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+        TileGenerator.Run(db, runSettings);
+
+        var tiles = db.ListHeightmaps().Select(s => db.LoadHeightmap(s.Id)!).ToList();
+        Assert.IsTrue(tiles.Count > 0, "Test setup produced no tiles.");
+
+        var comparedPoints = 0;
+        var maxAbsDifference = 0.0;
+
+        for (var row = 0; row < scanOptions.Height; row++)
+        {
+            for (var col = 0; col < scanOptions.Width; col++)
+            {
+                var (lat, lon) = scanResult.CellCenter(row, col);
+                var (offsetX, offsetY) = PlanetNoise.LatLonToOffset(lat, lon, 0.0, 0.0, radius);
+
+                var tile = tiles.FirstOrDefault(t =>
+                    offsetX >= t.OriginX && offsetX <= t.OriginX + t.Width * t.CellSizeMeters &&
+                    offsetY >= t.OriginY && offsetY <= t.OriginY + t.Height * t.CellSizeMeters);
+                if (tile is null) continue; // margin/edge cell not covered by any tile — skip, not a failure
+
+                var tileHeight = tile.SampleAt(offsetX, offsetY);
+                var scanHeight = scanResult.ElevationsMeters[row, col];
+                comparedPoints++;
+                maxAbsDifference = Math.Max(maxAbsDifference, Math.Abs(tileHeight - scanHeight));
+            }
+        }
+
+        Assert.IsTrue(comparedPoints > 100, $"Test setup only managed to compare {comparedPoints} points — window/tile layout is wrong.");
+        Assert.IsTrue(maxAbsDifference < 0.01,
+            $"--scan-detail elevation diverged from the real (uneroded) generation pipeline by up to {maxAbsDifference:0.######}m " +
+            $"across {comparedPoints} compared points — expected close agreement since both reference the same (0,0) origin.");
     }
 
     [TestMethod]
