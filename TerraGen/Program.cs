@@ -41,19 +41,60 @@ if (options.Scan)
         LatMin: options.LatMin, LatMax: options.LatMax, LonMin: options.LonMin, LonMax: options.LonMax,
         BoundaryInfluenceThreshold: options.ScanBoundaryThreshold, Detail: options.ScanDetail);
 
-    Console.WriteLine($"Sken lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
-                       $"{options.ScanWidth}x{options.ScanHeight} buněk (bez eroze, nic se neukládá)" +
-                       (options.ScanDetail ? ", včetně vrstvy pohoří" : "") + "...");
-
-    var scanResult = PlanetScanner.Scan(scanNoiseParams, planet.PlanetRadiusMeters, scanPlates, scanOptions);
-    var landmasses = LandmassDetector.Detect(scanResult, planet.PlanetRadiusMeters);
-    ScanRenderer.RenderToConsole(scanResult, landmasses);
-    if (options.ScanOutputPath is { } outputPath)
+    if (options.ScanLevels <= 1)
     {
-        ScanRenderer.SaveToFile(scanResult, landmasses, outputPath);
-        Console.WriteLine($"Mapa uložena do {outputPath}.");
+        Console.WriteLine($"Sken lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
+                           $"{options.ScanWidth}x{options.ScanHeight} buněk (bez eroze, nic se neukládá)" +
+                           (options.ScanDetail ? ", včetně vrstvy pohoří" : "") + "...");
+
+        var scanResult = PlanetScanner.Scan(scanNoiseParams, planet.PlanetRadiusMeters, scanPlates, scanOptions);
+        var landmasses = LandmassDetector.Detect(scanResult, planet.PlanetRadiusMeters);
+        ScanRenderer.RenderToConsole(scanResult, landmasses);
+        if (options.ScanOutputPath is { } outputPath)
+        {
+            ScanRenderer.SaveToFile(scanResult, landmasses, outputPath);
+            Console.WriteLine($"Mapa uložena do {outputPath}.");
+        }
+        return 0;
+    }
+
+    Console.WriteLine($"Postupný sken: {options.ScanLevels} úrovní, každá {options.ScanZoomFactor}x užší " +
+                       $"okno kolem nejbližšího pobřeží (bez eroze, nic se neukládá)...");
+
+    var progressiveOptions = new ProgressiveScanner.Options(options.ScanLevels, options.ScanZoomFactor, scanOptions);
+    var levels = ProgressiveScanner.Run(scanNoiseParams, planet.PlanetRadiusMeters, scanPlates, progressiveOptions);
+
+    foreach (var level in levels)
+    {
+        var w = level.WindowUsed;
+        Console.WriteLine();
+        Console.WriteLine($"══ Úroveň {level.Level + 1}/{levels.Count} — lat [{w.LatMin:0.###}:{w.LatMax:0.###}] " +
+                           $"lon [{w.LonMin:0.###}:{w.LonMax:0.###}] ══");
+        ScanRenderer.RenderToConsole(level.Scan, level.Landmasses);
+        Console.WriteLine(level.CoastlineTarget is { } t
+            ? $"Další úroveň se přibližuje k pobřeží u lat={t.LatDeg:0.###} lon={t.LonDeg:0.###}."
+            : "V tomhle okně nebylo nalezeno žádné pobřeží — další úroveň se přiblíží ke středu okna.");
+
+        if (options.ScanOutputPath is { } basePath)
+        {
+            var levelPath = LevelOutputPath(basePath, level.Level);
+            ScanRenderer.SaveToFile(level.Scan, level.Landmasses, levelPath);
+            Console.WriteLine($"Mapa uložena do {levelPath}.");
+        }
     }
     return 0;
+}
+
+/// <summary>Inserts <c>_level{N}</c> before the extension — e.g. <c>coast.txt</c> →
+/// <c>coast_level2.txt</c> — so a multi-level progressive scan doesn't overwrite the same file
+/// on every pass.</summary>
+static string LevelOutputPath(string basePath, int level)
+{
+    var dir = Path.GetDirectoryName(basePath);
+    var name = Path.GetFileNameWithoutExtension(basePath);
+    var ext = Path.GetExtension(basePath);
+    var fileName = $"{name}_level{level}{ext}";
+    return string.IsNullOrEmpty(dir) ? fileName : Path.Combine(dir, fileName);
 }
 
 // TerraGen only ever stores terrain tiles — never Locations/Connections/WorldObjects — so it
@@ -113,6 +154,15 @@ internal sealed class CliOptions
     /// plain --scan already pointed you at), not the whole planet.</summary>
     public bool ScanDetail { get; init; }
 
+    /// <summary>1 (default) is a single plain scan. &gt;1 switches to
+    /// <see cref="TerraGen.Generation.ProgressiveScanner"/>: repeats the scan, each pass zooming
+    /// into the coastline nearest the previous window's center, instead of the caller hand-copying
+    /// a landmass's --lat-range/--lon-range between separate runs.</summary>
+    public int ScanLevels { get; init; } = 1;
+    /// <summary>Each progressive level's window is this many times narrower than the previous
+    /// one. Only used when ScanLevels &gt; 1.</summary>
+    public double ScanZoomFactor { get; init; } = 4.0;
+
     /// <summary><c>null</c> (default — not passed on the command line) means "use whatever
     /// <c>appsettings.World.json</c>'s <c>PlanetTectonicPlateCount</c> says for this planet" (see
     /// <see cref="PlanetSettings"/>). Passing <c>--tectonic-plates</c> explicitly overrides that
@@ -163,6 +213,7 @@ internal sealed class CliOptions
                         [--scan-width <znaků, výchozí 120>] [--scan-height <řádků, výchozí 40>]
                         [--scan-boundary-threshold <0-1, výchozí 0.9>]
                         [--scan-detail]
+                        [--scan-levels <počet, výchozí 1> --scan-zoom <násobek zúžení, výchozí 4>]
                         [--scan-output <cesta .txt>, volitelně uloží mapu i do souboru]
 
             --scan vypíše ASCII mapu do konzole (barevně, včetně stínování nadmořské/podmořské
@@ -185,6 +236,14 @@ internal sealed class CliOptions
             zkopíruj její --lat-range/--lon-range → spusť znovu s --scan-detail pro detailnější
             náhled hor/prolomenin → teprve pak skutečné generování (bez --scan) se skutečnou
             erozí.
+
+            --scan-levels > 1 tenhle postup zautomatizuje: místo jednoho skenu proběhne N kol,
+            každé s --scan-zoom-krát užším oknem (ve stupních) než to předchozí, VŽDY vystředěné
+            na nejbližší pobřeží (hranici souš/oceán) k předchozímu středu — samo se tedy postupně
+            přiblíží ke konkrétnímu kusu pobřeží, aniž bys musel mezi běhy ručně kopírovat
+            --lat-range/--lon-range. Každá úroveň se vypíše zvlášť (a s --scan-output uloží do
+            samostatného souboru s příponou _level0, _level1, ...). Když v okně žádné pobřeží
+            není (celé moře/celá pevnina), další úroveň se přiblíží jen ke středu okna.
             """);
     }
 
@@ -202,6 +261,8 @@ internal sealed class CliOptions
         var scanBoundaryThreshold = 0.9;
         string? scanOutputPath = null;
         var scanDetail = false;
+        var scanLevels = 1;
+        var scanZoomFactor = 4.0;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -245,6 +306,12 @@ internal sealed class CliOptions
                     break;
                 case "--scan-detail":
                     scanDetail = true;
+                    break;
+                case "--scan-levels" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var sl):
+                    scanLevels = sl;
+                    break;
+                case "--scan-zoom" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var sz):
+                    scanZoomFactor = sz;
                     break;
                 default:
                     Console.Error.WriteLine($"Neznámý nebo neúplný argument: {args[i]}");
@@ -290,6 +357,21 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--scan-detail má smysl jen společně s --scan.");
             return null;
         }
+        if (scanLevels > 1 && !scan)
+        {
+            Console.Error.WriteLine("--scan-levels má smysl jen společně s --scan.");
+            return null;
+        }
+        if (scanLevels < 1)
+        {
+            Console.Error.WriteLine("--scan-levels musí být kladné.");
+            return null;
+        }
+        if (scanLevels > 1 && scanZoomFactor <= 1.0)
+        {
+            Console.Error.WriteLine("--scan-zoom musí být > 1 (jinak by se okno mezi úrovněmi nezmenšovalo).");
+            return null;
+        }
 
         return new CliOptions
         {
@@ -300,7 +382,7 @@ internal sealed class CliOptions
             TectonicPlateCount = tectonicPlateCount,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
-            ScanDetail = scanDetail,
+            ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
         };
     }
 
