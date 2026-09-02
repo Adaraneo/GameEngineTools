@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using GameEngineTools.World.Core.Astro;
 using Microsoft.Extensions.Configuration;
@@ -50,7 +51,11 @@ public static class PlanetSettings
     /// on every run.</summary>
     public static int ComputeSeed(string planetName, double planetMassKg, double planetEquatorialRadiusKm)
     {
-        var key = $"{planetName}|{planetMassKg:R}|{planetEquatorialRadiusKm:R}";
+        // Explicit invariant culture — without it, {value:R} formats through the OS's ambient
+        // locale (e.g. a comma decimal separator under Czech), so the SAME planet config would
+        // hash to a DIFFERENT seed depending on which machine/locale generated it. Must stay in
+        // lockstep with TerrainEditor's and WorldGen's own independent ComputeSeed implementations.
+        var key = string.Create(CultureInfo.InvariantCulture, $"{planetName}|{planetMassKg:R}|{planetEquatorialRadiusKm:R}");
         var hash = 2166136261u;
         foreach (var b in Encoding.UTF8.GetBytes(key))
         {

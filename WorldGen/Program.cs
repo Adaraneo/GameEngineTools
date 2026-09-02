@@ -4,6 +4,10 @@ using WorldGen;
 using WorldGen.Generation;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+// Keep console number formatting consistent with TerraGen's own fix — an ambient comma-decimal
+// locale (e.g. Czech) would otherwise print values that don't round-trip through the
+// InvariantCulture parsers this tool's own CLI args use.
+CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
 var options = CliOptions.Parse(args);
 if (options is null)

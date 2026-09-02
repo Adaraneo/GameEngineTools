@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -327,7 +328,12 @@ public partial class MainWindow : Window
         var planet = _vm.WorldDb.PlanetConfig;
         if (planet is null) return 1;
 
-        var key = $"{planet.PlanetName}|{planet.PlanetMassKg:R}|{planet.PlanetEquatorialRadiusKm:R}";
+        // Explicit invariant culture — without it, {value:R} formats through the OS's ambient
+        // locale (e.g. a comma decimal separator under Czech), so the SAME planet config would
+        // hash to a DIFFERENT seed depending on which machine/locale generated it. Must stay in
+        // lockstep with TerraGen's and WorldGen's own independent ComputeSeed implementations.
+        var key = string.Create(CultureInfo.InvariantCulture,
+            $"{planet.PlanetName}|{planet.PlanetMassKg:R}|{planet.PlanetEquatorialRadiusKm:R}");
         var hash = 2166136261u; // FNV-1a offset basis
         foreach (var b in System.Text.Encoding.UTF8.GetBytes(key))
         {

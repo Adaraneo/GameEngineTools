@@ -4,6 +4,12 @@ using TerraGen;
 using TerraGen.Generation;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+// Every printed number must round-trip through --lat-range/--lon-range's own parser, which reads
+// CultureInfo.InvariantCulture (decimal POINT) — under a comma-decimal OS locale (e.g. Czech),
+// default ToString()/interpolation formatting would print commas instead, so the --scan landmass
+// table's own "--lat-range X:Y" hints couldn't be pasted back into a real command. Force invariant
+// culture process-wide, once, rather than patching every individual WriteLine by hand.
+CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
 var options = CliOptions.Parse(args);
 if (options is null)
