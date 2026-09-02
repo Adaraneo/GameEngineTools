@@ -55,8 +55,9 @@ public static class WorldContentGenerator
         /// tier instead — mainly for deterministic tests; leave <c>null</c> for real generation.</summary>
         SettlementTier? ForcedTier = null,
         /// <summary>Whether Village/Town-tier settlements get <see cref="LocationType.Rest"/>
-        /// house sub-locations (see <see cref="HousesPerVillage"/>/<see cref="HousesPerTown"/>) —
-        /// GameSandbox uses these for character home assignment. Opt-in at this library level
+        /// house sub-locations laid out along radial streets (see <see cref="AddHouses"/>'s own
+        /// remarks for the layout grammar; count via <see cref="HousesPerVillage"/>/<see cref="HousesPerTown"/>)
+        /// — GameSandbox uses these for character home assignment. Opt-in at this library level
         /// (existing callers/tests expect exactly the locations they asked for); WorldGen's own
         /// CLI (<c>WorldGen/Program.cs</c>) turns this on by default for real runs.</summary>
         bool GenerateHouses = false,
@@ -470,10 +471,27 @@ public static class WorldContentGenerator
         return dx * dx + dy * dy;
     }
 
+    /// <summary>Radial streets a settlement's houses are laid out along, by tier — Village gets a
+    /// handful, Town more (Camp is gated out entirely by <see cref="AddHouses"/>'s own tier
+    /// switch, same as before this existed).</summary>
+    private static int StreetCountForTier(SettlementTier tier) => tier switch
+    {
+        SettlementTier.Village => 3,
+        SettlementTier.Town => 5,
+        _ => 1,
+    };
+
     /// <summary>Adds <see cref="Options.HousesPerVillage"/>/<see cref="Options.HousesPerTown"/>
     /// <see cref="LocationType.Rest"/> sub-locations around each placed Village/Town settlement
-    /// (Camp tier is too small/transient to bother) and connects each straight back to its parent.
-    /// Returns the number of connections created.</summary>
+    /// (Camp tier is too small/transient to bother) via a small settlement-layout grammar —
+    /// SETTLEMENT → SQUARE? STREET+, STREET → HOUSE+ — instead of the old pure-random circular
+    /// scatter: <see cref="StreetCountForTier"/> evenly-spaced radial streets (with a little angle
+    /// jitter, so they don't read as robotic spokes), each carrying a CHAIN of houses at
+    /// increasing distance — a house connects to the next one down its own street (not straight
+    /// back to the settlement), the same "walk down the street, not teleport to the town hall"
+    /// topology a real settlement has. Town tier additionally gets one Social "square" sub-location
+    /// (see <see cref="AddTownSquare"/>) that the streets radiate from instead of the settlement's
+    /// own raw point. Returns the number of connections created.</summary>
     private static int AddHouses(SqliteWorldDatabase worldDb, List<Placed> placed, Options options, Random rng)
     {
         var created = 0;
@@ -485,39 +503,104 @@ public static class WorldContentGenerator
                 SettlementTier.Town => options.HousesPerTown,
                 _ => 0,
             };
+            if (houseCount <= 0) continue;
 
-            for (var n = 1; n <= houseCount; n++)
+            var (hubId, hubX, hubY) = parent.Tier == SettlementTier.Town
+                ? AddTownSquare(worldDb, parent, options, ref created)
+                : (parent.Id, parent.X, parent.Y);
+
+            var streetCount = StreetCountForTier(parent.Tier);
+            var streetAngleStep = 2 * Math.PI / streetCount;
+            var houseIndex = 0;
+
+            for (var streetNum = 0; streetNum < streetCount; streetNum++)
             {
-                var angle = rng.NextDouble() * 2 * Math.PI;
-                var radius = 15.0 + rng.NextDouble() * 35.0;
-                var hx = parent.X + Math.Cos(angle) * radius;
-                var hy = parent.Y + Math.Sin(angle) * radius;
-                var houseId = $"{parent.Id}_house_{n:D2}";
+                var streetAngle = streetNum * streetAngleStep + (rng.NextDouble() - 0.5) * 0.3;
+                var housesOnThisStreet = houseCount / streetCount + (streetNum < houseCount % streetCount ? 1 : 0);
 
-                var descriptor = new LocationDescriptor(
-                    Id: houseId,
-                    DisplayName: $"Dům {n:D2}",
-                    BaseNoise: 0.05,
-                    NoisePerPerson: 0.03,
-                    Capacity: 3,
-                    AllowsPrivacy: true,
-                    Type: LocationType.Rest,
-                    Terrain: TerrainType.Indoor,
-                    DangerLevel: 0.0,
-                    AllowsPickup: true,
-                    NormId: null,
-                    X: hx,
-                    Y: hy,
-                    AltitudeMeters: parent.Tile.SampleAt(hx, hy));
-                worldDb.InsertLocation(descriptor, options.Region);
+                var backId = hubId;
+                var backX = hubX;
+                var backY = hubY;
 
-                var distance = radius;
-                worldDb.InsertConnection(houseId, parent.Id, distance);
-                worldDb.InsertConnection(parent.Id, houseId, distance);
-                created++;
+                for (var alongStreet = 1; alongStreet <= housesOnThisStreet; alongStreet++)
+                {
+                    houseIndex++;
+                    var radius = 15.0 * alongStreet + rng.NextDouble() * 8.0;
+                    var lateralJitter = (rng.NextDouble() - 0.5) * 6.0; // small perpendicular offset — a street isn't a ruler-straight line
+                    var perpAngle = streetAngle + Math.PI / 2;
+                    var hx = hubX + Math.Cos(streetAngle) * radius + Math.Cos(perpAngle) * lateralJitter;
+                    var hy = hubY + Math.Sin(streetAngle) * radius + Math.Sin(perpAngle) * lateralJitter;
+                    var houseId = $"{parent.Id}_house_{houseIndex:D2}";
+
+                    var descriptor = new LocationDescriptor(
+                        Id: houseId,
+                        DisplayName: $"Dům {houseIndex:D2}",
+                        BaseNoise: 0.05,
+                        NoisePerPerson: 0.03,
+                        Capacity: 3,
+                        AllowsPrivacy: true,
+                        Type: LocationType.Rest,
+                        Terrain: TerrainType.Indoor,
+                        DangerLevel: 0.0,
+                        AllowsPickup: true,
+                        NormId: null,
+                        X: hx,
+                        Y: hy,
+                        AltitudeMeters: parent.Tile.SampleAt(hx, hy));
+                    worldDb.InsertLocation(descriptor, options.Region);
+
+                    var dx = hx - backX;
+                    var dy = hy - backY;
+                    var distance = Math.Sqrt(dx * dx + dy * dy);
+                    worldDb.InsertConnection(houseId, backId, distance);
+                    worldDb.InsertConnection(backId, houseId, distance);
+                    created++;
+
+                    backId = houseId;
+                    backX = hx;
+                    backY = hy;
+                }
             }
         }
         return created;
+    }
+
+    /// <summary>Creates the one <see cref="LocationType.Social"/> "square" sub-location a Town
+    /// gets (a real gathering place slightly off the settlement's own abstract point, not layered
+    /// directly on top of it), connects it back to the settlement, and increments
+    /// <paramref name="connectionsCreated"/> for that one edge. Returns where the settlement's
+    /// streets should radiate FROM (the square's position), not the settlement's own X/Y.</summary>
+    private static (string HubId, double HubX, double HubY) AddTownSquare(
+        SqliteWorldDatabase worldDb, Placed parent, Options options, ref int connectionsCreated)
+    {
+        const double offset = 8.0;
+        var squareId = $"{parent.Id}_square";
+        var sx = parent.X + offset;
+        var sy = parent.Y + offset;
+
+        var descriptor = new LocationDescriptor(
+            Id: squareId,
+            DisplayName: "Náměstí",
+            BaseNoise: 0.35,
+            NoisePerPerson: 0.02,
+            Capacity: 60,
+            AllowsPrivacy: false,
+            Type: LocationType.Social,
+            Terrain: TerrainType.Courtyard,
+            DangerLevel: 0.0,
+            AllowsPickup: true,
+            NormId: null,
+            X: sx,
+            Y: sy,
+            AltitudeMeters: parent.Tile.SampleAt(sx, sy));
+        worldDb.InsertLocation(descriptor, options.Region);
+
+        var distance = offset * 1.4142135623730951; // sqrt(2) — the diagonal offset's own length
+        worldDb.InsertConnection(squareId, parent.Id, distance);
+        worldDb.InsertConnection(parent.Id, squareId, distance);
+        connectionsCreated++;
+
+        return (squareId, sx, sy);
     }
 
     /// <summary>Creates a single <see cref="LocationType.Public"/> cemetery location at a

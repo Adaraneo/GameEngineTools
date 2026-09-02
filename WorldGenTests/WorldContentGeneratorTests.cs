@@ -404,8 +404,12 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
-    public void Generate_HousesEnabled_VillageGetsRestHousesConnectedToParent()
+    public void Generate_HousesEnabled_VillageGetsRestHousesReachableFromParent()
     {
+        // Houses now lay out along a small number of radial streets, each a CHAIN (house connects
+        // to the next one down its own street, not straight back to the parent) — so the
+        // invariant to check is "every house is transitively reachable from the parent", not
+        // "every house has a direct edge to the parent" (only each street's first house does).
         using var db = NewWorldDb();
         var tiles = new[] { FlatTile(50.0) };
         var options = new WorldContentGenerator.Options(
@@ -421,10 +425,79 @@ public class WorldContentGeneratorTests
         Assert.AreEqual(3, houses.Count);
         Assert.IsTrue(houses.All(h => h.Descriptor.Type == LocationType.Rest));
 
-        var connections = db.GetAllConnections();
+        var adjacency = locations.ToDictionary(l => l.Descriptor.Id, _ => new HashSet<string>());
+        foreach (var (from, to, _) in db.GetAllConnections())
+            adjacency[from].Add(to);
+
+        var visited = new HashSet<string> { parent.Descriptor.Id };
+        var queue = new Queue<string>();
+        queue.Enqueue(parent.Descriptor.Id);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var next in adjacency[current])
+                if (visited.Add(next)) queue.Enqueue(next);
+        }
+
         foreach (var house in houses)
-            Assert.IsTrue(connections.Any(c => c.FromId == house.Descriptor.Id && c.ToId == parent.Descriptor.Id),
-                $"Expected a connection from {house.Descriptor.Id} back to its parent settlement.");
+            Assert.IsTrue(visited.Contains(house.Descriptor.Id), $"Expected {house.Descriptor.Id} to be reachable from its parent settlement.");
+    }
+
+    [TestMethod]
+    public void Generate_HousesEnabled_TownGetsASquare_ConnectedToParent()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
+            GenerateHouses: true, HousesPerTown: 6);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(53), Catalog);
+
+        var locations = db.GetAllLocations();
+        var parent = locations.Single(l => !l.Descriptor.Id.Contains("_house_") && !l.Descriptor.Id.EndsWith("_square", StringComparison.Ordinal));
+        var square = locations.SingleOrDefault(l => l.Descriptor.Id == $"{parent.Descriptor.Id}_square");
+
+        Assert.IsNotNull(square.Descriptor, "Expected a Town to get exactly one '_square' sub-location.");
+        Assert.AreEqual(LocationType.Social, square.Descriptor.Type);
+        Assert.IsFalse(square.Descriptor.AllowsPrivacy, "A public square should never allow privacy.");
+
+        var connections = db.GetAllConnections();
+        Assert.IsTrue(connections.Any(c => c.FromId == square.Descriptor.Id && c.ToId == parent.Descriptor.Id),
+            "Expected the square to connect back to its parent settlement.");
+    }
+
+    [TestMethod]
+    public void Generate_HousesEnabled_VillageDoesNotGetASquare()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Village,
+            GenerateHouses: true, HousesPerVillage: 4);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(54), Catalog);
+
+        var locations = db.GetAllLocations();
+        Assert.IsFalse(locations.Any(l => l.Descriptor.Id.EndsWith("_square", StringComparison.Ordinal)),
+            "Only Town tier should get a square — Village settlements are too small for a formal one.");
+    }
+
+    [TestMethod]
+    public void Generate_HousesEnabled_ConnectionCount_MatchesOneEdgePerHousePlusSquare()
+    {
+        // Chain topology: every house creates EXACTLY one edge (to whatever's immediately behind
+        // it on its street — the square/parent hub, or the previous house). Town tier adds
+        // exactly one more edge for the square itself.
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
+            GenerateHouses: true, HousesPerTown: 7);
+
+        var result = WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
+
+        Assert.AreEqual(7 + 1, result.ConnectionsCreated, "Expected 7 house edges + 1 square edge (no other connections for a single ForcedTier location with ConnectionsPerLocation's own hub logic finding nothing else to link).");
     }
 
     [TestMethod]
