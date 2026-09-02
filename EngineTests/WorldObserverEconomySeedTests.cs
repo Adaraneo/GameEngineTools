@@ -31,6 +31,18 @@ namespace EngineTests
 
             using var db = new SqliteWorldDatabase(":memory:");
             db.ExecuteScript(SqlScriptLoader.Load("schema.sql"));
+
+            // SocialNorms no longer live in seed_data.sql — WorldDatabaseSeeder.Initialize inserts
+            // them from SocialNorms.csv (SocialNormCatalogLoader) first, since Locations.NormId
+            // (e.g. 'norm_formal_work') is a foreign key into SocialNorms. Mirror that order here
+            // using WorldObserver's own disk-override CSV, sitting next to its seed_data.sql.
+            var normsPath = Path.Combine(Path.GetDirectoryName(seedPath)!, "..", "SocialNorms.csv");
+            if (File.Exists(normsPath))
+            {
+                foreach (var norm in SocialNormCatalogLoader.Load(normsPath))
+                    db.InsertSocialNorm(norm);
+            }
+
             db.ExecuteScript(File.ReadAllText(seedPath));
 
             var provider = new SqliteWorldObjectProvider(db);
