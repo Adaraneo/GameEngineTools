@@ -84,19 +84,11 @@ namespace GameEngineTools.Characters.Generation
             var minAgeDays = (minAgeYears == 0) ? 1 : minAgeYears * daysInYear;
             var maxAgeDays = maxAgeYears * daysInYear;
 
-            WDateOnly minBirth;
-            try
-            {
-                minBirth = new WDateOnly(now.DayIndex - maxAgeDays);
-            }
-            catch (ArgumentOutOfRangeException)
-            {
-                // The date would fall before the epoch — align it to 30 days back from "now"
-                // TODO: replace with a lunar calculation
-                minBirth = new WDateOnly(now.DayIndex - 30);
-            }
-
-            var maxBirth = new WDateOnly(now.DayIndex - minAgeDays);
+            // A freshly started world (close to day 0 of the epoch) has no calendar runway
+            // to place birth dates the requested age back — clamp to the epoch floor instead
+            // of underflowing WDateOnly's non-negative dayIndex.
+            var minBirth = new WDateOnly(Math.Max(0, now.DayIndex - maxAgeDays));
+            var maxBirth = new WDateOnly(Math.Max(0, now.DayIndex - minAgeDays));
 
             return new HumanBlueprintSpec(
                 SexWeights: (Female: 0.49, Male: 0.49, Intersex: 0.01, Unknown: 0.01),

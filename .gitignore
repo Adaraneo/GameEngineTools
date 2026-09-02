@@ -377,3 +377,6 @@ FodyWeavers.xsd
 
 /docs/
 /GameEngineTools/Grammar/grammar.czech.lexicon.db
+
+# Unity PoC scratch project (not part of the main solution)
+UnityPoC/
