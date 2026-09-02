@@ -172,6 +172,29 @@ public class LandmassDetectorTests
     }
 
     [TestMethod]
+    public void Detect_PartialWindowBeyond180_ReportsBoundsInsideThatWindowNotShiftedOutside()
+    {
+        // A non-wrapping window whose LonMax legitimately exceeds 180° (e.g. pasted straight
+        // from an earlier landmass's own --lon-range hint) defines its OWN coordinate frame —
+        // a landmass near its far edge must NOT get silently renormalized back into ±180°,
+        // which would report bounds that don't even overlap the window that was scanned.
+        var cells = new PlanetScanner.Cell[3, 10];
+        for (var r = 0; r < 3; r++) for (var c = 0; c < 10; c++) cells[r, c] = PlanetScanner.Cell.Ocean;
+        cells[1, 8] = PlanetScanner.Cell.Land;
+        cells[1, 9] = PlanetScanner.Cell.Land; // lon = 260 (window's own far edge, not wrapped)
+        var options = new PlanetScanner.Options(Width: 10, Height: 3, LatMin: -10, LatMax: 10, LonMin: 200, LonMax: 260);
+
+        var detection = LandmassDetector.Detect(BuildResult(cells, options), PlanetRadiusMeters);
+
+        Assert.AreEqual(1, detection.Landmasses.Count);
+        var lm = detection.Landmasses[0];
+        Assert.IsTrue(lm.LonMin >= 200.0 && lm.LonMax <= 260.0,
+            $"Expected bounds inside [200, 260], got [{lm.LonMin}, {lm.LonMax}].");
+        Assert.IsTrue(lm.CentroidLonDeg is >= 200.0 and <= 260.0,
+            $"Expected centroid inside [200, 260], got {lm.CentroidLonDeg}.");
+    }
+
+    [TestMethod]
     public void Detect_SameInputs_IsDeterministic()
     {
         var cells = new PlanetScanner.Cell[8, 8];

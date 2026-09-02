@@ -66,10 +66,17 @@ public static class LandmassDetector
             var rank = i + 1;
             var c = ranked[i];
 
-            // Shift the whole (still-contiguous, unwrapped) component back into a normal ±180°
-            // longitude range — as a PAIR, not each endpoint independently, or a seam-crossing
-            // range like [170, 200] would normalize into the nonsensical [170, -160].
-            var shift = c.LonMaxUnwrapped > 180.0 ? -360.0 : c.LonMinUnwrapped < -180.0 ? 360.0 : 0.0;
+            // Only renormalize into a canonical ±180° range when THIS scan was itself a full
+            // 360° window — there, ±180 is the one ambiguity-free frame to report in. A partial
+            // window (e.g. one already pasted in from an earlier landmass's own --lon-range,
+            // itself potentially outside ±180) defines its OWN coordinate frame; shifting a
+            // sub-range back into ±180 there would silently report bounds that don't even
+            // overlap the window the caller asked to scan. Shift the whole component as a PAIR,
+            // not each endpoint independently, or a seam-crossing range like [170, 200] would
+            // normalize into the nonsensical [170, -160].
+            var shift = !wrapLongitude ? 0.0
+                : c.LonMaxUnwrapped > 180.0 ? -360.0
+                : c.LonMinUnwrapped < -180.0 ? 360.0 : 0.0;
             var lonMin = c.LonMinUnwrapped + shift;
             var lonMax = c.LonMaxUnwrapped + shift;
             var centroidLon = c.SumLonUnwrapped / c.Cells.Count + shift;

@@ -10,6 +10,9 @@ namespace TerraGen.Generation;
 /// true-sphere lookup with no reference-point limitation, so the boundary overlay is accurate at
 /// planet scale even though the actual uplifted mountain TEXTURE isn't shown — this answers "where
 /// is land, and where would ranges/rifts form", not "what does the terrain look like up close".
+/// <see cref="Options.Detail"/> trades that planet-scale accuracy for exactly the opposite: a
+/// zoomed-in preview that DOES include the mountain-ridge layer, valid only for the requested
+/// window itself (see the option's own remarks).
 /// </summary>
 public static class PlanetScanner
 {
@@ -21,11 +24,17 @@ public static class PlanetScanner
         double LonMin,
         double LonMax,
         /// <summary>Minimum <see cref="TectonicPlates.BoundarySample.BoundaryInfluence"/> for a
-        /// cell to render as a boundary marker instead of plain land/ocean.</summary>
-        /// <summary>0.9 by default — the influence falloff is roughly linear with distance
-        /// across a whole plate, so a lower threshold reads as a wide colored region rather than
-        /// a thin boundary line at this map's resolution.</summary>
-        double BoundaryInfluenceThreshold = 0.9);
+        /// cell to render as a boundary marker instead of plain land/ocean. 0.9 by default — the
+        /// influence falloff is roughly linear with distance across a whole plate, so a lower
+        /// threshold reads as a wide colored region rather than a thin boundary line at this
+        /// map's resolution.</summary>
+        double BoundaryInfluenceThreshold = 0.9,
+        /// <summary>When true, also samples the mountain-ridge layer (<see cref="PlanetNoise.SampleCombined"/>)
+        /// using this window's OWN CENTER as an ad-hoc flat reference point, instead of the
+        /// pure globally-seamless landmass layer alone. Meaningful only for a genuinely local/
+        /// zoomed window — at planet scale the mountain layer's flat-plane approximation breaks
+        /// down (see <see cref="PlanetNoise"/>'s remarks), so this is opt-in, off by default.</summary>
+        bool Detail = false);
 
     public enum Cell { Ocean, Land, Convergent, Divergent, Transform }
 
@@ -59,6 +68,12 @@ public static class PlanetScanner
         var cells = new Cell[options.Height, options.Width];
         var elevations = new double[options.Height, options.Width];
 
+        // Only used when Options.Detail is set — the window's own center, so
+        // SampleCombined's flat mountain-plane approximation is evaluated as close as possible
+        // to where it's actually being asked to be accurate.
+        var detailRefLat = (options.LatMin + options.LatMax) / 2.0;
+        var detailRefLon = (options.LonMin + options.LonMax) / 2.0;
+
         for (var row = 0; row < options.Height; row++)
         {
             var t = options.Height <= 1 ? 0.5 : row / (double)(options.Height - 1);
@@ -69,7 +84,16 @@ public static class PlanetScanner
                 var u = options.Width <= 1 ? 0.5 : col / (double)(options.Width - 1);
                 var lon = options.LonMin + u * (options.LonMax - options.LonMin);
 
-                var elevation = PlanetNoise.SampleLandmass(lat, lon, noiseParams, planetRadiusMeters);
+                double elevation;
+                if (options.Detail)
+                {
+                    var (offsetX, offsetY) = PlanetNoise.LatLonToOffset(lat, lon, detailRefLat, detailRefLon, planetRadiusMeters);
+                    elevation = PlanetNoise.SampleCombined(offsetX, offsetY, detailRefLat, detailRefLon, noiseParams, planetRadiusMeters, plates);
+                }
+                else
+                {
+                    elevation = PlanetNoise.SampleLandmass(lat, lon, noiseParams, planetRadiusMeters);
+                }
                 elevations[row, col] = elevation;
 
                 var cell = elevation >= 0.0 ? Cell.Land : Cell.Ocean;

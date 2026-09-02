@@ -15,6 +15,7 @@ public static class ScanRenderer
     {
         var height = result.Cells.GetLength(0);
         var width = result.Cells.GetLength(1);
+        var (elevationMin, elevationMax) = ElevationRange(result.ElevationsMeters);
 
         for (var row = 0; row < height; row++)
         {
@@ -25,8 +26,7 @@ public static class ScanRenderer
                     PlanetScanner.Cell.Convergent => ConsoleColor.Red,
                     PlanetScanner.Cell.Divergent => ConsoleColor.Magenta,
                     PlanetScanner.Cell.Transform => ConsoleColor.DarkYellow,
-                    PlanetScanner.Cell.Land => ConsoleColor.Green,
-                    _ => ConsoleColor.Cyan,
+                    _ => ElevationColor(result.ElevationsMeters[row, col], elevationMin, elevationMax),
                 };
                 Console.Write(LabeledSymbol(result, detection, row, col));
             }
@@ -37,11 +37,41 @@ public static class ScanRenderer
 
         var options = result.Options;
         Console.WriteLine($"lat [{options.LatMax:0.0} nahoře .. {options.LatMin:0.0} dole]  " +
-                           $"lon [{options.LonMin:0.0} vlevo .. {options.LonMax:0.0} vpravo]");
-        Console.WriteLine("Legenda: 1-9/A-Z = souš, číslo/písmeno = ID pevniny (viz tabulka níže)   " +
-                           "~ = oceán   ^ = sbíhavá hranice (pohoří)   v = rozbíhavá (rift)   x = transformní");
+                           $"lon [{options.LonMin:0.0} vlevo .. {options.LonMax:0.0} vpravo]" +
+                           (options.Detail ? "  (--scan-detail: včetně vrstvy pohoří)" : ""));
+        Console.WriteLine("Legenda: 1-9/A-Z = souš, číslo/písmeno = ID pevniny (viz tabulka níže; barva = " +
+                           "nadmořská/podmořská výška)   ~ = oceán   ^ = sbíhavá hranice (pohoří)   " +
+                           "v = rozbíhavá (rift)   x = transformní");
 
         WriteLandmassTable(Console.Out, detection);
+    }
+
+    private static (double Min, double Max) ElevationRange(double[,] elevations)
+    {
+        var min = double.MaxValue;
+        var max = double.MinValue;
+        foreach (var e in elevations)
+        {
+            if (e < min) min = e;
+            if (e > max) max = e;
+        }
+        return (min, max);
+    }
+
+    /// <summary>Three shades each side of sea level, scaled against the ACTUAL min/max elevation
+    /// in this particular scan (not a fixed constant) — so shading stays meaningful whether this
+    /// is a global overview (small landmass-only amplitude) or a <see cref="PlanetScanner.Options.Detail"/>
+    /// zoom (much taller, since it includes the mountain-ridge layer).</summary>
+    private static ConsoleColor ElevationColor(double elevationMeters, double min, double max)
+    {
+        if (elevationMeters < 0.0)
+        {
+            var depthT = min < 0.0 ? Math.Clamp(elevationMeters / min, 0.0, 1.0) : 0.0;
+            return depthT > 0.66 ? ConsoleColor.DarkBlue : depthT > 0.33 ? ConsoleColor.Blue : ConsoleColor.Cyan;
+        }
+
+        var heightT = max > 0.0 ? Math.Clamp(elevationMeters / max, 0.0, 1.0) : 0.0;
+        return heightT > 0.66 ? ConsoleColor.DarkGray : heightT > 0.33 ? ConsoleColor.DarkGreen : ConsoleColor.Green;
     }
 
     public static void SaveToFile(PlanetScanner.Result result, LandmassDetector.Detection detection, string path)
@@ -52,7 +82,8 @@ public static class ScanRenderer
 
         using var writer = new StreamWriter(path, append: false, System.Text.Encoding.UTF8);
         writer.WriteLine($"TerraGen --scan  lat [{options.LatMin:0.###}:{options.LatMax:0.###}]  " +
-                          $"lon [{options.LonMin:0.###}:{options.LonMax:0.###}]  {width}x{height}");
+                          $"lon [{options.LonMin:0.###}:{options.LonMax:0.###}]  {width}x{height}" +
+                          (options.Detail ? "  (--scan-detail: včetně vrstvy pohoří)" : ""));
         for (var row = 0; row < height; row++)
         {
             var line = new char[width];

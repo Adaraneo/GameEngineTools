@@ -17,7 +17,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>terragen</ToolCommandName>
     <PackageId>TerraGen</PackageId>
-    <Version>1.0.0-preview.8</Version>
+    <Version>1.0.0-preview.9</Version>
     <Authors>50PSoftware</Authors>
     <Description>Dávkový generátor sousedících dlaždic planety pro GameEngineTools/TerrainEditor.</Description>
   </PropertyGroup>

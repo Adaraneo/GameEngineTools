@@ -26,13 +26,18 @@ if (options.Scan)
         TectonicPlateCount: tectonicPlateCount);
     var scanPlates = tectonicPlateCount > 0 ? TectonicPlates.Generate(planet.Seed, tectonicPlateCount) : null;
 
+    if (options.ScanDetail && options.LonMax - options.LonMin >= 90.0)
+        Console.WriteLine("Poznámka: --scan-detail je myšlený na úzké okno (řádově jednotky/desítky stupňů) " +
+                           "— na takhle širokém rozsahu bude vrstva pohoří zkreslená (viz --help).");
+
     var scanOptions = new PlanetScanner.Options(
         Width: options.ScanWidth, Height: options.ScanHeight,
         LatMin: options.LatMin, LatMax: options.LatMax, LonMin: options.LonMin, LonMax: options.LonMax,
-        BoundaryInfluenceThreshold: options.ScanBoundaryThreshold);
+        BoundaryInfluenceThreshold: options.ScanBoundaryThreshold, Detail: options.ScanDetail);
 
     Console.WriteLine($"Sken lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
-                       $"{options.ScanWidth}x{options.ScanHeight} buněk (bez eroze, nic se neukládá)...");
+                       $"{options.ScanWidth}x{options.ScanHeight} buněk (bez eroze, nic se neukládá)" +
+                       (options.ScanDetail ? ", včetně vrstvy pohoří" : "") + "...");
 
     var scanResult = PlanetScanner.Scan(scanNoiseParams, planet.PlanetRadiusMeters, scanPlates, scanOptions);
     var landmasses = LandmassDetector.Detect(scanResult, planet.PlanetRadiusMeters);
@@ -97,6 +102,10 @@ internal sealed class CliOptions
     public int ScanHeight { get; init; } = 40;
     public double ScanBoundaryThreshold { get; init; } = 0.9;
     public string? ScanOutputPath { get; init; }
+    /// <summary>Adds the mountain-ridge layer to the scan (see <see cref="PlanetScanner.Options.Detail"/>)
+    /// — meant for a narrow, already-zoomed-in --lat-range/--lon-range (e.g. one landmass a
+    /// plain --scan already pointed you at), not the whole planet.</summary>
+    public bool ScanDetail { get; init; }
 
     /// <summary><c>null</c> (default — not passed on the command line) means "use whatever
     /// <c>appsettings.World.json</c>'s <c>PlanetTectonicPlateCount</c> says for this planet" (see
@@ -147,18 +156,29 @@ internal sealed class CliOptions
                         [--lat-range <min>:<max> --lon-range <min>:<max>, výchozí celá planeta]
                         [--scan-width <znaků, výchozí 120>] [--scan-height <řádků, výchozí 40>]
                         [--scan-boundary-threshold <0-1, výchozí 0.9>]
+                        [--scan-detail]
                         [--scan-output <cesta .txt>, volitelně uloží mapu i do souboru]
 
-            --scan vypíše ASCII mapu do konzole (barevně) přímým vzorkováním kontinentálního
-            šumu (bez eroze, bez dlaždic, bez zápisu do DB) — použij ho PŘED skutečným
-            generováním, ať víš, kam vůbec mířit --lat-range/--lon-range. Souš je značená
-            číslem/písmenem podle toho, ke které souvislé pevnině patří (viz tabulka pod mapou);
-            '~' = oceán; s aktivními --tectonic-plates navíc '^' = sbíhavá hranice (pohoří), 'v'
-            = rozbíhavá (prolomenina/rift), 'x' = transformní. Pod mapou je tabulka VŠECH
-            nalezených pevnin seřazená podle plochy — u každé je odhad km², střed a rovnou
-            hotový --lat-range/--lon-range k vložení do skutečného běhu. Mapa ukazuje kde
-            vzniknou hory/prolomeniny, ne jak přesně budou vypadat zblízka — to je práce
-            skutečné eroze.
+            --scan vypíše ASCII mapu do konzole (barevně, včetně stínování nadmořské/podmořské
+            výšky) přímým vzorkováním kontinentálního šumu (bez eroze, bez dlaždic, bez zápisu
+            do DB) — použij ho PŘED skutečným generováním, ať víš, kam vůbec mířit
+            --lat-range/--lon-range. Souš je značená číslem/písmenem podle toho, ke které
+            souvislé pevnině patří (viz tabulka pod mapou); '~' = oceán; s aktivními
+            --tectonic-plates navíc '^' = sbíhavá hranice (pohoří), 'v' = rozbíhavá
+            (prolomenina/rift), 'x' = transformní. Pod mapou je tabulka VŠECH nalezených pevnin
+            seřazená podle plochy — u každé je odhad km², střed a rovnou hotový
+            --lat-range/--lon-range k vložení do dalšího běhu.
+
+            Normální --scan ukazuje jen kde vznikne SOUŠ, ne jak hornatá bude zblízka — vrstva
+            pohoří je totiž platná jen lokálně kolem jednoho referenčního bodu (viz komentáře u
+            PlanetNoise), takže ji přes celou planetu nemá smysl vzorkovat. --scan-detail tohle
+            obchází: použije STŘED aktuálního --lat-range/--lon-range okna jako svůj vlastní
+            referenční bod a přidá i vrstvu pohoří — takže dává smysl JEN na už zúžené okno
+            (typicky ten --lat-range/--lon-range, co ti vypsal běžný --scan pro konkrétní
+            pevninu), ne na celou planetu. Pracovní postup: --scan → najdi pevninu v tabulce →
+            zkopíruj její --lat-range/--lon-range → spusť znovu s --scan-detail pro detailnější
+            náhled hor/prolomenin → teprve pak skutečné generování (bez --scan) se skutečnou
+            erozí.
             """);
     }
 
@@ -175,6 +195,7 @@ internal sealed class CliOptions
         var scanHeight = 40;
         var scanBoundaryThreshold = 0.9;
         string? scanOutputPath = null;
+        var scanDetail = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -216,6 +237,9 @@ internal sealed class CliOptions
                 case "--scan-output" when i + 1 < args.Length:
                     scanOutputPath = args[++i];
                     break;
+                case "--scan-detail":
+                    scanDetail = true;
+                    break;
                 default:
                     Console.Error.WriteLine($"Neznámý nebo neúplný argument: {args[i]}");
                     return null;
@@ -255,6 +279,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--scan-width a --scan-height musí být kladné.");
             return null;
         }
+        if (scanDetail && !scan)
+        {
+            Console.Error.WriteLine("--scan-detail má smysl jen společně s --scan.");
+            return null;
+        }
 
         return new CliOptions
         {
@@ -265,6 +294,7 @@ internal sealed class CliOptions
             TectonicPlateCount = tectonicPlateCount,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
+            ScanDetail = scanDetail,
         };
     }
 

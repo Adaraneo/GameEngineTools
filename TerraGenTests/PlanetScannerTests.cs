@@ -21,6 +21,52 @@ public class PlanetScannerTests
     }
 
     [TestMethod]
+    public void Scan_DetailMode_ProducesGridOfRequestedSize()
+    {
+        var options = new PlanetScanner.Options(Width: 15, Height: 8, LatMin: 10, LatMax: 20, LonMin: 10, LonMax: 20, Detail: true);
+
+        var result = PlanetScanner.Scan(NoiseParams, PlanetRadiusMeters, plates: null, options);
+
+        Assert.AreEqual(8, result.Cells.GetLength(0));
+        Assert.AreEqual(15, result.Cells.GetLength(1));
+    }
+
+    [TestMethod]
+    public void Scan_DetailModeWithPlates_CanDifferFromNonDetailElevations()
+    {
+        // Detail mode adds the mountain-ridge layer on top of the landmass layer — for a window
+        // with plates active, at least somewhere in a reasonably sized grid the two must diverge
+        // (mountain uplift/rift is never uniformly zero everywhere).
+        var plates = TectonicPlates.Generate(seed: 7, count: 6);
+        var options = new PlanetScanner.Options(Width: 30, Height: 15, LatMin: -20, LatMax: 20, LonMin: -20, LonMax: 20);
+        var detailOptions = options with { Detail = true };
+
+        var plain = PlanetScanner.Scan(NoiseParams, PlanetRadiusMeters, plates, options);
+        var detailed = PlanetScanner.Scan(NoiseParams, PlanetRadiusMeters, plates, detailOptions);
+
+        var anyDifference = false;
+        for (var row = 0; row < 15 && !anyDifference; row++)
+            for (var col = 0; col < 30 && !anyDifference; col++)
+                if (Math.Abs(plain.ElevationsMeters[row, col] - detailed.ElevationsMeters[row, col]) > 1e-6)
+                    anyDifference = true;
+
+        Assert.IsTrue(anyDifference, "Expected the mountain-ridge layer to change elevation somewhere in the grid.");
+    }
+
+    [TestMethod]
+    public void Scan_DetailMode_IsDeterministic()
+    {
+        var options = new PlanetScanner.Options(Width: 12, Height: 6, LatMin: 5, LatMax: 15, LonMin: 5, LonMax: 15, Detail: true);
+
+        var a = PlanetScanner.Scan(NoiseParams, PlanetRadiusMeters, plates: null, options);
+        var b = PlanetScanner.Scan(NoiseParams, PlanetRadiusMeters, plates: null, options);
+
+        for (var row = 0; row < 6; row++)
+            for (var col = 0; col < 12; col++)
+                Assert.AreEqual(a.ElevationsMeters[row, col], b.ElevationsMeters[row, col], 1e-9);
+    }
+
+    [TestMethod]
     public void Scan_WithoutPlates_NeverProducesBoundaryCells()
     {
         var options = new PlanetScanner.Options(Width: 40, Height: 20, LatMin: -90, LatMax: 90, LonMin: -180, LonMax: 180);
