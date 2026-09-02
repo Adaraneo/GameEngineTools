@@ -1,0 +1,37 @@
+TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+# Katalog jídla/pití/odpočinku pro procedurální generátory (WorldGen) — jeden řádek = jeden
+# objektový vzor. Vlastní katalog: dej cestu k vlastnímu souboru přes volání
+# NutritionCatalogLoader.Load(diskPath) — kód se měnit nemusí.
+#
+# TemplateId: základ finálního id objektu ({lokace}_{TemplateId}_01) — musí být unikátní v souboru.
+# Biome: Forest / Mountain / Any (Any = použitelné v jakékoli lokaci) — spotřebitel vybírá jen
+#        řádky, jejichž Biome odpovídá klasifikaci dané lokace, plus všechny Any.
+# AffordanceType: Hunger / Thirst / Rest.
+# ItemKind: Food / Drink / None (musí odpovídat PickupItemKind).
+# Pickable: true/false.
+# Nutriční sloupce: prázdné = žádný přínos dané složky (NULL). U Rest řádků nech všechny prázdné.
+# HemeIronFraction: jen u masa/ryb (~0.4) — heme železo není posíleno vitamínem C.
+# VitaminCMilligrams: u kyselých/zelených plodů — posiluje vstřebávání non-heme železa v témže jídle.
+
+# ── Forest ────────────────────────────────────────────────────────────────────
+forest_berries;Lesní bobule;Forest;Hunger;0.20;Food;60;720;true;15;0.8;1.5;;25;;15
+forest_mushrooms;Lesní houby;Forest;Hunger;0.30;Food;80;720;true;10;3.0;2.5;18;10;;
+forest_nuts;Lesní ořechy;Forest;Hunger;0.35;Food;100;1440;true;28;5.0;2.0;;3;;
+forest_stream;Lesní potok;Forest;Thirst;0.85;Drink;500;120;false;0;;;;85;;
+
+# ── Mountain ──────────────────────────────────────────────────────────────────
+mountain_jerky;Sušené maso;Mountain;Hunger;0.55;Food;120;1440;true;55;40.0;12.0;;1;0.4;
+mountain_berries;Horské plody;Mountain;Hunger;0.15;Food;40;1440;true;10;0.5;1.0;;18;;
+mountain_snow;Roztátý sníh;Mountain;Thirst;0.80;Drink;500;60;false;0;;;;80;;
+
+# ── Plains ────────────────────────────────────────────────────────────────────
+plains_grain;Planinné obilí;Plains;Hunger;0.25;Food;70;720;true;20;3.0;1.0;;5;;10
+plains_well;Studna;Plains;Thirst;0.90;Drink;500;180;false;0;;;;90;;
+
+# ── Coastline ─────────────────────────────────────────────────────────────────
+coastline_shellfish;Mušle;Coastline;Hunger;0.40;Food;90;480;true;35;9.0;3.0;10;5;0.3;
+
+# ── Any (univerzální, dostupné všude) ──────────────────────────────────────────
+spring_water;Pramen vody;Any;Thirst;0.85;Drink;500;120;false;0;;;;85;;
+resting_spot;Odpočívadlo;Any;Rest;0.25;None;0;0;false;;;;;;;
+town_square;Tržiště;Any;Social;0.40;None;0;0;false;;;;;;;

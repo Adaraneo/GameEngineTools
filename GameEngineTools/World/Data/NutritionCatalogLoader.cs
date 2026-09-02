@@ -9,6 +9,7 @@ namespace GameEngineTools.World.Data
     using System.IO;
     using System.Reflection;
     using System.Text;
+    using GameEngineTools.Constants;
     using GameEngineTools.World.Objects;
 
     /// <summary>
@@ -36,11 +37,17 @@ namespace GameEngineTools.World.Data
         double? VitaminCMilligrams);
 
     /// <summary>
-    /// Loads the <see cref="FoodTemplate"/> catalog from a semicolon-delimited CSV — same
-    /// disk-override-then-embedded-fallback shape as <see cref="SqlScriptLoader"/>/<c>schema.sql</c>:
-    /// a single canonical default lives here (embedded in <c>GameEngineTools.dll</c>) so every
-    /// consumer shares one source of truth, while any consumer can still point
-    /// <see cref="Load"/> at its own CSV file to override it entirely.
+    /// Loads the <see cref="FoodTemplate"/> catalog from a semicolon-delimited CSV — three-tier
+    /// resolution, same shape as <see cref="SqlScriptLoader"/>/<c>schema.sql</c>:
+    /// <list type="number">
+    ///   <item>an explicit <c>diskPath</c> passed by the caller (e.g. WorldGen's own
+    ///   <c>--nutrition-csv</c>), when given and present;</item>
+    ///   <item>the disk override at <see cref="FileSystemConstant.SourceFilePath.Nutrition"/>
+    ///   (<c>SourceFiles\World\Nutrition.csv</c>) — lets a designer customise the catalog without
+    ///   recompiling;</item>
+    ///   <item>the default catalog embedded in <c>GameEngineTools.dll</c>, so every consumer
+    ///   shares one source of truth even without any disk file present.</item>
+    /// </list>
     /// </summary>
     public static class NutritionCatalogLoader
     {
@@ -48,8 +55,7 @@ namespace GameEngineTools.World.Data
         private const int ExpectedColumnCount = 16;
 
         /// <summary>
-        /// Loads the catalog. When <paramref name="diskPath"/> is given and exists, that file is
-        /// used; otherwise falls back to the default catalog embedded in this assembly.
+        /// Loads the catalog using the three-tier resolution described on the type.
         /// </summary>
         public static IReadOnlyList<FoodTemplate> Load(string? diskPath = null)
         {
@@ -57,6 +63,10 @@ namespace GameEngineTools.World.Data
             if (diskPath is not null && File.Exists(diskPath))
             {
                 csv = File.ReadAllText(diskPath, Encoding.UTF8);
+            }
+            else if (File.Exists(FileSystemConstant.SourceFilePath.Nutrition))
+            {
+                csv = File.ReadAllText(FileSystemConstant.SourceFilePath.Nutrition, Encoding.UTF8);
             }
             else
             {

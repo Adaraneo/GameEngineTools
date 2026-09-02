@@ -65,6 +65,11 @@ namespace GameEngineTools.World.Data
             if (db.GetAllLocations().Count > 0)
                 return;
 
+            // Default SocialNorms come from SocialNorms.csv (SocialNormCatalogLoader), not
+            // seed_data.sql — same disk-override-then-embedded-fallback shape as Nutrition.csv.
+            foreach (var norm in SocialNormCatalogLoader.Load())
+                db.InsertSocialNorm(norm);
+
             var seedSql = SqlScriptLoader.Load(SeedDataScript);
             db.ExecuteScript(seedSql);
         }

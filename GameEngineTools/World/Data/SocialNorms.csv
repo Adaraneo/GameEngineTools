@@ -1,0 +1,4 @@
+Id;DisplayName;Kind;Severity;EnforcementProbability;RelationalModel;CultureId;ValidFromYear;ValidToYear
+norm_funeral;Funeral / Mourning;RitualContext;0.85;0.90;;;;
+norm_formal_work;Formal Workplace;Authority;0.55;0.70;AuthorityRanking;;;
+norm_casual_social;Casual Social Gathering;PublicConduct;0.20;0.40;;;;

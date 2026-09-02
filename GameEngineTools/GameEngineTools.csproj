@@ -37,6 +37,7 @@
     <EmbeddedResource Include="World\Data\SQL\seed_data.sql" />
     <EmbeddedResource Include="World\Data\SQL\terrain_schema.sql" />
     <EmbeddedResource Include="World\Data\Nutrition.csv" />
+    <EmbeddedResource Include="World\Data\SocialNorms.csv" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@
 
 namespace EngineTests
 {
+    using System.Linq;
     using GameEngineTools.World.Data;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -23,6 +24,20 @@ namespace EngineTests
 
             Assert.AreEqual(0, db.GetAllLocations().Count,
                 "The default seed_data.sql no longer ships any locations — worlds start empty and are authored by their own bootstrap code (e.g. GameSandbox).");
+        }
+
+        [TestMethod]
+        public void Initialize_FreshDatabase_SeedsDefaultSocialNorms()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+
+            WorldDatabaseSeeder.Initialize(db);
+
+            var norms = db.GetAllSocialNorms();
+            Assert.IsTrue(norms.Any(n => n.Id == "norm_funeral"),
+                "Default SocialNorms now come from SocialNorms.csv (SocialNormCatalogLoader) instead of seed_data.sql — Initialize must still seed them.");
+            Assert.IsTrue(norms.Any(n => n.Id == "norm_formal_work"));
+            Assert.IsTrue(norms.Any(n => n.Id == "norm_casual_social"));
         }
 
         [TestMethod]

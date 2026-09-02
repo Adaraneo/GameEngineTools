@@ -97,6 +97,20 @@ namespace GameEngineTools.Constants
             public const string Connections = SourceDirectory.World + SourceFilename.Connections + Extension.SourceCsv;
 
             /// <summary>
+            /// Disk-override path for the food/drink/rest object catalog consumed by
+            /// <see cref="GameEngineTools.World.Data.NutritionCatalogLoader"/> (used by WorldGen).
+            /// When absent, the loader falls back to its embedded default catalog.
+            /// </summary>
+            public const string Nutrition = SourceDirectory.World + "Nutrition" + Extension.SourceCsv;
+
+            /// <summary>
+            /// Disk-override path for the default <c>SocialNorms</c> catalog consumed by
+            /// <see cref="GameEngineTools.World.Data.SocialNormCatalogLoader"/>. When absent, the
+            /// loader falls back to its embedded default catalog.
+            /// </summary>
+            public const string SocialNorms = SourceDirectory.World + "SocialNorms" + Extension.SourceCsv;
+
+            /// <summary>
             /// Default path to the world SQLite database.
             /// Created automatically on first run via <see cref="GameEngineTools.World.Data.WorldDatabaseSeeder"/>.
             /// </summary>

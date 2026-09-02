@@ -5,19 +5,11 @@
 -- Copyright (c) 50PSoftware
 --
 -- Deliberately ships NO Locations/Connections/WorldObjects — worlds start genuinely empty and are
--- authored per-caller (see GameSandbox/CastleVillageSeed.cs for a full C# port of the content that
--- used to live here). Only content that is NOT tied to specific locations belongs in this file.
+-- authored per-caller (see GameSandbox/Program.cs, which now sources them from WorldGen instead
+-- of hand-authoring content itself). Only content that is NOT tied to specific locations belongs
+-- in this file.
 --
--- COLUMN ORDER:
---   SocialNorms: Id, DisplayName, Kind, Severity, EnforcementProbability,
---                RelationalModel, CultureId, ValidFromYear, ValidToYear
-
--- ── Social Norms ──────────────────────────────────────────────────────────────
--- All norm contexts used in the world. Add new rows here — no C# changes needed.
-
-INSERT OR IGNORE INTO SocialNorms
-    (Id, DisplayName, Kind, Severity, EnforcementProbability, RelationalModel)
-VALUES
-    ('norm_funeral',       'Funeral / Mourning',      'RitualContext', 0.85, 0.90, NULL),
-    ('norm_formal_work',   'Formal Workplace',         'Authority',     0.55, 0.70, 'AuthorityRanking'),
-    ('norm_casual_social', 'Casual Social Gathering',  'PublicConduct', 0.20, 0.40, NULL);
+-- The default SocialNorms used to be hand-written INSERT statements here — they now live in
+-- SocialNorms.csv (see SocialNormCatalogLoader), the same disk-override-then-embedded-fallback
+-- shape as the food/drink/rest catalog in Nutrition.csv. This file is left as the extension point
+-- for any future non-location, non-CSV-shaped default seed data.
