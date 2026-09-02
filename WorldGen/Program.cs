@@ -155,9 +155,12 @@ internal sealed class CliOptions
             Každá lokace se klasifikuje jako Mountain (nad --mountain-threshold) / Coastline (do
             --coast-radius od vody) / Plains (plochý terén) / Forest (zbytek) a dostane náhodně
             jednu ze tří úrovní osídlení — tábor/vesnice/město — váženou podle biomu (hory =
-            skoro vždy tábor, pobřeží/planiny = častěji vesnice nebo město). Spojení mezi
-            lokacemi ve stejné dlaždici počítá RoadPathfinder (vyhýbá se prudkým svahům a řekám),
-            měst navíc navzájem propojuje páteřní síť.
+            skoro vždy tábor, pobřeží/planiny = častěji vesnice nebo město). Silniční síť je
+            hierarchická, ne jen nejbližší soused: města mezi sebou tvoří minimální kostru (každé
+            dosáhne na každé, nejmíň hran), každá vesnice se připojí k nejbližšímu městu a každý
+            tábor k nejbližší vesnici nebo městu (podle toho, co je blíž) — navíc si každá lokace
+            přidá pár lokálních spojení k nejbližším sousedům stejné úrovně. Vzdálenosti počítá
+            RoadPathfinder (vyhýbá se prudkým svahům a — po `terragen --rivers` — i řekám).
 
             --tectonic-plates > 0 (čte se automaticky z appsettings.World.json, stejně jako v
             TerraGenu — přepínač jen přebíjí hodnotu pro tento běh) zvyšuje DangerLevel lokací

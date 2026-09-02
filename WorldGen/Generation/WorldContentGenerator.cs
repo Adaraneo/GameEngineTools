@@ -74,7 +74,11 @@ public static class WorldContentGenerator
 
     public sealed record Result(int LocationsPlaced, int ConnectionsCreated, int ObjectsCreated, string? CemeteryLocationId = null);
 
-    private sealed record Placed(string Id, double X, double Y, TerrainHeightmap Tile, SettlementTier Tier);
+    /// <summary>Internal (not private) so WorldGenTests can hand-build a <see cref="List{Placed}"/>
+    /// and call <see cref="ConnectNearestNeighbors"/> directly — deterministic road-network testing
+    /// without needing a full noise-driven <see cref="Generate"/> run to happen to produce a
+    /// particular tier mix.</summary>
+    internal sealed record Placed(string Id, double X, double Y, TerrainHeightmap Tile, SettlementTier Tier);
 
     private static readonly AffordanceType[] BaseNeeds =
         [AffordanceType.Hunger, AffordanceType.Thirst, AffordanceType.Rest];
@@ -330,13 +334,20 @@ public static class WorldContentGenerator
         };
     }
 
-    /// <summary>Connects each placed location to its <see cref="Options.ConnectionsPerLocation"/>
-    /// nearest OTHER placed locations, both directions, using a terrain-aware walking distance
-    /// (see <see cref="RoadDistance"/>) rather than a straight line. Town-tier locations
-    /// additionally reach their nearest other Town beyond that budget, so the handful of major
-    /// hubs stay linked into one backbone even when they aren't each other's closest neighbor.
-    /// Doesn't touch any pre-existing locations already in world.db.</summary>
-    private static int ConnectNearestNeighbors(SqliteWorldDatabase worldDb, List<Placed> placed, Options options)
+    /// <summary>Builds the road network as a small settlement-hierarchy graph grammar rather than
+    /// pure nearest-neighbor: (1) Towns form a backbone via minimum spanning tree — the fewest
+    /// edges that still guarantee every Town reaches every other one, instead of a "each connects
+    /// to its own nearest Town" star that could leave two Towns stranded from each other if their
+    /// mutual nearest choices don't happen to chain up; (2) each Village joins the network through
+    /// its single nearest Town (its regional hub); (3) each Camp joins through whichever is
+    /// nearer, a Village or a Town — a remote camp shouldn't have to route all the way to a town
+    /// when a closer village exists; (4) every location ALSO gets up to
+    /// <see cref="Options.ConnectionsPerLocation"/> short lateral links to its nearest SAME-tier
+    /// peers, so local clusters (camp-to-camp, village-to-village) aren't forced to route
+    /// everything through a hub. All distances use a terrain-aware walking cost (see
+    /// <see cref="RoadDistance"/>) rather than a straight line. Doesn't touch any pre-existing
+    /// locations already in world.db.</summary>
+    internal static int ConnectNearestNeighbors(SqliteWorldDatabase worldDb, List<Placed> placed, Options options)
     {
         var madePairs = new HashSet<string>();
         var created = 0;
@@ -352,28 +363,91 @@ public static class WorldContentGenerator
             created++;
         }
 
-        foreach (var from in placed)
-        {
-            var nearest = placed
-                .Where(p => p.Id != from.Id)
-                .OrderBy(p => DistanceSquared(from, p))
-                .Take(Math.Max(0, options.ConnectionsPerLocation));
-
-            foreach (var to in nearest) Connect(from, to);
-        }
-
         if (options.ConnectionsPerLocation > 0)
         {
             var towns = placed.Where(p => p.Tier == SettlementTier.Town).ToList();
-            foreach (var from in towns)
+            var villages = placed.Where(p => p.Tier == SettlementTier.Village).ToList();
+            var camps = placed.Where(p => p.Tier == SettlementTier.Camp).ToList();
+
+            ConnectMinimumSpanningTree(towns, Connect);
+
+            foreach (var village in villages)
             {
-                var nearestTown = towns.Where(p => p.Id != from.Id).OrderBy(p => DistanceSquared(from, p)).FirstOrDefault();
-                if (nearestTown is not null) Connect(from, nearestTown);
+                var hub = NearestOf(village, towns);
+                if (hub is not null) Connect(village, hub);
+            }
+
+            var villagesAndTowns = villages.Concat(towns).ToList();
+            foreach (var camp in camps)
+            {
+                var hub = NearestOf(camp, villagesAndTowns);
+                if (hub is not null) Connect(camp, hub);
+            }
+        }
+
+        foreach (var tierGroup in new[]
+                 {
+                     placed.Where(p => p.Tier == SettlementTier.Town).ToList(),
+                     placed.Where(p => p.Tier == SettlementTier.Village).ToList(),
+                     placed.Where(p => p.Tier == SettlementTier.Camp).ToList(),
+                 })
+        {
+            foreach (var from in tierGroup)
+            {
+                var nearestSameTier = tierGroup
+                    .Where(p => p.Id != from.Id)
+                    .OrderBy(p => DistanceSquared(from, p))
+                    .Take(Math.Max(0, options.ConnectionsPerLocation));
+                foreach (var to in nearestSameTier) Connect(from, to);
             }
         }
 
         return created;
     }
+
+    /// <summary>Prim's algorithm over straight-line distance (the actual stored connection
+    /// distance still goes through <paramref name="connect"/>'s own <see cref="RoadDistance"/>
+    /// call) — <paramref name="nodes"/> is expected to be small (the Town-tier count for one run),
+    /// so the O(n³) worst case here is never actually a concern in practice.</summary>
+    private static void ConnectMinimumSpanningTree(List<Placed> nodes, Action<Placed, Placed> connect)
+    {
+        if (nodes.Count < 2) return;
+
+        var inTree = new bool[nodes.Count];
+        inTree[0] = true;
+        var remaining = nodes.Count - 1;
+
+        while (remaining > 0)
+        {
+            var bestFrom = -1;
+            var bestTo = -1;
+            var bestDistance = double.MaxValue;
+
+            for (var i = 0; i < nodes.Count; i++)
+            {
+                if (!inTree[i]) continue;
+                for (var j = 0; j < nodes.Count; j++)
+                {
+                    if (inTree[j]) continue;
+                    var distance = DistanceSquared(nodes[i], nodes[j]);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        bestFrom = i;
+                        bestTo = j;
+                    }
+                }
+            }
+
+            if (bestTo < 0) break; // unreachable given the loop invariant, but never hang over it
+            connect(nodes[bestFrom], nodes[bestTo]);
+            inTree[bestTo] = true;
+            remaining--;
+        }
+    }
+
+    private static Placed? NearestOf(Placed from, List<Placed> candidates) =>
+        candidates.Where(p => p.Id != from.Id).OrderBy(p => DistanceSquared(from, p)).FirstOrDefault();
 
     /// <summary>Terrain-aware walking distance via <see cref="RoadPathfinder"/> when both
     /// locations share the same tile (the pathfinder only ever sees one tile's own grid); a
