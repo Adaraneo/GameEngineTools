@@ -93,15 +93,27 @@ namespace GameEngineTools.World.Movement
                                              // in the source dataset besides pavement itself.
                 [TerrainType.Coastline] = 0.81, // analog: disturbed/uneven ground (sand, shingle,
                                                 // tideline debris) — not directly tested.
-                [TerrainType.Desert] = 0.65, // ⚠️ ANALOGICAL ESTIMATE — loose sand is harder to
-                                             // walk on than any surface in the source dataset;
-                                             // below Water's 0.56 floor is deliberately avoided.
-                [TerrainType.Tundra] = 0.68, // ⚠️ ANALOGICAL ESTIMATE — analog: snow/boggy ground,
-                                             // between Water (0.56) and Forest (0.78).
-                [TerrainType.Savanna] = 0.95, // ⚠️ ANALOGICAL ESTIMATE — analog: tall/uneven
-                                              // grassland, slightly below Plains' mown-grass 1.03.
-                [TerrainType.Jungle] = 0.60, // ⚠️ ANALOGICAL ESTIMATE — analog: dense
-                                             // undergrowth, below Forest's 0.78.
+                [TerrainType.Desert] = 0.48, // Source: Soule RG & Goldman RF 1972, J Appl
+                                             // Physiol 32(5):706-708 — loose/dry sand terrain
+                                             // factor 2.1× energy cost vs. blacktop; multiplier
+                                             // = 1/2.1. Corroborated by Lejeune, Willems &
+                                             // Heglund 1998, J Exp Biol 201(13):2071-2080
+                                             // (sand walking costs 1.6-2.7× a hard surface).
+                [TerrainType.Tundra] = 0.56, // Source: Pandolf, Haisman & Goldman 1976,
+                                             // Ergonomics 19(6):683-690 — terrain factor ~1.8×
+                                             // for shallow/packed snow-covered ground; multiplier
+                                             // = 1/1.8. Ties Water's 0.56 floor deliberately —
+                                             // permafrost/boggy tundra realistically approaches
+                                             // wetland difficulty, not below it.
+                [TerrainType.Savanna] = 0.74, // DIRECT match, not an estimate — same source and
+                                              // exact value as Forest's own "tall grassland"
+                                              // reference point above (de Gruchy et al. 2017):
+                                              // savanna IS tall/uneven grassland.
+                [TerrainType.Jungle] = 0.67, // Source: Soule RG & Goldman RF 1972, J Appl Physiol
+                                             // 32(5):706-708 — "heavy brush" terrain factor 1.5×;
+                                             // multiplier = 1/1.5. Below Forest's 0.78 (light/no
+                                             // undergrowth analog) as dense tropical undergrowth
+                                             // should be.
             };
     }
 }
