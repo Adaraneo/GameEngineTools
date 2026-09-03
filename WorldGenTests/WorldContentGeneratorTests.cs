@@ -697,6 +697,29 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
+    public void Generate_DesertLocation_UsesDesertTaggedCatalogTemplates()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0,
+            EquatorTemperatureCelsius: 40.0, PoleTemperatureCelsius: 40.0,
+            DesertHumidityThreshold: 1.1, DesertTemperatureThresholdC: -100.0,
+            ForcedTier: WorldContentGenerator.SettlementTier.Camp);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(66), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        Assert.AreEqual(TerrainType.Desert, descriptor.Terrain);
+
+        var objectIds = db.GetAllObjectsAt(descriptor.Id).Select(o => o.Id).ToList();
+        Assert.IsTrue(objectIds.Any(id => id.Contains("desert_dates") || id.Contains("desert_jerky")),
+            "Expected a Desert-tagged Hunger template from the real embedded catalog.");
+        Assert.IsTrue(objectIds.Any(id => id.Contains("desert_cactus_water")),
+            "Expected the Desert-tagged Thirst template from the real embedded catalog.");
+    }
+
+    [TestMethod]
     public void Generate_EmptyTileList_Throws()
     {
         using var db = NewWorldDb();
