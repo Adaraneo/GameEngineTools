@@ -36,13 +36,15 @@ public static class TileHydrology
     /// mask the same length/shape as <paramref name="grid"/>'s own <c>Values</c> — the exact
     /// convention <see cref="TerrainHeightmap.RiverMask"/> already uses.</summary>
     /// <remarks>
-    /// Routes flow across a <see cref="FillDepressions"/>-filled copy of the elevation, not the raw
-    /// values — ridged mountain noise is riddled with tiny local pits (every little bump creates
-    /// one), and without filling them first, D8 flow dead-ends in the very first pit it meets: the
-    /// visible symptom is a field of short, disconnected river dashes that never join into a longer
-    /// channel, instead of real rivers threading continuously downhill to the tile's edge. Filling
-    /// doesn't change the terrain itself (<paramref name="grid"/>'s own <c>Values</c> are untouched)
-    /// — only the elevation surface used to DECIDE which way water flows.
+    /// Routes flow across a <see cref="FillDepressions"/>-filled, then <see cref="ResolveFlats"/>-
+    /// corrected copy of the elevation, not the raw values — ridged mountain noise is riddled with
+    /// tiny local pits (every little bump creates one), and without filling them first, D8 flow
+    /// dead-ends in the very first pit it meets: the visible symptom is a field of short,
+    /// disconnected river dashes that never join into a longer channel. Filling alone fixes that but
+    /// introduces a second problem on genuinely low-relief ground — see <see cref="ResolveFlats"/> —
+    /// which is why its output, not the raw filled surface, is what flow is actually routed across.
+    /// Neither step changes the terrain itself (<paramref name="grid"/>'s own <c>Values</c> are
+    /// untouched) — only the elevation surface used to DECIDE which way water flows.
     /// </remarks>
     public static byte[] ComputeRiverMask(TerrainHeightmap grid, Parameters p)
     {
@@ -51,19 +53,22 @@ public static class TileHydrology
         var count = width * height;
 
         var filled = FillDepressions(grid);
+        var routed = ResolveFlats(filled, width, height);
 
         var downstream = new int[count]; // -1 = no strictly-downhill neighbor (only possible at a grid edge)
         for (var y = 0; y < height; y++)
             for (var x = 0; x < width; x++)
-                downstream[y * width + x] = SteepestDescentNeighbor(filled, width, height, x, y);
+                downstream[y * width + x] = SteepestDescentNeighbor(routed, width, height, x, y);
 
         // Flow only ever moves to STRICTLY lower ground (see SteepestDescentNeighbor), so
         // processing cells from highest to lowest elevation guarantees every cell's upstream
         // contributors have already added their share to it before it, in turn, drains onward —
-        // one O(n log n) sorted pass instead of an iterative graph solve.
+        // one O(n log n) sorted pass instead of an iterative graph solve. This holds regardless of
+        // exactly how `routed` was derived, since SteepestDescentNeighbor only ever returns a
+        // neighbor strictly lower than `here` IN THAT SAME FIELD by construction.
         var order = new int[count];
         for (var i = 0; i < count; i++) order[i] = i;
-        Array.Sort(order, (a, b) => filled[b].CompareTo(filled[a]));
+        Array.Sort(order, (a, b) => routed[b].CompareTo(routed[a]));
 
         var accumulation = new int[count];
         for (var i = 0; i < count; i++) accumulation[i] = 1;
@@ -140,6 +145,179 @@ public static class TileHydrology
         }
 
         return filled;
+    }
+
+    /// <summary>Near-equal filled-elevation gap (in <see cref="FillEpsilon"/> steps) two 8-connected
+    /// cells must fall within to be grouped into the same flat component by <see cref="ResolveFlats"/>
+    /// — a few epsilon steps, since <see cref="FillDepressions"/> only ever separates truly distinct
+    /// terrain by a real (much larger) slope; anything this close is the epsilon ring itself, not
+    /// genuine relief.</summary>
+    private const float FlatEqualityTolerance = FillEpsilon * 4f;
+
+    /// <summary>
+    /// Garbrecht &amp; Martz (1997) flat-surface resolution. <see cref="FillDepressions"/> alone
+    /// guarantees every cell has SOME strictly-lower neighbor, but on a genuinely low-relief
+    /// plateau the epsilon ring it adds radiates outward from the whole flooded boundary at once —
+    /// like ripples on a pond — so <see cref="SteepestDescentNeighbor"/> sends neighboring cells off
+    /// in whatever locally-nearest-ring direction they happen to face, with nothing pulling separate
+    /// paths back together. The visible symptom: flow smears as a wide sheet across the entire flat
+    /// instead of converging into a channel, instead of the dashed/fragmented rivers this whole file
+    /// already fixed once. This adds a second synthetic gradient on top of the filled surface,
+    /// computed per flat component (a maximal 8-connected run of cells within
+    /// <see cref="FlatEqualityTolerance"/> of each other) from two BFS distance fields seeded at the
+    /// component's own boundary: distance AWAY from the flat's higher inflow edge (nudges initial
+    /// flow off the wall, rather than hugging it) and distance TOWARD the flat's lower outflow edge
+    /// (pulls every path toward the SAME exit) — weighted 1:2 exactly as Garbrecht &amp; Martz
+    /// describe, scaled by <see cref="FillEpsilon"/> so the correction always nests strictly inside
+    /// the (much larger) real-terrain gap <see cref="FillDepressions"/> already put between this flat
+    /// and its genuinely higher/lower neighbors, never overturning the macro direction those already
+    /// fixed — only how the flat's own interior funnels toward it.
+    /// </summary>
+    private static float[] ResolveFlats(float[] filled, int width, int height)
+    {
+        var count = width * height;
+        var componentId = new int[count];
+        Array.Fill(componentId, -1);
+        var components = new List<List<int>>();
+
+        for (var start = 0; start < count; start++)
+        {
+            if (componentId[start] != -1) continue;
+
+            var members = new List<int> { start };
+            componentId[start] = -2; // provisional: "visited, component not finalized yet"
+            var stack = new Stack<int>();
+            stack.Push(start);
+
+            while (stack.Count > 0)
+            {
+                var idx = stack.Pop();
+                var x = idx % width;
+                var y = idx / width;
+                var here = filled[idx];
+
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        var nx = x + dx;
+                        var ny = y + dy;
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                        var nIdx = ny * width + nx;
+                        if (componentId[nIdx] != -1) continue;
+                        if (Math.Abs(filled[nIdx] - here) > FlatEqualityTolerance) continue;
+
+                        componentId[nIdx] = -2;
+                        members.Add(nIdx);
+                        stack.Push(nIdx);
+                    }
+                }
+            }
+
+            if (members.Count <= 1)
+            {
+                componentId[start] = -1; // single cell — no internal routing ambiguity to resolve
+                continue;
+            }
+
+            var id = components.Count;
+            foreach (var m in members) componentId[m] = id;
+            components.Add(members);
+        }
+
+        var routed = (float[])filled.Clone();
+
+        foreach (var members in components)
+        {
+            var memberSet = new HashSet<int>(members);
+            var indexInMembers = new Dictionary<int, int>(members.Count);
+            for (var i = 0; i < members.Count; i++) indexInMembers[members[i]] = i;
+
+            var distToLower = new int[members.Count];
+            var distToHigher = new int[members.Count];
+            Array.Fill(distToLower, -1);
+            Array.Fill(distToHigher, -1);
+            var lowerSeeds = new Queue<int>();
+            var higherSeeds = new Queue<int>();
+
+            foreach (var idx in members)
+            {
+                var x = idx % width;
+                var y = idx / width;
+                var here = filled[idx];
+                // The grid's own boundary is the local-approximation drain everywhere else in this
+                // file already treats it as (see FillDepressions/SteepestDescentNeighbor) — a flat
+                // cell sitting right on it is a guaranteed outflow edge regardless of its neighbors.
+                var touchesLower = x == 0 || x == width - 1 || y == 0 || y == height - 1;
+                var touchesHigher = false;
+
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        var nx = x + dx;
+                        var ny = y + dy;
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                        var nIdx = ny * width + nx;
+                        if (memberSet.Contains(nIdx)) continue;
+
+                        if (filled[nIdx] < here) touchesLower = true;
+                        else if (filled[nIdx] > here) touchesHigher = true;
+                    }
+                }
+
+                var mi = indexInMembers[idx];
+                if (touchesLower) { distToLower[mi] = 0; lowerSeeds.Enqueue(idx); }
+                if (touchesHigher) { distToHigher[mi] = 0; higherSeeds.Enqueue(idx); }
+            }
+
+            BfsFillDistances(lowerSeeds, distToLower, indexInMembers, memberSet, width, height);
+            BfsFillDistances(higherSeeds, distToHigher, indexInMembers, memberSet, width, height);
+
+            for (var i = 0; i < members.Count; i++)
+            {
+                // distToLower is always resolved: FillDepressions only ever raises a cell to reach a
+                // strictly-lower-or-boundary drain, so every flat has at least one true outflow edge.
+                // distToHigher can legitimately stay unresolved (a flat with no adjacent wall at
+                // all, e.g. one that fills its whole padded tile) — treat that as "no wall bias".
+                var toLower = distToLower[i] < 0 ? 0 : distToLower[i];
+                var toHigher = distToHigher[i] < 0 ? 0 : distToHigher[i];
+                routed[members[i]] = filled[members[i]] + FillEpsilon * (toHigher - 2f * toLower);
+            }
+        }
+
+        return routed;
+    }
+
+    private static void BfsFillDistances(Queue<int> queue, int[] dist, Dictionary<int, int> indexInMembers,
+        HashSet<int> memberSet, int width, int height)
+    {
+        while (queue.Count > 0)
+        {
+            var idx = queue.Dequeue();
+            var d = dist[indexInMembers[idx]];
+            var x = idx % width;
+            var y = idx / width;
+
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    var nx = x + dx;
+                    var ny = y + dy;
+                    if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                    var nIdx = ny * width + nx;
+                    if (!memberSet.Contains(nIdx)) continue;
+                    var nmi = indexInMembers[nIdx];
+                    if (dist[nmi] >= 0) continue;
+                    dist[nmi] = d + 1;
+                    queue.Enqueue(nIdx);
+                }
+            }
+        }
     }
 
     /// <summary>Index of the 8-connected neighbor with the steepest downhill slope from (x,y) in

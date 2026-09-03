@@ -119,4 +119,55 @@ public class TileHydrologyTests
         var centerColumnHasRiver = Enumerable.Range(0, height).Any(y => mask[y * width + center] == 1);
         Assert.IsTrue(centerColumnHasRiver, "Expected at least one river cell along the valley floor.");
     }
+
+    [TestMethod]
+    public void ComputeRiverMask_LargeValleyFunnel_DoesNotSmearFlowAsAWideSheet()
+    {
+        // Regression test for a real generation defect (found live on production terrain, seed
+        // -1384538600 lat~7.5 lon~7.5): FillDepressions alone guarantees SOME strictly-downhill
+        // neighbor everywhere, but on a genuinely low-relief valley floor its epsilon ring radiates
+        // outward from the whole flooded boundary at once, so flow smears as a wide sheet across
+        // most of the flat instead of converging — confirmed by temporarily bypassing
+        // ResolveFlats's caller (`var routed = filled;`) on this exact scenario, which drove the
+        // marked fraction from ~0.4% up to ~23% of the valley floor. ResolveFlats fixes it by
+        // funneling flow toward the valley's one open (south) side instead of letting it spread.
+        const int width = 200, height = 200;
+        var values = new float[width * height];
+        var isWall = new bool[width * height];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                // Irregular wall along north, east AND west, leaving only south open — a bounded
+                // valley, not a synthetic straight wall (which stays translation-symmetric and
+                // barely exercises the away-from-wall/toward-outlet bias at all).
+                var northWallDepth = 4 + (int)(3 * Math.Sin(x * 0.7) + 3 * Math.Sin(x * 0.31 + 1.7));
+                var westWallDepth = 4 + (int)(3 * Math.Sin(y * 0.53) + 3 * Math.Sin(y * 0.19 + 0.9));
+                var eastWallDepth = 4 + (int)(3 * Math.Sin(y * 0.41 + 2.1) + 3 * Math.Sin(y * 0.27));
+                var wall = y < northWallDepth || x < westWallDepth || x >= width - eastWallDepth;
+                isWall[y * width + x] = wall;
+                values[y * width + x] = wall
+                    ? 100f
+                    // Tiny deterministic per-cell jitter, well below FillEpsilon-multiple scale,
+                    // simulating realistic post-erosion float noise on otherwise near-flat ground.
+                    : 10f + ((x * 37 + y * 17) % 5) * 0.0001f;
+            }
+        }
+
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(FlowAccumulationThreshold: 50));
+
+        var flatCells = 0;
+        var riverCells = 0;
+        for (var i = 0; i < isWall.Length; i++)
+        {
+            if (isWall[i]) continue;
+            flatCells++;
+            if (mask[i] != 0) riverCells++;
+        }
+
+        var pct = 100.0 * riverCells / flatCells;
+        Assert.IsTrue(pct < 5.0, $"Expected the valley floor to funnel into a thin channel network " +
+            $"(<5% marked), not smear as a wide sheet — got {pct:F1}% ({riverCells}/{flatCells}).");
+    }
 }
