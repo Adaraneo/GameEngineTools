@@ -202,7 +202,20 @@ public static class RiverMeander
             var perpX = -dirY / len;
             var perpY = dirX / len;
 
-            var offsetMeters = amplitude * Math.Sin(phase[idx]);
+            // A pure, unmodulated sine wave reads as mechanical — a spring, not a river — because
+            // real meander trains are never that uniform: Langbein & Leopold's sine-generated curve
+            // is an idealized AVERAGE shape, but actual bank erodibility varies along a reach
+            // (floodplain sediment, vegetation, old scars aren't uniform), so real loops drift
+            // unevenly in size instead of repeating identically forever. Two slow, deliberately
+            // incommensurate secondary waves (not random — the same terrain must always meander the
+            // same way) modulate the amplitude envelope so consecutive loops vary, confirmed live to
+            // be what was missing (the perfectly uniform version visibly looked like a coiled
+            // spring). Phase-driven, not arc-length-driven, so the modulation rate stays
+            // proportional to loop count even where wavelength itself changes downstream.
+            var irregularity = 0.55
+                + 0.30 * Math.Sin(phase[idx] * 0.31 + 1.7)
+                + 0.15 * Math.Sin(phase[idx] * 0.093 + 4.2);
+            var offsetMeters = amplitude * irregularity * Math.Sin(phase[idx]);
             var offsetCells = offsetMeters / cellSize;
 
             offsetX[idx] = Math.Clamp((int)Math.Round(x + perpX * offsetCells), 0, width - 1);
