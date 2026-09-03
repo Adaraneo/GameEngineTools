@@ -179,7 +179,7 @@ internal sealed class CliOptions
     /// tile's own post-erosion drainage pattern (see <see cref="TerraGen.Generation.TileHydrology"/>)
     /// instead of leaving it null (TerrainEditor's manual painting is otherwise the only way it's ever set).</summary>
     public bool Rivers { get; init; }
-    public int RiverThreshold { get; init; } = 50;
+    public int RiverThreshold { get; init; } = 200;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -241,7 +241,7 @@ internal sealed class CliOptions
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
-                        [--rivers [--river-threshold <počet buněk, výchozí 50>]]
+                        [--rivers [--river-threshold <počet buněk, výchozí 200>]]
 
             --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
             desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
@@ -253,8 +253,12 @@ internal sealed class CliOptions
             naplní RiverMask dlaždice řekami — místo aby zůstal prázdný a řeky se daly jen ručně
             malovat v TerrainEditoru. --river-threshold určuje, kolik buněk musí do daného místa
             odtékat, aby se stalo řekou — nižší hodnota = hustší síť i s malými potůčky, vyšší =
-            jen pár velkých řek. RoadPathfinder (ve WorldGenu) už teď umí penalizovat křížení
-            řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby to mělo co penalizovat.
+            jen pár velkých řek. Výchozích 200 (při --cell-m 5 odpovídá sběrné ploše 200*5*5=5000 m²)
+            bylo naladěno naživo tak, aby pokrytí odpovídalo reálné hustotě říční sítě (řádově
+            jednotky procent plochy) — nižší hodnoty jako 50 označí i triviální 0.5ha odtok jako
+            řeku a síť vyjde několikanásobně hustší, než je fyzicky přiměřené. RoadPathfinder (ve
+            WorldGenu) už teď umí penalizovat křížení řeky — tenhle přepínač je to, co RiverMask
+            konečně naplní, aby to mělo co penalizovat.
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -328,7 +332,7 @@ internal sealed class CliOptions
         var erosion = 50.0;
         int? tectonicPlateCount = null;
         var rivers = false;
-        var riverThreshold = 50;
+        var riverThreshold = 200;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;

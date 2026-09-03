@@ -18,8 +18,13 @@ public static class TileHydrology
     public sealed record Parameters(
         /// <summary>Minimum flow accumulation (upstream cell count, including the cell itself)
         /// for a cell to be marked as river. Higher = fewer, larger rivers only; lower = a denser
-        /// network that also picks up small streams.</summary>
-        int FlowAccumulationThreshold = 50);
+        /// network that also picks up small streams. Default 200 was calibrated live against a
+        /// 5m-cell tile: 50 (the previous default) marked ~10% of a real low-relief tile as river —
+        /// a contributing catchment of just 50*5m*5m = 1250 m², trivial next to what a real
+        /// perennial stream needs — producing a network several times denser than the ~1-3% area
+        /// coverage real-world drainage density implies. 200 lands close to that (~2-3% on the same
+        /// tile) while still resolving a connected network, not just the very largest channels.</summary>
+        int FlowAccumulationThreshold = 200);
 
     /// <summary>Tiny per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit
     /// or a flat plateau — small enough to never visibly distort real terrain (real slopes differ
