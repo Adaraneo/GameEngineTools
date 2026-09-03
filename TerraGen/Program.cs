@@ -148,6 +148,14 @@ Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{optio
 
 var results = TileGenerator.Run(db, runSettings, line => Console.WriteLine(line));
 
+// Persisted once per run (idempotent — safe to overwrite with the same values on a re-run) so a
+// consumer like TerrainEditor can recover any saved tile's true (lat,lon) from its OriginX/OriginY
+// without assuming the (0,0) reference convention still holds — see TerrainGeoReference's remarks.
+db.SaveGeoReference(new TerrainGeoReference(
+    RefLatDeg: runSettings.MountainOriginLatDeg,
+    RefLonDeg: runSettings.MountainOriginLonDeg,
+    PlanetRadiusMeters: runSettings.PlanetRadiusMeters));
+
 Console.WriteLine($"Hotovo — {results.Count} dlaždic uloženo do {options.DbPath}.");
 return 0;
 

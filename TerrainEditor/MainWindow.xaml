@@ -84,6 +84,9 @@
                 <TextBlock Text="{Binding StatusText}" />
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{Binding ViewportBoundsLabel}" Margin="0,0,12,0" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
                 <TextBlock Text="{Binding CursorWorldPosition}" />
             </StatusBarItem>
         </StatusBar>

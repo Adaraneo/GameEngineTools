@@ -202,24 +202,16 @@ public static class PlanetNoise
     /// </summary>
     public static (double latDeg, double lonDeg) OffsetToLatLon(
         double offsetXMeters, double offsetYMeters, double refLatDeg, double refLonDeg, double planetRadiusMeters)
-    {
-        var refLatRad = refLatDeg * Math.PI / 180.0;
-        var lat = refLatDeg + offsetYMeters / planetRadiusMeters * (180.0 / Math.PI);
-        var lon = refLonDeg + offsetXMeters / (planetRadiusMeters * Math.Cos(refLatRad)) * (180.0 / Math.PI);
-        return (lat, lon);
-    }
+        => GameEngineTools.World.FlatPlanetProjection.OffsetToLatLon(
+            offsetXMeters, offsetYMeters, refLatDeg, refLonDeg, planetRadiusMeters);
 
     /// <summary>Inverse of <see cref="OffsetToLatLon"/> — converts true (lat,lon) into meters
     /// offset from the reference point, using the same fixed-at-the-reference-latitude
     /// equirectangular formula.</summary>
     public static (double offsetXMeters, double offsetYMeters) LatLonToOffset(
         double latDeg, double lonDeg, double refLatDeg, double refLonDeg, double planetRadiusMeters)
-    {
-        var refLatRad = refLatDeg * Math.PI / 180.0;
-        var offsetY = (latDeg - refLatDeg) * (Math.PI / 180.0) * planetRadiusMeters;
-        var offsetX = (lonDeg - refLonDeg) * (Math.PI / 180.0) * planetRadiusMeters * Math.Cos(refLatRad);
-        return (offsetX, offsetY);
-    }
+        => GameEngineTools.World.FlatPlanetProjection.LatLonToOffset(
+            latDeg, lonDeg, refLatDeg, refLonDeg, planetRadiusMeters);
 
     /// <summary>
     /// Samples the combined landmass + mountain elevation (meters) at a point given as meters

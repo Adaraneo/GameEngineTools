@@ -157,6 +157,66 @@ public class TileGeneratorTests
     }
 
     [TestMethod]
+    public void Run_TwoOverlappingRequests_WithDifferentCorners_PlaceTheSamePhysicalTileIdentically()
+    {
+        // Regression for the "regenerating shifts every tile" bug: nothing requires a re-scanned or
+        // re-typed --lat-range/--lon-range to land EXACTLY on the previous run's own corner, only to
+        // overlap it. Before snapping the tile grid to a fixed lattice, the second run's own corner
+        // would re-phase its whole grid, so even a tile physically inside both requests would end up
+        // with a different OriginX/OriginY (and a different id) each time — a visible position shift
+        // for anything not re-touched by that particular run (e.g. a cached river mask).
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 11, AmplitudeMeters: 200.0);
+            var erosionParams = new TileErosion.Parameters(Seed: 11, DropletCount: 500, MaxDropletLifetime: 6);
+            var radius = PlanetNoise.EarthRadiusMeters;
+
+            // First run's corner sits deliberately off any tile boundary.
+            var settings1 = new TileGenerator.RunSettings(
+                LatMin: 0.00013, LatMax: 0.006, LonMin: 0.00027, LonMax: 0.006,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams, ErosionParams: erosionParams, PlanetRadiusMeters: radius);
+            var results1 = TileGenerator.Run(db, settings1);
+
+            // Any tile whose center lies within BOTH requested regions must resolve to the exact
+            // same id (hence the exact same OriginX/OriginY) in both runs — capture run 1's Origin
+            // for each shared id BEFORE run 2 overwrites that same row.
+            var settings2 = settings1 with { LatMin = 0.00089, LonMin = 0.00061 };
+            var settings2SwX = Math.Floor(PlanetNoise.LatLonToOffset(settings2.LatMin, settings2.LonMin, 0, 0, radius).Item1 / settings2.TileSizeMeters) * settings2.TileSizeMeters;
+            var settings2SwY = Math.Floor(PlanetNoise.LatLonToOffset(settings2.LatMin, settings2.LonMin, 0, 0, radius).Item2 / settings2.TileSizeMeters) * settings2.TileSizeMeters;
+            var originsBeforeRun2 = results1.ToDictionary(r => r.Id, r => (db.LoadHeightmap(r.Id)!.OriginX, db.LoadHeightmap(r.Id)!.OriginY));
+
+            var results2 = TileGenerator.Run(db, settings2);
+            var shared = results1.Select(r => r.Id).Intersect(results2.Select(r => r.Id)).ToList();
+            Assert.IsTrue(shared.Count > 0, "Test setup needs at least one tile physically inside both overlapping requests.");
+
+            foreach (var id in shared)
+            {
+                var after = db.LoadHeightmap(id)!;
+                var before = originsBeforeRun2[id];
+                Assert.AreEqual(before.OriginX, after.OriginX, 1e-6,
+                    $"Tile {id}: OriginX shifted between two overlapping runs ({before.OriginX} -> {after.OriginX}) — the tile grid re-phased instead of landing on the same fixed lattice.");
+                Assert.AreEqual(before.OriginY, after.OriginY, 1e-6,
+                    $"Tile {id}: OriginY shifted between two overlapping runs ({before.OriginY} -> {after.OriginY}) — the tile grid re-phased instead of landing on the same fixed lattice.");
+            }
+
+            // Sanity: settings2's own SW anchor really is snapped to the same TileSizeMeters lattice
+            // as settings1's (both are multiples of TileSizeMeters), confirming the snap is what's
+            // actually doing the work here, not a coincidence of the chosen test numbers.
+            Assert.AreEqual(0.0, settings2SwX % settings2.TileSizeMeters, 1e-6);
+            Assert.AreEqual(0.0, settings2SwY % settings2.TileSizeMeters, 1e-6);
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
     public void Run_ProducesExpectedNumberOfTiles()
     {
         var dbPath = TempDbPath();

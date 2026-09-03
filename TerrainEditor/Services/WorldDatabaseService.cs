@@ -81,6 +81,13 @@ public sealed class WorldDatabaseService : IDisposable
     /// </summary>
     public UniverseConfig? PlanetConfig { get; private set; }
 
+    /// <summary>The planet-wide reference point/radius the open terrain.db's tiles were flat-
+    /// projected against, if it was ever written by a TerraGen batch run (see
+    /// <see cref="TerrainGeoReference"/>) — <c>null</c> for a terrain.db authored purely by hand in
+    /// TerrainEditor (e.g. only ever used via "Generate Terrain"/"Go to Lat/Long"), since those
+    /// grids don't share TerraGen's global tile frame at all.</summary>
+    public TerrainGeoReference? GeoReference { get; private set; }
+
     /// <summary>
     /// Opens (creating if necessary) the world database at <paramref name="path"/>, applying
     /// schema + migrations and — only if the database is entirely empty — the default seed.
@@ -136,6 +143,7 @@ public sealed class WorldDatabaseService : IDisposable
         DatabasePath = path;
         CosmologyConfig = WorldSettingsLoader.TryLoadAstroConfig(path);
         PlanetConfig = WorldSettingsLoader.TryLoadUniverseConfig(path);
+        GeoReference = _terrainDb.LoadGeoReference();
     }
 
     /// <summary>Opens (or creates) the sibling <c>terrain.db</c> next to <paramref name="worldDbPath"/>.</summary>
@@ -145,6 +153,7 @@ public sealed class WorldDatabaseService : IDisposable
         var terrainPath = string.IsNullOrEmpty(dir) ? TerrainDatabaseFileName : Path.Combine(dir, TerrainDatabaseFileName);
         _terrainDb = new SqliteWorldDatabase(terrainPath);
         WorldDatabaseSeeder.InitializeTerrainDatabase(_terrainDb);
+        GeoReference = _terrainDb.LoadGeoReference();
     }
 
     /// <summary>
@@ -189,6 +198,7 @@ public sealed class WorldDatabaseService : IDisposable
         DatabasePath = null;
         CosmologyConfig = null;
         PlanetConfig = null;
+        GeoReference = null;
         lock (_cacheSync)
             _heightmapCache.Clear();
     }

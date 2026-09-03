@@ -75,8 +75,24 @@ public static class TileGenerator
         // from the region's own center, so the same physical corner always lands at the same flat
         // offset regardless of what other region a future run happens to request. See the
         // type-level remarks for why this fixed-frame choice is what lets separate runs connect.
-        var (swX, swY) = PlanetNoise.LatLonToOffset(s.LatMin, s.LonMin, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
+        var (rawSwX, rawSwY) = PlanetNoise.LatLonToOffset(s.LatMin, s.LonMin, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
         var (neX, neY) = PlanetNoise.LatLonToOffset(s.LatMax, s.LonMax, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
+
+        // Snapped DOWN to the fixed global tile lattice (whole multiples of TileSizeMeters from the
+        // reference point) — NOT left at the raw requested corner. Every tile below is placed at
+        // swX + col*TileSizeMeters, so without this snap, two runs whose requested LatMin/LonMin
+        // merely overlap (rather than landing on an identical value down to the last bit — e.g. a
+        // re-scanned region typed back in, or a deliberate re-generate of "the same" area) would
+        // anchor their whole tile grid at two different phases and never actually line up, even
+        // though the underlying noise/elevation IS globally seamless. Symptom without this: re-
+        // running over what looks like the same area visibly shifts every tile's position, while
+        // anything that doesn't get regenerated (a river mask still cached from the old, differently
+        // -phased grid) stays behind at the old positions — looking like it "moved" relative to the
+        // new terrain. Snapping makes any tile physically inside two overlapping runs land at the
+        // exact same OriginX/OriginY (hence the same TileId) in both, regardless of exactly where
+        // each run's own corner was requested.
+        var swX = Math.Floor(rawSwX / s.TileSizeMeters) * s.TileSizeMeters;
+        var swY = Math.Floor(rawSwY / s.TileSizeMeters) * s.TileSizeMeters;
         var regionWidthMeters = neX - swX;
         var regionHeightMeters = neY - swY;
 

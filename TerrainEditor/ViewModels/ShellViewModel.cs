@@ -121,6 +121,36 @@ public sealed class ShellViewModel : ViewModelBase
         ? $"{lat:0.00}°, {lon:0.00}°"
         : "(plochá generace, žádná planetární pozice)";
 
+    private double? _viewportSwLatDeg;
+    private double? _viewportSwLonDeg;
+    private double? _viewportNeLatDeg;
+    private double? _viewportNeLonDeg;
+
+    /// <summary>Sets the geographic bounding box of the currently visible viewport, recomputed by
+    /// MainWindow every time the viewport moves/resizes/zooms (<c>EnsureViewportCoverage</c>) — all
+    /// four <c>null</c> means the currently displayed terrain has no known planetary position at
+    /// all (a purely local/manual grid with no TerraGen geo reference and no "Go to Lat/Long"
+    /// center), so <see cref="ViewportBoundsLabel"/> falls back to the same wording as
+    /// <see cref="CurrentCenterLabel"/> rather than showing stale or made-up numbers.</summary>
+    public void SetViewportBounds(double? swLatDeg, double? swLonDeg, double? neLatDeg, double? neLonDeg)
+    {
+        if (_viewportSwLatDeg == swLatDeg && _viewportSwLonDeg == swLonDeg
+            && _viewportNeLatDeg == neLatDeg && _viewportNeLonDeg == neLonDeg)
+            return;
+
+        _viewportSwLatDeg = swLatDeg;
+        _viewportSwLonDeg = swLonDeg;
+        _viewportNeLatDeg = neLatDeg;
+        _viewportNeLonDeg = neLonDeg;
+        OnPropertyChanged(nameof(ViewportBoundsLabel));
+    }
+
+    public string ViewportBoundsLabel =>
+        _viewportSwLatDeg is { } swLat && _viewportSwLonDeg is { } swLon
+        && _viewportNeLatDeg is { } neLat && _viewportNeLonDeg is { } neLon
+            ? $"SW {swLat:0.000}°, {swLon:0.000}°  —  NE {neLat:0.000}°, {neLon:0.000}°"
+            : "(neznámá planetární pozice pro aktuální výřez)";
+
     public RelayCommand ZoomInCommand { get; }
     public RelayCommand ZoomOutCommand { get; }
     public RelayCommand ZoomResetCommand { get; }
@@ -246,6 +276,7 @@ public sealed class ShellViewModel : ViewModelBase
         OpenTileBrowserCommand.RaiseCanExecuteChanged();
         CurrentCenterLatitude = null;
         CurrentCenterLongitude = null;
+        SetViewportBounds(null, null, null, null);
 
         CanEditWorldLocations = WorldDb.IsOpen && !WorldDb.IsTerrainOnly;
         if (!CanEditWorldLocations)

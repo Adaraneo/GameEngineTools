@@ -689,6 +689,51 @@ namespace GameEngineTools.World.Data
             return results;
         }
 
+        /// <summary>Inserts or replaces the single planet-wide reference point/radius this
+        /// database's <see cref="TerrainHeightmap"/> tiles were flat-projected against — see
+        /// <see cref="TerrainGeoReference"/>. Idempotent: safe to call again with the same values
+        /// after every batch run.</summary>
+        public void SaveGeoReference(TerrainGeoReference reference)
+        {
+            ArgumentNullException.ThrowIfNull(reference);
+
+            const string sql = """
+                INSERT INTO TerrainGeoReference (Id, RefLatDeg, RefLonDeg, PlanetRadiusMeters)
+                VALUES (1, @refLat, @refLon, @radius)
+                ON CONFLICT(Id) DO UPDATE SET
+                    RefLatDeg = excluded.RefLatDeg,
+                    RefLonDeg = excluded.RefLonDeg,
+                    PlanetRadiusMeters = excluded.PlanetRadiusMeters
+                """;
+
+            lock (_sync)
+                ExecuteNonQuery(sql,
+                    ("@refLat", reference.RefLatDeg),
+                    ("@refLon", reference.RefLonDeg),
+                    ("@radius", reference.PlanetRadiusMeters));
+        }
+
+        /// <summary>Loads the reference point/radius saved by <see cref="SaveGeoReference"/>, or
+        /// <c>null</c> if this terrain.db was never written by a TerraGen batch run (e.g. authored
+        /// purely by hand in TerrainEditor's flat "Generate Terrain" mode).</summary>
+        public TerrainGeoReference? LoadGeoReference()
+        {
+            const string sql = "SELECT RefLatDeg, RefLonDeg, PlanetRadiusMeters FROM TerrainGeoReference WHERE Id = 1";
+
+            lock (_sync)
+            {
+                using var cmd = CreateCommand(sql);
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read())
+                    return null;
+
+                return new TerrainGeoReference(
+                    RefLatDeg: reader.GetDouble(0),
+                    RefLonDeg: reader.GetDouble(1),
+                    PlanetRadiusMeters: reader.GetDouble(2));
+            }
+        }
+
         #endregion Terrain heightmap
 
         #endregion Location + Connection queries

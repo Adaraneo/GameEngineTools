@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using System.Threading.Tasks;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
+using GameEngineTools.World;
 using GameEngineTools.World.Data;
 using TerrainEditor.Diagnostics;
 using TerrainEditor.Models;
@@ -182,7 +183,7 @@ public partial class MainWindow : Window
         _vm.StatusText = $"Dlaždice „{id}“ načtena ({tile.Width}×{tile.Height}, buňka {tile.CellSizeMeters:0.0} m).";
         RenderGrid();
         RenderOverlay();
-        Dispatcher.BeginInvoke(new Action(FitZoomToWindow), DispatcherPriority.Loaded);
+        Dispatcher.BeginInvoke(new Action(() => { FitZoomToWindow(); EnsureViewportCoverage(); }), DispatcherPriority.Loaded);
     }
 
     /// <summary>
@@ -289,7 +290,7 @@ public partial class MainWindow : Window
         // both "doesn't fill the window" and "the scale doesn't match": zoom got computed against
         // the wrong viewport size). Posting at Loaded priority runs this only after WPF has
         // finished that pending layout pass — the standard technique for "act on final layout".
-        Dispatcher.BeginInvoke(new Action(FitZoomToWindow), DispatcherPriority.Loaded);
+        Dispatcher.BeginInvoke(new Action(() => { FitZoomToWindow(); EnsureViewportCoverage(); }), DispatcherPriority.Loaded);
     }
 
     /// <summary>
@@ -367,6 +368,58 @@ public partial class MainWindow : Window
 
         var radiusM = planet.PlanetEquatorialRadiusKm * 1000.0;
         return radiusM > 0 ? radiusM : TerrainGenerator.EarthRadiusMeters;
+    }
+
+    /// <summary>
+    /// Recomputes the SW/NE lat/lon corners of the given world-space (meters) viewport box and
+    /// pushes them to <see cref="ShellViewModel.SetViewportBounds"/> — called from
+    /// <see cref="EnsureViewportCoverage"/> on every pan/zoom, and after any operation that swaps
+    /// <see cref="_grid"/> outright (tile load, Go to Lat/Long).
+    /// </summary>
+    /// <remarks>
+    /// Two entirely different coordinate frames can be in play, so this picks whichever one
+    /// actually applies to what <see cref="_grid"/> currently holds:
+    /// <list type="bullet">
+    /// <item><b>Go to Lat/Long window</b> (<see cref="ShellViewModel.CurrentCenterLatitude"/> set) —
+    /// the grid's own meters frame is centered on that known point (see
+    /// <see cref="TerrainGenerator.GenerateSphere"/>), so the reference for the flat projection is
+    /// that center, and the offset is world position minus the grid's center in world space.</item>
+    /// <item><b>TerraGen tile(s)</b> (<see cref="Services.WorldDatabaseService.GeoReference"/> set,
+    /// no known center) — <see cref="_grid"/>'s OriginX/OriginY already live in that fixed
+    /// planet-wide frame (see <c>TileGenerator</c>'s remarks), so world position IS the offset from
+    /// the persisted reference point directly, no extra centering needed.</item>
+    /// <item>Neither is known (a hand-authored grid with no TerraGen geo reference and no
+    /// planetary center) — genuinely no way to place the viewport on the planet, so all four
+    /// bounds go to <c>null</c> and the status bar says so instead of guessing.</item>
+    /// </list>
+    /// </remarks>
+    private void UpdateViewportGeoLabel(double minWorldX, double minWorldY, double maxWorldX, double maxWorldY)
+    {
+        if (_vm.CurrentCenterLatitude is { } centerLat && _vm.CurrentCenterLongitude is { } centerLon && _grid is not null)
+        {
+            var planetRadiusMeters = ComputePlanetRadiusMeters();
+            var centerWorldX = _grid.OriginX + _grid.Width / 2.0 * _grid.CellSizeMeters;
+            var centerWorldY = _grid.OriginY + _grid.Height / 2.0 * _grid.CellSizeMeters;
+
+            var (swLat, swLon) = FlatPlanetProjection.OffsetToLatLon(
+                minWorldX - centerWorldX, minWorldY - centerWorldY, centerLat, centerLon, planetRadiusMeters);
+            var (neLat, neLon) = FlatPlanetProjection.OffsetToLatLon(
+                maxWorldX - centerWorldX, maxWorldY - centerWorldY, centerLat, centerLon, planetRadiusMeters);
+            _vm.SetViewportBounds(swLat, swLon, neLat, neLon);
+            return;
+        }
+
+        if (_vm.WorldDb.GeoReference is { } geoRef)
+        {
+            var (swLat, swLon) = FlatPlanetProjection.OffsetToLatLon(
+                minWorldX, minWorldY, geoRef.RefLatDeg, geoRef.RefLonDeg, geoRef.PlanetRadiusMeters);
+            var (neLat, neLon) = FlatPlanetProjection.OffsetToLatLon(
+                maxWorldX, maxWorldY, geoRef.RefLatDeg, geoRef.RefLonDeg, geoRef.PlanetRadiusMeters);
+            _vm.SetViewportBounds(swLat, swLon, neLat, neLon);
+            return;
+        }
+
+        _vm.SetViewportBounds(null, null, null, null);
     }
 
     private void GenerateLakes()
@@ -1193,6 +1246,10 @@ public partial class MainWindow : Window
 
         var (minWorldX, minWorldY) = CanvasToWorld(viewportCanvasLeft, viewportCanvasTop);
         var (maxWorldX, maxWorldY) = CanvasToWorld(viewportCanvasRight, viewportCanvasBottom);
+
+        // Independent of whether a stitch is needed below — the SW/NE display should track the
+        // visible viewport on every pan/zoom, not just the ticks that actually reload tiles.
+        UpdateViewportGeoLabel(minWorldX, minWorldY, maxWorldX, maxWorldY);
 
         // Runs on every throttled coverage check, independent of whether a real stitch+swap is
         // needed right now — see PrefetchAroundViewport's own doc comment for why.

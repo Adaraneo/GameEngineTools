@@ -69,13 +69,18 @@ public class TileHydrologyTests
     }
 
     [TestMethod]
-    public void ComputeRiverMask_FlatGrid_NeverThrows_AndThresholdAboveOneMarksNothing()
+    public void ComputeRiverMask_FlatGrid_NeverThrows_AndFillEpsilonStillResolvesADrainDirection()
     {
-        var grid = MakeGrid(6, 6, 1.0, (_, _) => 5f); // perfectly flat — no strictly-downhill neighbor anywhere
+        // Perfectly flat: every real elevation is tied, so without FillDepressions' epsilon nudge
+        // there'd be no strictly-downhill neighbor ANYWHERE and drainage would stay at 1 (itself)
+        // everywhere — exactly the "flat plateau after filling" dead-end FillDepressions exists to
+        // avoid (see its remarks). The epsilon gradient resolves a real drain direction from the
+        // interior toward the grid's own boundary even here, so some accumulation > 1 must occur.
+        var grid = MakeGrid(6, 6, 1.0, (_, _) => 5f);
 
         var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(FlowAccumulationThreshold: 2));
 
-        Assert.IsTrue(mask.All(b => b == 0), "A flat grid has no drainage anywhere — accumulation should stay at 1 (the cell itself) everywhere.");
+        Assert.IsTrue(mask.Any(b => b == 1), "Expected the epsilon-induced gradient to resolve at least one real drain path on a flat grid.");
     }
 
     [TestMethod]
