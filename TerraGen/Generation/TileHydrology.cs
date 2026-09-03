@@ -16,20 +16,23 @@ namespace TerraGen.Generation;
 public static class TileHydrology
 {
     public sealed record Parameters(
-        /// <summary>Minimum flow accumulation (upstream cell count, including the cell itself)
-        /// for a cell to be marked as river. Higher = fewer, larger rivers only; lower = a denser
-        /// network that also picks up small streams. Default 800 was calibrated live at 5m cells
-        /// against <see cref="TileGenerator"/>'s BATCH-wide combined grid (not a single tile — see
-        /// its type-level remarks): once accumulation genuinely carries across tile boundaries, the
-        /// same tile-scale calibration this used to use (200, when ComputeRiverMask still ran once
-        /// per ~40,000-cell tile) becomes far too low again — a low-relief area's Garbrecht-Martz
-        /// convergence bias (see <see cref="ResolveFlats"/>) weakens over a much larger flat span,
-        /// so with 200 many parallel channels each independently cleared the bar, producing a
-        /// "comb" of near-parallel streaks in one live tile (26% marked) instead of a connected
-        /// network. 800 keeps overall coverage close to the same ~1% real-world-drainage-density
-        /// target that motivated raising it off the original default of 50 in the first place,
-        /// while keeping any single tile's worst-case coverage down near 2.5% instead of 26%.</summary>
-        int FlowAccumulationThreshold = 800);
+        /// <summary>Montgomery &amp; Dietrich (1992) channel-initiation criterion: a cell becomes a
+        /// river when its contributing area (upstream cell count × cell area, in m²) TIMES the local
+        /// downslope gradient (dimensionless rise/run along the actual flow path — see
+        /// <see cref="ComputeRiverMask"/>'s remarks) reaches this value. Real channel heads form
+        /// where surface flow's shear stress exceeds the substrate's erosion resistance, and that
+        /// shear stress scales with area × slope, not area alone — a steep hillside needs only a
+        /// small catchment to start eroding a channel, while a dead-flat plain needs an enormous one
+        /// (in the limit, none at all, matching real drainage: water doesn't carve a channel across
+        /// perfectly flat ground). The units work out to m² — read it as "the contributing area
+        /// this would take on a 45° (slope = 1.0) hillside." Default 100 was calibrated live at 5m
+        /// cells against <see cref="TileGenerator"/>'s batch-wide combined grid on real generated
+        /// terrain (seed -1384538600): ~0.8% overall coverage, worst single tile 3.8% — inside the
+        /// same realistic ~0.5-2% area-coverage range the old pure-area threshold (800) needed live
+        /// tuning to reach, but without that threshold's own failure mode — a wide, genuinely flat
+        /// catchment no longer needs an arbitrarily large cell-count bar to stay believable, since
+        /// its near-zero real slope suppresses it directly, without per-scale recalibration.</summary>
+        double AreaSlopeThreshold = 100.0);
 
     /// <summary>Tiny per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit
     /// or a flat plateau — small enough to never visibly distort real terrain (real slopes differ
@@ -39,28 +42,38 @@ public static class TileHydrology
     /// flat basin.</summary>
     private const float FillEpsilon = 1e-3f;
 
-    /// <summary>Computes a river mask via single-flow-direction (D8) accumulation: every cell
-    /// starts with 1 unit of "rainfall" and drains to its single steepest downhill 8-connected
-    /// neighbor; accumulation sums along that path. Cells at or above
-    /// <see cref="Parameters.FlowAccumulationThreshold"/> are marked as river. Returns a 0/1 byte
-    /// mask the same length/shape as <paramref name="grid"/>'s own <c>Values</c> — the exact
-    /// convention <see cref="TerrainHeightmap.RiverMask"/> already uses.</summary>
+    /// <summary>Computes a river mask via single-flow-direction (D8) accumulation combined with the
+    /// Montgomery &amp; Dietrich area-slope channel-initiation criterion: every cell starts with 1
+    /// unit of "rainfall" and drains to its single steepest downhill 8-connected neighbor;
+    /// accumulation sums along that path. A cell is marked river once its contributing area (that
+    /// accumulation, in m²) times its local downslope gradient reaches
+    /// <see cref="Parameters.AreaSlopeThreshold"/> — see that property's remarks for why area alone
+    /// isn't the right criterion. Returns a 0/1 byte mask the same length/shape as
+    /// <paramref name="grid"/>'s own <c>Values</c> — the exact convention
+    /// <see cref="TerrainHeightmap.RiverMask"/> already uses.</summary>
     /// <remarks>
-    /// Routes flow across a <see cref="FillDepressions"/>-filled, then <see cref="ResolveFlats"/>-
-    /// corrected copy of the elevation, not the raw values — ridged mountain noise is riddled with
-    /// tiny local pits (every little bump creates one), and without filling them first, D8 flow
-    /// dead-ends in the very first pit it meets: the visible symptom is a field of short,
-    /// disconnected river dashes that never join into a longer channel. Filling alone fixes that but
-    /// introduces a second problem on genuinely low-relief ground — see <see cref="ResolveFlats"/> —
-    /// which is why its output, not the raw filled surface, is what flow is actually routed across.
-    /// Neither step changes the terrain itself (<paramref name="grid"/>'s own <c>Values</c> are
-    /// untouched) — only the elevation surface used to DECIDE which way water flows.
+    /// Flow DIRECTION and accumulation are routed across a <see cref="FillDepressions"/>-filled, then
+    /// <see cref="ResolveFlats"/>-corrected copy of the elevation, not the raw values — ridged
+    /// mountain noise is riddled with tiny local pits (every little bump creates one), and without
+    /// filling them first, D8 flow dead-ends in the very first pit it meets: the visible symptom is a
+    /// field of short, disconnected river dashes that never join into a longer channel. Filling alone
+    /// fixes that but introduces a second problem on genuinely low-relief ground — see
+    /// <see cref="ResolveFlats"/> — which is why its output, not the raw filled surface, is what
+    /// determines WHICH WAY flow goes. The channel-initiation SLOPE test, in contrast, is measured on
+    /// the RAW (untouched) elevation along whichever direction that routing chose — using the
+    /// filled/resolved surface there instead would measure the tiny synthetic epsilon gradient
+    /// <see cref="ResolveFlats"/> invents to break ties, not the real ground's actual steepness, and
+    /// every flat would then look artificially "sloped enough" to channelize no matter how large its
+    /// area got. Neither step changes the terrain itself (<paramref name="grid"/>'s own <c>Values</c>
+    /// are untouched) — only what's used to decide direction versus what's used to judge steepness.
     /// </remarks>
     public static byte[] ComputeRiverMask(TerrainHeightmap grid, Parameters p)
     {
         var width = grid.Width;
         var height = grid.Height;
         var count = width * height;
+        var cellSize = grid.CellSizeMeters;
+        var cellAreaM2 = cellSize * cellSize;
 
         var filled = FillDepressions(grid);
         var routed = ResolveFlats(filled, width, height);
@@ -91,8 +104,27 @@ public static class TileHydrology
         }
 
         var mask = new byte[count];
-        for (var i = 0; i < count; i++)
-            mask[i] = accumulation[i] >= p.FlowAccumulationThreshold ? (byte)1 : (byte)0;
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var i = y * width + x;
+                var next = downstream[i];
+                if (next < 0) continue; // no known outflow slope to judge — never a channel head
+
+                var nx = next % width;
+                var ny = next / width;
+                var distance = (nx != x && ny != y ? 1.4142135623730951 : 1.0) * cellSize;
+                // Raw (pre-fill) elevation drop, clamped at 0: a genuinely flat or ResolveFlats-only
+                // "downhill" step (real drop ~0 or slightly negative from epsilon tie-breaking) has
+                // no real slope to speak of, whatever direction routing picked for it.
+                var slope = Math.Max(0.0, (grid.Values[i] - grid.Values[next]) / distance);
+
+                var contributingAreaM2 = accumulation[i] * cellAreaM2;
+                if (contributingAreaM2 * slope >= p.AreaSlopeThreshold)
+                    mask[i] = 1;
+            }
+        }
 
         return mask;
     }

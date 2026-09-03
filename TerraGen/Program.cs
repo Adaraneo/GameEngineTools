@@ -130,7 +130,7 @@ var noiseParams = new PlanetNoise.Parameters(Seed: planet.Seed, GravityMs2: plan
 var erosionParams = new TileErosion.Parameters(Seed: planet.Seed, DropletCount: options.DropletsPerTile);
 
 var hydrologyParams = options.Rivers
-    ? new TileHydrology.Parameters(FlowAccumulationThreshold: options.RiverThreshold)
+    ? new TileHydrology.Parameters(AreaSlopeThreshold: options.RiverThreshold)
     : null;
 
 var runSettings = new TileGenerator.RunSettings(
@@ -179,7 +179,7 @@ internal sealed class CliOptions
     /// tile's own post-erosion drainage pattern (see <see cref="TerraGen.Generation.TileHydrology"/>)
     /// instead of leaving it null (TerrainEditor's manual painting is otherwise the only way it's ever set).</summary>
     public bool Rivers { get; init; }
-    public int RiverThreshold { get; init; } = 800;
+    public double RiverThreshold { get; init; } = 100.0;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -241,7 +241,7 @@ internal sealed class CliOptions
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
-                        [--rivers [--river-threshold <počet buněk, výchozí 800>]]
+                        [--rivers [--river-threshold <plocha×sklon v m², výchozí 100>]]
 
             --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
             desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
@@ -253,15 +253,16 @@ internal sealed class CliOptions
             po jedné dlaždici) — tok se tedy propojí i přes hranice dlaždic, ne že by na každé
             znovu "začínal od nuly". Stojí to víc paměti/výpočtu (celý region drží v paměti najednou)
             a druhé uložení RiverMasky navíc, ale bez toho by řeka vypadala na hranicích dlaždic
-            přerušovaně. --river-threshold určuje, kolik buněk musí do daného místa odtékat, aby se
-            stalo řekou — nižší hodnota = hustší síť i s malými potůčky, vyšší = jen pár velkých
-            řek. Výchozích 800 bylo naladěno naživo přímo na téhle celoregionové akumulaci (ne na
-            jedné dlaždici — tam nižší hodnota jako 200 stačila, ale na velké souvislé plošině bez
-            dost silné konvergence k jednomu odtoku vytvořila "hřeben" desítek rovnoběžných pramínků
-            místo propojené sítě) tak, aby pokrytí odpovídalo reálné hustotě říční sítě (řádově
-            jednotky procent plochy) i v nejhorším případě. RoadPathfinder (ve WorldGenu) už teď umí
-            penalizovat křížení řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby to
-            mělo co penalizovat.
+            přerušovaně. Buňka se stane řekou, když sběrná plocha (m²) krát místní sklon terénu
+            (bezrozměrný, měřený na SKUTEČNÉM terénu ve směru odtoku) dosáhne --river-threshold —
+            reálné kritérium vzniku koryta (Montgomery &amp; Dietrich 1992): smykové napětí odtoku,
+            které musí překonat odolnost podloží, je úměrné ploše×sklonu, ne jen ploše. Na strmém
+            svahu tak řeku spustí i malá sběrná plocha, na dokonale placaté rovině žádná — bez
+            nutnosti ručně ladit jedno číslo pro celou planetu, jak to vyžadoval starší čistě
+            plošní práh. Výchozích 100 bylo naladěno naživo (~0.8% pokrytí, nejhorší dlaždice 3.8%
+            — bez extrémů). RoadPathfinder (ve WorldGenu) už teď
+            umí penalizovat křížení řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby
+            to mělo co penalizovat.
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -335,7 +336,7 @@ internal sealed class CliOptions
         var erosion = 50.0;
         int? tectonicPlateCount = null;
         var rivers = false;
-        var riverThreshold = 800;
+        var riverThreshold = 100.0;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -374,7 +375,7 @@ internal sealed class CliOptions
                 case "--rivers":
                     rivers = true;
                     break;
-                case "--river-threshold" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rt):
+                case "--river-threshold" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var rt):
                     riverThreshold = rt;
                     break;
                 case "--scan":

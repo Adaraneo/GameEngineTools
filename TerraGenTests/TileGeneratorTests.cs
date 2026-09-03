@@ -332,7 +332,7 @@ public class TileGeneratorTests
                 NoiseParams: new PlanetNoise.Parameters(Seed: 5, AmplitudeMeters: 200.0),
                 ErosionParams: new TileErosion.Parameters(Seed: 5, DropletCount: 500, MaxDropletLifetime: 6),
                 PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
-                HydrologyParams: new TileHydrology.Parameters(FlowAccumulationThreshold: 30));
+                HydrologyParams: new TileHydrology.Parameters(AreaSlopeThreshold: 5.0));
 
             var results = TileGenerator.Run(db, settings);
             Assert.IsTrue(results.Count > 0);
@@ -376,7 +376,7 @@ public class TileGeneratorTests
                 NoiseParams: new PlanetNoise.Parameters(Seed: 5, AmplitudeMeters: 200.0),
                 ErosionParams: new TileErosion.Parameters(Seed: 5, DropletCount: 500, MaxDropletLifetime: 6),
                 PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
-                HydrologyParams: new TileHydrology.Parameters(FlowAccumulationThreshold: 30));
+                HydrologyParams: new TileHydrology.Parameters(AreaSlopeThreshold: 5.0));
 
             var results = TileGenerator.Run(db, settings);
             var tiles = results.Select(r => db.LoadHeightmap(r.Id)!).ToList();
