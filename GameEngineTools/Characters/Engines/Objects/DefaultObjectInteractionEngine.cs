@@ -408,7 +408,7 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             // Recompute the shop's posted price against the reduced stock (excludes the now-held object).
             var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
-            var oldPrice = _economyLedger.GetPrice(shopId, kind);
+            var oldPrice = _economyLedger.GetPrice(shopId, kind, price);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
@@ -472,7 +472,7 @@ namespace GameEngineTools.Characters.Engines.Objects
                 return;
 
             var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
-            var oldPrice = _economyLedger.GetPrice(shopId, kind);
+            var oldPrice = _economyLedger.GetPrice(shopId, kind, salePrice);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));

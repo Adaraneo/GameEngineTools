@@ -106,6 +106,65 @@ namespace EngineTests
             Assert.IsTrue(after < before, "Stock above target (glut) must lower the price.");
         }
 
+        [TestMethod]
+        public void EconomyLedger_GetPrice_ColdCacheUsesPersistedFallback_NotSeedPrice()
+        {
+            var ledger = new EconomyLedger();
+
+            var price = ledger.GetPrice("bakery", PickupItemKind.Bread, persistedFallback: 7.5);
+
+            Assert.AreEqual(7.5, price, 1e-9,
+                "On a cache miss, the caller's persisted price must win over the hardcoded SeedPrice constant.");
+        }
+
+        [TestMethod]
+        public void Buy_ColdLedger_PriceChangedOldPrice_ReflectsPersistedPrice_NotSeedPrice()
+        {
+            // SeedPrice(Bread) == 2.0 — pick a persisted price that differs from it so a regression
+            // (falling back to SeedPrice) is caught.
+            const double persistedPrice = 6.0;
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(PricedFood("shop_bread", price: persistedPrice, shop: "bakery"));
+
+            var ctx = BuyerContext(self, wealth: 30.0);
+            // A brand-new EconomyLedger simulates a cold cache after a process restart.
+            var engine = MakeObjectEngine(provider, lod: null);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Buy, WTimeSpan.FromMinutes(15)), ctx, outbox);
+
+            var priceChanged = outbox.Drain().OfType<PriceChanged>().SingleOrDefault();
+            Assert.IsNotNull(priceChanged, "A fully-simulated buy adjusts the shop's posted price.");
+            Assert.AreEqual(persistedPrice, priceChanged!.OldPrice, 1e-9,
+                "OldPrice must reflect the object's actual persisted price, not the hardcoded SeedPrice constant.");
+        }
+
+        [TestMethod]
+        public void Sell_ColdLedger_PriceChangedOldPrice_ReflectsPersistedPrice_NotSeedPrice()
+        {
+            const double persistedPrice = 6.0;
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+
+            var held = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self);
+            provider.AddObject(held);
+            provider.AddObject(PricedFood("bakery_bread", price: persistedPrice, shop: "bakery"));
+
+            var engine = MakeObjectEngine(provider);
+            var ctx = BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
+            var outbox = new EventCollector();
+
+            engine.Handle(
+                new ActionCommitted(new WDateTime(0), self, Sell, WTimeSpan.FromMinutes(15)),
+                ctx, outbox);
+
+            var priceChanged = outbox.Drain().OfType<PriceChanged>().SingleOrDefault();
+            Assert.IsNotNull(priceChanged, "A fully-simulated sell adjusts the shop's posted price.");
+            Assert.AreEqual(persistedPrice, priceChanged!.OldPrice, 1e-9,
+                "OldPrice must reflect the shop's actual persisted price, not the hardcoded SeedPrice constant.");
+        }
+
         // ── §5.1 Buy/Sell gating ─────────────────────────────────────────────────────
 
         [TestMethod]

@@ -26,11 +26,16 @@ namespace GameEngineTools.World.Economy
     {
         #region Public API
 
-        /// <summary>Current posted price for a shop's stock of a given item kind.</summary>
-        public double GetPrice(string shopId, PickupItemKind kind)
+        /// <summary>
+        /// Current posted price for a shop's stock of a given item kind. On a cache miss (e.g. a
+        /// freshly constructed ledger after a process restart), <paramref name="persistedFallback"/> —
+        /// the caller's already-resolved persisted price for this shop/kind, if it has one — is
+        /// preferred over the hardcoded <see cref="SeedPrice"/> constant.
+        /// </summary>
+        public double GetPrice(string shopId, PickupItemKind kind, double? persistedFallback = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(shopId);
-            return _prices.TryGetValue((shopId, kind), out var price) ? price : SeedPrice(kind);
+            return _prices.TryGetValue((shopId, kind), out var price) ? price : persistedFallback ?? SeedPrice(kind);
         }
 
         /// <summary>
