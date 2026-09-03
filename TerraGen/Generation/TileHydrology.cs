@@ -25,14 +25,23 @@ public static class TileHydrology
         /// small catchment to start eroding a channel, while a dead-flat plain needs an enormous one
         /// (in the limit, none at all, matching real drainage: water doesn't carve a channel across
         /// perfectly flat ground). The units work out to m² — read it as "the contributing area
-        /// this would take on a 45° (slope = 1.0) hillside." Default 100 was calibrated live at 5m
-        /// cells against <see cref="TileGenerator"/>'s batch-wide combined grid on real generated
-        /// terrain (seed -1384538600): ~0.8% overall coverage, worst single tile 3.8% — inside the
-        /// same realistic ~0.5-2% area-coverage range the old pure-area threshold (800) needed live
-        /// tuning to reach, but without that threshold's own failure mode — a wide, genuinely flat
-        /// catchment no longer needs an arbitrarily large cell-count bar to stay believable, since
-        /// its near-zero real slope suppresses it directly, without per-scale recalibration.</summary>
-        double AreaSlopeThreshold = 100.0);
+        /// this would take on a 45° (slope = 1.0) hillside." Note this ONLY governs where a channel
+        /// STARTS — see <see cref="ComputeRiverMask"/>'s remarks on why every cell downstream of a
+        /// qualifying one is marked too regardless of ITS OWN local slope, which is what makes a
+        /// channel actually continuous instead of flickering through every locally-noisy stretch.
+        /// Default 1200 was calibrated live at 5m cells against <see cref="TileGenerator"/>'s
+        /// batch-wide combined grid on real generated terrain (seed -1384538600), AFTER two fixes
+        /// that both needed a re-tune: the downstream-propagation fix (propagation makes clusters of
+        /// adjacent cells that independently qualify within a few cells of each other — a real but
+        /// narrow initiation zone, not a single exact point — each draw their own full-length
+        /// channel, which piled up into a solid wedge near a confluence instead of a thin line) and,
+        /// after that, a sign bug fix in <see cref="ResolveFlats"/>'s own flat-routing bias (it was
+        /// quietly pulling flow toward the nearest WALL instead of the nearest true exit inside every
+        /// flat component it touched, which — once propagation started drawing full channels from
+        /// every qualifying cell — widened that same wedge further). 1200 keeps overall coverage in
+        /// the same realistic range (~0.17%, worst single tile 2.2%) the original ~0.5-2%
+        /// area-coverage target aimed for, after both fixes.</summary>
+        double AreaSlopeThreshold = 1200.0);
 
     /// <summary>Tiny per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit
     /// or a flat plateau — small enough to never visibly distort real terrain (real slopes differ
@@ -66,8 +75,25 @@ public static class TileHydrology
     /// every flat would then look artificially "sloped enough" to channelize no matter how large its
     /// area got. Neither step changes the terrain itself (<paramref name="grid"/>'s own <c>Values</c>
     /// are untouched) — only what's used to decide direction versus what's used to judge steepness.
+    ///
+    /// The area×slope test only decides where a channel STARTS. Once a cell qualifies, every cell
+    /// downstream of it is marked too, regardless of whether THAT cell's own local slope clears the
+    /// bar — confirmed live this has to work this way: real post-erosion elevation is noisy enough
+    /// at the meter scale that two adjacent cells in the middle of an established, thousands-of-
+    /// cells-wide channel can have a real drop that rounds to ~0, and evaluating the criterion
+    /// pointwise at every cell (instead of just at the head) made the channel flicker on/off roughly
+    /// every other cell instead of reading as one continuous river. A real channel doesn't do that —
+    /// once water has cut a bed, it keeps flowing through a locally flat or noisy stretch rather than
+    /// vanishing there and restarting a few cells later.
     /// </remarks>
-    public static byte[] ComputeRiverMask(TerrainHeightmap grid, Parameters p)
+    public static byte[] ComputeRiverMask(TerrainHeightmap grid, Parameters p) => ComputeDiagnostics(grid, p).Mask;
+
+    /// <summary>Same computation as <see cref="ComputeRiverMask"/>, but also returns the
+    /// intermediate per-cell accumulation and slope arrays the mask is derived from — not needed by
+    /// any production caller (which only wants the final 0/1 mask), but lets a test or a future
+    /// investigation see WHY a specific cell did or didn't make the cut, instead of only the
+    /// pass/fail outcome.</summary>
+    internal static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream) ComputeDiagnostics(TerrainHeightmap grid, Parameters p)
     {
         var width = grid.Width;
         var height = grid.Height;
@@ -103,6 +129,7 @@ public static class TileHydrology
                 accumulation[next] += accumulation[idx];
         }
 
+        var slope = new double[count];
         var mask = new byte[count];
         for (var y = 0; y < height; y++)
         {
@@ -118,15 +145,36 @@ public static class TileHydrology
                 // Raw (pre-fill) elevation drop, clamped at 0: a genuinely flat or ResolveFlats-only
                 // "downhill" step (real drop ~0 or slightly negative from epsilon tie-breaking) has
                 // no real slope to speak of, whatever direction routing picked for it.
-                var slope = Math.Max(0.0, (grid.Values[i] - grid.Values[next]) / distance);
+                slope[i] = Math.Max(0.0, (grid.Values[i] - grid.Values[next]) / distance);
 
                 var contributingAreaM2 = accumulation[i] * cellAreaM2;
-                if (contributingAreaM2 * slope >= p.AreaSlopeThreshold)
+                if (contributingAreaM2 * slope[i] >= p.AreaSlopeThreshold)
                     mask[i] = 1;
             }
         }
 
-        return mask;
+        // Montgomery & Dietrich's area×slope criterion is for CHANNEL INITIATION — where does a
+        // channel first cut in — not a per-point validity check repeated at every single cell
+        // along its length. Evaluated pointwise like the loop above just did, it flickers: two
+        // adjacent post-erosion cells can have a real elevation drop that rounds to ~0 (meter-scale
+        // droplet-erosion granularity, not the river actually leveling out) even in the middle of a
+        // channel whose accumulation is already in the thousands — confirmed live on production
+        // terrain, where a single mainstem trunk (accumulation 6,600-11,800) marked barely half its
+        // cells, flickering on/off roughly every other one. A real channel doesn't do that: once
+        // water has cut a bed, it keeps flowing through a locally flat or noisy stretch instead of
+        // vanishing there. So once a cell IS a channel, every cell downstream of it is too — this
+        // single top-to-bottom pass (same order the accumulation sum above used, so a cell's own
+        // upstream propagation has always already landed on it before it decides whether to pass
+        // the mark further down) turns "was this exact point steep enough" into "has a channel
+        // already reached this point," which is what actually determines whether a river is there.
+        foreach (var idx in order)
+        {
+            if (mask[idx] == 0) continue;
+            var next = downstream[idx];
+            if (next >= 0) mask[next] = 1;
+        }
+
+        return (mask, accumulation, slope, downstream);
     }
 
     /// <summary>
@@ -208,9 +256,12 @@ public static class TileHydrology
     /// computed per flat component (a maximal 8-connected run of cells within
     /// <see cref="FlatEqualityTolerance"/> of each other) from two BFS distance fields seeded at the
     /// component's own boundary: distance AWAY from the flat's higher inflow edge (nudges initial
-    /// flow off the wall, rather than hugging it) and distance TOWARD the flat's lower outflow edge
-    /// (pulls every path toward the SAME exit) — weighted 1:2 exactly as Garbrecht &amp; Martz
-    /// describe, scaled by <see cref="FillEpsilon"/> so the correction always nests strictly inside
+    /// flow off the wall, rather than hugging it — a cell close to the wall gets pushed UP, away
+    /// from being anyone's downhill target) and distance TOWARD the flat's lower outflow edge (a
+    /// cell close to the true exit gets pulled DOWN, toward being everyone's downhill target, so
+    /// every path funnels to the SAME exit instead of drifting toward the nearest wall) — weighted
+    /// 1:2 exactly as Garbrecht &amp; Martz describe, scaled by <see cref="FillEpsilon"/> so the
+    /// correction always nests strictly inside
     /// the (much larger) real-terrain gap <see cref="FillDepressions"/> already put between this flat
     /// and its genuinely higher/lower neighbors, never overturning the macro direction those already
     /// fixed — only how the flat's own interior funnels toward it.
@@ -326,7 +377,13 @@ public static class TileHydrology
                 // all, e.g. one that fills its whole padded tile) — treat that as "no wall bias".
                 var toLower = distToLower[i] < 0 ? 0 : distToLower[i];
                 var toHigher = distToHigher[i] < 0 ? 0 : distToHigher[i];
-                routed[members[i]] = filled[members[i]] + FillEpsilon * (toHigher - 2f * toLower);
+                // +toLower (a cell far from the true exit sits HIGH, so it's never anyone's downhill
+                // target) and -toHigher (a cell far from the wall sits LOW, pulling flow away from
+                // hugging it) — NOT the other way around, which would bias flow toward the wall
+                // instead of the exit. Found live via a propagation regression test: within an
+                // isolated flat component this bias is the only thing deciding direction, and the
+                // wrong sign here quietly sent water the wrong way inside every flat it touched.
+                routed[members[i]] = filled[members[i]] + FillEpsilon * (2f * toLower - toHigher);
             }
         }
 

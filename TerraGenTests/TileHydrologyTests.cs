@@ -32,32 +32,31 @@ public class TileHydrologyTests
         // real slope is exactly 10 everywhere), no variation in y — every cell's single steepest-
         // descent neighbor is straight ahead (x+1,y), so contributing area at column x is exactly
         // (x+1) cells and the area×slope product is (x+1)*10 — a simple, hand-verifiable case. The
-        // LAST column (x=width-1) has no downstream neighbor (grid edge) so is never marked
-        // regardless of threshold — a channel needs a real downslope direction to judge against,
-        // see ComputeRiverMask's remarks.
+        // LAST column (x=width-1) has no downstream neighbor of its own to judge (grid edge), but
+        // once ANY upstream column becomes a channel, downstream propagation (see
+        // ComputeRiverMask's remarks) carries that mark all the way to the edge regardless — a
+        // channel doesn't stop existing just because there's no further column left to evaluate.
         const int width = 6, height = 3;
         var grid = MakeGrid(width, height, 1.0, (x, _) => (width - x) * 10f);
 
-        // The minimum possible product (column 0: area=1 cell, slope=10) marks every column that
-        // HAS a downstream neighbor, i.e. every column except the last.
+        // The minimum possible product (column 0: area=1 cell, slope=10) marks every column,
+        // including the last one via propagation from column width-2.
         var maskLow = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 10.0));
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
-            {
-                var expected = x < width - 1 ? 1 : 0;
-                Assert.AreEqual(expected, maskLow[y * width + x], $"Mismatch at ({x},{y}).");
-            }
+                Assert.AreEqual(1, maskLow[y * width + x], $"Mismatch at ({x},{y}).");
         }
 
-        // The maximum possible product among cells WITH a downstream neighbor is at column
-        // width-2 (area=width-1, slope=10) — a threshold set exactly there marks only that column.
+        // The maximum possible product among cells that can judge their OWN slope is at column
+        // width-2 (area=width-1, slope=10) — a threshold set exactly there marks only that column
+        // AND whatever it propagates to (here, just the last column, its sole downstream cell).
         var maskHigh = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: (width - 1) * 10.0));
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
             {
-                var expected = x == width - 2 ? 1 : 0;
+                var expected = x >= width - 2 ? 1 : 0;
                 Assert.AreEqual(expected, maskHigh[y * width + x], $"Mismatch at ({x},{y}).");
             }
         }
@@ -149,10 +148,13 @@ public class TileHydrologyTests
         // ResolveFlats's caller (`var routed = filled;`) on this exact scenario, which drove the
         // marked fraction from ~0.4% up to ~23% of the valley floor. ResolveFlats fixes it by
         // funneling flow toward the valley's one open (south) side instead of letting it spread.
-        // Threshold set low (0.05) specifically to still exercise this on the area×slope criterion
-        // despite this floor's real relief being tiny (deliberately, to simulate realistic post-
-        // erosion float noise) — a higher, realistic threshold would trivially mark ~nothing here
-        // and not actually test the shape-of-the-network regression this guards against.
+        // Threshold set low specifically to still exercise this on the area×slope criterion despite
+        // this floor's real relief being tiny (deliberately, to simulate realistic post-erosion
+        // float noise, no uniform trend) — a higher, realistic threshold would trivially mark
+        // ~nothing here and not actually test the shape-of-the-network regression this guards
+        // against. Downstream propagation (see ComputeRiverMask's remarks) means the assertion below
+        // only needs "not a wide sheet", not "not connected" — propagation is what MAKES a marked
+        // stretch connected now, that's not the failure mode this test targets.
         const int width = 200, height = 200;
         var values = new float[width * height];
         var isWall = new bool[width * height];
@@ -170,15 +172,15 @@ public class TileHydrologyTests
                 isWall[y * width + x] = wall;
                 values[y * width + x] = wall
                     ? 100f
-                    // A gentle south-trending slope (not perfectly flat — see the type-level
-                    // rationale above) plus tiny deterministic per-cell jitter simulating realistic
-                    // post-erosion float noise.
-                    : 10f - y * 0.01f + ((x * 37 + y * 17) % 5) * 0.0001f;
+                    // Tiny deterministic per-cell jitter simulating realistic post-erosion float
+                    // noise on otherwise near-flat ground — no uniform trend, so ANY marking here
+                    // has to come from the noise itself plus accumulated area, not a built-in slope.
+                    : 10f + ((x * 37 + y * 17) % 5) * 0.0001f;
             }
         }
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 20.0));
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
 
         var flatCells = 0;
         var riverCells = 0;
@@ -190,7 +192,43 @@ public class TileHydrologyTests
         }
 
         var pct = 100.0 * riverCells / flatCells;
-        Assert.IsTrue(pct is > 0.0 and < 5.0, $"Expected the valley floor to funnel into a thin channel network " +
-            $"(0%<pct<5%, non-trivial but not a wide sheet), not smear as a wide sheet — got {pct:F2}% ({riverCells}/{flatCells}).");
+        Assert.IsTrue(pct is > 0.0 and < 10.0, $"Expected the valley floor to funnel into a thin channel network " +
+            $"(0%<pct<10%, non-trivial but not a wide sheet), not smear as a wide sheet — got {pct:F2}% ({riverCells}/{flatCells}).");
+    }
+
+    [TestMethod]
+    public void ComputeRiverMask_ChannelContinuesThroughLocallyFlatSteps_DoesNotFlicker()
+    {
+        // Regression test for a real generation defect (found live via TileHydrology's internal
+        // ComputeDiagnostics on production terrain): the area×slope criterion is for CHANNEL
+        // INITIATION, not a per-point validity check repeated at every cell along an established
+        // channel — evaluated pointwise, it flickers wherever two adjacent post-erosion cells
+        // happen to have a real drop that rounds to ~0 (meter-scale erosion-granularity noise, not
+        // the river actually leveling out). Confirmed live: a single mainstem trunk with
+        // accumulation in the thousands marked barely half its own cells, on/off roughly every
+        // other one. ComputeRiverMask now propagates a mark downstream once a channel is
+        // established, so every cell after the first that clears the threshold stays marked
+        // regardless of locally flat noise.
+        const int width = 20;
+        var values = new float[width];
+        // Steps at 8, 9, 13, 14, 15 have ZERO drop to the next column (a flat run of several
+        // cells in a row), simulating post-erosion quantization noise on an otherwise real slope.
+        var flatSteps = new HashSet<int> { 8, 9, 13, 14, 15 };
+        var h = (float)width;
+        for (var x = 0; x < width; x++)
+        {
+            values[x] = h;
+            if (!flatSteps.Contains(x)) h -= 1f;
+        }
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 1.0, width, 1, values);
+
+        // Threshold low enough the channel initiates almost immediately (column 1: area=2 cells,
+        // slope=1 -> product=2) — every flat step's OWN local slope is exactly 0, which would fail
+        // ANY positive threshold if evaluated pointwise instead of propagated.
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 2.0));
+
+        for (var x = 1; x < width - 1; x++)
+            Assert.AreEqual(1, mask[x], $"Column {x} (flatStep={flatSteps.Contains(x)}) should stay marked — " +
+                "an established channel must not un-mark itself over a locally flat step.");
     }
 }

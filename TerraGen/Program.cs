@@ -179,7 +179,7 @@ internal sealed class CliOptions
     /// tile's own post-erosion drainage pattern (see <see cref="TerraGen.Generation.TileHydrology"/>)
     /// instead of leaving it null (TerrainEditor's manual painting is otherwise the only way it's ever set).</summary>
     public bool Rivers { get; init; }
-    public double RiverThreshold { get; init; } = 100.0;
+    public double RiverThreshold { get; init; } = 1200.0;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -241,7 +241,7 @@ internal sealed class CliOptions
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
-                        [--rivers [--river-threshold <plocha×sklon v m², výchozí 100>]]
+                        [--rivers [--river-threshold <plocha×sklon v m², výchozí 1200>]]
 
             --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
             desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
@@ -253,14 +253,16 @@ internal sealed class CliOptions
             po jedné dlaždici) — tok se tedy propojí i přes hranice dlaždic, ne že by na každé
             znovu "začínal od nuly". Stojí to víc paměti/výpočtu (celý region drží v paměti najednou)
             a druhé uložení RiverMasky navíc, ale bez toho by řeka vypadala na hranicích dlaždic
-            přerušovaně. Buňka se stane řekou, když sběrná plocha (m²) krát místní sklon terénu
-            (bezrozměrný, měřený na SKUTEČNÉM terénu ve směru odtoku) dosáhne --river-threshold —
-            reálné kritérium vzniku koryta (Montgomery &amp; Dietrich 1992): smykové napětí odtoku,
-            které musí překonat odolnost podloží, je úměrné ploše×sklonu, ne jen ploše. Na strmém
-            svahu tak řeku spustí i malá sběrná plocha, na dokonale placaté rovině žádná — bez
-            nutnosti ručně ladit jedno číslo pro celou planetu, jak to vyžadoval starší čistě
-            plošní práh. Výchozích 100 bylo naladěno naživo (~0.8% pokrytí, nejhorší dlaždice 3.8%
-            — bez extrémů). RoadPathfinder (ve WorldGenu) už teď
+            přerušovaně. Buňka se stane začátkem řeky, když sběrná plocha (m²) krát místní sklon
+            terénu (bezrozměrný, měřený na SKUTEČNÉM terénu ve směru odtoku) dosáhne
+            --river-threshold — reálné kritérium vzniku koryta (Montgomery &amp; Dietrich 1992):
+            smykové napětí odtoku, které musí překonat odolnost podloží, je úměrné ploše×sklonu, ne
+            jen ploše. Na strmém svahu tak řeku spustí i malá sběrná plocha, na dokonale placaté
+            rovině žádná. Jakmile řeka jednou vznikne, pokračuje dál i přes lokálně plošší/šumem
+            zašuměné úseky (jinak by blikala — po erozi je terén na úrovni metrů šumový, takže čistě
+            bodové vyhodnocení sklonu v každé buňce zvlášť řeku uprostřed koryta zbytečně přerušuje).
+            Výchozích 1200 bylo naladěno naživo (~0.17% pokrytí, nejhorší dlaždice 2.2% — bez extrémů).
+            RoadPathfinder (ve WorldGenu) už teď
             umí penalizovat křížení řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby
             to mělo co penalizovat.
 
@@ -336,7 +338,7 @@ internal sealed class CliOptions
         var erosion = 50.0;
         int? tectonicPlateCount = null;
         var rivers = false;
-        var riverThreshold = 100.0;
+        var riverThreshold = 1200.0;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
