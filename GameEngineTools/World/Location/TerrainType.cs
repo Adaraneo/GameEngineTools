@@ -32,5 +32,20 @@ public enum TerrainType
     Plains,
 
     /// <summary>Land bordering open water — beaches, cliffs, harbor fronts.</summary>
-    Coastline
+    Coastline,
+
+    /// <summary>Hot, dry land — low humidity and high temperature (simplified Köppen "B").</summary>
+    Desert,
+
+    /// <summary>Cold land near or below freezing — polar latitudes or high altitude (simplified
+    /// Köppen "E").</summary>
+    Tundra,
+
+    /// <summary>Warm, seasonally dry grassland — moderate-to-low humidity and high temperature,
+    /// flat enough to build on (simplified Köppen "Aw"/"BSh").</summary>
+    Savanna,
+
+    /// <summary>Hot, consistently wet lowland — high humidity and high temperature (simplified
+    /// Köppen "Af").</summary>
+    Jungle
 }

@@ -119,6 +119,7 @@ namespace GameEngineTools.World.Data
             // IF NOT EXISTS above is a no-op on an existing Locations table, so older
             // databases need an explicit ALTER TABLE to gain the X/Y columns.
             db.MigrateLocationCoordinateColumns();
+            db.MigrateLocationClimateColumns();
         }
 
         #endregion Public API

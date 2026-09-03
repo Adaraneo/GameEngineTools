@@ -594,6 +594,109 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
+    public void Generate_ExtremeColdTemperature_ClassifiesAsTundra()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) }; // would classify Plains under the pre-climate rules
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0,
+            EquatorTemperatureCelsius: -10.0, PoleTemperatureCelsius: -10.0); // always below the default Tundra threshold, regardless of latitude/noise
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(60), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        Assert.AreEqual(TerrainType.Tundra, descriptor.Terrain);
+        Assert.IsTrue(descriptor.Id.StartsWith("tundra_", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Generate_MountainThreshold_OverridesTundra()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(500.0) }; // above the default 300m Mountain threshold
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0,
+            EquatorTemperatureCelsius: -10.0, PoleTemperatureCelsius: -10.0); // cold enough for Tundra too
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(61), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        Assert.AreEqual(TerrainType.Mountain, descriptor.Terrain, "Elevation must win over temperature — Mountain is checked first.");
+    }
+
+    [TestMethod]
+    public void Generate_HotAndDry_ClassifiesAsDesert()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0,
+            EquatorTemperatureCelsius: 40.0, PoleTemperatureCelsius: 40.0, // always hot enough
+            DesertHumidityThreshold: 1.1, DesertTemperatureThresholdC: -100.0); // humidity <= 1.1 is always true, so only the (guaranteed) heat condition matters
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(62), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        Assert.AreEqual(TerrainType.Desert, descriptor.Terrain);
+        Assert.IsTrue(descriptor.Id.StartsWith("desert_", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Generate_HotAndWet_ClassifiesAsJungle()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0,
+            EquatorTemperatureCelsius: 40.0, PoleTemperatureCelsius: 40.0,
+            DesertHumidityThreshold: -1.1, // never true — humidity is always >= 0, so Desert never wins first
+            JungleHumidityThreshold: -1.1, JungleTemperatureThresholdC: -100.0); // humidity >= -1.1 is always true
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(63), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        Assert.AreEqual(TerrainType.Jungle, descriptor.Terrain);
+        Assert.IsTrue(descriptor.Id.StartsWith("jungle_", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Generate_FlatWarmSeasonallyDry_ClassifiesAsSavanna()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) }; // flat — would classify Plains under the pre-climate rules
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0,
+            EquatorTemperatureCelsius: 30.0, PoleTemperatureCelsius: 30.0,
+            DesertHumidityThreshold: -1.1, JungleHumidityThreshold: 1.1, // neither Desert nor Jungle can ever trigger
+            SavannaHumidityThreshold: 1.1, SavannaTemperatureThresholdC: -100.0); // humidity <= 1.1 is always true
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(64), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        Assert.AreEqual(TerrainType.Savanna, descriptor.Terrain);
+        Assert.IsTrue(descriptor.Id.StartsWith("savanna_", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Generate_StoresTemperatureAndHumidityOnDescriptor()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0,
+            EquatorTemperatureCelsius: 30.0, PoleTemperatureCelsius: -10.0);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(65), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        // Placed near the equatorial origin at low altitude — temperature should read close to
+        // the equatorial default (well above the pole default), not the unset 0.0 default.
+        Assert.IsTrue(descriptor.TemperatureCelsius > 20.0,
+            $"Expected a near-equator low-altitude temperature close to 30°C, got {descriptor.TemperatureCelsius}.");
+        Assert.IsTrue(descriptor.Humidity is >= 0.0 and <= 1.0);
+    }
+
+    [TestMethod]
     public void Generate_EmptyTileList_Throws()
     {
         using var db = NewWorldDb();

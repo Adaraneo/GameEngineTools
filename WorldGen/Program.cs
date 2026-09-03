@@ -73,6 +73,10 @@ var genOptions = new WorldContentGenerator.Options(
     TectonicPlateCount: tectonicPlateCount,
     TectonicSeed: planet.Seed,
     PlanetRadiusMeters: planet.PlanetRadiusMeters,
+    // Reuses the planet's own seed (already read from the same appsettings.World.json TerraGen
+    // reads) so the climate map is reproducible per-planet without a separate CLI flag — same
+    // convention as TectonicSeed above.
+    ClimateSeed: planet.Seed,
     GenerateHouses: options.GenerateHouses,
     GenerateCemetery: options.GenerateCemetery,
     GenerateProductionChain: options.GenerateProductionChain);
@@ -152,10 +156,14 @@ internal sealed class CliOptions
             (spusť napřed terragen) — nikdy negeneruje nový terén. --world-db se VYTVOŘÍ, pokud
             ještě neexistuje (na rozdíl od TerraGenu, který se world.db nikdy nedotýká).
 
-            Každá lokace se klasifikuje jako Mountain (nad --mountain-threshold) / Coastline (do
-            --coast-radius od vody) / Plains (plochý terén) / Forest (zbytek) a dostane náhodně
-            jednu ze tří úrovní osídlení — tábor/vesnice/město — váženou podle biomu (hory =
-            skoro vždy tábor, pobřeží/planiny = častěji vesnice nebo město). Silniční síť je
+            Každá lokace se klasifikuje podle výšky, sklonu a lehkého klimatického modelu (teplota
+            ze zeměpisné šířky + nadmořské výšky, vlhkost z nezávislé šumové vrstvy — žádné
+            sezónnosti/větru, viz WorldGen.Generation.ClimateModel): Mountain (nad
+            --mountain-threshold) → Tundra (pod bodem mrazu) → Coastline (do --coast-radius od
+            vody) → Desert/Jungle (horko+sucho/horko+vlhko) → Savanna/Plains (plochý terén, dle
+            vlhkosti) → Forest (zbytek, svažitý terén). Dostane náhodně jednu ze tří úrovní
+            osídlení — tábor/vesnice/město — váženou podle biomu (hory/poušť/tundra/džungle =
+            většinou tábor, pobřeží/planiny/savana = častěji vesnice nebo město). Silniční síť je
             hierarchická, ne jen nejbližší soused: města mezi sebou tvoří minimální kostru (každé
             dosáhne na každé, nejmíň hran), každá vesnice se připojí k nejbližšímu městu a každý
             tábor k nejbližší vesnici nebo městu (podle toho, co je blíž) — navíc si každá lokace

@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS Locations (
     NormId          TEXT    REFERENCES SocialNorms(Id),  -- nullable
     X               REAL    NOT NULL DEFAULT 0.0,  -- local 2D world-space position, meters
     Y               REAL    NOT NULL DEFAULT 0.0,
-    AltitudeMeters  REAL    NOT NULL DEFAULT 0.0   -- elevation above sea level; authored by TerrainEditor
+    AltitudeMeters  REAL    NOT NULL DEFAULT 0.0,  -- elevation above sea level; authored by TerrainEditor
+    TemperatureCelsius REAL NOT NULL DEFAULT 0.0,  -- from WorldGen's lat/altitude climate model
+    Humidity        REAL    NOT NULL DEFAULT 0.0   -- [0,1], from WorldGen's climate model
 );
 
 -- ── Connections ───────────────────────────────────────────────────────────────

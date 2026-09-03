@@ -93,6 +93,15 @@ namespace GameEngineTools.World.Movement
                                              // in the source dataset besides pavement itself.
                 [TerrainType.Coastline] = 0.81, // analog: disturbed/uneven ground (sand, shingle,
                                                 // tideline debris) — not directly tested.
+                [TerrainType.Desert] = 0.65, // ⚠️ ANALOGICAL ESTIMATE — loose sand is harder to
+                                             // walk on than any surface in the source dataset;
+                                             // below Water's 0.56 floor is deliberately avoided.
+                [TerrainType.Tundra] = 0.68, // ⚠️ ANALOGICAL ESTIMATE — analog: snow/boggy ground,
+                                             // between Water (0.56) and Forest (0.78).
+                [TerrainType.Savanna] = 0.95, // ⚠️ ANALOGICAL ESTIMATE — analog: tall/uneven
+                                              // grassland, slightly below Plains' mown-grass 1.03.
+                [TerrainType.Jungle] = 0.60, // ⚠️ ANALOGICAL ESTIMATE — analog: dense
+                                             // undergrowth, below Forest's 0.78.
             };
     }
 }

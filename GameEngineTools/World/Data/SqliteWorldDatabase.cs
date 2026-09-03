@@ -386,7 +386,8 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Type, Region,
                        BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy,
-                       Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters
+                       Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters,
+                       TemperatureCelsius, Humidity
                 FROM Locations
                 """;
 
@@ -413,7 +414,9 @@ namespace GameEngineTools.World.Data
                         NormId: reader.IsDBNull(11) ? null : reader.GetString(11),
                         X: reader.GetDouble(12),
                         Y: reader.GetDouble(13),
-                        AltitudeMeters: reader.GetDouble(14));
+                        AltitudeMeters: reader.GetDouble(14),
+                        TemperatureCelsius: reader.GetDouble(15),
+                        Humidity: reader.GetDouble(16));
 
                     results.Add((descriptor, reader.GetString(3)));
                 }
@@ -540,6 +543,33 @@ namespace GameEngineTools.World.Data
                     Execute("ALTER TABLE Locations ADD COLUMN Y REAL NOT NULL DEFAULT 0.0;");
                 if (!existingColumns.Contains("AltitudeMeters"))
                     Execute("ALTER TABLE Locations ADD COLUMN AltitudeMeters REAL NOT NULL DEFAULT 0.0;");
+            }
+        }
+
+        /// <summary>
+        /// One-time migration: adds the <c>TemperatureCelsius</c>/<c>Humidity</c> climate columns
+        /// to <c>Locations</c> if a database created before WorldGen's climate model existed is
+        /// missing them. No-op on a fresh database, whose schema already includes them.
+        /// </summary>
+        public void MigrateLocationClimateColumns()
+        {
+            lock (_sync)
+            {
+                var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var cmd = CreateCommand("PRAGMA table_info(Locations)"))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                        existingColumns.Add(reader.GetString(1)); // column 1 = "name"
+                }
+
+                if (existingColumns.Count == 0)
+                    return; // Locations table doesn't exist yet — nothing to migrate.
+
+                if (!existingColumns.Contains("TemperatureCelsius"))
+                    Execute("ALTER TABLE Locations ADD COLUMN TemperatureCelsius REAL NOT NULL DEFAULT 0.0;");
+                if (!existingColumns.Contains("Humidity"))
+                    Execute("ALTER TABLE Locations ADD COLUMN Humidity REAL NOT NULL DEFAULT 0.0;");
             }
         }
 
@@ -753,10 +783,11 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 INSERT OR IGNORE INTO Locations
                     (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson,
-                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters)
+                     Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters,
+                     TemperatureCelsius, Humidity)
                 VALUES
                     (@id, @name, @type, @region, @noise, @npp,
-                     @cap, @priv, @terrain, @danger, @pickup, @normId, @x, @y, @alt)
+                     @cap, @priv, @terrain, @danger, @pickup, @normId, @x, @y, @alt, @temp, @humidity)
                 """;
 
             lock (_sync)
@@ -775,7 +806,9 @@ namespace GameEngineTools.World.Data
                     ("@normId", (object?)d.NormId ?? DBNull.Value),
                     ("@x", d.X),
                     ("@y", d.Y),
-                    ("@alt", d.AltitudeMeters));
+                    ("@alt", d.AltitudeMeters),
+                    ("@temp", d.TemperatureCelsius),
+                    ("@humidity", d.Humidity));
         }
 
         /// <summary>

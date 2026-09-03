@@ -110,11 +110,13 @@ namespace GameEngineTools.World.Data
                 sb.AppendLine(
                     $"INSERT OR IGNORE INTO Locations " +
                     $"(Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, " +
-                    $"Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters) VALUES " +
+                    $"Capacity, AllowsPrivacy, Terrain, DangerLevel, AllowsPickup, NormId, X, Y, AltitudeMeters, " +
+                    $"TemperatureCelsius, Humidity) VALUES " +
                     $"({Str(d.Id)}, {Str(d.DisplayName)}, {Str(d.Type.ToString())}, {Str(region)}, " +
                     $"{R(d.BaseNoise)}, {R(d.NoisePerPerson)}, " +
                     $"{d.Capacity}, {B(d.AllowsPrivacy)}, {Str(d.Terrain.ToString())}, " +
-                    $"{R(d.DangerLevel)}, {B(d.AllowsPickup)}, {Str(d.NormId)}, {R(d.X)}, {R(d.Y)}, {R(d.AltitudeMeters)});");
+                    $"{R(d.DangerLevel)}, {B(d.AllowsPickup)}, {Str(d.NormId)}, {R(d.X)}, {R(d.Y)}, {R(d.AltitudeMeters)}, " +
+                    $"{R(d.TemperatureCelsius)}, {R(d.Humidity)});");
             }
 
             sb.AppendLine();

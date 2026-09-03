@@ -44,7 +44,9 @@ namespace GameEngineTools.World.Data
                 NormId          TEXT    REFERENCES SocialNorms(Id),
                 X               REAL NOT NULL DEFAULT 0.0,
                 Y               REAL NOT NULL DEFAULT 0.0,
-                AltitudeMeters  REAL NOT NULL DEFAULT 0.0
+                AltitudeMeters  REAL NOT NULL DEFAULT 0.0,
+                TemperatureCelsius REAL NOT NULL DEFAULT 0.0,
+                Humidity        REAL NOT NULL DEFAULT 0.0
             );
 
             -- ── Terrain Heightmap ─────────────────────────────────────────────────

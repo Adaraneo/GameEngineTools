@@ -67,6 +67,19 @@ namespace GameEngineTools.World.Location
     /// simulation layer is expected to populate from this field per character's current
     /// location (not yet wired — see project plan).
     /// </param>
+    /// <param name="TemperatureCelsius">
+    /// Ambient temperature at this location's position, derived from latitude and altitude by
+    /// WorldGen's climate model (see <c>WorldGen.Generation.ClimateModel</c>). <c>0.0</c> (the
+    /// default) means unset — locations authored by hand (indoor rooms, houses) never populate
+    /// this. Not yet consumed by any engine (see project plan) — stored for future use, e.g. by
+    /// Physiology's cold/heat exposure or clothing choice.
+    /// </param>
+    /// <param name="Humidity">
+    /// Ambient relative wetness [0, 1] at this location's position, from an independent noise
+    /// field (see <c>WorldGen.Generation.ClimateModel</c>). <c>0.0</c> (the default) means unset.
+    /// Drives Desert/Savanna/Jungle biome classification alongside <paramref name="TemperatureCelsius"/>;
+    /// not yet consumed by any engine beyond that.
+    /// </param>
     public sealed record LocationDescriptor(
         string Id,
         string DisplayName,
@@ -85,7 +98,9 @@ namespace GameEngineTools.World.Location
         string? NormId = null,
         double X = 0.0,
         double Y = 0.0,
-        double AltitudeMeters = 0.0);
+        double AltitudeMeters = 0.0,
+        double TemperatureCelsius = 0.0,
+        double Humidity = 0.0);
 
     #endregion Location data types
 

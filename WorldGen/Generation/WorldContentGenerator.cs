@@ -51,6 +51,45 @@ public static class WorldContentGenerator
         int TectonicPlateCount = 0,
         int TectonicSeed = 0,
         double PlanetRadiusMeters = 6_378_100.0,
+        /// <summary>Temperature at the equator at sea level, in °C — the warm end of the
+        /// latitude gradient <see cref="ClimateModel"/> uses for classification.</summary>
+        double EquatorTemperatureCelsius = 27.0,
+        /// <summary>Temperature at the poles at sea level, in °C — the cold end of the same
+        /// gradient.</summary>
+        double PoleTemperatureCelsius = -25.0,
+        /// <summary>Temperature drop per kilometer of altitude, in °C/km — the standard
+        /// environmental lapse rate (~6.5) unless overridden.</summary>
+        double LapseRateCPerKm = 6.5,
+        /// <summary>Seed for the independent humidity noise field — 0 (default) reuses whatever
+        /// value the caller passes (WorldGen's CLI reuses the planet's own tectonic seed so a
+        /// climate map stays reproducible per-planet without a separate flag).</summary>
+        int ClimateSeed = 0,
+        /// <summary>Wavelength (meters) of the large-scale humidity noise field — real climate
+        /// zones span hundreds of kilometers, so this defaults far larger than terrain-noise
+        /// wavelengths.</summary>
+        double HumidityWavelengthMeters = 500_000.0,
+        /// <summary>How much humidity drops per kilometer of altitude — higher ground holds less
+        /// moisture (a coarse stand-in for orographic drying, without modeling prevailing wind or
+        /// rain shadows).</summary>
+        double AltitudeDrynessPerKm = 0.05,
+        /// <summary>Temperature (°C) at/below which a candidate (that isn't already Mountain) is
+        /// classified Tundra regardless of humidity, slope, or coastal proximity.</summary>
+        double TundraTemperatureThresholdC = -5.0,
+        /// <summary>Humidity at/below which a hot, non-coastal, non-tundra candidate classifies
+        /// Desert instead of continuing through the Plains/Forest/Savanna checks.</summary>
+        double DesertHumidityThreshold = 0.2,
+        /// <summary>Minimum temperature (°C) for the Desert check above to apply.</summary>
+        double DesertTemperatureThresholdC = 24.0,
+        /// <summary>Humidity at/above which a hot, non-coastal, non-tundra, non-desert candidate
+        /// classifies Jungle instead of continuing through the Plains/Forest/Savanna checks.</summary>
+        double JungleHumidityThreshold = 0.8,
+        /// <summary>Minimum temperature (°C) for the Jungle check above to apply.</summary>
+        double JungleTemperatureThresholdC = 22.0,
+        /// <summary>Humidity at/below which a flat, warm candidate (that already passed the
+        /// Desert/Jungle checks) classifies Savanna instead of Plains.</summary>
+        double SavannaHumidityThreshold = 0.4,
+        /// <summary>Minimum temperature (°C) for the Savanna check above to apply.</summary>
+        double SavannaTemperatureThresholdC = 18.0,
         /// <summary>Skips <see cref="PickTier"/>'s per-biome weighted roll and always uses this
         /// tier instead — mainly for deterministic tests; leave <c>null</c> for real generation.</summary>
         SettlementTier? ForcedTier = null,
@@ -93,6 +132,10 @@ public static class WorldContentGenerator
         [TerrainType.Forest] = ("Lesní", "Lesní", "Lesní"),
         [TerrainType.Plains] = ("Planinský", "Planinská", "Planinské"),
         [TerrainType.Coastline] = ("Pobřežní", "Pobřežní", "Pobřežní"),
+        [TerrainType.Desert] = ("Pouštní", "Pouštní", "Pouštní"),
+        [TerrainType.Tundra] = ("Tundrový", "Tundrová", "Tundrové"),
+        [TerrainType.Savanna] = ("Savanový", "Savanová", "Savanové"),
+        [TerrainType.Jungle] = ("Džunglový", "Džunglová", "Džunglové"),
     };
 
     private static readonly Dictionary<SettlementTier, string> TierNoun = new()
@@ -134,7 +177,8 @@ public static class WorldContentGenerator
                 continue; // couldn't find a valid spot after MaxPlacementAttempts — skip this one
 
             placedIndex++;
-            var biome = ClassifyBiome(tiles, tile, x, y, height, options);
+            var climate = ClimateModel.At(x, y, height, options);
+            var biome = ClassifyBiome(tiles, tile, x, y, height, climate, options);
             var tier = options.ForcedTier ?? PickTier(biome, rng);
             var categoryPrefix = biome.ToString().ToLowerInvariant();
             var id = $"{categoryPrefix}_{runToken}_{placedIndex:D3}";
@@ -157,7 +201,9 @@ public static class WorldContentGenerator
                 NormId: null,
                 X: x,
                 Y: y,
-                AltitudeMeters: height);
+                AltitudeMeters: height,
+                TemperatureCelsius: climate.TemperatureCelsius,
+                Humidity: climate.Humidity);
             worldDb.InsertLocation(descriptor, options.Region);
 
             objectsCreated += AddCatalogObjects(worldDb, id, biome, tier, catalog, rng);
@@ -218,15 +264,31 @@ public static class WorldContentGenerator
     }
 
     /// <summary>Classifies a candidate's biome: Mountain by raw elevation (unchanged, existing
-    /// threshold), else Coastline when land within <see cref="Options.CoastRadiusMeters"/> touches
-    /// water, else Plains when locally flat, else Forest as the remaining (hilly, dry, inland)
-    /// default.</summary>
+    /// threshold) always wins first; then Tundra by low temperature (cold overrides everything
+    /// else — a frozen coastline is still Tundra, not Coastline); then Coastline when land within
+    /// <see cref="Options.CoastRadiusMeters"/> touches water; then, among the remaining warmer
+    /// inland candidates, Desert (hot+dry) or Jungle (hot+wet) by <paramref name="climate"/>
+    /// regardless of slope; finally, for the flat remainder, Savanna (warm+seasonally-dry) or
+    /// Plains, and for the sloped remainder, Forest — same fallback the pre-climate classifier
+    /// used.</summary>
     private static TerrainType ClassifyBiome(
-        IReadOnlyList<TerrainHeightmap> tiles, TerrainHeightmap tile, double x, double y, double height, Options options)
+        IReadOnlyList<TerrainHeightmap> tiles, TerrainHeightmap tile, double x, double y, double height,
+        ClimateModel.Sample climate, Options options)
     {
         if (height >= options.MountainThresholdMeters) return TerrainType.Mountain;
+        if (climate.TemperatureCelsius <= options.TundraTemperatureThresholdC) return TerrainType.Tundra;
         if (IsNearWater(tiles, tile, x, y, options.CoastRadiusMeters)) return TerrainType.Coastline;
-        return EstimateSlope(tile, x, y) <= options.PlainsSlopeThreshold ? TerrainType.Plains : TerrainType.Forest;
+
+        if (climate.Humidity <= options.DesertHumidityThreshold && climate.TemperatureCelsius >= options.DesertTemperatureThresholdC)
+            return TerrainType.Desert;
+        if (climate.Humidity >= options.JungleHumidityThreshold && climate.TemperatureCelsius >= options.JungleTemperatureThresholdC)
+            return TerrainType.Jungle;
+
+        if (EstimateSlope(tile, x, y) > options.PlainsSlopeThreshold) return TerrainType.Forest;
+
+        return climate.Humidity <= options.SavannaHumidityThreshold && climate.TemperatureCelsius >= options.SavannaTemperatureThresholdC
+            ? TerrainType.Savanna
+            : TerrainType.Plains;
     }
 
     /// <summary>Finite-difference gradient magnitude (rise/run) at (x,y), sampled one cell-width
@@ -278,6 +340,10 @@ public static class WorldContentGenerator
             TerrainType.Mountain => (0.75, 0.22, 0.03),
             TerrainType.Coastline => (0.20, 0.45, 0.35),
             TerrainType.Plains => (0.20, 0.50, 0.30),
+            TerrainType.Savanna => (0.25, 0.48, 0.27), // flat, buildable — nearly as settleable as Plains
+            TerrainType.Desert => (0.65, 0.28, 0.07), // harsh, water-scarce — mostly lone camps
+            TerrainType.Tundra => (0.70, 0.25, 0.05), // cold, short growing season — rarely a town
+            TerrainType.Jungle => (0.60, 0.32, 0.08), // dense, disease-prone — hard to grow into a town
             _ => (0.55, 0.38, 0.07), // Forest
         };
 
@@ -312,6 +378,10 @@ public static class WorldContentGenerator
         TerrainType.Mountain => 0.30,
         TerrainType.Coastline => 0.12,
         TerrainType.Plains => 0.08,
+        TerrainType.Savanna => 0.10,
+        TerrainType.Desert => 0.20, // dehydration/exposure risk
+        TerrainType.Tundra => 0.25, // cold-exposure risk
+        TerrainType.Jungle => 0.28, // dense terrain, disease, wildlife
         _ => 0.15, // Forest
     };
 
