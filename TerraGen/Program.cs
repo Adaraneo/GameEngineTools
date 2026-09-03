@@ -262,7 +262,13 @@ internal sealed class CliOptions
             zašuměné úseky (jinak by blikala — po erozi je terén na úrovni metrů šumový, takže čistě
             bodové vyhodnocení sklonu v každé buňce zvlášť řeku uprostřed koryta zbytečně přerušuje).
             Výchozích 1200 bylo naladěno naživo (~0.17% pokrytí, nejhorší dlaždice 2.2% — bez extrémů).
-            RoadPathfinder (ve WorldGenu) už teď
+            Takhle spočtená D8 kostra ale sama o sobě teče geometricky rovně (v každé buňce vybírá
+            jeden z 8 pevných směrů, žádná setrvačnost/boční eroze) — proto se na ni ještě aplikuje
+            RiverMeander: boční výchylka podle sinusové křivky (Langbein &amp; Leopold 1966), jejíž
+            amplituda roste s odhadovanou šířkou koryta (ta se šířkou sběrné plochy) a klesá se
+            sklonem terénu — na strmém svahu zůstává řeka rovná (horské bystřiny), na plošině
+            klikatí (nížinné meandry), přesně podle skutečného vztahu sinuozity ke sklonu (Leopold &amp;
+            Wolman 1957). RoadPathfinder (ve WorldGenu) už teď
             umí penalizovat křížení řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby
             to mělo co penalizovat.
 

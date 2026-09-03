@@ -93,7 +93,7 @@ public static class TileHydrology
     /// any production caller (which only wants the final 0/1 mask), but lets a test or a future
     /// investigation see WHY a specific cell did or didn't make the cut, instead of only the
     /// pass/fail outcome.</summary>
-    internal static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream) ComputeDiagnostics(TerrainHeightmap grid, Parameters p)
+    internal static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order) ComputeDiagnostics(TerrainHeightmap grid, Parameters p)
     {
         var width = grid.Width;
         var height = grid.Height;
@@ -174,7 +174,7 @@ public static class TileHydrology
             if (next >= 0) mask[next] = 1;
         }
 
-        return (mask, accumulation, slope, downstream);
+        return (mask, accumulation, slope, downstream, order);
     }
 
     /// <summary>
