@@ -51,6 +51,20 @@ public static class RiverMeander
     public static byte[] ApplyMeander(TerrainHeightmap grid, byte[] straightMask, int[] accumulation,
         double[] slope, int[] downstream, int[] order, Parameters p)
     {
+        var (offsetX, offsetY) = ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
+        return Rasterize(grid, straightMask, downstream, offsetX, offsetY);
+    }
+
+    /// <summary>Same computation as <see cref="ApplyMeander"/>, but stops short of rasterizing —
+    /// returns each backbone cell's own displaced (x,y) instead, in the SAME arc-length/amplitude
+    /// units the rasterized mask is built from. Not needed by any production caller (which only
+    /// wants the final mask), but lets a test measure the meander's actual path length/sinuosity
+    /// directly from where cells moved, instead of only from how many raster pixels ended up lit —
+    /// Bresenham's own pixel count depends on rasterization angle in a way true arc length
+    /// doesn't.</summary>
+    internal static (int[] OffsetX, int[] OffsetY) ComputeOffsets(TerrainHeightmap grid, byte[] straightMask,
+        int[] accumulation, double[] slope, int[] downstream, int[] order, Parameters p)
+    {
         var width = grid.Width;
         var height = grid.Height;
         var count = width * height;
@@ -61,8 +75,41 @@ public static class RiverMeander
         // largest contributor has already resolved its own arc length before passing it onward.
         // This is what gives the sine curve a stable, connected phase along the whole channel
         // instead of restarting arbitrarily at every confluence.
+        //
+        // Two more quantities propagate the same way, both to fix a real self-intersection defect
+        // (confirmed live: 44% of measured reaches crossed themselves, one 24 times over ~3km) that
+        // a sine-generated curve should NOT have — Leopold's own belt-width ratios only stay
+        // non-self-crossing when channel width (hence wavelength/amplitude) stays effectively
+        // constant across one full meander cycle. Recomputing width from each cell's own raw,
+        // locally noisy accumulation broke that assumption every time accumulation jittered even
+        // slightly cycle-to-cycle. Exponentially smoothing both along arc length, with a decay
+        // length of one wavelength, fixes it the same way a real channel's own width doesn't
+        // fluctuate cell-to-cell either:
+        //   - smoothedWidth: stabilizes wavelength/amplitude so successive cycles stay consistent
+        //     instead of drifting into each other.
+        //   - smoothedDir: the D8 backbone itself is jittery at cell resolution (that's the whole
+        //     reason it needed meandering in the first place) — sine-overlaying a wobble on top of
+        //     an already-wobbly base direction compounds the two curvatures and can loop back on
+        //     itself even with a perfectly steady width, so the perpendicular axis needs to follow
+        //     the backbone's smoothed TREND direction, not its raw single-cell direction.
         var arcLength = new double[count];
+        // Accumulated PHASE of the sine wave (radians), not raw arc length — kept as its own
+        // running total rather than recomputed as arcLength/wavelength at each cell. Wavelength
+        // grows downstream as accumulated area grows, and sin(2π·s/λ(s)) — evaluating the WHOLE
+        // arc length so far against only the CURRENT, already-much-larger wavelength — silently
+        // assumes the entire path so far occurred at today's wavelength. It didn't: confirmed live,
+        // this was the actual cause of the self-crossing loops earlier tuning couldn't fix by
+        // adjusting amplitude or smoothing alone, because the bug wasn't in either of those — a
+        // proper varying-wavelength wave needs its phase integrated incrementally, exactly like
+        // arcLength itself already is.
+        var phase = new double[count];
         var bestUpstreamAccum = new int[count];
+        var smoothedWidth = new double[count];
+        var smoothedDirX = new double[count];
+        var smoothedDirY = new double[count];
+
+        for (var i = 0; i < count; i++)
+            smoothedWidth[i] = p.WidthPerSqrtAreaM2 * Math.Sqrt(accumulation[i] * cellSize * cellSize);
 
         foreach (var idx in order)
         {
@@ -74,13 +121,34 @@ public static class RiverMeander
             var y = idx / width;
             var nx = next % width;
             var ny = next / width;
-            var stepDist = (nx != x && ny != y ? 1.4142135623730951 : 1.0) * cellSize;
+            var cellMag = nx != x && ny != y ? 1.4142135623730951 : 1.0;
+            var stepDist = cellMag * cellSize;
             var candidateArc = arcLength[idx] + stepDist;
+
+            // Unit direction vector (dimensionless), not the raw step — this is what gets smoothed.
+            var stepDirX = (nx - x) / cellMag;
+            var stepDirY = (ny - y) / cellMag;
 
             if (accumulation[idx] >= bestUpstreamAccum[next])
             {
                 bestUpstreamAccum[next] = accumulation[idx];
                 arcLength[next] = candidateArc;
+
+                // Phase advances by this step's own length measured in units of idx's OWN (already
+                // resolved) wavelength — an incremental integral, not a lump-sum recomputation.
+                var wavelengthHere = Math.Max(cellSize, p.WavelengthPerWidth * smoothedWidth[idx]);
+                phase[next] = phase[idx] + 2.0 * Math.PI * stepDist / wavelengthHere;
+
+                // Exponential smoothing along the dominant path: blend this step's own raw value
+                // toward the upstream neighbor's ALREADY-smoothed value, decaying over a distance
+                // of one wavelength (estimated from the upstream neighbor's own smoothed width, so
+                // it's self-consistent rather than circular).
+                var smoothingLength = Math.Max(cellSize, p.WavelengthPerWidth * smoothedWidth[idx]);
+                var w = 1.0 - Math.Exp(-stepDist / smoothingLength);
+                var rawWidthHere = p.WidthPerSqrtAreaM2 * Math.Sqrt(accumulation[next] * cellSize * cellSize);
+                smoothedWidth[next] = smoothedWidth[idx] + (rawWidthHere - smoothedWidth[idx]) * w;
+                smoothedDirX[next] = smoothedDirX[idx] + (stepDirX - smoothedDirX[idx]) * w;
+                smoothedDirY[next] = smoothedDirY[idx] + (stepDirY - smoothedDirY[idx]) * w;
             }
         }
 
@@ -95,9 +163,7 @@ public static class RiverMeander
             var next = downstream[idx];
             if (next < 0) continue;
 
-            var areaM2 = accumulation[idx] * cellSize * cellSize;
-            var channelWidth = p.WidthPerSqrtAreaM2 * Math.Sqrt(areaM2);
-            var wavelength = Math.Max(cellSize, p.WavelengthPerWidth * channelWidth);
+            var channelWidth = smoothedWidth[idx];
             var maxAmplitude = p.AmplitudePerWidth * channelWidth;
 
             var here = slope[idx];
@@ -109,33 +175,52 @@ public static class RiverMeander
 
             var x = idx % width;
             var y = idx / width;
-            var nx = next % width;
-            var ny = next / width;
-            var dirX = nx - x;
-            var dirY = ny - y;
-            var len = Math.Sqrt(dirX * dirX + dirY * dirY);
-            if (len < 0.001) continue;
 
-            // Perpendicular to the local flow direction — this is the axis the sine wave displaces
-            // the channel along, same as a real meander swings side-to-side across its valley.
+            // The smoothed TREND direction, not the raw single-cell D8 step — see the remarks above
+            // on why overlaying a wobble on an already-jittery base direction compounds curvature.
+            // Falls back to the raw step for a cell whose smoothing never got a chance to run (e.g.
+            // a head cell one step from its own start).
+            var dirX = smoothedDirX[idx];
+            var dirY = smoothedDirY[idx];
+            var len = Math.Sqrt(dirX * dirX + dirY * dirY);
+            if (len < 0.001)
+            {
+                var nx0 = next % width;
+                var ny0 = next / width;
+                dirX = nx0 - x;
+                dirY = ny0 - y;
+                len = Math.Sqrt(dirX * dirX + dirY * dirY);
+                if (len < 0.001) continue;
+            }
+
+            // Perpendicular to the smoothed flow direction — this is the axis the sine wave
+            // displaces the channel along, same as a real meander swings side-to-side across its
+            // valley.
             var perpX = -dirY / len;
             var perpY = dirX / len;
 
-            var offsetMeters = amplitude * Math.Sin(2.0 * Math.PI * arcLength[idx] / wavelength);
+            var offsetMeters = amplitude * Math.Sin(phase[idx]);
             var offsetCells = offsetMeters / cellSize;
 
             offsetX[idx] = Math.Clamp((int)Math.Round(x + perpX * offsetCells), 0, width - 1);
             offsetY[idx] = Math.Clamp((int)Math.Round(y + perpY * offsetCells), 0, height - 1);
         }
 
-        // Reconnect: every original edge (cell -> its downstream cell) gets redrawn between the
-        // TWO cells' own offset positions, not just the offset cells marked in isolation — a
-        // meander swing can move a cell several grid cells sideways between one step and the next,
-        // and without redrawing the connecting line the channel would fragment into disconnected
-        // dots exactly like the bug TileHydrology's own downstream-propagation fix already solved
-        // for the straight case.
-        var meandered = new byte[count];
-        for (var idx = 0; idx < count; idx++)
+        return (offsetX, offsetY);
+    }
+
+    /// <summary>Reconnect: every original edge (cell -> its downstream cell) gets redrawn between
+    /// the TWO cells' own offset positions, not just the offset cells marked in isolation — a
+    /// meander swing can move a cell several grid cells sideways between one step and the next, and
+    /// without redrawing the connecting line the channel would fragment into disconnected dots
+    /// exactly like the bug TileHydrology's own downstream-propagation fix already solved for the
+    /// straight case.</summary>
+    private static byte[] Rasterize(TerrainHeightmap grid, byte[] straightMask, int[] downstream, int[] offsetX, int[] offsetY)
+    {
+        var width = grid.Width;
+        var height = grid.Height;
+        var meandered = new byte[straightMask.Length];
+        for (var idx = 0; idx < straightMask.Length; idx++)
         {
             if (straightMask[idx] == 0) continue;
             var next = downstream[idx];
