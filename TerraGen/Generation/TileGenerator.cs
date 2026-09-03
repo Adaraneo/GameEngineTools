@@ -12,6 +12,24 @@ namespace TerraGen.Generation;
 /// border agrees exactly after erosion too, not just in the raw pre-erosion noise. A direction
 /// with no existing neighbor yet is left as this tile's own fresh result, to be picked up later
 /// as context whenever that neighbor eventually gets generated.
+///
+/// River extraction (see <see cref="TileHydrology"/>) is the one step that does NOT follow this
+/// same per-tile-independent shape: D8 flow accumulation genuinely needs to know how much water
+/// already flowed in from upstream, which per-tile computation alone can't answer — a river that
+/// built up a large catchment over many tiles would otherwise look, to each individual downstream
+/// tile, like it's starting fresh with a tiny local catchment right at its own western/southern
+/// edge, breaking the channel into disconnected fragments at every tile boundary (confirmed live:
+/// only ~9% of river cells sitting exactly on a tile edge lined up with a river cell in the
+/// neighboring tile at the same position). So hydrology runs ONCE, after every tile in THIS batch
+/// has been generated and eroded, over the whole batch's stitched elevation — not once per tile —
+/// then the combined river mask is sliced back out per tile for a second, river-mask-only save.
+/// That fully connects rivers WITHIN one Run() call, at the cost of holding every tile's elevation
+/// in memory simultaneously instead of one at a time (worse memory/CPU for large batches — an
+/// accepted tradeoff for connected rivers) and a second SaveHeightmap round-trip per tile. It does
+/// NOT connect across two SEPARATE Run() invocations (e.g. filling in a region next to one
+/// generated last week) — that would require re-flowing accumulation through already-saved
+/// neighbor tiles too, a much bigger, potentially whole-planet-cascading problem; existing
+/// neighbor tiles' river masks are left exactly as they already were.
 /// </summary>
 /// <remarks>
 /// Every tile's mountain layer is computed as a flat offset from <see cref="RunSettings.MountainOriginLatDeg"/>/
@@ -41,9 +59,10 @@ public static class TileGenerator
         double MountainOriginLonDeg = 0.0,
         /// <summary><c>null</c> (default) skips river extraction entirely — existing worlds/tiles
         /// generated before this option existed must keep regenerating identically. Non-null
-        /// derives <see cref="TerrainHeightmap.RiverMask"/> from the tile's own drainage pattern
-        /// (see <see cref="TileHydrology"/>) right after erosion, instead of leaving it null for
-        /// TerrainEditor's manual painting to be the only way it's ever set.</summary>
+        /// derives <see cref="TerrainHeightmap.RiverMask"/> from the WHOLE requested batch's own
+        /// drainage pattern (see <see cref="TileHydrology"/> and the type-level remarks on why this
+        /// is computed once per batch, not once per tile) right after erosion, instead of leaving it
+        /// null for TerrainEditor's manual painting to be the only way it's ever set.</summary>
         TileHydrology.Parameters? HydrologyParams = null);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
@@ -112,6 +131,14 @@ public static class TileGenerator
 
         var results = new List<TileResult>(rows * cols);
 
+        // Only populated when s.HydrologyParams is set — holds every tile's post-erosion interior
+        // elevation so the batch-wide hydrology pass below can stitch them into one combined grid.
+        // Left empty (no extra memory) when rivers are off, matching this method's existing
+        // "existing behavior must not change" backward-compatibility rule.
+        var batchTiles = s.HydrologyParams is not null
+            ? new List<(int Row, int Col, string Id, double CenterLat, double CenterLon, float[] Interior)>(rows * cols)
+            : null;
+
         for (var row = 0; row < rows; row++)
         {
             for (var col = 0; col < cols; col++)
@@ -173,37 +200,72 @@ public static class TileGenerator
 
                 TileErosion.Erode(padded, s.ErosionParams, locked);
 
-                // Computed AFTER erosion, on the eroded elevations — a river follows the terrain
-                // erosion actually carved, not the pre-erosion noise.
-                var paddedRiverMask = s.HydrologyParams is { } hydrologyParams
-                    ? TileHydrology.ComputeRiverMask(padded, hydrologyParams)
-                    : null;
-
                 var interior = new float[cellsPerTile * cellsPerTile];
-                var riverMaskInterior = paddedRiverMask is null ? null : new byte[cellsPerTile * cellsPerTile];
                 for (var iy = 0; iy < cellsPerTile; iy++)
                 {
                     var py = iy + margin;
                     for (var ix = 0; ix < cellsPerTile; ix++)
                     {
                         var px = ix + margin;
-                        var paddedIdx = py * paddedSize + px;
-                        var interiorIdx = iy * cellsPerTile + ix;
-                        interior[interiorIdx] = padded.Values[paddedIdx];
-                        if (riverMaskInterior is not null)
-                            riverMaskInterior[interiorIdx] = paddedRiverMask![paddedIdx];
+                        interior[iy * cellsPerTile + ix] = padded.Values[py * paddedSize + px];
                     }
                 }
 
                 var (centerLat, centerLon) = TileCenter(row, col);
                 var id = TileId(s.NoiseParams.Seed, centerLat, centerLon);
+                // River mask left null here even when hydrology is on — filled in by the batch
+                // pass below, which needs every tile's elevation already saved (for the NEXT
+                // tile's own neighbor-locking above) before it can compute anything.
                 var tile = new TerrainHeightmap(id, tileOriginX, tileOriginY, s.CellSizeMeters,
-                    cellsPerTile, cellsPerTile, interior, riverMaskInterior);
+                    cellsPerTile, cellsPerTile, interior);
                 db.SaveHeightmap(tile);
+
+                batchTiles?.Add((row, col, id, centerLat, centerLon, interior));
 
                 var result = new TileResult(row, col, id, centerLat, centerLon);
                 results.Add(result);
                 onProgress?.Invoke($"[{row},{col}] {id}  lat={centerLat:0.000} lon={centerLon:0.000}");
+            }
+        }
+
+        if (batchTiles is { Count: > 0 } && s.HydrologyParams is { } hydrologyParams)
+        {
+            // Stitch every tile's interior elevation into one combined grid, in the same row/col
+            // layout the loop above already placed them at — see the type-level remarks for why
+            // this has to happen once per batch instead of once per tile.
+            var bigWidth = cols * cellsPerTile;
+            var bigHeight = rows * cellsPerTile;
+            var combined = new float[bigWidth * bigHeight];
+            foreach (var t in batchTiles)
+            {
+                var baseX = t.Col * cellsPerTile;
+                var baseY = t.Row * cellsPerTile;
+                for (var iy = 0; iy < cellsPerTile; iy++)
+                {
+                    var srcRow = iy * cellsPerTile;
+                    var dstRow = (baseY + iy) * bigWidth + baseX;
+                    Array.Copy(t.Interior, srcRow, combined, dstRow, cellsPerTile);
+                }
+            }
+
+            var combinedGrid = new TerrainHeightmap("batch-combined", swX, swY, s.CellSizeMeters,
+                bigWidth, bigHeight, combined);
+            var combinedRiverMask = TileHydrology.ComputeRiverMask(combinedGrid, hydrologyParams);
+
+            foreach (var t in batchTiles)
+            {
+                var baseX = t.Col * cellsPerTile;
+                var baseY = t.Row * cellsPerTile;
+                var riverMaskInterior = new byte[cellsPerTile * cellsPerTile];
+                for (var iy = 0; iy < cellsPerTile; iy++)
+                {
+                    var srcRow = (baseY + iy) * bigWidth + baseX;
+                    Array.Copy(combinedRiverMask, srcRow, riverMaskInterior, iy * cellsPerTile, cellsPerTile);
+                }
+
+                var tile = new TerrainHeightmap(t.Id, swX + t.Col * s.TileSizeMeters, swY + t.Row * s.TileSizeMeters,
+                    s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior);
+                db.SaveHeightmap(tile);
             }
         }
 

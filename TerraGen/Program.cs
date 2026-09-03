@@ -179,7 +179,7 @@ internal sealed class CliOptions
     /// tile's own post-erosion drainage pattern (see <see cref="TerraGen.Generation.TileHydrology"/>)
     /// instead of leaving it null (TerrainEditor's manual painting is otherwise the only way it's ever set).</summary>
     public bool Rivers { get; init; }
-    public int RiverThreshold { get; init; } = 200;
+    public int RiverThreshold { get; init; } = 800;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -241,24 +241,27 @@ internal sealed class CliOptions
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
-                        [--rivers [--river-threshold <počet buněk, výchozí 200>]]
+                        [--rivers [--river-threshold <počet buněk, výchozí 800>]]
 
             --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
             desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
             Typická hodnota pro planetu podobnou Zemi je 8-16. Existující dlaždice vygenerované
             bez tohoto přepínače musí dál generovat identicky, proto je výchozí hodnota 0.
 
-            --rivers (vypnuto výchozí, ze stejného důvodu jako --tectonic-plates) po erozi
-            spočítá D8 flow-accumulation (odtokový model) na vygenerovaném terénu a podle toho
-            naplní RiverMask dlaždice řekami — místo aby zůstal prázdný a řeky se daly jen ručně
-            malovat v TerrainEditoru. --river-threshold určuje, kolik buněk musí do daného místa
-            odtékat, aby se stalo řekou — nižší hodnota = hustší síť i s malými potůčky, vyšší =
-            jen pár velkých řek. Výchozích 200 (při --cell-m 5 odpovídá sběrné ploše 200*5*5=5000 m²)
-            bylo naladěno naživo tak, aby pokrytí odpovídalo reálné hustotě říční sítě (řádově
-            jednotky procent plochy) — nižší hodnoty jako 50 označí i triviální 0.5ha odtok jako
-            řeku a síť vyjde několikanásobně hustší, než je fyzicky přiměřené. RoadPathfinder (ve
-            WorldGenu) už teď umí penalizovat křížení řeky — tenhle přepínač je to, co RiverMask
-            konečně naplní, aby to mělo co penalizovat.
+            --rivers (vypnuto výchozí, ze stejného důvodu jako --tectonic-plates) po erozi spočítá
+            D8 flow-accumulation (odtokový model) JEDNOU přes celý požadovaný region najednou (ne
+            po jedné dlaždici) — tok se tedy propojí i přes hranice dlaždic, ne že by na každé
+            znovu "začínal od nuly". Stojí to víc paměti/výpočtu (celý region drží v paměti najednou)
+            a druhé uložení RiverMasky navíc, ale bez toho by řeka vypadala na hranicích dlaždic
+            přerušovaně. --river-threshold určuje, kolik buněk musí do daného místa odtékat, aby se
+            stalo řekou — nižší hodnota = hustší síť i s malými potůčky, vyšší = jen pár velkých
+            řek. Výchozích 800 bylo naladěno naživo přímo na téhle celoregionové akumulaci (ne na
+            jedné dlaždici — tam nižší hodnota jako 200 stačila, ale na velké souvislé plošině bez
+            dost silné konvergence k jednomu odtoku vytvořila "hřeben" desítek rovnoběžných pramínků
+            místo propojené sítě) tak, aby pokrytí odpovídalo reálné hustotě říční sítě (řádově
+            jednotky procent plochy) i v nejhorším případě. RoadPathfinder (ve WorldGenu) už teď umí
+            penalizovat křížení řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby to
+            mělo co penalizovat.
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -332,7 +335,7 @@ internal sealed class CliOptions
         var erosion = 50.0;
         int? tectonicPlateCount = null;
         var rivers = false;
-        var riverThreshold = 200;
+        var riverThreshold = 800;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;

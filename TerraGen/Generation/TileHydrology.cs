@@ -18,13 +18,18 @@ public static class TileHydrology
     public sealed record Parameters(
         /// <summary>Minimum flow accumulation (upstream cell count, including the cell itself)
         /// for a cell to be marked as river. Higher = fewer, larger rivers only; lower = a denser
-        /// network that also picks up small streams. Default 200 was calibrated live against a
-        /// 5m-cell tile: 50 (the previous default) marked ~10% of a real low-relief tile as river —
-        /// a contributing catchment of just 50*5m*5m = 1250 m², trivial next to what a real
-        /// perennial stream needs — producing a network several times denser than the ~1-3% area
-        /// coverage real-world drainage density implies. 200 lands close to that (~2-3% on the same
-        /// tile) while still resolving a connected network, not just the very largest channels.</summary>
-        int FlowAccumulationThreshold = 200);
+        /// network that also picks up small streams. Default 800 was calibrated live at 5m cells
+        /// against <see cref="TileGenerator"/>'s BATCH-wide combined grid (not a single tile — see
+        /// its type-level remarks): once accumulation genuinely carries across tile boundaries, the
+        /// same tile-scale calibration this used to use (200, when ComputeRiverMask still ran once
+        /// per ~40,000-cell tile) becomes far too low again — a low-relief area's Garbrecht-Martz
+        /// convergence bias (see <see cref="ResolveFlats"/>) weakens over a much larger flat span,
+        /// so with 200 many parallel channels each independently cleared the bar, producing a
+        /// "comb" of near-parallel streaks in one live tile (26% marked) instead of a connected
+        /// network. 800 keeps overall coverage close to the same ~1% real-world-drainage-density
+        /// target that motivated raising it off the original default of 50 in the first place,
+        /// while keeping any single tile's worst-case coverage down near 2.5% instead of 26%.</summary>
+        int FlowAccumulationThreshold = 800);
 
     /// <summary>Tiny per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit
     /// or a flat plateau — small enough to never visibly distort real terrain (real slopes differ

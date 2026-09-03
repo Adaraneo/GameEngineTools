@@ -349,4 +349,100 @@ public class TileGeneratorTests
             if (File.Exists(dbPath)) File.Delete(dbPath);
         }
     }
+
+    [TestMethod]
+    public void Run_WithHydrologyParams_RiversStayConnectedAcrossTileBoundaries()
+    {
+        // Regression test for a real generation defect (found live on production terrain): before
+        // this batch-wide hydrology pass existed, TileHydrology.ComputeRiverMask ran once PER
+        // TILE, so a river's flow accumulation reset to a tiny local catchment at every tile edge —
+        // confirmed live, only ~9% of river cells sitting exactly on a tile boundary lined up with
+        // a river cell in the neighboring tile at the same position (i.e. ~91% just dead-ended).
+        // TileGenerator.Run now stitches every tile in the batch into one combined grid before
+        // calling ComputeRiverMask ONCE, so a river's accumulation genuinely carries across tile
+        // edges. This asserts that fix holds: for river cells sitting exactly on an INTERNAL tile
+        // boundary (i.e. not the whole batch's own outer edge, which still has no upstream context
+        // to draw on — same already-accepted local-approximation limit as before), most must line
+        // up with a river cell in the neighboring tile at the same position.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.006, LonMin: 0.0, LonMax: 0.006,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 5, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 5, DropletCount: 500, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                HydrologyParams: new TileHydrology.Parameters(FlowAccumulationThreshold: 30));
+
+            var results = TileGenerator.Run(db, settings);
+            var tiles = results.Select(r => db.LoadHeightmap(r.Id)!).ToList();
+            Assert.IsTrue(tiles.Count >= 4, "Need a multi-tile grid for a boundary-crossing check to mean anything.");
+
+            var byOrigin = tiles.ToDictionary(t => (Math.Round(t.OriginX, 3), Math.Round(t.OriginY, 3)));
+            var boundaryRiverCells = 0;
+            var connectedAcross = 0;
+
+            foreach (var t in tiles)
+            {
+                if (t.RiverMask is null) continue;
+                var w = t.Width;
+                var h = t.Height;
+                var cs = t.CellSizeMeters;
+
+                // Checked against a 3-wide window (y-1..y+1 / x-1..x+1) on the far side, not just
+                // the exact same row/column — D8 flow is 8-connected, so a channel crossing a
+                // boundary diagonally legitimately lands one cell off straight-across.
+                var eastKey = (Math.Round(t.OriginX + w * cs, 3), Math.Round(t.OriginY, 3));
+                if (byOrigin.TryGetValue(eastKey, out var east) && east.RiverMask is not null)
+                {
+                    for (var y = 0; y < h; y++)
+                    {
+                        if (t.RiverMask[y * w + (w - 1)] == 0) continue;
+                        boundaryRiverCells++;
+                        var found = false;
+                        for (var dy = -1; dy <= 1 && !found; dy++)
+                        {
+                            var ny = y + dy;
+                            if (ny < 0 || ny >= h) continue;
+                            if (east.RiverMask[ny * w + 0] != 0) found = true;
+                        }
+                        if (found) connectedAcross++;
+                    }
+                }
+
+                var northKey = (Math.Round(t.OriginX, 3), Math.Round(t.OriginY + h * cs, 3));
+                if (byOrigin.TryGetValue(northKey, out var north) && north.RiverMask is not null)
+                {
+                    for (var x = 0; x < w; x++)
+                    {
+                        if (t.RiverMask[(h - 1) * w + x] == 0) continue;
+                        boundaryRiverCells++;
+                        var found = false;
+                        for (var dx = -1; dx <= 1 && !found; dx++)
+                        {
+                            var nx = x + dx;
+                            if (nx < 0 || nx >= w) continue;
+                            if (north.RiverMask[0 * w + nx] != 0) found = true;
+                        }
+                        if (found) connectedAcross++;
+                    }
+                }
+            }
+
+            Assert.IsTrue(boundaryRiverCells > 0, "Test grid produced no river cells on any internal tile boundary — pick different noise/threshold.");
+            var pct = 100.0 * connectedAcross / boundaryRiverCells;
+            Assert.IsTrue(pct > 50.0,
+                $"Expected most internal-boundary river cells to connect into their neighbor tile " +
+                $"(>50%), not dead-end at nearly every edge like the pre-fix per-tile computation did " +
+                $"(~9% live) — got {pct:F1}% ({connectedAcross}/{boundaryRiverCells}).");
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
 }
