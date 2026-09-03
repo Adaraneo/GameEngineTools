@@ -250,13 +250,15 @@ public static class TileGenerator
 
             var combinedGrid = new TerrainHeightmap("batch-combined", swX, swY, s.CellSizeMeters,
                 bigWidth, bigHeight, combined);
-            var (straightRiverMask, riverAccumulation, riverSlope, riverDownstream, riverOrder) =
+            var (straightRiverMask, riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder) =
                 TileHydrology.ComputeDiagnostics(combinedGrid, hydrologyParams);
             // Bends the straight D8 backbone above into a meandering path (see RiverMeander's own
             // remarks for why D8 alone can't produce one) — a shape-only pass, so it never changes
             // which cells actually count as river-worthy, just where within the grid each one draws.
+            // The Strahler order threaded through here is what ends up baked into each tile's own
+            // saved RiverMask byte value below, instead of a flat 1 — see TerrainHeightmap's remarks.
             var combinedRiverMask = RiverMeander.ApplyMeander(combinedGrid, straightRiverMask,
-                riverAccumulation, riverSlope, riverDownstream, riverOrder, new RiverMeander.Parameters());
+                riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, new RiverMeander.Parameters());
 
             foreach (var t in batchTiles)
             {

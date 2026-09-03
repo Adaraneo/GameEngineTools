@@ -43,16 +43,19 @@ public static class RiverMeander
         double SlopeSuppressedAbove = 0.08);
 
     /// <summary>Takes the straight D8 mask <see cref="TileHydrology.ComputeDiagnostics"/> already
-    /// computed (plus its accumulation/slope/downstream arrays, which this reuses rather than
-    /// recomputing) and returns a new mask where every marked cell has been laterally displaced
-    /// along a sine-generated curve. Cell count and shape match the input — this only ever
-    /// redistributes WHERE within the same grid the channel is drawn, it doesn't add or remove
-    /// catchment area or change the underlying accumulation/routing at all.</summary>
+    /// computed (plus its accumulation/slope/downstream/Strahler-order arrays, which this reuses
+    /// rather than recomputing) and returns a new mask where every marked cell has been laterally
+    /// displaced along a sine-generated curve. Cell count and shape match the input — this only
+    /// ever redistributes WHERE within the same grid the channel is drawn, it doesn't add or remove
+    /// catchment area or change the underlying accumulation/routing at all. The returned byte value
+    /// at a river cell is its Strahler order (see <see cref="GameEngineTools.World.Data.TerrainHeightmap.RiverMask"/>'s
+    /// remarks), not a flat 1 — meandering only changes shape, never what a cell's own order was on
+    /// the straight backbone.</summary>
     public static byte[] ApplyMeander(TerrainHeightmap grid, byte[] straightMask, int[] accumulation,
-        double[] slope, int[] downstream, int[] order, Parameters p)
+        double[] slope, int[] downstream, int[] order, byte[] strahlerOrder, Parameters p)
     {
         var (offsetX, offsetY) = ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
-        return Rasterize(grid, straightMask, downstream, offsetX, offsetY);
+        return Rasterize(grid, straightMask, downstream, strahlerOrder, offsetX, offsetY);
     }
 
     /// <summary>Same computation as <see cref="ApplyMeander"/>, but stops short of rasterizing —
@@ -215,7 +218,8 @@ public static class RiverMeander
     /// without redrawing the connecting line the channel would fragment into disconnected dots
     /// exactly like the bug TileHydrology's own downstream-propagation fix already solved for the
     /// straight case.</summary>
-    private static byte[] Rasterize(TerrainHeightmap grid, byte[] straightMask, int[] downstream, int[] offsetX, int[] offsetY)
+    private static byte[] Rasterize(TerrainHeightmap grid, byte[] straightMask, int[] downstream,
+        byte[] strahlerOrder, int[] offsetX, int[] offsetY)
     {
         var width = grid.Width;
         var height = grid.Height;
@@ -223,21 +227,24 @@ public static class RiverMeander
         for (var idx = 0; idx < straightMask.Length; idx++)
         {
             if (straightMask[idx] == 0) continue;
+            var value = strahlerOrder[idx];
             var next = downstream[idx];
             if (next < 0)
             {
-                meandered[offsetY[idx] * width + offsetX[idx]] = 1;
+                StampMax(meandered, offsetY[idx] * width + offsetX[idx], value);
                 continue;
             }
-            DrawLine(meandered, width, height, offsetX[idx], offsetY[idx], offsetX[next], offsetY[next]);
+            DrawLine(meandered, width, height, offsetX[idx], offsetY[idx], offsetX[next], offsetY[next], value);
         }
 
         return meandered;
     }
 
     /// <summary>Bresenham line rasterization, so two consecutive offset points always end up
-    /// 8-connected on the grid no matter how far apart a meander swing put them.</summary>
-    private static void DrawLine(byte[] mask, int width, int height, int x0, int y0, int x1, int y1)
+    /// 8-connected on the grid no matter how far apart a meander swing put them. Stamps
+    /// <paramref name="value"/> (the source cell's Strahler order) rather than a flat 1 — see
+    /// <see cref="ApplyMeander"/>'s remarks.</summary>
+    private static void DrawLine(byte[] mask, int width, int height, int x0, int y0, int x1, int y1, byte value)
     {
         var dx = Math.Abs(x1 - x0);
         var dy = -Math.Abs(y1 - y0);
@@ -250,11 +257,19 @@ public static class RiverMeander
         while (true)
         {
             if (x >= 0 && x < width && y >= 0 && y < height)
-                mask[y * width + x] = 1;
+                StampMax(mask, y * width + x, value);
             if (x == x1 && y == y1) break;
             var e2 = 2 * err;
             if (e2 >= dy) { err += dy; x += sx; }
             if (e2 <= dx) { err += dx; y += sy; }
         }
+    }
+
+    /// <summary>Two different reaches' meander swings can rasterize over the same pixel — keep
+    /// whichever order is bigger rather than letting draw order arbitrarily decide, so a large
+    /// river's line never gets accidentally overwritten by a small tributary passing near it.</summary>
+    private static void StampMax(byte[] mask, int idx, byte value)
+    {
+        if (value > mask[idx]) mask[idx] = value;
     }
 }

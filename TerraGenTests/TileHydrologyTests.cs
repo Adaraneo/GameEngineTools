@@ -231,4 +231,121 @@ public class TileHydrologyTests
             Assert.AreEqual(1, mask[x], $"Column {x} (flatStep={flatSteps.Contains(x)}) should stay marked — " +
                 "an established channel must not un-mark itself over a locally flat step.");
     }
+
+    [TestMethod]
+    public void ComputeDiagnostics_StrahlerOrder_HeadwatersAreAlwaysOrderOne()
+    {
+        // Definitional: a channel head (a river cell with no river cell flowing INTO it) has never
+        // had a tributary merge into it, so by Strahler's own definition it must be order 1 — true
+        // regardless of terrain shape, so this checks the property directly rather than hand-predicting
+        // values for one specific hand-built confluence.
+        var (mask, _, _, downstream, order, strahlerOrder) = ComputeOnAConfluenceRichGrid();
+        var upstreamCount = BuildUpstreamCounts(mask, downstream, order.Length);
+
+        for (var i = 0; i < mask.Length; i++)
+        {
+            if (mask[i] == 0) continue;
+            if (upstreamCount[i] == 0)
+                Assert.AreEqual(1, strahlerOrder[i], $"Headwater cell {i} should be Strahler order 1.");
+        }
+    }
+
+    [TestMethod]
+    public void ComputeDiagnostics_StrahlerOrder_NeverDecreasesDownstream()
+    {
+        // Definitional: Strahler order can only stay the same or increase moving downstream —
+        // merging a smaller tributary into a bigger reach never shrinks the bigger reach's own
+        // classification.
+        var (mask, _, _, downstream, _, strahlerOrder) = ComputeOnAConfluenceRichGrid();
+
+        for (var i = 0; i < mask.Length; i++)
+        {
+            if (mask[i] == 0) continue;
+            var next = downstream[i];
+            if (next < 0 || mask[next] == 0) continue;
+            Assert.IsTrue(strahlerOrder[next] >= strahlerOrder[i],
+                $"Order dropped from {strahlerOrder[i]} at {i} to {strahlerOrder[next]} downstream at {next} — Strahler order must never decrease.");
+        }
+    }
+
+    [TestMethod]
+    public void ComputeDiagnostics_StrahlerOrder_OnlyIncreasesWhenTwoEqualOrdersMerge()
+    {
+        // Definitional: at a confluence (2+ river cells flowing into the same cell), the merged
+        // cell's order is max(upstream orders)+1 ONLY if that max is shared by at least two
+        // tributaries; a single dominant tributary absorbing a smaller one keeps its own order
+        // unchanged — a big river doesn't bump up in classification just because a trickle joins it.
+        var (mask, _, _, downstream, order, strahlerOrder) = ComputeOnAConfluenceRichGrid();
+        var upstream = BuildUpstreamLists(mask, downstream, order.Length);
+
+        var confluencesChecked = 0;
+        for (var i = 0; i < mask.Length; i++)
+        {
+            if (mask[i] == 0) continue;
+            var ups = upstream[i];
+            if (ups.Count < 2) continue;
+
+            var upstreamOrders = ups.Select(u => (int)strahlerOrder[u]).ToList();
+            var maxOrder = upstreamOrders.Max();
+            var countAtMax = upstreamOrders.Count(o => o == maxOrder);
+            var expected = countAtMax >= 2 ? maxOrder + 1 : maxOrder;
+
+            Assert.AreEqual(expected, strahlerOrder[i],
+                $"Confluence at {i} merging orders [{string.Join(",", upstreamOrders)}] should be order {expected}.");
+            confluencesChecked++;
+        }
+
+        Assert.IsTrue(confluencesChecked > 0, "Test terrain should contain at least one real confluence to check.");
+    }
+
+    /// <summary>A wide, gently-sloped, irregularly-walled basin — the same style of terrain used
+    /// throughout this file to exercise realistic branching drainage — with a low enough threshold
+    /// that multiple independent tributaries form and merge, giving the Strahler tests above actual
+    /// confluences to check instead of one single unbranched line.</summary>
+    private static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order, byte[] StrahlerOrder) ComputeOnAConfluenceRichGrid()
+    {
+        const int width = 200, height = 200;
+        var values = new float[width * height];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var northWallDepth = 4 + (int)(3 * Math.Sin(x * 0.7) + 3 * Math.Sin(x * 0.31 + 1.7));
+                var westWallDepth = 4 + (int)(3 * Math.Sin(y * 0.53) + 3 * Math.Sin(y * 0.19 + 0.9));
+                var eastWallDepth = 4 + (int)(3 * Math.Sin(y * 0.41 + 2.1) + 3 * Math.Sin(y * 0.27));
+                var wall = y < northWallDepth || x < westWallDepth || x >= width - eastWallDepth;
+                values[y * width + x] = wall
+                    ? 100f
+                    : 10f - y * 0.02f + ((x * 37 + y * 17) % 5) * 0.0001f;
+            }
+        }
+
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
+        return TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 15.0));
+    }
+
+    private static int[] BuildUpstreamCounts(byte[] mask, int[] downstream, int count)
+    {
+        var upstreamCount = new int[count];
+        for (var i = 0; i < count; i++)
+        {
+            if (mask[i] == 0) continue;
+            var next = downstream[i];
+            if (next >= 0 && mask[next] != 0) upstreamCount[next]++;
+        }
+        return upstreamCount;
+    }
+
+    private static List<int>[] BuildUpstreamLists(byte[] mask, int[] downstream, int count)
+    {
+        var upstream = new List<int>[count];
+        for (var i = 0; i < count; i++) upstream[i] = new List<int>();
+        for (var i = 0; i < count; i++)
+        {
+            if (mask[i] == 0) continue;
+            var next = downstream[i];
+            if (next >= 0 && mask[next] != 0) upstream[next].Add(i);
+        }
+        return upstream;
+    }
 }

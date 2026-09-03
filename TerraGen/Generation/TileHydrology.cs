@@ -89,11 +89,12 @@ public static class TileHydrology
     public static byte[] ComputeRiverMask(TerrainHeightmap grid, Parameters p) => ComputeDiagnostics(grid, p).Mask;
 
     /// <summary>Same computation as <see cref="ComputeRiverMask"/>, but also returns the
-    /// intermediate per-cell accumulation and slope arrays the mask is derived from — not needed by
-    /// any production caller (which only wants the final 0/1 mask), but lets a test or a future
-    /// investigation see WHY a specific cell did or didn't make the cut, instead of only the
-    /// pass/fail outcome.</summary>
-    internal static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order) ComputeDiagnostics(TerrainHeightmap grid, Parameters p)
+    /// intermediate per-cell accumulation, slope, and Strahler-order arrays the mask is derived
+    /// from — the order array specifically IS production-relevant (<see cref="TileGenerator"/>
+    /// bakes it into the persisted <see cref="TerrainHeightmap.RiverMask"/> byte value instead of a
+    /// flat 1, see that type's remarks), the rest exist so a test or a future investigation can see
+    /// WHY a specific cell did or didn't make the cut, instead of only the pass/fail outcome.</summary>
+    internal static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order, byte[] StrahlerOrder) ComputeDiagnostics(TerrainHeightmap grid, Parameters p)
     {
         var width = grid.Width;
         var height = grid.Height;
@@ -174,7 +175,37 @@ public static class TileHydrology
             if (next >= 0) mask[next] = 1;
         }
 
-        return (mask, accumulation, slope, downstream, order);
+        // Strahler stream order (Strahler 1952/1957): a headwater reach with no river tributary
+        // feeding it is order 1; a reach's own order only increases — by exactly 1 — where two
+        // tributaries of the SAME order merge. A big creek absorbing a much smaller trickle stays
+        // the same order, same as real USGS/hydrology classification — order is meant to track
+        // "how many times has a comparably-sized channel joined this one," not raw contributing
+        // area. Computed in the same source-to-mouth topological pass `order` already gives every
+        // other per-cell quantity here, incrementally: `runningMaxOrder`/`runningCountAtMax` track
+        // the highest order seen among a cell's own upstream river contributors so far, and how
+        // many of them tied for it, without needing to materialize a full per-cell upstream list.
+        var strahlerOrder = new byte[count];
+        var runningMaxOrder = new int[count];
+        var runningCountAtMax = new int[count];
+        Array.Fill(runningMaxOrder, -1);
+
+        foreach (var idx in order)
+        {
+            if (mask[idx] == 0) continue;
+
+            var myOrder = runningMaxOrder[idx] < 0 ? 1
+                : runningCountAtMax[idx] >= 2 ? runningMaxOrder[idx] + 1
+                : runningMaxOrder[idx];
+            strahlerOrder[idx] = (byte)Math.Min(255, myOrder);
+
+            var next = downstream[idx];
+            if (next < 0) continue;
+
+            if (myOrder > runningMaxOrder[next]) { runningMaxOrder[next] = myOrder; runningCountAtMax[next] = 1; }
+            else if (myOrder == runningMaxOrder[next]) { runningCountAtMax[next]++; }
+        }
+
+        return (mask, accumulation, slope, downstream, order, strahlerOrder);
     }
 
     /// <summary>

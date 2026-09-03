@@ -22,10 +22,18 @@ namespace GameEngineTools.World.Data
     /// <paramref name="Width"/> * <paramref name="Height"/>.
     /// </param>
     /// <param name="RiverMask">
-    /// Optional row-major flags (0/1 bytes, same length as <paramref name="Values"/>) marking
-    /// river cells — painted separately from elevation so a river reads as freshwater even far
-    /// from the coast (e.g. a mountain valley above sea level), instead of only "below 0m =
-    /// water" being renderable as water. <c>null</c> means no river data has been painted yet.
+    /// Optional row-major byte flags, same length as <paramref name="Values"/>, marking river
+    /// cells — painted separately from elevation so a river reads as freshwater even far from the
+    /// coast (e.g. a mountain valley above sea level), instead of only "below 0m = water" being
+    /// renderable as water. <c>0</c> means not a river; a non-zero cell IS a river, and the value
+    /// itself carries its Strahler stream order (TerraGen's <c>TileHydrology</c>/<c>RiverMeander</c>
+    /// — a headwater creek with no river tributary is order 1; order increases by 1 only where two
+    /// reaches of the SAME order merge, so a creek staying a creek after a much smaller trickle
+    /// joins it doesn't jump — matching how real drainage networks are classified, and giving a
+    /// direct signal for "how big a river is this" beyond just "is it one"). Hand-painted rivers
+    /// (TerrainEditor's brush/spring-trace/lake tools) always write plain <c>1</c> — a real river's
+    /// bigger-downstream-of-a-merge structure isn't something a manual brush stroke can express,
+    /// so those tools don't try to. <c>null</c> means no river data has been painted yet.
     /// </param>
     public sealed record TerrainHeightmap(
         string Id,
@@ -37,13 +45,19 @@ namespace GameEngineTools.World.Data
         float[] Values,
         byte[]? RiverMask = null)
     {
-        /// <summary>True when (gx, gy) — clamped to the grid — has been painted as a river cell.</summary>
-        public bool IsRiver(int gx, int gy)
+        /// <summary>True when (gx, gy) — clamped to the grid — has been painted as a river cell,
+        /// of any Strahler order. Use <see cref="RiverOrder"/> to distinguish a headwater creek
+        /// from a large trunk river.</summary>
+        public bool IsRiver(int gx, int gy) => RiverOrder(gx, gy) > 0;
+
+        /// <summary>Strahler stream order at (gx, gy) — clamped to the grid — or 0 if it's not a
+        /// river cell at all. See <see cref="RiverMask"/>'s remarks for what the order means.</summary>
+        public byte RiverOrder(int gx, int gy)
         {
-            if (RiverMask is null) return false;
+            if (RiverMask is null) return 0;
             var cx = Math.Clamp(gx, 0, Width - 1);
             var cy = Math.Clamp(gy, 0, Height - 1);
-            return RiverMask[cy * Width + cx] != 0;
+            return RiverMask[cy * Width + cx];
         }
 
         /// <summary>

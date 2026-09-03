@@ -17,8 +17,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 1f; // gentle uniform slope in +y
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
+        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
 
         Assert.AreEqual(mask.Length, meandered.Length);
     }
@@ -38,8 +38,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 2.5f;
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
+        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
 
         CollectionAssert.AreEqual(mask, meandered, "A steep, uniform slope should suppress meandering entirely — the path should be unchanged.");
     }
@@ -64,8 +64,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 0.005f + Math.Abs(x - width / 2) * 0.05f;
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 50.0));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 50.0));
+        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
 
         var straightSet = new HashSet<int>(Enumerable.Range(0, mask.Length).Where(i => mask[i] != 0));
         var meanderedSet = new HashSet<int>(Enumerable.Range(0, meandered.Length).Where(i => meandered[i] != 0));
@@ -89,8 +89,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 0.005f + Math.Abs(x - width / 2) * 0.5f;
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 0.5));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 0.5));
+        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
 
         Assert.IsTrue(meandered.Count(b => b != 0) > 0, "Test setup should produce at least some river cells.");
 
@@ -136,8 +136,8 @@ public class RiverMeanderTests
                 for (var x = 0; x < width; x++)
                     values[y * width + x] = (float)((height - y) * 0.002 + Math.Abs(x - width / 2) * crossSlope);
             var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-            var (mask, accumulation, slope, downstream, order) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 0.3));
-            var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters());
+            var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 0.3));
+            var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
 
             var maxDx = 0;
             for (var y = 0; y < height; y++)

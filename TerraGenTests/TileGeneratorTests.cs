@@ -341,7 +341,10 @@ public class TileGeneratorTests
                 var tile = db.LoadHeightmap(r.Id)!;
                 Assert.IsNotNull(tile.RiverMask);
                 Assert.AreEqual(tile.Width * tile.Height, tile.RiverMask!.Length);
-                Assert.IsTrue(tile.RiverMask.All(b => b is 0 or 1), "RiverMask must only ever contain 0/1 bytes.");
+                // A river cell's byte value is its Strahler order (see TerrainHeightmap.RiverMask's
+                // remarks), not a flat 1 — sanity-bound it instead of requiring exactly 0/1: this
+                // tiny test grid can't plausibly produce a double-digit order.
+                Assert.IsTrue(tile.RiverMask.All(b => b < 20), "RiverMask order values should be small on a tiny test grid.");
             }
         }
         finally

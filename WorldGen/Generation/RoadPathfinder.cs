@@ -12,7 +12,13 @@ namespace WorldGen.Generation;
 public static class RoadPathfinder
 {
     private const double SlopePenaltyFactor = 4.0;
-    private const double RiverCrossingCost = 30.0;
+    // Scaled by the cell's own Strahler order (TerrainHeightmap.RiverMask's remarks) rather than a
+    // flat per-crossing cost — fording a headwater creek (order 1) is a non-event; a road actually
+    // has to bridge a trunk river several tributaries merged into, and pathfinding should avoid
+    // that harder than it avoids a trickle. 15 keeps a single order-1 crossing half as costly as
+    // the old flat 30 was, so existing small-creek-heavy regions aren't suddenly avoided more than
+    // before; a big order-4+ river gets meaningfully pricier instead.
+    private const double RiverCrossingCostPerOrder = 15.0;
     private const double SeaCrossingCost = 300.0;
 
     public sealed record RoadPath(IReadOnlyList<(double X, double Y)> WorldPoints, double LengthMeters);
@@ -67,8 +73,9 @@ public static class RoadPathfinder
                     var stepDist = grid.CellSizeMeters * (dx != 0 && dy != 0 ? 1.4142135623730951 : 1.0);
                     var slope = Math.Abs(grid.Values[nIdx] - grid.Values[current]) / stepDist;
                     var cost = stepDist * (1.0 + slope * SlopePenaltyFactor);
-                    if (grid.IsRiver(nx, ny))
-                        cost += RiverCrossingCost;
+                    var riverOrder = grid.RiverOrder(nx, ny);
+                    if (riverOrder > 0)
+                        cost += RiverCrossingCostPerOrder * riverOrder;
                     if (grid.Values[nIdx] < 0f)
                         cost += SeaCrossingCost;
 
