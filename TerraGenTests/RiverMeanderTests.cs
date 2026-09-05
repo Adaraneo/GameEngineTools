@@ -184,4 +184,105 @@ public class RiverMeanderTests
         Assert.AreEqual(2.0 / (2.0 * 0.03), RiverMeander.CurvatureMemoryLengthMeters(channelDepthMeters: 2.0, frictionCoefficient: 0.03), 1e-9);
         Assert.AreEqual(1.5 / (2.0 * 0.003), RiverMeander.CurvatureMemoryLengthMeters(channelDepthMeters: 1.5, frictionCoefficient: 0.003), 1e-9);
     }
+
+    #region Stream-power meander suppression (Stage 2)
+
+    /// <summary>Builds a single-column channel with ONE deliberate kink (straight down, then a
+    /// one-cell sideways jog, then straight down again) — a perfectly straight line has exactly
+    /// zero curvature everywhere regardless of erodibility (nothing for suppression to actually
+    /// suppress, making "no migration" trivially true either way), so the two stream-power tests
+    /// below need this real bend to meaningfully distinguish "suppressed" from "not suppressed."
+    /// <see cref="RiverMeander.Parameters.InitialPerturbationPerWidth"/> is set to 0 by both callers
+    /// specifically to remove the OTHER confound: that seed perturbation scales with channel width,
+    /// which these tests deliberately push to extremes, and would otherwise move the point on its
+    /// own regardless of migration suppression.</summary>
+    private static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order, int KinkIndex) BuildKinkedColumn(
+        int width, int height, int accumulation, double slope)
+    {
+        var mask = new byte[width * height];
+        var accumulationArr = new int[width * height];
+        var slopeArr = new double[width * height];
+        var downstream = new int[width * height];
+        Array.Fill(downstream, -1);
+        var order = new List<int>();
+
+        const int x = 5;
+        var kinkRow = height / 2;
+        var kinkIndex = -1;
+        for (var y = 0; y < height; y++)
+        {
+            var thisX = y > kinkRow ? x + 1 : x; // one-cell sideways jog partway down
+            var idx = y * width + thisX;
+            mask[idx] = 1;
+            accumulationArr[idx] = accumulation;
+            slopeArr[idx] = slope;
+            if (y == kinkRow) kinkIndex = idx;
+            if (y + 1 < height)
+            {
+                var nextX = y + 1 > kinkRow ? x + 1 : x;
+                downstream[idx] = (y + 1) * width + nextX;
+            }
+            order.Add(idx);
+        }
+        for (var i = 0; i < mask.Length; i++) if (mask[i] == 0) order.Add(i);
+
+        return (mask, accumulationArr, slopeArr, downstream, order.ToArray(), kinkIndex);
+    }
+
+    [TestMethod]
+    public void ComputeStreamPower_KnownDischargeSlopeWidth_MatchesHandCalculatedValue()
+    {
+        // ω = ρ·g·Q·S/w, ρ=1000, g=9.81, Q=10, S=0.01, w=20 -> 1000*9.81*10*0.01/20 = 49.05 W/m².
+        const double q = 10.0, s = 0.01, w = 20.0;
+        var expected = 1000.0 * 9.81 * q * s / w;
+
+        Assert.AreEqual(expected, RiverMeander.ComputeSpecificStreamPowerWPerM2(q, s, w), 1e-9);
+    }
+
+    [TestMethod]
+    public void ComputeOffsets_HighStreamPowerLowSlope_StillSuppressesMigrationDespitePassingFlatSlopeCheck()
+    {
+        // Modest accumulation (~3m channel width, keeping the seed/grid scale sane) with slope well
+        // below SlopeFullMeanderBelow — the OLD flat-slope check alone would allow full-strength
+        // migration at the kink — but a deliberately large test-local DischargePerContributingAreaM2
+        // (NOT the production default, which is too tiny to reach any threshold at this accumulation
+        // scale — see its own remarks) drives stream power comfortably above the default threshold.
+        // Proves the new gate actually adds behavior, not dead code shadowed by the slope check.
+        const int width = 10, height = 40;
+        var (mask, accumulation, slope, downstream, order, kinkIndex) =
+            BuildKinkedColumn(width, height, accumulation: 1000, slope: 0.005);
+
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+        var p = new RiverMeander.Parameters(InitialPerturbationPerWidth: 0.0, DischargePerContributingAreaM2: 1.0);
+        var (offsetX, offsetY) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+
+        var kinkX = kinkIndex % width;
+        var kinkY = kinkIndex / width;
+        Assert.AreEqual(kinkX, offsetX[kinkIndex], "The kink cell (the only one with real curvature to amplify) should not have migrated — stream power should have suppressed it despite the gentle slope.");
+        Assert.AreEqual(kinkY, offsetY[kinkIndex]);
+    }
+
+    [TestMethod]
+    public void ComputeOffsets_LowStreamPowerHighSlope_StillSuppressedByExistingSlopeCheck()
+    {
+        // Companion regression guard: the SAME kinked shape, but steep (above SlopeSuppressedAbove)
+        // with a tiny, realistic accumulation and the PRODUCTION-DEFAULT DischargePerContributingAreaM2
+        // (stream power nowhere near the threshold) — migration should still be suppressed via the
+        // ORIGINAL flat-slope check alone, proving the new gate is purely additive and never
+        // accidentally loosens the pre-existing behavior.
+        const int width = 10, height = 40;
+        var (mask, accumulation, slope, downstream, order, kinkIndex) =
+            BuildKinkedColumn(width, height, accumulation: 5, slope: 0.5);
+
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+        var p = new RiverMeander.Parameters(InitialPerturbationPerWidth: 0.0);
+        var (offsetX, offsetY) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+
+        var kinkX = kinkIndex % width;
+        var kinkY = kinkIndex / width;
+        Assert.AreEqual(kinkX, offsetX[kinkIndex], "The kink cell should not have migrated — the pre-existing steep-slope check should have suppressed it.");
+        Assert.AreEqual(kinkY, offsetY[kinkIndex]);
+    }
+
+    #endregion Stream-power meander suppression (Stage 2)
 }

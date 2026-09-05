@@ -42,6 +42,29 @@ public static class RiverMeander
     /// <see cref="Parameters.BankErosionCoefficientE"/>'s remarks.</summary>
     private const double DefaultScourFactor = 3.0;
 
+    /// <summary>Fresh water density, kg/m³ — not literature-specific, but named per the project's
+    /// own convention of never using bare magic numbers (see e.g. <see cref="FillEpsilon"/> in
+    /// <see cref="TileHydrology"/>). Used only by <see cref="ComputeSpecificStreamPowerWPerM2"/>.
+    /// Source: standard value at ~4°C / SI definition (a physical constant, not a calibrated one).</summary>
+    private const double WaterDensityKgPerM3 = 1000.0;
+
+    /// <summary>Standard gravity, m/s² — see <see cref="WaterDensityKgPerM3"/>'s remarks. Used only
+    /// by <see cref="ComputeSpecificStreamPowerWPerM2"/>.
+    /// Source: CGPM (1901) standard gravity g_n = 9.80665 m/s², rounded to 9.81 (a physical
+    /// constant, not a calibrated one).</summary>
+    private const double GravityMPerS2 = 9.81;
+
+    /// <summary>Specific stream power <c>ω = ρ·g·Q·S/w</c> (W/m²) — van den Berg's (1995) alluvial
+    /// channel-pattern discriminant. A standalone method (like <see cref="CurvatureMemoryLengthMeters"/>)
+    /// specifically so this exact formula can be unit-tested in isolation against hand-calculated
+    /// values.
+    /// <para>Source: van den Berg, J.H. (1995). "Prediction of alluvial channel pattern of perennial
+    /// rivers." <i>Geomorphology</i> 12:259-279 (form of the relationship only — see
+    /// <see cref="Parameters.StreamPowerSuppressionThresholdWPerM2"/>'s remarks for why no specific
+    /// threshold NUMBER from that source is cited here).</para></summary>
+    internal static double ComputeSpecificStreamPowerWPerM2(double dischargeM3PerS, double slope, double channelWidthMeters)
+        => WaterDensityKgPerM3 * GravityMPerS2 * dischargeM3PerS * slope / channelWidthMeters;
+
     /// <summary>Edwards &amp; Smith (2002) upstream curvature-memory decay length
     /// <c>D = H / (2·C_f)</c> — see <see cref="Parameters.FrictionCoefficient"/>'s remarks. A
     /// standalone method (not inlined into <see cref="ComputeOffsets"/>) specifically so this exact
@@ -161,8 +184,32 @@ public static class RiverMeander
         /// <summary>Local slope above which migration is fully suppressed and the channel stays on
         /// its straight D8 path — deliberately conservative (well past a typical lowland grade)
         /// rather than tuned to Leopold &amp; Wolman's own discharge-specific threshold line, which
-        /// needs real discharge this generator doesn't simulate.</summary>
-        double SlopeSuppressedAbove = 0.08);
+        /// needs real discharge this generator doesn't simulate. Stage 2's
+        /// <see cref="StreamPowerSuppressionThresholdWPerM2"/> now partially addresses that
+        /// disclaimer with an actual discharge-aware criterion — but this flat-slope check remains,
+        /// additively, as a cheap independent filter for genuinely steep terrain regardless of
+        /// discharge (a suppression from EITHER check applies; neither replaces the other).</summary>
+        double SlopeSuppressedAbove = 0.08,
+        /// <summary>Specific stream power (W/m²) above which the channel pattern switches from
+        /// single-thread meandering to a suppressed/braided-tendency regime — an ADDITIONAL,
+        /// independent suppression gate alongside (not replacing) <see cref="SlopeSuppressedAbove"/>,
+        /// computed via <see cref="ComputeSpecificStreamPowerWPerM2"/>.
+        /// <para>The real van den Berg (1995) threshold is grain-size-dependent (<c>ω ∝ D50^0.42</c>,
+        /// calibrated across 126 streams/rivers — see "Prediction of alluvial channel pattern of
+        /// perennial rivers," <i>Geomorphology</i> 12:259-279) and this codebase has no D50/grain-
+        /// size field to plug into it. Rather than invent an unstated D50 assumption, this default
+        /// is an UNCITED PLACEHOLDER — only the FORM of the relationship (ω = ρ·g·Q·S/w) is cited,
+        /// not a specific literature number. Tune per biome/climate once a grain-size field exists,
+        /// or treat it as a pure gameplay/visual dial until then.</para></summary>
+        double StreamPowerSuppressionThresholdWPerM2 = 300.0,
+        /// <summary>Rough discharge-per-unit-contributing-area conversion (m/s — a specific-runoff-
+        /// yield-style rate) used to turn contributing area into an estimated bankfull discharge
+        /// for <see cref="StreamPowerSuppressionThresholdWPerM2"/>'s stream-power calculation, since
+        /// this generator has no simulated rainfall/runoff model.
+        /// <para>UNCITED PLACEHOLDER, not a literature-calibrated regional value (order-of-magnitude
+        /// only, loosely comparable to a temperate-climate specific runoff yield of roughly
+        /// 10 L/s/km²) — tune per biome/climate rather than treating it as a cited constant.</para></summary>
+        double DischargePerContributingAreaM2 = 1e-8);
 
     /// <summary>Takes the straight D8 mask <see cref="TileHydrology.ComputeDiagnostics"/> already
     /// computed (plus its accumulation/slope/downstream/Strahler-order/Shreve-magnitude arrays,
@@ -195,6 +242,7 @@ public static class RiverMeander
         var height = grid.Height;
         var count = width * height;
         var cellSize = grid.CellSizeMeters;
+        var cellAreaM2 = cellSize * cellSize;
 
         // Dominant predecessor per cell (the single upstream neighbor with the largest contributing
         // area) — the same selection TileHydrology's own connectivity relies on, giving every
@@ -276,6 +324,15 @@ public static class RiverMeander
             var suppression = here <= p.SlopeFullMeanderBelow ? 1.0
                 : here >= p.SlopeSuppressedAbove ? 0.0
                 : 1.0 - (here - p.SlopeFullMeanderBelow) / (p.SlopeSuppressedAbove - p.SlopeFullMeanderBelow);
+
+            // Stream-power suppression gate (Stage 2 — see Parameters.StreamPowerSuppressionThresholdWPerM2's
+            // remarks): ADDITIVE to the flat-slope check above, not a replacement — either one alone
+            // can suppress migration, since the flat-slope check stays a legitimate cheap pre-filter
+            // for genuinely steep terrain regardless of discharge.
+            var dischargeM3PerS = accumulation[i] * cellAreaM2 * p.DischargePerContributingAreaM2;
+            var streamPowerWPerM2 = ComputeSpecificStreamPowerWPerM2(dischargeM3PerS, here, channelWidth[i]);
+            if (streamPowerWPerM2 >= p.StreamPowerSuppressionThresholdWPerM2) suppression = 0.0;
+
             erodibility[i] = p.ErosionCoefficient * suppression * physicalFactor;
         }
 
