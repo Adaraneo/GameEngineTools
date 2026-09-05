@@ -17,8 +17,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 1f; // gentle uniform slope in +y
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 1.0));
+        var (meandered, _) = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters());
 
         Assert.AreEqual(mask.Length, meandered.Length);
     }
@@ -38,8 +38,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 2.5f;
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 1.0));
+        var (meandered, _) = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters());
 
         CollectionAssert.AreEqual(mask, meandered, "A steep, uniform slope should suppress meandering entirely — the path should be unchanged.");
     }
@@ -64,8 +64,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 0.005f + Math.Abs(x - width / 2) * 0.05f;
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 50.0));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 0.5));
+        var (meandered, _) = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters());
 
         var straightSet = new HashSet<int>(Enumerable.Range(0, mask.Length).Where(i => mask[i] != 0));
         var meanderedSet = new HashSet<int>(Enumerable.Range(0, meandered.Length).Where(i => meandered[i] != 0));
@@ -89,8 +89,8 @@ public class RiverMeanderTests
                 values[y * width + x] = (height - y) * 0.005f + Math.Abs(x - width / 2) * 0.5f;
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 0.5));
-        var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
+        var (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 0.1));
+        var (meandered, _) = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters());
 
         Assert.IsTrue(meandered.Count(b => b != 0) > 0, "Test setup should produce at least some river cells.");
 
@@ -136,8 +136,8 @@ public class RiverMeanderTests
                 for (var x = 0; x < width; x++)
                     values[y * width + x] = (float)((height - y) * 0.002 + Math.Abs(x - width / 2) * crossSlope);
             var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-            var (mask, accumulation, slope, downstream, order, strahlerOrder) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 0.3));
-            var meandered = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, new RiverMeander.Parameters());
+            var (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude) = TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 0.01));
+            var (meandered, _) = RiverMeander.ApplyMeander(grid, mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters());
 
             var maxDx = 0;
             for (var y = 0; y < height; y++)
@@ -155,5 +155,34 @@ public class RiverMeanderTests
         var large = MaxSpread(0.5);
 
         Assert.IsTrue(large > small, $"Expected the larger-catchment channel to swing wider (got small={small}, large={large}).");
+    }
+
+    [TestMethod]
+    public void RiverMeanderParameters_DefaultScourFactor_IsWithinIkedaParkerSawaiRange()
+    {
+        var p = new RiverMeander.Parameters();
+
+        Assert.IsTrue(p.ScourFactor is >= 2.5 and <= 6.0,
+            $"Default ScourFactor {p.ScourFactor} should be within Ikeda/Parker/Sawai (1981)'s cited range [2.5, 6].");
+    }
+
+    [TestMethod]
+    public void RiverMeanderParameters_DefaultBankErosionCoefficient_IsWithinFieldCalibratedRange()
+    {
+        var p = new RiverMeander.Parameters();
+
+        Assert.IsTrue(p.BankErosionCoefficientE is >= 1e-8 and <= 1e-7,
+            $"Default BankErosionCoefficientE {p.BankErosionCoefficientE} should be within the field-calibrated range [1e-8, 1e-7].");
+    }
+
+    [TestMethod]
+    public void ComputeCurvatureMemoryDecayLength_GivenDepthAndFriction_MatchesEdwardsSmithFormula()
+    {
+        // Unit tests the D = H/(2·C_f) formula (Edwards & Smith 2002) directly against
+        // hand-calculated values for a few (H, C_f) pairs spanning the cited friction-coefficient
+        // range [0.003, 0.03].
+        Assert.AreEqual(10.0 / (2.0 * 0.005), RiverMeander.CurvatureMemoryLengthMeters(channelDepthMeters: 10.0, frictionCoefficient: 0.005), 1e-9);
+        Assert.AreEqual(2.0 / (2.0 * 0.03), RiverMeander.CurvatureMemoryLengthMeters(channelDepthMeters: 2.0, frictionCoefficient: 0.03), 1e-9);
+        Assert.AreEqual(1.5 / (2.0 * 0.003), RiverMeander.CurvatureMemoryLengthMeters(channelDepthMeters: 1.5, frictionCoefficient: 0.003), 1e-9);
     }
 }

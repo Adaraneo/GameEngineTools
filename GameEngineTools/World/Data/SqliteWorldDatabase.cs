@@ -574,8 +574,9 @@ namespace GameEngineTools.World.Data
         }
 
         /// <summary>
-        /// One-time migration: adds the <c>RiverMask</c> column to <c>TerrainHeightmap</c> if a
-        /// database created before rivers existed is missing it. No-op on a fresh database.
+        /// One-time migration: adds the <c>RiverMask</c> and <c>ShreveMagnitude</c> columns to
+        /// <c>TerrainHeightmap</c> if a database created before either existed is missing them.
+        /// No-op on a fresh database.
         /// </summary>
         public void MigrateTerrainHeightmapColumns()
         {
@@ -594,6 +595,8 @@ namespace GameEngineTools.World.Data
 
                 if (!existingColumns.Contains("RiverMask"))
                     Execute("ALTER TABLE TerrainHeightmap ADD COLUMN RiverMask BLOB;");
+                if (!existingColumns.Contains("ShreveMagnitude"))
+                    Execute("ALTER TABLE TerrainHeightmap ADD COLUMN ShreveMagnitude BLOB;");
             }
         }
 
@@ -608,9 +611,9 @@ namespace GameEngineTools.World.Data
 
             const string sql = """
                 INSERT OR REPLACE INTO TerrainHeightmap
-                    (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask)
+                    (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask, ShreveMagnitude)
                 VALUES
-                    (@id, @originX, @originY, @cellSize, @width, @height, @data, @riverMask)
+                    (@id, @originX, @originY, @cellSize, @width, @height, @data, @riverMask, @shreveMagnitude)
                 """;
 
             lock (_sync)
@@ -622,14 +625,17 @@ namespace GameEngineTools.World.Data
                     ("@width", grid.Width),
                     ("@height", grid.Height),
                     ("@data", grid.ToBytes()),
-                    ("@riverMask", (object?)grid.RiverMask ?? DBNull.Value));
+                    ("@riverMask", (object?)grid.RiverMask ?? DBNull.Value),
+                    ("@shreveMagnitude", grid.ShreveMagnitude is null
+                        ? DBNull.Value
+                        : TerrainHeightmap.Int32ArrayToBytes(grid.ShreveMagnitude)));
         }
 
         /// <summary>Loads a named heightmap grid, or <c>null</c> if none exists with that id.</summary>
         public TerrainHeightmap? LoadHeightmap(string id)
         {
             const string sql = """
-                SELECT Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask
+                SELECT Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask, ShreveMagnitude
                 FROM TerrainHeightmap
                 WHERE Id = @id
                 """;
@@ -645,6 +651,9 @@ namespace GameEngineTools.World.Data
                 var height = reader.GetInt32(5);
                 var data = (byte[])reader.GetValue(6);
                 var riverMask = reader.IsDBNull(7) ? null : (byte[])reader.GetValue(7);
+                var shreveMagnitude = reader.IsDBNull(8)
+                    ? null
+                    : TerrainHeightmap.Int32ArrayFromBytes((byte[])reader.GetValue(8), width, height);
 
                 return new TerrainHeightmap(
                     Id: reader.GetString(0),
@@ -654,7 +663,8 @@ namespace GameEngineTools.World.Data
                     Width: width,
                     Height: height,
                     Values: TerrainHeightmap.ValuesFromBytes(data, width, height),
-                    RiverMask: riverMask);
+                    RiverMask: riverMask,
+                    ShreveMagnitude: shreveMagnitude);
             }
         }
 

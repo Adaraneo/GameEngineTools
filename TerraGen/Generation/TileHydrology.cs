@@ -17,31 +17,32 @@ public static class TileHydrology
 {
     public sealed record Parameters(
         /// <summary>Montgomery &amp; Dietrich (1992) channel-initiation criterion: a cell becomes a
-        /// river when its contributing area (upstream cell count × cell area, in m²) TIMES the local
-        /// downslope gradient (dimensionless rise/run along the actual flow path — see
-        /// <see cref="ComputeRiverMask"/>'s remarks) reaches this value. Real channel heads form
-        /// where surface flow's shear stress exceeds the substrate's erosion resistance, and that
-        /// shear stress scales with area × slope, not area alone — a steep hillside needs only a
-        /// small catchment to start eroding a channel, while a dead-flat plain needs an enormous one
-        /// (in the limit, none at all, matching real drainage: water doesn't carve a channel across
-        /// perfectly flat ground). The units work out to m² — read it as "the contributing area
-        /// this would take on a 45° (slope = 1.0) hillside." Note this ONLY governs where a channel
-        /// STARTS — see <see cref="ComputeRiverMask"/>'s remarks on why every cell downstream of a
-        /// qualifying one is marked too regardless of ITS OWN local slope, which is what makes a
-        /// channel actually continuous instead of flickering through every locally-noisy stretch.
-        /// Default 1200 was calibrated live at 5m cells against <see cref="TileGenerator"/>'s
-        /// batch-wide combined grid on real generated terrain (seed -1384538600), AFTER two fixes
-        /// that both needed a re-tune: the downstream-propagation fix (propagation makes clusters of
-        /// adjacent cells that independently qualify within a few cells of each other — a real but
-        /// narrow initiation zone, not a single exact point — each draw their own full-length
-        /// channel, which piled up into a solid wedge near a confluence instead of a thin line) and,
-        /// after that, a sign bug fix in <see cref="ResolveFlats"/>'s own flat-routing bias (it was
-        /// quietly pulling flow toward the nearest WALL instead of the nearest true exit inside every
-        /// flat component it touched, which — once propagation started drawing full channels from
-        /// every qualifying cell — widened that same wedge further). 1200 keeps overall coverage in
-        /// the same realistic range (~0.17%, worst single tile 2.2%) the original ~0.5-2%
-        /// area-coverage target aimed for, after both fixes.</summary>
-        double AreaSlopeThreshold = 1200.0);
+        /// river when its contributing area (upstream cell count × cell area, in m²) TIMES THE
+        /// SQUARE of the local downslope gradient (dimensionless rise/run along the actual flow
+        /// path — see <see cref="ComputeRiverMask"/>'s remarks) reaches this value — i.e. this is
+        /// <c>A·S²</c>, not <c>A·S</c>. Real channel heads form where surface flow's shear stress
+        /// exceeds the substrate's erosion resistance, and that shear stress scales with area ×
+        /// slope SQUARED, not area × slope — a steep hillside needs only a small catchment to start
+        /// eroding a channel, while a dead-flat plain needs an enormous one (in the limit, none at
+        /// all, matching real drainage: water doesn't carve a channel across perfectly flat ground).
+        /// The units work out to m². Note this ONLY governs where a channel STARTS — see
+        /// <see cref="ComputeRiverMask"/>'s remarks on why every cell downstream of a qualifying one
+        /// is marked too regardless of ITS OWN local slope, which is what makes a channel actually
+        /// continuous instead of flickering through every locally-noisy stretch.
+        /// <para>Source: Montgomery, D.R. &amp; Dietrich, W.E. (1992). "Channel Initiation and the
+        /// Problem of Landscape Scale." <i>Science</i> 255(5046):826-830.
+        /// doi:10.1126/science.255.5046.826. Field-measured channel-head threshold range
+        /// <c>A·S² ∈ [500, 4000] m²</c> (normalized per unit contour length,
+        /// <c>(A/b)·S² ∈ [25, 200] m</c>). An order-of-magnitude scatter across that range is
+        /// inherent to the original field data itself, not a calibration gap here — pick a value
+        /// per-biome/per-climate rather than expecting one constant to fit every terrain.</para>
+        /// Default 2000 (mid-range of the cited [500, 4000] interval) — NOT the old 1200 linear-model
+        /// value, which was calibrated for <c>A·S</c> and would silently misclassify channel heads
+        /// under the corrected <c>A·S²</c> formula (a linear-model value carried over here would
+        /// require unrealistically gentle slopes to ever clear the bar, since real slopes are usually
+        /// well below 1.0 and squaring shrinks anything below 1 further). Re-tune per <see cref="TileGenerator"/>
+        /// batch/biome the same way 1200 was live-calibrated for the old formula.</summary>
+        double ChannelInitiationAreaSlopeSquaredThreshold = 2000.0);
 
     /// <summary>Tiny per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit
     /// or a flat plateau — small enough to never visibly distort real terrain (real slopes differ
@@ -52,12 +53,13 @@ public static class TileHydrology
     private const float FillEpsilon = 1e-3f;
 
     /// <summary>Computes a river mask via single-flow-direction (D8) accumulation combined with the
-    /// Montgomery &amp; Dietrich area-slope channel-initiation criterion: every cell starts with 1
-    /// unit of "rainfall" and drains to its single steepest downhill 8-connected neighbor;
+    /// Montgomery &amp; Dietrich area-slope-squared channel-initiation criterion: every cell starts
+    /// with 1 unit of "rainfall" and drains to its single steepest downhill 8-connected neighbor;
     /// accumulation sums along that path. A cell is marked river once its contributing area (that
-    /// accumulation, in m²) times its local downslope gradient reaches
-    /// <see cref="Parameters.AreaSlopeThreshold"/> — see that property's remarks for why area alone
-    /// isn't the right criterion. Returns a 0/1 byte mask the same length/shape as
+    /// accumulation, in m²) times the SQUARE of its local downslope gradient reaches
+    /// <see cref="Parameters.ChannelInitiationAreaSlopeSquaredThreshold"/> — see that property's
+    /// remarks for why area alone (or even area × slope, unsquared) isn't the right criterion.
+    /// Returns a 0/1 byte mask the same length/shape as
     /// <paramref name="grid"/>'s own <c>Values</c> — the exact convention
     /// <see cref="TerrainHeightmap.RiverMask"/> already uses.</summary>
     /// <remarks>
@@ -76,7 +78,7 @@ public static class TileHydrology
     /// area got. Neither step changes the terrain itself (<paramref name="grid"/>'s own <c>Values</c>
     /// are untouched) — only what's used to decide direction versus what's used to judge steepness.
     ///
-    /// The area×slope test only decides where a channel STARTS. Once a cell qualifies, every cell
+    /// The area×slope² test only decides where a channel STARTS. Once a cell qualifies, every cell
     /// downstream of it is marked too, regardless of whether THAT cell's own local slope clears the
     /// bar — confirmed live this has to work this way: real post-erosion elevation is noisy enough
     /// at the meter scale that two adjacent cells in the middle of an established, thousands-of-
@@ -89,12 +91,13 @@ public static class TileHydrology
     public static byte[] ComputeRiverMask(TerrainHeightmap grid, Parameters p) => ComputeDiagnostics(grid, p).Mask;
 
     /// <summary>Same computation as <see cref="ComputeRiverMask"/>, but also returns the
-    /// intermediate per-cell accumulation, slope, and Strahler-order arrays the mask is derived
-    /// from — the order array specifically IS production-relevant (<see cref="TileGenerator"/>
+    /// intermediate per-cell accumulation, slope, Strahler-order and Shreve-magnitude arrays the
+    /// mask is derived from — the order array specifically IS production-relevant (<see cref="TileGenerator"/>
     /// bakes it into the persisted <see cref="TerrainHeightmap.RiverMask"/> byte value instead of a
-    /// flat 1, see that type's remarks), the rest exist so a test or a future investigation can see
-    /// WHY a specific cell did or didn't make the cut, instead of only the pass/fail outcome.</summary>
-    internal static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order, byte[] StrahlerOrder) ComputeDiagnostics(TerrainHeightmap grid, Parameters p)
+    /// flat 1, see that type's remarks), likewise Shreve magnitude (<see cref="TerrainHeightmap.ShreveMagnitude"/>);
+    /// the rest exist so a test or a future investigation can see WHY a specific cell did or didn't
+    /// make the cut, instead of only the pass/fail outcome.</summary>
+    internal static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order, byte[] StrahlerOrder, int[] ShreveMagnitude) ComputeDiagnostics(TerrainHeightmap grid, Parameters p)
     {
         var width = grid.Width;
         var height = grid.Height;
@@ -149,12 +152,12 @@ public static class TileHydrology
                 slope[i] = Math.Max(0.0, (grid.Values[i] - grid.Values[next]) / distance);
 
                 var contributingAreaM2 = accumulation[i] * cellAreaM2;
-                if (contributingAreaM2 * slope[i] >= p.AreaSlopeThreshold)
+                if (contributingAreaM2 * slope[i] * slope[i] >= p.ChannelInitiationAreaSlopeSquaredThreshold)
                     mask[i] = 1;
             }
         }
 
-        // Montgomery & Dietrich's area×slope criterion is for CHANNEL INITIATION — where does a
+        // Montgomery & Dietrich's area×slope² criterion is for CHANNEL INITIATION — where does a
         // channel first cut in — not a per-point validity check repeated at every single cell
         // along its length. Evaluated pointwise like the loop above just did, it flickers: two
         // adjacent post-erosion cells can have a real elevation drop that rounds to ~0 (meter-scale
@@ -184,10 +187,25 @@ public static class TileHydrology
         // other per-cell quantity here, incrementally: `runningMaxOrder`/`runningCountAtMax` track
         // the highest order seen among a cell's own upstream river contributors so far, and how
         // many of them tied for it, without needing to materialize a full per-cell upstream list.
+        //
+        // Shreve stream magnitude (Shreve 1966) is computed in this SAME pass, right alongside
+        // Strahler order, rather than a second walk over `order` — both are pure functions of "what
+        // river cells feed into me," so there's no reason to visit every cell twice just because
+        // they answer different questions about that same upstream set. Unlike Strahler order,
+        // magnitude is plainly additive: a headwater (no river cell flowing into it) starts at 1,
+        // and every confluence's magnitude is the SUM — not the max/conditional-increment Strahler
+        // uses — of whatever its river contributors carry. That makes it proportional (to first
+        // order) to upstream contributing drainage area, which Strahler order deliberately is NOT
+        // (see the order field's own remarks) — Strahler stays the discrete, bounded-tier signal
+        // TerrainEditor's brush tool wants for a small set of "visual sizes"; Shreve magnitude is the
+        // continuous, physically-additive signal a stream-power/width/sediment calculation would
+        // actually need. Source: Shreve, R.L. (1966). "Statistical law of stream numbers." Journal
+        // of Geology 74:17-37.
         var strahlerOrder = new byte[count];
         var runningMaxOrder = new int[count];
         var runningCountAtMax = new int[count];
         Array.Fill(runningMaxOrder, -1);
+        var shreveMagnitude = new int[count];
 
         foreach (var idx in order)
         {
@@ -198,14 +216,18 @@ public static class TileHydrology
                 : runningMaxOrder[idx];
             strahlerOrder[idx] = (byte)Math.Min(255, myOrder);
 
+            if (shreveMagnitude[idx] == 0) shreveMagnitude[idx] = 1; // no river contributor reached it yet -> headwater
+
             var next = downstream[idx];
             if (next < 0) continue;
 
             if (myOrder > runningMaxOrder[next]) { runningMaxOrder[next] = myOrder; runningCountAtMax[next] = 1; }
             else if (myOrder == runningMaxOrder[next]) { runningCountAtMax[next]++; }
+
+            if (mask[next] != 0) shreveMagnitude[next] += shreveMagnitude[idx];
         }
 
-        return (mask, accumulation, slope, downstream, order, strahlerOrder);
+        return (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude);
     }
 
     /// <summary>

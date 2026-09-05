@@ -35,6 +35,21 @@ namespace GameEngineTools.World.Data
     /// bigger-downstream-of-a-merge structure isn't something a manual brush stroke can express,
     /// so those tools don't try to. <c>null</c> means no river data has been painted yet.
     /// </param>
+    /// <param name="ShreveMagnitude">
+    /// Optional row-major Shreve stream magnitude (Shreve 1966), same length as
+    /// <paramref name="Values"/>, co-indexed with <paramref name="RiverMask"/> — <c>0</c> off-river,
+    /// and on a river cell the SUM (not the discrete, capped-increment Strahler order
+    /// <see cref="RiverMask"/> carries) of every upstream river contributor's own magnitude,
+    /// defaulting to 1 at a headwater. Unlike Strahler order, magnitude is additive and proportional
+    /// (to first order) to upstream contributing drainage area, making it the better signal wherever
+    /// a physical river-size estimate is needed (stream power, channel width, sediment transport) —
+    /// Strahler order stays the discrete, bounded-tier signal for rendering (e.g. TerrainEditor's
+    /// river-width brush tiers). Stored as <c>int</c>, not <c>byte</c>: unlike Strahler order (which
+    /// is deliberately bounded — it only climbs on an equal-order merge), magnitude sums without any
+    /// such cap and can exceed 255 on a large basin. <c>null</c> means no river data has been
+    /// generated yet (same as a <c>null</c> <see cref="RiverMask"/> — hand-painted rivers never set
+    /// this, since a manual brush stroke has no upstream network to sum).
+    /// </param>
     public sealed record TerrainHeightmap(
         string Id,
         double OriginX,
@@ -43,7 +58,8 @@ namespace GameEngineTools.World.Data
         int Width,
         int Height,
         float[] Values,
-        byte[]? RiverMask = null)
+        byte[]? RiverMask = null,
+        int[]? ShreveMagnitude = null)
     {
         /// <summary>True when (gx, gy) — clamped to the grid — has been painted as a river cell,
         /// of any Strahler order. Use <see cref="RiverOrder"/> to distinguish a headwater creek
@@ -110,6 +126,31 @@ namespace GameEngineTools.World.Data
                     nameof(bytes));
 
             var values = new float[width * height];
+            Buffer.BlockCopy(bytes, 0, values, 0, bytes.Length);
+            return values;
+        }
+
+        /// <summary>Packs <paramref name="values"/> (e.g. <see cref="ShreveMagnitude"/>) into a
+        /// little-endian int32 byte buffer for BLOB storage — the same convention <see cref="ToBytes"/>
+        /// uses for <see cref="Values"/>, sized for <c>int</c> instead of <c>float</c> since Shreve
+        /// magnitude sums without a cap and can exceed a <c>byte</c>'s range on a large basin.</summary>
+        public static byte[] Int32ArrayToBytes(int[] values)
+        {
+            var bytes = new byte[values.Length * sizeof(int)];
+            Buffer.BlockCopy(values, 0, bytes, 0, bytes.Length);
+            return bytes;
+        }
+
+        /// <summary>Unpacks a little-endian int32 byte buffer (as produced by <see cref="Int32ArrayToBytes"/>) back into samples.</summary>
+        public static int[] Int32ArrayFromBytes(byte[] bytes, int width, int height)
+        {
+            var expected = width * height * sizeof(int);
+            if (bytes.Length != expected)
+                throw new ArgumentException(
+                    $"Int32 array byte buffer length {bytes.Length} does not match {width}x{height} ints ({expected} bytes).",
+                    nameof(bytes));
+
+            var values = new int[width * height];
             Buffer.BlockCopy(bytes, 0, values, 0, bytes.Length);
             return values;
         }

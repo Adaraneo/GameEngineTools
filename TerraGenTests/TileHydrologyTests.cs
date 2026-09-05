@@ -26,22 +26,22 @@ public class TileHydrologyTests
     }
 
     [TestMethod]
-    public void ComputeRiverMask_UniformSlopeAlongOneRow_AreaSlopeProductGrowsLinearlyDownstream()
+    public void ComputeRiverMask_UniformSlopeAlongOneRow_AreaSlopeSquaredProductGrowsLinearlyDownstream()
     {
         // Every row slopes the same way in +x (height decreases left to right by 10 per cell, so
         // real slope is exactly 10 everywhere), no variation in y — every cell's single steepest-
         // descent neighbor is straight ahead (x+1,y), so contributing area at column x is exactly
-        // (x+1) cells and the area×slope product is (x+1)*10 — a simple, hand-verifiable case. The
-        // LAST column (x=width-1) has no downstream neighbor of its own to judge (grid edge), but
-        // once ANY upstream column becomes a channel, downstream propagation (see
-        // ComputeRiverMask's remarks) carries that mark all the way to the edge regardless — a
+        // (x+1) cells and the area×slope² product is (x+1)*100 (slope=10, squared=100) — a simple,
+        // hand-verifiable case. The LAST column (x=width-1) has no downstream neighbor of its own to
+        // judge (grid edge), but once ANY upstream column becomes a channel, downstream propagation
+        // (see ComputeRiverMask's remarks) carries that mark all the way to the edge regardless — a
         // channel doesn't stop existing just because there's no further column left to evaluate.
         const int width = 6, height = 3;
         var grid = MakeGrid(width, height, 1.0, (x, _) => (width - x) * 10f);
 
-        // The minimum possible product (column 0: area=1 cell, slope=10) marks every column,
+        // The minimum possible product (column 0: area=1 cell, slope²=100) marks every column,
         // including the last one via propagation from column width-2.
-        var maskLow = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 10.0));
+        var maskLow = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 100.0));
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
@@ -49,9 +49,9 @@ public class TileHydrologyTests
         }
 
         // The maximum possible product among cells that can judge their OWN slope is at column
-        // width-2 (area=width-1, slope=10) — a threshold set exactly there marks only that column
+        // width-2 (area=width-1, slope²=100) — a threshold set exactly there marks only that column
         // AND whatever it propagates to (here, just the last column, its sole downstream cell).
-        var maskHigh = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: (width - 1) * 10.0));
+        var maskHigh = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: (width - 1) * 100.0));
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
@@ -63,13 +63,61 @@ public class TileHydrologyTests
     }
 
     [TestMethod]
+    public void ComputeRiverMask_LowSlopeHighArea_RequiresMuchLargerAreaThanLinearModelWould()
+    {
+        // Regression test for the exact bug this squared-slope fix corrects: under the OLD (buggy)
+        // linear model (area×slope), halving the slope only requires DOUBLING the area to still
+        // qualify for the same threshold. Under the correct area×slope² model, halving the slope
+        // requires QUADRUPLING the area — a regression back to the unsquared formula would mark the
+        // "doubled area" case below, which the correct model must NOT.
+        //
+        // Two independent uniform-slope lines (steep at slope=10, shallow at exactly half, slope=5),
+        // both starting fresh at column 0 (area=1) so a column's own area is just (column index + 1)
+        // — the same simple, hand-verifiable setup the uniform-slope test above uses. Threshold is
+        // fixed at 1000 = area(10)×slope(10)² (the steep line's OWN qualifying point, at column 9,
+        // area=10) for both lines, so the shallow line's columns are judged against the exact same
+        // bar the steep line needs to clear.
+        const int width = 45, height = 1;
+        const double threshold = 1000.0; // = 10 (area) * 10² (slope), the steep line's own bar
+
+        TerrainHeightmap MakeUniformSlopeLine(float slope)
+        {
+            var values = new float[width];
+            var h = 10_000f;
+            for (var x = 0; x < width; x++)
+            {
+                values[x] = h;
+                h -= slope;
+            }
+            return new TerrainHeightmap("test", 0.0, 0.0, 1.0, width, height, values);
+        }
+
+        var steepMask = TileHydrology.ComputeRiverMask(MakeUniformSlopeLine(10f), new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: threshold));
+        // Column 9: area=10, slope=10 -> 10*100=1000 >= threshold — qualifies, confirming the
+        // threshold is exactly where this line's own bar sits (not accidentally too high/low).
+        Assert.AreEqual(1, steepMask[9], "Steep line's own qualifying point (area=10, slope=10) should mark at threshold=1000.");
+
+        var shallowMask = TileHydrology.ComputeRiverMask(MakeUniformSlopeLine(5f), new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: threshold));
+        // Column 19: area=20 (DOUBLE the steep line's qualifying area), slope=5 (HALF the steep
+        // line's slope) -> 20*25=500 < 1000 — must NOT qualify. A linear (unsquared) model would
+        // instead compare 20*5=100 against a linear-model threshold of 10*10=100 and WRONGLY mark
+        // it (equal, not less) — this is exactly the case a regression to the linear formula would
+        // flip.
+        Assert.AreEqual(0, shallowMask[19], "Doubled area at half the slope must NOT qualify under the correct squared model.");
+        // Column 39: area=40 (QUADRUPLE the steep line's qualifying area), slope=5 -> 40*25=1000 >=
+        // threshold — DOES qualify, confirming quadrupling (not doubling) area is what compensates
+        // for halving the slope.
+        Assert.AreEqual(1, shallowMask[39], "Quadrupled area at half the slope SHOULD qualify under the correct squared model.");
+    }
+
+    [TestMethod]
     public void ComputeRiverMask_HigherThreshold_NeverProducesMoreRiverCellsThanLowerThreshold()
     {
         var rng = new Random(7);
         var grid = MakeGrid(15, 15, 1.0, (_, _) => (float)(rng.NextDouble() * 100));
 
-        var low = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 20));
-        var high = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 400));
+        var low = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 20));
+        var high = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 400));
 
         var lowCount = low.Count(b => b == 1);
         var highCount = high.Count(b => b == 1);
@@ -87,7 +135,7 @@ public class TileHydrologyTests
         // spontaneously carve a channel, no matter how much area drains across it.
         var grid = MakeGrid(6, 6, 1.0, (_, _) => 5f);
 
-        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 0.001));
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 0.001));
 
         Assert.IsTrue(mask.All(b => b == 0), "A perfectly flat grid has zero real slope everywhere and should never be marked as river.");
     }
@@ -98,8 +146,8 @@ public class TileHydrologyTests
         var rng = new Random(3);
         var grid = MakeGrid(20, 20, 2.5, (_, _) => (float)(rng.NextDouble() * 50));
 
-        var a = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 30));
-        var b = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 30));
+        var a = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 30));
+        var b = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 30));
 
         CollectionAssert.AreEqual(a, b);
     }
@@ -110,22 +158,22 @@ public class TileHydrologyTests
         // A V-shaped cross-section (height rises with distance from the center column), PLUS a
         // gentle downhill trend along y so the valley floor actually has somewhere to drain — a
         // valley whose floor is perfectly level along its own length (no y-term at all) has zero
-        // REAL slope there under the new area×slope criterion (which measures slope on raw
-        // elevation, not a synthetic tie-break), so it would never channelize, same as any other
-        // flat ground; real valley floors slope toward their outlet, which is what the small y-term
-        // models. The cross-valley slope (5/cell) still dominates the y-trend (0.3/cell) enough
-        // that ridge cells still drain toward the center first, same as before.
+        // REAL slope there under the area×slope² criterion (which measures slope on raw elevation,
+        // not a synthetic tie-break), so it would never channelize, same as any other flat ground;
+        // real valley floors slope toward their outlet, which is what the small y-term models. The
+        // cross-valley slope (5/cell) still dominates the y-trend (0.3/cell) enough that ridge cells
+        // still drain toward the center first, same as before.
         // The outer two ridge columns never receive any upstream contribution (nothing further out
         // to feed them — area is always exactly 1 cell there), so even their steep local
         // cross-valley slope (5, an exact value here: the y-term cancels in a same-row horizontal
-        // comparison) can never cross a threshold set above 1*5 on its own. Columns BETWEEN the
-        // ridge and center do accumulate some lateral inflow, so this only asserts the clean-cut
+        // comparison) can never cross a threshold set above 1*5² = 25 on its own. Columns BETWEEN
+        // the ridge and center do accumulate some lateral inflow, so this only asserts the clean-cut
         // case (isolated steep cell, no area behind it, must NOT count) rather than every column.
         const int width = 11, height = 5;
         const int center = width / 2;
         var grid = MakeGrid(width, height, 1.0, (x, y) => Math.Abs(x - center) * 5f + y * 0.3f);
 
-        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 8.0));
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 30.0));
 
         for (var y = 0; y < height; y++)
         {
@@ -148,13 +196,15 @@ public class TileHydrologyTests
         // ResolveFlats's caller (`var routed = filled;`) on this exact scenario, which drove the
         // marked fraction from ~0.4% up to ~23% of the valley floor. ResolveFlats fixes it by
         // funneling flow toward the valley's one open (south) side instead of letting it spread.
-        // Threshold set low specifically to still exercise this on the area×slope criterion despite
+        // Threshold set low specifically to still exercise this on the area×slope² criterion despite
         // this floor's real relief being tiny (deliberately, to simulate realistic post-erosion
         // float noise, no uniform trend) — a higher, realistic threshold would trivially mark
         // ~nothing here and not actually test the shape-of-the-network regression this guards
-        // against. Downstream propagation (see ComputeRiverMask's remarks) means the assertion below
-        // only needs "not a wide sheet", not "not connected" — propagation is what MAKES a marked
-        // stretch connected now, that's not the failure mode this test targets.
+        // against. Retuned for the squared model (typical noise slope here is well under 1, so
+        // squaring shrinks the product by several more orders of magnitude than the old linear
+        // threshold assumed). Downstream propagation (see ComputeRiverMask's remarks) means the
+        // assertion below only needs "not a wide sheet", not "not connected" — propagation is what
+        // MAKES a marked stretch connected now, that's not the failure mode this test targets.
         const int width = 200, height = 200;
         var values = new float[width * height];
         var isWall = new bool[width * height];
@@ -180,7 +230,7 @@ public class TileHydrologyTests
         }
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 1.0));
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 0.001));
 
         var flatCells = 0;
         var riverCells = 0;
@@ -225,7 +275,7 @@ public class TileHydrologyTests
         // Threshold low enough the channel initiates almost immediately (column 1: area=2 cells,
         // slope=1 -> product=2) — every flat step's OWN local slope is exactly 0, which would fail
         // ANY positive threshold if evaluated pointwise instead of propagated.
-        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 2.0));
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 2.0));
 
         for (var x = 1; x < width - 1; x++)
             Assert.AreEqual(1, mask[x], $"Column {x} (flatStep={flatSteps.Contains(x)}) should stay marked — " +
@@ -239,7 +289,7 @@ public class TileHydrologyTests
         // had a tributary merge into it, so by Strahler's own definition it must be order 1 — true
         // regardless of terrain shape, so this checks the property directly rather than hand-predicting
         // values for one specific hand-built confluence.
-        var (mask, _, _, downstream, order, strahlerOrder) = ComputeOnAConfluenceRichGrid();
+        var (mask, _, _, downstream, order, strahlerOrder, _) = ComputeOnAConfluenceRichGrid();
         var upstreamCount = BuildUpstreamCounts(mask, downstream, order.Length);
 
         for (var i = 0; i < mask.Length; i++)
@@ -256,7 +306,7 @@ public class TileHydrologyTests
         // Definitional: Strahler order can only stay the same or increase moving downstream —
         // merging a smaller tributary into a bigger reach never shrinks the bigger reach's own
         // classification.
-        var (mask, _, _, downstream, _, strahlerOrder) = ComputeOnAConfluenceRichGrid();
+        var (mask, _, _, downstream, _, strahlerOrder, _) = ComputeOnAConfluenceRichGrid();
 
         for (var i = 0; i < mask.Length; i++)
         {
@@ -275,7 +325,7 @@ public class TileHydrologyTests
         // cell's order is max(upstream orders)+1 ONLY if that max is shared by at least two
         // tributaries; a single dominant tributary absorbing a smaller one keeps its own order
         // unchanged — a big river doesn't bump up in classification just because a trickle joins it.
-        var (mask, _, _, downstream, order, strahlerOrder) = ComputeOnAConfluenceRichGrid();
+        var (mask, _, _, downstream, order, strahlerOrder, _) = ComputeOnAConfluenceRichGrid();
         var upstream = BuildUpstreamLists(mask, downstream, order.Length);
 
         var confluencesChecked = 0;
@@ -302,7 +352,7 @@ public class TileHydrologyTests
     /// throughout this file to exercise realistic branching drainage — with a low enough threshold
     /// that multiple independent tributaries form and merge, giving the Strahler tests above actual
     /// confluences to check instead of one single unbranched line.</summary>
-    private static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order, byte[] StrahlerOrder) ComputeOnAConfluenceRichGrid()
+    private static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order, byte[] StrahlerOrder, int[] ShreveMagnitude) ComputeOnAConfluenceRichGrid()
     {
         const int width = 200, height = 200;
         var values = new float[width * height];
@@ -321,7 +371,12 @@ public class TileHydrologyTests
         }
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
-        return TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(AreaSlopeThreshold: 15.0));
+        // Threshold retuned for the area×slope² model (was 15.0 under the old area×slope model) —
+        // this basin's real interior slope is gentle (~0.004, from the y*0.02 term at 5m cells), so
+        // squaring shrinks it far more than the old linear threshold assumed; retuned empirically to
+        // keep this basin producing the same kind of branching, multi-confluence network the
+        // Strahler tests above need.
+        return TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 1.5));
     }
 
     private static int[] BuildUpstreamCounts(byte[] mask, int[] downstream, int count)

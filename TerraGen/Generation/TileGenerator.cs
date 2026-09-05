@@ -250,29 +250,32 @@ public static class TileGenerator
 
             var combinedGrid = new TerrainHeightmap("batch-combined", swX, swY, s.CellSizeMeters,
                 bigWidth, bigHeight, combined);
-            var (straightRiverMask, riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder) =
+            var (straightRiverMask, riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude) =
                 TileHydrology.ComputeDiagnostics(combinedGrid, hydrologyParams);
             // Bends the straight D8 backbone above into a meandering path (see RiverMeander's own
             // remarks for why D8 alone can't produce one) — a shape-only pass, so it never changes
             // which cells actually count as river-worthy, just where within the grid each one draws.
-            // The Strahler order threaded through here is what ends up baked into each tile's own
-            // saved RiverMask byte value below, instead of a flat 1 — see TerrainHeightmap's remarks.
-            var combinedRiverMask = RiverMeander.ApplyMeander(combinedGrid, straightRiverMask,
-                riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, new RiverMeander.Parameters());
+            // The Strahler order and Shreve magnitude threaded through here are what end up baked
+            // into each tile's own saved RiverMask/ShreveMagnitude arrays below, instead of a flat 1
+            // — see TerrainHeightmap's remarks.
+            var (combinedRiverMask, combinedShreveMagnitude) = RiverMeander.ApplyMeander(combinedGrid, straightRiverMask,
+                riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude, new RiverMeander.Parameters());
 
             foreach (var t in batchTiles)
             {
                 var baseX = t.Col * cellsPerTile;
                 var baseY = t.Row * cellsPerTile;
                 var riverMaskInterior = new byte[cellsPerTile * cellsPerTile];
+                var shreveMagnitudeInterior = new int[cellsPerTile * cellsPerTile];
                 for (var iy = 0; iy < cellsPerTile; iy++)
                 {
                     var srcRow = (baseY + iy) * bigWidth + baseX;
                     Array.Copy(combinedRiverMask, srcRow, riverMaskInterior, iy * cellsPerTile, cellsPerTile);
+                    Array.Copy(combinedShreveMagnitude, srcRow, shreveMagnitudeInterior, iy * cellsPerTile, cellsPerTile);
                 }
 
                 var tile = new TerrainHeightmap(t.Id, swX + t.Col * s.TileSizeMeters, swY + t.Row * s.TileSizeMeters,
-                    s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior);
+                    s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior, shreveMagnitudeInterior);
                 db.SaveHeightmap(tile);
             }
         }

@@ -178,6 +178,38 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void SaveHeightmap_WithShreveMagnitude_RoundTrips()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            // A value above 255 exercises the int32 (not byte) storage this needs — Shreve
+            // magnitude sums without Strahler order's cap, so it must survive round-tripping a
+            // value no byte column could ever hold.
+            var grid = MakeGrid() with { RiverMask = [0, 1, 1, 0, 0, 1], ShreveMagnitude = [0, 300, 1, 0, 0, 1] };
+            db.SaveHeightmap(grid);
+
+            var loaded = db.LoadHeightmap("default");
+
+            Assert.IsNotNull(loaded);
+            CollectionAssert.AreEqual(grid.ShreveMagnitude, loaded!.ShreveMagnitude);
+        }
+
+        [TestMethod]
+        public void SaveHeightmap_NoShreveMagnitude_LoadsAsNull()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            db.SaveHeightmap(MakeGrid());
+
+            var loaded = db.LoadHeightmap("default");
+
+            Assert.IsNotNull(loaded);
+            Assert.IsNull(loaded!.ShreveMagnitude);
+        }
+
+        [TestMethod]
         public void LoadHeightmap_UnknownId_ReturnsNull()
         {
             using var db = new SqliteWorldDatabase(":memory:");
@@ -236,6 +268,44 @@ namespace EngineTests
             Assert.IsNotNull(loaded);
             CollectionAssert.AreEqual(grid.Values, loaded!.Values);
             Assert.IsNull(loaded.RiverMask);
+            Assert.IsNull(loaded.ShreveMagnitude);
+        }
+
+        /// <summary>TerrainHeightmap shape as it existed after RiverMask but before ShreveMagnitude
+        /// was introduced — the realistic upgrade path, since almost every existing database will
+        /// already have RiverMask by the time this migration runs.</summary>
+        private const string PreShreveHeightmapSchema = """
+            CREATE TABLE TerrainHeightmap (
+                Id              TEXT    PRIMARY KEY,
+                OriginX         REAL    NOT NULL,
+                OriginY         REAL    NOT NULL,
+                CellSizeMeters  REAL    NOT NULL,
+                Width           INTEGER NOT NULL,
+                Height          INTEGER NOT NULL,
+                Data            BLOB    NOT NULL,
+                RiverMask       BLOB
+            );
+            """;
+
+        [TestMethod]
+        public void MigrateTerrainHeightmapColumns_PreShreveRow_SurvivesAndGainsNullShreveMagnitude()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            db.ExecuteScript(PreShreveHeightmapSchema);
+
+            var grid = MakeGrid() with { RiverMask = [0, 1, 1, 0, 0, 1] };
+            db.ExecuteScript($"""
+                INSERT INTO TerrainHeightmap (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask)
+                VALUES ('default', 0.0, 0.0, 10.0, 3, 2, X'{Convert.ToHexString(grid.ToBytes())}', X'{Convert.ToHexString(grid.RiverMask)}');
+                """);
+
+            db.MigrateTerrainHeightmapColumns();
+
+            var loaded = db.LoadHeightmap("default");
+            Assert.IsNotNull(loaded);
+            CollectionAssert.AreEqual(grid.Values, loaded!.Values);
+            CollectionAssert.AreEqual(grid.RiverMask, loaded.RiverMask);
+            Assert.IsNull(loaded.ShreveMagnitude);
         }
 
         [TestMethod]
@@ -252,7 +322,7 @@ namespace EngineTests
             using var db = new SqliteWorldDatabase(":memory:");
             SeedSchema(db);
 
-            var grid = MakeGrid() with { RiverMask = [1, 0, 0, 1, 0, 0] };
+            var grid = MakeGrid() with { RiverMask = [1, 0, 0, 1, 0, 0], ShreveMagnitude = [1, 0, 0, 2, 0, 0] };
             db.SaveHeightmap(grid);
 
             db.MigrateTerrainHeightmapColumns();
@@ -260,6 +330,7 @@ namespace EngineTests
 
             var loaded = db.LoadHeightmap("default");
             CollectionAssert.AreEqual(grid.RiverMask, loaded!.RiverMask);
+            CollectionAssert.AreEqual(grid.ShreveMagnitude, loaded.ShreveMagnitude);
         }
 
         #endregion Migration from a pre-river schema

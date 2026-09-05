@@ -34,6 +34,21 @@ namespace TerraGen.Generation;
 /// </summary>
 public static class RiverMeander
 {
+    /// <summary>Reference point <see cref="Parameters.BankErosionCoefficientE"/>/<see cref="Parameters.ScourFactor"/>
+    /// are normalized against — see <see cref="Parameters.BankErosionCoefficientE"/>'s remarks.</summary>
+    private const double DefaultBankErosionCoefficientE = 3e-8;
+
+    /// <summary>Reference point <see cref="Parameters.ScourFactor"/> is normalized against — see
+    /// <see cref="Parameters.BankErosionCoefficientE"/>'s remarks.</summary>
+    private const double DefaultScourFactor = 3.0;
+
+    /// <summary>Edwards &amp; Smith (2002) upstream curvature-memory decay length
+    /// <c>D = H / (2·C_f)</c> — see <see cref="Parameters.FrictionCoefficient"/>'s remarks. A
+    /// standalone method (not inlined into <see cref="ComputeOffsets"/>) specifically so this exact
+    /// formula can be unit-tested in isolation against hand-calculated values.</summary>
+    internal static double CurvatureMemoryLengthMeters(double channelDepthMeters, double frictionCoefficient)
+        => channelDepthMeters / (2.0 * frictionCoefficient);
+
     public sealed record Parameters(
         /// <summary>Real channel width has no simulated discharge to derive it from here, so this
         /// approximates it from contributing area via a simplified power law (width grows with the
@@ -62,12 +77,59 @@ public static class RiverMeander
         /// (and saturating at, via <see cref="MaxBeltWidthPerWidth"/>) 80%+ of its belt cap within
         /// 200-300 iterations for all of them.</summary>
         double ErosionCoefficient = 150.0,
-        /// <summary>IPS's upstream curvature "memory" — how far back along the channel (in multiples
-        /// of local channel width) a bend's influence carries before decaying away. Real rivers
-        /// resonate at a wavelength set by this decay length relative to channel width; too short
-        /// and every point reacts only to itself (no coherent bends ever form), too long and the
-        /// whole channel responds as one unit (one giant, unrealistic bend).</summary>
-        double CurvatureMemoryLengthPerWidth = 6.0,
+        /// <summary>Ikeda, Parker &amp; Sawai's (1981) bank-erosion coefficient E (dimensionless) —
+        /// how strongly the near-bank excess velocity a bend's curvature creates actually erodes the
+        /// outer bank, in the linearized IPS bend theory this whole simulation is built on.
+        /// <para>Source: field-calibrated range <c>E ∈ [1e-8, 1e-7]</c>; reference value
+        /// <c>E = 3×10⁻⁸</c> used in Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L.
+        /// (2005). "On the long-term behavior of meandering rivers." <i>Water Resources Research</i>
+        /// 41:W12403.</para>
+        /// E primarily rescales the SIMULATION'S OWN time axis (larger E migrates a bend further per
+        /// iteration), not the resulting planform SHAPE — <see cref="ErosionCoefficient"/> above is
+        /// what this generator actually live-tunes for visual/gameplay pacing (it has no simulated
+        /// discharge to plug a literal E into and get a meaningful meters-per-iteration answer from),
+        /// so E and <see cref="ScourFactor"/> enter the migration formula NORMALIZED against their
+        /// own defaults — moving either within its cited range scales migration up/down from
+        /// whatever <see cref="ErosionCoefficient"/> already produces, in the SAME proportion IPS's
+        /// linear theory says it should (E doubled -> migration doubled), without silently changing
+        /// the already-calibrated default look the moment this field was introduced.</summary>
+        double BankErosionCoefficientE = 3e-8,
+        /// <summary>Ikeda, Parker &amp; Sawai's (1981) scour/transverse-bed-slope factor — called
+        /// "A" in the source's own near-bank-velocity equation, renamed here to avoid confusion with
+        /// drainage AREA elsewhere in this codebase (see e.g. <see cref="TileHydrology"/>).
+        /// <para>Source: range <c>2.5-6</c>, commonly ≈3. Ikeda, S., Parker, G. &amp; Sawai, K.
+        /// (1981). "Bend theory of river meanders. Part 1. Linear development." <i>Journal of Fluid
+        /// Mechanics</i> 112:363-377. doi:10.1017/S0022112081000451. Also see Odgaard, A.J. (1981)
+        /// for a consistent field range.</para>
+        /// TODO(Stage 2): Johannesson &amp; Parker (1989) correct this coefficient for a
+        /// depth-averaged (rather than IPS's original near-surface) velocity profile — deliberately
+        /// NOT implemented in this pass, which only relabels/re-ranges the existing IPS constant
+        /// correctly; the JP correction needs its own research-verified equation form. See
+        /// <see cref="BankErosionCoefficientE"/>'s remarks for how this enters the migration formula
+        /// alongside <see cref="ErosionCoefficient"/>.</summary>
+        double ScourFactor = 3.0,
+        /// <summary>Typical alluvial-channel width-to-depth ratio, used ONLY to estimate channel
+        /// depth H (= width / this ratio) for <see cref="FrictionCoefficient"/>'s D=H/(2·Cf) decay
+        /// length below — this generator has no simulated discharge to derive a real depth from, the
+        /// same reason <see cref="WidthPerSqrtAreaM2"/> approximates width from area instead of a
+        /// real width-discharge relationship.
+        /// Source: typical range 10-20 for alluvial (sand/gravel-bed) channels — Leopold, L.B. &amp;
+        /// Maddock, T. (1953). "The hydraulic geometry of stream channels and some physiographic
+        /// implications." USGS Professional Paper 252.</summary>
+        double WidthToDepthRatio = 15.0,
+        /// <summary>Dimensionless bed-friction coefficient C_f in Edwards &amp; Smith's (2002)
+        /// upstream curvature-memory decay length <c>D = H / (2·C_f)</c> (H = local channel depth,
+        /// estimated via <see cref="WidthToDepthRatio"/>) — this REPLACES what used to be a flat
+        /// "N channel widths" decay-length constant with one actually derived from the channel's own
+        /// depth and bed roughness, so the memory length scales per-reach instead of being globally
+        /// fixed. Source: typical range 0.003-0.03 depending on bed roughness. Edwards, B.F. &amp;
+        /// Smith, N.D. (2002). "River meandering dynamics." <i>Physical Review E</i>.
+        /// Default 0.0056 was picked, within that cited range, specifically to reproduce (via
+        /// D=H/(2·C_f) with the <see cref="WidthToDepthRatio"/> default) almost exactly the same
+        /// decay length the old flat "6× channel width" constant it replaces already had live-tuned
+        /// — this formula change is a re-derivation of an already-working number, not a re-tune of
+        /// the resulting shapes.</summary>
+        double FrictionCoefficient = 0.0056,
         /// <summary>Seed perturbation amplitude (fraction of local channel width) applied once,
         /// before any iteration — a real channel is never perfectly straight either, and the whole
         /// migration feedback below has nothing to amplify without SOME starting irregularity to
@@ -103,20 +165,22 @@ public static class RiverMeander
         double SlopeSuppressedAbove = 0.08);
 
     /// <summary>Takes the straight D8 mask <see cref="TileHydrology.ComputeDiagnostics"/> already
-    /// computed (plus its accumulation/slope/downstream/Strahler-order arrays, which this reuses
-    /// rather than recomputing) and returns a new mask where every marked cell has migrated to
-    /// wherever the bank-erosion simulation moved it. Cell count and shape match the input — this
-    /// only ever redistributes WHERE within the same grid the channel is drawn, it doesn't add or
-    /// remove catchment area or change the underlying accumulation/routing at all. The returned byte
+    /// computed (plus its accumulation/slope/downstream/Strahler-order/Shreve-magnitude arrays,
+    /// which this reuses rather than recomputing) and returns a new mask (plus a co-indexed
+    /// migrated Shreve-magnitude array) where every marked cell has migrated to wherever the
+    /// bank-erosion simulation moved it. Cell count and shape match the input — this only ever
+    /// redistributes WHERE within the same grid the channel is drawn, it doesn't add or remove
+    /// catchment area or change the underlying accumulation/routing at all. The returned byte
     /// value at a river cell is its Strahler order (see
     /// <see cref="GameEngineTools.World.Data.TerrainHeightmap.RiverMask"/>'s remarks), not a flat 1
-    /// — migration only changes shape, never what a cell's own order was on the straight
-    /// backbone.</summary>
-    public static byte[] ApplyMeander(TerrainHeightmap grid, byte[] straightMask, int[] accumulation,
-        double[] slope, int[] downstream, int[] order, byte[] strahlerOrder, Parameters p)
+    /// — migration only changes shape, never what a cell's own order (or magnitude) was on the
+    /// straight backbone.</summary>
+    public static (byte[] Mask, int[] ShreveMagnitude) ApplyMeander(TerrainHeightmap grid, byte[] straightMask,
+        int[] accumulation, double[] slope, int[] downstream, int[] order, byte[] strahlerOrder,
+        int[] shreveMagnitude, Parameters p)
     {
         var (offsetX, offsetY) = ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
-        return Rasterize(grid, straightMask, downstream, strahlerOrder, offsetX, offsetY);
+        return Rasterize(grid, straightMask, downstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
     }
 
     /// <summary>Same computation as <see cref="ApplyMeander"/>, but stops short of rasterizing —
@@ -144,6 +208,14 @@ public static class RiverMeander
         var channelWidth = new double[count];
         for (var i = 0; i < count; i++)
             channelWidth[i] = Math.Max(cellSize * 0.1, p.WidthPerSqrtAreaM2 * Math.Sqrt(accumulation[i] * cellSize * cellSize));
+
+        // Estimated channel depth (see Parameters.WidthToDepthRatio's remarks) — feeds ONLY the
+        // Edwards & Smith (2002) curvature-memory decay length D=H/(2·C_f) below, the same way
+        // channelWidth already estimates a physical scale this generator has no simulated discharge
+        // to derive directly.
+        var channelDepth = new double[count];
+        for (var i = 0; i < count; i++)
+            channelDepth[i] = channelWidth[i] / p.WidthToDepthRatio;
 
         foreach (var idx in order)
         {
@@ -190,6 +262,12 @@ public static class RiverMeander
         // Erodibility: how strongly a cell's curvature signal actually translates into migration —
         // zero on steep ground (real channels there don't get the chance to wander before just
         // cutting straight downhill, Leopold & Wolman 1957), full strength on gentle ground.
+        // physicalFactor folds in BankErosionCoefficientE and ScourFactor (IPS's own E and A)
+        // NORMALIZED against their own defaults — see BankErosionCoefficientE's remarks for why: it
+        // keeps ErosionCoefficient's already-live-tuned default look exactly unchanged (factor=1.0
+        // at defaults) while still making E/A individually meaningful, cited, in-range dials that
+        // scale migration in the same linear proportion IPS's theory says they should.
+        var physicalFactor = (p.BankErosionCoefficientE * p.ScourFactor) / (DefaultBankErosionCoefficientE * DefaultScourFactor);
         var erodibility = new double[count];
         for (var i = 0; i < count; i++)
         {
@@ -198,7 +276,7 @@ public static class RiverMeander
             var suppression = here <= p.SlopeFullMeanderBelow ? 1.0
                 : here >= p.SlopeSuppressedAbove ? 0.0
                 : 1.0 - (here - p.SlopeFullMeanderBelow) / (p.SlopeSuppressedAbove - p.SlopeFullMeanderBelow);
-            erodibility[i] = p.ErosionCoefficient * suppression;
+            erodibility[i] = p.ErosionCoefficient * suppression * physicalFactor;
         }
 
         // Seed phase, propagated incrementally along arc length like a running total (NOT
@@ -209,9 +287,10 @@ public static class RiverMeander
         // moved (0.085m average over the whole simulation) while narrow creeks moved freely (2m+) —
         // the trunk's memory window spanned 4+ full seed oscillation cycles, so the alternating
         // +/- signal averaged itself out to near-zero before the migration feedback ever got a
-        // usable direction to amplify. Tying the seed's own wavelength to
-        // CurvatureMemoryLengthPerWidth keeps roughly one seed cycle per memory window at any
-        // channel size, so there's always a coherent (not self-cancelling) direction to grow.
+        // usable direction to amplify. Tying the seed's own wavelength to the SAME Edwards & Smith
+        // decay length the migration feedback itself uses (see the CurvatureMemoryLengthMeters local
+        // function below) keeps roughly one seed cycle per memory window at any channel size, so
+        // there's always a coherent (not self-cancelling) direction to grow.
         var seedPhase = new double[count];
         foreach (var idx in order)
         {
@@ -223,9 +302,15 @@ public static class RiverMeander
             var x = idx % width; var y = idx / width;
             var nx = next % width; var ny = next / width;
             var stepDist = (nx != x && ny != y ? 1.4142135623730951 : 1.0) * cellSize;
-            var seedWavelength = Math.Max(cellSize, p.CurvatureMemoryLengthPerWidth * channelWidth[idx]);
+            var seedWavelength = Math.Max(cellSize, DecayLengthAt(idx));
             seedPhase[next] = seedPhase[idx] + 2.0 * Math.PI * stepDist / seedWavelength;
         }
+
+        // Edwards & Smith (2002) upstream curvature-memory decay length D = H/(2·C_f) — see
+        // Parameters.FrictionCoefficient's remarks and the standalone CurvatureMemoryLengthMeters
+        // itself. Local function wrapper (not inlined) since it's needed identically in both the
+        // seed-wavelength calculation above and the per-iteration convolution below.
+        double DecayLengthAt(int cellIndex) => CurvatureMemoryLengthMeters(channelDepth[cellIndex], p.FrictionCoefficient);
 
         // World-space positions (meters), one per grid cell — starts exactly on the straight D8
         // backbone, then migrates in place over the iterations below. A tiny deterministic
@@ -318,7 +403,7 @@ public static class RiverMeander
                 if (predecessor[next] != idx) continue; // only the dominant edge carries memory forward
 
                 var stepDist = Math.Sqrt(Math.Pow(posX[next] - posX[idx], 2) + Math.Pow(posY[next] - posY[idx], 2));
-                var decayLength = Math.Max(cellSize, p.CurvatureMemoryLengthPerWidth * channelWidth[idx]);
+                var decayLength = Math.Max(cellSize, DecayLengthAt(idx));
                 var decayWeight = Math.Exp(-stepDist / decayLength);
                 convolvedCurvature[next] = curvature[next] * (1.0 - decayWeight) + convolvedCurvature[idx] * decayWeight;
             }
@@ -450,34 +535,40 @@ public static class RiverMeander
     /// — a migration step can move a point several grid cells sideways over the course of the
     /// simulation, and without redrawing the connecting line the channel would fragment into
     /// disconnected dots exactly like the bug TileHydrology's own downstream-propagation fix already
-    /// solved for the straight case.</summary>
-    private static byte[] Rasterize(TerrainHeightmap grid, byte[] straightMask, int[] downstream,
-        byte[] strahlerOrder, int[] offsetX, int[] offsetY)
+    /// solved for the straight case. Shreve magnitude is stamped alongside the Strahler-order mask
+    /// from the SAME source cell at every rasterized pixel — see <see cref="StampMax"/> — rather
+    /// than in a separate pass, so a pixel's magnitude always corresponds to whichever reach's line
+    /// actually "won" that pixel, not an unrelated reach that happened to draw over it too.</summary>
+    private static (byte[] Mask, int[] ShreveMagnitude) Rasterize(TerrainHeightmap grid, byte[] straightMask,
+        int[] downstream, byte[] strahlerOrder, int[] shreveMagnitude, int[] offsetX, int[] offsetY)
     {
         var width = grid.Width;
         var height = grid.Height;
         var meandered = new byte[straightMask.Length];
+        var meanderedMagnitude = new int[straightMask.Length];
         for (var idx = 0; idx < straightMask.Length; idx++)
         {
             if (straightMask[idx] == 0) continue;
             var value = strahlerOrder[idx];
+            var magnitude = shreveMagnitude[idx];
             var next = downstream[idx];
             if (next < 0)
             {
-                StampMax(meandered, offsetY[idx] * width + offsetX[idx], value);
+                StampMax(meandered, meanderedMagnitude, offsetY[idx] * width + offsetX[idx], value, magnitude);
                 continue;
             }
-            DrawLine(meandered, width, height, offsetX[idx], offsetY[idx], offsetX[next], offsetY[next], value);
+            DrawLine(meandered, meanderedMagnitude, width, height, offsetX[idx], offsetY[idx], offsetX[next], offsetY[next], value, magnitude);
         }
 
-        return meandered;
+        return (meandered, meanderedMagnitude);
     }
 
     /// <summary>Bresenham line rasterization, so two consecutive migrated points always end up
     /// 8-connected on the grid no matter how far apart the simulation put them. Stamps
-    /// <paramref name="value"/> (the source cell's Strahler order) rather than a flat 1 — see
-    /// <see cref="ApplyMeander"/>'s remarks.</summary>
-    private static void DrawLine(byte[] mask, int width, int height, int x0, int y0, int x1, int y1, byte value)
+    /// <paramref name="value"/> (the source cell's Strahler order) and <paramref name="magnitude"/>
+    /// (its Shreve magnitude) together rather than a flat 1 — see <see cref="ApplyMeander"/>'s
+    /// remarks.</summary>
+    private static void DrawLine(byte[] mask, int[] magnitudeMask, int width, int height, int x0, int y0, int x1, int y1, byte value, int magnitude)
     {
         var dx = Math.Abs(x1 - x0);
         var dy = -Math.Abs(y1 - y0);
@@ -490,7 +581,7 @@ public static class RiverMeander
         while (true)
         {
             if (x >= 0 && x < width && y >= 0 && y < height)
-                StampMax(mask, y * width + x, value);
+                StampMax(mask, magnitudeMask, y * width + x, value, magnitude);
             if (x == x1 && y == y1) break;
             var e2 = 2 * err;
             if (e2 >= dy) { err += dy; x += sx; }
@@ -499,10 +590,13 @@ public static class RiverMeander
     }
 
     /// <summary>Two different reaches' migrated lines can rasterize over the same pixel — keep
-    /// whichever order is bigger rather than letting draw order arbitrarily decide, so a large
-    /// river's line never gets accidentally overwritten by a small tributary passing near it.</summary>
-    private static void StampMax(byte[] mask, int idx, byte value)
+    /// whichever order (and its co-indexed magnitude) is bigger rather than letting draw order
+    /// arbitrarily decide, so a large river's line never gets accidentally overwritten by a small
+    /// tributary passing near it.</summary>
+    private static void StampMax(byte[] mask, int[] magnitudeMask, int idx, byte value, int magnitude)
     {
-        if (value > mask[idx]) mask[idx] = value;
+        if (value <= mask[idx]) return;
+        mask[idx] = value;
+        magnitudeMask[idx] = magnitude;
     }
 }
