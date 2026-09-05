@@ -867,7 +867,9 @@ public partial class MainWindow : Window
             {
                 var i = rowStart + bx;
                 var isRiver = grid.RiverMask is { } mask && mask[i] != 0;
-                var color = TerrainColorRamp.ForCell(grid.Values[i], min, max, isRiver);
+                var shreveMagnitude = isRiver ? grid.ShreveMagnitude is { } mag ? mag[i] : 1 : 0;
+                var isOxbow = grid.OxbowMask is { } oxbow && oxbow[i] != 0;
+                var color = TerrainColorRamp.ForCell(grid.Values[i], min, max, shreveMagnitude, isOxbow);
                 var pixelPtr = rowPtr + bx * 4;
                 pixelPtr[0] = color.B;
                 pixelPtr[1] = color.G;

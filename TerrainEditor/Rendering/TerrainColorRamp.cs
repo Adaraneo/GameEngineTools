@@ -41,17 +41,34 @@ public static class TerrainColorRamp
     private static readonly Color DeepWater = Color.FromRgb(0x0A, 0x1A, 0x4F);
     private static readonly Color ShoreWater = Color.FromRgb(0x4F, 0x9B, 0xC9);
 
-    /// <summary>Freshwater tint for river cells — deliberately distinct from the ocean blues
-    /// above, so a mountain river doesn't read as a bay.</summary>
-    private static readonly Color RiverColor = Color.FromRgb(0x3F, 0xA9, 0x9B);
+    /// <summary>Freshwater tint for a single-cell creek — deliberately distinct from the ocean blues so a mountain river doesn't read as a bay.</summary>
+    private static readonly Color RiverColorSmall = Color.FromRgb(0x6F, 0xC2, 0xB4);
+
+    /// <summary>Freshwater tint a river ramps toward as its Shreve magnitude grows — darker/more saturated, reading as a bigger trunk.</summary>
+    private static readonly Color RiverColorLarge = Color.FromRgb(0x1B, 0x5E, 0x53);
+
+    /// <summary>Shreve magnitude at which <see cref="RiverColorForMagnitude"/> saturates to <see cref="RiverColorLarge"/> — log-scaled since magnitude is unbounded and most reaches are small.</summary>
+    private const double RiverMagnitudeSaturationPoint = 60.0;
+
+    /// <summary>Still-water tint for a severed oxbow lake — distinct from both flowing-river <see cref="RiverColorSmall"/> and ocean blues.</summary>
+    private static readonly Color OxbowColor = Color.FromRgb(0x4A, 0x78, 0x62);
 
     /// <summary>Also used by the caller to color the sea-level (0m) contour as a coastline.</summary>
     public static readonly Color CoastlineColor = Color.FromRgb(0x2E, 0x6F, 0x9E);
 
-    /// <summary>Elevation-tinted color for a cell, with river cells overriding to <see cref="RiverColor"/>
-    /// regardless of their absolute height (a river carved through a mountain valley is still a river).</summary>
-    public static Color ForCell(float heightMeters, float gridMin, float gridMax, bool isRiver)
-        => isRiver ? RiverColor : ForHeight(heightMeters, gridMin, gridMax);
+    /// <summary>Elevation-tinted color for a cell; <paramref name="isOxbow"/> wins over a positive <paramref name="shreveMagnitude"/>, 0 falls through to plain elevation.</summary>
+    public static Color ForCell(float heightMeters, float gridMin, float gridMax, int shreveMagnitude, bool isOxbow)
+    {
+        if (isOxbow) return OxbowColor;
+        if (shreveMagnitude > 0) return RiverColorForMagnitude(shreveMagnitude);
+        return ForHeight(heightMeters, gridMin, gridMax);
+    }
+
+    private static Color RiverColorForMagnitude(int magnitude)
+    {
+        var t = Math.Clamp(Math.Log(Math.Max(1, magnitude)) / Math.Log(RiverMagnitudeSaturationPoint), 0.0, 1.0);
+        return Lerp(RiverColorSmall, RiverColorLarge, t);
+    }
 
     public static Color ForHeight(float heightMeters, float gridMin, float gridMax)
     {

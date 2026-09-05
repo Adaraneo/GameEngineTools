@@ -45,4 +45,45 @@ public class TerrainColorRampTests
         Assert.AreNotEqual(onShortGrid, onTallGrid,
             "The same 60m point must look 'higher up the ramp' on a 60m-tall grid than on a 400m-tall one.");
     }
+
+    [TestMethod]
+    public void ForCell_NoRiverNoOxbow_MatchesForHeight()
+    {
+        var cellColor = TerrainColorRamp.ForCell(heightMeters: 60f, gridMin: 0f, gridMax: 400f, shreveMagnitude: 0, isOxbow: false);
+        var heightColor = TerrainColorRamp.ForHeight(heightMeters: 60f, gridMin: 0f, gridMax: 400f);
+
+        Assert.AreEqual(heightColor, cellColor);
+    }
+
+    [TestMethod]
+    public void ForCell_LargerShreveMagnitude_RendersDarkerThanASmallCreek()
+    {
+        var creek = TerrainColorRamp.ForCell(heightMeters: 100f, gridMin: 0f, gridMax: 400f, shreveMagnitude: 1, isOxbow: false);
+        var trunk = TerrainColorRamp.ForCell(heightMeters: 100f, gridMin: 0f, gridMax: 400f, shreveMagnitude: 5000, isOxbow: false);
+
+        Assert.AreNotEqual(creek, trunk);
+        Assert.IsTrue(trunk.R + trunk.G + trunk.B < creek.R + creek.G + creek.B,
+            $"Expected a large-magnitude trunk river to render darker than a magnitude-1 creek — creek={creek}, trunk={trunk}.");
+    }
+
+    [TestMethod]
+    public void ForCell_VeryLargeMagnitude_SaturatesInsteadOfGrowingUnbounded()
+    {
+        var atSaturation = TerrainColorRamp.ForCell(heightMeters: 100f, gridMin: 0f, gridMax: 400f, shreveMagnitude: 60, isOxbow: false);
+        var wellPastSaturation = TerrainColorRamp.ForCell(heightMeters: 100f, gridMin: 0f, gridMax: 400f, shreveMagnitude: 1_000_000, isOxbow: false);
+
+        Assert.AreEqual(atSaturation, wellPastSaturation,
+            "Magnitude is unbounded — the color ramp must clamp instead of producing an out-of-range or crashing result.");
+    }
+
+    [TestMethod]
+    public void ForCell_Oxbow_OverridesRiverGradientEvenWithAPositiveMagnitude()
+    {
+        // A cutoff removes a cell from the active river, but stale magnitude data shouldn't matter —
+        // isOxbow must win regardless.
+        var oxbow = TerrainColorRamp.ForCell(heightMeters: 100f, gridMin: 0f, gridMax: 400f, shreveMagnitude: 500, isOxbow: true);
+        var river = TerrainColorRamp.ForCell(heightMeters: 100f, gridMin: 0f, gridMax: 400f, shreveMagnitude: 500, isOxbow: false);
+
+        Assert.AreNotEqual(river, oxbow);
+    }
 }
