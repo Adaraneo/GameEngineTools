@@ -20,8 +20,9 @@ public static class TectonicPlates
 
     /// <param name="BoundaryInfluence">0 deep inside a plate's own territory, growing toward 1 the
     /// closer a point sits to the Voronoi border with its nearest neighboring plate.</param>
+    /// <param name="ApproachRate">Signed closing speed between the two nearest plates (same arbitrary units as <see cref="Plate.VelX"/>) — positive=convergent, negative=divergent; consumed by <see cref="StreamPowerErosion"/>'s uplift-field mapping.</param>
     public readonly record struct BoundarySample(
-        int PlateId, bool IsContinental, BoundaryType Boundary, double BoundaryInfluence);
+        int PlateId, bool IsContinental, BoundaryType Boundary, double BoundaryInfluence, double ApproachRate = 0.0);
 
     /// <summary>
     /// Builds <paramref name="count"/> plates for <paramref name="seed"/> — pure function of those
@@ -99,7 +100,7 @@ public static class TectonicPlates
 
         var nearest = plates[nearestIdx];
         if (plates.Length < 2)
-            return new BoundarySample(nearest.Id, nearest.IsContinental, BoundaryType.None, 0.0);
+            return new BoundarySample(nearest.Id, nearest.IsContinental, BoundaryType.None, 0.0, 0.0);
 
         var second = plates[secondIdx];
         var distNearest = Math.Sqrt(nearestDist);
@@ -115,6 +116,7 @@ public static class TectonicPlates
         var connLen = Math.Sqrt(connX * connX + connY * connY + connZ * connZ);
 
         var boundary = BoundaryType.None;
+        var approach = 0.0;
         if (connLen > 1e-9)
         {
             connX /= connLen; connY /= connLen; connZ /= connLen;
@@ -123,14 +125,14 @@ public static class TectonicPlates
             var relVelZ = second.VelZ - nearest.VelZ;
             // Positive = the two plates are closing the gap between their centers (convergent);
             // negative = pulling apart (divergent); near zero = mostly sliding past (transform).
-            var approach = -(relVelX * connX + relVelY * connY + relVelZ * connZ);
+            approach = -(relVelX * connX + relVelY * connY + relVelZ * connZ);
             const double transformThreshold = 0.15;
             boundary = approach > transformThreshold ? BoundaryType.Convergent
                 : approach < -transformThreshold ? BoundaryType.Divergent
                 : BoundaryType.Transform;
         }
 
-        return new BoundarySample(nearest.Id, nearest.IsContinental, boundary, influence);
+        return new BoundarySample(nearest.Id, nearest.IsContinental, boundary, influence, approach);
     }
 
     /// <summary>Orthonormal (tangent, bitangent) basis at a unit-sphere point — used to build a

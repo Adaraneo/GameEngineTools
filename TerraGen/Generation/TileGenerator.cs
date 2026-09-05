@@ -55,7 +55,9 @@ public static class TileGenerator
         /// <summary>Tiles per side of a square hydrology chunk, bounding the combined grid so it can't overflow a 32-bit array index on a large region. Default 20 ≈ 64M cells at TileKm=1/CellMeters=2.5.</summary>
         int HydrologyChunkTilesPerSide = 20,
         /// <summary>Off by default (always regenerate/overwrite). When true, a tile whose TileId already has a saved heightmap of the expected size skips noise+erosion and reuses the saved elevation; hydrology (if on) still reprocesses its whole chunk.</summary>
-        bool SkipExisting = false);
+        bool SkipExisting = false,
+        /// <summary>Null (default) keeps the existing ridged-noise mountain layer unchanged — see <see cref="StreamPowerErosion"/>. Non-null REPLACES it: each tile samples landmass only, then <see cref="StreamPowerErosion.Erode"/> builds relief from an uplift field derived from <see cref="TectonicPlates"/> (Task 1.2.4's confirmed integration mode), before droplet erosion runs as a fine-detail finishing pass. ⚠ Runs per padded tile with the same erosion-margin neighbor-locking as <see cref="TileErosion"/> — a local-drainage approximation, not a whole-region solve; a real basin wider than the margin is truncated at the tile's own padding.</summary>
+        StreamPowerErosion.Parameters? SpimParams = null);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -166,8 +168,17 @@ public static class TileGenerator
                     for (var gx = 0; gx < paddedSize; gx++)
                     {
                         var worldX = paddedOriginX + gx * s.CellSizeMeters;
-                        paddedValues[gy * paddedSize + gx] = (float)PlanetNoise.SampleCombined(
-                            worldX, worldY, refLatDeg, refLonDeg, s.NoiseParams, s.PlanetRadiusMeters, plates);
+                        // --spim samples landmass only here — StreamPowerErosion supplies the mountain relief below, replacing the ridged-noise term SampleCombined would otherwise add.
+                        if (s.SpimParams is not null)
+                        {
+                            var (spimLat, spimLon) = PlanetNoise.OffsetToLatLon(worldX, worldY, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
+                            paddedValues[gy * paddedSize + gx] = (float)PlanetNoise.SampleLandmass(spimLat, spimLon, s.NoiseParams, s.PlanetRadiusMeters);
+                        }
+                        else
+                        {
+                            paddedValues[gy * paddedSize + gx] = (float)PlanetNoise.SampleCombined(
+                                worldX, worldY, refLatDeg, refLonDeg, s.NoiseParams, s.PlanetRadiusMeters, plates);
+                        }
                     }
                 }
 
@@ -206,6 +217,12 @@ public static class TileGenerator
                 LockAgainst(LoadNeighbor(row, col + 1), paddedSize - margin, paddedSize, 0, paddedSize); // east
                 LockAgainst(LoadNeighbor(row - 1, col), 0, paddedSize, 0, margin); // south
                 LockAgainst(LoadNeighbor(row + 1, col), 0, paddedSize, paddedSize - margin, paddedSize); // north
+
+                if (s.SpimParams is { } spimParams)
+                {
+                    var uplift = StreamPowerErosion.UpliftFieldFromPlates(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
+                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked);
+                }
 
                 TileErosion.Erode(padded, s.ErosionParams, locked);
 
@@ -293,23 +310,11 @@ public static class TileGenerator
                 var (combinedRiverMask, combinedShreveMagnitude, combinedOxbowMask, riverNetwork) = RiverMeander.ApplyMeanderWithGraph(combinedGrid, networkId, straightRiverMask,
                     riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude, new RiverMeander.Parameters());
 
+                // Stage 4: the graph saved below is the only persisted river data now — RiverMask/etc stay null here.
                 foreach (var t in chunkTiles)
                 {
-                    var baseX = (t.Col - minCol) * cellsPerTile;
-                    var baseY = (t.Row - minRow) * cellsPerTile;
-                    var riverMaskInterior = new byte[cellsPerTile * cellsPerTile];
-                    var shreveMagnitudeInterior = new int[cellsPerTile * cellsPerTile];
-                    var oxbowMaskInterior = new byte[cellsPerTile * cellsPerTile];
-                    for (var iy = 0; iy < cellsPerTile; iy++)
-                    {
-                        var srcRow = (baseY + iy) * chunkBigWidth + baseX;
-                        Array.Copy(combinedRiverMask, srcRow, riverMaskInterior, iy * cellsPerTile, cellsPerTile);
-                        Array.Copy(combinedShreveMagnitude, srcRow, shreveMagnitudeInterior, iy * cellsPerTile, cellsPerTile);
-                        Array.Copy(combinedOxbowMask, srcRow, oxbowMaskInterior, iy * cellsPerTile, cellsPerTile);
-                    }
-
                     var tile = new TerrainHeightmap(t.Id, swX + t.Col * s.TileSizeMeters, swY + t.Row * s.TileSizeMeters,
-                        s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior, shreveMagnitudeInterior, oxbowMaskInterior);
+                        s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior);
                     db.SaveHeightmap(tile);
                 }
 

@@ -133,6 +133,8 @@ var hydrologyParams = options.Rivers
     ? new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: options.RiverThreshold)
     : null;
 
+var spimParams = options.Spim ? new StreamPowerErosion.Parameters() : null;
+
 var runSettings = new TileGenerator.RunSettings(
     LatMin: options.LatMin, LatMax: options.LatMax,
     LonMin: options.LonMin, LonMax: options.LonMax,
@@ -143,7 +145,8 @@ var runSettings = new TileGenerator.RunSettings(
     PlanetRadiusMeters: planet.PlanetRadiusMeters,
     HydrologyParams: hydrologyParams,
     HydrologyChunkTilesPerSide: options.RiverChunkTiles,
-    SkipExisting: options.SkipExisting);
+    SkipExisting: options.SkipExisting,
+    SpimParams: spimParams);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -234,6 +237,8 @@ internal sealed class CliOptions
     public int RiverChunkTiles { get; init; } = 20;
     /// <summary>Off by default (always regenerate/overwrite). See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SkipExisting"/>.</summary>
     public bool SkipExisting { get; init; }
+    /// <summary>Off by default — existing tiles must keep regenerating identically without it. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimParams"/>.</summary>
+    public bool Spim { get; init; }
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -297,7 +302,7 @@ internal sealed class CliOptions
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
-                        [--skip-existing]
+                        [--skip-existing] [--spim]
 
             --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
             TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
@@ -339,6 +344,16 @@ internal sealed class CliOptions
             Wolman 1957). RoadPathfinder (ve WorldGenu) už teď
             umí penalizovat křížení řeky — tenhle přepínač je to, co RiverMask konečně naplní, aby
             to mělo co penalizovat.
+
+            --spim (vypnuto výchozí, ze stejného důvodu jako --tectonic-plates/--rivers) nahradí
+            šumovou vrstvu pohoří (ridged-fractal) fyzikálně podloženým Stream-Power Incision Modelem
+            (Braun & Willett 2013): pohoří vznikají jako rovnováha mezi tektonickým zdvihem
+            (odvozeným ze sbíhavých/rozbíhavých hranic desek, viz --tectonic-plates) a fluviální
+            erozí, ne ze statického šumu. Vyžaduje --tectonic-plates > 0, jinak je zdvih všude
+            nulový a --spim jen zplošní terén na samotnou pevninu/oceán vrstvu. Kapkovitá eroze
+            (--erosion) běží i nadále, jako doladění detailu NAD SPIM reliéfem. Běží po jednotlivých
+            dlaždicích se stejným zamykáním okraje jako --erosion — lokální aproximace odtokové
+            oblasti omezené na okraj dlaždice, ne řešení celého povodí.
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -415,6 +430,7 @@ internal sealed class CliOptions
         var riverThreshold = 2000.0;
         var riverChunkTiles = 20;
         var skipExisting = false;
+        var spim = false;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -461,6 +477,9 @@ internal sealed class CliOptions
                     break;
                 case "--skip-existing":
                     skipExisting = true;
+                    break;
+                case "--spim":
+                    spim = true;
                     break;
                 case "--scan":
                     scan = true;
@@ -569,7 +588,7 @@ internal sealed class CliOptions
             TileKm = tileKm, CellMeters = cellMeters, ErosionStrength = Math.Clamp(erosion, 0, 100),
             TectonicPlateCount = tectonicPlateCount,
             Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
-            SkipExisting = skipExisting,
+            SkipExisting = skipExisting, Spim = spim,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,

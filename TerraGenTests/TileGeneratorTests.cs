@@ -317,8 +317,11 @@ public class TileGeneratorTests
     }
 
     [TestMethod]
-    public void Run_WithHydrologyParams_PopulatesRiverMaskOfCorrectLength()
+    public void Run_WithHydrologyParams_PersistsGraphInsteadOfRasterForTiles()
     {
+        // Stage 4 (docs/plans/river-network-graph-model.md): a hydrology-generated tile no longer
+        // gets its own RiverMask column — the graph is the only persisted river data, materialized
+        // on demand via RiverNetworkRasterizer.MaterializeOnto (same as every real consumer does).
         var dbPath = TempDbPath();
         try
         {
@@ -335,15 +338,20 @@ public class TileGeneratorTests
 
             var results = TileGenerator.Run(db, settings);
             Assert.IsTrue(results.Count > 0);
+            var reaches = db.LoadAllReaches();
+            var oxbows = db.LoadAllOxbows();
+            Assert.IsTrue(reaches.Count > 0, "Expected at least one persisted reach for this seed/threshold.");
+
             foreach (var r in results)
             {
                 var tile = db.LoadHeightmap(r.Id)!;
-                Assert.IsNotNull(tile.RiverMask);
-                Assert.AreEqual(tile.Width * tile.Height, tile.RiverMask!.Length);
+                Assert.IsNull(tile.RiverMask, "Hydrology-generated tiles must not persist a raster column anymore.");
+
+                var materialized = RiverNetworkRasterizer.MaterializeOnto(reaches, oxbows, tile);
                 // A river cell's byte value is its Strahler order (see TerrainHeightmap.RiverMask's
                 // remarks), not a flat 1 — sanity-bound it instead of requiring exactly 0/1: this
                 // tiny test grid can't plausibly produce a double-digit order.
-                Assert.IsTrue(tile.RiverMask.All(b => b < 20), "RiverMask order values should be small on a tiny test grid.");
+                Assert.IsTrue(materialized.GraphRiverMask!.All(b => b < 20), "RiverOrder values should be small on a tiny test grid.");
             }
         }
         finally
@@ -376,9 +384,9 @@ public class TileGeneratorTests
             foreach (var r in results)
             {
                 var tile = db.LoadHeightmap(r.Id)!;
-                Assert.IsNotNull(tile.RiverMask);
-                Assert.IsTrue(tile.RiverMask!.All(b => b == 0), "Flat terrain should never qualify a channel.");
+                Assert.IsNull(tile.RiverMask, "Hydrology-generated tiles must not persist a raster column anymore.");
             }
+            Assert.AreEqual(0, db.LoadAllReaches().Count, "Flat terrain should never qualify a channel, so no reach should be persisted.");
             Assert.IsTrue(progressLines.Any(l => l.Contains("--river-threshold") && l.Contains("reliéf")),
                 "A run that found zero river cells anywhere should explain why instead of just reporting success.");
         }
@@ -417,7 +425,9 @@ public class TileGeneratorTests
                 HydrologyParams: new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 5.0));
 
             var results = TileGenerator.Run(db, settings);
-            var tiles = results.Select(r => db.LoadHeightmap(r.Id)!).ToList();
+            var reaches = db.LoadAllReaches();
+            var oxbows = db.LoadAllOxbows();
+            var tiles = results.Select(r => RiverNetworkRasterizer.MaterializeOnto(reaches, oxbows, db.LoadHeightmap(r.Id)!)).ToList();
             Assert.IsTrue(tiles.Count >= 4, "Need a multi-tile grid for a boundary-crossing check to mean anything.");
 
             var byOrigin = tiles.ToDictionary(t => (Math.Round(t.OriginX, 3), Math.Round(t.OriginY, 3)));
@@ -426,7 +436,7 @@ public class TileGeneratorTests
 
             foreach (var t in tiles)
             {
-                if (t.RiverMask is null) continue;
+                if (t.GraphRiverMask is null) continue;
                 var w = t.Width;
                 var h = t.Height;
                 var cs = t.CellSizeMeters;
@@ -435,36 +445,36 @@ public class TileGeneratorTests
                 // the exact same row/column — D8 flow is 8-connected, so a channel crossing a
                 // boundary diagonally legitimately lands one cell off straight-across.
                 var eastKey = (Math.Round(t.OriginX + w * cs, 3), Math.Round(t.OriginY, 3));
-                if (byOrigin.TryGetValue(eastKey, out var east) && east.RiverMask is not null)
+                if (byOrigin.TryGetValue(eastKey, out var east) && east.GraphRiverMask is not null)
                 {
                     for (var y = 0; y < h; y++)
                     {
-                        if (t.RiverMask[y * w + (w - 1)] == 0) continue;
+                        if (t.GraphRiverMask[y * w + (w - 1)] == 0) continue;
                         boundaryRiverCells++;
                         var found = false;
                         for (var dy = -1; dy <= 1 && !found; dy++)
                         {
                             var ny = y + dy;
                             if (ny < 0 || ny >= h) continue;
-                            if (east.RiverMask[ny * w + 0] != 0) found = true;
+                            if (east.GraphRiverMask[ny * w + 0] != 0) found = true;
                         }
                         if (found) connectedAcross++;
                     }
                 }
 
                 var northKey = (Math.Round(t.OriginX, 3), Math.Round(t.OriginY + h * cs, 3));
-                if (byOrigin.TryGetValue(northKey, out var north) && north.RiverMask is not null)
+                if (byOrigin.TryGetValue(northKey, out var north) && north.GraphRiverMask is not null)
                 {
                     for (var x = 0; x < w; x++)
                     {
-                        if (t.RiverMask[(h - 1) * w + x] == 0) continue;
+                        if (t.GraphRiverMask[(h - 1) * w + x] == 0) continue;
                         boundaryRiverCells++;
                         var found = false;
                         for (var dx = -1; dx <= 1 && !found; dx++)
                         {
                             var nx = x + dx;
                             if (nx < 0 || nx >= w) continue;
-                            if (north.RiverMask[0 * w + nx] != 0) found = true;
+                            if (north.GraphRiverMask[0 * w + nx] != 0) found = true;
                         }
                         if (found) connectedAcross++;
                     }
@@ -518,11 +528,13 @@ public class TileGeneratorTests
                 || results.Select(r => r.Col / chunkTilesPerSide).Distinct().Count() > 1,
                 "Test grid should span multiple hydrology chunks for this test to mean anything.");
 
-            var tilesById = results.ToDictionary(r => r.Id, r => db.LoadHeightmap(r.Id)!);
+            var reaches = db.LoadAllReaches();
+            var oxbows = db.LoadAllOxbows();
+            var tilesById = results.ToDictionary(r => r.Id, r => RiverNetworkRasterizer.MaterializeOnto(reaches, oxbows, db.LoadHeightmap(r.Id)!));
             foreach (var t in tilesById.Values)
             {
-                Assert.IsNotNull(t.RiverMask, "Every tile should still get river data with chunked processing, same as before.");
-                Assert.AreEqual(t.Width * t.Height, t.RiverMask!.Length);
+                Assert.IsNotNull(t.GraphRiverMask, "Every tile should still get river data with chunked processing, same as before.");
+                Assert.AreEqual(t.Width * t.Height, t.GraphRiverMask!.Length);
             }
 
             var boundaryRiverCells = 0;
@@ -543,14 +555,14 @@ public class TileGeneratorTests
 
                 for (var y = 0; y < h; y++)
                 {
-                    if (west.RiverMask![y * w + (w - 1)] == 0) continue;
+                    if (west.GraphRiverMask![y * w + (w - 1)] == 0) continue;
                     boundaryRiverCells++;
                     var found = false;
                     for (var dy = -1; dy <= 1 && !found; dy++)
                     {
                         var ny = y + dy;
                         if (ny < 0 || ny >= h) continue;
-                        if (east.RiverMask![ny * w + 0] != 0) found = true;
+                        if (east.GraphRiverMask![ny * w + 0] != 0) found = true;
                     }
                     if (found) connectedAcross++;
                 }
@@ -635,12 +647,16 @@ public class TileGeneratorTests
                 HydrologyParams = new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 5.0),
             };
             var results = TileGenerator.Run(db, withHydrology);
+            var reaches = db.LoadAllReaches();
+            var oxbows = db.LoadAllOxbows();
 
             foreach (var r in results)
             {
                 var tile = db.LoadHeightmap(r.Id)!;
-                Assert.IsNotNull(tile.RiverMask, "Skipped tile should still get hydrology's RiverMask, not stay null.");
-                Assert.AreEqual(tile.Width * tile.Height, tile.RiverMask!.Length);
+                Assert.IsNull(tile.RiverMask, "Hydrology-generated tiles must not persist a raster column anymore.");
+                var materialized = RiverNetworkRasterizer.MaterializeOnto(reaches, oxbows, tile);
+                Assert.IsNotNull(materialized.GraphRiverMask, "Skipped tile should still get hydrology's graph data, not stay empty.");
+                Assert.AreEqual(tile.Width * tile.Height, materialized.GraphRiverMask!.Length);
             }
         }
         finally
@@ -693,6 +709,95 @@ public class TileGeneratorTests
                 minRow: 0, maxRowInclusive: 49, minCol: 0, maxColInclusive: 49));
 
         StringAssert.Contains(ex.Message, "HydrologyChunkTilesPerSide");
+    }
+
+    [TestMethod]
+    public void Run_WithoutSpimParams_MatchesDirectSampleCombined()
+    {
+        // Byte-identical-when-disabled regression per the plan's cross-cutting requirement: with
+        // SpimParams left at its default (null), each cell must still come straight from
+        // PlanetNoise.SampleCombined, same as before --spim existed. DropletCount: 0 keeps erosion
+        // from perturbing the comparison.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 13, AmplitudeMeters: 200.0);
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.002,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams,
+                ErosionParams: new TileErosion.Parameters(Seed: 13, DropletCount: 0),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters);
+
+            var results = TileGenerator.Run(db, settings);
+            var tile = db.LoadHeightmap(results[0].Id)!;
+
+            for (var iy = 0; iy < tile.Height; iy++)
+            {
+                for (var ix = 0; ix < tile.Width; ix++)
+                {
+                    var worldX = tile.OriginX + ix * tile.CellSizeMeters;
+                    var worldY = tile.OriginY + iy * tile.CellSizeMeters;
+                    var expected = (float)PlanetNoise.SampleCombined(worldX, worldY, 0.0, 0.0, noiseParams, PlanetNoise.EarthRadiusMeters, plates: null);
+                    Assert.AreEqual(expected, tile.Values[iy * tile.Width + ix], 1e-6f);
+                }
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
+    public void Run_WithSpimParams_ProducesFiniteReliefDifferentFromRidgedNoise()
+    {
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 13, AmplitudeMeters: 200.0, TectonicPlateCount: 8);
+            var baseSettings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.002,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams,
+                ErosionParams: new TileErosion.Parameters(Seed: 13, DropletCount: 0),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters);
+
+            var ridgedResults = TileGenerator.Run(db, baseSettings);
+            var ridgedTile = db.LoadHeightmap(ridgedResults[0].Id)!.Values.ToArray();
+
+            var spimDbPath = TempDbPath();
+            try
+            {
+                using var spimDb = new SqliteWorldDatabase(spimDbPath);
+                WorldDatabaseSeeder.InitializeTerrainDatabase(spimDb);
+                var spimSettings = baseSettings with { SpimParams = new StreamPowerErosion.Parameters(Iterations: 30) };
+                var spimResults = TileGenerator.Run(spimDb, spimSettings);
+                var spimTile = spimDb.LoadHeightmap(spimResults[0].Id)!.Values;
+
+                foreach (var v in spimTile)
+                {
+                    Assert.IsFalse(float.IsNaN(v));
+                    Assert.IsFalse(float.IsInfinity(v));
+                }
+                CollectionAssert.AreNotEqual(ridgedTile, spimTile,
+                    "Expected --spim to produce different relief than the ridged-noise mountain layer.");
+            }
+            finally
+            {
+                if (File.Exists(spimDbPath)) File.Delete(spimDbPath);
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
     }
 
     [TestMethod]
