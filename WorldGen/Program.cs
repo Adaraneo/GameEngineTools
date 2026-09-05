@@ -34,10 +34,15 @@ if (summaries.Count == 0)
     return 1;
 }
 
+// Materializes each tile's graph-derived river data (Stage 4, docs/plans/river-network-graph-model.md)
+// so RoadPathfinder's TerrainHeightmap.RiverOrder sees rivers even for a tile whose RiverMask column
+// TileGenerator no longer writes — one DB read of the whole (sparse) graph, reused for every tile.
+var riverReaches = terrainDb.LoadAllReaches();
+var riverOxbows = terrainDb.LoadAllOxbows();
 var tiles = summaries
     .Select(s => terrainDb.LoadHeightmap(s.Id))
     .Where(t => t is not null)
-    .Select(t => t!)
+    .Select(t => RiverNetworkRasterizer.MaterializeOnto(riverReaches, riverOxbows, t!))
     .ToList();
 
 Console.WriteLine($"Nalezeno {tiles.Count} dlaždic terénu v {options.TerrainDbPath}.");

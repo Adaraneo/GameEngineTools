@@ -816,26 +816,14 @@ public partial class MainWindow : Window
         ContourSurface.InvalidateVisual();
     }
 
-    /// <summary>Graph-Stage-3 rasterization, OR-merged onto _grid; call only right after a fresh load/stitch, never from RenderGrid.</summary>
+    /// <summary>Populates _grid's Graph* fields (Stage 4) — call only right after a fresh load/stitch, never from RenderGrid.</summary>
     private void MaterializeRiverGraph()
     {
         if (_grid is null) return;
         var (reaches, oxbows) = _vm.WorldDb.LoadRiverReachesAndOxbows();
         if (reaches.Count == 0 && oxbows.Count == 0) return;
 
-        var (graphMask, graphMagnitude, graphOxbow) = RiverNetworkRasterizer.Rasterize(reaches, oxbows, _grid);
-        var cellCount = _grid.Width * _grid.Height;
-        var mergedMask = _grid.RiverMask is { } m ? (byte[])m.Clone() : new byte[cellCount];
-        var mergedMagnitude = _grid.ShreveMagnitude is { } sm ? (int[])sm.Clone() : new int[cellCount];
-        var mergedOxbow = _grid.OxbowMask is { } om ? (byte[])om.Clone() : new byte[cellCount];
-
-        for (var i = 0; i < cellCount; i++)
-        {
-            if (graphMask[i] > mergedMask[i]) { mergedMask[i] = graphMask[i]; mergedMagnitude[i] = graphMagnitude[i]; }
-            if (graphOxbow[i] != 0) mergedOxbow[i] = 1;
-        }
-
-        _grid = _grid with { RiverMask = mergedMask, ShreveMagnitude = mergedMagnitude, OxbowMask = mergedOxbow };
+        _grid = RiverNetworkRasterizer.MaterializeOnto(reaches, oxbows, _grid);
     }
 
     private unsafe void RenderGrid()
@@ -891,9 +879,9 @@ public partial class MainWindow : Window
             for (var bx = 0; bx < bitmapWidth; bx++)
             {
                 var i = rowStart + bx;
-                var isRiver = grid.RiverMask is { } mask && mask[i] != 0;
-                var shreveMagnitude = isRiver ? grid.ShreveMagnitude is { } mag ? mag[i] : 1 : 0;
-                var isOxbow = grid.OxbowMask is { } oxbow && oxbow[i] != 0;
+                var shreveMagnitude = grid.ShreveMagnitudeAt(bx, by);
+                if (shreveMagnitude == 0 && grid.IsRiver(bx, by)) shreveMagnitude = 1;
+                var isOxbow = grid.IsOxbow(bx, by);
                 var color = TerrainColorRamp.ForCell(grid.Values[i], min, max, shreveMagnitude, isOxbow);
                 var pixelPtr = rowPtr + bx * 4;
                 pixelPtr[0] = color.B;

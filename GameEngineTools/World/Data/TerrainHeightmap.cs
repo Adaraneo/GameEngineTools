@@ -71,21 +71,52 @@ namespace GameEngineTools.World.Data
         float[] Values,
         byte[]? RiverMask = null,
         int[]? ShreveMagnitude = null,
-        byte[]? OxbowMask = null)
+        byte[]? OxbowMask = null,
+        /// <summary>In-memory-only twin of <see cref="RiverMask"/> — never persisted, so a graph-derived river never gets saved back (Stage 4).</summary>
+        byte[]? GraphRiverMask = null,
+        /// <summary>In-memory-only counterpart to <see cref="ShreveMagnitude"/>, co-indexed with <see cref="GraphRiverMask"/>.</summary>
+        int[]? GraphShreveMagnitude = null,
+        /// <summary>In-memory-only counterpart to <see cref="OxbowMask"/> — see <see cref="GraphRiverMask"/>'s remarks.</summary>
+        byte[]? GraphOxbowMask = null)
     {
-        /// <summary>True when (gx, gy) — clamped to the grid — has been painted as a river cell,
-        /// of any Strahler order. Use <see cref="RiverOrder"/> to distinguish a headwater creek
-        /// from a large trunk river.</summary>
+        /// <summary>True when (gx, gy) — clamped to the grid — is a river cell, hand-painted
+        /// (<see cref="RiverMask"/>) or graph-derived (<see cref="GraphRiverMask"/>), of any Strahler
+        /// order. Use <see cref="RiverOrder"/> to distinguish a headwater creek from a trunk river.</summary>
         public bool IsRiver(int gx, int gy) => RiverOrder(gx, gy) > 0;
 
         /// <summary>Strahler stream order at (gx, gy) — clamped to the grid — or 0 if it's not a
-        /// river cell at all. See <see cref="RiverMask"/>'s remarks for what the order means.</summary>
+        /// river cell in either <see cref="RiverMask"/> or <see cref="GraphRiverMask"/> (whichever is
+        /// bigger wins, same tie-break <c>RiverNetworkRasterizer</c> itself uses).</summary>
         public byte RiverOrder(int gx, int gy)
         {
-            if (RiverMask is null) return 0;
             var cx = Math.Clamp(gx, 0, Width - 1);
             var cy = Math.Clamp(gy, 0, Height - 1);
-            return RiverMask[cy * Width + cx];
+            var idx = cy * Width + cx;
+            var painted = RiverMask?[idx] ?? 0;
+            var graph = GraphRiverMask?[idx] ?? 0;
+            return Math.Max(painted, graph);
+        }
+
+        /// <summary>Shreve magnitude at (gx, gy) — clamped to the grid — co-indexed with whichever
+        /// of <see cref="RiverMask"/>/<see cref="GraphRiverMask"/> <see cref="RiverOrder"/> picked; 0 off-river.</summary>
+        public int ShreveMagnitudeAt(int gx, int gy)
+        {
+            var cx = Math.Clamp(gx, 0, Width - 1);
+            var cy = Math.Clamp(gy, 0, Height - 1);
+            var idx = cy * Width + cx;
+            var painted = RiverMask?[idx] ?? 0;
+            var graph = GraphRiverMask?[idx] ?? 0;
+            if (painted == 0 && graph == 0) return 0;
+            return painted >= graph ? ShreveMagnitude?[idx] ?? 0 : GraphShreveMagnitude?[idx] ?? 0;
+        }
+
+        /// <summary>True when (gx, gy) — clamped to the grid — is an oxbow cell in either <see cref="OxbowMask"/> or <see cref="GraphOxbowMask"/>.</summary>
+        public bool IsOxbow(int gx, int gy)
+        {
+            var cx = Math.Clamp(gx, 0, Width - 1);
+            var cy = Math.Clamp(gy, 0, Height - 1);
+            var idx = cy * Width + cx;
+            return (OxbowMask?[idx] ?? 0) != 0 || (GraphOxbowMask?[idx] ?? 0) != 0;
         }
 
         /// <summary>

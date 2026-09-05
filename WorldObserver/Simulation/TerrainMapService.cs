@@ -131,8 +131,11 @@ namespace WorldObserver.Simulation
                     }
                 }
 
-                return new TerrainHeightmap("combined", combinedOriginX, combinedOriginY, CellSizeMeters,
+                var combined = new TerrainHeightmap("combined", combinedOriginX, combinedOriginY, CellSizeMeters,
                     combinedWidth, combinedHeight, values, riverMask);
+                // Stage 4: RoadMapService's RoadPathfinder needs graph-derived rivers too, not just a
+                // hand-painted/legacy RiverMask column this service itself never populates.
+                return RiverNetworkRasterizer.MaterializeOnto(_db.LoadAllReaches(), _db.LoadAllOxbows(), combined);
             }
         }
 

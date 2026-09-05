@@ -10,6 +10,13 @@ namespace GameEngineTools.World.Data
     /// generated at — see docs/plans/river-network-graph-model.md, Stage 3.</summary>
     public static class RiverNetworkRasterizer
     {
+        /// <summary>Rasterizes onto <paramref name="grid"/>'s own <c>Graph*</c> fields only — never touches <c>RiverMask</c>/etc, so nothing graph-derived can be saved back (Stage 4).</summary>
+        public static TerrainHeightmap MaterializeOnto(IReadOnlyList<RiverReach> reaches, IReadOnlyList<OxbowLoop> oxbows, TerrainHeightmap grid)
+        {
+            var (mask, magnitude, oxbowMask) = Rasterize(reaches, oxbows, grid);
+            return grid with { GraphRiverMask = mask, GraphShreveMagnitude = magnitude, GraphOxbowMask = oxbowMask };
+        }
+
         /// <summary>Rasterizes <paramref name="reaches"/>/<paramref name="oxbows"/> onto
         /// <paramref name="targetGrid"/>'s own origin/size/cell size, same output shape as
         /// <see cref="TerrainHeightmap.RiverMask"/>/<see cref="TerrainHeightmap.ShreveMagnitude"/>/

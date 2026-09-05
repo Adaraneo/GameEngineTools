@@ -125,6 +125,51 @@ namespace EngineTests
 
         #endregion River mask
 
+        #region Graph river mask (Stage 4)
+
+        [TestMethod]
+        public void RiverOrder_GraphMaskOnly_ReflectsGraphFlags()
+        {
+            var grid = MakeGrid() with { GraphRiverMask = [0, 3, 0, 0, 0, 0] };
+
+            Assert.AreEqual(3, grid.RiverOrder(1, 0));
+            Assert.IsTrue(grid.IsRiver(1, 0));
+            Assert.AreEqual(0, grid.RiverOrder(0, 0));
+        }
+
+        [TestMethod]
+        public void RiverOrder_BothMasksSet_PicksTheBiggerOrder()
+        {
+            var grid = MakeGrid() with { RiverMask = [0, 1, 0, 0, 0, 0], GraphRiverMask = [0, 5, 0, 0, 0, 0] };
+
+            Assert.AreEqual(5, grid.RiverOrder(1, 0));
+        }
+
+        [TestMethod]
+        public void ShreveMagnitudeAt_PicksMagnitudeFromWhicheverSourceWonTheOrder()
+        {
+            var grid = MakeGrid() with
+            {
+                RiverMask = [0, 1, 0, 0, 0, 0], ShreveMagnitude = [0, 100, 0, 0, 0, 0],
+                GraphRiverMask = [0, 5, 0, 0, 0, 0], GraphShreveMagnitude = [0, 42, 0, 0, 0, 0]
+            };
+
+            Assert.AreEqual(42, grid.ShreveMagnitudeAt(1, 0), "Graph order (5) beat painted order (1), so its magnitude should be reported.");
+        }
+
+        [TestMethod]
+        public void IsOxbow_EitherMaskSet_ReturnsTrue()
+        {
+            var painted = MakeGrid() with { OxbowMask = [0, 1, 0, 0, 0, 0] };
+            var graph = MakeGrid() with { GraphOxbowMask = [0, 0, 1, 0, 0, 0] };
+
+            Assert.IsTrue(painted.IsOxbow(1, 0));
+            Assert.IsTrue(graph.IsOxbow(2, 0));
+            Assert.IsFalse(graph.IsOxbow(1, 0));
+        }
+
+        #endregion Graph river mask (Stage 4)
+
         #region Persistence round-trip
 
         [TestMethod]
