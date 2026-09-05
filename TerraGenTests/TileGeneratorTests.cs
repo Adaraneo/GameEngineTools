@@ -353,6 +353,42 @@ public class TileGeneratorTests
     }
 
     [TestMethod]
+    public void Run_WithHydrologyParams_AndZeroRelief_EmitsNoRiverHintInsteadOfSilence()
+    {
+        // AmplitudeMeters: 0 deterministically reproduces the flat-terrain case that triggers the hint.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.002,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 5, AmplitudeMeters: 0.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 5, DropletCount: 0, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                HydrologyParams: new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 10.0));
+
+            var progressLines = new List<string>();
+            var results = TileGenerator.Run(db, settings, onProgress: progressLines.Add);
+
+            foreach (var r in results)
+            {
+                var tile = db.LoadHeightmap(r.Id)!;
+                Assert.IsNotNull(tile.RiverMask);
+                Assert.IsTrue(tile.RiverMask!.All(b => b == 0), "Flat terrain should never qualify a channel.");
+            }
+            Assert.IsTrue(progressLines.Any(l => l.Contains("--river-threshold") && l.Contains("reliéf")),
+                "A run that found zero river cells anywhere should explain why instead of just reporting success.");
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
     public void Run_WithHydrologyParams_RiversStayConnectedAcrossTileBoundaries()
     {
         // Regression test for a real generation defect (found live on production terrain): before

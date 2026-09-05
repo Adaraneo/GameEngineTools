@@ -1,3 +1,4 @@
+using System.Linq;
 using GameEngineTools.World.Data;
 
 namespace TerraGen.Generation;
@@ -239,6 +240,8 @@ public static class TileGenerator
         {
             onProgress?.Invoke("Generuji hydrologii (řeky)...");
             var chunkTilesPerSide = Math.Max(1, s.HydrologyChunkTilesPerSide);
+            // Tallied so a run finding zero channels anywhere can hint why (see PlanetNoise.SampleCombined).
+            var totalRiverCellsInRun = 0L;
             // Group tiles by chunk coordinate (keeping each tile's batchTiles index, so its Interior
             // can be released there once the chunk is done), ordered like generation above.
             var chunks = batchTiles
@@ -312,8 +315,11 @@ public static class TileGenerator
 
                 db.SaveRiverNetwork(riverNetwork);
 
+                var chunkRiverCells = combinedRiverMask.Count(b => b != 0);
+                totalRiverCellsInRun += chunkRiverCells;
+
                 // Saved per chunk above — a crash on a later chunk doesn't lose this one's data.
-                onProgress?.Invoke($"hydrology chunk rows[{minRow}..{minRow + chunkRows - 1}] cols[{minCol}..{minCol + chunkCols - 1}]: {chunkTiles.Count} tiles saved with rivers");
+                onProgress?.Invoke($"hydrology chunk rows[{minRow}..{minRow + chunkRows - 1}] cols[{minCol}..{minCol + chunkCols - 1}]: {chunkTiles.Count} tiles saved with rivers ({chunkRiverCells} river cells)");
 
                 // Release this chunk's Interior arrays from batchTiles now that they're persisted, so peak memory tracks one chunk, not the whole region.
                 foreach (var entry in chunkEntries)
@@ -322,6 +328,11 @@ public static class TileGenerator
                     batchTiles[entry.Index] = (t.Row, t.Col, t.Id, t.CenterLat, t.CenterLon, Array.Empty<float>());
                 }
             }
+
+            if (totalRiverCellsInRun == 0)
+                onProgress?.Invoke("Pozn.: žádná buňka nesplnila --river-threshold — region má patrně zanedbatelný reliéf " +
+                    "(mimo sbíhavou/rozbíhavou hranici desek reliéf pohoří vychází 0, viz PlanetNoise.SampleCombined); " +
+                    "zkus oblast blíž tektonické hranici (--scan-detail), nebo --tectonic-plates 0.");
         }
 
         return results;
