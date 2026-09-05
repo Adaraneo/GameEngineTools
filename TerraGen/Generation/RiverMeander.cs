@@ -23,61 +23,30 @@ namespace TerraGen.Generation;
 /// 1957), and channel width (hence how far a reach can wander and how long its curvature "memory"
 /// reaches) still comes from contributing area the same way it did before.
 ///
-/// Stage 2 adds real neck-cutoff splicing (see <see cref="ApplyMeanderWithCutoffs"/>): once a bend's
-/// proposed step would bring it within <see cref="Parameters.CutoffTriggerPerWidth"/> channel widths
-/// of a non-adjacent point on the SAME channel, the intervening loop is severed from the active
-/// backbone and rasterized separately as a still-water oxbow lake, rather than merely damped —
-/// Howard &amp; Knutson (1984) report meandering channels typically migrate 5-7 channel widths
-/// before this actually happens in nature. Below that tighter threshold, the original damping
-/// still applies (see <see cref="Parameters.MinSeparationPerWidth"/>) — a bend slows down as it
-/// approaches self-intersection before it actually cuts, it doesn't jump straight from "unaffected"
-/// to "severed." <see cref="ApplyMeander"/> keeps its original 2-tuple signature for existing
-/// callers (cutoffs still happen, only the oxbow output is discarded).
+/// Stage 2 adds real neck-cutoff splicing — see <see cref="ApplyMeanderWithCutoffs"/>.
 /// </summary>
 public static class RiverMeander
 {
-    /// <summary>Reference point <see cref="Parameters.BankErosionCoefficientE"/>/<see cref="Parameters.ScourFactor"/>
-    /// are normalized against — see <see cref="Parameters.BankErosionCoefficientE"/>'s remarks.</summary>
+    /// <summary>Normalization reference for <see cref="Parameters.BankErosionCoefficientE"/>.</summary>
     private const double DefaultBankErosionCoefficientE = 3e-8;
 
-    /// <summary>Reference point <see cref="Parameters.ScourFactor"/> is normalized against — see
-    /// <see cref="Parameters.BankErosionCoefficientE"/>'s remarks.</summary>
+    /// <summary>Normalization reference for <see cref="Parameters.ScourFactor"/>.</summary>
     private const double DefaultScourFactor = 3.0;
 
-    /// <summary>Fresh water density, kg/m³ — not literature-specific, but named per the project's
-    /// own convention of never using bare magic numbers (see e.g. <see cref="FillEpsilon"/> in
-    /// <see cref="TileHydrology"/>). Used only by <see cref="ComputeSpecificStreamPowerWPerM2"/>.
-    /// Source: standard value at ~4°C / SI definition (a physical constant, not a calibrated one).</summary>
+    /// <summary>Fresh water density, kg/m³ (SI/physical constant, not calibrated).</summary>
     private const double WaterDensityKgPerM3 = 1000.0;
 
-    /// <summary>Standard gravity, m/s² — see <see cref="WaterDensityKgPerM3"/>'s remarks. Used only
-    /// by <see cref="ComputeSpecificStreamPowerWPerM2"/>.
-    /// Source: CGPM (1901) standard gravity g_n = 9.80665 m/s², rounded to 9.81 (a physical
-    /// constant, not a calibrated one).</summary>
+    /// <summary>Standard gravity, m/s² (CGPM 1901, g_n = 9.80665, rounded).</summary>
     private const double GravityMPerS2 = 9.81;
 
-    /// <summary>Specific stream power <c>ω = ρ·g·Q·S/w</c> (W/m²) — van den Berg's (1995) alluvial
-    /// channel-pattern discriminant. A standalone method (like <see cref="CurvatureMemoryLengthMeters"/>)
-    /// specifically so this exact formula can be unit-tested in isolation against hand-calculated
-    /// values.
-    /// <para>Source: van den Berg, J.H. (1995). "Prediction of alluvial channel pattern of perennial
-    /// rivers." <i>Geomorphology</i> 12:259-279 (form of the relationship only — see
-    /// <see cref="Parameters.StreamPowerSuppressionThresholdWPerM2"/>'s remarks for why no specific
-    /// threshold NUMBER from that source is cited here).</para></summary>
+    /// <summary>Specific stream power ω = ρ·g·Q·S/w (W/m²). Source: van den Berg, J.H. (1995), Geomorphology 12:259-279 (form only — see <see cref="Parameters.StreamPowerSuppressionThresholdWPerM2"/>).</summary>
     internal static double ComputeSpecificStreamPowerWPerM2(double dischargeM3PerS, double slope, double channelWidthMeters)
         => WaterDensityKgPerM3 * GravityMPerS2 * dischargeM3PerS * slope / channelWidthMeters;
 
-    /// <summary>A neck-cutoff's severed loop (Stage 2 — see the type-level remarks and
-    /// <see cref="ApplyMeanderWithCutoffs"/>): the backbone cell indices removed from the active
-    /// channel, and where each one's migrated position was at the moment of the cut — frozen there
-    /// permanently, since a severed loop is stagnant water from that point on, not still
-    /// migrating.</summary>
+    /// <summary>A neck-cutoff's severed loop: removed backbone indices and their frozen (x,y) at the moment of the cut.</summary>
     internal readonly record struct SeveredLoop(int[] BackboneIndices, int[] OffsetX, int[] OffsetY);
 
-    /// <summary>Edwards &amp; Smith (2002) upstream curvature-memory decay length
-    /// <c>D = H / (2·C_f)</c> — see <see cref="Parameters.FrictionCoefficient"/>'s remarks. A
-    /// standalone method (not inlined into <see cref="ComputeOffsets"/>) specifically so this exact
-    /// formula can be unit-tested in isolation against hand-calculated values.</summary>
+    /// <summary>Edwards &amp; Smith (2002) decay length D = H/(2·C_f) — see <see cref="Parameters.FrictionCoefficient"/>.</summary>
     internal static double CurvatureMemoryLengthMeters(double channelDepthMeters, double frictionCoefficient)
         => channelDepthMeters / (2.0 * frictionCoefficient);
 
@@ -109,58 +78,18 @@ public static class RiverMeander
         /// (and saturating at, via <see cref="MaxBeltWidthPerWidth"/>) 80%+ of its belt cap within
         /// 200-300 iterations for all of them.</summary>
         double ErosionCoefficient = 150.0,
-        /// <summary>Ikeda, Parker &amp; Sawai's (1981) bank-erosion coefficient E (dimensionless) —
-        /// how strongly the near-bank excess velocity a bend's curvature creates actually erodes the
-        /// outer bank, in the linearized IPS bend theory this whole simulation is built on.
-        /// <para>Source: field-calibrated range <c>E ∈ [1e-8, 1e-7]</c>; reference value
-        /// <c>E = 3×10⁻⁸</c> used in Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L.
-        /// (2005). "On the long-term behavior of meandering rivers." <i>Water Resources Research</i>
-        /// 41:W12403.</para>
-        /// E primarily rescales the SIMULATION'S OWN time axis (larger E migrates a bend further per
-        /// iteration), not the resulting planform SHAPE — <see cref="ErosionCoefficient"/> above is
-        /// what this generator actually live-tunes for visual/gameplay pacing (it has no simulated
-        /// discharge to plug a literal E into and get a meaningful meters-per-iteration answer from),
-        /// so E and <see cref="ScourFactor"/> enter the migration formula NORMALIZED against their
-        /// own defaults — moving either within its cited range scales migration up/down from
-        /// whatever <see cref="ErosionCoefficient"/> already produces, in the SAME proportion IPS's
-        /// linear theory says it should (E doubled -> migration doubled), without silently changing
-        /// the already-calibrated default look the moment this field was introduced.</summary>
+        /// <summary>IPS bank-erosion coefficient E, normalized against its own default (see <see cref="ErosionCoefficient"/>).
+        /// Source: Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L. (2005), WRR 41:W12403 — field range [1e-8, 1e-7].</summary>
         double BankErosionCoefficientE = 3e-8,
-        /// <summary>Ikeda, Parker &amp; Sawai's (1981) scour/transverse-bed-slope factor — called
-        /// "A" in the source's own near-bank-velocity equation, renamed here to avoid confusion with
-        /// drainage AREA elsewhere in this codebase (see e.g. <see cref="TileHydrology"/>).
-        /// <para>Source: range <c>2.5-6</c>, commonly ≈3. Ikeda, S., Parker, G. &amp; Sawai, K.
-        /// (1981). "Bend theory of river meanders. Part 1. Linear development." <i>Journal of Fluid
-        /// Mechanics</i> 112:363-377. doi:10.1017/S0022112081000451. Also see Odgaard, A.J. (1981)
-        /// for a consistent field range.</para>
-        /// TODO(Stage 2): Johannesson &amp; Parker (1989) correct this coefficient for a
-        /// depth-averaged (rather than IPS's original near-surface) velocity profile — deliberately
-        /// NOT implemented in this pass, which only relabels/re-ranges the existing IPS constant
-        /// correctly; the JP correction needs its own research-verified equation form. See
-        /// <see cref="BankErosionCoefficientE"/>'s remarks for how this enters the migration formula
-        /// alongside <see cref="ErosionCoefficient"/>.</summary>
+        /// <summary>IPS scour/transverse-bed-slope factor (their "A", renamed to avoid clashing with drainage area).
+        /// Source: Ikeda, S., Parker, G. &amp; Sawai, K. (1981), J. Fluid Mech. 112:363-377 — range [2.5, 6].
+        /// TODO(Stage 2): Johannesson &amp; Parker (1989) depth-averaged correction not yet applied.</summary>
         double ScourFactor = 3.0,
-        /// <summary>Typical alluvial-channel width-to-depth ratio, used ONLY to estimate channel
-        /// depth H (= width / this ratio) for <see cref="FrictionCoefficient"/>'s D=H/(2·Cf) decay
-        /// length below — this generator has no simulated discharge to derive a real depth from, the
-        /// same reason <see cref="WidthPerSqrtAreaM2"/> approximates width from area instead of a
-        /// real width-discharge relationship.
-        /// Source: typical range 10-20 for alluvial (sand/gravel-bed) channels — Leopold, L.B. &amp;
-        /// Maddock, T. (1953). "The hydraulic geometry of stream channels and some physiographic
-        /// implications." USGS Professional Paper 252.</summary>
+        /// <summary>Alluvial width-to-depth ratio, used only to estimate depth for <see cref="FrictionCoefficient"/>'s decay length.
+        /// Source: Leopold, L.B. &amp; Maddock, T. (1953), USGS Professional Paper 252 — typical range [10, 20].</summary>
         double WidthToDepthRatio = 15.0,
-        /// <summary>Dimensionless bed-friction coefficient C_f in Edwards &amp; Smith's (2002)
-        /// upstream curvature-memory decay length <c>D = H / (2·C_f)</c> (H = local channel depth,
-        /// estimated via <see cref="WidthToDepthRatio"/>) — this REPLACES what used to be a flat
-        /// "N channel widths" decay-length constant with one actually derived from the channel's own
-        /// depth and bed roughness, so the memory length scales per-reach instead of being globally
-        /// fixed. Source: typical range 0.003-0.03 depending on bed roughness. Edwards, B.F. &amp;
-        /// Smith, N.D. (2002). "River meandering dynamics." <i>Physical Review E</i>.
-        /// Default 0.0056 was picked, within that cited range, specifically to reproduce (via
-        /// D=H/(2·C_f) with the <see cref="WidthToDepthRatio"/> default) almost exactly the same
-        /// decay length the old flat "6× channel width" constant it replaces already had live-tuned
-        /// — this formula change is a re-derivation of an already-working number, not a re-tune of
-        /// the resulting shapes.</summary>
+        /// <summary>Bed-friction coefficient C_f in the curvature-memory decay length D = H/(2·C_f).
+        /// Source: Edwards, B.F. &amp; Smith, N.D. (2002), Physical Review E — typical range [0.003, 0.03].</summary>
         double FrictionCoefficient = 0.0056,
         /// <summary>Seed perturbation amplitude (fraction of local channel width) applied once,
         /// before any iteration — a real channel is never perfectly straight either, and the whole
@@ -179,20 +108,8 @@ public static class RiverMeander
         /// instead of applied in full — keeps the channel from tangling into itself instead of
         /// letting it pinch into a proper oxbow.</summary>
         double MinSeparationPerWidth = 1.5,
-        /// <summary>Neck-cutoff trigger distance, in multiples of local channel width. When a
-        /// point's proposed position would fall within this distance of a non-adjacent point on the
-        /// SAME channel network (i.e. reachable from it by following <c>predecessor</c>/
-        /// <c>downstream</c> links, not a different tributary — see <see cref="ComputeOffsets"/>'s
-        /// remarks), the intervening loop is severed and rasterized separately as an oxbow lake
-        /// (<see cref="RasterizeOxbowLakes"/>) instead of being damped further. Must be strictly
-        /// smaller than <see cref="MinSeparationPerWidth"/> — enforced by <see cref="Validate"/> —
-        /// so damping still has a chance to act as a bend approaches self-intersection before an
-        /// actual cutoff fires; a cutoff threshold that never engages before damping saturates would
-        /// silently disable this feature.
-        /// <para>Source: Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L. (2008).
-        /// "Significance of cutoff in meandering river dynamics." <i>Journal of Geophysical
-        /// Research</i> 113:F01001. doi:10.1029/2006JF000600. Cutoff trigger at approximately 1
-        /// channel width of neck separation.</para></summary>
+        /// <summary>Neck-cutoff trigger distance (channel widths); must stay below <see cref="MinSeparationPerWidth"/> (see <see cref="Validate"/>).
+        /// Source: Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L. (2008), JGR 113:F01001 — ~1 channel width.</summary>
         double CutoffTriggerPerWidth = 1.0,
         /// <summary>Meander-belt cap: total drift from a point's original straight-backbone position
         /// is limited to this many multiples of local channel width — real rivers wander within a
@@ -205,42 +122,17 @@ public static class RiverMeander
         /// <summary>Local slope (dimensionless rise/run) below which migration runs at full
         /// strength — a real lowland/floodplain-scale gradient.</summary>
         double SlopeFullMeanderBelow = 0.01,
-        /// <summary>Local slope above which migration is fully suppressed and the channel stays on
-        /// its straight D8 path — deliberately conservative (well past a typical lowland grade)
-        /// rather than tuned to Leopold &amp; Wolman's own discharge-specific threshold line, which
-        /// needs real discharge this generator doesn't simulate. Stage 2's
-        /// <see cref="StreamPowerSuppressionThresholdWPerM2"/> now partially addresses that
-        /// disclaimer with an actual discharge-aware criterion — but this flat-slope check remains,
-        /// additively, as a cheap independent filter for genuinely steep terrain regardless of
-        /// discharge (a suppression from EITHER check applies; neither replaces the other).</summary>
+        /// <summary>Local slope above which migration is fully suppressed — deliberately conservative, not tuned to a discharge-specific threshold this generator can't simulate.
+        /// Additive to <see cref="StreamPowerSuppressionThresholdWPerM2"/> (Stage 2) — either check alone can suppress.</summary>
         double SlopeSuppressedAbove = 0.08,
-        /// <summary>Specific stream power (W/m²) above which the channel pattern switches from
-        /// single-thread meandering to a suppressed/braided-tendency regime — an ADDITIONAL,
-        /// independent suppression gate alongside (not replacing) <see cref="SlopeSuppressedAbove"/>,
-        /// computed via <see cref="ComputeSpecificStreamPowerWPerM2"/>.
-        /// <para>The real van den Berg (1995) threshold is grain-size-dependent (<c>ω ∝ D50^0.42</c>,
-        /// calibrated across 126 streams/rivers — see "Prediction of alluvial channel pattern of
-        /// perennial rivers," <i>Geomorphology</i> 12:259-279) and this codebase has no D50/grain-
-        /// size field to plug into it. Rather than invent an unstated D50 assumption, this default
-        /// is an UNCITED PLACEHOLDER — only the FORM of the relationship (ω = ρ·g·Q·S/w) is cited,
-        /// not a specific literature number. Tune per biome/climate once a grain-size field exists,
-        /// or treat it as a pure gameplay/visual dial until then.</para></summary>
+        /// <summary>Specific stream power (W/m²) above which meandering is suppressed — additive to <see cref="SlopeSuppressedAbove"/>, via <see cref="ComputeSpecificStreamPowerWPerM2"/>.
+        /// UNCITED PLACEHOLDER: van den Berg (1995)'s real threshold is grain-size-dependent (no D50 field exists here) — only the ω=ρ·g·Q·S/w FORM is cited, not this number.</summary>
         double StreamPowerSuppressionThresholdWPerM2 = 300.0,
-        /// <summary>Rough discharge-per-unit-contributing-area conversion (m/s — a specific-runoff-
-        /// yield-style rate) used to turn contributing area into an estimated bankfull discharge
-        /// for <see cref="StreamPowerSuppressionThresholdWPerM2"/>'s stream-power calculation, since
-        /// this generator has no simulated rainfall/runoff model.
-        /// <para>UNCITED PLACEHOLDER, not a literature-calibrated regional value (order-of-magnitude
-        /// only, loosely comparable to a temperate-climate specific runoff yield of roughly
-        /// 10 L/s/km²) — tune per biome/climate rather than treating it as a cited constant.</para></summary>
+        /// <summary>Discharge-per-contributing-area conversion (m/s) feeding the stream-power calculation above.
+        /// UNCITED PLACEHOLDER, order-of-magnitude only — no rainfall/runoff model exists here to calibrate it against.</summary>
         double DischargePerContributingAreaM2 = 1e-8)
     {
-        /// <summary>Throws if this instance is internally inconsistent. Currently only checks that
-        /// <see cref="CutoffTriggerPerWidth"/> is strictly smaller than
-        /// <see cref="MinSeparationPerWidth"/> — see that field's own remarks for why. Called
-        /// automatically by <see cref="ComputeOffsets"/> (hence by <see cref="ApplyMeander"/> and
-        /// <see cref="ApplyMeanderWithCutoffs"/>); call directly only to validate a Parameters
-        /// instance before it's actually used.</summary>
+        /// <summary>Throws unless <see cref="CutoffTriggerPerWidth"/> &lt; <see cref="MinSeparationPerWidth"/>.</summary>
         public void Validate()
         {
             if (CutoffTriggerPerWidth >= MinSeparationPerWidth)
@@ -284,14 +176,8 @@ public static class RiverMeander
         return (mask, magnitude, oxbow);
     }
 
-    /// <summary>Rasterizes every <see cref="SeveredLoop"/> a meander simulation cut off into a
-    /// standalone still-water mask — the oxbow lake left behind after a neck cutoff. Separate from
-    /// the main river mask so a caller can render/tag it distinctly (no flow, no Strahler order,
-    /// eventually stagnant).
-    /// <para>Source: Schwenk, J. &amp; Foufoula-Georgiou, E. (2016). "Meander cutoffs nonlocally
-    /// accelerate upstream and downstream migration and channel widening." <i>Geophysical Research
-    /// Letters</i> 43:12437-12445. doi:10.1002/2016GL071670 — cutoffs sever a loop which becomes an
-    /// oxbow lake.</para></summary>
+    /// <summary>Rasterizes severed loops into a standalone still-water mask, separate from the main river mask.
+    /// Source: Schwenk, J. &amp; Foufoula-Georgiou, E. (2016), GRL 43:12437-12445.</summary>
     internal static byte[] RasterizeOxbowLakes(TerrainHeightmap grid, IReadOnlyList<SeveredLoop> severedLoops)
     {
         var width = grid.Width;
@@ -314,32 +200,7 @@ public static class RiverMeander
         return oxbow;
     }
 
-    /// <summary>Same computation as <see cref="ApplyMeander"/>/<see cref="ApplyMeanderWithCutoffs"/>,
-    /// but stops short of rasterizing — returns each still-active backbone cell's own final migrated
-    /// (x,y), the EFFECTIVE downstream connectivity (identical to <paramref name="downstream"/>
-    /// except where a cutoff spliced across a severed loop), which cells are still active (identical
-    /// to <paramref name="straightMask"/>'s own nonzero cells except wherever a cutoff removed one),
-    /// and the list of cutoffs that actually fired. Not needed by any production caller directly
-    /// (which only wants the final masks), but lets a test or investigation measure the simulation's
-    /// actual output — path length, sinuosity, self-crossing, cutoffs — directly from where cells
-    /// ended up, instead of only from how many raster pixels ended up lit.</summary>
-    /// <remarks>
-    /// Neck-cutoff detection (Stage 2) reuses the SAME per-iteration proximity check that already
-    /// existed for collision-avoidance damping, just with a second, tighter comparison against
-    /// <see cref="Parameters.CutoffTriggerPerWidth"/> (validated smaller than
-    /// <see cref="Parameters.MinSeparationPerWidth"/> — see <see cref="Parameters.Validate"/>):
-    /// when a point's proposed step lands within that tighter distance of a non-adjacent point, this
-    /// only actually severs a loop if the two points are genuinely on the SAME channel (one
-    /// reachable from the other by following the current downstream chain, not two different
-    /// tributaries that merely drifted close together spatially — splicing across unrelated
-    /// branches wouldn't be topologically meaningful). When they are, the run of backbone cells
-    /// strictly between them is frozen at its current position (recorded as a
-    /// <see cref="SeveredLoop"/>), marked inactive, and the chain is spliced directly across the gap
-    /// (a local, in-place update — only the two endpoints' own predecessor/downstream pointers
-    /// change); every later iteration then sees the shortened chain. When the two points are NOT on
-    /// the same channel, the proximity is handled exactly as before: plain damping against
-    /// <see cref="Parameters.MinSeparationPerWidth"/>, unaffected by this Stage.
-    /// </remarks>
+    /// <summary>Pre-rasterization step: final migrated (x,y) per cell, plus post-splice topology.</summary>
     internal static (int[] OffsetX, int[] OffsetY, int[] EffectiveDownstream, bool[] Active, IReadOnlyList<SeveredLoop> SeveredLoops) ComputeOffsets(
         TerrainHeightmap grid, byte[] straightMask, int[] accumulation, double[] slope, int[] downstream, int[] order, Parameters p)
     {
@@ -389,11 +250,7 @@ public static class RiverMeander
             }
         }
 
-        // Mutable working copies used ONLY inside the per-iteration simulation loop below — a
-        // cutoff (Stage 2) locally rewrites exactly two entries (the splice endpoints) in these,
-        // never in the original `predecessor`/`downstream` arrays, which everything computed ABOVE
-        // this point (seed phase, initial perturbation, nearbyInChain) already correctly used the
-        // pre-cutoff topology for and never needs to see a splice.
+        // Mutable copies a cutoff can locally splice, without touching the pre-cutoff originals above.
         var curPred = (int[])predecessor.Clone();
         var curDown = (int[])downstream.Clone();
 
@@ -427,14 +284,7 @@ public static class RiverMeander
             nearbyInChain[i] = set;
         }
 
-        // Erodibility: how strongly a cell's curvature signal actually translates into migration —
-        // zero on steep ground (real channels there don't get the chance to wander before just
-        // cutting straight downhill, Leopold & Wolman 1957), full strength on gentle ground.
-        // physicalFactor folds in BankErosionCoefficientE and ScourFactor (IPS's own E and A)
-        // NORMALIZED against their own defaults — see BankErosionCoefficientE's remarks for why: it
-        // keeps ErosionCoefficient's already-live-tuned default look exactly unchanged (factor=1.0
-        // at defaults) while still making E/A individually meaningful, cited, in-range dials that
-        // scale migration in the same linear proportion IPS's theory says they should.
+        // Erodibility: zero on steep ground (Leopold & Wolman 1957), full strength on gentle ground.
         var physicalFactor = (p.BankErosionCoefficientE * p.ScourFactor) / (DefaultBankErosionCoefficientE * DefaultScourFactor);
         var erodibility = new double[count];
         for (var i = 0; i < count; i++)
@@ -445,10 +295,7 @@ public static class RiverMeander
                 : here >= p.SlopeSuppressedAbove ? 0.0
                 : 1.0 - (here - p.SlopeFullMeanderBelow) / (p.SlopeSuppressedAbove - p.SlopeFullMeanderBelow);
 
-            // Stream-power suppression gate (Stage 2 — see Parameters.StreamPowerSuppressionThresholdWPerM2's
-            // remarks): ADDITIVE to the flat-slope check above, not a replacement — either one alone
-            // can suppress migration, since the flat-slope check stays a legitimate cheap pre-filter
-            // for genuinely steep terrain regardless of discharge.
+            // Stream-power gate, additive to the flat-slope check above (either alone can suppress).
             var dischargeM3PerS = accumulation[i] * cellAreaM2 * p.DischargePerContributingAreaM2;
             var streamPowerWPerM2 = ComputeSpecificStreamPowerWPerM2(dischargeM3PerS, here, channelWidth[i]);
             if (streamPowerWPerM2 >= p.StreamPowerSuppressionThresholdWPerM2) suppression = 0.0;
@@ -532,9 +379,7 @@ public static class RiverMeander
         var newPosY = new double[count];
         var severedLoops = new List<SeveredLoop>();
 
-        // Same world-space-meters -> grid-cell conversion the final offset pass below already did
-        // inline — factored out here too since a cutoff needs to freeze a severed loop's grid
-        // position at the moment of the cut, not just at the very end of the simulation.
+        // World-space-meters -> grid-cell, shared by the final offset pass and cutoff freezing.
         int GridX(double px) => Math.Clamp((int)Math.Round((px - grid.OriginX) / cellSize), 0, width - 1);
         int GridY(double py) => Math.Clamp((int)Math.Round((py - grid.OriginY) / cellSize), 0, height - 1);
 
@@ -619,10 +464,7 @@ public static class RiverMeander
                 newPosY[i] = posY[i] + normalY * stepMeters;
             }
 
-            // Collision-avoidance: bucket the PROPOSED positions of still-active points, and for any
-            // point whose new position landed too close to a non-adjacent point, either (Stage 2)
-            // sever the intervening loop as a genuine neck cutoff, or (unchanged from before) shrink
-            // the step instead of applying it in full.
+            // Collision-avoidance: bucket proposed positions; too close either cuts or damps below.
             var buckets = new Dictionary<(int, int), List<int>>();
             for (var i = 0; i < count; i++)
             {
