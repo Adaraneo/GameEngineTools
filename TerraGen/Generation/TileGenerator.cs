@@ -220,14 +220,17 @@ public static class TileGenerator
         if (batchTiles is { Count: > 0 } && s.HydrologyParams is { } hydrologyParams)
         {
             var chunkTilesPerSide = Math.Max(1, s.HydrologyChunkTilesPerSide);
-            // Group tiles by chunk coordinate, ordered top-to-bottom/west-to-east like generation above.
+            // Group tiles by chunk coordinate (keeping each tile's batchTiles index, so its Interior
+            // can be released there once the chunk is done), ordered like generation above.
             var chunks = batchTiles
-                .GroupBy(t => (ChunkRow: t.Row / chunkTilesPerSide, ChunkCol: t.Col / chunkTilesPerSide))
+                .Select((t, i) => (Tile: t, Index: i))
+                .GroupBy(x => (ChunkRow: x.Tile.Row / chunkTilesPerSide, ChunkCol: x.Tile.Col / chunkTilesPerSide))
                 .OrderBy(g => g.Key.ChunkRow).ThenBy(g => g.Key.ChunkCol);
 
             foreach (var chunk in chunks)
             {
-                var chunkTiles = chunk.ToList();
+                var chunkEntries = chunk.ToList();
+                var chunkTiles = chunkEntries.Select(x => x.Tile).ToList();
                 var minRow = chunkTiles.Min(t => t.Row);
                 var minCol = chunkTiles.Min(t => t.Col);
                 var chunkRows = chunkTiles.Max(t => t.Row) - minRow + 1;
@@ -288,6 +291,13 @@ public static class TileGenerator
 
                 // Saved per chunk above — a crash on a later chunk doesn't lose this one's data.
                 onProgress?.Invoke($"hydrology chunk rows[{minRow}..{minRow + chunkRows - 1}] cols[{minCol}..{minCol + chunkCols - 1}]: {chunkTiles.Count} tiles saved with rivers");
+
+                // Release this chunk's Interior arrays from batchTiles now that they're persisted, so peak memory tracks one chunk, not the whole region.
+                foreach (var entry in chunkEntries)
+                {
+                    var t = entry.Tile;
+                    batchTiles[entry.Index] = (t.Row, t.Col, t.Id, t.CenterLat, t.CenterLon, Array.Empty<float>());
+                }
             }
         }
 
