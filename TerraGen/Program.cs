@@ -148,18 +148,49 @@ var runSettings = new TileGenerator.RunSettings(
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
 
-var lastProgressPercent = -1;
-var results = TileGenerator.Run(db, runSettings, line => Console.WriteLine(line), (done, total) =>
+// Pinned bottom line in an interactive terminal (like apt); redirected output falls back to plain lines.
+var progressBarVisible = false;
+var lastProgressBarText = "";
+var lastRedirectedPercent = -1;
+
+void ClearProgressBar()
+{
+    if (!progressBarVisible) return;
+    Console.Write("\r" + new string(' ', lastProgressBarText.Length) + "\r");
+    progressBarVisible = false;
+}
+
+void WriteLogLine(string text)
+{
+    if (Console.IsOutputRedirected) { Console.WriteLine(text); return; }
+    ClearProgressBar();
+    Console.WriteLine(text);
+}
+
+void RenderProgressBar(int done, int total)
 {
     var fraction = total <= 0 ? 1.0 : (double)done / total;
     var percent = (int)(fraction * 100);
-    if (percent == lastProgressPercent && done != total) return;
-    lastProgressPercent = percent;
     const int barWidth = 30;
     var filled = (int)Math.Round(fraction * barWidth);
     var bar = new string('#', filled) + new string('-', barWidth - filled);
-    Console.WriteLine($"[{bar}] {percent,3}% ({done}/{total})");
-});
+    var text = $"[{bar}] {percent,3}% ({done}/{total})";
+
+    if (Console.IsOutputRedirected)
+    {
+        if (percent == lastRedirectedPercent && done != total) return;
+        lastRedirectedPercent = percent;
+        Console.WriteLine(text);
+        return;
+    }
+
+    Console.Write("\r" + text);
+    lastProgressBarText = text;
+    progressBarVisible = done < total;
+    if (done >= total) Console.WriteLine();
+}
+
+var results = TileGenerator.Run(db, runSettings, WriteLogLine, RenderProgressBar);
 
 // Persisted once per run (idempotent — safe to overwrite with the same values on a re-run) so a
 // consumer like TerrainEditor can recover any saved tile's true (lat,lon) from its OriginX/OriginY
@@ -169,7 +200,7 @@ db.SaveGeoReference(new TerrainGeoReference(
     RefLonDeg: runSettings.MountainOriginLonDeg,
     PlanetRadiusMeters: runSettings.PlanetRadiusMeters));
 
-Console.WriteLine($"Hotovo — {results.Count} dlaždic uloženo do {options.DbPath}.");
+WriteLogLine($"Hotovo — {results.Count} dlaždic uloženo do {options.DbPath}.");
 return 0;
 
 /// <summary>Parsed and validated CLI arguments for one TerraGen run.</summary>
