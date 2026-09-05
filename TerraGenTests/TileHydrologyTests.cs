@@ -509,4 +509,95 @@ public class TileHydrologyTests
         }
         return upstream;
     }
+
+    #region D-infinity (Stage 2)
+
+    /// <summary>A perfect inclined plane tilted at <paramref name="thetaRadians"/> off the +x axis —
+    /// exercises D-infinity's facet math directly without any real terrain generation, since a
+    /// plane's true gradient direction is known exactly in advance (the standard validation
+    /// technique for D-infinity implementations — see e.g. Tarboton's own paper).</summary>
+    private static float[] MakePlane(int width, int height, double thetaRadians)
+    {
+        var values = new float[width * height];
+        for (var y = 0; y < height; y++)
+            for (var x = 0; x < width; x++)
+                // Negative so elevation DECREASES in the (cosθ, sinθ) direction — that's the downhill way.
+                values[y * width + x] = (float)(-(x * Math.Cos(thetaRadians) + y * Math.Sin(thetaRadians)));
+        return values;
+    }
+
+    [TestMethod]
+    public void ComputeDInfinityDirections_FlowExactlyAlignedWithGridDirection_ProducesSingleNeighborFullWeight()
+    {
+        // A plane tilted at exactly 0° (pure +x gradient) — the true steepest-descent direction IS
+        // the grid-aligned +x (E) neighbor, so D-infinity should degenerate fully to a single
+        // neighbor at full weight, matching what SteepestDescentNeighbor (D8) would pick for the
+        // same surface.
+        const int width = 9, height = 9;
+        var routed = MakePlane(width, height, 0.0);
+        var (_, neighborA, neighborB, weightA) = TileHydrology.ComputeDInfinityDirections(routed, width, height);
+
+        const int cx = 4, cy = 4;
+        var center = cy * width + cx;
+        var expectedNeighbor = cy * width + (cx + 1); // due "E"
+
+        Assert.AreEqual(1.0, weightA[center], 1e-9);
+        Assert.AreEqual(-1, neighborB[center]);
+        Assert.AreEqual(expectedNeighbor, neighborA[center]);
+    }
+
+    [TestMethod]
+    public void ComputeDInfinityDirections_FlowAtFacetMidpoint_SplitsWeightEvenlyBetweenBothNeighbors()
+    {
+        // A plane tilted at exactly 22.5° — halfway across the facet bounded by the "E" (0°) and
+        // "NE" (45°) neighbors — so Tarboton's method should split flow evenly between them.
+        const int width = 9, height = 9;
+        var routed = MakePlane(width, height, Math.PI / 8.0);
+        var (_, neighborA, neighborB, weightA) = TileHydrology.ComputeDInfinityDirections(routed, width, height);
+
+        const int cx = 4, cy = 4;
+        var center = cy * width + cx;
+        var eNeighbor = cy * width + (cx + 1);
+        var neNeighbor = (cy + 1) * width + (cx + 1);
+
+        Assert.AreEqual(0.5, weightA[center], 1e-6);
+        var chosen = new HashSet<int> { neighborA[center], neighborB[center] };
+        CollectionAssert.AreEquivalent(new[] { eNeighbor, neNeighbor }, chosen.ToArray());
+    }
+
+    [TestMethod]
+    public void ComputeDInfinityAccumulation_ConservesTotalRainfallMass_AcrossRealTerrain()
+    {
+        // Tarboton (1997)'s accumulation must conserve mass: every cell starts with exactly 1 unit
+        // of "rainfall", and since every interior cell forwards 100% of what it receives onward
+        // (split fractionally, never dropped), the total should reappear undiminished at whatever
+        // cells have no downhill facet at all (outlets/edges) — the same conservation property real
+        // flow accumulation must have, and the property Tarboton's own reported lower bias/RMSE
+        // (vs. D8) on test surfaces of known contributing area presupposes actually holding exactly,
+        // not approximately.
+        var grid = MakeGrid(60, 60, 5.0, (x, y) =>
+        {
+            var northWallDepth = 4 + (int)(3 * Math.Sin(x * 0.7) + 3 * Math.Sin(x * 0.31 + 1.7));
+            var westWallDepth = 4 + (int)(3 * Math.Sin(y * 0.53) + 3 * Math.Sin(y * 0.19 + 0.9));
+            var eastWallDepth = 4 + (int)(3 * Math.Sin(y * 0.41 + 2.1) + 3 * Math.Sin(y * 0.27));
+            var wall = y < northWallDepth || x < westWallDepth || x >= 60 - eastWallDepth;
+            return wall ? 100f : 10f - y * 0.02f + ((x * 37 + y * 17) % 5) * 0.0001f;
+        });
+
+        var (_, neighborA, neighborB, weightA, accumulation) = TileHydrology.ComputeDInfinityDiagnostics(grid);
+
+        var outletMass = 0.0;
+        for (var i = 0; i < accumulation.Length; i++)
+            if (neighborA[i] < 0) outletMass += accumulation[i];
+
+        Assert.AreEqual(grid.Width * grid.Height, outletMass, 1e-6,
+            "Total accumulated mass at every outlet (cells with no downhill D-infinity facet) should equal the grid's total cell count — one unit of rainfall per cell, none dropped or duplicated.");
+
+        // Sanity: every non-outlet cell actually forwarded something (accumulation strictly positive
+        // everywhere, since it starts at 1 and only ever grows).
+        foreach (var a in accumulation)
+            Assert.IsTrue(a >= 1.0, "Accumulation should never fall below its own starting rainfall unit.");
+    }
+
+    #endregion D-infinity (Stage 2)
 }
