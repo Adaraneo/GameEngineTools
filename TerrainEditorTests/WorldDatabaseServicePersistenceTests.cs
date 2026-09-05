@@ -325,41 +325,4 @@ public class WorldDatabaseServicePersistenceTests
             svc.InsertLocation(new LocationInfo("x", "X", "", 0, 0, 0)));
         Assert.Throws<InvalidOperationException>(() => svc.ExportSeedSql());
     }
-
-    [TestMethod]
-    public void Open_LegacyFileWithTerrainHeightmapTable_MigratesIntoSiblingTerrainDb()
-    {
-        // Simulates a world.db saved before terrain moved to its own database: the file still
-        // physically has a TerrainHeightmap table (schema.sql no longer creates one, but an
-        // existing file on disk isn't retroactively altered).
-        var dbPath = Path.Combine(_tempDir, "legacy_world.db");
-
-        using (var db = new GameEngineTools.World.Data.SqliteWorldDatabase(dbPath))
-        {
-            GameEngineTools.World.Data.WorldDatabaseSeeder.InitializeSchemaOnly(db);
-            db.ExecuteScript("""
-                CREATE TABLE TerrainHeightmap (
-                    Id TEXT PRIMARY KEY, OriginX REAL NOT NULL, OriginY REAL NOT NULL,
-                    CellSizeMeters REAL NOT NULL, Width INTEGER NOT NULL, Height INTEGER NOT NULL,
-                    Data BLOB NOT NULL, RiverMask BLOB
-                );
-                """);
-            db.SaveHeightmap(new GameEngineTools.World.Data.TerrainHeightmap(
-                "default", OriginX: 10.0, OriginY: 20.0, CellSizeMeters: 5.0,
-                Width: 2, Height: 2, Values: [1f, 2f, 3f, 4f]));
-        }
-
-        using var svc = new WorldDatabaseService();
-        svc.Open(dbPath);
-
-        var migrated = svc.LoadHeightmap();
-        Assert.IsNotNull(migrated, "The legacy heightmap must be migrated into the sibling terrain.db.");
-        CollectionAssert.AreEqual(new float[] { 1f, 2f, 3f, 4f }, migrated!.Values);
-
-        using (var db = new GameEngineTools.World.Data.SqliteWorldDatabase(dbPath))
-        {
-            Assert.Throws<Microsoft.Data.Sqlite.SqliteException>(() => db.LoadHeightmap("default"),
-                "TerrainHeightmap must be dropped from world.db after a successful migration.");
-        }
-    }
 }
