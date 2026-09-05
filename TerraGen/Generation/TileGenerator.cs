@@ -284,8 +284,10 @@ public static class TileGenerator
                     s.CellSizeMeters, chunkBigWidth, chunkBigHeight, combined);
                 var (straightRiverMask, riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude) =
                     TileHydrology.ComputeDiagnostics(combinedGrid, hydrologyParams);
-                // Bends the straight D8 backbone into a meandering path and severs cutoffs into an OxbowMask.
-                var (combinedRiverMask, combinedShreveMagnitude, combinedOxbowMask) = RiverMeander.ApplyMeanderWithCutoffs(combinedGrid, straightRiverMask,
+                // Bends the straight D8 backbone into a meandering path, severs cutoffs into an OxbowMask, and
+                // extracts the persisted graph — dual-write alongside the raster, see docs/plans/river-network-graph-model.md.
+                var networkId = $"{s.NoiseParams.Seed}_chunk_{minRow}_{minCol}";
+                var (combinedRiverMask, combinedShreveMagnitude, combinedOxbowMask, riverNetwork) = RiverMeander.ApplyMeanderWithGraph(combinedGrid, networkId, straightRiverMask,
                     riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude, new RiverMeander.Parameters());
 
                 foreach (var t in chunkTiles)
@@ -307,6 +309,8 @@ public static class TileGenerator
                         s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior, shreveMagnitudeInterior, oxbowMaskInterior);
                     db.SaveHeightmap(tile);
                 }
+
+                db.SaveRiverNetwork(riverNetwork);
 
                 // Saved per chunk above — a crash on a later chunk doesn't lose this one's data.
                 onProgress?.Invoke($"hydrology chunk rows[{minRow}..{minRow + chunkRows - 1}] cols[{minCol}..{minCol + chunkCols - 1}]: {chunkTiles.Count} tiles saved with rivers");

@@ -246,7 +246,7 @@ public class RiverMeanderTests
         var (mask, accumulation, slope, downstream, order) = BuildCutoffTestTopology(width, height, chain);
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
 
-        var (_, _, effectiveDownstream, active, severedLoops) =
+        var (_, _, effectiveDownstream, active, severedLoops, _, _) =
             RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters(Iterations: 1));
 
         Assert.IsTrue(severedLoops.Count > 0, "The hook's near-self-approach should have triggered at least one cutoff.");
@@ -280,7 +280,7 @@ public class RiverMeanderTests
         // (1.0*10m = 10m > 7.07m) — the same closeness that triggered a cutoff in the previous test
         // now falls squarely in the damping-only range instead.
         var p = new RiverMeander.Parameters(Iterations: 1, CutoffTriggerPerWidth: 0.001, MinSeparationPerWidth: 1.0);
-        var (_, _, _, active, severedLoops) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+        var (_, _, _, active, severedLoops, _, _) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
 
         Assert.AreEqual(0, severedLoops.Count, "No cutoff should fire when the closeness only crosses the (looser) damping threshold, not the (tighter) cutoff one.");
         Assert.AreEqual(chain.Count, Enumerable.Range(0, mask.Length).Count(i => active[i]),
@@ -344,6 +344,98 @@ public class RiverMeanderTests
     }
 
     #endregion Neck cutoffs (Stage 2)
+
+    #region Persisted graph (river-network-graph-model.md, Stage 2)
+
+    private static int SnapToCellIndex(TerrainHeightmap grid, double worldX, double worldY)
+    {
+        var gx = (int)Math.Round((worldX - grid.OriginX) / grid.CellSizeMeters);
+        var gy = (int)Math.Round((worldY - grid.OriginY) / grid.CellSizeMeters);
+        return gy * grid.Width + gx;
+    }
+
+    [TestMethod]
+    public void ApplyMeanderWithGraph_SteepSlope_EveryNodeAndReachPointLiesOnAnActiveRiverCell()
+    {
+        // Steep uniform slope suppresses migration entirely (see ApplyMeander_SteepSlope_StaysOnTheStraightPath)
+        // — the straight D8 backbone IS the final mask, giving a deterministic shape to check the graph against.
+        const int width = 10, height = 20;
+        var values = new float[width * height];
+        for (var y = 0; y < height; y++)
+            for (var x = 0; x < width; x++)
+                values[y * width + x] = (height - y) * 2.5f;
+
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
+        var (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude) =
+            TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 1.0));
+        var (meandered, _, oxbowMask, network) = RiverMeander.ApplyMeanderWithGraph(grid, "net1", mask,
+            accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters());
+
+        Assert.IsTrue(network.Nodes.Count >= 2, "Expected at least a source and a mouth node.");
+        Assert.IsTrue(network.Reaches.Count >= 1);
+        CollectionAssert.AreEqual(Array.Empty<byte>(), oxbowMask.Where(b => b != 0).ToArray(),
+            "No self-approach happens on a steep straight-down slope — no cutoff, no oxbow.");
+
+        foreach (var node in network.Nodes)
+            Assert.AreNotEqual((byte)0, meandered[SnapToCellIndex(grid, node.X, node.Y)],
+                $"Node {node.Id} at ({node.X},{node.Y}) should land on an active river cell.");
+
+        foreach (var reach in network.Reaches)
+            foreach (var (x, y) in reach.Polyline)
+                Assert.AreNotEqual((byte)0, meandered[SnapToCellIndex(grid, x, y)],
+                    $"Reach {reach.Id} point ({x},{y}) should land on an active river cell.");
+    }
+
+    [TestMethod]
+    public void ApplyMeanderWithGraph_SteepSlope_ReachEndpointsMatchItsNodePositions()
+    {
+        const int width = 10, height = 20;
+        var values = new float[width * height];
+        for (var y = 0; y < height; y++)
+            for (var x = 0; x < width; x++)
+                values[y * width + x] = (height - y) * 2.5f;
+
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, values);
+        var (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude) =
+            TileHydrology.ComputeDiagnostics(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 1.0));
+        var (_, _, _, network) = RiverMeander.ApplyMeanderWithGraph(grid, "net1", mask,
+            accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters());
+
+        var nodesById = network.Nodes.ToDictionary(n => n.Id);
+        foreach (var reach in network.Reaches)
+        {
+            var from = nodesById[reach.FromNodeId];
+            var to = nodesById[reach.ToNodeId];
+            Assert.AreEqual((from.X, from.Y), reach.Polyline[0]);
+            Assert.AreEqual((to.X, to.Y), reach.Polyline[^1]);
+        }
+    }
+
+    [TestMethod]
+    public void ApplyMeanderWithGraph_CutoffScenario_ProducesOneOxbowLoopPerSeveredLoop()
+    {
+        const int width = 20, height = 20;
+        var chain = BuildHookChain(2, 2);
+        var (mask, accumulation, slope, downstream, order) = BuildCutoffTestTopology(width, height, chain);
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+        var strahlerOrder = new byte[mask.Length];
+        var shreveMagnitude = new int[mask.Length];
+        for (var i = 0; i < mask.Length; i++) { strahlerOrder[i] = mask[i]; shreveMagnitude[i] = mask[i]; }
+
+        var (_, _, oxbowMask, network) = RiverMeander.ApplyMeanderWithGraph(grid, "net1", mask, accumulation, slope,
+            downstream, order, strahlerOrder, shreveMagnitude, new RiverMeander.Parameters(Iterations: 1));
+
+        Assert.IsTrue(network.Oxbows.Count > 0, "The hook's self-approach should have produced at least one graph oxbow.");
+        foreach (var oxbow in network.Oxbows)
+        {
+            Assert.IsTrue(oxbow.Polyline.Count > 0);
+            foreach (var (x, y) in oxbow.Polyline)
+                Assert.AreNotEqual((byte)0, oxbowMask[SnapToCellIndex(grid, x, y)],
+                    $"Graph oxbow {oxbow.Id} point ({x},{y}) should match a rasterized oxbow cell.");
+        }
+    }
+
+    #endregion Persisted graph (river-network-graph-model.md, Stage 2)
 
     #region Stream-power meander suppression (Stage 2)
 
@@ -414,7 +506,7 @@ public class RiverMeanderTests
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
         var p = new RiverMeander.Parameters(InitialPerturbationPerWidth: 0.0, DischargePerContributingAreaM2: 1.0);
-        var (offsetX, offsetY, _, _, _) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+        var (offsetX, offsetY, _, _, _, _, _) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
 
         var kinkX = kinkIndex % width;
         var kinkY = kinkIndex / width;
@@ -436,7 +528,7 @@ public class RiverMeanderTests
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
         var p = new RiverMeander.Parameters(InitialPerturbationPerWidth: 0.0);
-        var (offsetX, offsetY, _, _, _) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+        var (offsetX, offsetY, _, _, _, _, _) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
 
         var kinkX = kinkIndex % width;
         var kinkY = kinkIndex / width;

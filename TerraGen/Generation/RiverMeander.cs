@@ -148,7 +148,7 @@ public static class RiverMeander
         int[] accumulation, double[] slope, int[] downstream, int[] order, byte[] strahlerOrder,
         int[] shreveMagnitude, Parameters p)
     {
-        var (offsetX, offsetY, effectiveDownstream, active, _) =
+        var (offsetX, offsetY, effectiveDownstream, active, _, _, _) =
             ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
         return Rasterize(grid, active, effectiveDownstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
     }
@@ -158,11 +158,27 @@ public static class RiverMeander
         TerrainHeightmap grid, byte[] straightMask, int[] accumulation, double[] slope,
         int[] downstream, int[] order, byte[] strahlerOrder, int[] shreveMagnitude, Parameters p)
     {
-        var (offsetX, offsetY, effectiveDownstream, active, severedLoops) =
+        var (offsetX, offsetY, effectiveDownstream, active, severedLoops, _, _) =
             ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
         var (mask, magnitude) = Rasterize(grid, active, effectiveDownstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
         var oxbow = RasterizeOxbowLakes(grid, severedLoops);
         return (mask, magnitude, oxbow);
+    }
+
+    /// <summary>Same simulation as <see cref="ApplyMeanderWithCutoffs"/>, but also returns the
+    /// persisted graph (docs/plans/river-network-graph-model.md, Stage 2) — a dual-write, the
+    /// rasterized outputs are unchanged.</summary>
+    public static (byte[] RiverMask, int[] ShreveMagnitude, byte[] OxbowMask, RiverNetwork Network) ApplyMeanderWithGraph(
+        TerrainHeightmap grid, string networkId, byte[] straightMask, int[] accumulation, double[] slope,
+        int[] downstream, int[] order, byte[] strahlerOrder, int[] shreveMagnitude, Parameters p)
+    {
+        var (offsetX, offsetY, effectiveDownstream, active, severedLoops, posX, posY) =
+            ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
+        var (mask, magnitude) = Rasterize(grid, active, effectiveDownstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
+        var oxbowMask = RasterizeOxbowLakes(grid, severedLoops);
+        var network = BuildGraph(networkId, grid, active, effectiveDownstream, strahlerOrder, shreveMagnitude,
+            accumulation, posX, posY, severedLoops, p);
+        return (mask, magnitude, oxbowMask, network);
     }
 
     /// <summary>Rasterizes severed loops into a still-water mask. Source: Schwenk &amp; Foufoula-Georgiou (2016), GRL 43:12437-12445.</summary>
@@ -188,8 +204,13 @@ public static class RiverMeander
         return oxbow;
     }
 
-    /// <summary>Pre-rasterization step: final migrated (x,y) per cell, plus post-splice topology.</summary>
-    internal static (int[] OffsetX, int[] OffsetY, int[] EffectiveDownstream, bool[] Active, IReadOnlyList<SeveredLoop> SeveredLoops) ComputeOffsets(
+    /// <summary>Channel width from contributing area — shared by <see cref="ComputeOffsets"/> and <see cref="BuildGraph"/>.</summary>
+    private static double ChannelWidthAt(int idx, int[] accumulation, double cellSize, double widthPerSqrtAreaM2)
+        => Math.Max(cellSize * 0.1, widthPerSqrtAreaM2 * Math.Sqrt(accumulation[idx] * cellSize * cellSize));
+
+    /// <summary>Pre-rasterization step: final migrated (x,y) per cell (grid-snapped AND continuous
+    /// world-space, the latter for <see cref="BuildGraph"/>), plus post-splice topology.</summary>
+    internal static (int[] OffsetX, int[] OffsetY, int[] EffectiveDownstream, bool[] Active, IReadOnlyList<SeveredLoop> SeveredLoops, double[] PosX, double[] PosY) ComputeOffsets(
         TerrainHeightmap grid, byte[] straightMask, int[] accumulation, double[] slope, int[] downstream, int[] order, Parameters p)
     {
         p.Validate();
@@ -214,7 +235,7 @@ public static class RiverMeander
 
         var channelWidth = new double[count];
         for (var i = 0; i < count; i++)
-            channelWidth[i] = Math.Max(cellSize * 0.1, p.WidthPerSqrtAreaM2 * Math.Sqrt(accumulation[i] * cellSize * cellSize));
+            channelWidth[i] = ChannelWidthAt(i, accumulation, cellSize, p.WidthPerSqrtAreaM2);
 
         // Estimated channel depth, feeds only the curvature-memory decay length below.
         var channelDepth = new double[count];
@@ -552,7 +573,90 @@ public static class RiverMeander
             offsetY[i] = GridY(posY[i]);
         }
 
-        return (offsetX, offsetY, curDown, active, severedLoops);
+        return (offsetX, offsetY, curDown, active, severedLoops, posX, posY);
+    }
+
+    /// <summary>Extracts the persisted graph — <see cref="RiverNode"/>s at every source/confluence/mouth,
+    /// <see cref="RiverReach"/>s of continuous polyline points between them, <see cref="OxbowLoop"/>s from
+    /// <paramref name="severedLoops"/> — from the same per-cell arrays <see cref="Rasterize"/> stamps into a
+    /// mask. See docs/plans/river-network-graph-model.md, Stage 1/2.</summary>
+    internal static RiverNetwork BuildGraph(string networkId, TerrainHeightmap grid, bool[] active,
+        int[] effectiveDownstream, byte[] strahlerOrder, int[] shreveMagnitude, int[] accumulation,
+        double[] posX, double[] posY, IReadOnlyList<SeveredLoop> severedLoops, Parameters p)
+    {
+        var count = active.Length;
+        var cellSize = grid.CellSizeMeters;
+
+        var inDegree = new int[count];
+        for (var i = 0; i < count; i++)
+        {
+            if (!active[i]) continue;
+            var next = effectiveDownstream[i];
+            if (next >= 0 && active[next]) inDegree[next]++;
+        }
+
+        // A node marks a branch point or an end — everything else is a plain pass-through cell that
+        // ends up as an interior polyline point of whichever reach passes through it.
+        var nodeKindByIndex = new Dictionary<int, RiverNodeKind>();
+        for (var i = 0; i < count; i++)
+        {
+            if (!active[i]) continue;
+            var hasOutflow = effectiveDownstream[i] >= 0 && active[effectiveDownstream[i]];
+            if (inDegree[i] == 0) nodeKindByIndex[i] = RiverNodeKind.Source;
+            else if (!hasOutflow) nodeKindByIndex[i] = RiverNodeKind.Mouth;
+            else if (inDegree[i] >= 2) nodeKindByIndex[i] = RiverNodeKind.Confluence;
+        }
+
+        var nodeIdByIndex = new Dictionary<int, string>();
+        var nodes = new List<RiverNode>(nodeKindByIndex.Count);
+        var nodeCounter = 0;
+        foreach (var (idx, kind) in nodeKindByIndex)
+        {
+            var id = $"{networkId}_n{nodeCounter++}";
+            nodeIdByIndex[idx] = id;
+            nodes.Add(new RiverNode(id, networkId, posX[idx], posY[idx], kind));
+        }
+
+        var reaches = new List<RiverReach>();
+        var reachCounter = 0;
+        foreach (var (startIdx, startKind) in nodeKindByIndex)
+        {
+            if (startKind == RiverNodeKind.Mouth) continue; // no outgoing edge from a mouth
+            var next = effectiveDownstream[startIdx];
+            if (next < 0 || !active[next]) continue; // defensive; a Mouth is the only kind this can happen for
+
+            var pathIndices = new List<int> { startIdx };
+            var cur = next;
+            while (true)
+            {
+                pathIndices.Add(cur);
+                if (nodeKindByIndex.ContainsKey(cur)) break;
+                var nxt = effectiveDownstream[cur];
+                if (nxt < 0 || !active[nxt]) break; // defensive; every chain ends at a classified Mouth
+                cur = nxt;
+            }
+
+            if (!nodeIdByIndex.TryGetValue(cur, out var toId)) continue;
+
+            var polyline = pathIndices.Select(i => (posX[i], posY[i])).ToList();
+            var widthMeters = pathIndices.Average(i => ChannelWidthAt(i, accumulation, cellSize, p.WidthPerSqrtAreaM2));
+
+            reaches.Add(new RiverReach(
+                $"{networkId}_r{reachCounter++}", networkId, nodeIdByIndex[startIdx], toId, polyline,
+                strahlerOrder[startIdx], shreveMagnitude[startIdx], widthMeters));
+        }
+
+        var oxbows = new List<OxbowLoop>(severedLoops.Count);
+        var oxbowCounter = 0;
+        foreach (var loop in severedLoops)
+        {
+            var polyline = new List<(double X, double Y)>(loop.OffsetX.Length);
+            for (var k = 0; k < loop.OffsetX.Length; k++)
+                polyline.Add((grid.OriginX + loop.OffsetX[k] * cellSize, grid.OriginY + loop.OffsetY[k] * cellSize));
+            oxbows.Add(new OxbowLoop($"{networkId}_o{oxbowCounter++}", networkId, polyline));
+        }
+
+        return new RiverNetwork(networkId, nodes, reaches, oxbows);
     }
 
     /// <summary>Finds whether start/target lie on the same channel and, if so, the loop between them.</summary>

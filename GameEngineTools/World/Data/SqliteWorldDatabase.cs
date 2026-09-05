@@ -749,6 +749,78 @@ namespace GameEngineTools.World.Data
             }
         }
 
+        /// <summary>Replaces every node/reach/oxbow for <see cref="RiverNetwork.NetworkId"/> in one transaction.</summary>
+        public void SaveRiverNetwork(RiverNetwork network)
+        {
+            ArgumentNullException.ThrowIfNull(network);
+
+            lock (_sync)
+            {
+                using var tx = _connection.BeginTransaction();
+
+                ExecuteNonQuery("DELETE FROM RiverNode WHERE NetworkId = @id", ("@id", network.NetworkId));
+                ExecuteNonQuery("DELETE FROM RiverReach WHERE NetworkId = @id", ("@id", network.NetworkId));
+                ExecuteNonQuery("DELETE FROM RiverOxbow WHERE NetworkId = @id", ("@id", network.NetworkId));
+
+                foreach (var node in network.Nodes)
+                    ExecuteNonQuery(
+                        "INSERT INTO RiverNode (Id, NetworkId, X, Y, Kind) VALUES (@id, @net, @x, @y, @kind)",
+                        ("@id", node.Id), ("@net", node.NetworkId), ("@x", node.X), ("@y", node.Y), ("@kind", node.Kind.ToString()));
+
+                foreach (var reach in network.Reaches)
+                    ExecuteNonQuery("""
+                        INSERT INTO RiverReach
+                            (Id, NetworkId, FromNodeId, ToNodeId, Polyline, StrahlerOrder, ShreveMagnitude, WidthMeters)
+                        VALUES
+                            (@id, @net, @from, @to, @poly, @strahler, @shreve, @width)
+                        """,
+                        ("@id", reach.Id), ("@net", reach.NetworkId), ("@from", reach.FromNodeId), ("@to", reach.ToNodeId),
+                        ("@poly", RiverReach.PolylineToBytes(reach.Polyline)), ("@strahler", reach.StrahlerOrder),
+                        ("@shreve", reach.ShreveMagnitude), ("@width", reach.WidthMeters));
+
+                foreach (var oxbow in network.Oxbows)
+                    ExecuteNonQuery(
+                        "INSERT INTO RiverOxbow (Id, NetworkId, Polyline) VALUES (@id, @net, @poly)",
+                        ("@id", oxbow.Id), ("@net", oxbow.NetworkId), ("@poly", RiverReach.PolylineToBytes(oxbow.Polyline)));
+
+                tx.Commit();
+            }
+        }
+
+        /// <summary>Loads the river network saved under <paramref name="networkId"/>, or an empty
+        /// network if nothing was ever saved for it.</summary>
+        public RiverNetwork LoadRiverNetwork(string networkId)
+        {
+            lock (_sync)
+            {
+                var nodes = new List<RiverNode>();
+                using (var cmd = CreateCommand("SELECT Id, X, Y, Kind FROM RiverNode WHERE NetworkId = @id", ("@id", networkId)))
+                using (var reader = cmd.ExecuteReader())
+                    while (reader.Read())
+                        nodes.Add(new RiverNode(reader.GetString(0), networkId, reader.GetDouble(1), reader.GetDouble(2),
+                            Enum.Parse<RiverNodeKind>(reader.GetString(3))));
+
+                var reaches = new List<RiverReach>();
+                using (var cmd = CreateCommand("""
+                    SELECT Id, FromNodeId, ToNodeId, Polyline, StrahlerOrder, ShreveMagnitude, WidthMeters
+                    FROM RiverReach WHERE NetworkId = @id
+                    """, ("@id", networkId)))
+                using (var reader = cmd.ExecuteReader())
+                    while (reader.Read())
+                        reaches.Add(new RiverReach(reader.GetString(0), networkId, reader.GetString(1), reader.GetString(2),
+                            RiverReach.PolylineFromBytes((byte[])reader.GetValue(3)), reader.GetInt32(4), reader.GetInt32(5),
+                            reader.GetDouble(6)));
+
+                var oxbows = new List<OxbowLoop>();
+                using (var cmd = CreateCommand("SELECT Id, Polyline FROM RiverOxbow WHERE NetworkId = @id", ("@id", networkId)))
+                using (var reader = cmd.ExecuteReader())
+                    while (reader.Read())
+                        oxbows.Add(new OxbowLoop(reader.GetString(0), networkId, RiverReach.PolylineFromBytes((byte[])reader.GetValue(1))));
+
+                return new RiverNetwork(networkId, nodes, reaches, oxbows);
+            }
+        }
+
         #endregion Terrain heightmap
 
         #endregion Location + Connection queries

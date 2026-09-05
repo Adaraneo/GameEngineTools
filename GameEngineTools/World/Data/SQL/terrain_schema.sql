@@ -39,3 +39,39 @@ CREATE TABLE IF NOT EXISTS TerrainGeoReference (
     RefLonDeg           REAL    NOT NULL,
     PlanetRadiusMeters  REAL    NOT NULL
 );
+
+-- ── River Network (graph) ─────────────────────────────────────────────────────
+-- Dual-written alongside RiverMask/ShreveMagnitude/OxbowMask (see docs/plans/river-network-graph-model.md,
+-- Stage 1/2) — a continuous, resolution-independent representation of the same river topology those
+-- rasters encode. NetworkId groups every node/reach/oxbow generated together (same value as the
+-- TerrainHeightmap chunk id they were derived from — one hydrology chunk can span several tiles).
+-- Coordinates are world-space meters, same convention as TerrainHeightmap.OriginX/OriginY.
+
+CREATE TABLE IF NOT EXISTS RiverNode (
+    Id          TEXT    PRIMARY KEY,
+    NetworkId   TEXT    NOT NULL,
+    X           REAL    NOT NULL,
+    Y           REAL    NOT NULL,
+    Kind        TEXT    NOT NULL    -- Source | Confluence | Mouth
+);
+
+CREATE TABLE IF NOT EXISTS RiverReach (
+    Id              TEXT    PRIMARY KEY,
+    NetworkId       TEXT    NOT NULL,
+    FromNodeId      TEXT    NOT NULL,
+    ToNodeId        TEXT    NOT NULL,
+    Polyline        BLOB    NOT NULL,   -- packed little-endian float64 (x0,y0,x1,y1,...), see RiverReach.PolylineToBytes
+    StrahlerOrder   INTEGER NOT NULL,
+    ShreveMagnitude INTEGER NOT NULL,
+    WidthMeters     REAL    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS RiverOxbow (
+    Id          TEXT    PRIMARY KEY,
+    NetworkId   TEXT    NOT NULL,
+    Polyline    BLOB    NOT NULL       -- packed little-endian float64 (x0,y0,x1,y1,...), same convention as RiverReach.Polyline
+);
+
+CREATE INDEX IF NOT EXISTS IX_RiverNode_NetworkId ON RiverNode (NetworkId);
+CREATE INDEX IF NOT EXISTS IX_RiverReach_NetworkId ON RiverReach (NetworkId);
+CREATE INDEX IF NOT EXISTS IX_RiverOxbow_NetworkId ON RiverOxbow (NetworkId);
