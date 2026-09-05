@@ -347,6 +347,113 @@ public class TileHydrologyTests
         Assert.IsTrue(confluencesChecked > 0, "Test terrain should contain at least one real confluence to check.");
     }
 
+    [TestMethod]
+    public void ComputeDiagnostics_ShreveMagnitude_HeadwatersAreAlwaysMagnitudeOne()
+    {
+        // Definitional (Shreve 1966): a channel head with no river tributary feeding it has no
+        // upstream contributor to sum, so its magnitude defaults to 1 — true regardless of terrain
+        // shape, same property the Strahler headwater test above checks for order.
+        var (mask, _, _, downstream, order, _, shreveMagnitude) = ComputeOnAConfluenceRichGrid();
+        var upstreamCount = BuildUpstreamCounts(mask, downstream, order.Length);
+
+        for (var i = 0; i < mask.Length; i++)
+        {
+            if (mask[i] == 0) continue;
+            if (upstreamCount[i] == 0)
+                Assert.AreEqual(1, shreveMagnitude[i], $"Headwater cell {i} should have Shreve magnitude 1.");
+        }
+    }
+
+    [TestMethod]
+    public void ComputeDiagnostics_ShreveMagnitude_IsAdditiveAtConfluences_UnlikeStrahlerOrder()
+    {
+        // Definitional (Shreve 1966): at EVERY confluence, magnitude is the SUM of every upstream
+        // river contributor's own magnitude — never capped, never conditional on the contributors
+        // being equal, unlike Strahler order (see the order-only-increases-on-equal-merge test
+        // above). This checks the additive rule at every real confluence in the same
+        // confluence-rich basin the Strahler tests use, and specifically locates at least one
+        // confluence where the two rules diverge (unequal-order tributaries) to prove magnitude
+        // really is tracking something different from order, not just coincidentally agreeing.
+        var (mask, _, _, downstream, order, strahlerOrder, shreveMagnitude) = ComputeOnAConfluenceRichGrid();
+        var upstream = BuildUpstreamLists(mask, downstream, order.Length);
+
+        var confluencesChecked = 0;
+        var foundDivergentConfluence = false;
+        for (var i = 0; i < mask.Length; i++)
+        {
+            if (mask[i] == 0) continue;
+            var ups = upstream[i];
+            if (ups.Count < 2) continue;
+
+            var expectedMagnitude = ups.Sum(u => shreveMagnitude[u]);
+            Assert.AreEqual(expectedMagnitude, shreveMagnitude[i],
+                $"Confluence at {i} merging magnitudes [{string.Join(",", ups.Select(u => shreveMagnitude[u]))}] should sum to {expectedMagnitude}.");
+            confluencesChecked++;
+
+            // Reproduce the Strahler rule exactly (same formula the OnlyIncreasesWhenTwoEqualOrdersMerge
+            // test above already validates independently) so this test can compare it directly
+            // against what magnitude does at the SAME confluence, rather than re-deriving its own
+            // (and getting it wrong for a 3+-way confluence where two contributors happen to tie
+            // at the max alongside a third that doesn't).
+            var upstreamOrders = ups.Select(u => (int)strahlerOrder[u]).ToList();
+            var maxOrder = upstreamOrders.Max();
+            var countAtMax = upstreamOrders.Count(o => o == maxOrder);
+            var strahlerStayedAtMax = countAtMax < 2; // per the production rule: only increments on a 2+-way tie at the max
+
+            if (strahlerStayedAtMax && upstreamOrders.Distinct().Count() > 1)
+            {
+                // A genuinely mixed-order confluence where Strahler stayed at the dominant
+                // tributary's own order — magnitude, in contrast, is ALWAYS the full sum of every
+                // contributor (never just the dominant one's), so the two are visibly different
+                // numbers here, not just different names for the same rule.
+                Assert.AreEqual(maxOrder, strahlerOrder[i],
+                    $"Confluence at {i} with upstream orders {string.Join(",", upstreamOrders)} (no 2-way tie at the max) should keep Strahler order at the max.");
+                Assert.AreNotEqual(ups.Select(u => shreveMagnitude[u]).Max(), shreveMagnitude[i],
+                    $"Confluence at {i} should sum magnitudes, not just take the dominant tributary's own magnitude.");
+                foundDivergentConfluence = true;
+            }
+        }
+
+        Assert.IsTrue(confluencesChecked > 0, "Test terrain should contain at least one real confluence to check.");
+        Assert.IsTrue(foundDivergentConfluence,
+            "Test terrain should contain at least one confluence where Strahler order and Shreve magnitude visibly diverge (unequal-order tributaries).");
+    }
+
+    [TestMethod]
+    public void ComputeDiagnostics_ShreveMagnitude_NeverDecreasesDownstream_AndConservesTotalAtEveryMouth()
+    {
+        // Definitional (Shreve 1966): magnitude only ever grows or stays the same moving
+        // downstream (mirrors the Strahler never-decreases test above) — AND, because every unit
+        // of magnitude traces back to exactly one headwater and is never dropped or double-counted
+        // along the way, the sum of magnitude at every network "mouth" (a river cell with no
+        // downstream river cell after it) must equal the total number of headwaters — a global
+        // conservation check that a hand-picked single confluence or one linear chain can't offer,
+        // confirming magnitude "accumulates correctly to the mouth" across the WHOLE network, not
+        // just one path through it.
+        var (mask, _, _, downstream, order, _, shreveMagnitude) = ComputeOnAConfluenceRichGrid();
+        var upstreamCount = BuildUpstreamCounts(mask, downstream, order.Length);
+
+        var headwaterCount = 0;
+        var mouthMagnitudeTotal = 0;
+        for (var i = 0; i < mask.Length; i++)
+        {
+            if (mask[i] == 0) continue;
+
+            if (upstreamCount[i] == 0) headwaterCount++;
+
+            var next = downstream[i];
+            if (next < 0 || mask[next] == 0) mouthMagnitudeTotal += shreveMagnitude[i];
+
+            if (next < 0 || mask[next] == 0) continue;
+            Assert.IsTrue(shreveMagnitude[next] >= shreveMagnitude[i],
+                $"Magnitude dropped from {shreveMagnitude[i]} at {i} to {shreveMagnitude[next]} downstream at {next} — Shreve magnitude must never decrease.");
+        }
+
+        Assert.IsTrue(headwaterCount > 0, "Test terrain should contain at least one headwater.");
+        Assert.AreEqual(headwaterCount, mouthMagnitudeTotal,
+            "Total magnitude flowing out every network mouth should equal the total number of headwaters — every headwater's unit of magnitude must reach exactly one mouth, undropped and undoubled.");
+    }
+
     /// <summary>A wide, gently-sloped, irregularly-walled basin — the same style of terrain used
     /// throughout this file to exercise realistic branching drainage — with a low enough threshold
     /// that multiple independent tributaries form and merge, giving the Strahler tests above actual
