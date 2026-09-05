@@ -16,40 +16,13 @@ namespace TerraGen.Generation;
 public static class TileHydrology
 {
     public sealed record Parameters(
-        /// <summary>Montgomery &amp; Dietrich (1992) channel-initiation criterion: a cell becomes a
-        /// river when its contributing area (upstream cell count × cell area, in m²) TIMES THE
-        /// SQUARE of the local downslope gradient (dimensionless rise/run along the actual flow
-        /// path — see <see cref="ComputeRiverMask"/>'s remarks) reaches this value — i.e. this is
-        /// <c>A·S²</c>, not <c>A·S</c>. Real channel heads form where surface flow's shear stress
-        /// exceeds the substrate's erosion resistance, and that shear stress scales with area ×
-        /// slope SQUARED, not area × slope — a steep hillside needs only a small catchment to start
-        /// eroding a channel, while a dead-flat plain needs an enormous one (in the limit, none at
-        /// all, matching real drainage: water doesn't carve a channel across perfectly flat ground).
-        /// The units work out to m². Note this ONLY governs where a channel STARTS — see
-        /// <see cref="ComputeRiverMask"/>'s remarks on why every cell downstream of a qualifying one
-        /// is marked too regardless of ITS OWN local slope, which is what makes a channel actually
-        /// continuous instead of flickering through every locally-noisy stretch.
-        /// <para>Source: Montgomery, D.R. &amp; Dietrich, W.E. (1992). "Channel Initiation and the
-        /// Problem of Landscape Scale." <i>Science</i> 255(5046):826-830.
-        /// doi:10.1126/science.255.5046.826. Field-measured channel-head threshold range
-        /// <c>A·S² ∈ [500, 4000] m²</c> (normalized per unit contour length,
-        /// <c>(A/b)·S² ∈ [25, 200] m</c>). An order-of-magnitude scatter across that range is
-        /// inherent to the original field data itself, not a calibration gap here — pick a value
-        /// per-biome/per-climate rather than expecting one constant to fit every terrain.</para>
-        /// Default 2000 (mid-range of the cited [500, 4000] interval) — NOT the old 1200 linear-model
-        /// value, which was calibrated for <c>A·S</c> and would silently misclassify channel heads
-        /// under the corrected <c>A·S²</c> formula (a linear-model value carried over here would
-        /// require unrealistically gentle slopes to ever clear the bar, since real slopes are usually
-        /// well below 1.0 and squaring shrinks anything below 1 further). Re-tune per <see cref="TileGenerator"/>
-        /// batch/biome the same way 1200 was live-calibrated for the old formula.</summary>
+        /// <summary>Channel-initiation criterion A·S² (not A·S). Source: Montgomery &amp; Dietrich (1992), Science 255(5046):826-830 — field range [500, 4000] m².</summary>
         double ChannelInitiationAreaSlopeSquaredThreshold = 2000.0);
 
-    /// <summary>90° in radians — the angular span of each of Tarboton's 8 triangular facets around a
-    /// cell (360°/8). Used only by <see cref="ComputeDInfinityDirections"/>/<see cref="ComputeDInfinityAccumulation"/>.</summary>
+    /// <summary>90° in radians — the angular span of one of Tarboton's 8 triangular facets.</summary>
     private const double QuarterPi = Math.PI / 4.0;
 
-    /// <summary>√2 — the Euclidean grid distance to a diagonal neighbor when the orthogonal distance
-    /// is 1. Used only by <see cref="ComputeDInfinityDirections"/>.</summary>
+    /// <summary>√2 — grid distance to a diagonal neighbor.</summary>
     private const double Root2 = 1.4142135623730951;
 
     /// <summary>Tiny per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit
@@ -196,19 +169,7 @@ public static class TileHydrology
         // the highest order seen among a cell's own upstream river contributors so far, and how
         // many of them tied for it, without needing to materialize a full per-cell upstream list.
         //
-        // Shreve stream magnitude (Shreve 1966) is computed in this SAME pass, right alongside
-        // Strahler order, rather than a second walk over `order` — both are pure functions of "what
-        // river cells feed into me," so there's no reason to visit every cell twice just because
-        // they answer different questions about that same upstream set. Unlike Strahler order,
-        // magnitude is plainly additive: a headwater (no river cell flowing into it) starts at 1,
-        // and every confluence's magnitude is the SUM — not the max/conditional-increment Strahler
-        // uses — of whatever its river contributors carry. That makes it proportional (to first
-        // order) to upstream contributing drainage area, which Strahler order deliberately is NOT
-        // (see the order field's own remarks) — Strahler stays the discrete, bounded-tier signal
-        // TerrainEditor's brush tool wants for a small set of "visual sizes"; Shreve magnitude is the
-        // continuous, physically-additive signal a stream-power/width/sediment calculation would
-        // actually need. Source: Shreve, R.L. (1966). "Statistical law of stream numbers." Journal
-        // of Geology 74:17-37.
+        // Shreve stream magnitude, computed in the same pass: additive (sum of contributors), unlike Strahler's max/conditional-increment. Source: Shreve, R.L. (1966), J. Geology 74:17-37.
         var strahlerOrder = new byte[count];
         var runningMaxOrder = new int[count];
         var runningCountAtMax = new int[count];
@@ -238,36 +199,20 @@ public static class TileHydrology
         return (mask, accumulation, slope, downstream, order, strahlerOrder, shreveMagnitude);
     }
 
-    /// <summary>Stage 2: D-infinity flow-direction/accumulation diagnostics — run alongside (NOT
-    /// replacing) <see cref="ComputeDiagnostics"/>'s single-direction D8 computation, purely so a
-    /// future investigation can visually compare the two accumulation fields on real generated
-    /// terrain before deciding whether/where D∞ should actually feed production code. Deliberately
-    /// NOT wired into <see cref="TileGenerator"/> — that decision (and which of channel-initiation
-    /// vs. only downstream accumulation, if either, should switch over) is left to the user after
-    /// reviewing that comparison, not assumed here.
-    /// <para>Source: Tarboton, D.G. (1997). "A new method for the determination of flow directions
-    /// and upslope areas in grid digital elevation models." <i>Water Resources Research</i>
-    /// 33(2):309-319. doi:10.1029/96WR03137.</para></summary>
+    /// <summary>Diagnostic-only D-infinity routing, run alongside D8, not wired into production. Source: Tarboton, D.G. (1997), WRR 33(2):309-319.</summary>
     internal static (double[] Angle, int[] NeighborA, int[] NeighborB, double[] WeightA, double[] Accumulation) ComputeDInfinityDiagnostics(TerrainHeightmap grid)
     {
         var width = grid.Width;
         var height = grid.Height;
         var count = width * height;
 
-        // Same filled/flow-resolved surface D8 routes direction across (see ComputeDiagnostics'
-        // remarks on why) — D∞ needs the same pit-free, flat-resolved input to have a well-defined
-        // downhill facet everywhere.
+        // Same filled/flow-resolved surface D8 routes across — D∞ needs the same pit-free input.
         var filled = FillDepressions(grid);
         var routed = ResolveFlats(filled, width, height);
 
         var (angle, neighborA, neighborB, weightA) = ComputeDInfinityDirections(routed, width, height);
 
-        // Elevation-sorted topological order, exactly like ComputeDiagnostics' own `order` array —
-        // safe to reuse the SAME construction for D∞ (rather than something D∞-specific) because it
-        // depends only on `routed`'s own strict outward monotonicity (guaranteed by FillDepressions'
-        // epsilon bump — see that method's remarks), not on which direction scheme (D8 or D∞) a cell
-        // ultimately drains toward. Confirms the plan's own reasoning: elevation order is a valid
-        // topological order for ANY strictly-downhill-only direction scheme on this surface.
+        // Elevation-sorted topological order, same construction as ComputeDiagnostics' own `order`.
         var order = new int[count];
         for (var i = 0; i < count; i++) order[i] = i;
         Array.Sort(order, (a, b) => routed[b].CompareTo(routed[a]));
@@ -277,35 +222,7 @@ public static class TileHydrology
         return (angle, neighborA, neighborB, weightA, accumulation);
     }
 
-    /// <summary>Computes Tarboton's (1997) eight-triangular-facet D-infinity flow direction for
-    /// every cell of a filled/flow-resolved elevation grid: a continuous downhill angle, expressed
-    /// as the two discrete 8-connected neighbors bounding whichever 45°-wide facet contains the
-    /// steepest downhill direction, plus the fractional weight assigned to the dominant one
-    /// (<paramref name="routed"/>'s cell size cancels out of every ratio this method computes, so it
-    /// is NOT a parameter — see the remarks for why).
-    /// <para>Per facet <c>k</c> (spanning the real angle range <c>[k·45°, (k+1)·45°]</c>, bounded by
-    /// neighbors <c>e1</c> at <c>k·45°</c> and <c>e2</c> at <c>(k+1)·45°</c>): with <c>s1 = e0-e1</c>
-    /// and <c>s2 = e1-e2</c> (both drops per unit grid step — see remarks), <c>r = atan2(s2, s1)</c>
-    /// is the facet-local angle from <c>e1</c> toward <c>e2</c>. <c>r</c> clamped to <c>[0, 45°]</c>
-    /// (falling outside the facet means the OTHER neighbor alone is steeper — a normal D8 step); the
-    /// facet with the largest resulting downhill magnitude across all 8 wins, and its <c>r</c>
-    /// (as a fraction of 45°) sets how flow splits between its two neighbors. Each facet always
-    /// pairs a CARDINAL neighbor as <c>e1</c> (real grid distance 1 — see the implementation's own
-    /// remarks on why this ordering, not simple compass-consecutive pairing, is required) with an
-    /// adjacent DIAGONAL neighbor as <c>e2</c>.</para>
-    /// <para><see cref="Angle"/> is a monotonically-consistent bookkeeping value (winning facet
-    /// index × 45° + <c>r</c>), not a literal compass bearing — the cardinal-first facet ordering
-    /// above doesn't sweep the 8 real directions in simple ascending-angle order, and nothing in
-    /// this Stage consumes it as a true geographic angle; only <see cref="NeighborA"/>/
-    /// <see cref="NeighborB"/>/<see cref="WeightA"/> carry the actual routing decision.</para>
-    /// <para>Source: Tarboton, D.G. (1997), Water Resources Research 33(2):309-319.</para></summary>
-    /// <remarks>Every facet's <c>s1</c>/<c>s2</c> here are computed as raw elevation drops rather
-    /// than true slopes (drop ÷ cell size) — dividing both by the SAME cell size within one cell's 8
-    /// facets never changes which facet has the largest magnitude nor the ratio <c>atan2(s2,s1)</c>
-    /// (both terms scale identically), so cell size is irrelevant to picking a direction and is
-    /// omitted from this method's inputs entirely. It still matters for an ABSOLUTE slope value —
-    /// nothing here needs one; <see cref="ComputeDInfinityAccumulation"/> only ever uses the
-    /// resulting fractional weights, not a magnitude.</remarks>
+    /// <summary>Tarboton's (1997) eight-triangular-facet D-infinity flow direction per cell, as two bounding neighbors plus a fractional weight.</summary>
     internal static (double[] Angle, int[] NeighborA, int[] NeighborB, double[] WeightA) ComputeDInfinityDirections(float[] routed, int width, int height)
     {
         var count = width * height;
@@ -319,17 +236,7 @@ public static class TileHydrology
         // 8 directions in 45° steps around the cell: E, NE, N, NW, W, SW, S, SE.
         Span<int> dx = stackalloc int[] { 1, 1, 0, -1, -1, -1, 0, 1 };
         Span<int> dy = stackalloc int[] { 0, 1, 1, 1, 0, -1, -1, -1 };
-        // Each of the 8 facets pairs ONE cardinal neighbor (index into dx/dy at an EVEN position:
-        // E=0, N=2, W=4, S=6 — real grid distance 1 from the cell) with ONE of its two adjacent
-        // diagonal neighbors (an ODD position — real grid distance √2). This distinction matters:
-        // Tarboton's per-facet formula needs e1 (the vertex `s1` is measured to) at real distance 1,
-        // since s1 is used as a raw elevation drop standing in for a distance-1 slope. A naive
-        // "just walk consecutive compass directions" facet definition (e1=dirs[k], e2=dirs[k+1])
-        // gets this backwards for every OTHER facet, where dirs[k] would be the DIAGONAL neighbor
-        // instead — confirmed live: it let a wrongly-scaled facet report a slope magnitude that
-        // impossibly exceeds a test plane's own true gradient magnitude, because the diagonal
-        // neighbor's real √2 distance was silently treated as 1. cardinal[m]/diagonal[m] below are
-        // the (e1, e2) pair for facet m, always cardinal-first, avoiding that bug entirely.
+        // Each facet pairs a cardinal (distance-1) e1 with an adjacent diagonal (distance-√2) e2 — naive consecutive-direction pairing gets this backwards on alternating facets.
         Span<int> cardinal = stackalloc int[] { 0, 2, 2, 4, 4, 6, 6, 0 };
         Span<int> diagonal = stackalloc int[] { 1, 1, 3, 3, 5, 5, 7, 7 };
 
@@ -390,14 +297,7 @@ public static class TileHydrology
         return (angle, neighborA, neighborB, weightA);
     }
 
-    /// <summary>Same purpose as <see cref="ComputeDiagnostics"/>'s D8 accumulation, but distributes
-    /// each cell's contribution fractionally between its two D-infinity downslope neighbors
-    /// (<paramref name="weightA"/>/<c>1-weightA</c>) instead of committing it entirely to a single
-    /// steepest-descent neighbor — removes the grid-alignment bias a single-direction scheme is
-    /// prone to. <paramref name="order"/> is the SAME elevation-sorted topological order
-    /// <see cref="ComputeDiagnostics"/> derives for D8 — see <see cref="ComputeDInfinityDiagnostics"/>'s
-    /// remarks for why reusing it (rather than something direction-scheme-specific) is valid here.
-    /// <para>Source: Tarboton, D.G. (1997), Water Resources Research 33(2):309-319.</para></summary>
+    /// <summary>Like D8 accumulation, but splits each cell's contribution fractionally between its two D∞ downslope neighbors. Source: Tarboton, D.G. (1997), WRR 33(2):309-319.</summary>
     internal static double[] ComputeDInfinityAccumulation(int[] order, int[] neighborA, int[] neighborB, double[] weightA, int width, int height)
     {
         var count = width * height;

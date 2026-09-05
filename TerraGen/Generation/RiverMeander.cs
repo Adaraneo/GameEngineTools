@@ -78,18 +78,13 @@ public static class RiverMeander
         /// (and saturating at, via <see cref="MaxBeltWidthPerWidth"/>) 80%+ of its belt cap within
         /// 200-300 iterations for all of them.</summary>
         double ErosionCoefficient = 150.0,
-        /// <summary>IPS bank-erosion coefficient E, normalized against its own default (see <see cref="ErosionCoefficient"/>).
-        /// Source: Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L. (2005), WRR 41:W12403 — field range [1e-8, 1e-7].</summary>
+        /// <summary>IPS bank-erosion coefficient E. Source: Camporeale et al. (2005), WRR 41:W12403 — range [1e-8, 1e-7].</summary>
         double BankErosionCoefficientE = 3e-8,
-        /// <summary>IPS scour/transverse-bed-slope factor (their "A", renamed to avoid clashing with drainage area).
-        /// Source: Ikeda, S., Parker, G. &amp; Sawai, K. (1981), J. Fluid Mech. 112:363-377 — range [2.5, 6].
-        /// TODO(Stage 2): Johannesson &amp; Parker (1989) depth-averaged correction not yet applied.</summary>
+        /// <summary>IPS scour factor. Source: Ikeda, Parker &amp; Sawai (1981), J. Fluid Mech. 112:363-377 — range [2.5, 6].</summary>
         double ScourFactor = 3.0,
-        /// <summary>Alluvial width-to-depth ratio, used only to estimate depth for <see cref="FrictionCoefficient"/>'s decay length.
-        /// Source: Leopold, L.B. &amp; Maddock, T. (1953), USGS Professional Paper 252 — typical range [10, 20].</summary>
+        /// <summary>Width-to-depth ratio. Source: Leopold &amp; Maddock (1953), USGS Prof. Paper 252 — range [10, 20].</summary>
         double WidthToDepthRatio = 15.0,
-        /// <summary>Bed-friction coefficient C_f in the curvature-memory decay length D = H/(2·C_f).
-        /// Source: Edwards, B.F. &amp; Smith, N.D. (2002), Physical Review E — typical range [0.003, 0.03].</summary>
+        /// <summary>Bed-friction coefficient C_f. Source: Edwards &amp; Smith (2002), Phys. Rev. E — range [0.003, 0.03].</summary>
         double FrictionCoefficient = 0.0056,
         /// <summary>Seed perturbation amplitude (fraction of local channel width) applied once,
         /// before any iteration — a real channel is never perfectly straight either, and the whole
@@ -108,8 +103,7 @@ public static class RiverMeander
         /// instead of applied in full — keeps the channel from tangling into itself instead of
         /// letting it pinch into a proper oxbow.</summary>
         double MinSeparationPerWidth = 1.5,
-        /// <summary>Neck-cutoff trigger distance (channel widths); must stay below <see cref="MinSeparationPerWidth"/> (see <see cref="Validate"/>).
-        /// Source: Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L. (2008), JGR 113:F01001 — ~1 channel width.</summary>
+        /// <summary>Neck-cutoff trigger distance. Source: Camporeale et al. (2008), JGR 113:F01001 — ~1 channel width.</summary>
         double CutoffTriggerPerWidth = 1.0,
         /// <summary>Meander-belt cap: total drift from a point's original straight-backbone position
         /// is limited to this many multiples of local channel width — real rivers wander within a
@@ -122,14 +116,11 @@ public static class RiverMeander
         /// <summary>Local slope (dimensionless rise/run) below which migration runs at full
         /// strength — a real lowland/floodplain-scale gradient.</summary>
         double SlopeFullMeanderBelow = 0.01,
-        /// <summary>Local slope above which migration is fully suppressed — deliberately conservative, not tuned to a discharge-specific threshold this generator can't simulate.
-        /// Additive to <see cref="StreamPowerSuppressionThresholdWPerM2"/> (Stage 2) — either check alone can suppress.</summary>
+        /// <summary>Local slope above which migration is fully suppressed; additive to <see cref="StreamPowerSuppressionThresholdWPerM2"/>.</summary>
         double SlopeSuppressedAbove = 0.08,
-        /// <summary>Specific stream power (W/m²) above which meandering is suppressed — additive to <see cref="SlopeSuppressedAbove"/>, via <see cref="ComputeSpecificStreamPowerWPerM2"/>.
-        /// UNCITED PLACEHOLDER: van den Berg (1995)'s real threshold is grain-size-dependent (no D50 field exists here) — only the ω=ρ·g·Q·S/w FORM is cited, not this number.</summary>
+        /// <summary>UNCITED PLACEHOLDER stream-power threshold (W/m²); only the ω=ρ·g·Q·S/w form is sourced, not this number.</summary>
         double StreamPowerSuppressionThresholdWPerM2 = 300.0,
-        /// <summary>Discharge-per-contributing-area conversion (m/s) feeding the stream-power calculation above.
-        /// UNCITED PLACEHOLDER, order-of-magnitude only — no rainfall/runoff model exists here to calibrate it against.</summary>
+        /// <summary>UNCITED PLACEHOLDER discharge-per-contributing-area conversion (m/s), order-of-magnitude only.</summary>
         double DischargePerContributingAreaM2 = 1e-8)
     {
         /// <summary>Throws unless <see cref="CutoffTriggerPerWidth"/> &lt; <see cref="MinSeparationPerWidth"/>.</summary>
@@ -162,9 +153,7 @@ public static class RiverMeander
         return Rasterize(grid, active, effectiveDownstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
     }
 
-    /// <summary>Stage 2: same simulation as <see cref="ApplyMeander"/> — cutoffs happen there too,
-    /// this is the only entry point that also SURFACES the resulting oxbow lakes and Shreve
-    /// magnitude together with the river mask, rather than discarding them.</summary>
+    /// <summary>Same simulation as <see cref="ApplyMeander"/>, but also surfaces the severed oxbow lakes.</summary>
     public static (byte[] RiverMask, int[] ShreveMagnitude, byte[] OxbowMask) ApplyMeanderWithCutoffs(
         TerrainHeightmap grid, byte[] straightMask, int[] accumulation, double[] slope,
         int[] downstream, int[] order, byte[] strahlerOrder, int[] shreveMagnitude, Parameters p)
@@ -176,8 +165,7 @@ public static class RiverMeander
         return (mask, magnitude, oxbow);
     }
 
-    /// <summary>Rasterizes severed loops into a standalone still-water mask, separate from the main river mask.
-    /// Source: Schwenk, J. &amp; Foufoula-Georgiou, E. (2016), GRL 43:12437-12445.</summary>
+    /// <summary>Rasterizes severed loops into a still-water mask. Source: Schwenk &amp; Foufoula-Georgiou (2016), GRL 43:12437-12445.</summary>
     internal static byte[] RasterizeOxbowLakes(TerrainHeightmap grid, IReadOnlyList<SeveredLoop> severedLoops)
     {
         var width = grid.Width;
@@ -211,9 +199,7 @@ public static class RiverMeander
         var cellSize = grid.CellSizeMeters;
         var cellAreaM2 = cellSize * cellSize;
 
-        // Active backbone flags — starts identical to straightMask's own nonzero cells; a cutoff
-        // (Stage 2) removes a cell from active use for the REST of the simulation without deleting
-        // it from any array (its final frozen position still matters for oxbow rasterization).
+        // Active backbone flags; a cutoff removes a cell from active use without deleting it.
         var active = new bool[count];
         for (var i = 0; i < count; i++) active[i] = straightMask[i] != 0;
 
@@ -230,10 +216,7 @@ public static class RiverMeander
         for (var i = 0; i < count; i++)
             channelWidth[i] = Math.Max(cellSize * 0.1, p.WidthPerSqrtAreaM2 * Math.Sqrt(accumulation[i] * cellSize * cellSize));
 
-        // Estimated channel depth (see Parameters.WidthToDepthRatio's remarks) — feeds ONLY the
-        // Edwards & Smith (2002) curvature-memory decay length D=H/(2·C_f) below, the same way
-        // channelWidth already estimates a physical scale this generator has no simulated discharge
-        // to derive directly.
+        // Estimated channel depth, feeds only the curvature-memory decay length below.
         var channelDepth = new double[count];
         for (var i = 0; i < count; i++)
             channelDepth[i] = channelWidth[i] / p.WidthToDepthRatio;
@@ -330,10 +313,7 @@ public static class RiverMeander
             seedPhase[next] = seedPhase[idx] + 2.0 * Math.PI * stepDist / seedWavelength;
         }
 
-        // Edwards & Smith (2002) upstream curvature-memory decay length D = H/(2·C_f) — see
-        // Parameters.FrictionCoefficient's remarks and the standalone CurvatureMemoryLengthMeters
-        // itself. Local function wrapper (not inlined) since it's needed identically in both the
-        // seed-wavelength calculation above and the per-iteration convolution below.
+        // Local wrapper: needed identically in both the seed-wavelength calc above and the convolution below.
         double DecayLengthAt(int cellIndex) => CurvatureMemoryLengthMeters(channelDepth[cellIndex], p.FrictionCoefficient);
 
         // World-space positions (meters), one per grid cell — starts exactly on the straight D8
@@ -507,9 +487,7 @@ public static class RiverMeander
                 if (closest < cutoffThreshold && closestJ >= 0 &&
                     TryFindLoop(i, closestJ, curDown, active, count, out var loopIndices, out var upstreamEnd, out var downstreamEnd))
                 {
-                    // Genuine same-channel neck cutoff — freeze the severed loop's positions (its
-                    // final, permanent shape as a stagnant oxbow lake), remove it from the active
-                    // backbone, and splice the chain directly across the gap.
+                    // Genuine neck cutoff: freeze the severed loop as an oxbow, splice the backbone across it.
                     var loopOffsetX = new int[loopIndices.Count];
                     var loopOffsetY = new int[loopIndices.Count];
                     for (var k = 0; k < loopIndices.Count; k++)
@@ -577,15 +555,7 @@ public static class RiverMeander
         return (offsetX, offsetY, curDown, active, severedLoops);
     }
 
-    /// <summary>Neck-cutoff support: determines whether <paramref name="start"/> and
-    /// <paramref name="target"/> lie on the SAME channel — one reachable from the other by
-    /// following <paramref name="curDown"/> — and if so, which is upstream/downstream and which
-    /// cells lie strictly between them (the loop a cutoff would sever). Walks forward from each end
-    /// in turn (bounded by <paramref name="maxHops"/>, a safe upper bound on any real chain length)
-    /// rather than assuming a direction, since either point could be the upstream one. Returns
-    /// <c>false</c> (no loop) when neither walk reaches the other — the two points merely drifted
-    /// spatially close on DIFFERENT tributaries, which isn't a real neck cutoff (splicing across
-    /// unrelated branches wouldn't be topologically meaningful).</summary>
+    /// <summary>Finds whether start/target lie on the same channel and, if so, the loop between them.</summary>
     private static bool TryFindLoop(int start, int target, int[] curDown, bool[] active, int maxHops,
         out List<int> loopIndices, out int upstreamEnd, out int downstreamEnd)
     {
@@ -627,18 +597,7 @@ public static class RiverMeander
         return false;
     }
 
-    /// <summary>Reconnect: every EFFECTIVE edge (a still-active cell -> its effective downstream
-    /// cell, post-cutoff-splicing — see <see cref="ComputeOffsets"/>'s remarks) gets redrawn between
-    /// the TWO cells' own final migrated positions, not just the migrated cells marked in isolation
-    /// — a migration step can move a point several grid cells sideways over the course of the
-    /// simulation, and without redrawing the connecting line the channel would fragment into
-    /// disconnected dots exactly like the bug TileHydrology's own downstream-propagation fix already
-    /// solved for the straight case. Shreve magnitude is stamped alongside the Strahler-order mask
-    /// from the SAME source cell at every rasterized pixel — see <see cref="StampMax"/> — rather
-    /// than in a separate pass, so a pixel's magnitude always corresponds to whichever reach's line
-    /// actually "won" that pixel, not an unrelated reach that happened to draw over it too. Cells a
-    /// cutoff removed from <paramref name="active"/> are skipped entirely — they belong only to
-    /// <see cref="RasterizeOxbowLakes"/>'s output now, not the main channel.</summary>
+    /// <summary>Redraws each active cell's line to its effective downstream cell, stamping Strahler order + Shreve magnitude.</summary>
     private static (byte[] Mask, int[] ShreveMagnitude) Rasterize(TerrainHeightmap grid, bool[] active,
         int[] effectiveDownstream, byte[] strahlerOrder, int[] shreveMagnitude, int[] offsetX, int[] offsetY)
     {
@@ -664,12 +623,7 @@ public static class RiverMeander
         return (meandered, meanderedMagnitude);
     }
 
-    /// <summary>Bresenham line rasterization shared by <see cref="Rasterize"/> (the main river
-    /// channel) and <see cref="RasterizeOxbowLakes"/> (severed-loop still water) — the exact same
-    /// point-to-point line-plotting logic either way, only WHAT gets stamped at each point differs,
-    /// so that decision is left entirely to <paramref name="plot"/>. Ensures two consecutive
-    /// migrated points always end up 8-connected on the grid no matter how far apart the simulation
-    /// put them.</summary>
+    /// <summary>Bresenham line rasterization shared by <see cref="Rasterize"/> and <see cref="RasterizeOxbowLakes"/>.</summary>
     private static void ForEachLinePoint(int width, int height, int x0, int y0, int x1, int y1, Action<int> plot)
     {
         var dx = Math.Abs(x1 - x0);
@@ -691,10 +645,7 @@ public static class RiverMeander
         }
     }
 
-    /// <summary>Two different reaches' migrated lines can rasterize over the same pixel — keep
-    /// whichever order (and its co-indexed magnitude) is bigger rather than letting draw order
-    /// arbitrarily decide, so a large river's line never gets accidentally overwritten by a small
-    /// tributary passing near it.</summary>
+    /// <summary>Keeps whichever order (and co-indexed magnitude) is bigger when reaches overlap a pixel.</summary>
     private static void StampMax(byte[] mask, int[] magnitudeMask, int idx, byte value, int magnitude)
     {
         if (value <= mask[idx]) return;
