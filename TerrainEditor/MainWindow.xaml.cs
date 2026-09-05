@@ -176,6 +176,7 @@ public partial class MainWindow : Window
         }
 
         _grid = tile;
+        MaterializeRiverGraph();
         _combinedSources = [];
         _roadPaths.Clear();
         _vm.CurrentCenterLatitude = null;
@@ -555,12 +556,14 @@ public partial class MainWindow : Window
             if (tile is not null)
             {
                 _grid = tile;
+                MaterializeRiverGraph();
                 _combinedSources = [tile];
                 return;
             }
         }
 
         _grid = _vm.WorldDb.LoadHeightmap() ?? CreateDefaultGrid(locations);
+        MaterializeRiverGraph();
         _combinedSources = [];
     }
 
@@ -811,6 +814,28 @@ public partial class MainWindow : Window
         if (supersample == _lastContourSupersample) return;
         _lastContourSupersample = supersample;
         ContourSurface.InvalidateVisual();
+    }
+
+    /// <summary>Graph-Stage-3 rasterization, OR-merged onto _grid; call only right after a fresh load/stitch, never from RenderGrid.</summary>
+    private void MaterializeRiverGraph()
+    {
+        if (_grid is null) return;
+        var (reaches, oxbows) = _vm.WorldDb.LoadRiverReachesAndOxbows();
+        if (reaches.Count == 0 && oxbows.Count == 0) return;
+
+        var (graphMask, graphMagnitude, graphOxbow) = RiverNetworkRasterizer.Rasterize(reaches, oxbows, _grid);
+        var cellCount = _grid.Width * _grid.Height;
+        var mergedMask = _grid.RiverMask is { } m ? (byte[])m.Clone() : new byte[cellCount];
+        var mergedMagnitude = _grid.ShreveMagnitude is { } sm ? (int[])sm.Clone() : new int[cellCount];
+        var mergedOxbow = _grid.OxbowMask is { } om ? (byte[])om.Clone() : new byte[cellCount];
+
+        for (var i = 0; i < cellCount; i++)
+        {
+            if (graphMask[i] > mergedMask[i]) { mergedMask[i] = graphMask[i]; mergedMagnitude[i] = graphMagnitude[i]; }
+            if (graphOxbow[i] != 0) mergedOxbow[i] = 1;
+        }
+
+        _grid = _grid with { RiverMask = mergedMask, ShreveMagnitude = mergedMagnitude, OxbowMask = mergedOxbow };
     }
 
     private unsafe void RenderGrid()
@@ -1451,6 +1476,7 @@ public partial class MainWindow : Window
         var (worldCenterX, worldCenterY) = CanvasToWorld(viewportCenterCanvasX, viewportCenterCanvasY);
 
         _grid = newGrid;
+        MaterializeRiverGraph();
         _combinedSources = sources;
         RenderGrid();
 

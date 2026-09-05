@@ -821,6 +821,43 @@ namespace GameEngineTools.World.Data
             }
         }
 
+        /// <summary>Loads every reach in the database, regardless of <see cref="RiverReach.NetworkId"/> —
+        /// for a spatial (not network-keyed) consumer like <see cref="RiverNetworkRasterizer"/>. No spatial
+        /// index yet (see docs/plans/river-network-graph-model.md, Stage 3 addendum) — fine while the
+        /// network stays sparse; a large world may need one later.</summary>
+        public IReadOnlyList<RiverReach> LoadAllReaches()
+        {
+            const string sql = "SELECT Id, NetworkId, FromNodeId, ToNodeId, Polyline, StrahlerOrder, ShreveMagnitude, WidthMeters FROM RiverReach";
+
+            var reaches = new List<RiverReach>();
+            lock (_sync)
+            {
+                using var cmd = CreateCommand(sql);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    reaches.Add(new RiverReach(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                        RiverReach.PolylineFromBytes((byte[])reader.GetValue(4)), reader.GetInt32(5), reader.GetInt32(6), reader.GetDouble(7)));
+            }
+            return reaches;
+        }
+
+        /// <summary>Loads every oxbow in the database, regardless of <see cref="OxbowLoop.NetworkId"/> —
+        /// same spatial-consumer rationale as <see cref="LoadAllReaches"/>.</summary>
+        public IReadOnlyList<OxbowLoop> LoadAllOxbows()
+        {
+            const string sql = "SELECT Id, NetworkId, Polyline FROM RiverOxbow";
+
+            var oxbows = new List<OxbowLoop>();
+            lock (_sync)
+            {
+                using var cmd = CreateCommand(sql);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    oxbows.Add(new OxbowLoop(reader.GetString(0), reader.GetString(1), RiverReach.PolylineFromBytes((byte[])reader.GetValue(2))));
+            }
+            return oxbows;
+        }
+
         #endregion Terrain heightmap
 
         #endregion Location + Connection queries

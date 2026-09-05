@@ -252,6 +252,14 @@ public sealed class WorldDatabaseService : IDisposable
         return _terrainDb!.ListHeightmaps();
     }
 
+    /// <summary>Every reach/oxbow in the open terrain.db, for <see cref="RiverNetworkRasterizer"/> — see
+    /// <see cref="SqliteWorldDatabase.LoadAllReaches"/>'s remarks on why this isn't network- or tile-keyed.</summary>
+    public (IReadOnlyList<RiverReach> Reaches, IReadOnlyList<OxbowLoop> Oxbows) LoadRiverReachesAndOxbows()
+    {
+        RequireTerrainOpen();
+        return (_terrainDb!.LoadAllReaches(), _terrainDb!.LoadAllOxbows());
+    }
+
     public void SaveHeightmap(TerrainHeightmap grid)
     {
         RequireTerrainOpen();

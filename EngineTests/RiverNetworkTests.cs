@@ -119,5 +119,23 @@ namespace EngineTests
             Assert.AreEqual(2, loadedA.Nodes.Count);
             Assert.AreEqual(2, loadedB.Nodes.Count);
         }
+
+        [TestMethod]
+        public void LoadAllReaches_AndLoadAllOxbows_ReturnRowsAcrossEveryNetworkId()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            db.SaveRiverNetwork(MakeNetwork("chunk_a"));
+            db.SaveRiverNetwork(MakeNetwork("chunk_b"));
+
+            var reaches = db.LoadAllReaches();
+            var oxbows = db.LoadAllOxbows();
+
+            Assert.AreEqual(2, reaches.Count);
+            Assert.AreEqual(2, oxbows.Count);
+            CollectionAssert.Contains((System.Collections.ICollection)new[] { reaches[0].NetworkId, reaches[1].NetworkId }, "chunk_a");
+            CollectionAssert.Contains((System.Collections.ICollection)new[] { reaches[0].NetworkId, reaches[1].NetworkId }, "chunk_b");
+        }
     }
 }
