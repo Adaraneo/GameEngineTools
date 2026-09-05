@@ -141,7 +141,8 @@ var runSettings = new TileGenerator.RunSettings(
     NoiseParams: noiseParams,
     ErosionParams: erosionParams,
     PlanetRadiusMeters: planet.PlanetRadiusMeters,
-    HydrologyParams: hydrologyParams);
+    HydrologyParams: hydrologyParams,
+    HydrologyChunkTilesPerSide: options.RiverChunkTiles);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -183,6 +184,11 @@ internal sealed class CliOptions
     /// see <see cref="TerraGen.Generation.TileHydrology.Parameters.ChannelInitiationAreaSlopeSquaredThreshold"/>.
     /// Default 2000 is the middle of that source's cited field-measured range [500, 4000].</summary>
     public double RiverThreshold { get; init; } = 2000.0;
+    /// <summary>See <see cref="TerraGen.Generation.TileGenerator.RunSettings.HydrologyChunkTilesPerSide"/>'s
+    /// remarks — lower this if a large --lat-range/--lon-range batch throws the
+    /// "would need a NxN combined grid" error, or raise it (at the cost of memory) if a smaller
+    /// value is visibly fragmenting rivers across chunk boundaries more than desired.</summary>
+    public int RiverChunkTiles { get; init; } = 20;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -244,7 +250,8 @@ internal sealed class CliOptions
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
-                        [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]]
+                        [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
+                                  [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
 
             --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
             desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
@@ -252,11 +259,16 @@ internal sealed class CliOptions
             bez tohoto přepínače musí dál generovat identicky, proto je výchozí hodnota 0.
 
             --rivers (vypnuto výchozí, ze stejného důvodu jako --tectonic-plates) po erozi spočítá
-            D8 flow-accumulation (odtokový model) JEDNOU přes celý požadovaný region najednou (ne
-            po jedné dlaždici) — tok se tedy propojí i přes hranice dlaždic, ne že by na každé
-            znovu "začínal od nuly". Stojí to víc paměti/výpočtu (celý region drží v paměti najednou)
-            a druhé uložení RiverMasky navíc, ale bez toho by řeka vypadala na hranicích dlaždic
-            přerušovaně. Buňka se stane začátkem řeky, když sběrná plocha (m²) krát DRUHÁ MOCNINA
+            D8 flow-accumulation (odtokový model) JEDNOU přes každý --river-chunk-tiles×--river-chunk-tiles
+            velký blok dlaždic (ne po jedné dlaždici) — tok se tedy propojí i přes hranice dlaždic
+            UVNITŘ jednoho chunku, ne že by na každé znovu "začínal od nuly". Přes hranici mezi
+            dvěma chunky se tok stejně jako dřív nepropojí (stejný už přijatý kompromis jako mezi
+            dvěma samostatnými spuštěními TerraGenu). Menší --river-chunk-tiles = méně paměti a
+            menší riziko přerušení na hranici chunku napříč velkým regionem; moc velký chunk na
+            velkém --lat-range/--lon-range požadavku může spadnout na přetečení kombinované mřížky
+            (přes 2^31 buněk) nebo vyčerpat paměť — v tom případě sniž --river-chunk-tiles. Bez toho
+            by řeka vypadala na hranicích dlaždic přerušovaně. Buňka se stane začátkem řeky, když
+            sběrná plocha (m²) krát DRUHÁ MOCNINA
             místního sklonu terénu (bezrozměrný, měřený na SKUTEČNÉM terénu ve směru odtoku) dosáhne
             --river-threshold — reálné kritérium vzniku koryta (Montgomery &amp; Dietrich 1992):
             smykové napětí odtoku, které musí překonat odolnost podloží, je úměrné ploše×sklonu²,
@@ -350,6 +362,7 @@ internal sealed class CliOptions
         int? tectonicPlateCount = null;
         var rivers = false;
         var riverThreshold = 2000.0;
+        var riverChunkTiles = 20;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -390,6 +403,9 @@ internal sealed class CliOptions
                     break;
                 case "--river-threshold" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var rt):
                     riverThreshold = rt;
+                    break;
+                case "--river-chunk-tiles" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rct):
+                    riverChunkTiles = rct;
                     break;
                 case "--scan":
                     scan = true;
@@ -484,6 +500,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--river-threshold musí být kladné.");
             return null;
         }
+        if (riverChunkTiles < 1)
+        {
+            Console.Error.WriteLine("--river-chunk-tiles musí být kladné.");
+            return null;
+        }
 
         return new CliOptions
         {
@@ -492,7 +513,7 @@ internal sealed class CliOptions
             LonMin = lonMin.Value, LonMax = lonMax!.Value,
             TileKm = tileKm, CellMeters = cellMeters, ErosionStrength = Math.Clamp(erosion, 0, 100),
             TectonicPlateCount = tectonicPlateCount,
-            Rivers = rivers, RiverThreshold = riverThreshold,
+            Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,

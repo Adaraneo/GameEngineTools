@@ -447,4 +447,116 @@ public class TileGeneratorTests
             if (File.Exists(dbPath)) File.Delete(dbPath);
         }
     }
+
+    [TestMethod]
+    public void Run_WithSmallHydrologyChunkSize_StillConnectsRiversWithinEachChunk()
+    {
+        // Regression test for the chunked hydrology processing that replaced a single combined
+        // grid for the ENTIRE batch (which could overflow a 32-bit array length or exhaust memory
+        // on a large real request — see RunSettings.HydrologyChunkTilesPerSide's remarks). A small
+        // HydrologyChunkTilesPerSide forces this batch into MULTIPLE chunks (unlike every other
+        // hydrology test in this file, which all fit inside one default-sized chunk and so never
+        // actually exercise the new multi-chunk code path) — connectivity is only guaranteed WITHIN
+        // a chunk, so this checks river cells only across an internal boundary shared by two tiles
+        // in the SAME chunk, mirroring RiversStayConnectedAcrossTileBoundaries's own check but
+        // scoped to that weaker (chunk-local, not batch-wide) guarantee.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            const int chunkTilesPerSide = 2;
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.006, LonMin: 0.0, LonMax: 0.006,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 5, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 5, DropletCount: 500, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                HydrologyParams: new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 5.0),
+                HydrologyChunkTilesPerSide: chunkTilesPerSide);
+
+            var results = TileGenerator.Run(db, settings);
+            var byRowCol = results.ToDictionary(r => (r.Row, r.Col));
+            Assert.IsTrue(results.Select(r => r.Row / chunkTilesPerSide).Distinct().Count() > 1
+                || results.Select(r => r.Col / chunkTilesPerSide).Distinct().Count() > 1,
+                "Test grid should span multiple hydrology chunks for this test to mean anything.");
+
+            var tilesById = results.ToDictionary(r => r.Id, r => db.LoadHeightmap(r.Id)!);
+            foreach (var t in tilesById.Values)
+            {
+                Assert.IsNotNull(t.RiverMask, "Every tile should still get river data with chunked processing, same as before.");
+                Assert.AreEqual(t.Width * t.Height, t.RiverMask!.Length);
+            }
+
+            var boundaryRiverCells = 0;
+            var connectedAcross = 0;
+            foreach (var (row, col) in byRowCol.Keys)
+            {
+                var eastRowCol = (row, col + 1);
+                if (!byRowCol.TryGetValue(eastRowCol, out var eastResult)) continue;
+                // Only a same-chunk pair exercises the chunk-local connectivity guarantee — a
+                // cross-chunk pair is expected to fragment (that's the accepted tradeoff, not a bug).
+                if (row / chunkTilesPerSide != eastResult.Row / chunkTilesPerSide) continue;
+                if (col / chunkTilesPerSide != eastResult.Col / chunkTilesPerSide) continue;
+
+                var west = tilesById[byRowCol[(row, col)].Id];
+                var east = tilesById[eastResult.Id];
+                var w = west.Width;
+                var h = west.Height;
+
+                for (var y = 0; y < h; y++)
+                {
+                    if (west.RiverMask![y * w + (w - 1)] == 0) continue;
+                    boundaryRiverCells++;
+                    var found = false;
+                    for (var dy = -1; dy <= 1 && !found; dy++)
+                    {
+                        var ny = y + dy;
+                        if (ny < 0 || ny >= h) continue;
+                        if (east.RiverMask![ny * w + 0] != 0) found = true;
+                    }
+                    if (found) connectedAcross++;
+                }
+            }
+
+            Assert.IsTrue(boundaryRiverCells > 0, "Test grid produced no river cells on any same-chunk internal tile boundary — pick different noise/threshold/chunk size.");
+            var pct = 100.0 * connectedAcross / boundaryRiverCells;
+            Assert.IsTrue(pct > 50.0,
+                $"Expected most SAME-CHUNK internal-boundary river cells to still connect into their neighbor tile " +
+                $"(>50%) with chunked processing — got {pct:F1}% ({connectedAcross}/{boundaryRiverCells}).");
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
+    public void ValidateHydrologyChunkSize_ChunkExceedsSafeCellCount_ThrowsActionableException()
+    {
+        // Direct unit test of the extracted guard (see its own remarks) against a contrived chunk
+        // size well past MaxSafeHydrologyChunkCells — this is the check that turns what used to be
+        // a bare, confusing OverflowException (or worse, silent memory exhaustion) from
+        // `new float[bigWidth * bigHeight]` into an actionable message pointing at
+        // HydrologyChunkTilesPerSide, without needing to actually generate a batch large enough to
+        // trigger it for real.
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            TileGenerator.ValidateHydrologyChunkSize(
+                chunkBigWidth: 20_000, chunkBigHeight: 20_000, chunkTilesPerSide: 50,
+                minRow: 0, maxRowInclusive: 49, minCol: 0, maxColInclusive: 49));
+
+        StringAssert.Contains(ex.Message, "HydrologyChunkTilesPerSide");
+    }
+
+    [TestMethod]
+    public void ValidateHydrologyChunkSize_ChunkWithinSafeCellCount_DoesNotThrow()
+    {
+        // Regression guard: the default HydrologyChunkTilesPerSide=20 at the common default
+        // TileKm=1/CellMeters=2.5 (400 cells/tile side) produces an 8000x8000 chunk — this must NOT
+        // trip the guard, or every ordinary batch run using defaults would start failing.
+        TileGenerator.ValidateHydrologyChunkSize(
+            chunkBigWidth: 8000, chunkBigHeight: 8000, chunkTilesPerSide: 20,
+            minRow: 0, maxRowInclusive: 19, minCol: 0, maxColInclusive: 19);
+    }
 }

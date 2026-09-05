@@ -20,16 +20,19 @@ namespace TerraGen.Generation;
 /// tile, like it's starting fresh with a tiny local catchment right at its own western/southern
 /// edge, breaking the channel into disconnected fragments at every tile boundary (confirmed live:
 /// only ~9% of river cells sitting exactly on a tile edge lined up with a river cell in the
-/// neighboring tile at the same position). So hydrology runs ONCE, after every tile in THIS batch
-/// has been generated and eroded, over the whole batch's stitched elevation — not once per tile —
-/// then the combined river mask is sliced back out per tile for a second, river-mask-only save.
-/// That fully connects rivers WITHIN one Run() call, at the cost of holding every tile's elevation
-/// in memory simultaneously instead of one at a time (worse memory/CPU for large batches — an
-/// accepted tradeoff for connected rivers) and a second SaveHeightmap round-trip per tile. It does
-/// NOT connect across two SEPARATE Run() invocations (e.g. filling in a region next to one
-/// generated last week) — that would require re-flowing accumulation through already-saved
-/// neighbor tiles too, a much bigger, potentially whole-planet-cascading problem; existing
-/// neighbor tiles' river masks are left exactly as they already were.
+/// neighboring tile at the same position). So hydrology runs once per <see cref="RunSettings.HydrologyChunkTilesPerSide"/>
+/// -sized CHUNK of the batch (not once per tile, and — as of the fix below — NOT once for the
+/// entire requested region either), over that chunk's own stitched elevation, then the combined
+/// river mask is sliced back out per tile in the chunk for a second, river-mask-only save. That
+/// fully connects rivers WITHIN one chunk, at the cost of holding one chunk's tiles' elevation in
+/// memory simultaneously instead of one at a time (worse memory/CPU per chunk than per-tile would
+/// be — an accepted tradeoff for connected rivers) and a second SaveHeightmap round-trip per tile.
+/// It does NOT connect across a CHUNK boundary, the same already-accepted local-approximation
+/// tradeoff as not connecting across two separate Run() invocations (see
+/// <see cref="RunSettings.HydrologyChunkTilesPerSide"/>'s remarks for why processing the WHOLE
+/// region in one combined grid, which is what this used to do, doesn't scale: a big enough region
+/// makes that combined grid's own cell count overflow a 32-bit array index, and even short of
+/// that, the memory for it and its several same-sized diagnostic arrays becomes impractical).
 /// </summary>
 /// <remarks>
 /// Every tile's mountain layer is computed as a flat offset from <see cref="RunSettings.MountainOriginLatDeg"/>/
@@ -59,11 +62,39 @@ public static class TileGenerator
         double MountainOriginLonDeg = 0.0,
         /// <summary><c>null</c> (default) skips river extraction entirely — existing worlds/tiles
         /// generated before this option existed must keep regenerating identically. Non-null
-        /// derives <see cref="TerrainHeightmap.RiverMask"/> from the WHOLE requested batch's own
+        /// derives <see cref="TerrainHeightmap.RiverMask"/> from each hydrology CHUNK's own stitched
         /// drainage pattern (see <see cref="TileHydrology"/> and the type-level remarks on why this
-        /// is computed once per batch, not once per tile) right after erosion, instead of leaving it
-        /// null for TerrainEditor's manual painting to be the only way it's ever set.</summary>
-        TileHydrology.Parameters? HydrologyParams = null);
+        /// is computed once per chunk, not once per tile — or, as it used to, once for the entire
+        /// region) right after erosion, instead of leaving it null for TerrainEditor's manual
+        /// painting to be the only way it's ever set.</summary>
+        TileHydrology.Parameters? HydrologyParams = null,
+        /// <summary>How many tiles per side of a square "hydrology chunk" — <see cref="HydrologyParams"/>'s
+        /// batch-wide D8/meander processing (see the type-level remarks) runs once per chunk of
+        /// this size instead of once for the ENTIRE requested region, keeping the combined grid
+        /// TileHydrology/RiverMeander build (and its several same-sized parallel diagnostic arrays
+        /// — accumulation, slope, downstream, order, mask, Strahler order, Shreve magnitude) bounded
+        /// regardless of how large a region is requested.
+        /// <para>Confirmed live: a real ~1.5°×1.5° request at the common default tile/cell size
+        /// (400 cells/tile side) produces a combined grid around 66,800×66,800 ≈ 4.46 BILLION
+        /// cells — already past <c>int.MaxValue</c> (~2.15 billion), so <c>new float[bigWidth *
+        /// bigHeight]</c> throws <see cref="OverflowException"/> outright before memory is even the
+        /// limiting factor (which it would also be: the several sibling arrays at that cell count
+        /// would together need well over 100 GB).</para>
+        /// Rivers still connect fully WITHIN one chunk; a river crossing a CHUNK boundary fragments
+        /// the same way one crossing a whole separate <see cref="Run"/> invocation already does (see
+        /// the type-level remarks) — a coarser-grained instance of the SAME already-accepted local-
+        /// approximation tradeoff, not a new one. Each chunk's tiles are also saved with their river
+        /// data as soon as that chunk finishes, rather than only after the entire region's hydrology
+        /// pass completes — a crash partway through a large batch no longer loses every chunk that
+        /// already finished.
+        /// Default 20: at the common default TileKm=1/CellMeters=2.5 (400 cells/tile side) this
+        /// gives an 8000×8000 combined grid per chunk (64 million cells) — comfortably under both
+        /// the int-overflow ceiling and a sane per-chunk memory budget (roughly 1-2 GB across all
+        /// the diagnostic arrays at that cell count). Lower it for a coarser CellSizeMeters/larger
+        /// TileSizeMeters combination that would otherwise still produce an oversized chunk; see
+        /// <see cref="Run"/>'s own guard, which throws with an actionable message instead of letting
+        /// an oversized chunk silently overflow or exhaust memory.</summary>
+        int HydrologyChunkTilesPerSide = 20);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -230,60 +261,124 @@ public static class TileGenerator
 
         if (batchTiles is { Count: > 0 } && s.HydrologyParams is { } hydrologyParams)
         {
-            // Stitch every tile's interior elevation into one combined grid, in the same row/col
-            // layout the loop above already placed them at — see the type-level remarks for why
-            // this has to happen once per batch instead of once per tile.
-            var bigWidth = cols * cellsPerTile;
-            var bigHeight = rows * cellsPerTile;
-            var combined = new float[bigWidth * bigHeight];
-            foreach (var t in batchTiles)
+            var chunkTilesPerSide = Math.Max(1, s.HydrologyChunkTilesPerSide);
+            // Grouping by (tile row, tile col) divided down to its own chunk coordinate — see
+            // RunSettings.HydrologyChunkTilesPerSide's remarks for why the combined grid below is
+            // built per CHUNK now, not once for the entire batch. Explicit ordering (not just
+            // GroupBy's own first-seen order, though that already matches) keeps chunk processing
+            // — and hence which tiles' rivers get saved in what sequence — reading top-to-bottom,
+            // west-to-east, same as the tile-generation loop above.
+            var chunks = batchTiles
+                .GroupBy(t => (ChunkRow: t.Row / chunkTilesPerSide, ChunkCol: t.Col / chunkTilesPerSide))
+                .OrderBy(g => g.Key.ChunkRow).ThenBy(g => g.Key.ChunkCol);
+
+            foreach (var chunk in chunks)
             {
-                var baseX = t.Col * cellsPerTile;
-                var baseY = t.Row * cellsPerTile;
-                for (var iy = 0; iy < cellsPerTile; iy++)
-                {
-                    var srcRow = iy * cellsPerTile;
-                    var dstRow = (baseY + iy) * bigWidth + baseX;
-                    Array.Copy(t.Interior, srcRow, combined, dstRow, cellsPerTile);
-                }
-            }
+                var chunkTiles = chunk.ToList();
+                var minRow = chunkTiles.Min(t => t.Row);
+                var minCol = chunkTiles.Min(t => t.Col);
+                var chunkRows = chunkTiles.Max(t => t.Row) - minRow + 1;
+                var chunkCols = chunkTiles.Max(t => t.Col) - minCol + 1;
 
-            var combinedGrid = new TerrainHeightmap("batch-combined", swX, swY, s.CellSizeMeters,
-                bigWidth, bigHeight, combined);
-            var (straightRiverMask, riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude) =
-                TileHydrology.ComputeDiagnostics(combinedGrid, hydrologyParams);
-            // Bends the straight D8 backbone above into a meandering path (see RiverMeander's own
-            // remarks for why D8 alone can't produce one) — a shape-only pass, so it never changes
-            // which cells actually count as river-worthy, just where within the grid each one draws.
-            // The Strahler order and Shreve magnitude threaded through here are what end up baked
-            // into each tile's own saved RiverMask/ShreveMagnitude arrays below, instead of a flat 1
-            // — see TerrainHeightmap's remarks. Stage 2 additionally severs neck cutoffs into a
-            // parallel OxbowMask — ApplyMeanderWithCutoffs, not the plain ApplyMeander, so those
-            // still-water loops actually get persisted per tile instead of silently discarded.
-            var (combinedRiverMask, combinedShreveMagnitude, combinedOxbowMask) = RiverMeander.ApplyMeanderWithCutoffs(combinedGrid, straightRiverMask,
-                riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude, new RiverMeander.Parameters());
+                // Computed as `long` first specifically so an oversized chunk fails with an
+                // actionable message (see ValidateHydrologyChunkSize) instead of silently wrapping
+                // into a negative array length and throwing a bare OverflowException from
+                // `new float[...]` a few lines down — see RunSettings.HydrologyChunkTilesPerSide's
+                // remarks for the real request (~1.5°x1.5° at default settings) that did exactly
+                // that before chunking existed.
+                var chunkBigWidthLong = (long)chunkCols * cellsPerTile;
+                var chunkBigHeightLong = (long)chunkRows * cellsPerTile;
+                ValidateHydrologyChunkSize(chunkBigWidthLong, chunkBigHeightLong, chunkTilesPerSide,
+                    minRow, minRow + chunkRows - 1, minCol, minCol + chunkCols - 1);
 
-            foreach (var t in batchTiles)
-            {
-                var baseX = t.Col * cellsPerTile;
-                var baseY = t.Row * cellsPerTile;
-                var riverMaskInterior = new byte[cellsPerTile * cellsPerTile];
-                var shreveMagnitudeInterior = new int[cellsPerTile * cellsPerTile];
-                var oxbowMaskInterior = new byte[cellsPerTile * cellsPerTile];
-                for (var iy = 0; iy < cellsPerTile; iy++)
+                var chunkBigWidth = (int)chunkBigWidthLong;
+                var chunkBigHeight = (int)chunkBigHeightLong;
+
+                // Stitch just THIS chunk's tiles into a combined grid, in the same row/col layout
+                // the tile-generation loop above already placed them at (offset by the chunk's own
+                // minRow/minCol so the chunk's combined grid always starts at local (0,0)).
+                var combined = new float[chunkBigWidth * chunkBigHeight];
+                foreach (var t in chunkTiles)
                 {
-                    var srcRow = (baseY + iy) * bigWidth + baseX;
-                    Array.Copy(combinedRiverMask, srcRow, riverMaskInterior, iy * cellsPerTile, cellsPerTile);
-                    Array.Copy(combinedShreveMagnitude, srcRow, shreveMagnitudeInterior, iy * cellsPerTile, cellsPerTile);
-                    Array.Copy(combinedOxbowMask, srcRow, oxbowMaskInterior, iy * cellsPerTile, cellsPerTile);
+                    var baseX = (t.Col - minCol) * cellsPerTile;
+                    var baseY = (t.Row - minRow) * cellsPerTile;
+                    for (var iy = 0; iy < cellsPerTile; iy++)
+                    {
+                        var srcRow = iy * cellsPerTile;
+                        var dstRow = (baseY + iy) * chunkBigWidth + baseX;
+                        Array.Copy(t.Interior, srcRow, combined, dstRow, cellsPerTile);
+                    }
                 }
 
-                var tile = new TerrainHeightmap(t.Id, swX + t.Col * s.TileSizeMeters, swY + t.Row * s.TileSizeMeters,
-                    s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior, shreveMagnitudeInterior, oxbowMaskInterior);
-                db.SaveHeightmap(tile);
+                var chunkOriginX = swX + minCol * s.TileSizeMeters;
+                var chunkOriginY = swY + minRow * s.TileSizeMeters;
+                var combinedGrid = new TerrainHeightmap("batch-combined-chunk", chunkOriginX, chunkOriginY,
+                    s.CellSizeMeters, chunkBigWidth, chunkBigHeight, combined);
+                var (straightRiverMask, riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude) =
+                    TileHydrology.ComputeDiagnostics(combinedGrid, hydrologyParams);
+                // Bends the straight D8 backbone above into a meandering path (see RiverMeander's
+                // own remarks for why D8 alone can't produce one) — a shape-only pass, so it never
+                // changes which cells actually count as river-worthy, just where within the grid
+                // each one draws. The Strahler order and Shreve magnitude threaded through here are
+                // what end up baked into each tile's own saved RiverMask/ShreveMagnitude arrays
+                // below, instead of a flat 1 — see TerrainHeightmap's remarks. Stage 2 additionally
+                // severs neck cutoffs into a parallel OxbowMask — ApplyMeanderWithCutoffs, not the
+                // plain ApplyMeander, so those still-water loops actually get persisted per tile
+                // instead of silently discarded.
+                var (combinedRiverMask, combinedShreveMagnitude, combinedOxbowMask) = RiverMeander.ApplyMeanderWithCutoffs(combinedGrid, straightRiverMask,
+                    riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude, new RiverMeander.Parameters());
+
+                foreach (var t in chunkTiles)
+                {
+                    var baseX = (t.Col - minCol) * cellsPerTile;
+                    var baseY = (t.Row - minRow) * cellsPerTile;
+                    var riverMaskInterior = new byte[cellsPerTile * cellsPerTile];
+                    var shreveMagnitudeInterior = new int[cellsPerTile * cellsPerTile];
+                    var oxbowMaskInterior = new byte[cellsPerTile * cellsPerTile];
+                    for (var iy = 0; iy < cellsPerTile; iy++)
+                    {
+                        var srcRow = (baseY + iy) * chunkBigWidth + baseX;
+                        Array.Copy(combinedRiverMask, srcRow, riverMaskInterior, iy * cellsPerTile, cellsPerTile);
+                        Array.Copy(combinedShreveMagnitude, srcRow, shreveMagnitudeInterior, iy * cellsPerTile, cellsPerTile);
+                        Array.Copy(combinedOxbowMask, srcRow, oxbowMaskInterior, iy * cellsPerTile, cellsPerTile);
+                    }
+
+                    var tile = new TerrainHeightmap(t.Id, swX + t.Col * s.TileSizeMeters, swY + t.Row * s.TileSizeMeters,
+                        s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior, shreveMagnitudeInterior, oxbowMaskInterior);
+                    db.SaveHeightmap(tile);
+                }
+
+                // Saved to the database immediately above, per chunk — a crash on a LATER chunk no
+                // longer loses the river data this chunk already finished and persisted.
+                onProgress?.Invoke($"hydrology chunk rows[{minRow}..{minRow + chunkRows - 1}] cols[{minCol}..{minCol + chunkCols - 1}]: {chunkTiles.Count} tiles saved with rivers");
             }
         }
 
         return results;
+    }
+
+    /// <summary>Soft ceiling on a single hydrology chunk's own combined-grid cell count — well
+    /// under the hard <c>int.MaxValue</c> array-length limit (~2.15 billion) that
+    /// <see cref="RunSettings.HydrologyChunkTilesPerSide"/>'s remarks describe a real request
+    /// overflowing, chosen instead around what keeps the several same-sized parallel diagnostic
+    /// arrays TileHydrology/RiverMeander build (accumulation, slope, downstream, order, mask,
+    /// Strahler order, Shreve magnitude — a mix of int/double/byte element sizes) to a few GB total
+    /// for one chunk, a reasonable ceiling for the machine actually running TerraGen rather than
+    /// the theoretical array-index limit.</summary>
+    private const long MaxSafeHydrologyChunkCells = 200_000_000;
+
+    /// <summary>Throws an actionable <see cref="InvalidOperationException"/> if a hydrology chunk's
+    /// own combined-grid cell count exceeds <see cref="MaxSafeHydrologyChunkCells"/> — a standalone
+    /// method (not inlined into <see cref="Run"/>) specifically so this guard can be unit-tested
+    /// directly against contrived large numbers, without needing to actually generate a batch big
+    /// enough to trigger it for real.</summary>
+    internal static void ValidateHydrologyChunkSize(long chunkBigWidth, long chunkBigHeight, int chunkTilesPerSide,
+        int minRow, int maxRowInclusive, int minCol, int maxColInclusive)
+    {
+        if (chunkBigWidth * chunkBigHeight > MaxSafeHydrologyChunkCells)
+            throw new InvalidOperationException(
+                $"Hydrology chunk at tile rows [{minRow}..{maxRowInclusive}], cols [{minCol}..{maxColInclusive}] " +
+                $"would need a {chunkBigWidth}x{chunkBigHeight} combined grid ({chunkBigWidth * chunkBigHeight:N0} cells) " +
+                $"— reduce RunSettings.HydrologyChunkTilesPerSide (currently {chunkTilesPerSide}) or increase CellSizeMeters/decrease TileSizeMeters.");
     }
 }
