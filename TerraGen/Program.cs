@@ -142,12 +142,24 @@ var runSettings = new TileGenerator.RunSettings(
     ErosionParams: erosionParams,
     PlanetRadiusMeters: planet.PlanetRadiusMeters,
     HydrologyParams: hydrologyParams,
-    HydrologyChunkTilesPerSide: options.RiverChunkTiles);
+    HydrologyChunkTilesPerSide: options.RiverChunkTiles,
+    SkipExisting: options.SkipExisting);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
 
-var results = TileGenerator.Run(db, runSettings, line => Console.WriteLine(line));
+var lastProgressPercent = -1;
+var results = TileGenerator.Run(db, runSettings, line => Console.WriteLine(line), (done, total) =>
+{
+    var fraction = total <= 0 ? 1.0 : (double)done / total;
+    var percent = (int)(fraction * 100);
+    if (percent == lastProgressPercent && done != total) return;
+    lastProgressPercent = percent;
+    const int barWidth = 30;
+    var filled = (int)Math.Round(fraction * barWidth);
+    var bar = new string('#', filled) + new string('-', barWidth - filled);
+    Console.WriteLine($"[{bar}] {percent,3}% ({done}/{total})");
+});
 
 // Persisted once per run (idempotent — safe to overwrite with the same values on a re-run) so a
 // consumer like TerrainEditor can recover any saved tile's true (lat,lon) from its OriginX/OriginY
@@ -189,6 +201,8 @@ internal sealed class CliOptions
     /// "would need a NxN combined grid" error, or raise it (at the cost of memory) if a smaller
     /// value is visibly fragmenting rivers across chunk boundaries more than desired.</summary>
     public int RiverChunkTiles { get; init; } = 20;
+    /// <summary>Off by default (always regenerate/overwrite). See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SkipExisting"/>.</summary>
+    public bool SkipExisting { get; init; }
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -252,6 +266,12 @@ internal sealed class CliOptions
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
+                        [--skip-existing]
+
+            --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
+            TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
+            se rovnou uložená výšková data. Hydrologie (--rivers) na to nehledí a přepočítá celý
+            chunk vždy znovu, i s přeskočenými dlaždicemi uvnitř.
 
             --tectonic-plates > 0 přepne pohoří/prolomeniny z jednoho pevného pásu (výchozí) na
             desky — pohoří vznikají na sbíhavých hranicích desek, prolomeniny na rozbíhavých.
@@ -363,6 +383,7 @@ internal sealed class CliOptions
         var rivers = false;
         var riverThreshold = 2000.0;
         var riverChunkTiles = 20;
+        var skipExisting = false;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -406,6 +427,9 @@ internal sealed class CliOptions
                     break;
                 case "--river-chunk-tiles" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rct):
                     riverChunkTiles = rct;
+                    break;
+                case "--skip-existing":
+                    skipExisting = true;
                     break;
                 case "--scan":
                     scan = true;
@@ -514,6 +538,7 @@ internal sealed class CliOptions
             TileKm = tileKm, CellMeters = cellMeters, ErosionStrength = Math.Clamp(erosion, 0, 100),
             TectonicPlateCount = tectonicPlateCount,
             Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
+            SkipExisting = skipExisting,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
