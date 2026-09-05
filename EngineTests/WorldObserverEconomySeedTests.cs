@@ -3,12 +3,12 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.IO;
-    using System.Linq;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Objects;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.IO;
+    using System.Linq;
 
     /// <summary>
     /// End-to-end validation that the WorldObserver seed makes the bakery a priced bread shop once the

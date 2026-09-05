@@ -54,7 +54,7 @@ namespace EngineTests
             Assert.AreEqual(a, bFact!.KnownSharedWith, "B's fact must be shared with A.");
         }
 
-        #endregion
+        #endregion Test 1 — mutual knowledge set when both witness the same event
 
         #region Test 2 — MutualKnowledgeFormed event emitted
 
@@ -76,7 +76,7 @@ namespace EngineTests
             Assert.AreEqual(a, formed!.SharedWith);
         }
 
-        #endregion
+        #endregion Test 2 — MutualKnowledgeFormed event emitted
 
         #region Test 3 — ceiling distribution: mean ≈ 4, SD ≈ 1
 
@@ -100,7 +100,7 @@ namespace EngineTests
             Assert.IsTrue(samples.All(s => s is >= 1 and <= 8), "Ceilings must be clamped to [1, 8].");
         }
 
-        #endregion
+        #endregion Test 3 — ceiling distribution: mean ≈ 4, SD ≈ 1
 
         #region Test 4 — depth degrades under stress
 
@@ -121,7 +121,7 @@ namespace EngineTests
                 "Effective depth must never drop below 1.");
         }
 
-        #endregion
+        #endregion Test 4 — depth degrades under stress
 
         #region Test 5 — per-NPC ceiling is carried on Personality (sampled by generator)
 
@@ -146,7 +146,7 @@ namespace EngineTests
             Assert.IsTrue(ceilings.All(c => c is >= 1 and <= 8));
         }
 
-        #endregion
+        #endregion Test 5 — per-NPC ceiling is carried on Personality (sampled by generator)
 
         #region Helpers
 
@@ -189,12 +189,16 @@ namespace EngineTests
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _r;
+
             public SeededRandom(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

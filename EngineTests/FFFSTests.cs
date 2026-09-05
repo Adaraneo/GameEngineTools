@@ -3,10 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Collections.Immutable;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -19,6 +15,10 @@ namespace EngineTests
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -132,7 +132,7 @@ namespace EngineTests
                 "With a proximal hazard present, FFFS fires.");
         }
 
-        #endregion
+        #endregion Modifier — gating
 
         #region Generator
 
@@ -161,7 +161,7 @@ namespace EngineTests
                 "FFFS bridges to the Neuroticism fear-facet: higher N → higher sensitivity.");
         }
 
-        #endregion
+        #endregion Generator
 
         #region Helpers
 
@@ -231,6 +231,6 @@ namespace EngineTests
                 AvailableObjects: availableObjects);
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

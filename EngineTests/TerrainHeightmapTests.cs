@@ -3,9 +3,9 @@
 
 namespace EngineTests
 {
-    using System;
     using GameEngineTools.World.Data;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
 
     /// <summary>
     /// Unit tests for <see cref="TerrainHeightmap"/> (byte packing, bilinear sampling) and its

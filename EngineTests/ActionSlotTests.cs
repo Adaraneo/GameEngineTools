@@ -34,6 +34,7 @@ namespace EngineTests
         private static readonly WDateTime T0 = WDateTime.New(WDateOnly.New(100, 1, 1));
 
         // ─────────────────────────────────────────────────────────────────────
+
         #region ActionSlotMaskResolver — basic lookups
 
         /// <summary>
@@ -67,8 +68,8 @@ namespace EngineTests
         [TestMethod]
         public void ActionSlotMaskResolver_SitAndEat_NoConflict()
         {
-            var sit  = ActionSlotMaskResolver.Get(ActionNames.UseObjectForRest);
-            var eat  = ActionSlotMaskResolver.Get(ActionNames.Eat);
+            var sit = ActionSlotMaskResolver.Get(ActionNames.UseObjectForRest);
+            var eat = ActionSlotMaskResolver.Get(ActionNames.Eat);
 
             Assert.AreEqual(ActionSlotMask.None, sit & eat,
                 "Sitting and eating must not share any slot bits.");
@@ -81,7 +82,7 @@ namespace EngineTests
         [TestMethod]
         public void ActionSlotMaskResolver_WorkAndCreate_RequireHandsAndMind()
         {
-            var work   = ActionSlotMaskResolver.Get(ActionNames.Work);
+            var work = ActionSlotMaskResolver.Get(ActionNames.Work);
             var create = ActionSlotMaskResolver.Get(ActionNames.Create);
 
             Assert.AreEqual(ActionSlotMask.Hands | ActionSlotMask.Mind, work);
@@ -124,9 +125,10 @@ namespace EngineTests
             Assert.AreEqual(ActionSlotMask.Hands, mask);
         }
 
-        #endregion
+        #endregion ActionSlotMaskResolver — basic lookups
 
         // ─────────────────────────────────────────────────────────────────────
+
         #region ActiveActionSlots — acquire, expire, release
 
         /// <summary>
@@ -214,7 +216,7 @@ namespace EngineTests
             var slots = new ActiveActionSlots();
 
             slots.AcquireOrReplace("UseObject:Rest", ActionSlotMask.Posture, T0, WTimeSpan.FromHours(1));
-            slots.AcquireOrReplace("ReachOut",       ActionSlotMask.Mouth,   T0, WTimeSpan.FromMinutes(20));
+            slots.AcquireOrReplace("ReachOut", ActionSlotMask.Mouth, T0, WTimeSpan.FromMinutes(20));
 
             slots.Release("UseObject:Rest");
 
@@ -231,15 +233,16 @@ namespace EngineTests
             var slots = new ActiveActionSlots();
 
             slots.AcquireOrReplace("UseObject:Rest", ActionSlotMask.Posture, T0, WTimeSpan.FromHours(1));
-            slots.AcquireOrReplace("ReachOut",       ActionSlotMask.Mouth,   T0, WTimeSpan.FromMinutes(20));
+            slots.AcquireOrReplace("ReachOut", ActionSlotMask.Mouth, T0, WTimeSpan.FromMinutes(20));
 
             var expected = ActionSlotMask.Posture | ActionSlotMask.Mouth;
             Assert.AreEqual(expected, slots.OccupiedMask);
         }
 
-        #endregion
+        #endregion ActiveActionSlots — acquire, expire, release
 
         // ─────────────────────────────────────────────────────────────────────
+
         #region ObjectInteractionBehaviorModifier — slot-aware output
 
         /// <summary>
@@ -249,8 +252,8 @@ namespace EngineTests
         [TestMethod]
         public void ObjectInteractionBehaviorModifier_BenchWithRest_EmitsUseObjectForRest()
         {
-            var modifier  = new ObjectInteractionBehaviorModifier();
-            var bench     = MakeAffordanceObject("bench_01", AffordanceType.Rest, satisfaction: 0.9, isPickable: false);
+            var modifier = new ObjectInteractionBehaviorModifier();
+            var bench = MakeAffordanceObject("bench_01", AffordanceType.Rest, satisfaction: 0.9, isPickable: false);
             var candidates = new List<BehaviorCandidate>();
 
             modifier.Modify(BuildModifierContext([bench], needRest: 80), candidates);
@@ -266,8 +269,8 @@ namespace EngineTests
         [TestMethod]
         public void ObjectInteractionBehaviorModifier_BenchWithRest_SlotMaskIsPosture()
         {
-            var modifier  = new ObjectInteractionBehaviorModifier();
-            var bench     = MakeAffordanceObject("bench_01", AffordanceType.Rest, satisfaction: 0.9, isPickable: false);
+            var modifier = new ObjectInteractionBehaviorModifier();
+            var bench = MakeAffordanceObject("bench_01", AffordanceType.Rest, satisfaction: 0.9, isPickable: false);
             var candidates = new List<BehaviorCandidate>();
 
             modifier.Modify(BuildModifierContext([bench], needRest: 80), candidates);
@@ -284,8 +287,8 @@ namespace EngineTests
         [TestMethod]
         public void ObjectInteractionBehaviorModifier_Workbench_EmitsUseObjectForWork_WithHandsMindMask()
         {
-            var modifier   = new ObjectInteractionBehaviorModifier();
-            var workbench  = MakeAffordanceObject("workbench_01", AffordanceType.Work, satisfaction: 0.8, isPickable: false);
+            var modifier = new ObjectInteractionBehaviorModifier();
+            var workbench = MakeAffordanceObject("workbench_01", AffordanceType.Work, satisfaction: 0.8, isPickable: false);
             var candidates = new List<BehaviorCandidate>();
 
             modifier.Modify(BuildModifierContext([workbench], needCompetence: 70), candidates);
@@ -303,12 +306,12 @@ namespace EngineTests
         [TestMethod]
         public void ObjectInteractionBehaviorModifier_Fireplace_EmitsUseObjectForWarmth_WithNoneMask()
         {
-            var modifier   = new ObjectInteractionBehaviorModifier();
+            var modifier = new ObjectInteractionBehaviorModifier();
             // Force need score above threshold by providing a cold body temp via a high-enough rest need;
             // Warmth affordance uses BodyTempDelta — set needRest high to pass MinNeedThreshold path.
             // Actually Warmth uses BodyTempDelta<-1 check; we work around by giving it a high base score.
             // Use needRest=80 so other affordances don't beat warmth in utility.
-            var fireplace  = MakeAffordanceObject("fireplace_01", AffordanceType.Warmth, satisfaction: 1.0, isPickable: false);
+            var fireplace = MakeAffordanceObject("fireplace_01", AffordanceType.Warmth, satisfaction: 1.0, isPickable: false);
             var candidates = new List<BehaviorCandidate>();
 
             // BuildModifierContext with cold body so Warmth need score = 70 (above threshold).
@@ -331,8 +334,8 @@ namespace EngineTests
         [TestMethod]
         public void ObjectInteractionBehaviorModifier_PickableOwnership_KeepsInteractWithObjectName()
         {
-            var modifier   = new ObjectInteractionBehaviorModifier();
-            var item       = MakeAffordanceObject("sword_01", AffordanceType.Ownership, satisfaction: 0.8, isPickable: true);
+            var modifier = new ObjectInteractionBehaviorModifier();
+            var item = MakeAffordanceObject("sword_01", AffordanceType.Ownership, satisfaction: 0.8, isPickable: true);
             var candidates = new List<BehaviorCandidate>();
 
             modifier.Modify(BuildModifierContext([item]), candidates);
@@ -343,9 +346,10 @@ namespace EngineTests
                 "Take interactions must keep the generic InteractWithObject name.");
         }
 
-        #endregion
+        #endregion ObjectInteractionBehaviorModifier — slot-aware output
 
         // ─────────────────────────────────────────────────────────────────────
+
         #region SelectSecondaryAction — filter logic
 
         /// <summary>
@@ -354,8 +358,8 @@ namespace EngineTests
         [TestMethod]
         public void SelectSecondaryAction_RestPlusEat_NoConflict_ReturnsEat()
         {
-            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,       utility: 60);
-            var eat = MakeCandidate(ActionNames.Eat,              ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 40);
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
+            var eat = MakeCandidate(ActionNames.Eat, ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 40);
 
             var result = DefaultBehaviorEngine.SelectSecondaryAction(
                 [sit, eat], primary: sit, alreadyOccupied: ActionSlotMask.None);
@@ -370,7 +374,7 @@ namespace EngineTests
         [TestMethod]
         public void SelectSecondaryAction_ConflictingSlots_ReturnsNull()
         {
-            var work   = MakeCandidate(ActionNames.Work,   ActionSlotMask.Hands | ActionSlotMask.Mind, utility: 70);
+            var work = MakeCandidate(ActionNames.Work, ActionSlotMask.Hands | ActionSlotMask.Mind, utility: 70);
             var create = MakeCandidate(ActionNames.Create, ActionSlotMask.Hands | ActionSlotMask.Mind, utility: 50);
 
             var result = DefaultBehaviorEngine.SelectSecondaryAction(
@@ -386,8 +390,8 @@ namespace EngineTests
         [TestMethod]
         public void SelectSecondaryAction_SocialTargeting_Excluded()
         {
-            var sit     = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
-            var reachOut = MakeCandidate(ActionNames.ReachOut,         ActionSlotMask.Mouth,  utility: 50,
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
+            var reachOut = MakeCandidate(ActionNames.ReachOut, ActionSlotMask.Mouth, utility: 50,
                 socialTargeting: new SocialTargetingData(
                     new HumanId(Guid.NewGuid()), RelationalActKind.SmallTalk, 0.7, 0.8, 0.2));
 
@@ -403,8 +407,8 @@ namespace EngineTests
         [TestMethod]
         public void SelectSecondaryAction_BelowMinUtility_Excluded()
         {
-            var sit  = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,                     utility: 60);
-            var low  = MakeCandidate(ActionNames.SelfCare,         ActionSlotMask.Hands,                       utility: 5);
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
+            var low = MakeCandidate(ActionNames.SelfCare, ActionSlotMask.Hands, utility: 5);
 
             var result = DefaultBehaviorEngine.SelectSecondaryAction(
                 [sit, low], primary: sit, alreadyOccupied: ActionSlotMask.None);
@@ -419,8 +423,8 @@ namespace EngineTests
         [TestMethod]
         public void SelectSecondaryAction_AlreadyOccupiedFromPriorTick_BlocksConflictingSecondary()
         {
-            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,       utility: 60);
-            var eat = MakeCandidate(ActionNames.Eat,              ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 40);
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
+            var eat = MakeCandidate(ActionNames.Eat, ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 40);
 
             // Hands are already occupied from a prior tick (e.g., carrying something).
             var result = DefaultBehaviorEngine.SelectSecondaryAction(
@@ -435,9 +439,9 @@ namespace EngineTests
         [TestMethod]
         public void SelectSecondaryAction_MultipleEligible_ReturnsHighestUtility()
         {
-            var sit     = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture,                     utility: 60);
-            var eat     = MakeCandidate(ActionNames.Eat,              ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 45);
-            var drink   = MakeCandidate(ActionNames.Drink,            ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 30);
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
+            var eat = MakeCandidate(ActionNames.Eat, ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 45);
+            var drink = MakeCandidate(ActionNames.Drink, ActionSlotMask.Hands | ActionSlotMask.Mouth, utility: 30);
 
             var result = DefaultBehaviorEngine.SelectSecondaryAction(
                 [sit, eat, drink], primary: sit, alreadyOccupied: ActionSlotMask.None);
@@ -453,8 +457,8 @@ namespace EngineTests
         [TestMethod]
         public void SelectSecondaryAction_PassiveCandidateNoneMask_Excluded()
         {
-            var sit   = MakeCandidate(ActionNames.UseObjectForRest,   ActionSlotMask.Posture, utility: 60);
-            var warmth = MakeCandidate(ActionNames.UseObjectForWarmth, ActionSlotMask.None,   utility: 35);
+            var sit = MakeCandidate(ActionNames.UseObjectForRest, ActionSlotMask.Posture, utility: 60);
+            var warmth = MakeCandidate(ActionNames.UseObjectForWarmth, ActionSlotMask.None, utility: 35);
 
             var result = DefaultBehaviorEngine.SelectSecondaryAction(
                 [sit, warmth], primary: sit, alreadyOccupied: ActionSlotMask.None);
@@ -468,16 +472,17 @@ namespace EngineTests
             double utility,
             SocialTargetingData? socialTargeting = null)
             => new BehaviorCandidate(
-                Name:             name,
-                Utility:          utility,
-                Duration:         WTimeSpan.FromMinutes(30),
-                Domain:           BehaviorDomain.Physiological,
-                SlotMask:         mask,
-                SocialTargeting:  socialTargeting);
+                Name: name,
+                Utility: utility,
+                Duration: WTimeSpan.FromMinutes(30),
+                Domain: BehaviorDomain.Physiological,
+                SlotMask: mask,
+                SocialTargeting: socialTargeting);
 
-        #endregion
+        #endregion SelectSecondaryAction — filter logic
 
         // ─────────────────────────────────────────────────────────────────────
+
         #region Private factory helpers
 
         private static WorldObject MakeAffordanceObject(
@@ -487,54 +492,54 @@ namespace EngineTests
             bool isPickable)
             => new()
             {
-                Id            = id,
-                DisplayName   = id,
-                Category      = WorldObjectCategory.Furniture,
-                LocationId    = "test_location",
-                IsAvailable   = true,
-                Affordances   = ImmutableArray.Create(new WorldObjectAffordance(type, satisfaction)),
-                IsPickable    = isPickable,
-                WeightGrams   = 0,
-                ItemKind      = PickupItemKind.None,
-                HeldBy        = null,
-                ConsumedAt    = null,
-                Respawns      = false,
+                Id = id,
+                DisplayName = id,
+                Category = WorldObjectCategory.Furniture,
+                LocationId = "test_location",
+                IsAvailable = true,
+                Affordances = ImmutableArray.Create(new WorldObjectAffordance(type, satisfaction)),
+                IsPickable = isPickable,
+                WeightGrams = 0,
+                ItemKind = PickupItemKind.None,
+                HeldBy = null,
+                ConsumedAt = null,
+                Respawns = false,
                 RespawnMinutes = 0
             };
 
         private static BehaviorContext BuildModifierContext(
             IReadOnlyList<WorldObject> availableObjects,
-            double needRest       = 50,
+            double needRest = 50,
             double needCompetence = 50,
-            double bodyTempDelta  = 0.0)
+            double bodyTempDelta = 0.0)
         {
             var physio = new PhysiologyState(
-                Energy:          80,
-                SleepDebtHours:  0,
-                Hunger:          25,
-                Thirst:          25,
-                Pain:            0,
-                ImmuneLoad:      0,
-                BodyTempDelta:   bodyTempDelta,
-                Cycle:           null);
+                Energy: 80,
+                SleepDebtHours: 0,
+                Hunger: 25,
+                Thirst: 25,
+                Pain: 0,
+                ImmuneLoad: 0,
+                BodyTempDelta: bodyTempDelta,
+                Cycle: null);
 
             var psych = new PsychologyState(
-                Valence:         0.0,
-                Arousal:         0.5,
-                Dominance:       0.5,
-                Stress:          0,
-                CognitiveLoad:   0,
+                Valence: 0.0,
+                Arousal: 0.5,
+                Dominance: 0.5,
+                Stress: 0,
+                CognitiveLoad: 0,
                 DominantEmotion: DiscreteEmotion.Neutral);
 
             var behaviorState = new BehaviorState(
-                NeedRest:        needRest,
-                NeedFood:        25,
-                NeedWater:       25,
-                NeedBelonging:   50,
-                NeedCompetence:  needCompetence,
-                NeedIntimacy:    30,
-                CurrentPlan:     null,
-                Cooldowns:       new Dictionary<string, double>());
+                NeedRest: needRest,
+                NeedFood: 25,
+                NeedWater: 25,
+                NeedBelonging: 50,
+                NeedCompetence: needCompetence,
+                NeedIntimacy: 30,
+                CurrentPlan: null,
+                Cooldowns: new Dictionary<string, double>());
 
             var snapshot = new EnginesSnapshot(
                 physio, psych, behaviorState,
@@ -543,48 +548,52 @@ namespace EngineTests
                 new MemoryIndex(new List<EpisodicMemory>()));
 
             var personality = new Personality(
-                BigFive:        new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
-                Attachment:     AttachmentProfile.Secure,
-                Communication:  CommunicationStyle.Direct,
-                Motivation:     new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
+                BigFive: new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
+                Attachment: AttachmentProfile.Secure,
+                Communication: CommunicationStyle.Direct,
+                Motivation: new MotivationWeights(0.5, 0.5, 0.3, 0.4, 0.5, 0.5, 0.5, 0.6, 0.4),
                 Sociosexuality: Sociosexuality.Intermediate,
-                Chronotype:     Chronotype.Neutral);
+                Chronotype: Chronotype.Neutral);
 
             var humanCtx = new HumanContext
             {
-                Id          = new HumanId(Guid.NewGuid()),
-                Biology     = SexBiology.Female,
+                Id = new HumanId(Guid.NewGuid()),
+                Biology = SexBiology.Female,
                 Personality = personality,
-                Snapshot    = snapshot,
-                Random      = new AlwaysFalseRandom(),
-                Logger      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler(),
+                Snapshot = snapshot,
+                Random = new AlwaysFalseRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler(),
             };
 
             return new BehaviorContext(
-                Now:                      T0,
-                Dt:                       WTimeSpan.FromHours(1),
-                HumanContext:             humanCtx,
-                Outbox:                   new EventCollector(),
-                State:                    behaviorState,
-                Config:                   new BehaviorConfig(),
-                Cooldowns:                new Dictionary<string, double>(),
-                DecisionWorkingSets:      null,
+                Now: T0,
+                Dt: WTimeSpan.FromHours(1),
+                HumanContext: humanCtx,
+                Outbox: new EventCollector(),
+                State: behaviorState,
+                Config: new BehaviorConfig(),
+                Cooldowns: new Dictionary<string, double>(),
+                DecisionWorkingSets: null,
                 HabitApplicabilityModulator: null,
-                AvailableObjects:         availableObjects);
+                AvailableObjects: availableObjects);
         }
 
         private sealed class AlwaysFalseRandom : IRandomSource
         {
             public int Next(int min, int max) => min;
-            public double NextUnit()          => 0.0;
-            public bool Chance(double p)      => false;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p) => false;
         }
 
         private sealed class NullEventBus : IEventBus
         {
-            public void Publish(IDomainEvent @event) { }
+            public void Publish(IDomainEvent @event)
+            { }
+
             public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : class, IDomainEvent
                 => new NullDisposable();
         }
@@ -593,18 +602,22 @@ namespace EngineTests
         {
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public ScheduledId ScheduleAfter(WDateTime now, WTimeSpan delay, ScheduledAction action, string? tag = null)
                 => new ScheduledId(Guid.NewGuid());
+
             public bool Cancel(ScheduledId id) => false;
+
             public IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now)
                 => Array.Empty<(ScheduledId, ScheduledAction)>();
         }
 
         private sealed class NullDisposable : IDisposable
         {
-            public void Dispose() { }
+            public void Dispose()
+            { }
         }
 
-        #endregion
+        #endregion Private factory helpers
     }
 }

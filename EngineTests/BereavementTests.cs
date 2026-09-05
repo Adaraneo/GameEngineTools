@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -21,6 +18,9 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Tests for the bereavement subsystem: trajectory-class prevalences (Lundorff 2020), grief
@@ -76,7 +76,7 @@ namespace EngineTests
                 $"Violent/sudden loss sharply raises prolonged-grief risk. non-violent={nonViolentProlonged}, violent={violentProlonged}");
         }
 
-        #endregion
+        #endregion Trajectory prevalences — Lundorff 2020 ~64/20/8/7
 
         #region Onset intensity ∝ bond, partner > acquaintance
 
@@ -91,7 +91,7 @@ namespace EngineTests
             Assert.IsTrue(acquaintance > weak, "Intensity scales with the strength of the lost bond.");
         }
 
-        #endregion
+        #endregion Onset intensity ∝ bond, partner > acquaintance
 
         #region DPM — waves of grief, not a monotonic decline
 
@@ -113,7 +113,7 @@ namespace EngineTests
             Assert.IsTrue(rose && fell, "Grief oscillates (loss/restoration waves) rather than decaying monotonically.");
         }
 
-        #endregion
+        #endregion DPM — waves of grief, not a monotonic decline
 
         #region Engine — onset registers a loss + acute spike; idempotent
 
@@ -173,7 +173,7 @@ namespace EngineTests
             Assert.IsTrue(after < before, $"A funeral relieves grief (regained control/closure). before={before:F1}, after={after:F1}");
         }
 
-        #endregion
+        #endregion Engine — onset registers a loss + acute spike; idempotent
 
         #region Widowhood mortality hazard
 
@@ -219,7 +219,7 @@ namespace EngineTests
                 "The widowhood effect is partner-specific.");
         }
 
-        #endregion
+        #endregion Widowhood mortality hazard
 
         #region Psychology integration — grief pang drops mood, sets Sadness
 
@@ -240,7 +240,7 @@ namespace EngineTests
             Assert.IsTrue(engine.State.Stress > 20, "A grief pang raises stress.");
         }
 
-        #endregion
+        #endregion Psychology integration — grief pang drops mood, sets Sadness
 
         #region Physical burial — Buried / GraveVisited handlers
 
@@ -277,7 +277,7 @@ namespace EngineTests
             Assert.AreEqual(ContinuingBond.Internalized, engine.State.Losses[0].Bond, "A tended grave internalises the continuing bond.");
         }
 
-        #endregion
+        #endregion Physical burial — Buried / GraveVisited handlers
 
         #region BurialObjects helper — id round-trip
 
@@ -295,7 +295,7 @@ namespace EngineTests
             Assert.IsTrue(GameEngineTools.World.Objects.BurialObjects.TryGetDeceased(grave, out var fromGrave) && fromGrave == deceased);
         }
 
-        #endregion
+        #endregion BurialObjects helper — id round-trip
 
         #region Behavior bridge — Bury becomes a utility candidate
 
@@ -437,7 +437,7 @@ namespace EngineTests
             };
         }
 
-        #endregion
+        #endregion Behavior bridge — Bury becomes a utility candidate
 
         #region Helpers
 
@@ -503,19 +503,25 @@ namespace EngineTests
         private sealed class ZeroRandomSource : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => false;
         }
 
         private sealed class SystemRandomSource : IRandomSource
         {
             private readonly Random _r;
+
             public SystemRandomSource(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

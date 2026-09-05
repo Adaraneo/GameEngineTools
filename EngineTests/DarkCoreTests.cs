@@ -3,10 +3,10 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
+    using System;
+    using System.Linq;
 
     /// <summary>
     /// Tests for <see cref="DarkCoreGenerator"/> — the generation of the dark-core (D-factor)
@@ -35,7 +35,7 @@ namespace EngineTests
                 $"Low-A DarkCore ({profileLowA.DarkCore:F3}) must exceed high-A DarkCore ({profileHighA.DarkCore:F3}).");
         }
 
-        #endregion
+        #endregion Test 1 — Low Agreeableness → higher DarkCore than high Agreeableness
 
         #region Test 2 — Male biology shifts DarkCore higher than female for identical Big Five
 
@@ -46,7 +46,7 @@ namespace EngineTests
                                       Extraversion: 0.5, Agreeableness: 0.5, Neuroticism: 0.5);
 
             // Act — null random keeps residuals at zero; only the sex constant differs.
-            var male   = DarkCoreGenerator.Generate(bigFive, SexBiology.Male,   random: null);
+            var male = DarkCoreGenerator.Generate(bigFive, SexBiology.Male, random: null);
             var female = DarkCoreGenerator.Generate(bigFive, SexBiology.Female, random: null);
 
             // Assert — male is higher (Muris et al. 2017).
@@ -54,7 +54,7 @@ namespace EngineTests
                 $"Male DarkCore ({male.DarkCore:F3}) must exceed female DarkCore ({female.DarkCore:F3}).");
         }
 
-        #endregion
+        #endregion Test 2 — Male biology shifts DarkCore higher than female for identical Big Five
 
         #region Test 3 — Population distribution is right-skewed (mean < 0.5)
 
@@ -68,11 +68,11 @@ namespace EngineTests
             for (var i = 0; i < 500; i++)
             {
                 var bigFive = new BigFive(
-                    Openness:          rng.NextDouble(),
+                    Openness: rng.NextDouble(),
                     Conscientiousness: rng.NextDouble(),
-                    Extraversion:      rng.NextDouble(),
-                    Agreeableness:     rng.NextDouble(),
-                    Neuroticism:       rng.NextDouble());
+                    Extraversion: rng.NextDouble(),
+                    Agreeableness: rng.NextDouble(),
+                    Neuroticism: rng.NextDouble());
 
                 // Use a fresh per-character random for noise; sex alternates to avoid constant bias.
                 var bio = i % 2 == 0 ? SexBiology.Female : SexBiology.Male;
@@ -88,7 +88,7 @@ namespace EngineTests
                 $"Population DarkCore mean ({mean:F3}) should be < 0.45, confirming right-skew (most are low-D).");
         }
 
-        #endregion
+        #endregion Test 3 — Population distribution is right-skewed (mean < 0.5)
 
         #region Test 4 — Deterministic: two null-random calls produce identical results
 
@@ -104,7 +104,7 @@ namespace EngineTests
             Assert.AreEqual(p1, p2, "Null-random generation must be deterministic (no noise).");
         }
 
-        #endregion
+        #endregion Test 4 — Deterministic: two null-random calls produce identical results
 
         #region Test 5 — All outputs in [0,1]
 
@@ -134,7 +134,7 @@ namespace EngineTests
             }
         }
 
-        #endregion
+        #endregion Test 5 — All outputs in [0,1]
 
         #region Test 6 — IRandomSource overload produces consistent results with null-random for same traits
 
@@ -145,13 +145,13 @@ namespace EngineTests
             // Use ZeroRandom (always returns 0) as a deterministic IRandomSource.
             var rng = new ZeroRandom();
 
-            var lowA  = DarkCoreGenerator.Generate(rng, new BigFive(0.5, 0.5, 0.5, 0.1, 0.5), SexBiology.Female);
+            var lowA = DarkCoreGenerator.Generate(rng, new BigFive(0.5, 0.5, 0.5, 0.1, 0.5), SexBiology.Female);
             var highA = DarkCoreGenerator.Generate(rng, new BigFive(0.5, 0.5, 0.5, 0.9, 0.5), SexBiology.Female);
 
             Assert.IsTrue(lowA.DarkCore > highA.DarkCore,
                 $"IRandomSource overload: low-A DarkCore ({lowA.DarkCore:F3}) must exceed high-A ({highA.DarkCore:F3}).");
         }
 
-        #endregion
+        #endregion Test 6 — IRandomSource overload produces consistent results with null-random for same traits
     }
 }

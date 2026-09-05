@@ -3,15 +3,14 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text.Json;
-    using System.Text.Json.Serialization;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Linq;
+    using System.Text.Json;
+    using System.Text.Json.Serialization;
 
     /// <summary>
     /// Vocabulary survives save and load.

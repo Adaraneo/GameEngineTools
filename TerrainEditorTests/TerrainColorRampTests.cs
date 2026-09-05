@@ -1,4 +1,3 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TerrainEditor.Rendering;
 
 namespace TerrainEditorTests;

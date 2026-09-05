@@ -3,11 +3,11 @@
 
 namespace EngineTests
 {
-    using System;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
 
     /// <summary>
     /// Phase 0 of lexical acquisition: the half-life-regression store on its own, consuming nothing and

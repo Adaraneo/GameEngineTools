@@ -3,13 +3,13 @@
 
 namespace EngineTests
 {
-    using System;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Dialogue.Conversation;
     using GameEngineTools.Dialogue.Planning;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
 
     /// <summary>
     /// Model B — conversations: adjacency pairs (question⇒answer, disclosure⇒validation, greeting⇒
@@ -76,7 +76,7 @@ namespace EngineTests
         public void ResponseTo_Boundary_HasNoObligedResponse()
             => Assert.IsNull(AdjacencyPairResolver.ResponseTo(Act(RelationalActKind.Boundary, A, B, 1)));
 
-        #endregion
+        #endregion Adjacency pairs
 
         #region Coordinator — turn-taking
 
@@ -121,7 +121,7 @@ namespace EngineTests
             Assert.AreEqual(0, coord.ActiveCount);   // stale conversation dropped
         }
 
-        #endregion
+        #endregion Coordinator — turn-taking
 
         #region Response obligation (search by responder)
 
@@ -220,7 +220,7 @@ namespace EngineTests
             Assert.IsFalse(coord.TryGetObligation(B, now, out _, out _));
         }
 
-        #endregion
+        #endregion Response obligation (search by responder)
 
         #region Planner response mode + exchange
 
@@ -268,6 +268,6 @@ namespace EngineTests
             Assert.IsFalse(coord.TryGetPendingResponse(B, A, new WDateTime(1300), out _));
         }
 
-        #endregion
+        #endregion Planner response mode + exchange
     }
 }

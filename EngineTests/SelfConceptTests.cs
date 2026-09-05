@@ -49,7 +49,7 @@ namespace EngineTests
                 $"Disconfirming feedback must apply ~{cfg.DisconfirmingWeight:F2}× nominal. Got: {weightApplied:F3}");
         }
 
-        #endregion
+        #endregion Test 1 — disconfirming feedback heavily discounted
 
         #region Test 2 — confirming feedback accepted
 
@@ -77,7 +77,7 @@ namespace EngineTests
                 "Confirming feedback must dominate disconfirming feedback (self-verification asymmetry).");
         }
 
-        #endregion
+        #endregion Test 2 — confirming feedback accepted
 
         #region Test 3 — high discrepancy seeds BuildIdentity (→ GoalActivated through GoalEngine)
 
@@ -118,7 +118,7 @@ namespace EngineTests
             Assert.AreEqual(PersistentGoalKind.BuildIdentity, activated!.Kind);
         }
 
-        #endregion
+        #endregion Test 3 — high discrepancy seeds BuildIdentity (→ GoalActivated through GoalEngine)
 
         #region Test 4 — self-esteem year-over-year stability
 
@@ -161,9 +161,10 @@ namespace EngineTests
             Assert.IsTrue(meanAbsChange > 0.005, $"Self-esteem must still change a little. Mean |Δ|={meanAbsChange:F4}");
         }
 
-        #endregion
+        #endregion Test 4 — self-esteem year-over-year stability
 
         #region Test 5 — acceptance: chronic rejection lowers perceived extraversion despite high actual,
+
         //                  and the effect is much smaller than equally-frequent confirming feedback.
 
         [TestMethod]
@@ -201,7 +202,7 @@ namespace EngineTests
                 $"confirming/unit={confPerUnit:F4}, disconfirming/unit={discPerUnit:F4}");
         }
 
-        #endregion
+        #endregion Test 5 — acceptance: chronic rejection lowers perceived extraversion despite high actual,
 
         #region Helpers
 
@@ -277,6 +278,6 @@ namespace EngineTests
             return cov / (Math.Sqrt(vx) * Math.Sqrt(vy));
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

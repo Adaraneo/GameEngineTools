@@ -277,12 +277,14 @@ namespace EngineTests
 
             public void ReceiveEvent(IDomainEvent @event) => _receivedEvents.Add(@event);
 
-            public void Tick(WDateTime now, WTimeSpan dt) { }
+            public void Tick(WDateTime now, WTimeSpan dt)
+            { }
 
             public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default)
                 => _snapshot = snapshot;
 
-            public void FlushInbox() { }
+            public void FlushInbox()
+            { }
 
             public int CompareTo(IHuman? other) => throw new NotImplementedException();
         }
@@ -299,9 +301,13 @@ namespace EngineTests
         /// <summary>Returns <see cref="CognitiveResolutionLevel.Nearby"/> so social functions run.</summary>
         private sealed class AllNearbyLodRuntime : ICognitiveResolutionLevelRuntime
         {
-            public void Clear(HumanId id) { }
+            public void Clear(HumanId id)
+            { }
+
             public CognitiveResolutionLevel Get(HumanId id) => CognitiveResolutionLevel.Nearby;
-            public void Set(HumanId id, CognitiveResolutionLevel level) { }
+
+            public void Set(HumanId id, CognitiveResolutionLevel level)
+            { }
         }
 
         private sealed class NeutralAttractionCalculator : IAttractionCalculator
@@ -327,8 +333,12 @@ namespace EngineTests
         private sealed class EmptyWorldObjectProvider : IWorldObjectProvider
         {
             public IEnumerable<WorldObject> GetObjectsAt(string locationId) => Enumerable.Empty<WorldObject>();
+
             public IEnumerable<WorldObject> GetAllObjects() => Enumerable.Empty<WorldObject>();
-            public void AddObject(WorldObject obj) { }
+
+            public void AddObject(WorldObject obj)
+            { }
+
             public WorldObject? FindObject(string objectId) => null;
         }
 

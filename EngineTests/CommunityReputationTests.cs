@@ -40,7 +40,7 @@ namespace EngineTests
             Assert.IsTrue(ledger.Get(villain, loc)!.Score < -0.7, "Repeated negative acts must build a low score.");
         }
 
-        #endregion
+        #endregion Test 1 — aggregates from observations
 
         #region Test 2 — recency decay half-life
 
@@ -62,7 +62,7 @@ namespace EngineTests
                 "Older observations must weigh less.");
         }
 
-        #endregion
+        #endregion Test 2 — recency decay half-life
 
         #region Test 3 — initial trust prior shifts with score
 
@@ -94,7 +94,7 @@ namespace EngineTests
             Assert.IsTrue(heroPrior > villainPrior, "Hero must be trusted more than villain on arrival.");
         }
 
-        #endregion
+        #endregion Test 3 — initial trust prior shifts with score
 
         #region Test 4 — cooperation collapses below the Nowak–Sigmund threshold
 
@@ -118,7 +118,7 @@ namespace EngineTests
                 $"A single observation leaves spread too low for stable cooperation. Spread={rep.Spread:F3}");
         }
 
-        #endregion
+        #endregion Test 4 — cooperation collapses below the Nowak–Sigmund threshold
 
         #region Test 5 — stern judging: negativity bias moves reputation harder
 
@@ -139,12 +139,12 @@ namespace EngineTests
                 "Intimate observations do not change the image score.");
         }
 
-        #endregion
+        #endregion Test 5 — stern judging: negativity bias moves reputation harder
 
         #region Helpers
 
         private static WDateTime At(int year) => WDateOnly.New(year, 1, 1).ToDateTime();
 
-        #endregion
+        #endregion Helpers
     }
 }

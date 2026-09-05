@@ -3,10 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Collections.Immutable;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -21,6 +17,10 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -105,7 +105,7 @@ namespace EngineTests
                 $"Wanting must not be redundant with RegulatoryFocus.Promotion (r<0.7). Got r={r:F3}.");
         }
 
-        #endregion
+        #endregion Generator
 
         #region Wanting gain modifier
 
@@ -176,7 +176,7 @@ namespace EngineTests
                 "κ applied to the raw (undiscounted) value would indicate wrong ordering.");
         }
 
-        #endregion
+        #endregion Wanting gain modifier
 
         #region Liking — consumption-time hedonic impact
 
@@ -226,7 +226,7 @@ namespace EngineTests
             return engine.State.Valence;
         }
 
-        #endregion
+        #endregion Liking — consumption-time hedonic impact
 
         #region Helpers
 
@@ -315,12 +315,16 @@ namespace EngineTests
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _r;
+
             public SeededRandom(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

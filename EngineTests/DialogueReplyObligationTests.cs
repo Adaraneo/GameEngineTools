@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Attraction;
     using GameEngineTools.Characters.Engines.Behavior;
@@ -23,6 +20,9 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging.Abstractions;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Integration cover for the response obligation in <see cref="DefaultSceneOrchestrator"/>.
@@ -234,11 +234,13 @@ namespace EngineTests
         /// <summary>Nearby, so the orchestrator actually runs its reach-out / reply routing.</summary>
         private sealed class AllNearbyLodRuntime : ICognitiveResolutionLevelRuntime
         {
-            public void Clear(HumanId id) { }
+            public void Clear(HumanId id)
+            { }
 
             public CognitiveResolutionLevel Get(HumanId id) => CognitiveResolutionLevel.Nearby;
 
-            public void Set(HumanId id, CognitiveResolutionLevel level) { }
+            public void Set(HumanId id, CognitiveResolutionLevel level)
+            { }
         }
 
         private sealed class FullPerceptionPolicy : IPerceptionFidelityPolicy
@@ -272,7 +274,8 @@ namespace EngineTests
 
             public IEnumerable<WorldObject> GetAllObjects() => Enumerable.Empty<WorldObject>();
 
-            public void AddObject(WorldObject obj) { }
+            public void AddObject(WorldObject obj)
+            { }
 
             public WorldObject? FindObject(string objectId) => null;
         }
@@ -340,12 +343,14 @@ namespace EngineTests
 
             public void ReceiveEvent(IDomainEvent @event) => _received.Add(@event);
 
-            public void Tick(WDateTime now, WTimeSpan dt) { }
+            public void Tick(WDateTime now, WTimeSpan dt)
+            { }
 
             public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default)
                 => _snapshot = snapshot;
 
-            public void FlushInbox() { }
+            public void FlushInbox()
+            { }
         }
     }
 }

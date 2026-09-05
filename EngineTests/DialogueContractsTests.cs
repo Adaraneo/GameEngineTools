@@ -3,16 +3,16 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Immutable;
-    using System.Text.Json;
-    using System.Text.Json.Serialization;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Dialogue.Contracts;
     using GameEngineTools.Dialogue.Semantics;
     using GameEngineTools.World.Utils.Time;
     using Grammar.Core.Enums;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Immutable;
+    using System.Text.Json;
+    using System.Text.Json.Serialization;
 
     /// <summary>
     /// Phase-1 serialization/identity guarantees for the dialogue contracts: a <see cref="SpeechAct"/>

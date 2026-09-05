@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -18,6 +16,8 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Tests for the social comparison engine (Finding 4): contrast-as-default, the assimilation
@@ -47,7 +47,7 @@ namespace EngineTests
             Assert.AreEqual(0.0, r.AchievementMotivationDelta, 1e-9, "Pure contrast gives no inspiration.");
         }
 
-        #endregion
+        #endregion Math — contrast is the default upward response
 
         #region Math — assimilation requires attainability + identification
 
@@ -66,7 +66,7 @@ namespace EngineTests
             Assert.IsTrue(r.SelfEsteemDelta >= 0, "Assimilation does not lower self-esteem.");
         }
 
-        #endregion
+        #endregion Math — assimilation requires attainability + identification
 
         #region Math — malicious envy under low agreeableness
 
@@ -89,7 +89,7 @@ namespace EngineTests
             Assert.AreEqual(0.0, benignAgreeable.TargetHostilityDelta, 1e-9);
         }
 
-        #endregion
+        #endregion Math — malicious envy under low agreeableness
 
         #region Math — downward mood repair, stronger for low self-esteem
 
@@ -111,7 +111,7 @@ namespace EngineTests
                 $"Low self-esteem comparers benefit more from downward comparison (Wills 1981). low={lowSe.MoodValenceDelta:F4}, high={highSe.MoodValenceDelta:F4}");
         }
 
-        #endregion
+        #endregion Math — downward mood repair, stronger for low self-esteem
 
         #region Math — orientation + salience gate
 
@@ -132,7 +132,7 @@ namespace EngineTests
             Assert.AreEqual(ComparisonDirection.None, r.Direction, "A standing gap below MinSalientGap is not a comparison.");
         }
 
-        #endregion
+        #endregion Math — orientation + salience gate
 
         #region Engine — emission + throttle
 
@@ -175,7 +175,7 @@ namespace EngineTests
             Assert.AreEqual(0, second.Drain().OfType<SocialComparisonOccurred>().Count(), "Comparison is throttled within the cooldown.");
         }
 
-        #endregion
+        #endregion Engine — emission + throttle
 
         #region Helpers
 
@@ -234,10 +234,12 @@ namespace EngineTests
         private sealed class ZeroRandomSource : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => false;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

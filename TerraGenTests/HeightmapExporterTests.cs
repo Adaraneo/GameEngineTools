@@ -1,6 +1,5 @@
-using System.Text.Json;
 using GameEngineTools.World.Data;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Text.Json;
 using TerraGen.Generation;
 
 namespace TerraGenTests;

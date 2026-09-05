@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -18,6 +16,8 @@ namespace EngineTests
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Phases 1 and 3: reinforcement wired into <see cref="DefaultInteractionEngine"/>, and the social
@@ -236,7 +236,8 @@ namespace EngineTests
         private static InteractionProposed Proposal(WDateTime when)
         {
             var act = SpeechAct.Relational(RelationalActKind.SmallTalk, Speaker, Listener, when)
-                with { PredicateLemma = Lemma };
+                with
+            { PredicateLemma = Lemma };
             return new InteractionProposed(when, Speaker, Listener, new InteractionContent(act), SexBiology.Male);
         }
 

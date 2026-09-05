@@ -225,6 +225,7 @@ namespace EngineTests
 
         // VIWorld calendar: 10 months × 36 days × 26 hours.
         private const int HoursPerGameYear = 10 * 36 * 26;
+
         private const int HoursPerGameDay = 26;
 
         private static double AnnualMortality(PhysiologyState s, int age) =>
@@ -303,7 +304,7 @@ namespace EngineTests
             Assert.AreEqual(DeathCause.Dehydration, cause, "Pure thirst death must resolve to Dehydration.");
         }
 
-        #endregion Section 4 — Calibration
+        #endregion Section 4 — Calibration (annual mortality over a 9360-hour game year)
 
         #region Section 5 — Death persisted in snapshot (Status)
 

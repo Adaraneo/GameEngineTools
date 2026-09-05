@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -17,6 +14,9 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -159,6 +159,6 @@ namespace EngineTests
                 new Dictionary<string, double>());
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

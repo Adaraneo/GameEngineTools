@@ -5,7 +5,6 @@ namespace EngineTests
 {
     using GameEngineTools.Characters.Traits;
     using System;
-    using System.Linq;
 
     /// <summary>
     /// Tests for <see cref="ComparisonOrientationGenerator"/> and <see cref="ComparisonOrientationProfile"/>.
@@ -27,12 +26,12 @@ namespace EngineTests
             // Arrange — all other traits held at 0.5
             var highN = new BigFive(Openness: 0.5, Conscientiousness: 0.5,
                                    Extraversion: 0.5, Agreeableness: 0.5, Neuroticism: 0.9);
-            var lowN  = new BigFive(Openness: 0.5, Conscientiousness: 0.5,
+            var lowN = new BigFive(Openness: 0.5, Conscientiousness: 0.5,
                                    Extraversion: 0.5, Agreeableness: 0.5, Neuroticism: 0.1);
 
             // Act — deterministic (null random)
             var highProfile = ComparisonOrientationGenerator.Generate(highN, random: null);
-            var lowProfile  = ComparisonOrientationGenerator.Generate(lowN,  random: null);
+            var lowProfile = ComparisonOrientationGenerator.Generate(lowN, random: null);
 
             // Assert — high N yields higher Overall SCO
             Assert.IsTrue(highProfile.Overall > lowProfile.Overall,
@@ -40,7 +39,7 @@ namespace EngineTests
                 $"High={highProfile.Overall:F3}, Low={lowProfile.Overall:F3}");
         }
 
-        #endregion
+        #endregion Test 1 — High Neuroticism → Higher Overall SCO than Low Neuroticism
 
         #region Test 2 — Deterministic: two null-random Generate calls produce identical profiles
 
@@ -64,7 +63,7 @@ namespace EngineTests
                 "Null-random generation must be deterministic (no noise).");
         }
 
-        #endregion
+        #endregion Test 2 — Deterministic: two null-random Generate calls produce identical profiles
 
         #region Test 3 — All outputs in [0, 1]
 
@@ -98,7 +97,7 @@ namespace EngineTests
             }
         }
 
-        #endregion
+        #endregion Test 3 — All outputs in [0, 1]
 
         #region Test 4 — Average character has Overall ≈ 0.5
 
@@ -122,7 +121,7 @@ namespace EngineTests
                 $"Average character should produce Opinion=0.5 by construction. Got: {p.Opinion:F4}");
         }
 
-        #endregion
+        #endregion Test 4 — Average character has Overall ≈ 0.5
 
         #region Test 5 (optional) — Population mean of Overall in plausible band
 
@@ -140,11 +139,11 @@ namespace EngineTests
             for (var i = 0; i < n; i++)
             {
                 var bf = new BigFive(
-                    Openness:          rng.NextDouble(),
+                    Openness: rng.NextDouble(),
                     Conscientiousness: rng.NextDouble(),
-                    Extraversion:      rng.NextDouble(),
-                    Agreeableness:     rng.NextDouble(),
-                    Neuroticism:       rng.NextDouble());
+                    Extraversion: rng.NextDouble(),
+                    Agreeableness: rng.NextDouble(),
+                    Neuroticism: rng.NextDouble());
 
                 sum += ComparisonOrientationGenerator.Generate(bf, rng).Overall;
             }
@@ -155,7 +154,7 @@ namespace EngineTests
                 $"Population mean of Overall SCO should be in [0.45, 0.65]. Got: {mean:F4}");
         }
 
-        #endregion
+        #endregion Test 5 (optional) — Population mean of Overall in plausible band
 
         #region Test 6 — High Neuroticism → Higher Ability subscale than Low Neuroticism
 
@@ -167,17 +166,17 @@ namespace EngineTests
         {
             var highN = new BigFive(Openness: 0.5, Conscientiousness: 0.5,
                                    Extraversion: 0.5, Agreeableness: 0.5, Neuroticism: 0.9);
-            var lowN  = new BigFive(Openness: 0.5, Conscientiousness: 0.5,
+            var lowN = new BigFive(Openness: 0.5, Conscientiousness: 0.5,
                                    Extraversion: 0.5, Agreeableness: 0.5, Neuroticism: 0.1);
 
             var highProfile = ComparisonOrientationGenerator.Generate(highN, random: null);
-            var lowProfile  = ComparisonOrientationGenerator.Generate(lowN,  random: null);
+            var lowProfile = ComparisonOrientationGenerator.Generate(lowN, random: null);
 
             Assert.IsTrue(highProfile.Ability > lowProfile.Ability,
                 $"High N should produce higher Ability SCO. High={highProfile.Ability:F3}, Low={lowProfile.Ability:F3}");
         }
 
-        #endregion
+        #endregion Test 6 — High Neuroticism → Higher Ability subscale than Low Neuroticism
 
         #region Test 7 — High Openness → Higher Opinion subscale than Low Openness
 
@@ -190,16 +189,16 @@ namespace EngineTests
         {
             var highO = new BigFive(Openness: 0.9, Conscientiousness: 0.5,
                                    Extraversion: 0.5, Agreeableness: 0.5, Neuroticism: 0.5);
-            var lowO  = new BigFive(Openness: 0.1, Conscientiousness: 0.5,
+            var lowO = new BigFive(Openness: 0.1, Conscientiousness: 0.5,
                                    Extraversion: 0.5, Agreeableness: 0.5, Neuroticism: 0.5);
 
             var highProfile = ComparisonOrientationGenerator.Generate(highO, random: null);
-            var lowProfile  = ComparisonOrientationGenerator.Generate(lowO,  random: null);
+            var lowProfile = ComparisonOrientationGenerator.Generate(lowO, random: null);
 
             Assert.IsTrue(highProfile.Opinion > lowProfile.Opinion,
                 $"High O should produce higher Opinion SCO. High={highProfile.Opinion:F3}, Low={lowProfile.Opinion:F3}");
         }
 
-        #endregion
+        #endregion Test 7 — High Openness → Higher Opinion subscale than Low Openness
     }
 }

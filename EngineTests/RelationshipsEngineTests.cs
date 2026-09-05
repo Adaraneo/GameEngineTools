@@ -7,21 +7,21 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Interests;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
-    using GameEngineTools.Characters.Engines.Interests;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.SelfConcept;
-    using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Engines.SemanticMemory;
+    using GameEngineTools.Characters.Engines.Values;
     using GameEngineTools.Characters.Generation;
-    using GameEngineTools.Dialogue.Interpretation;
-    using GameEngineTools.Dialogue.Semantics;
     using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Hosting.Defaults;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.Dialogue.Interpretation;
+    using GameEngineTools.Dialogue.Semantics;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
@@ -2431,7 +2431,7 @@ namespace EngineTests
             };
         }
 
-        #endregion Jealousy gap-fill testy
+        #endregion Jealousy gap-fill (Buss et al. 1992; Dijkstra & Buunk 1998; Pollet & Saxton 2020) testy
 
         #region Transference (Topic C) — SignificantOtherThresholdCrossed emission
 
@@ -2951,7 +2951,8 @@ namespace EngineTests
             var speaker = new HumanId(Guid.NewGuid());
             var addressee = new HumanId(Guid.NewGuid());
             var act = SpeechAct.Relational(RelationalActKind.SmallTalk, speaker, addressee, new WDateTime(1000))
-                with { PredicateLemma = predicateLemma, Directness = Directness.Neutral, Polarity = Polarity.Affirmative };
+                with
+            { PredicateLemma = predicateLemma, Directness = Directness.Neutral, Polarity = Polarity.Affirmative };
             return interpreter.Appraise(act, new ListenerContext(4, 60, 0.0)).PerceivedPowerDelta;
         }
 

@@ -682,7 +682,7 @@ namespace EngineTests
                 $"(before={before:F3}, after={after:F3})");
         }
 
-        #endregion Transference
+        #endregion Transference (Topic C) — SignificantOthers storage + perturbation
 
         private static DefaultSemanticMemoryEngine BuildEngine()
             => new(Options.Create(new SemanticMemoryConfig()));

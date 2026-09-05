@@ -116,6 +116,6 @@ namespace EngineTests
             Assert.IsTrue(v is >= 0.0 and <= 1.0, $"State must stay within [0,1]. Got: {v}");
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

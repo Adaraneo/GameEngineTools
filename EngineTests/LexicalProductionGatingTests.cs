@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.Characters.Traits;
@@ -12,6 +10,8 @@ namespace EngineTests
     using GameEngineTools.Dialogue.Seed;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Phase 4: a speaker reaches for words they actually have.

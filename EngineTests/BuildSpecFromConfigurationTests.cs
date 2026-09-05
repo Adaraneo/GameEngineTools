@@ -3,10 +3,10 @@
 
 namespace EngineTests
 {
-    using System.Collections.Generic;
     using GameEngineTools;
     using Microsoft.Extensions.Configuration;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System.Collections.Generic;
 
     /// <summary>
     /// End-to-end tests for <see cref="GameEngineToolsRuntime.BuildSpecFromConfiguration"/> — proving
@@ -29,13 +29,13 @@ namespace EngineTests
             var cfg = BuildConfig(new Dictionary<string, string?>
             {
                 ["World:Universe:PlanetSiderealRotationHrs"] = "26",
-                ["World:Calendar:MonthCount"]                = "10",
-                ["World:Calendar:TargetYearDays"]            = "360",
-                ["World:Calendar:TicksPerSecond"]            = "10000000",
-                ["World:Calendar:MinutesPerHour"]            = "60",
-                ["World:Calendar:SecondsPerMinute"]          = "60",
-                ["World:Calendar:LeapYearInterval"]          = "4",
-                ["World:Calendar:LeapExtraDays"]             = "5",
+                ["World:Calendar:MonthCount"] = "10",
+                ["World:Calendar:TargetYearDays"] = "360",
+                ["World:Calendar:TicksPerSecond"] = "10000000",
+                ["World:Calendar:MinutesPerHour"] = "60",
+                ["World:Calendar:SecondsPerMinute"] = "60",
+                ["World:Calendar:LeapYearInterval"] = "4",
+                ["World:Calendar:LeapExtraDays"] = "5",
             });
 
             var spec = GameEngineToolsRuntime.BuildSpecFromConfiguration(cfg);
@@ -58,7 +58,7 @@ namespace EngineTests
             var cfg = BuildConfig(new Dictionary<string, string?>
             {
                 ["World:Universe:PlanetSiderealRotationHrs"] = "23.9345",
-                ["World:Universe:OrbitSemiMajorAxisAu"]      = "1.000001",
+                ["World:Universe:OrbitSemiMajorAxisAu"] = "1.000001",
                 // Star defaults to Sol via the UniverseConfig record.
             });
 
@@ -79,21 +79,21 @@ namespace EngineTests
             var cfg = BuildConfig(new Dictionary<string, string?>
             {
                 ["World:Universe:PlanetSiderealRotationHrs"] = "23.9345",
-                ["World:Calendar:UseGregorianLeap"]          = "true",
-                ["World:Calendar:LeapExtraDays"]             = "1",
-                ["World:Calendar:LeapMonth"]                 = "2",
-                ["World:Calendar:MonthLengths:0"]            = "31",
-                ["World:Calendar:MonthLengths:1"]            = "28",
-                ["World:Calendar:MonthLengths:2"]            = "31",
-                ["World:Calendar:MonthLengths:3"]            = "30",
-                ["World:Calendar:MonthLengths:4"]            = "31",
-                ["World:Calendar:MonthLengths:5"]            = "30",
-                ["World:Calendar:MonthLengths:6"]            = "31",
-                ["World:Calendar:MonthLengths:7"]            = "31",
-                ["World:Calendar:MonthLengths:8"]            = "30",
-                ["World:Calendar:MonthLengths:9"]            = "31",
-                ["World:Calendar:MonthLengths:10"]           = "30",
-                ["World:Calendar:MonthLengths:11"]           = "31",
+                ["World:Calendar:UseGregorianLeap"] = "true",
+                ["World:Calendar:LeapExtraDays"] = "1",
+                ["World:Calendar:LeapMonth"] = "2",
+                ["World:Calendar:MonthLengths:0"] = "31",
+                ["World:Calendar:MonthLengths:1"] = "28",
+                ["World:Calendar:MonthLengths:2"] = "31",
+                ["World:Calendar:MonthLengths:3"] = "30",
+                ["World:Calendar:MonthLengths:4"] = "31",
+                ["World:Calendar:MonthLengths:5"] = "30",
+                ["World:Calendar:MonthLengths:6"] = "31",
+                ["World:Calendar:MonthLengths:7"] = "31",
+                ["World:Calendar:MonthLengths:8"] = "30",
+                ["World:Calendar:MonthLengths:9"] = "31",
+                ["World:Calendar:MonthLengths:10"] = "30",
+                ["World:Calendar:MonthLengths:11"] = "31",
             });
 
             var spec = GameEngineToolsRuntime.BuildSpecFromConfiguration(cfg);

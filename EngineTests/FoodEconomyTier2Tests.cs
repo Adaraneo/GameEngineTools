@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -22,6 +19,9 @@ namespace EngineTests
     using Microsoft.Extensions.Logging.Abstractions;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -358,21 +358,31 @@ namespace EngineTests
 
             public IEnumerable<WorldObject> GetObjectsAt(string loc)
                 => _o.Values.Where(o => o.LocationId == loc && o.HeldBy is null && o.IsAvailable);
+
             public IEnumerable<WorldObject> GetAllObjectsAt(string loc) => _o.Values.Where(o => o.LocationId == loc);
+
             public IEnumerable<WorldObject> GetAllObjects() => _o.Values.ToList();
+
             public void AddObject(WorldObject o) => _o[o.Id] = o;
+
             public WorldObject? FindObject(string id) => _o.TryGetValue(id, out var v) ? v : null;
+
             public bool RemoveObject(string loc, string id) => _o.Remove(id);
+
             public bool ConsumeObject(string loc, string id, WDateTime now) => _o.Remove(id);
+
             public bool RestoreObject(string loc, string id) => false;
+
             public bool SetHeldBy(string loc, string id, HumanId? holder)
             {
                 if (!_o.TryGetValue(id, out var v)) return false;
                 _o[id] = v with { HeldBy = holder };
                 return true;
             }
+
             public IEnumerable<WorldObject> GetHeldBy(HumanId holder)
                 => _o.Values.Where(o => o.HeldBy is { } h && h.Equals(holder));
+
             public IEnumerable<string> GetKnownLocationIds() => _o.Values.Select(o => o.LocationId).Distinct();
         }
 
@@ -380,16 +390,28 @@ namespace EngineTests
         private sealed class FixedLocationService : ILocationService
         {
             private readonly string _loc;
+
             public FixedLocationService(string loc) => _loc = loc;
 
             public string? GetLocation(HumanId characterId) => _loc;
+
             public LocationDescriptor? GetDescriptor(string locationId)
                 => new(locationId, locationId, 0.3, 0.05, 8, true, LocationType.Public);
-            public void RegisterLocation(LocationDescriptor descriptor) { }
-            public void MoveCharacter(HumanId characterId, string locationId) { }
-            public void RemoveCharacter(HumanId characterId) { }
-            public void DispatchContextEvents(WDateTime now, IReadOnlyList<IHuman> characters, bool forceAll = false) { }
+
+            public void RegisterLocation(LocationDescriptor descriptor)
+            { }
+
+            public void MoveCharacter(HumanId characterId, string locationId)
+            { }
+
+            public void RemoveCharacter(HumanId characterId)
+            { }
+
+            public void DispatchContextEvents(WDateTime now, IReadOnlyList<IHuman> characters, bool forceAll = false)
+            { }
+
             public IReadOnlyList<HumanId> GetCharactersAt(string locationId) => Array.Empty<HumanId>();
+
             public IReadOnlyList<string> GetLocationsByType(LocationType type) => Array.Empty<string>();
         }
 
@@ -405,8 +427,12 @@ namespace EngineTests
         private sealed class AllBackgroundLod : ICognitiveResolutionLevelRuntime
         {
             public CognitiveResolutionLevel Get(HumanId id) => CognitiveResolutionLevel.Background;
-            public void Set(HumanId id, CognitiveResolutionLevel level) { }
-            public void Clear(HumanId id) { }
+
+            public void Set(HumanId id, CognitiveResolutionLevel level)
+            { }
+
+            public void Clear(HumanId id)
+            { }
         }
     }
 }

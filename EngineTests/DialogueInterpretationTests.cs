@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Immutable;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Psychology.Appraisal;
@@ -14,6 +11,9 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Grammar.Core.Enums;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Immutable;
+    using System.Linq;
 
     /// <summary>
     /// Phase-4 listener side: the same objective <see cref="SpeechAct"/> is read differently depending
@@ -28,7 +28,8 @@ namespace EngineTests
 
         private static SpeechAct Act(Directness directness = Directness.Neutral, ForceShift? forceShift = null)
             => SpeechAct.Relational(RelationalActKind.SmallTalk, Speaker, Addressee, new WDateTime(1000))
-                with { Directness = directness, Polarity = Polarity.Affirmative, ForceShift = forceShift };
+                with
+            { Directness = directness, Polarity = Polarity.Affirmative, ForceShift = forceShift };
 
         private static readonly ForceShift IronicShift = new(IllocutionaryPoint.Expressive, Polarity.Negative);
 
@@ -255,7 +256,7 @@ namespace EngineTests
             Assert.AreEqual(0.105, pm.ConnotationDelta, 1e-9);
         }
 
-        #endregion
+        #endregion Connotation layer (opt-in)
 
         [TestMethod]
         public void Appraise_IsDeterministic()
@@ -274,7 +275,7 @@ namespace EngineTests
             CollectionAssert.AreEquivalent(a.ResolvedRoles.ToList(), b.ResolvedRoles.ToList());
         }
 
-        #endregion
+        #endregion Interpreter — divergence
 
         #region Appraiser — feeds CPM only on divergence
 
@@ -372,6 +373,6 @@ namespace EngineTests
             Assert.IsTrue(praiseOutcome!.IntrinsicPleasantness > assentOutcome!.IntrinsicPleasantness);
         }
 
-        #endregion
+        #endregion Appraiser — feeds CPM only on divergence
     }
 }

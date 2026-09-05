@@ -124,12 +124,12 @@ namespace EngineTests
             var provider = new SqliteSocialNormProvider(db);
 
             var funeral = provider.GetNormContext("norm_funeral");
-            var work    = provider.GetNormContext("norm_formal_work");
-            var casual  = provider.GetNormContext("norm_casual_social");
+            var work = provider.GetNormContext("norm_formal_work");
+            var casual = provider.GetNormContext("norm_casual_social");
 
-            Assert.IsNotNull(funeral,  "norm_funeral must load.");
-            Assert.IsNotNull(work,     "norm_formal_work must load.");
-            Assert.IsNotNull(casual,   "norm_casual_social must load.");
+            Assert.IsNotNull(funeral, "norm_funeral must load.");
+            Assert.IsNotNull(work, "norm_formal_work must load.");
+            Assert.IsNotNull(casual, "norm_casual_social must load.");
 
             Assert.AreEqual(SocialNormKind.PublicConduct, casual!.Kind);
             Assert.AreEqual(0.20, casual.Severity, delta: 0.001);

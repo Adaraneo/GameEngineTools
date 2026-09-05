@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TerraGen;
 
 namespace TerraGenTests;

@@ -3,8 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -16,6 +14,8 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Tests for the Borbély two-process sleep model (<see cref="SleepRegulationCalculator"/>) and the
@@ -59,7 +59,7 @@ namespace EngineTests
                 $"Over {dt} h, decay ({decayedFraction:F3}) should outpace buildup ({builtFraction:F3}).");
         }
 
-        #endregion
+        #endregion Process S time constants
 
         #region Homeostatic / circadian dissociation
 
@@ -82,7 +82,7 @@ namespace EngineTests
             Assert.IsTrue(restedTrough > 0, "A rested character at the circadian trough is still net sleepy.");
         }
 
-        #endregion
+        #endregion Homeostatic / circadian dissociation
 
         #region Van Dongen chronic restriction
 
@@ -144,7 +144,7 @@ namespace EngineTests
                 $"8 h of sleep should substantially recover the cognitive deficit. Got {deficit:F3}.");
         }
 
-        #endregion
+        #endregion Van Dongen chronic restriction
 
         #region Psychology integration
 
@@ -210,6 +210,6 @@ namespace EngineTests
             };
         }
 
-        #endregion
+        #endregion Psychology integration
     }
 }

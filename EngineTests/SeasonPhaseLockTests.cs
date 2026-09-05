@@ -3,12 +3,12 @@
 
 namespace EngineTests
 {
-    using System;
     using GameEngineTools.Universe;
     using GameEngineTools.World.Core.Astro;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
 
     /// <summary>
     /// Verifies that the Phase-2 <see cref="CelestialContextComputer"/> temperature season is
@@ -27,29 +27,29 @@ namespace EngineTests
         private static (int PeakDaylightDay, int PeakTempDay) ScanYear(double thermalLag, double latitudeDeg)
         {
             var computer = new CelestialContextComputer(new SunModel());
-            var star     = StarPhysics.Sol;
+            var star = StarPhysics.Sol;
             // Circular orbit (e = 0) isolates the axial-tilt season from the minor eccentric
             // distance effect, so the light and temperature seasons must line up exactly.
-            var orbit    = new OrbitalElements(
+            var orbit = new OrbitalElements(
                 SemiMajorAxisAu: 1.0, Eccentricity: 0.0, InclinationDeg: 0.0,
                 LongAscNodeDeg: 0.0, ArgPeriapsisDeg: 0.0, MeanLongitudeDeg: 0.0);
-            var planet   = PlanetConfig.Earth;
+            var planet = PlanetConfig.Earth;
             var cfg = new AstroConfig(
-                Sun:                        new SunParamsConfig(),
-                LatitudeDeg:                latitudeDeg,
-                LongitudeDeg:               0.0,
-                BaseTemperatureCelsius:     11.0,
-                SeasonalAmplitudeCelsius:   9.0,
-                VernalPhase:                0.0,
+                Sun: new SunParamsConfig(),
+                LatitudeDeg: latitudeDeg,
+                LongitudeDeg: 0.0,
+                BaseTemperatureCelsius: 11.0,
+                SeasonalAmplitudeCelsius: 9.0,
+                VernalPhase: 0.0,
                 SeasonalThermalLagFraction: thermalLag);
 
-            var start   = WDateTime.New(WDateOnly.New(100, 1, 1));
+            var start = WDateTime.New(WDateOnly.New(100, 1, 1));
             var yearLen = (int)WWorld.Spec.Calendar.DaysInYear(100);
 
             double maxDaylight = double.NegativeInfinity;
-            double maxTemp     = double.NegativeInfinity;
+            double maxTemp = double.NegativeInfinity;
             int peakDaylightDay = 0;
-            int peakTempDay     = 0;
+            int peakTempDay = 0;
 
             for (int d = 0; d < yearLen; d++)
             {
@@ -98,7 +98,7 @@ namespace EngineTests
             var yearLen = (int)WWorld.Spec.Calendar.DaysInYear(100);
 
             int forwardOffset = ((peakTemp - peakDaylight) % yearLen + yearLen) % yearLen;
-            int expected      = (int)Math.Round(lag * yearLen);
+            int expected = (int)Math.Round(lag * yearLen);
             Assert.IsTrue(Math.Abs(forwardOffset - expected) <= 3,
                 $"Temperature peak should trail the longest day by ~{expected} days (thermal lag); " +
                 $"actual forward offset was {forwardOffset}.");

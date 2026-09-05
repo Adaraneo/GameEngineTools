@@ -3,11 +3,11 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Linq;
 
     /// <summary>
     /// Unit tests for <see cref="DualControlMath"/> — per-NPC DCM (SES/SIS1/SIS2) generation.
@@ -68,20 +68,20 @@ namespace EngineTests
 
             // Act + Assert
             foreach (var o in extremes)
-            foreach (var c in extremes)
-            foreach (var e in extremes)
-            foreach (var nn in extremes)
-            {
-                for (var seed = 0; seed < 50; seed++)
-                {
-                    var dcm = DualControlMath.Generate(
-                        new DeterministicRandom(seed), o, c, e, nn, NeutralSocio);
+                foreach (var c in extremes)
+                    foreach (var e in extremes)
+                        foreach (var nn in extremes)
+                        {
+                            for (var seed = 0; seed < 50; seed++)
+                            {
+                                var dcm = DualControlMath.Generate(
+                                    new DeterministicRandom(seed), o, c, e, nn, NeutralSocio);
 
-                    Assert.IsTrue(dcm.SES is >= 0.0 and <= 1.0, $"SES out of range: {dcm.SES}");
-                    Assert.IsTrue(dcm.SIS1 is >= 0.0 and <= 1.0, $"SIS1 out of range: {dcm.SIS1}");
-                    Assert.IsTrue(dcm.SIS2 is >= 0.0 and <= 1.0, $"SIS2 out of range: {dcm.SIS2}");
-                }
-            }
+                                Assert.IsTrue(dcm.SES is >= 0.0 and <= 1.0, $"SES out of range: {dcm.SES}");
+                                Assert.IsTrue(dcm.SIS1 is >= 0.0 and <= 1.0, $"SIS1 out of range: {dcm.SIS1}");
+                                Assert.IsTrue(dcm.SIS2 is >= 0.0 and <= 1.0, $"SIS2 out of range: {dcm.SIS2}");
+                            }
+                        }
         }
 
         #endregion Unit-range clamping

@@ -3,11 +3,11 @@
 
 namespace EngineTests
 {
+    using GameEngineTools.World.Data;
+    using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
     using System.IO;
     using System.Linq;
-    using GameEngineTools.World.Data;
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
 
     [TestClass]
     public class SocialNormCatalogLoaderTests

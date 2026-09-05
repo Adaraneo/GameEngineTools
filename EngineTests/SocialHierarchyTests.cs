@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -18,6 +15,9 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Tests for the social-hierarchy subsystem: the two-axis emergent <see cref="SocietalStatus"/>,
@@ -55,7 +55,7 @@ namespace EngineTests
             Assert.AreEqual(SocietalStatus.Neutral, s);
         }
 
-        #endregion
+        #endregion Consensus — two orthogonal axes, conferred by others
 
         #region StatusLedger — status is the network consensus
 
@@ -127,7 +127,7 @@ namespace EngineTests
                 $"Churn must lower hierarchy stability. before={stable:F2}, after={ledger.HierarchyStability():F2}");
         }
 
-        #endregion
+        #endregion StatusLedger — status is the network consensus
 
         #region Status × stability × control → stress
 
@@ -181,7 +181,7 @@ namespace EngineTests
                 $"A threatened high-status character accrues more stress. neutral={engineA.State.Stress:F2}, threatened={engineB.State.Stress:F2}");
         }
 
-        #endregion
+        #endregion Status × stability × control → stress
 
         #region Deference
 
@@ -196,7 +196,7 @@ namespace EngineTests
             Assert.IsTrue(StatusMath.DeferenceBias(self, coercive, Cfg) < 0, "People avoid coercive dominants.");
         }
 
-        #endregion
+        #endregion Deference
 
         #region Ascribed status (role / occupation prior)
 
@@ -261,7 +261,7 @@ namespace EngineTests
             Assert.IsNull(ascribed.GetPrior(id), "Commoner confers no ascribed advantage.");
         }
 
-        #endregion
+        #endregion Ascribed status (role / occupation prior)
 
         #region Gossip / observation co-evolution
 
@@ -279,7 +279,7 @@ namespace EngineTests
             Assert.IsTrue(ledger.Get(target).PrestigeStatus > 70.0, "Witnessed prestige propagates into emergent status.");
         }
 
-        #endregion
+        #endregion Gossip / observation co-evolution
 
         #region Helpers
 
@@ -336,10 +336,12 @@ namespace EngineTests
         private sealed class ZeroRandomSource : IRandomSource
         {
             public int Next(int min, int max) => min;
+
             public double NextUnit() => 0.0;
+
             public bool Chance(double p) => false;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

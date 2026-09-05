@@ -3,7 +3,6 @@
 
 namespace EngineTests
 {
-    using System.Collections.Generic;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Hosting;
@@ -12,6 +11,7 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System.Collections.Generic;
 
     /// <summary>
     /// Verifies that <see cref="SimulationScene.AddCharacter"/> lets a character join a running

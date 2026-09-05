@@ -47,7 +47,7 @@ namespace EngineTests
                 $"High A should produce Benevolence > 0.60. Got: {profile.Benevolence:F3}");
         }
 
-        #endregion
+        #endregion Test 1 — High Agreeableness → High Benevolence
 
         #region Test 2 — Low Agreeableness → Low Benevolence
 
@@ -66,7 +66,7 @@ namespace EngineTests
                 $"Low A should produce Benevolence < 0.40. Got: {profile.Benevolence:F3}");
         }
 
-        #endregion
+        #endregion Test 2 — Low Agreeableness → Low Benevolence
 
         #region Test 3 — High Openness → High SelfDirection
 
@@ -85,7 +85,7 @@ namespace EngineTests
                 $"High O should produce SelfDirection > 0.62. Got: {profile.SelfDirection:F3}");
         }
 
-        #endregion
+        #endregion Test 3 — High Openness → High SelfDirection
 
         #region Test 4 — High Extraversion, Low Agreeableness → Power > Achievement
 
@@ -105,7 +105,7 @@ namespace EngineTests
                 $"Power={profile.Power:F3}, Achievement={profile.Achievement:F3}");
         }
 
-        #endregion
+        #endregion Test 4 — High Extraversion, Low Agreeableness → Power > Achievement
 
         #region Test 5 — High Conscientiousness, Low Openness → High Security
 
@@ -124,7 +124,7 @@ namespace EngineTests
                 $"High C + Low O should produce Security > 0.60. Got: {profile.Security:F3}");
         }
 
-        #endregion
+        #endregion Test 5 — High Conscientiousness, Low Openness → High Security
 
         #region Test 6 — Low Openness, Mid-High Agreeableness → High Tradition
 
@@ -143,7 +143,7 @@ namespace EngineTests
                 $"Low O + Moderate A should produce Tradition > 0.60. Got: {profile.Tradition:F3}");
         }
 
-        #endregion
+        #endregion Test 6 — Low Openness, Mid-High Agreeableness → High Tradition
 
         #region Test 7 — Ipsatization: mean of all 10 values ≈ 0.5
 
@@ -166,7 +166,7 @@ namespace EngineTests
                 $"Ipsatized values should have mean ≈ 0.5. Got: {mean:F4}");
         }
 
-        #endregion
+        #endregion Test 7 — Ipsatization: mean of all 10 values ≈ 0.5
 
         #region Test 8 — Deterministic without noise
 
@@ -186,7 +186,7 @@ namespace EngineTests
                 "Null-random generation must be deterministic (no noise).");
         }
 
-        #endregion
+        #endregion Test 8 — Deterministic without noise
 
         #region Test 8b — Coefficient magnitudes stay within meta-analytic bounds
 
@@ -204,7 +204,7 @@ namespace EngineTests
             }
         }
 
-        #endregion
+        #endregion Test 8b — Coefficient magnitudes stay within meta-analytic bounds
 
         #region Test 9 — ActionValueLoadings: Work has positive Achievement
 
@@ -217,7 +217,7 @@ namespace EngineTests
                 $"Work should have positive Achievement loading. Got: {loading.Achievement:F2}");
         }
 
-        #endregion
+        #endregion Test 9 — ActionValueLoadings: Work has positive Achievement
 
         #region Test 10 — ActionValueLoadings: InviteIntimacy has negative Conformity
 
@@ -230,7 +230,7 @@ namespace EngineTests
                 $"InviteIntimacy should have negative Conformity loading. Got: {loading.Conformity:F2}");
         }
 
-        #endregion
+        #endregion Test 10 — ActionValueLoadings: InviteIntimacy has negative Conformity
 
         #region Test 11 — ValueLoadVector: ReachOut congruent with high-Benevolence profile
 
@@ -253,7 +253,7 @@ namespace EngineTests
                 $"ReachOut should be congruent with high-Benevolence profile. Got: {congruence:F3}");
         }
 
-        #endregion
+        #endregion Test 11 — ValueLoadVector: ReachOut congruent with high-Benevolence profile
 
         #region Test 12 — ValuesBehaviorModifier: high Benevolence boosts ReachOut utility
 
@@ -282,7 +282,7 @@ namespace EngineTests
                 $"Before={baseUtility}, After={candidates[0].Utility:F2}");
         }
 
-        #endregion
+        #endregion Test 12 — ValuesBehaviorModifier: high Benevolence boosts ReachOut utility
 
         #region Test 13 — ValuesBehaviorModifier: high Conformity reduces InviteIntimacy utility
 
@@ -312,7 +312,7 @@ namespace EngineTests
                 $"Before={baseUtility}, After={candidates[0].Utility:F2}");
         }
 
-        #endregion
+        #endregion Test 13 — ValuesBehaviorModifier: high Conformity reduces InviteIntimacy utility
 
         #region Test 14 — ValuesBehaviorModifier: congruence < -0.30 emits ValueCongruenceViolated
 
@@ -345,7 +345,7 @@ namespace EngineTests
                 $"Emitted violation must have negative congruence. Got: {violation.Congruence:F4}");
         }
 
-        #endregion
+        #endregion Test 14 — ValuesBehaviorModifier: congruence < -0.30 emits ValueCongruenceViolated
 
         #region Test 15 — ValuesBehaviorModifier: high stress attenuates value effect
 
@@ -362,15 +362,15 @@ namespace EngineTests
             var ctxLowStress = BuildContextWithValues(values, stress: 10, cogLoad: 20);
             var ctxHighStress = BuildContextWithValues(values, stress: 95, cogLoad: 20);
 
-            var candidatesLow  = new List<BehaviorCandidate> { new(ActionNames.ReachOut, baseUtility, WTimeSpan.FromHours(1), BehaviorDomain.Social) };
+            var candidatesLow = new List<BehaviorCandidate> { new(ActionNames.ReachOut, baseUtility, WTimeSpan.FromHours(1), BehaviorDomain.Social) };
             var candidatesHigh = new List<BehaviorCandidate> { new(ActionNames.ReachOut, baseUtility, WTimeSpan.FromHours(1), BehaviorDomain.Social) };
 
             // Act
             var modifier = new ValuesBehaviorModifier();
-            modifier.Modify(ctxLowStress,  candidatesLow);
+            modifier.Modify(ctxLowStress, candidatesLow);
             modifier.Modify(ctxHighStress, candidatesHigh);
 
-            var deltaLowStress  = candidatesLow[0].Utility  - baseUtility;
+            var deltaLowStress = candidatesLow[0].Utility - baseUtility;
             var deltaHighStress = candidatesHigh[0].Utility - baseUtility;
 
             // Assert — high stress produces < 30% of the low-stress delta
@@ -378,7 +378,7 @@ namespace EngineTests
                 $"High-stress delta ({deltaHighStress:F2}) should be < 30% of low-stress delta ({deltaLowStress:F2}).");
         }
 
-        #endregion
+        #endregion Test 15 — ValuesBehaviorModifier: high stress attenuates value effect
 
         #region Test 16 — PsychologyEngine: ValueCongruenceViolated applies Guilt spike
 
@@ -424,7 +424,7 @@ namespace EngineTests
                 $"Dominance must remain above 0.25 (guilt, not shame). Got: {engine.State.Dominance:F3}");
         }
 
-        #endregion
+        #endregion Test 16 — PsychologyEngine: ValueCongruenceViolated applies Guilt spike
 
         #region Test 17 — InferEmotion: correct VAD → Guilt (not Shame, not Neutral)
 
@@ -462,7 +462,7 @@ namespace EngineTests
                 $"VAD (V=-0.50, A=0.50, D=0.35) must infer Guilt. Got: {shifted.To}");
         }
 
-        #endregion
+        #endregion Test 17 — InferEmotion: correct VAD → Guilt (not Shame, not Neutral)
 
         #region Test 18 — InferEmotion: Guilt VAD does NOT collapse to Shame
 
@@ -505,7 +505,7 @@ namespace EngineTests
                 "DominantEmotion with D=0.40 must not be Shame.");
         }
 
-        #endregion
+        #endregion Test 18 — InferEmotion: Guilt VAD does NOT collapse to Shame
 
         #region Test 19 — EmotionDecayGuilt faster than Shame
 
@@ -518,7 +518,7 @@ namespace EngineTests
                 $"EmotionDecayGuilt ({cfg.EmotionDecayGuilt}) must be > EmotionDecayShame ({cfg.EmotionDecayShame}).");
         }
 
-        #endregion
+        #endregion Test 19 — EmotionDecayGuilt faster than Shame
 
         #region Helper methods
 
@@ -544,7 +544,7 @@ namespace EngineTests
         private static IHumanContext BuildPsychologyContext(HumanId self, Personality personality)
         {
             var physio = new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null);
-            var psych  = new PsychologyState(0.0, 0.4, 0.5, 0, 10, DiscreteEmotion.Neutral);
+            var psych = new PsychologyState(0.0, 0.4, 0.5, 0, 10, DiscreteEmotion.Neutral);
             var snapshot = new EnginesSnapshot(physio, psych,
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
                 new InteractionSurface(null, false, 0.1, 0.1, SurfaceKind.Social),
@@ -552,15 +552,15 @@ namespace EngineTests
                 new MemoryIndex(new List<EpisodicMemory>()));
             return new HumanContext
             {
-                Id          = self,
-                Biology     = SexBiology.Female,
+                Id = self,
+                Biology = SexBiology.Female,
                 Personality = personality,
                 PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot    = snapshot,
-                Random      = new ZeroRandom(),
-                Logger      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler()
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
         }
 
@@ -578,7 +578,7 @@ namespace EngineTests
             var personality = MakePersonality();
 
             var physio = new PhysiologyState(95, 0, 5, 5, 0, 0, 0, null);
-            var psych  = new PsychologyState(0.0, 0.4, 0.5, stress, cogLoad, DiscreteEmotion.Neutral);
+            var psych = new PsychologyState(0.0, 0.4, 0.5, stress, cogLoad, DiscreteEmotion.Neutral);
             var snapshot = new EnginesSnapshot(physio, psych,
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
                 new InteractionSurface(null, false, 0.1, 0.1, SurfaceKind.Social),
@@ -588,25 +588,25 @@ namespace EngineTests
 
             var ctx = new HumanContext
             {
-                Id          = self,
-                Biology     = SexBiology.Female,
+                Id = self,
+                Biology = SexBiology.Female,
                 Personality = personality,
                 PsychologyProfile = PsychologicalProfile.FromPersonality(personality),
-                Snapshot    = snapshot,
-                Random      = new ZeroRandom(),
-                Logger      = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
-                EventBus    = new NullEventBus(),
-                Scheduler   = new NullScheduler()
+                Snapshot = snapshot,
+                Random = new ZeroRandom(),
+                Logger = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger("Test"),
+                EventBus = new NullEventBus(),
+                Scheduler = new NullScheduler()
             };
 
             return new BehaviorContext(
-                Now:        new WDateTime(0),
-                Dt:         WTimeSpan.FromHours(1),
+                Now: new WDateTime(0),
+                Dt: WTimeSpan.FromHours(1),
                 HumanContext: ctx,
-                Outbox:     outbox ?? new EventCollector(),
-                State:      new BehaviorState(10, 5, 5, 20, 50, 30, null),
-                Config:     new BehaviorConfig(),
-                Cooldowns:  new Dictionary<string, double>());
+                Outbox: outbox ?? new EventCollector(),
+                State: new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                Config: new BehaviorConfig(),
+                Cooldowns: new Dictionary<string, double>());
         }
 
         #endregion Helper methods

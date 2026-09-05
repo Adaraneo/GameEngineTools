@@ -56,7 +56,7 @@ namespace EngineTests
                 $"Mid-life evaluation episode rate must sit in the empirical band. Got: {rate:P1}");
         }
 
-        #endregion
+        #endregion Test 1 — no scripted crisis: episode base rate respected
 
         #region Test 2 — null-effect probability is non-zero
 
@@ -84,7 +84,7 @@ namespace EngineTests
             Assert.IsTrue(nullEffects > population / 2, "Most transitions should be uneventful (no scripted crisis).");
         }
 
-        #endregion
+        #endregion Test 2 — null-effect probability is non-zero
 
         #region Test 3 — empty nest default is a small positive
 
@@ -106,7 +106,7 @@ namespace EngineTests
                 $"Strong-parenting empty-nest effect must be negative. before={beforeParent:F3}, after={parent.State.Valence:F3}");
         }
 
-        #endregion
+        #endregion Test 3 — empty nest default is a small positive
 
         #region Test 4 — empty nest: majority positive across population
 
@@ -132,7 +132,7 @@ namespace EngineTests
                 $"Most empty-nesters should experience a positive shift. Got: {fraction:P0}");
         }
 
-        #endregion
+        #endregion Test 4 — empty nest: majority positive across population
 
         #region Test 5 — R3 hook: mid-life transition shifts IdealSelf and seeds FindMeaning
 
@@ -156,7 +156,7 @@ namespace EngineTests
             Assert.AreEqual(PersistentGoalKind.FindMeaning, injected!.Kind);
         }
 
-        #endregion
+        #endregion Test 5 — R3 hook: mid-life transition shifts IdealSelf and seeds FindMeaning
 
         #region Test 6 — R3 hook: teen→adult seeds BuildIdentity
 
@@ -177,7 +177,7 @@ namespace EngineTests
             Assert.AreEqual(PersistentGoalKind.BuildIdentity, injected!.Kind);
         }
 
-        #endregion
+        #endregion Test 6 — R3 hook: teen→adult seeds BuildIdentity
 
         #region Test 7 — LifeStageMath base rates and empty-nest signs
 
@@ -199,7 +199,7 @@ namespace EngineTests
                 "Non-midlife transitions apply no mood dip.");
         }
 
-        #endregion
+        #endregion Test 7 — LifeStageMath base rates and empty-nest signs
 
         #region Helpers
 
@@ -267,12 +267,16 @@ namespace EngineTests
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _r;
+
             public SeededRandom(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

@@ -67,7 +67,7 @@ namespace EngineTests
                 "Baseline must never change from drift.");
         }
 
-        #endregion
+        #endregion Test 1 — repeated violation erodes the held value monotonically
 
         #region Test 2 — no stimulation regresses toward baseline
 
@@ -97,7 +97,7 @@ namespace EngineTests
                 $"Yearly regression should be slow (~8%). Closed fraction: {closedFraction:F3}");
         }
 
-        #endregion
+        #endregion Test 2 — no stimulation regresses toward baseline
 
         #region Test 3 — external incentive discounts the update (Kelley discounting)
 
@@ -133,7 +133,7 @@ namespace EngineTests
                 $"External update should be ~0.4× the free update. Ratio: {ratio:F3}");
         }
 
-        #endregion
+        #endregion Test 3 — external incentive discounts the update (Kelley discounting)
 
         #region Test 4 — guilt is keyed to Current, not Baseline
 
@@ -142,11 +142,11 @@ namespace EngineTests
         {
             // Baseline values Conformity low; Current has drifted to value Conformity highly.
             var baseline = Neutral() with { Conformity = 0.10, Hedonism = 0.9, Benevolence = 0.9, Stimulation = 0.9 };
-            var current  = Neutral() with { Conformity = 0.95, Hedonism = 0.05, Benevolence = 0.1, Stimulation = 0.1 };
+            var current = Neutral() with { Conformity = 0.95, Hedonism = 0.05, Benevolence = 0.1, Stimulation = 0.1 };
 
             // InviteIntimacy violates Conformity/Tradition. With high-Conformity Current, congruence is negative.
             var loading = ActionValueLoadings.Get(ActionNames.InviteIntimacy);
-            var congruenceCurrent  = loading.Congruence(current);
+            var congruenceCurrent = loading.Congruence(current);
             var congruenceBaseline = loading.Congruence(baseline);
 
             var self = new HumanId(Guid.NewGuid());
@@ -169,7 +169,7 @@ namespace EngineTests
                 "Congruence must NOT be computed from Baseline.");
         }
 
-        #endregion
+        #endregion Test 4 — guilt is keyed to Current, not Baseline
 
         #region Test 5 — acceptance: divergent choices produce distinct Current profiles
 
@@ -207,7 +207,7 @@ namespace EngineTests
                 "Selfish character must value Benevolence less than the prosocial character.");
         }
 
-        #endregion
+        #endregion Test 5 — acceptance: divergent choices produce distinct Current profiles
 
         #region Test 6 — routine actions over many years do not saturate (saturation fix)
 
@@ -242,7 +242,7 @@ namespace EngineTests
             }
         }
 
-        #endregion
+        #endregion Test 6 — routine actions over many years do not saturate (saturation fix)
 
         #region Test 7 — per-dimension cooldown caps same-day affirmations (saturation fix)
 
@@ -271,7 +271,7 @@ namespace EngineTests
                 "A fresh nudge must land once the affirmation cooldown expires.");
         }
 
-        #endregion
+        #endregion Test 7 — per-dimension cooldown caps same-day affirmations (saturation fix)
 
         #region Helpers
 
@@ -403,6 +403,6 @@ namespace EngineTests
             return 1.0 - cos;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

@@ -18,11 +18,9 @@ namespace EngineTests
     using GameEngineTools.Characters.GameObjects;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
-    using GameEngineTools.Config;
     using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.FileSystem;
     using GameEngineTools.Logging;
-    using GameEngineTools.World.Core.Calendars;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Location;
@@ -32,7 +30,6 @@ namespace EngineTests
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
-    using Microsoft.Extensions.Options;
     using System;
     using System.Collections.Generic;
     using System.Linq;

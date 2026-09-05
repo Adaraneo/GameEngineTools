@@ -3,9 +3,9 @@
 
 namespace EngineTests
 {
-    using System.Linq;
     using GameEngineTools.World.Data;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System.Linq;
 
     /// <summary>
     /// Unit tests for <see cref="WorldDatabaseSeeder"/> — in particular that

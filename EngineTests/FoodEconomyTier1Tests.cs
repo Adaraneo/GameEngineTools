@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System.Collections.Generic;
-    using System.Collections.Immutable;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -15,6 +12,8 @@ namespace EngineTests
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -211,21 +210,31 @@ namespace EngineTests
 
             public IEnumerable<WorldObject> GetObjectsAt(string loc)
                 => _o.Values.Where(o => o.LocationId == loc && o.HeldBy is null && o.IsAvailable);
+
             public IEnumerable<WorldObject> GetAllObjectsAt(string loc) => _o.Values.Where(o => o.LocationId == loc);
+
             public IEnumerable<WorldObject> GetAllObjects() => _o.Values.ToList();
+
             public void AddObject(WorldObject o) => _o[o.Id] = o;
+
             public WorldObject? FindObject(string id) => _o.TryGetValue(id, out var v) ? v : null;
+
             public bool RemoveObject(string loc, string id) => _o.Remove(id);
+
             public bool ConsumeObject(string loc, string id, WDateTime now) => _o.Remove(id);
+
             public bool RestoreObject(string loc, string id) => false;
+
             public bool SetHeldBy(string loc, string id, HumanId? holder)
             {
                 if (!_o.TryGetValue(id, out var v)) return false;
                 _o[id] = v with { HeldBy = holder };
                 return true;
             }
+
             public IEnumerable<WorldObject> GetHeldBy(HumanId holder)
                 => _o.Values.Where(o => o.HeldBy is { } h && h.Equals(holder));
+
             public IEnumerable<string> GetKnownLocationIds() => _o.Values.Select(o => o.LocationId).Distinct();
         }
     }

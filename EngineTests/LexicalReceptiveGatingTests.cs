@@ -3,13 +3,13 @@
 
 namespace EngineTests
 {
-    using System;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Language;
     using GameEngineTools.Dialogue.Interpretation;
     using GameEngineTools.Dialogue.Semantics;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
 
     /// <summary>
     /// Phase 2: a stock ironic phrase is only pre-packaged for someone who knows it.

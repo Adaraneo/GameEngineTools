@@ -3,15 +3,15 @@
 
 namespace EngineTests
 {
-    using System;
     using GameEngineTools.Characters.Core;
-    using GameEngineTools.Dialogue.Seed;
     using GameEngineTools.Dialogue.Realization;
+    using GameEngineTools.Dialogue.Seed;
     using GameEngineTools.World.Utils.Time;
     using Grammar.Czech;
     using Grammar.Czech.Services;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
 
     /// <summary>
     /// Covers the seed predicate mapping and <see cref="CzechSpeechActRealizer"/>: the lexicon must
@@ -37,7 +37,8 @@ namespace EngineTests
 
         private static SpeechAct ActWithLemma(string imperfectiveLemma, RelationalActKind kind)
             => SpeechAct.Relational(kind, new HumanId(Guid.NewGuid()), new HumanId(Guid.NewGuid()), new WDateTime(0))
-                with { PredicateLemma = imperfectiveLemma };
+                with
+            { PredicateLemma = imperfectiveLemma };
 
         [TestMethod]
         public void SeedLexicon_CoversEveryRelationalActKind_WithAtLeastOneCandidate()

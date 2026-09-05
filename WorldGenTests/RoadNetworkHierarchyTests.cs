@@ -3,7 +3,6 @@
 
 using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using WorldGen.Generation;
 
 namespace WorldGenTests;

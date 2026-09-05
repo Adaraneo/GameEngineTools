@@ -5,12 +5,12 @@ namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
-    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;

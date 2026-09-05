@@ -1,4 +1,3 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TerraGen.Generation;
 
 namespace TerraGenTests;
@@ -35,6 +34,7 @@ public class PngHeightmapWriterTests
         (uint)((b[offset] << 24) | (b[offset + 1] << 16) | (b[offset + 2] << 8) | b[offset + 3]);
 
     private static readonly uint[] CrcTable = BuildCrcTable();
+
     private static uint[] BuildCrcTable()
     {
         var table = new uint[256];
@@ -47,6 +47,7 @@ public class PngHeightmapWriterTests
         }
         return table;
     }
+
     private static uint Crc32(byte[] type, byte[] data)
     {
         var crc = 0xFFFFFFFFu;

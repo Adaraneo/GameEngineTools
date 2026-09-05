@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -18,6 +15,9 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -52,7 +52,7 @@ namespace EngineTests
                 $"low DarkCore ({lowDCCandidates[0].Utility:F2}).");
         }
 
-        #endregion
+        #endregion Test 1 — High DarkCore → higher Fight utility than low DarkCore
 
         #region Test 2 — High DarkCore → lower ReachOut utility than low DarkCore
 
@@ -78,7 +78,7 @@ namespace EngineTests
                 $"than low DarkCore ({lowDCCandidates[0].Utility:F2}).");
         }
 
-        #endregion
+        #endregion Test 2 — High DarkCore → lower ReachOut utility than low DarkCore
 
         #region Test 3 — High DarkCore → lower InviteIntimacy utility than low DarkCore
 
@@ -104,7 +104,7 @@ namespace EngineTests
                 $"than low DarkCore ({lowDCCandidates[0].Utility:F2}).");
         }
 
-        #endregion
+        #endregion Test 3 — High DarkCore → lower InviteIntimacy utility than low DarkCore
 
         #region Test 4 — Monotonicity: antagonism boost strictly increases with DarkCore
 
@@ -132,7 +132,7 @@ namespace EngineTests
             }
         }
 
-        #endregion
+        #endregion Test 4 — Monotonicity: antagonism boost strictly increases with DarkCore
 
         #region Test 5 — Null DarkCore → no change (no-op)
 
@@ -157,7 +157,7 @@ namespace EngineTests
             }
         }
 
-        #endregion
+        #endregion Test 5 — Null DarkCore → no change (no-op)
 
         #region Test 6 — SocialComparisonMath: high darkCore amplifies malicious hostility
 
@@ -175,12 +175,12 @@ namespace EngineTests
                 MaliciousEnvyHostilityWeight: 6.0,
                 DarkCoreMaliciousAmplification: 0.5);
 
-            const double selfStanding   = 30.0;
+            const double selfStanding = 30.0;
             const double targetStanding = 70.0;  // gap = 40 > AttainabilityGap
-            const double closeness      = 20.0;  // below IdentificationCloseness
-            const double neuroticism    = 0.5;
-            const double agreeableness  = 0.1;   // low A → high malicious disposition
-            const double selfEsteem     = 0.5;
+            const double closeness = 20.0;  // below IdentificationCloseness
+            const double neuroticism = 0.5;
+            const double agreeableness = 0.1;   // low A → high malicious disposition
+            const double selfEsteem = 0.5;
 
             var resultNoDark = SocialComparisonMath.Evaluate(
                 selfStanding, targetStanding, closeness,
@@ -197,7 +197,7 @@ namespace EngineTests
                 $"no-dark-core hostility ({resultNoDark.TargetHostilityDelta:F3}).");
         }
 
-        #endregion
+        #endregion Test 6 — SocialComparisonMath: high darkCore amplifies malicious hostility
 
         #region Test 7 — SocialComparisonMath: default darkCore=0 does not change existing behaviour
 
@@ -213,12 +213,12 @@ namespace EngineTests
                 MaliciousEnvyHostilityWeight: 6.0,
                 DarkCoreMaliciousAmplification: 0.5);
 
-            const double selfStanding   = 30.0;
+            const double selfStanding = 30.0;
             const double targetStanding = 70.0;
-            const double closeness      = 20.0;
-            const double neuroticism    = 0.5;
-            const double agreeableness  = 0.1;
-            const double selfEsteem     = 0.5;
+            const double closeness = 20.0;
+            const double neuroticism = 0.5;
+            const double agreeableness = 0.1;
+            const double selfEsteem = 0.5;
 
             var resultDefault = SocialComparisonMath.Evaluate(
                 selfStanding, targetStanding, closeness,
@@ -234,7 +234,7 @@ namespace EngineTests
                 "Omitting darkCore (default 0.0) must produce identical hostility to explicit 0.0.");
         }
 
-        #endregion
+        #endregion Test 7 — SocialComparisonMath: default darkCore=0 does not change existing behaviour
 
         #region Helpers
 
@@ -308,6 +308,6 @@ namespace EngineTests
                 new Dictionary<string, double>());
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

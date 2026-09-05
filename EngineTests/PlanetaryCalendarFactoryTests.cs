@@ -87,7 +87,7 @@ namespace EngineTests
         [TestMethod]
         public void Build_ReproducesVigiliaInsectianisExactly()
         {
-            var planet  = PlanetConfig.Earth with { SiderealRotationHrs = 26.0 };
+            var planet = PlanetConfig.Earth with { SiderealRotationHrs = 26.0 };
             var options = new CalendarOptions(
                 MonthCount: 10, TargetYearDays: 360,
                 MinutesPerHour: 60, SecondsPerMinute: 60, TicksPerSecond: 10_000_000,
@@ -113,10 +113,10 @@ namespace EngineTests
         public void Build_WithGregorianCalendar_MatchesRealEarth()
         {
             var options = new CalendarOptions(
-                MonthLengths:     new[] { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 },
+                MonthLengths: new[] { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 },
                 UseGregorianLeap: true,
-                LeapExtraDays:    1,
-                LeapMonth:        2);
+                LeapExtraDays: 1,
+                LeapMonth: 2);
 
             var spec = PlanetaryCalendarFactory.Build(
                 PlanetConfig.Earth, OrbitalElements.Earth, StarPhysics.Sol, options);

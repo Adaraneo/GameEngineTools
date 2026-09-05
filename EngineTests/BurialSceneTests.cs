@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines;
@@ -25,6 +22,9 @@ namespace EngineTests
     using GameEngineTools.World.Simulation;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging.Abstractions;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Integration tests for physical burial in <see cref="DefaultSceneOrchestrator"/>: a death spawns a
@@ -216,7 +216,7 @@ namespace EngineTests
                 CommunalStrength: 50,
                 KinRole: kin);
 
-        #endregion
+        #endregion Helpers
 
         #region Test doubles
 
@@ -240,15 +240,20 @@ namespace EngineTests
             }
 
             public void SetLastOutbox(params IDomainEvent[] events) => _lastOutbox = events;
+
             public void SetBereavement(BereavementState state) => _snapshot = _snapshot with { Bereavement = state };
+
             public IReadOnlyList<IDomainEvent> ReceivedEvents => _received;
 
             public HumanId Id { get; }
+
             public Identity Identity => new(
                 new Name { Original = "T", Familiar = new[] { "T" } },
                 new Surname { Male = "Spy", Female = "Spy" },
                 WDateOnly.New(80, 1, 1));
+
             public SexBiology Biology => SexBiology.Female;
+
             public Personality Personality => new(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5),
                 AttachmentProfile.Secure,
@@ -256,11 +261,14 @@ namespace EngineTests
                 new MotivationWeights(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
                 Sociosexuality.Intermediate,
                 Chronotype.Neutral);
+
             public PsychologicalProfile PsychologyProfile => PsychologicalProfile.FromPersonality(Personality);
+
             public PhysicalAppearance PhysicalAppearance => TestAppearanceFactory.Build(
                 heightCm: 168, frame: BodyFrame.Medium, skinTone: SkinTone.Light, eyeColor: EyeColor.Brown,
                 hairColor: HairColorNatural.Brown, hairType: HairType.Straight, faceShape: FaceShape.Oval,
                 shoulderBreadthCm: 40, hipBreadthCm: 38, noseProjection: 0.5, lipFullness: 0.5);
+
             public AttractionProfile? AttractionProfile => null;
             public EnginesSnapshot Snapshot => _snapshot;
             public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutbox;
@@ -268,9 +276,15 @@ namespace EngineTests
             public StadiumType Stadium => StadiumType.Adult;
 
             public void ReceiveEvent(IDomainEvent @event) => _received.Add(@event);
-            public void Tick(WDateTime now, WTimeSpan dt) { }
+
+            public void Tick(WDateTime now, WTimeSpan dt)
+            { }
+
             public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default) => _snapshot = snapshot;
-            public void FlushInbox() { }
+
+            public void FlushInbox()
+            { }
+
             public int CompareTo(IHuman? other) => 0;
         }
 
@@ -281,16 +295,25 @@ namespace EngineTests
 
             public IEnumerable<WorldObject> GetObjectsAt(string locationId)
                 => _objects.Values.Where(o => o.LocationId == locationId);
+
             public IEnumerable<WorldObject> GetAllObjects() => _objects.Values.ToList();
+
             public void AddObject(WorldObject obj) => _objects[obj.Id] = obj;
+
             public WorldObject? FindObject(string objectId) => _objects.TryGetValue(objectId, out var o) ? o : null;
 
             public bool RemoveObject(string locationId, string objectId) => _objects.Remove(objectId);
+
             public bool ConsumeObject(string locationId, string objectId, WDateTime now) => false;
+
             public bool RestoreObject(string locationId, string objectId) => false;
+
             public bool SetHeldBy(string locationId, string objectId, HumanId? holder) => false;
+
             public IEnumerable<WorldObject> GetHeldBy(HumanId holder) => Enumerable.Empty<WorldObject>();
+
             public IEnumerable<string> GetKnownLocationIds() => _objects.Values.Select(o => o.LocationId).Distinct();
+
             public IEnumerable<WorldObject> GetAllObjectsAt(string locationId) => GetObjectsAt(locationId);
         }
 
@@ -301,9 +324,13 @@ namespace EngineTests
 
         private sealed class AllBackgroundLodRuntime : ICognitiveResolutionLevelRuntime
         {
-            public void Clear(HumanId id) { }
+            public void Clear(HumanId id)
+            { }
+
             public CognitiveResolutionLevel Get(HumanId id) => CognitiveResolutionLevel.Background;
-            public void Set(HumanId id, CognitiveResolutionLevel level) { }
+
+            public void Set(HumanId id, CognitiveResolutionLevel level)
+            { }
         }
 
         private sealed class NeutralAttractionCalculator : IAttractionCalculator
@@ -319,6 +346,6 @@ namespace EngineTests
             public double GetSpeedMetersPerMinute(EnginesSnapshot snapshot, TerrainType terrain = TerrainType.Indoor) => metersPerMinute;
         }
 
-        #endregion
+        #endregion Test doubles
     }
 }

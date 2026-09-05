@@ -3,10 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text.Json;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -22,6 +18,10 @@ namespace EngineTests
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Text.Json;
 
     /// <summary>
     /// Phase 5 — the subjective trace ("unreliable witness"): a listener remembers its OWN divergent

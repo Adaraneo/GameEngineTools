@@ -3,14 +3,14 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Dialogue.Planning;
     using GameEngineTools.World.Utils.Time;
     using Grammar.Core.Enums;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Linq;
 
     /// <summary>
     /// Phase-3 planner: register follows relationship state, directness follows a Brown &amp; Levinson

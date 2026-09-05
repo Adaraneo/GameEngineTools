@@ -15,6 +15,9 @@
 
 namespace EngineTests
 {
+    using GameEngineTools.Logging;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -22,9 +25,6 @@ namespace EngineTests
     using System.Reflection;
     using System.Text.Json;
     using System.Text.Json.Serialization;
-    using GameEngineTools.Logging;
-    using Microsoft.Extensions.Logging;
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
 
     [TestClass]
     public sealed class EventRegistryTests
@@ -63,7 +63,7 @@ namespace EngineTests
                 $"eventRegistry.json not found at {path}. Run with GENERATE_REGISTRY=1 to create it.");
 
             var committed = File.ReadAllText(path).Replace("\r\n", "\n").TrimEnd();
-            var expected  = json.Replace("\r\n", "\n").TrimEnd();
+            var expected = json.Replace("\r\n", "\n").TrimEnd();
 
             Assert.AreEqual(expected, committed,
                 "eventRegistry.json has drifted from CoreLog.cs. " +
@@ -88,11 +88,11 @@ namespace EngineTests
                     .ToList();
 
                 defs.Add(new EventDef(
-                    Id:      attr.EventId,
-                    Kind:    m.Name,
-                    Engine:  EngineFor(attr.EventId),
-                    Scope:   WorldScopedIds.Contains(attr.EventId) ? "world" : "character",
-                    Level:   attr.Level.ToString(),
+                    Id: attr.EventId,
+                    Kind: m.Name,
+                    Engine: EngineFor(attr.EventId),
+                    Scope: WorldScopedIds.Contains(attr.EventId) ? "world" : "character",
+                    Level: attr.Level.ToString(),
                     Payload: payload));
             }
             return defs.OrderBy(d => d.Id).ToList();
@@ -116,19 +116,19 @@ namespace EngineTests
             >= 5000 and <= 5099 => "Physiology",
             >= 5100 and <= 5199 => "Psychology",
             >= 5200 and <= 5299 => "Behavior",
-            _                   => "Unknown",
+            _ => "Unknown",
         };
 
         /// <summary>JS-friendly type names for the payload schema.</summary>
         private static string FriendlyType(Type t) => t switch
         {
             _ when t == typeof(double) => "number",
-            _ when t == typeof(float)  => "number",
-            _ when t == typeof(int)    => "int",
-            _ when t == typeof(long)   => "long",
-            _ when t == typeof(bool)   => "bool",
+            _ when t == typeof(float) => "number",
+            _ when t == typeof(int) => "int",
+            _ when t == typeof(long) => "long",
+            _ when t == typeof(bool) => "bool",
             _ when t == typeof(string) => "string",
-            _                          => t.Name,
+            _ => t.Name,
         };
 
         private static readonly JsonSerializerOptions JsonOpts = new()

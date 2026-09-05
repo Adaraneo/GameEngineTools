@@ -69,7 +69,7 @@ namespace EngineTests
             Assert.IsTrue(rCConventional > 0.3, $"Conscientiousness→Conventional must be positive. Got: {rCConventional:F2}");
         }
 
-        #endregion
+        #endregion Test 1 — BigFive → RIASEC mapping signature (Larson 2002)
 
         #region Test 2 — sex prior: Things–People gap with overlap
 
@@ -107,7 +107,7 @@ namespace EngineTests
                 "Distributions must overlap substantially (no deterministic sex difference).");
         }
 
-        #endregion
+        #endregion Test 2 — sex prior: Things–People gap with overlap
 
         #region Test 3 — rewarding episodes raise the matching dimension
 
@@ -127,7 +127,7 @@ namespace EngineTests
                 $"~10 rewarding Create episodes must push Artistic into the maintained band. before={before:F3}, after={after:F3}");
         }
 
-        #endregion
+        #endregion Test 3 — rewarding episodes raise the matching dimension
 
         #region Test 4 — runaway guard: regression caps growth
 
@@ -154,7 +154,7 @@ namespace EngineTests
                 "Regression pulls toward baseline, not below it.");
         }
 
-        #endregion
+        #endregion Test 4 — runaway guard: regression caps growth
 
         #region Test 5 — neutral-mood routine actions do not saturate Social (saturation fix)
 
@@ -176,7 +176,7 @@ namespace EngineTests
             Assert.IsTrue(social < 0.99, "Social must not reach the ceiling from mere baseline mood.");
         }
 
-        #endregion
+        #endregion Test 5 — neutral-mood routine actions do not saturate Social (saturation fix)
 
         #region Test 6 — a genuinely rewarding moment still raises interest (regression guard)
 
@@ -198,7 +198,7 @@ namespace EngineTests
                 $"before={before:F3}, after={after:F3}");
         }
 
-        #endregion
+        #endregion Test 6 — a genuinely rewarding moment still raises interest (regression guard)
 
         #region Helpers
 
@@ -266,6 +266,6 @@ namespace EngineTests
             return cov / (Math.Sqrt(vx) * Math.Sqrt(vy));
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

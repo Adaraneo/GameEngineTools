@@ -90,6 +90,7 @@ namespace EngineTests
         #endregion Private fields
 
         #region Setup
+
         protected override void TestInit()
         {
             base.TestInit();
@@ -504,14 +505,14 @@ namespace EngineTests
 
         #endregion Factory methods
 
-    #region SpyHuman
+        #region SpyHuman
 
-    /// <summary>
-    /// Minimal <see cref="IHuman"/> that records all received events
-    /// and exposes helpers for seeding relationship edges (used to simulate
-    /// what <see cref="DefaultRelationshipsEngine"/> would write to snapshot).
-    /// </summary>
-    private sealed class SpyHuman : IHuman
+        /// <summary>
+        /// Minimal <see cref="IHuman"/> that records all received events
+        /// and exposes helpers for seeding relationship edges (used to simulate
+        /// what <see cref="DefaultRelationshipsEngine"/> would write to snapshot).
+        /// </summary>
+        private sealed class SpyHuman : IHuman
         {
             #region Private state
 
@@ -590,12 +591,14 @@ namespace EngineTests
             public void ReceiveEvent(IDomainEvent @event)
                 => _receivedEvents.Add(@event);
 
-            public void Tick(WDateTime now, WTimeSpan dt) { }
+            public void Tick(WDateTime now, WTimeSpan dt)
+            { }
 
             public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default)
                 => _snapshot = snapshot;
 
-            public void FlushInbox() { }
+            public void FlushInbox()
+            { }
 
             // ── Test helpers ──────────────────────────────────────────────────
 
@@ -672,10 +675,13 @@ namespace EngineTests
         /// <summary>Returns <see cref="CognitiveResolutionLevel.Background"/> for all characters.</summary>
         private sealed class AllBackgroundLodRuntime : ICognitiveResolutionLevelRuntime
         {
-            public void Clear(HumanId id) { }
+            public void Clear(HumanId id)
+            { }
 
             public CognitiveResolutionLevel Get(HumanId id) => CognitiveResolutionLevel.Background;
-            public void Set(HumanId id, CognitiveResolutionLevel level) { }
+
+            public void Set(HumanId id, CognitiveResolutionLevel level)
+            { }
         }
 
         /// <summary>Always returns <see cref="AttractionResult.Neutral"/>.</summary>
@@ -709,7 +715,8 @@ namespace EngineTests
             public IEnumerable<WorldObject> GetAllObjects()
                 => Enumerable.Empty<WorldObject>();
 
-            public void AddObject(WorldObject obj) { }
+            public void AddObject(WorldObject obj)
+            { }
 
             public WorldObject? FindObject(string objectId) => null;
         }

@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Goals;
@@ -19,6 +16,9 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Tests for the Scherer-CPM appraisal path (<see cref="AppraisalEvaluator"/>,
@@ -104,7 +104,7 @@ namespace EngineTests
             Assert.AreEqual(DiscreteEmotion.Neutral, result.Emotion);
         }
 
-        #endregion
+        #endregion AppraisalEmotionMap — agency discriminates negative emotions
 
         #region Engine integration — same PAD, different appraisal → different emotion
 
@@ -158,7 +158,7 @@ namespace EngineTests
                 "Completed-goal appraisal must emit EmotionAppraised.");
         }
 
-        #endregion
+        #endregion Engine integration — same PAD, different appraisal → different emotion
 
         #region Helpers
 
@@ -212,6 +212,6 @@ namespace EngineTests
             };
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

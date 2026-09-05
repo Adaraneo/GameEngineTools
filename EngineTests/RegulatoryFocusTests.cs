@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
@@ -17,6 +14,9 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
@@ -77,7 +77,7 @@ namespace EngineTests
                 $"Promotion/Prevention must NOT be strongly negative (bipolar). Got r={r:F3}.");
         }
 
-        #endregion
+        #endregion Generator
 
         #region Loss-aversion λ modulation
 
@@ -130,7 +130,7 @@ namespace EngineTests
             return candidates.First(c => c.Name == Create).Utility;
         }
 
-        #endregion
+        #endregion Loss-aversion λ modulation
 
         #region Regulatory fit bonus
 
@@ -175,7 +175,7 @@ namespace EngineTests
                 "Neutral-strategy action receives no fit bonus.");
         }
 
-        #endregion
+        #endregion Regulatory fit bonus
 
         #region Helpers
 
@@ -248,12 +248,16 @@ namespace EngineTests
         private sealed class SeededRandom : IRandomSource
         {
             private readonly Random _r;
+
             public SeededRandom(int seed) => _r = new Random(seed);
+
             public int Next(int min, int max) => _r.Next(min, max);
+
             public double NextUnit() => _r.NextDouble();
+
             public bool Chance(double p) => _r.NextDouble() < p;
         }
 
-        #endregion
+        #endregion Helpers
     }
 }

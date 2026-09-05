@@ -3,13 +3,13 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using System;
+    using System.Linq;
 
     /// <summary>
     /// Verifies that a grave produced by burial survives a round trip through the real

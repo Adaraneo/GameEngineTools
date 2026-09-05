@@ -3,9 +3,6 @@
 
 namespace EngineTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.NeedAppraisal;
@@ -18,6 +15,9 @@ namespace EngineTests
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Tests for Subsystem E (SDT basic needs): the derived <see cref="NeedAppraisalState"/> /
@@ -48,7 +48,7 @@ namespace EngineTests
                 $"Stalled, frustrated goals → high competence frustration. Got {state.Competence.Frustration:F3}.");
         }
 
-        #endregion
+        #endregion Competence
 
         #region Relatedness
 
@@ -84,7 +84,7 @@ namespace EngineTests
                 "Absence of relationships is a deficit, not active thwarting — frustration stays low.");
         }
 
-        #endregion
+        #endregion Relatedness
 
         #region Autonomy
 
@@ -124,7 +124,7 @@ namespace EngineTests
                 $"Autonomy must stay distinct from RegulatoryFocus.Promotion (r<0.6). Got r={r:F3}.");
         }
 
-        #endregion
+        #endregion Autonomy
 
         #region Channel / balance math
 
@@ -164,7 +164,7 @@ namespace EngineTests
             Assert.AreEqual(0.5, effective.GlobalBalance, 1e-9, "Empty → all channels neutral (balance 0.5).");
         }
 
-        #endregion
+        #endregion Channel / balance math
 
         #region Helpers
 
@@ -260,6 +260,6 @@ namespace EngineTests
             };
         }
 
-        #endregion
+        #endregion Helpers
     }
 }
