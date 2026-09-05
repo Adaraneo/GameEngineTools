@@ -185,7 +185,177 @@ public class RiverMeanderTests
         Assert.AreEqual(1.5 / (2.0 * 0.003), RiverMeander.CurvatureMemoryLengthMeters(channelDepthMeters: 1.5, frictionCoefficient: 0.003), 1e-9);
     }
 
+    #region Neck cutoffs (Stage 2)
+
+    /// <summary>Builds a "hook"-shaped D8 backbone (3.5 sides of a rectangle, starting at
+    /// (baseX,baseY)) as raw topology arrays — bypassing TileHydrology/real terrain entirely, since
+    /// ComputeOffsets takes mask/accumulation/slope/downstream/order directly and only reads
+    /// OriginX/OriginY/CellSizeMeters/Width/Height off the grid. The hook's open end curls back to
+    /// land its second cell and its last cell within one diagonal grid step of each other
+    /// (√2×cellSize ≈ 7.07m at cellSize=5) — deterministically close, rather than relying on
+    /// chaotic emergent migration to maybe self-approach over many iterations.</summary>
+    private static List<(int X, int Y)> BuildHookChain(int baseX, int baseY)
+    {
+        var path = new List<(int, int)>();
+        for (var x = baseX; x <= baseX + 8; x++) path.Add((x, baseY)); // leg 1: rightward
+        for (var y = baseY + 1; y <= baseY + 8; y++) path.Add((baseX + 8, y)); // leg 2: downward
+        for (var x = baseX + 7; x >= baseX; x--) path.Add((x, baseY + 8)); // leg 3: leftward
+        for (var y = baseY + 7; y >= baseY + 1; y--) path.Add((baseX, y)); // leg 4: upward, ending 1 row below the start
+        return path;
+    }
+
+    /// <summary>Stamps one or more independent hook chains (see <see cref="BuildHookChain"/>) into
+    /// straight-backbone topology arrays ComputeOffsets can consume directly. Every chain gets a
+    /// uniform, hand-picked accumulation large enough (with default WidthPerSqrtAreaM2) to produce
+    /// a ~10m channel width — comfortably wider than the hook's own ~7.07m self-approach distance,
+    /// so the default CutoffTriggerPerWidth=1.0 (10m) already exceeds it before any migration.</summary>
+    private static (byte[] Mask, int[] Accumulation, double[] Slope, int[] Downstream, int[] Order) BuildCutoffTestTopology(
+        int width, int height, params List<(int X, int Y)>[] chains)
+    {
+        var count = width * height;
+        var mask = new byte[count];
+        var accumulation = new int[count];
+        var slope = new double[count];
+        var downstream = new int[count];
+        Array.Fill(downstream, -1);
+        var order = new List<int>();
+
+        foreach (var chain in chains)
+        {
+            for (var k = 0; k < chain.Count; k++)
+            {
+                var idx = chain[k].Y * width + chain[k].X;
+                mask[idx] = 1;
+                accumulation[idx] = 10000; // -> ~10m channel width at the default WidthPerSqrtAreaM2/cellSize=5
+                slope[idx] = 0.001; // well below SlopeFullMeanderBelow — full erodibility, not that this test needs any migration
+                if (k + 1 < chain.Count) downstream[idx] = chain[k + 1].Y * width + chain[k + 1].X;
+                order.Add(idx);
+            }
+        }
+        for (var i = 0; i < count; i++)
+            if (mask[i] == 0) order.Add(i);
+
+        return (mask, accumulation, slope, downstream, order.ToArray());
+    }
+
+    [TestMethod]
+    public void ComputeOffsets_BendApproachingNeckBelowCutoffThreshold_SplicesBackboneAndRecordsSeveredLoop()
+    {
+        const int width = 20, height = 20;
+        var chain = BuildHookChain(2, 2);
+        var (mask, accumulation, slope, downstream, order) = BuildCutoffTestTopology(width, height, chain);
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+
+        var (_, _, effectiveDownstream, active, severedLoops) =
+            RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters(Iterations: 1));
+
+        Assert.IsTrue(severedLoops.Count > 0, "The hook's near-self-approach should have triggered at least one cutoff.");
+
+        var loop = severedLoops[0];
+        foreach (var idx in loop.BackboneIndices)
+            Assert.IsFalse(active[idx], $"Severed loop cell {idx} should no longer be part of the active backbone.");
+
+        // Contiguity: no still-active cell's effective downstream should point at an inactive
+        // (severed) one — the splice must connect straight across the gap, not leave a dangling
+        // reference into the removed loop.
+        for (var i = 0; i < mask.Length; i++)
+        {
+            if (!active[i]) continue;
+            var next = effectiveDownstream[i];
+            if (next < 0) continue;
+            Assert.IsTrue(active[next], $"Active cell {i}'s effective downstream {next} should also still be active after splicing.");
+        }
+    }
+
+    [TestMethod]
+    public void ComputeOffsets_BendWithinDampingRangeButAboveCutoffThreshold_DampsWithoutCuttingLoop()
+    {
+        const int width = 20, height = 20;
+        var chain = BuildHookChain(2, 2);
+        var (mask, accumulation, slope, downstream, order) = BuildCutoffTestTopology(width, height, chain);
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+
+        // CutoffTriggerPerWidth shrunk to effectively unreachable (0.001*10m = 1cm) while
+        // MinSeparationPerWidth stays comfortably above the hook's ~7.07m self-approach distance
+        // (1.0*10m = 10m > 7.07m) — the same closeness that triggered a cutoff in the previous test
+        // now falls squarely in the damping-only range instead.
+        var p = new RiverMeander.Parameters(Iterations: 1, CutoffTriggerPerWidth: 0.001, MinSeparationPerWidth: 1.0);
+        var (_, _, _, active, severedLoops) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+
+        Assert.AreEqual(0, severedLoops.Count, "No cutoff should fire when the closeness only crosses the (looser) damping threshold, not the (tighter) cutoff one.");
+        Assert.AreEqual(chain.Count, Enumerable.Range(0, mask.Length).Count(i => active[i]),
+            "Every original chain cell should still be active — damping must not remove anything from the backbone.");
+    }
+
+    [TestMethod]
+    public void RasterizeOxbowLakes_SingleSeveredLoop_ProducesNonEmptyMaskMatchingLoopShape()
+    {
+        const int width = 10, height = 10;
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+        var loop = new RiverMeander.SeveredLoop(
+            BackboneIndices: [1, 2, 3],
+            OffsetX: [2, 3, 4],
+            OffsetY: [5, 5, 5]);
+
+        var oxbow = RiverMeander.RasterizeOxbowLakes(grid, [loop]);
+
+        Assert.AreEqual(width * height, oxbow.Length);
+        foreach (var x in new[] { 2, 3, 4 })
+            Assert.AreEqual(1, oxbow[5 * width + x], $"Expected oxbow cell at ({x},5) — part of the severed loop's own recorded shape.");
+        Assert.AreEqual(3, oxbow.Count(b => b != 0), "A straight 3-point horizontal loop should rasterize to exactly those 3 cells, nothing more.");
+    }
+
+    [TestMethod]
+    public void ApplyMeanderWithCutoffs_MultipleIndependentBends_EachCanCutOffSeparately()
+    {
+        const int width = 80, height = 80;
+        var chainA = BuildHookChain(2, 2);
+        var chainB = BuildHookChain(50, 50);
+        var (mask, accumulation, slope, downstream, order) = BuildCutoffTestTopology(width, height, chainA, chainB);
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+        var strahlerOrder = new byte[mask.Length];
+        var shreveMagnitude = new int[mask.Length];
+        for (var i = 0; i < mask.Length; i++) { strahlerOrder[i] = mask[i]; shreveMagnitude[i] = mask[i]; }
+
+        var (_, _, oxbowMask) = RiverMeander.ApplyMeanderWithCutoffs(grid, mask, accumulation, slope, downstream, order,
+            strahlerOrder, shreveMagnitude, new RiverMeander.Parameters(Iterations: 1));
+
+        var oxbowNearA = false;
+        var oxbowNearB = false;
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                if (oxbowMask[y * width + x] == 0) continue;
+                if (x < 40) oxbowNearA = true; else oxbowNearB = true;
+            }
+        }
+
+        Assert.IsTrue(oxbowNearA, "Expected the first independent hook (near x=2..10) to have cut off its own oxbow lake.");
+        Assert.IsTrue(oxbowNearB, "Expected the second independent hook (near x=50..58) to have cut off its own oxbow lake, separately from the first.");
+    }
+
+    [TestMethod]
+    public void Parameters_CutoffTriggerGreaterThanOrEqualToMinSeparation_ThrowsArgumentException()
+    {
+        var p = new RiverMeander.Parameters(CutoffTriggerPerWidth: 2.0, MinSeparationPerWidth: 1.5);
+
+        Assert.Throws<ArgumentException>(() => p.Validate());
+    }
+
+    #endregion Neck cutoffs (Stage 2)
+
     #region Stream-power meander suppression (Stage 2)
+
+    [TestMethod]
+    public void ComputeStreamPower_KnownDischargeSlopeWidth_MatchesHandCalculatedValue()
+    {
+        // ω = ρ·g·Q·S/w, ρ=1000, g=9.81, Q=10, S=0.01, w=20 -> 1000*9.81*10*0.01/20 = 49.05 W/m².
+        const double q = 10.0, s = 0.01, w = 20.0;
+        var expected = 1000.0 * 9.81 * q * s / w;
+
+        Assert.AreEqual(expected, RiverMeander.ComputeSpecificStreamPowerWPerM2(q, s, w), 1e-9);
+    }
 
     /// <summary>Builds a single-column channel with ONE deliberate kink (straight down, then a
     /// one-cell sideways jog, then straight down again) — a perfectly straight line has exactly
@@ -230,16 +400,6 @@ public class RiverMeanderTests
     }
 
     [TestMethod]
-    public void ComputeStreamPower_KnownDischargeSlopeWidth_MatchesHandCalculatedValue()
-    {
-        // ω = ρ·g·Q·S/w, ρ=1000, g=9.81, Q=10, S=0.01, w=20 -> 1000*9.81*10*0.01/20 = 49.05 W/m².
-        const double q = 10.0, s = 0.01, w = 20.0;
-        var expected = 1000.0 * 9.81 * q * s / w;
-
-        Assert.AreEqual(expected, RiverMeander.ComputeSpecificStreamPowerWPerM2(q, s, w), 1e-9);
-    }
-
-    [TestMethod]
     public void ComputeOffsets_HighStreamPowerLowSlope_StillSuppressesMigrationDespitePassingFlatSlopeCheck()
     {
         // Modest accumulation (~3m channel width, keeping the seed/grid scale sane) with slope well
@@ -254,7 +414,7 @@ public class RiverMeanderTests
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
         var p = new RiverMeander.Parameters(InitialPerturbationPerWidth: 0.0, DischargePerContributingAreaM2: 1.0);
-        var (offsetX, offsetY) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+        var (offsetX, offsetY, _, _, _) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
 
         var kinkX = kinkIndex % width;
         var kinkY = kinkIndex / width;
@@ -276,7 +436,7 @@ public class RiverMeanderTests
 
         var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
         var p = new RiverMeander.Parameters(InitialPerturbationPerWidth: 0.0);
-        var (offsetX, offsetY) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
+        var (offsetX, offsetY, _, _, _) = RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, p);
 
         var kinkX = kinkIndex % width;
         var kinkY = kinkIndex / width;

@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS TerrainHeightmap (
     Height          INTEGER NOT NULL,
     Data            BLOB    NOT NULL,
     RiverMask       BLOB,           -- nullable: 0/1 byte per cell, painted separately from elevation
-    ShreveMagnitude BLOB            -- nullable: int32 per cell, co-indexed with RiverMask (Shreve 1966)
+    ShreveMagnitude BLOB,           -- nullable: int32 per cell, co-indexed with RiverMask (Shreve 1966)
+    OxbowMask       BLOB            -- nullable: 0/1 byte per cell, still-water loops severed by a neck cutoff (Stage 2)
 );
 
 -- ── Terrain Geo Reference ─────────────────────────────────────────────────────

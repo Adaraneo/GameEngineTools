@@ -23,14 +23,16 @@ namespace TerraGen.Generation;
 /// 1957), and channel width (hence how far a reach can wander and how long its curvature "memory"
 /// reaches) still comes from contributing area the same way it did before.
 ///
-/// KNOWN SIMPLIFICATION: real Howard-Knutson simulations also detect and splice out neck cutoffs
-/// (where a bend curves back close enough to itself to pinch off into an oxbow lake) — without
-/// that, letting the simulation run indefinitely eventually tangles a channel into itself. This
-/// implementation skips explicit cutoffs and instead damps any step that would bring a point too
-/// close to a non-adjacent part of the same network, and keeps the iteration count modest — bends
-/// develop and vary in a stable-enough range without ever needing to resolve a real cutoff. A
-/// future pass could add real cutoff splicing (and the resulting oxbow-lake cells) if that specific
-/// detail turns out to matter.
+/// Stage 2 adds real neck-cutoff splicing (see <see cref="ApplyMeanderWithCutoffs"/>): once a bend's
+/// proposed step would bring it within <see cref="Parameters.CutoffTriggerPerWidth"/> channel widths
+/// of a non-adjacent point on the SAME channel, the intervening loop is severed from the active
+/// backbone and rasterized separately as a still-water oxbow lake, rather than merely damped —
+/// Howard &amp; Knutson (1984) report meandering channels typically migrate 5-7 channel widths
+/// before this actually happens in nature. Below that tighter threshold, the original damping
+/// still applies (see <see cref="Parameters.MinSeparationPerWidth"/>) — a bend slows down as it
+/// approaches self-intersection before it actually cuts, it doesn't jump straight from "unaffected"
+/// to "severed." <see cref="ApplyMeander"/> keeps its original 2-tuple signature for existing
+/// callers (cutoffs still happen, only the oxbow output is discarded).
 /// </summary>
 public static class RiverMeander
 {
@@ -64,6 +66,13 @@ public static class RiverMeander
     /// threshold NUMBER from that source is cited here).</para></summary>
     internal static double ComputeSpecificStreamPowerWPerM2(double dischargeM3PerS, double slope, double channelWidthMeters)
         => WaterDensityKgPerM3 * GravityMPerS2 * dischargeM3PerS * slope / channelWidthMeters;
+
+    /// <summary>A neck-cutoff's severed loop (Stage 2 — see the type-level remarks and
+    /// <see cref="ApplyMeanderWithCutoffs"/>): the backbone cell indices removed from the active
+    /// channel, and where each one's migrated position was at the moment of the cut — frozen there
+    /// permanently, since a severed loop is stagnant water from that point on, not still
+    /// migrating.</summary>
+    internal readonly record struct SeveredLoop(int[] BackboneIndices, int[] OffsetX, int[] OffsetY);
 
     /// <summary>Edwards &amp; Smith (2002) upstream curvature-memory decay length
     /// <c>D = H / (2·C_f)</c> — see <see cref="Parameters.FrictionCoefficient"/>'s remarks. A
@@ -170,6 +179,21 @@ public static class RiverMeander
         /// instead of applied in full — keeps the channel from tangling into itself instead of
         /// letting it pinch into a proper oxbow.</summary>
         double MinSeparationPerWidth = 1.5,
+        /// <summary>Neck-cutoff trigger distance, in multiples of local channel width. When a
+        /// point's proposed position would fall within this distance of a non-adjacent point on the
+        /// SAME channel network (i.e. reachable from it by following <c>predecessor</c>/
+        /// <c>downstream</c> links, not a different tributary — see <see cref="ComputeOffsets"/>'s
+        /// remarks), the intervening loop is severed and rasterized separately as an oxbow lake
+        /// (<see cref="RasterizeOxbowLakes"/>) instead of being damped further. Must be strictly
+        /// smaller than <see cref="MinSeparationPerWidth"/> — enforced by <see cref="Validate"/> —
+        /// so damping still has a chance to act as a bend approaches self-intersection before an
+        /// actual cutoff fires; a cutoff threshold that never engages before damping saturates would
+        /// silently disable this feature.
+        /// <para>Source: Camporeale, C., Perona, P., Porporato, A. &amp; Ridolfi, L. (2008).
+        /// "Significance of cutoff in meandering river dynamics." <i>Journal of Geophysical
+        /// Research</i> 113:F01001. doi:10.1029/2006JF000600. Cutoff trigger at approximately 1
+        /// channel width of neck separation.</para></summary>
+        double CutoffTriggerPerWidth = 1.0,
         /// <summary>Meander-belt cap: total drift from a point's original straight-backbone position
         /// is limited to this many multiples of local channel width — real rivers wander within a
         /// bounded floodplain belt, not indefinitely. This is the actual saturation mechanism for the
@@ -209,7 +233,22 @@ public static class RiverMeander
         /// <para>UNCITED PLACEHOLDER, not a literature-calibrated regional value (order-of-magnitude
         /// only, loosely comparable to a temperate-climate specific runoff yield of roughly
         /// 10 L/s/km²) — tune per biome/climate rather than treating it as a cited constant.</para></summary>
-        double DischargePerContributingAreaM2 = 1e-8);
+        double DischargePerContributingAreaM2 = 1e-8)
+    {
+        /// <summary>Throws if this instance is internally inconsistent. Currently only checks that
+        /// <see cref="CutoffTriggerPerWidth"/> is strictly smaller than
+        /// <see cref="MinSeparationPerWidth"/> — see that field's own remarks for why. Called
+        /// automatically by <see cref="ComputeOffsets"/> (hence by <see cref="ApplyMeander"/> and
+        /// <see cref="ApplyMeanderWithCutoffs"/>); call directly only to validate a Parameters
+        /// instance before it's actually used.</summary>
+        public void Validate()
+        {
+            if (CutoffTriggerPerWidth >= MinSeparationPerWidth)
+                throw new ArgumentException(
+                    $"{nameof(CutoffTriggerPerWidth)} ({CutoffTriggerPerWidth}) must be strictly smaller than " +
+                    $"{nameof(MinSeparationPerWidth)} ({MinSeparationPerWidth}), or damping would saturate before a cutoff could ever fire.");
+        }
+    }
 
     /// <summary>Takes the straight D8 mask <see cref="TileHydrology.ComputeDiagnostics"/> already
     /// computed (plus its accumulation/slope/downstream/Strahler-order/Shreve-magnitude arrays,
@@ -226,23 +265,96 @@ public static class RiverMeander
         int[] accumulation, double[] slope, int[] downstream, int[] order, byte[] strahlerOrder,
         int[] shreveMagnitude, Parameters p)
     {
-        var (offsetX, offsetY) = ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
-        return Rasterize(grid, straightMask, downstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
+        var (offsetX, offsetY, effectiveDownstream, active, _) =
+            ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
+        return Rasterize(grid, active, effectiveDownstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
     }
 
-    /// <summary>Same computation as <see cref="ApplyMeander"/>, but stops short of rasterizing —
-    /// returns each backbone cell's own final migrated (x,y) instead. Not needed by any production
-    /// caller (which only wants the final mask), but lets a test or investigation measure the
-    /// simulation's actual output — path length, sinuosity, self-crossing — directly from where
-    /// cells ended up, instead of only from how many raster pixels ended up lit.</summary>
-    internal static (int[] OffsetX, int[] OffsetY) ComputeOffsets(TerrainHeightmap grid, byte[] straightMask,
-        int[] accumulation, double[] slope, int[] downstream, int[] order, Parameters p)
+    /// <summary>Stage 2: same simulation as <see cref="ApplyMeander"/> — cutoffs happen there too,
+    /// this is the only entry point that also SURFACES the resulting oxbow lakes and Shreve
+    /// magnitude together with the river mask, rather than discarding them.</summary>
+    public static (byte[] RiverMask, int[] ShreveMagnitude, byte[] OxbowMask) ApplyMeanderWithCutoffs(
+        TerrainHeightmap grid, byte[] straightMask, int[] accumulation, double[] slope,
+        int[] downstream, int[] order, byte[] strahlerOrder, int[] shreveMagnitude, Parameters p)
     {
+        var (offsetX, offsetY, effectiveDownstream, active, severedLoops) =
+            ComputeOffsets(grid, straightMask, accumulation, slope, downstream, order, p);
+        var (mask, magnitude) = Rasterize(grid, active, effectiveDownstream, strahlerOrder, shreveMagnitude, offsetX, offsetY);
+        var oxbow = RasterizeOxbowLakes(grid, severedLoops);
+        return (mask, magnitude, oxbow);
+    }
+
+    /// <summary>Rasterizes every <see cref="SeveredLoop"/> a meander simulation cut off into a
+    /// standalone still-water mask — the oxbow lake left behind after a neck cutoff. Separate from
+    /// the main river mask so a caller can render/tag it distinctly (no flow, no Strahler order,
+    /// eventually stagnant).
+    /// <para>Source: Schwenk, J. &amp; Foufoula-Georgiou, E. (2016). "Meander cutoffs nonlocally
+    /// accelerate upstream and downstream migration and channel widening." <i>Geophysical Research
+    /// Letters</i> 43:12437-12445. doi:10.1002/2016GL071670 — cutoffs sever a loop which becomes an
+    /// oxbow lake.</para></summary>
+    internal static byte[] RasterizeOxbowLakes(TerrainHeightmap grid, IReadOnlyList<SeveredLoop> severedLoops)
+    {
+        var width = grid.Width;
+        var height = grid.Height;
+        var oxbow = new byte[width * height];
+
+        foreach (var loop in severedLoops)
+        {
+            for (var k = 0; k < loop.OffsetX.Length; k++)
+            {
+                var x = loop.OffsetX[k];
+                var y = loop.OffsetY[k];
+                if (x >= 0 && x < width && y >= 0 && y < height) oxbow[y * width + x] = 1;
+
+                if (k + 1 >= loop.OffsetX.Length) continue;
+                ForEachLinePoint(width, height, x, y, loop.OffsetX[k + 1], loop.OffsetY[k + 1], idx => oxbow[idx] = 1);
+            }
+        }
+
+        return oxbow;
+    }
+
+    /// <summary>Same computation as <see cref="ApplyMeander"/>/<see cref="ApplyMeanderWithCutoffs"/>,
+    /// but stops short of rasterizing — returns each still-active backbone cell's own final migrated
+    /// (x,y), the EFFECTIVE downstream connectivity (identical to <paramref name="downstream"/>
+    /// except where a cutoff spliced across a severed loop), which cells are still active (identical
+    /// to <paramref name="straightMask"/>'s own nonzero cells except wherever a cutoff removed one),
+    /// and the list of cutoffs that actually fired. Not needed by any production caller directly
+    /// (which only wants the final masks), but lets a test or investigation measure the simulation's
+    /// actual output — path length, sinuosity, self-crossing, cutoffs — directly from where cells
+    /// ended up, instead of only from how many raster pixels ended up lit.</summary>
+    /// <remarks>
+    /// Neck-cutoff detection (Stage 2) reuses the SAME per-iteration proximity check that already
+    /// existed for collision-avoidance damping, just with a second, tighter comparison against
+    /// <see cref="Parameters.CutoffTriggerPerWidth"/> (validated smaller than
+    /// <see cref="Parameters.MinSeparationPerWidth"/> — see <see cref="Parameters.Validate"/>):
+    /// when a point's proposed step lands within that tighter distance of a non-adjacent point, this
+    /// only actually severs a loop if the two points are genuinely on the SAME channel (one
+    /// reachable from the other by following the current downstream chain, not two different
+    /// tributaries that merely drifted close together spatially — splicing across unrelated
+    /// branches wouldn't be topologically meaningful). When they are, the run of backbone cells
+    /// strictly between them is frozen at its current position (recorded as a
+    /// <see cref="SeveredLoop"/>), marked inactive, and the chain is spliced directly across the gap
+    /// (a local, in-place update — only the two endpoints' own predecessor/downstream pointers
+    /// change); every later iteration then sees the shortened chain. When the two points are NOT on
+    /// the same channel, the proximity is handled exactly as before: plain damping against
+    /// <see cref="Parameters.MinSeparationPerWidth"/>, unaffected by this Stage.
+    /// </remarks>
+    internal static (int[] OffsetX, int[] OffsetY, int[] EffectiveDownstream, bool[] Active, IReadOnlyList<SeveredLoop> SeveredLoops) ComputeOffsets(
+        TerrainHeightmap grid, byte[] straightMask, int[] accumulation, double[] slope, int[] downstream, int[] order, Parameters p)
+    {
+        p.Validate();
         var width = grid.Width;
         var height = grid.Height;
         var count = width * height;
         var cellSize = grid.CellSizeMeters;
         var cellAreaM2 = cellSize * cellSize;
+
+        // Active backbone flags — starts identical to straightMask's own nonzero cells; a cutoff
+        // (Stage 2) removes a cell from active use for the REST of the simulation without deleting
+        // it from any array (its final frozen position still matters for oxbow rasterization).
+        var active = new bool[count];
+        for (var i = 0; i < count; i++) active[i] = straightMask[i] != 0;
 
         // Dominant predecessor per cell (the single upstream neighbor with the largest contributing
         // area) — the same selection TileHydrology's own connectivity relies on, giving every
@@ -276,6 +388,14 @@ public static class RiverMeander
                 predecessor[next] = idx;
             }
         }
+
+        // Mutable working copies used ONLY inside the per-iteration simulation loop below — a
+        // cutoff (Stage 2) locally rewrites exactly two entries (the splice endpoints) in these,
+        // never in the original `predecessor`/`downstream` arrays, which everything computed ABOVE
+        // this point (seed phase, initial perturbation, nearbyInChain) already correctly used the
+        // pre-cutoff topology for and never needs to see a splice.
+        var curPred = (int[])predecessor.Clone();
+        var curDown = (int[])downstream.Clone();
 
         // Points a handful of hops away along the SAME chain are always going to be physically
         // close together — that's just what a continuous polyline with ~cellSize point spacing
@@ -410,6 +530,13 @@ public static class RiverMeander
         var convolvedCurvature = new double[count];
         var newPosX = new double[count];
         var newPosY = new double[count];
+        var severedLoops = new List<SeveredLoop>();
+
+        // Same world-space-meters -> grid-cell conversion the final offset pass below already did
+        // inline — factored out here too since a cutoff needs to freeze a severed loop's grid
+        // position at the moment of the cut, not just at the very end of the simulation.
+        int GridX(double px) => Math.Clamp((int)Math.Round((px - grid.OriginX) / cellSize), 0, width - 1);
+        int GridY(double py) => Math.Clamp((int)Math.Round((py - grid.OriginY) / cellSize), 0, height - 1);
 
         for (var iter = 0; iter < p.Iterations; iter++)
         {
@@ -420,10 +547,10 @@ public static class RiverMeander
             for (var i = 0; i < count; i++)
             {
                 curvature[i] = 0.0;
-                if (straightMask[i] == 0) continue;
-                var pred = predecessor[i];
-                var next = downstream[i];
-                if (pred < 0 || next < 0 || straightMask[next] == 0) continue;
+                if (!active[i]) continue;
+                var pred = curPred[i];
+                var next = curDown[i];
+                if (pred < 0 || next < 0 || !active[next]) continue;
 
                 var ax = posX[pred]; var ay = posY[pred];
                 var bx = posX[i]; var by = posY[i];
@@ -449,15 +576,15 @@ public static class RiverMeander
             // changed above.
             for (var i = 0; i < count; i++)
             {
-                if (straightMask[i] == 0) continue;
-                if (predecessor[i] < 0) { convolvedCurvature[i] = curvature[i]; continue; }
+                if (!active[i]) continue;
+                if (curPred[i] < 0) { convolvedCurvature[i] = curvature[i]; continue; }
             }
             foreach (var idx in order)
             {
-                if (straightMask[idx] == 0) continue;
-                var next = downstream[idx];
-                if (next < 0 || straightMask[next] == 0) continue;
-                if (predecessor[next] != idx) continue; // only the dominant edge carries memory forward
+                if (!active[idx]) continue;
+                var next = curDown[idx];
+                if (next < 0 || !active[next]) continue;
+                if (curPred[next] != idx) continue; // only the dominant edge carries memory forward
 
                 var stepDist = Math.Sqrt(Math.Pow(posX[next] - posX[idx], 2) + Math.Pow(posY[next] - posY[idx], 2));
                 var decayLength = Math.Max(cellSize, DecayLengthAt(idx));
@@ -472,10 +599,10 @@ public static class RiverMeander
 
             for (var i = 0; i < count; i++)
             {
-                if (straightMask[i] == 0) continue;
-                var pred = predecessor[i];
-                var next = downstream[i];
-                if (pred < 0 || next < 0 || straightMask[next] == 0) continue;
+                if (!active[i]) continue;
+                var pred = curPred[i];
+                var next = curDown[i];
+                if (pred < 0 || next < 0 || !active[next]) continue;
 
                 var tdx = posX[next] - posX[pred];
                 var tdy = posY[next] - posY[pred];
@@ -492,14 +619,14 @@ public static class RiverMeander
                 newPosY[i] = posY[i] + normalY * stepMeters;
             }
 
-            // Collision-avoidance safety clamp (stands in for real cutoff splicing — see the
-            // type-level remarks): bucket the PROPOSED positions, and for any point whose new
-            // position landed too close to a non-adjacent point, shrink that step instead of
-            // applying it in full.
+            // Collision-avoidance: bucket the PROPOSED positions of still-active points, and for any
+            // point whose new position landed too close to a non-adjacent point, either (Stage 2)
+            // sever the intervening loop as a genuine neck cutoff, or (unchanged from before) shrink
+            // the step instead of applying it in full.
             var buckets = new Dictionary<(int, int), List<int>>();
             for (var i = 0; i < count; i++)
             {
-                if (straightMask[i] == 0) continue;
+                if (!active[i]) continue;
                 var key = ((int)Math.Floor(newPosX[i] / bucketSize), (int)Math.Floor(newPosY[i] / bucketSize));
                 if (!buckets.TryGetValue(key, out var list)) buckets[key] = list = new List<int>();
                 list.Add(i);
@@ -507,15 +634,17 @@ public static class RiverMeander
 
             for (var i = 0; i < count; i++)
             {
-                if (straightMask[i] == 0) continue;
-                var pred = predecessor[i];
-                var next = downstream[i];
-                if (pred < 0 || next < 0 || straightMask[next] == 0) continue;
+                if (!active[i]) continue;
+                var pred = curPred[i];
+                var next = curDown[i];
+                if (pred < 0 || next < 0 || !active[next]) continue;
 
                 var minAllowed = p.MinSeparationPerWidth * channelWidth[i];
+                var cutoffThreshold = p.CutoffTriggerPerWidth * channelWidth[i];
                 var bx = (int)Math.Floor(newPosX[i] / bucketSize);
                 var by = (int)Math.Floor(newPosY[i] / bucketSize);
                 var closest = double.PositiveInfinity;
+                var closestJ = -1;
 
                 for (var dby = -1; dby <= 1; dby++)
                 {
@@ -528,9 +657,30 @@ public static class RiverMeander
                             var dx = newPosX[j] - newPosX[i];
                             var dy = newPosY[j] - newPosY[i];
                             var d = Math.Sqrt(dx * dx + dy * dy);
-                            if (d < closest) closest = d;
+                            if (d < closest) { closest = d; closestJ = j; }
                         }
                     }
+                }
+
+                if (closest < cutoffThreshold && closestJ >= 0 &&
+                    TryFindLoop(i, closestJ, curDown, active, count, out var loopIndices, out var upstreamEnd, out var downstreamEnd))
+                {
+                    // Genuine same-channel neck cutoff — freeze the severed loop's positions (its
+                    // final, permanent shape as a stagnant oxbow lake), remove it from the active
+                    // backbone, and splice the chain directly across the gap.
+                    var loopOffsetX = new int[loopIndices.Count];
+                    var loopOffsetY = new int[loopIndices.Count];
+                    for (var k = 0; k < loopIndices.Count; k++)
+                    {
+                        var li = loopIndices[k];
+                        loopOffsetX[k] = GridX(newPosX[li]);
+                        loopOffsetY[k] = GridY(newPosY[li]);
+                        active[li] = false;
+                    }
+                    severedLoops.Add(new SeveredLoop(loopIndices.ToArray(), loopOffsetX, loopOffsetY));
+                    curDown[upstreamEnd] = downstreamEnd;
+                    curPred[downstreamEnd] = upstreamEnd;
+                    continue; // this iteration's positions for i/j stand — that closeness IS the pinched-neck geometry
                 }
 
                 if (closest < minAllowed)
@@ -577,17 +727,66 @@ public static class RiverMeander
         {
             offsetX[i] = i % width;
             offsetY[i] = i / width;
-            if (straightMask[i] == 0) continue;
-            var gx = (int)Math.Round((posX[i] - grid.OriginX) / cellSize);
-            var gy = (int)Math.Round((posY[i] - grid.OriginY) / cellSize);
-            offsetX[i] = Math.Clamp(gx, 0, width - 1);
-            offsetY[i] = Math.Clamp(gy, 0, height - 1);
+            if (!active[i]) continue;
+            offsetX[i] = GridX(posX[i]);
+            offsetY[i] = GridY(posY[i]);
         }
 
-        return (offsetX, offsetY);
+        return (offsetX, offsetY, curDown, active, severedLoops);
     }
 
-    /// <summary>Reconnect: every original edge (cell -> its downstream cell) gets redrawn between
+    /// <summary>Neck-cutoff support: determines whether <paramref name="start"/> and
+    /// <paramref name="target"/> lie on the SAME channel — one reachable from the other by
+    /// following <paramref name="curDown"/> — and if so, which is upstream/downstream and which
+    /// cells lie strictly between them (the loop a cutoff would sever). Walks forward from each end
+    /// in turn (bounded by <paramref name="maxHops"/>, a safe upper bound on any real chain length)
+    /// rather than assuming a direction, since either point could be the upstream one. Returns
+    /// <c>false</c> (no loop) when neither walk reaches the other — the two points merely drifted
+    /// spatially close on DIFFERENT tributaries, which isn't a real neck cutoff (splicing across
+    /// unrelated branches wouldn't be topologically meaningful).</summary>
+    private static bool TryFindLoop(int start, int target, int[] curDown, bool[] active, int maxHops,
+        out List<int> loopIndices, out int upstreamEnd, out int downstreamEnd)
+    {
+        var path = new List<int>();
+        var cur = curDown[start];
+        var hops = 0;
+        while (cur >= 0 && active[cur] && cur != target && hops++ < maxHops)
+        {
+            path.Add(cur);
+            cur = curDown[cur];
+        }
+        if (cur == target)
+        {
+            loopIndices = path;
+            upstreamEnd = start;
+            downstreamEnd = target;
+            return true;
+        }
+
+        path.Clear();
+        cur = curDown[target];
+        hops = 0;
+        while (cur >= 0 && active[cur] && cur != start && hops++ < maxHops)
+        {
+            path.Add(cur);
+            cur = curDown[cur];
+        }
+        if (cur == start)
+        {
+            loopIndices = path;
+            upstreamEnd = target;
+            downstreamEnd = start;
+            return true;
+        }
+
+        loopIndices = null!;
+        upstreamEnd = -1;
+        downstreamEnd = -1;
+        return false;
+    }
+
+    /// <summary>Reconnect: every EFFECTIVE edge (a still-active cell -> its effective downstream
+    /// cell, post-cutoff-splicing — see <see cref="ComputeOffsets"/>'s remarks) gets redrawn between
     /// the TWO cells' own final migrated positions, not just the migrated cells marked in isolation
     /// — a migration step can move a point several grid cells sideways over the course of the
     /// simulation, and without redrawing the connecting line the channel would fragment into
@@ -595,37 +794,41 @@ public static class RiverMeander
     /// solved for the straight case. Shreve magnitude is stamped alongside the Strahler-order mask
     /// from the SAME source cell at every rasterized pixel — see <see cref="StampMax"/> — rather
     /// than in a separate pass, so a pixel's magnitude always corresponds to whichever reach's line
-    /// actually "won" that pixel, not an unrelated reach that happened to draw over it too.</summary>
-    private static (byte[] Mask, int[] ShreveMagnitude) Rasterize(TerrainHeightmap grid, byte[] straightMask,
-        int[] downstream, byte[] strahlerOrder, int[] shreveMagnitude, int[] offsetX, int[] offsetY)
+    /// actually "won" that pixel, not an unrelated reach that happened to draw over it too. Cells a
+    /// cutoff removed from <paramref name="active"/> are skipped entirely — they belong only to
+    /// <see cref="RasterizeOxbowLakes"/>'s output now, not the main channel.</summary>
+    private static (byte[] Mask, int[] ShreveMagnitude) Rasterize(TerrainHeightmap grid, bool[] active,
+        int[] effectiveDownstream, byte[] strahlerOrder, int[] shreveMagnitude, int[] offsetX, int[] offsetY)
     {
         var width = grid.Width;
         var height = grid.Height;
-        var meandered = new byte[straightMask.Length];
-        var meanderedMagnitude = new int[straightMask.Length];
-        for (var idx = 0; idx < straightMask.Length; idx++)
+        var meandered = new byte[active.Length];
+        var meanderedMagnitude = new int[active.Length];
+        for (var idx = 0; idx < active.Length; idx++)
         {
-            if (straightMask[idx] == 0) continue;
+            if (!active[idx]) continue;
             var value = strahlerOrder[idx];
             var magnitude = shreveMagnitude[idx];
-            var next = downstream[idx];
-            if (next < 0)
+            var next = effectiveDownstream[idx];
+            if (next < 0 || !active[next])
             {
                 StampMax(meandered, meanderedMagnitude, offsetY[idx] * width + offsetX[idx], value, magnitude);
                 continue;
             }
-            DrawLine(meandered, meanderedMagnitude, width, height, offsetX[idx], offsetY[idx], offsetX[next], offsetY[next], value, magnitude);
+            ForEachLinePoint(width, height, offsetX[idx], offsetY[idx], offsetX[next], offsetY[next],
+                lineIdx => StampMax(meandered, meanderedMagnitude, lineIdx, value, magnitude));
         }
 
         return (meandered, meanderedMagnitude);
     }
 
-    /// <summary>Bresenham line rasterization, so two consecutive migrated points always end up
-    /// 8-connected on the grid no matter how far apart the simulation put them. Stamps
-    /// <paramref name="value"/> (the source cell's Strahler order) and <paramref name="magnitude"/>
-    /// (its Shreve magnitude) together rather than a flat 1 — see <see cref="ApplyMeander"/>'s
-    /// remarks.</summary>
-    private static void DrawLine(byte[] mask, int[] magnitudeMask, int width, int height, int x0, int y0, int x1, int y1, byte value, int magnitude)
+    /// <summary>Bresenham line rasterization shared by <see cref="Rasterize"/> (the main river
+    /// channel) and <see cref="RasterizeOxbowLakes"/> (severed-loop still water) — the exact same
+    /// point-to-point line-plotting logic either way, only WHAT gets stamped at each point differs,
+    /// so that decision is left entirely to <paramref name="plot"/>. Ensures two consecutive
+    /// migrated points always end up 8-connected on the grid no matter how far apart the simulation
+    /// put them.</summary>
+    private static void ForEachLinePoint(int width, int height, int x0, int y0, int x1, int y1, Action<int> plot)
     {
         var dx = Math.Abs(x1 - x0);
         var dy = -Math.Abs(y1 - y0);
@@ -638,7 +841,7 @@ public static class RiverMeander
         while (true)
         {
             if (x >= 0 && x < width && y >= 0 && y < height)
-                StampMax(mask, magnitudeMask, y * width + x, value, magnitude);
+                plot(y * width + x);
             if (x == x1 && y == y1) break;
             var e2 = 2 * err;
             if (e2 >= dy) { err += dy; x += sx; }

@@ -257,8 +257,10 @@ public static class TileGenerator
             // which cells actually count as river-worthy, just where within the grid each one draws.
             // The Strahler order and Shreve magnitude threaded through here are what end up baked
             // into each tile's own saved RiverMask/ShreveMagnitude arrays below, instead of a flat 1
-            // — see TerrainHeightmap's remarks.
-            var (combinedRiverMask, combinedShreveMagnitude) = RiverMeander.ApplyMeander(combinedGrid, straightRiverMask,
+            // — see TerrainHeightmap's remarks. Stage 2 additionally severs neck cutoffs into a
+            // parallel OxbowMask — ApplyMeanderWithCutoffs, not the plain ApplyMeander, so those
+            // still-water loops actually get persisted per tile instead of silently discarded.
+            var (combinedRiverMask, combinedShreveMagnitude, combinedOxbowMask) = RiverMeander.ApplyMeanderWithCutoffs(combinedGrid, straightRiverMask,
                 riverAccumulation, riverSlope, riverDownstream, riverTopoOrder, riverStrahlerOrder, riverShreveMagnitude, new RiverMeander.Parameters());
 
             foreach (var t in batchTiles)
@@ -267,15 +269,17 @@ public static class TileGenerator
                 var baseY = t.Row * cellsPerTile;
                 var riverMaskInterior = new byte[cellsPerTile * cellsPerTile];
                 var shreveMagnitudeInterior = new int[cellsPerTile * cellsPerTile];
+                var oxbowMaskInterior = new byte[cellsPerTile * cellsPerTile];
                 for (var iy = 0; iy < cellsPerTile; iy++)
                 {
                     var srcRow = (baseY + iy) * bigWidth + baseX;
                     Array.Copy(combinedRiverMask, srcRow, riverMaskInterior, iy * cellsPerTile, cellsPerTile);
                     Array.Copy(combinedShreveMagnitude, srcRow, shreveMagnitudeInterior, iy * cellsPerTile, cellsPerTile);
+                    Array.Copy(combinedOxbowMask, srcRow, oxbowMaskInterior, iy * cellsPerTile, cellsPerTile);
                 }
 
                 var tile = new TerrainHeightmap(t.Id, swX + t.Col * s.TileSizeMeters, swY + t.Row * s.TileSizeMeters,
-                    s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior, shreveMagnitudeInterior);
+                    s.CellSizeMeters, cellsPerTile, cellsPerTile, t.Interior, riverMaskInterior, shreveMagnitudeInterior, oxbowMaskInterior);
                 db.SaveHeightmap(tile);
             }
         }

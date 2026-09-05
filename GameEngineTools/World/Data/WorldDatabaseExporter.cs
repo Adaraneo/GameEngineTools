@@ -132,11 +132,12 @@ namespace GameEngineTools.World.Data
             sb.AppendLine();
             sb.AppendLine(
                 $"INSERT OR IGNORE INTO TerrainHeightmap " +
-                $"(Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask, ShreveMagnitude) VALUES " +
+                $"(Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask, ShreveMagnitude, OxbowMask) VALUES " +
                 $"({Str(grid.Id)}, {R(grid.OriginX)}, {R(grid.OriginY)}, {R(grid.CellSizeMeters)}, " +
                 $"{grid.Width}, {grid.Height}, {Blob(grid.ToBytes())}, " +
                 $"{(grid.RiverMask is null ? "NULL" : Blob(grid.RiverMask))}, " +
-                $"{(grid.ShreveMagnitude is null ? "NULL" : Blob(TerrainHeightmap.Int32ArrayToBytes(grid.ShreveMagnitude)))});");
+                $"{(grid.ShreveMagnitude is null ? "NULL" : Blob(TerrainHeightmap.Int32ArrayToBytes(grid.ShreveMagnitude)))}, " +
+                $"{(grid.OxbowMask is null ? "NULL" : Blob(grid.OxbowMask))});");
             sb.AppendLine();
         }
 

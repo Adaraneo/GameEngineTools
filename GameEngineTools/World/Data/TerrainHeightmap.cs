@@ -50,6 +50,17 @@ namespace GameEngineTools.World.Data
     /// generated yet (same as a <c>null</c> <see cref="RiverMask"/> — hand-painted rivers never set
     /// this, since a manual brush stroke has no upstream network to sum).
     /// </param>
+    /// <param name="OxbowMask">
+    /// Optional row-major byte flags, same length as <paramref name="Values"/>, marking still-water
+    /// oxbow lakes — the loops a meander neck-cutoff (TerraGen's <c>RiverMeander.ApplyMeanderWithCutoffs</c>,
+    /// Stage 2) severed from the active river channel. Deliberately a SEPARATE mask from
+    /// <see cref="RiverMask"/>, not folded into it: an oxbow has no flow, no Strahler order, no
+    /// Shreve magnitude — it's stagnant water, not a river — so a renderer needs to tell the two
+    /// apart rather than treating every nonzero cell the same way. <c>0</c> means not an oxbow cell;
+    /// a non-zero cell IS one (a flat <c>1</c> — unlike <see cref="RiverMask"/>, there is no order/
+    /// magnitude concept to bake into the value here). <c>null</c> means no cutoff has ever been
+    /// computed for this grid (same meaning as a <c>null</c> <see cref="RiverMask"/>).
+    /// </param>
     public sealed record TerrainHeightmap(
         string Id,
         double OriginX,
@@ -59,7 +70,8 @@ namespace GameEngineTools.World.Data
         int Height,
         float[] Values,
         byte[]? RiverMask = null,
-        int[]? ShreveMagnitude = null)
+        int[]? ShreveMagnitude = null,
+        byte[]? OxbowMask = null)
     {
         /// <summary>True when (gx, gy) — clamped to the grid — has been painted as a river cell,
         /// of any Strahler order. Use <see cref="RiverOrder"/> to distinguish a headwater creek

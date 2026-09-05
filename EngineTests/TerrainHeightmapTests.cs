@@ -210,6 +210,38 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void SaveHeightmap_WithOxbowMask_RoundTrips()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            // Deliberately DIFFERENT from RiverMask — an oxbow lake is a still-water loop severed
+            // from the flowing channel, not the same cells, so this exercises the two masks living
+            // independently rather than one accidentally aliasing the other.
+            var grid = MakeGrid() with { RiverMask = [0, 1, 1, 0, 0, 1], OxbowMask = [1, 0, 0, 1, 0, 0] };
+            db.SaveHeightmap(grid);
+
+            var loaded = db.LoadHeightmap("default");
+
+            Assert.IsNotNull(loaded);
+            CollectionAssert.AreEqual(grid.OxbowMask, loaded!.OxbowMask);
+        }
+
+        [TestMethod]
+        public void SaveHeightmap_NoOxbowMask_LoadsAsNull()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            SeedSchema(db);
+
+            db.SaveHeightmap(MakeGrid());
+
+            var loaded = db.LoadHeightmap("default");
+
+            Assert.IsNotNull(loaded);
+            Assert.IsNull(loaded!.OxbowMask);
+        }
+
+        [TestMethod]
         public void LoadHeightmap_UnknownId_ReturnsNull()
         {
             using var db = new SqliteWorldDatabase(":memory:");
@@ -269,6 +301,7 @@ namespace EngineTests
             CollectionAssert.AreEqual(grid.Values, loaded!.Values);
             Assert.IsNull(loaded.RiverMask);
             Assert.IsNull(loaded.ShreveMagnitude);
+            Assert.IsNull(loaded.OxbowMask);
         }
 
         /// <summary>TerrainHeightmap shape as it existed after RiverMask but before ShreveMagnitude
@@ -306,6 +339,46 @@ namespace EngineTests
             CollectionAssert.AreEqual(grid.Values, loaded!.Values);
             CollectionAssert.AreEqual(grid.RiverMask, loaded.RiverMask);
             Assert.IsNull(loaded.ShreveMagnitude);
+            Assert.IsNull(loaded.OxbowMask);
+        }
+
+        /// <summary>TerrainHeightmap shape as it existed after RiverMask/ShreveMagnitude but before
+        /// OxbowMask (Stage 2) was introduced — the realistic upgrade path once Stage 1 has already
+        /// shipped.</summary>
+        private const string PreOxbowHeightmapSchema = """
+            CREATE TABLE TerrainHeightmap (
+                Id              TEXT    PRIMARY KEY,
+                OriginX         REAL    NOT NULL,
+                OriginY         REAL    NOT NULL,
+                CellSizeMeters  REAL    NOT NULL,
+                Width           INTEGER NOT NULL,
+                Height          INTEGER NOT NULL,
+                Data            BLOB    NOT NULL,
+                RiverMask       BLOB,
+                ShreveMagnitude BLOB
+            );
+            """;
+
+        [TestMethod]
+        public void MigrateTerrainHeightmapColumns_PreOxbowRow_SurvivesAndGainsNullOxbowMask()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            db.ExecuteScript(PreOxbowHeightmapSchema);
+
+            var grid = MakeGrid() with { RiverMask = [0, 1, 1, 0, 0, 1], ShreveMagnitude = [0, 1, 1, 0, 0, 1] };
+            db.ExecuteScript($"""
+                INSERT INTO TerrainHeightmap (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask, ShreveMagnitude)
+                VALUES ('default', 0.0, 0.0, 10.0, 3, 2, X'{Convert.ToHexString(grid.ToBytes())}', X'{Convert.ToHexString(grid.RiverMask)}', X'{Convert.ToHexString(TerrainHeightmap.Int32ArrayToBytes(grid.ShreveMagnitude!))}');
+                """);
+
+            db.MigrateTerrainHeightmapColumns();
+
+            var loaded = db.LoadHeightmap("default");
+            Assert.IsNotNull(loaded);
+            CollectionAssert.AreEqual(grid.Values, loaded!.Values);
+            CollectionAssert.AreEqual(grid.RiverMask, loaded.RiverMask);
+            CollectionAssert.AreEqual(grid.ShreveMagnitude, loaded.ShreveMagnitude);
+            Assert.IsNull(loaded.OxbowMask);
         }
 
         [TestMethod]
@@ -322,7 +395,7 @@ namespace EngineTests
             using var db = new SqliteWorldDatabase(":memory:");
             SeedSchema(db);
 
-            var grid = MakeGrid() with { RiverMask = [1, 0, 0, 1, 0, 0], ShreveMagnitude = [1, 0, 0, 2, 0, 0] };
+            var grid = MakeGrid() with { RiverMask = [1, 0, 0, 1, 0, 0], ShreveMagnitude = [1, 0, 0, 2, 0, 0], OxbowMask = [0, 1, 0, 0, 1, 0] };
             db.SaveHeightmap(grid);
 
             db.MigrateTerrainHeightmapColumns();
@@ -331,6 +404,7 @@ namespace EngineTests
             var loaded = db.LoadHeightmap("default");
             CollectionAssert.AreEqual(grid.RiverMask, loaded!.RiverMask);
             CollectionAssert.AreEqual(grid.ShreveMagnitude, loaded.ShreveMagnitude);
+            CollectionAssert.AreEqual(grid.OxbowMask, loaded.OxbowMask);
         }
 
         #endregion Migration from a pre-river schema

@@ -61,7 +61,8 @@ namespace GameEngineTools.World.Data
                 Height          INTEGER NOT NULL,
                 Data            BLOB    NOT NULL,
                 RiverMask       BLOB,
-                ShreveMagnitude BLOB
+                ShreveMagnitude BLOB,
+                OxbowMask       BLOB
             );
 
             -- ── Connections ───────────────────────────────────────────────────────
