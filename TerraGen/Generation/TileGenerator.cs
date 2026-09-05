@@ -52,7 +52,9 @@ public static class TileGenerator
         /// <summary><c>null</c> (default) skips river extraction entirely. Non-null derives <see cref="TerrainHeightmap.RiverMask"/> from each hydrology chunk's own stitched drainage pattern.</summary>
         TileHydrology.Parameters? HydrologyParams = null,
         /// <summary>Tiles per side of a square hydrology chunk, bounding the combined grid so it can't overflow a 32-bit array index on a large region. Default 20 ≈ 64M cells at TileKm=1/CellMeters=2.5.</summary>
-        int HydrologyChunkTilesPerSide = 20);
+        int HydrologyChunkTilesPerSide = 20,
+        /// <summary>Off by default (always regenerate/overwrite). When true, a tile whose TileId already has a saved heightmap of the expected size skips noise+erosion and reuses the saved elevation; hydrology (if on) still reprocesses its whole chunk.</summary>
+        bool SkipExisting = false);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -66,7 +68,9 @@ public static class TileGenerator
     /// <summary>Runs the whole batch, saving every generated tile into <paramref name="db"/> and
     /// returning the tiles produced in generation order. <paramref name="onProgress"/> (optional)
     /// receives one human-readable line per completed tile.</summary>
-    public static IReadOnlyList<TileResult> Run(SqliteWorldDatabase db, RunSettings s, Action<string>? onProgress = null)
+    /// <param name="onTileProgress">Optional (done, total) callback after each tile, for a progress bar.</param>
+    public static IReadOnlyList<TileResult> Run(SqliteWorldDatabase db, RunSettings s,
+        Action<string>? onProgress = null, Action<int, int>? onTileProgress = null)
     {
         var refLatDeg = s.MountainOriginLatDeg;
         var refLonDeg = s.MountainOriginLonDeg;
@@ -128,12 +132,27 @@ public static class TileGenerator
             ? new List<(int Row, int Col, string Id, double CenterLat, double CenterLon, float[] Interior)>(rows * cols)
             : null;
 
+        var totalTiles = rows * cols;
+        var tilesDone = 0;
+
         for (var row = 0; row < rows; row++)
         {
             for (var col = 0; col < cols; col++)
             {
                 var tileOriginX = swX + col * s.TileSizeMeters;
                 var tileOriginY = swY + row * s.TileSizeMeters;
+                var (centerLat, centerLon) = TileCenter(row, col);
+                var id = TileId(s.NoiseParams.Seed, centerLat, centerLon);
+
+                if (s.SkipExisting && db.LoadHeightmap(id) is { } existing &&
+                    existing.Width == cellsPerTile && existing.Height == cellsPerTile)
+                {
+                    batchTiles?.Add((row, col, id, centerLat, centerLon, existing.Values));
+                    results.Add(new TileResult(row, col, id, centerLat, centerLon));
+                    onProgress?.Invoke($"[{row},{col}] {id}: přeskočeno, dlaždice už existuje");
+                    onTileProgress?.Invoke(++tilesDone, totalTiles);
+                    continue;
+                }
 
                 var paddedSize = cellsPerTile + 2 * margin;
                 var paddedOriginX = tileOriginX - margin * s.CellSizeMeters;
@@ -200,8 +219,6 @@ public static class TileGenerator
                     }
                 }
 
-                var (centerLat, centerLon) = TileCenter(row, col);
-                var id = TileId(s.NoiseParams.Seed, centerLat, centerLon);
                 // River mask left null here even when hydrology is on — filled in by the batch
                 // pass below, which needs every tile's elevation already saved (for the NEXT
                 // tile's own neighbor-locking above) before it can compute anything.
@@ -214,11 +231,13 @@ public static class TileGenerator
                 var result = new TileResult(row, col, id, centerLat, centerLon);
                 results.Add(result);
                 onProgress?.Invoke($"[{row},{col}] {id}  lat={centerLat:0.000} lon={centerLon:0.000}");
+                onTileProgress?.Invoke(++tilesDone, totalTiles);
             }
         }
 
         if (batchTiles is { Count: > 0 } && s.HydrologyParams is { } hydrologyParams)
         {
+            onProgress?.Invoke("Generuji hydrologii (řeky)...");
             var chunkTilesPerSide = Math.Max(1, s.HydrologyChunkTilesPerSide);
             // Group tiles by chunk coordinate (keeping each tile's batchTiles index, so its Interior
             // can be released there once the chunk is done), ordered like generation above.
