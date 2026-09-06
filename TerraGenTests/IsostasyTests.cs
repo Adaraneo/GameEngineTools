@@ -14,6 +14,26 @@ public class IsostasyTests
     }
 
     [TestMethod]
+    public void ErosionalReboundHeight_MatchesTheStandardFormula()
+    {
+        var rebound = Isostasy.ErosionalReboundHeight(erodedHeightM: 1000.0, crustDensity: 2670.0, mantleDensity: 3300.0);
+        Assert.AreEqual(1000.0 * 2670.0 / 3300.0, rebound, 1e-9);
+    }
+
+    [TestMethod]
+    public void ErosionalReboundHeight_IsAlwaysLessThanTheErodedAmount()
+    {
+        // Regression for the actual field bug: ErosionalReboundHeight's fraction (crustDensity/mantleDensity)
+        // must always be < 1, unlike AiryRootDepth's ratio (crustDensity/(mantleDensity-crustDensity)), which
+        // is always > 1 and diverges to +Infinity if mistakenly used for the erosion-rebound step instead.
+        foreach (var crustDensity in new[] { 2350.0, 2670.0, 2900.0 })
+        {
+            var rebound = Isostasy.ErosionalReboundHeight(erodedHeightM: 500.0, crustDensity, mantleDensity: 3300.0);
+            Assert.IsTrue(rebound < 500.0, $"Rebound ({rebound}) should always be less than the eroded amount for crustDensity={crustDensity}.");
+        }
+    }
+
+    [TestMethod]
     public void Erode_WithoutIsostasyParams_LeavesUpliftArrayUnmutated()
     {
         // Byte-identical-when-disabled regression: the whole isostasy feedback is opt-in.

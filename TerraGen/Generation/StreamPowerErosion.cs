@@ -113,7 +113,7 @@ public static class StreamPowerErosion
             ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams!, p.Iterations - 1, p.Iterations, onDiagnostic);
     }
 
-    /// <summary>Converts each cell's accumulated eroded-height loss into an Airy rebound height (<see cref="Isostasy.AiryRootDepth"/>) and adds it DIRECTLY to <paramref name="grid"/>'s current elevation — a one-time state correction proportional to that interval's own erosion, not a rate that persists or compounds into later iterations — then resets the accumulator to 0.</summary>
+    /// <summary>Converts each cell's accumulated eroded-height loss into an isostatic rebound height (<see cref="Isostasy.ErosionalReboundHeight"/>, always &lt; the eroded amount itself) and adds it DIRECTLY to <paramref name="grid"/>'s current elevation — a one-time state correction proportional to that interval's own erosion, not a rate that persists or compounds into later iterations — then resets the accumulator to 0.</summary>
     private static void ApplyIsostaticRebound(double[] erodedHeightAccumulator, TerrainHeightmap grid,
         bool[]? locked, double[]? crustDensityPerCell, Isostasy.Parameters isostasyParams, int iter, int totalIterations, Action<string>? onDiagnostic)
     {
@@ -122,7 +122,7 @@ public static class StreamPowerErosion
             if (locked is not null && locked[idx]) { erodedHeightAccumulator[idx] = 0.0; continue; }
 
             var crustDensity = crustDensityPerCell?[idx] ?? isostasyParams.DefaultCrustDensityKgM3;
-            var rebound = Isostasy.AiryRootDepth(erodedHeightAccumulator[idx], crustDensity, isostasyParams.MantleDensityKgM3);
+            var rebound = Isostasy.ErosionalReboundHeight(erodedHeightAccumulator[idx], crustDensity, isostasyParams.MantleDensityKgM3);
             var newValue = grid.Values[idx] + rebound;
             var newValueF = (float)newValue; // see Erode's own float-cast-overflow comment
 
