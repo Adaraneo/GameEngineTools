@@ -14,7 +14,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>worldgen</ToolCommandName>
     <PackageId>WorldGen</PackageId>
-    <Version>1.0.0-preview.11</Version>
+    <Version>1.0.0-preview.12</Version>
     <Authors>50PSoftware</Authors>
     <Description>Generuje lokace, spojení a affordances do world.db na pozicích už vygenerovaných TerraGenem v terrain.db.</Description>
   </PropertyGroup>
