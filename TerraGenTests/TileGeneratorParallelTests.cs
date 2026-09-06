@@ -9,6 +9,72 @@ public class TileGeneratorParallelTests
     private static string TempDbPath() => Path.Combine(Path.GetTempPath(), $"terragen_test_{Guid.NewGuid():N}.db");
 
     [TestMethod]
+    public void Run_WithParallelTiles_HydrologyDefaultsToSequential()
+    {
+        // Regression for a reported memory blowup: --parallel used to also parallelize hydrology
+        // chunks (each ~(HydrologyChunkTilesPerSide)^2 times a single tile's memory cost) at the
+        // SAME degree as tiles, so running with many cores could spawn many multi-GB chunks at
+        // once. HydrologyMaxDegreeOfParallelism must default to 1 regardless of MaxDegreeOfParallelism.
+        var settings = new TileGenerator.RunSettings(
+            LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.002,
+            TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+            NoiseParams: new PlanetNoise.Parameters(Seed: 30, AmplitudeMeters: 200.0),
+            ErosionParams: new TileErosion.Parameters(Seed: 30, DropletCount: 200, MaxDropletLifetime: 6),
+            PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+            MaxDegreeOfParallelism: Environment.ProcessorCount);
+
+        Assert.AreEqual(1, settings.HydrologyMaxDegreeOfParallelism);
+    }
+
+    [TestMethod]
+    public void Run_HydrologyParallelVsSequential_ProducesByteIdenticalOutput()
+    {
+        var dbPathSeq = TempDbPath();
+        var dbPathPar = TempDbPath();
+        try
+        {
+            var baseSettings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.008, LonMin: 0.0, LonMax: 0.008,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 31, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 31, DropletCount: 200, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                HydrologyParams: new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 5.0),
+                HydrologyChunkTilesPerSide: 2);
+
+            using (var dbSeq = new SqliteWorldDatabase(dbPathSeq))
+            {
+                WorldDatabaseSeeder.InitializeTerrainDatabase(dbSeq);
+                TileGenerator.Run(dbSeq, baseSettings with { HydrologyMaxDegreeOfParallelism = 1 });
+            }
+            using (var dbPar = new SqliteWorldDatabase(dbPathPar))
+            {
+                WorldDatabaseSeeder.InitializeTerrainDatabase(dbPar);
+                TileGenerator.Run(dbPar, baseSettings with { HydrologyMaxDegreeOfParallelism = 4 });
+            }
+
+            using var readSeq = new SqliteWorldDatabase(dbPathSeq);
+            using var readPar = new SqliteWorldDatabase(dbPathPar);
+            var seqReaches = readSeq.LoadAllReaches();
+            var parReaches = readPar.LoadAllReaches();
+            Assert.AreEqual(seqReaches.Count, parReaches.Count, "River reach count differed between sequential and parallel hydrology.");
+
+            foreach (var summary in readSeq.ListHeightmaps())
+            {
+                var seqTile = readSeq.LoadHeightmap(summary.Id)!;
+                var parTile = readPar.LoadHeightmap(summary.Id);
+                Assert.IsNotNull(parTile, $"Tile {summary.Id} missing from the hydrology-parallel run.");
+                CollectionAssert.AreEqual(seqTile.Values, parTile!.Values, $"Tile {summary.Id} differed between sequential and hydrology-parallel runs.");
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPathSeq)) File.Delete(dbPathSeq);
+            if (File.Exists(dbPathPar)) File.Delete(dbPathPar);
+        }
+    }
+
+    [TestMethod]
     public void Run_ParallelVsSequential_ProducesByteIdenticalOutput()
     {
         // Load-bearing regression: TileGenerator.Run's remarks prove neighbor availability is identical between row-major and diagonal-batched order, so output must be byte-identical regardless of MaxDegreeOfParallelism.

@@ -66,8 +66,10 @@ public static class TileGenerator
         Isostasy.Parameters? IsostasyParams = null,
         /// <summary>Null (default) keeps SPIM's bare D8 cell-count drainage area, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) weights it by <see cref="OrographicPrecipitation"/>'s Smith &amp; Barstad field instead (Stage 4).</summary>
         OrographicPrecipitation.Parameters? OrographicParams = null,
-        /// <summary>1 (default) keeps every tile/chunk fully sequential, byte-identical to before this setting existed. &gt;1 processes independent tiles/hydrology chunks concurrently — see <see cref="Run"/>'s remarks on the diagonal-wavefront schedule this relies on for correctness.</summary>
-        int MaxDegreeOfParallelism = 1);
+        /// <summary>1 (default) keeps every tile fully sequential, byte-identical to before this setting existed. &gt;1 processes independent tiles concurrently — see <see cref="Run"/>'s remarks on the diagonal-wavefront schedule this relies on for correctness. Each in-flight tile costs ~10-20MB, so this scales safely with core count.</summary>
+        int MaxDegreeOfParallelism = 1,
+        /// <summary>1 (default) keeps hydrology chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>. A chunk's combined grid is ~(HydrologyChunkTilesPerSide)² times a single tile's cost (several GB at the default 20-tile-per-side chunk), so running many chunks at once the way tiles safely can will exhaust RAM — confirmed live (48GB and climbing) when this was mistakenly defaulted to match tile parallelism. Raise only with HydrologyChunkTilesPerSide lowered to compensate, or with headroom verified first.</summary>
+        int HydrologyMaxDegreeOfParallelism = 1);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -80,7 +82,7 @@ public static class TileGenerator
 
     /// <summary>Runs the whole batch, saving every generated tile into <paramref name="db"/> and returning the tiles in row-major order regardless of <see cref="RunSettings.MaxDegreeOfParallelism"/>. <paramref name="onProgress"/> (optional) receives one human-readable line per completed tile.</summary>
     /// <param name="onTileProgress">Optional (done, total) callback after each tile, for a progress bar.</param>
-    /// <remarks>MaxDegreeOfParallelism &gt; 1 batches tiles by anti-diagonal (row+col) instead of one row at a time: a tile's west/south neighbor always sits on the PREVIOUS diagonal, so no two same-diagonal tiles can ever be each other's neighbor — provably independent, safe to run concurrently within a diagonal, with a barrier between diagonals. Neighbor availability at generation time is therefore identical to fully sequential order, so output is byte-identical (see TileGeneratorTests' parallel-vs-sequential regression). Hydrology chunks below need no such scheme — they only start once every tile exists, and each owns a disjoint tile set and network id, so chunks are unconditionally independent.</remarks>
+    /// <remarks>MaxDegreeOfParallelism &gt; 1 batches tiles by anti-diagonal (row+col) instead of one row at a time: a tile's west/south neighbor always sits on the PREVIOUS diagonal, so no two same-diagonal tiles can ever be each other's neighbor — provably independent, safe to run concurrently within a diagonal, with a barrier between diagonals. Neighbor availability at generation time is therefore identical to fully sequential order, so output is byte-identical (see TileGeneratorTests' parallel-vs-sequential regression). Hydrology chunks below are unconditionally independent (no scheme needed, each owns a disjoint tile set and network id) but are NOT parallelized by this same setting — see <see cref="RunSettings.HydrologyMaxDegreeOfParallelism"/>'s remarks on why a chunk's much larger per-unit memory cost needs its own, separately conservative knob.</remarks>
     public static IReadOnlyList<TileResult> Run(SqliteWorldDatabase db, RunSettings s,
         Action<string>? onProgress = null, Action<int, int>? onTileProgress = null)
     {
@@ -422,7 +424,8 @@ public static class TileGenerator
                 }
             }
 
-            if (maxDegreeOfParallelism <= 1)
+            var hydrologyMaxDegreeOfParallelism = Math.Max(1, s.HydrologyMaxDegreeOfParallelism);
+            if (hydrologyMaxDegreeOfParallelism <= 1)
             {
                 foreach (var chunk in chunks) ProcessChunk(chunk);
             }
@@ -430,7 +433,7 @@ public static class TileGenerator
             {
                 try
                 {
-                    Parallel.ForEach(chunks, new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism }, ProcessChunk);
+                    Parallel.ForEach(chunks, new ParallelOptions { MaxDegreeOfParallelism = hydrologyMaxDegreeOfParallelism }, ProcessChunk);
                 }
                 catch (AggregateException ex)
                 {
