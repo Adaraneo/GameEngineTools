@@ -152,7 +152,8 @@ var runSettings = new TileGenerator.RunSettings(
     SpimParams: spimParams,
     RockTypeParams: rockTypeParams,
     IsostasyParams: isostasyParams,
-    OrographicParams: orographicParams);
+    OrographicParams: orographicParams,
+    MaxDegreeOfParallelism: options.ParallelDegree);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -253,6 +254,8 @@ internal sealed class CliOptions
     public bool Orographic { get; init; }
     /// <summary>Compass bearing the wind blows FROM. See <see cref="TerraGen.Generation.OrographicPrecipitation.Parameters.WindDirectionFromDeg"/>.</summary>
     public double WindDirectionFromDeg { get; init; } = 270.0;
+    /// <summary>Off by default (fully sequential, 1). See <see cref="TerraGen.Generation.TileGenerator.RunSettings.MaxDegreeOfParallelism"/>.</summary>
+    public int ParallelDegree { get; init; } = 1;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -317,6 +320,7 @@ internal sealed class CliOptions
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
                         [--skip-existing] [--spim [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí 270>]]]
+                        [--parallel | --parallel-degree <počet vláken>]
 
             --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
             TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
@@ -390,6 +394,16 @@ internal sealed class CliOptions
             symetricky kolem hřebene. --wind-from udává, odkud vítr vane (výchozí 270 = od západu).
             Srážkové pole se počítá JEDNOU z terénu před SPIM (statická klimatická aproximace,
             ne přepočet každou iteraci — to by SPIM 200x prodražilo).
+
+            --parallel (vypnuto výchozí, sekvenčně jedno vlákno) zapne generování dlaždic i
+            hydrologických chunků paralelně přes všechna jádra CPU (Environment.ProcessorCount).
+            --parallel-degree <n> nastaví konkrétní počet vláken místo automatické hodnoty (jde
+            použít i samostatně, bez --parallel). Výstup je bit přesně stejný jako sekvenční běh —
+            dlaždice se dál generují v "diagonálních vlnách" (po row+col), takže západní/jižní
+            soused je vždy hotový dřív, než ho aktuální dlaždice potřebuje zamknout, přesně jako
+            v sekvenčním běhu, jen se to děje po dávkách místo řádek po řádku. Mění se jen čas
+            běhu, ne vygenerovaný terén. Paměť roste zhruba lineárně s počtem vláken (každá
+            rozpracovaná dlaždice potřebuje vlastní paddovanou mřížku + SPIM pracovní pole).
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -471,6 +485,7 @@ internal sealed class CliOptions
         var isostasy = false;
         var orographic = false;
         var windDirectionFromDeg = 270.0;
+        var parallelDegree = 1;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -532,6 +547,12 @@ internal sealed class CliOptions
                     break;
                 case "--wind-from" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var wd):
                     windDirectionFromDeg = wd;
+                    break;
+                case "--parallel":
+                    parallelDegree = Environment.ProcessorCount;
+                    break;
+                case "--parallel-degree" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pd):
+                    parallelDegree = pd;
                     break;
                 case "--scan":
                     scan = true;
@@ -621,6 +642,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--orographic má smysl jen společně s --spim.");
             return null;
         }
+        if (parallelDegree < 1)
+        {
+            Console.Error.WriteLine("--parallel-degree musí být kladné.");
+            return null;
+        }
         if (scanLevels > 1 && !scan)
         {
             Console.Error.WriteLine("--scan-levels má smysl jen společně s --scan.");
@@ -656,7 +682,7 @@ internal sealed class CliOptions
             TectonicPlateCount = tectonicPlateCount,
             Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
             SkipExisting = skipExisting, Spim = spim, RockTypes = rockTypes, Isostasy = isostasy,
-            Orographic = orographic, WindDirectionFromDeg = windDirectionFromDeg,
+            Orographic = orographic, WindDirectionFromDeg = windDirectionFromDeg, ParallelDegree = parallelDegree,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,

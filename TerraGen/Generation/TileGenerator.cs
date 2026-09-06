@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using GameEngineTools.World.Data;
 
 namespace TerraGen.Generation;
@@ -63,7 +65,9 @@ public static class TileGenerator
         /// <summary>Null (default) leaves SPIM's uplift field untouched by erosion, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) turns on the Stage 3.1 erosion→unloading→rebound feedback (<see cref="Isostasy"/>).</summary>
         Isostasy.Parameters? IsostasyParams = null,
         /// <summary>Null (default) keeps SPIM's bare D8 cell-count drainage area, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) weights it by <see cref="OrographicPrecipitation"/>'s Smith &amp; Barstad field instead (Stage 4).</summary>
-        OrographicPrecipitation.Parameters? OrographicParams = null);
+        OrographicPrecipitation.Parameters? OrographicParams = null,
+        /// <summary>1 (default) keeps every tile/chunk fully sequential, byte-identical to before this setting existed. &gt;1 processes independent tiles/hydrology chunks concurrently — see <see cref="Run"/>'s remarks on the diagonal-wavefront schedule this relies on for correctness.</summary>
+        int MaxDegreeOfParallelism = 1);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -74,10 +78,9 @@ public static class TileGenerator
     public static string TileId(int seed, double centerLatDeg, double centerLonDeg)
         => $"tile_{seed}_{(int)Math.Round(centerLatDeg * 1000)}_{(int)Math.Round(centerLonDeg * 1000)}";
 
-    /// <summary>Runs the whole batch, saving every generated tile into <paramref name="db"/> and
-    /// returning the tiles produced in generation order. <paramref name="onProgress"/> (optional)
-    /// receives one human-readable line per completed tile.</summary>
+    /// <summary>Runs the whole batch, saving every generated tile into <paramref name="db"/> and returning the tiles in row-major order regardless of <see cref="RunSettings.MaxDegreeOfParallelism"/>. <paramref name="onProgress"/> (optional) receives one human-readable line per completed tile.</summary>
     /// <param name="onTileProgress">Optional (done, total) callback after each tile, for a progress bar.</param>
+    /// <remarks>MaxDegreeOfParallelism &gt; 1 batches tiles by anti-diagonal (row+col) instead of one row at a time: a tile's west/south neighbor always sits on the PREVIOUS diagonal, so no two same-diagonal tiles can ever be each other's neighbor — provably independent, safe to run concurrently within a diagonal, with a barrier between diagonals. Neighbor availability at generation time is therefore identical to fully sequential order, so output is byte-identical (see TileGeneratorTests' parallel-vs-sequential regression). Hydrology chunks below need no such scheme — they only start once every tile exists, and each owns a disjoint tile set and network id, so chunks are unconditionally independent.</remarks>
     public static IReadOnlyList<TileResult> Run(SqliteWorldDatabase db, RunSettings s,
         Action<string>? onProgress = null, Action<int, int>? onTileProgress = null)
     {
@@ -131,23 +134,35 @@ public static class TileGenerator
             return PlanetNoise.OffsetToLatLon(centerX, centerY, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
         }
 
-        var results = new List<TileResult>(rows * cols);
-
-        // Only populated when s.HydrologyParams is set — holds every tile's post-erosion interior
-        // elevation so the batch-wide hydrology pass below can stitch them into one combined grid.
-        // Left empty (no extra memory) when rivers are off, matching this method's existing
-        // "existing behavior must not change" backward-compatibility rule.
-        var batchTiles = s.HydrologyParams is not null
-            ? new List<(int Row, int Col, string Id, double CenterLat, double CenterLon, float[] Interior)>(rows * cols)
+        // Filled by row*cols+col index from GenerateOneTile below (each slot written exactly once,
+        // by whichever diagonal batch owns that (row,col)), then flattened to row-major order —
+        // safe to write from multiple threads concurrently since every write targets a distinct index.
+        var resultSlots = new TileResult?[rows * cols];
+        var batchTileSlots = s.HydrologyParams is not null
+            ? new (int Row, int Col, string Id, double CenterLat, double CenterLon, float[] Interior)?[rows * cols]
             : null;
 
         var totalTiles = rows * cols;
         var tilesDone = 0;
 
-        for (var row = 0; row < rows; row++)
+        // Every onProgress/onTileProgress invocation goes through this lock — callers (e.g.
+        // Program.cs's console progress bar) keep their own non-thread-safe mutable state and must
+        // never see two callbacks land at once, parallel tiles or not.
+        var progressLock = new object();
+        void ReportProgress(string message)
         {
-            for (var col = 0; col < cols; col++)
-            {
+            if (onProgress is null) return;
+            lock (progressLock) onProgress(message);
+        }
+        void ReportTileProgress()
+        {
+            var done = Interlocked.Increment(ref tilesDone);
+            if (onTileProgress is null) return;
+            lock (progressLock) onTileProgress(done, totalTiles);
+        }
+
+        (TileResult Result, (int Row, int Col, string Id, double CenterLat, double CenterLon, float[] Interior)? BatchEntry) GenerateOneTile(int row, int col)
+        {
                 var tileOriginX = swX + col * s.TileSizeMeters;
                 var tileOriginY = swY + row * s.TileSizeMeters;
                 var (centerLat, centerLon) = TileCenter(row, col);
@@ -156,11 +171,10 @@ public static class TileGenerator
                 if (s.SkipExisting && db.LoadHeightmap(id) is { } existing &&
                     existing.Width == cellsPerTile && existing.Height == cellsPerTile)
                 {
-                    batchTiles?.Add((row, col, id, centerLat, centerLon, existing.Values));
-                    results.Add(new TileResult(row, col, id, centerLat, centerLon));
-                    onProgress?.Invoke($"[{row},{col}] {id}: přeskočeno, dlaždice už existuje");
-                    onTileProgress?.Invoke(++tilesDone, totalTiles);
-                    continue;
+                    ReportProgress($"[{row},{col}] {id}: přeskočeno, dlaždice už existuje");
+                    ReportTileProgress();
+                    return (new TileResult(row, col, id, centerLat, centerLon),
+                        (row, col, id, centerLat, centerLon, existing.Values));
                 }
 
                 var paddedSize = cellsPerTile + 2 * margin;
@@ -204,7 +218,7 @@ public static class TileGenerator
                     // Defensive: a neighbor saved by an earlier corrupted run can carry NaN/Infinity — invalidate it rather than smuggling that into this tile's own grid.
                     if (HasNonFiniteValues(neighbor.Values))
                     {
-                        onProgress?.Invoke($"[{row},{col}] {id}: soused {neighbor.Id} obsahuje neplatná data (NaN/Infinity) — nejspíš pozůstatek staršího/rozbitého běhu; dlaždice byla z DB smazána, tento okraj se negeneruje zamčený proti ní.");
+                        ReportProgress($"[{row},{col}] {id}: soused {neighbor.Id} obsahuje neplatná data (NaN/Infinity) — nejspíš pozůstatek staršího/rozbitého běhu; dlaždice byla z DB smazána, tento okraj se negeneruje zamčený proti ní.");
                         db.DeleteHeightmap(neighbor.Id);
                         return;
                     }
@@ -248,7 +262,7 @@ public static class TileGenerator
                     var precipitationWeight = s.OrographicParams is { } orographicParams
                         ? OrographicPrecipitation.ComputePrecipitationField(padded, orographicParams)
                         : null;
-                    void LogSpimDiagnostic(string message) => onProgress?.Invoke($"[{row},{col}] {id}: {message}");
+                    void LogSpimDiagnostic(string message) => ReportProgress($"[{row},{col}] {id}: {message}");
                     StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimDiagnostic);
                 }
 
@@ -272,18 +286,59 @@ public static class TileGenerator
                     cellsPerTile, cellsPerTile, interior);
                 db.SaveHeightmap(tile);
 
-                batchTiles?.Add((row, col, id, centerLat, centerLon, interior));
-
                 var result = new TileResult(row, col, id, centerLat, centerLon);
-                results.Add(result);
-                onProgress?.Invoke($"[{row},{col}] {id}  lat={centerLat:0.000} lon={centerLon:0.000}");
-                onTileProgress?.Invoke(++tilesDone, totalTiles);
+                ReportProgress($"[{row},{col}] {id}  lat={centerLat:0.000} lon={centerLon:0.000}");
+                ReportTileProgress();
+                return (result, (row, col, id, centerLat, centerLon, interior));
+        }
+
+        // Diagonal-wavefront schedule — see Run's remarks for the correctness proof. Diagonal d
+        // holds every (row,col) with row+col==d; diagonals are processed strictly in order (a
+        // barrier between them), but tiles WITHIN one diagonal are provably independent and run
+        // concurrently when s.MaxDegreeOfParallelism > 1.
+        var maxDegreeOfParallelism = Math.Max(1, s.MaxDegreeOfParallelism);
+        for (var diagonal = 0; diagonal <= rows + cols - 2; diagonal++)
+        {
+            var minColInDiagonal = Math.Max(0, diagonal - (rows - 1));
+            var maxColInDiagonal = Math.Min(cols - 1, diagonal);
+            var tileCountInDiagonal = maxColInDiagonal - minColInDiagonal + 1;
+            if (tileCountInDiagonal <= 0) continue;
+
+            void ProcessDiagonalOffset(int offset)
+            {
+                var col = minColInDiagonal + offset;
+                var row = diagonal - col;
+                var (result, batchEntry) = GenerateOneTile(row, col);
+                var slot = row * cols + col;
+                resultSlots[slot] = result;
+                if (batchTileSlots is not null) batchTileSlots[slot] = batchEntry;
+            }
+
+            if (maxDegreeOfParallelism <= 1 || tileCountInDiagonal <= 1)
+            {
+                for (var offset = 0; offset < tileCountInDiagonal; offset++) ProcessDiagonalOffset(offset);
+            }
+            else
+            {
+                try
+                {
+                    Parallel.For(0, tileCountInDiagonal,
+                        new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism },
+                        ProcessDiagonalOffset);
+                }
+                catch (AggregateException ex)
+                {
+                    throw ex.Flatten().InnerExceptions[0];
+                }
             }
         }
 
+        var results = resultSlots.Select(r => r!).ToList();
+        var batchTiles = batchTileSlots?.Select(t => t!.Value).ToList();
+
         if (batchTiles is { Count: > 0 } && s.HydrologyParams is { } hydrologyParams)
         {
-            onProgress?.Invoke("Generuji hydrologii (řeky)...");
+            ReportProgress("Generuji hydrologii (řeky)...");
             var chunkTilesPerSide = Math.Max(1, s.HydrologyChunkTilesPerSide);
             // Tallied so a run finding zero channels anywhere can hint why (see PlanetNoise.SampleCombined).
             var totalRiverCellsInRun = 0L;
@@ -292,9 +347,13 @@ public static class TileGenerator
             var chunks = batchTiles
                 .Select((t, i) => (Tile: t, Index: i))
                 .GroupBy(x => (ChunkRow: x.Tile.Row / chunkTilesPerSide, ChunkCol: x.Tile.Col / chunkTilesPerSide))
-                .OrderBy(g => g.Key.ChunkRow).ThenBy(g => g.Key.ChunkCol);
+                .OrderBy(g => g.Key.ChunkRow).ThenBy(g => g.Key.ChunkCol)
+                .ToList();
 
-            foreach (var chunk in chunks)
+            // Chunks have no ordering dependency at all — each owns a disjoint tile set and a
+            // unique river network id — so this is a plain parallel loop, no diagonal scheme needed.
+            void ProcessChunk(IGrouping<(int ChunkRow, int ChunkCol), (
+                (int Row, int Col, string Id, double CenterLat, double CenterLon, float[] Interior) Tile, int Index)> chunk)
             {
                 var chunkEntries = chunk.ToList();
                 var chunkTiles = chunkEntries.Select(x => x.Tile).ToList();
@@ -349,12 +408,13 @@ public static class TileGenerator
                 db.SaveRiverNetwork(riverNetwork);
 
                 var chunkRiverCells = combinedRiverMask.Count(b => b != 0);
-                totalRiverCellsInRun += chunkRiverCells;
+                Interlocked.Add(ref totalRiverCellsInRun, chunkRiverCells);
 
                 // Saved per chunk above — a crash on a later chunk doesn't lose this one's data.
-                onProgress?.Invoke($"hydrology chunk rows[{minRow}..{minRow + chunkRows - 1}] cols[{minCol}..{minCol + chunkCols - 1}]: {chunkTiles.Count} tiles saved with rivers ({chunkRiverCells} river cells)");
+                ReportProgress($"hydrology chunk rows[{minRow}..{minRow + chunkRows - 1}] cols[{minCol}..{minCol + chunkCols - 1}]: {chunkTiles.Count} tiles saved with rivers ({chunkRiverCells} river cells)");
 
                 // Release this chunk's Interior arrays from batchTiles now that they're persisted, so peak memory tracks one chunk, not the whole region.
+                // Distinct chunks never share a tile, so distinct chunks' index writes never collide.
                 foreach (var entry in chunkEntries)
                 {
                     var t = entry.Tile;
@@ -362,8 +422,24 @@ public static class TileGenerator
                 }
             }
 
+            if (maxDegreeOfParallelism <= 1)
+            {
+                foreach (var chunk in chunks) ProcessChunk(chunk);
+            }
+            else
+            {
+                try
+                {
+                    Parallel.ForEach(chunks, new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism }, ProcessChunk);
+                }
+                catch (AggregateException ex)
+                {
+                    throw ex.Flatten().InnerExceptions[0];
+                }
+            }
+
             if (totalRiverCellsInRun == 0)
-                onProgress?.Invoke("Pozn.: žádná buňka nesplnila --river-threshold — region má patrně zanedbatelný reliéf " +
+                ReportProgress("Pozn.: žádná buňka nesplnila --river-threshold — region má patrně zanedbatelný reliéf " +
                     "(mimo sbíhavou/rozbíhavou hranici desek reliéf pohoří vychází 0, viz PlanetNoise.SampleCombined); " +
                     "zkus oblast blíž tektonické hranici (--scan-detail), nebo --tectonic-plates 0.");
         }
