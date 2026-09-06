@@ -156,6 +156,57 @@ public class TileGeneratorTests
     }
 
     [TestMethod]
+    public void Run_NeighborTileHasNonFiniteData_IsInvalidatedInsteadOfLockedAgainst()
+    {
+        // Regression for a reported crash: a neighbor tile left over from an earlier corrupted run
+        // (e.g. a since-fixed SPIM/isostasy divergence) can contain NaN/Infinity — locking against
+        // it would smuggle that corruption into the new tile. TileGenerator must instead delete the
+        // bad neighbor and generate this tile's margin fresh, as if the neighbor never existed.
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 9, AmplitudeMeters: 200.0);
+            var erosionParams = new TileErosion.Parameters(Seed: 9, DropletCount: 800, MaxDropletLifetime: 6);
+            var radius = PlanetNoise.EarthRadiusMeters;
+
+            var settings1 = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.002, LonMin: 0.0, LonMax: 0.003,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams, ErosionParams: erosionParams, PlanetRadiusMeters: radius);
+            var results1 = TileGenerator.Run(db, settings1);
+
+            var row0 = results1.Where(r => r.Row == 0).OrderBy(r => r.Col).ToList();
+            var westTile = db.LoadHeightmap(row0[^1].Id)!;
+            var boundaryX = westTile.OriginX + westTile.Width * westTile.CellSizeMeters;
+            var (_, boundaryLon) = PlanetNoise.OffsetToLatLon(boundaryX, 0.0, 0.0, 0.0, radius);
+
+            // Corrupt the west tile in place, as if an earlier buggy run had saved bad data for it.
+            var corruptedValues = (float[])westTile.Values.Clone();
+            corruptedValues[0] = float.PositiveInfinity;
+            db.SaveHeightmap(westTile with { Values = corruptedValues });
+
+            var settings2 = settings1 with { LonMin = boundaryLon, LonMax = boundaryLon + 0.003 };
+            var progressLines = new List<string>();
+            var results2 = TileGenerator.Run(db, settings2, progressLines.Add);
+
+            Assert.IsTrue(progressLines.Any(l => l.Contains("neplatná data")),
+                "Expected a progress line reporting the corrupted neighbor was invalidated.");
+            Assert.IsNull(db.LoadHeightmap(westTile.Id), "Corrupted neighbor should have been deleted from the database.");
+
+            var row0b = results2.Where(r => r.Row == 0).OrderBy(r => r.Col).ToList();
+            var eastTile = db.LoadHeightmap(row0b[0].Id)!;
+            Assert.IsTrue(eastTile.Values.All(float.IsFinite), "New tile's own data must stay clean even though its neighbor was corrupted.");
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
     public void Run_TwoOverlappingRequests_WithDifferentCorners_PlaceTheSamePhysicalTileIdentically()
     {
         // Regression for the "regenerating shifts every tile" bug: nothing requires a re-scanned or

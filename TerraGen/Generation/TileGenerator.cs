@@ -200,6 +200,15 @@ public static class TileGenerator
                 void LockAgainst(TerrainHeightmap? neighbor, int gxStart, int gxEnd, int gyStart, int gyEnd)
                 {
                     if (neighbor is null) return;
+
+                    // Defensive: a neighbor saved by an earlier corrupted run can carry NaN/Infinity — invalidate it rather than smuggling that into this tile's own grid.
+                    if (HasNonFiniteValues(neighbor.Values))
+                    {
+                        onProgress?.Invoke($"[{row},{col}] {id}: soused {neighbor.Id} obsahuje neplatná data (NaN/Infinity) — nejspíš pozůstatek staršího/rozbitého běhu; dlaždice byla z DB smazána, tento okraj se negeneruje zamčený proti ní.");
+                        db.DeleteHeightmap(neighbor.Id);
+                        return;
+                    }
+
                     for (var gy = gyStart; gy < gyEnd; gy++)
                     {
                         var worldY = paddedOriginY + gy * s.CellSizeMeters;
@@ -360,6 +369,14 @@ public static class TileGenerator
         }
 
         return results;
+    }
+
+    /// <summary>True if any value in <paramref name="values"/> is NaN or +/-Infinity — see <c>LockAgainst</c>'s neighbor-invalidation check.</summary>
+    private static bool HasNonFiniteValues(float[] values)
+    {
+        foreach (var v in values)
+            if (!float.IsFinite(v)) return true;
+        return false;
     }
 
     /// <summary>Soft ceiling on a chunk's combined-grid cell count, well under the int.MaxValue array-length limit.</summary>

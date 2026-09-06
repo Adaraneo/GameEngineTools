@@ -704,6 +704,14 @@ namespace GameEngineTools.World.Data
             return results;
         }
 
+        /// <summary>Permanently removes a saved heightmap by id — e.g. one TerraGen's <c>TileGenerator</c> found to contain non-finite (NaN/Infinity) elevation data left over from an earlier, corrupted generation run, so a later run doesn't lock its own tile's margin against it. No-op if no row with that id exists.</summary>
+        public void DeleteHeightmap(string id)
+        {
+            const string sql = "DELETE FROM TerrainHeightmap WHERE Id = @id";
+            lock (_sync)
+                ExecuteNonQuery(sql, ("@id", id));
+        }
+
         /// <summary>Inserts or replaces the single planet-wide reference point/radius this
         /// database's <see cref="TerrainHeightmap"/> tiles were flat-projected against — see
         /// <see cref="TerrainGeoReference"/>. Idempotent: safe to call again with the same values
