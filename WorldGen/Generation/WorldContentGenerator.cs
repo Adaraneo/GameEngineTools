@@ -72,6 +72,14 @@ public static class WorldContentGenerator
         /// moisture (a coarse stand-in for orographic drying, without modeling prevailing wind or
         /// rain shadows).</summary>
         double AltitudeDrynessPerKm = 0.05,
+        /// <summary>Whether the planet has a ring system — gates the ring-shadow cooling term in <see cref="ClimateModel"/> (Stage 5).</summary>
+        bool HasRings = false,
+        /// <summary>Ring optical depth — scales the ring-shadow cooling term. Only meaningful when <see cref="HasRings"/>.</summary>
+        double RingMeanOpticalDepth = 0.0,
+        /// <summary>Half-width (degrees latitude either side of the equator) of the annual-mean band the ring's shadow sweeps — defaults to the planet's own obliquity.</summary>
+        double RingShadowHalfWidthDeg = 0.0,
+        /// <summary>Maximum ring-shadow cooling (°C) at the equator itself, at optical depth 1.0 — [DESIGN SIMPLIFICATION], see docs/plans/planet-physics-driven-climate.md Stage 5.</summary>
+        double RingShadowMaxCoolingC = 5.0,
         /// <summary>Temperature (°C) at/below which a candidate (that isn't already Mountain) is
         /// classified Tundra regardless of humidity, slope, or coastal proximity.</summary>
         double TundraTemperatureThresholdC = -5.0,

@@ -46,7 +46,8 @@ public static class ClimateModel
 
         var altitudeAboveSeaKm = Math.Max(heightMeters, 0.0) / 1000.0;
         var temperature = double.Lerp(options.EquatorTemperatureCelsius, options.PoleTemperatureCelsius, latitudeFactor)
-                           - options.LapseRateCPerKm * altitudeAboveSeaKm;
+                           - options.LapseRateCPerKm * altitudeAboveSeaKm
+                           - RingShadowCoolingC(latDeg, options);
 
         var humidityNoise = Fbm2D(
             offsetXMeters / options.HumidityWavelengthMeters + HumidityPhaseOffset,
@@ -55,6 +56,18 @@ public static class ClimateModel
         var humidity = (humidityNoise + 1.0) / 2.0 - options.AltitudeDrynessPerKm * altitudeAboveSeaKm;
 
         return new Sample(temperature, Math.Clamp(humidity, 0.0, 1.0));
+    }
+
+    /// <summary>Annual-mean ring-shadow cooling (°C) at this latitude — see docs/plans/planet-physics-driven-climate.md Stage 5.</summary>
+    private static double RingShadowCoolingC(double latDeg, WorldContentGenerator.Options options)
+    {
+        if (!options.HasRings || options.RingShadowHalfWidthDeg <= 0) return 0.0;
+
+        var absLat = Math.Abs(latDeg);
+        if (absLat >= options.RingShadowHalfWidthDeg) return 0.0;
+
+        var tapered = 1.0 - absLat / options.RingShadowHalfWidthDeg;
+        return options.RingShadowMaxCoolingC * options.RingMeanOpticalDepth * tapered;
     }
 
     private static double Fbm2D(double x, double y, int seed)

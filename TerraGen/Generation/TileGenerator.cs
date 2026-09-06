@@ -66,6 +66,8 @@ public static class TileGenerator
         Isostasy.Parameters? IsostasyParams = null,
         /// <summary>Null (default) keeps SPIM's bare D8 cell-count drainage area, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) weights it by <see cref="OrographicPrecipitation"/>'s Smith &amp; Barstad field instead (Stage 4).</summary>
         OrographicPrecipitation.Parameters? OrographicParams = null,
+        /// <summary>Null (default) keeps OrographicParams' own fixed WindDirectionFromDeg for every tile — unchanged back-compat path (e.g. an explicit --wind-direction). Non-null overrides it per tile from the tile's own center latitude — see <see cref="PrevailingWindModel"/>, docs/plans/planet-physics-driven-climate.md Stage 6.</summary>
+        Func<double, double>? WindDirectionForLatitudeDeg = null,
         /// <summary>1 (default) keeps every tile fully sequential, byte-identical to before this setting existed. &gt;1 processes independent tiles concurrently — see <see cref="Run"/>'s remarks on the diagonal-wavefront schedule this relies on for correctness. Each in-flight tile costs ~10-20MB, so this scales safely with core count.</summary>
         int MaxDegreeOfParallelism = 1,
         /// <summary>1 (default) keeps hydrology chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>. A chunk's combined grid is ~(HydrologyChunkTilesPerSide)² times a single tile's cost (several GB at the default 20-tile-per-side chunk), so running many chunks at once the way tiles safely can will exhaust RAM — confirmed live (48GB and climbing) when this was mistakenly defaulted to match tile parallelism. Raise only with HydrologyChunkTilesPerSide lowered to compensate, or with headroom verified first. An explicit value here always wins over <see cref="AutoHydrologyParallelism"/>.</summary>
@@ -264,7 +266,9 @@ public static class TileGenerator
                     }
                     // Computed ONCE against the pre-SPIM (landmass-only) terrain — see Erode's remarks on precipitationWeightPerCell.
                     var precipitationWeight = s.OrographicParams is { } orographicParams
-                        ? OrographicPrecipitation.ComputePrecipitationField(padded, orographicParams)
+                        ? OrographicPrecipitation.ComputePrecipitationField(padded, s.WindDirectionForLatitudeDeg is { } windFn
+                            ? orographicParams with { WindDirectionFromDeg = windFn(centerLat) }
+                            : orographicParams)
                         : null;
                     void LogSpimDiagnostic(string message) => ReportProgress($"[{row},{col}] {id}: {message}");
                     StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimDiagnostic);

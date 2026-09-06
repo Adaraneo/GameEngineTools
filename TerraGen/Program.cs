@@ -156,7 +156,17 @@ var hydrologyParams = options.Rivers
 var spimParams = options.Spim ? new StreamPowerErosion.Parameters() : null;
 var rockTypeParams = options.RockTypes ? new RockLayer.Parameters(Seed: planet.Seed) : null;
 var isostasyParams = options.Isostasy ? new Isostasy.Parameters() : null;
-var orographicParams = options.Orographic ? new OrographicPrecipitation.Parameters(WindDirectionFromDeg: options.WindDirectionFromDeg) : null;
+// --wind-direction (non-null) keeps the old fixed-bearing behavior everywhere, unchanged. Left
+// unset (null), the wind is derived per tile from latitude via PrevailingWindModel instead — see
+// docs/plans/planet-physics-driven-climate.md Stage 6.
+var orographicParams = options.Orographic ? new OrographicPrecipitation.Parameters(WindDirectionFromDeg: options.WindDirectionFromDeg ?? 270.0) : null;
+Func<double, double>? windDirectionForLatitudeDeg = null;
+if (options.Orographic && options.WindDirectionFromDeg is null)
+{
+    var subtropicalBeltBoundaryDeg = PrevailingWindModel.SubtropicalBeltBoundaryDeg(planet);
+    Console.WriteLine($"Vítr: pásmová Coriolisova cirkulace (hranice pasátů/západních větrů ±{subtropicalBeltBoundaryDeg:0.0}°).");
+    windDirectionForLatitudeDeg = lat => PrevailingWindModel.WindDirectionFromDeg(lat, subtropicalBeltBoundaryDeg);
+}
 
 var runSettings = new TileGenerator.RunSettings(
     LatMin: options.LatMin, LatMax: options.LatMax,
@@ -173,6 +183,7 @@ var runSettings = new TileGenerator.RunSettings(
     RockTypeParams: rockTypeParams,
     IsostasyParams: isostasyParams,
     OrographicParams: orographicParams,
+    WindDirectionForLatitudeDeg: windDirectionForLatitudeDeg,
     MaxDegreeOfParallelism: options.ParallelDegree,
     HydrologyMaxDegreeOfParallelism: options.ParallelHydrologyDegree,
     AutoHydrologyParallelism: options.AutoParallelHydrology);
@@ -274,8 +285,8 @@ internal sealed class CliOptions
     public bool Isostasy { get; init; }
     /// <summary>Off by default. Only meaningful together with <see cref="Spim"/> — see <see cref="TerraGen.Generation.TileGenerator.RunSettings.OrographicParams"/>.</summary>
     public bool Orographic { get; init; }
-    /// <summary>Compass bearing the wind blows FROM. See <see cref="TerraGen.Generation.OrographicPrecipitation.Parameters.WindDirectionFromDeg"/>.</summary>
-    public double WindDirectionFromDeg { get; init; } = 270.0;
+    /// <summary>Null (default) derives wind per tile from latitude via PrevailingWindModel (Stage 6). Explicit value keeps the old fixed compass bearing everywhere.</summary>
+    public double? WindDirectionFromDeg { get; init; }
     /// <summary>Off by default (fully sequential, 1). See <see cref="TerraGen.Generation.TileGenerator.RunSettings.MaxDegreeOfParallelism"/>.</summary>
     public int ParallelDegree { get; init; } = 1;
     /// <summary>Off by default (fully sequential, 1) — deliberately NOT tied to --parallel. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.HydrologyMaxDegreeOfParallelism"/>'s remarks on why (memory, not correctness).</summary>
@@ -347,7 +358,7 @@ internal sealed class CliOptions
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
-                        [--skip-existing] [--spim [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí 270>]]]
+                        [--skip-existing] [--spim [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí odvozeno ze šířky/rotace>]]]
                         [--parallel | --parallel-degree <počet vláken>]
                         [--parallel-hydrology | --parallel-hydrology-degree <počet vláken>]
 
@@ -420,9 +431,13 @@ internal sealed class CliOptions
             odtokovou plochu srážkově váženou (Smith & Barstad 2004, lineární teorie orografických
             srážek přes FFT): návětrná strana hory dostane víc "srážek" do odtokové plochy, závětrná
             (déšťový stín) míň — takže eroze i řeky vycházejí nesouměrně podle směru větru, ne
-            symetricky kolem hřebene. --wind-from udává, odkud vítr vane (výchozí 270 = od západu).
-            Srážkové pole se počítá JEDNOU z terénu před SPIM (statická klimatická aproximace,
-            ne přepočet každou iteraci — to by SPIM 200x prodražilo).
+            symetricky kolem hřebene. Bez --wind-from se směr větru odvozuje pro každou dlaždici ze
+            zeměpisné šířky a rotace planety (pasáty/západní větry/polární východní větry, hranice
+            pásu podle Held & Hou 1980 — viz PrevailingWindModel a
+            docs/plans/planet-physics-driven-climate.md). --wind-from <stupně> tohle přebije jednou
+            pevnou hodnotou pro celý běh (odkud vítr vane, 270 = od západu). Srážkové pole se počítá
+            JEDNOU z terénu před SPIM (statická klimatická aproximace, ne přepočet každou iteraci —
+            to by SPIM 200x prodražilo).
 
             --parallel (vypnuto výchozí, sekvenčně jedno vlákno) zapne generování DLAŽDIC paralelně
             přes všechna jádra CPU (Environment.ProcessorCount). --parallel-degree <n> nastaví
@@ -534,7 +549,7 @@ internal sealed class CliOptions
         var rockTypes = false;
         var isostasy = false;
         var orographic = false;
-        var windDirectionFromDeg = 270.0;
+        double? windDirectionFromDeg = null;
         var parallelDegree = 1;
         var parallelHydrologyDegree = 1;
         var autoParallelHydrology = false;

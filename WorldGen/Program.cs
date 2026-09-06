@@ -68,6 +68,13 @@ var tectonicPlateCount = options.TectonicPlateCount ?? planet.TectonicPlateCount
 if (tectonicPlateCount > 0)
     Console.WriteLine($"Tektonické desky: {tectonicPlateCount} (seed={planet.Seed}, poloměr={planet.PlanetRadiusMeters / 1000.0:0.0} km).");
 
+// Derived from the planet's own star/albedo/greenhouse/obliquity physics (docs/plans/planet-physics-driven-climate.md
+// Stage 3/4) instead of the old hardcoded 27C/-25C — --equator-temp-c/--pole-temp-c override for manual tuning.
+var (derivedEquatorC, derivedPoleC) = PlanetaryTemperatureModel.DeriveEquatorPoleTemperatures(planet, options.EpochKyr);
+var equatorTemperatureC = options.EquatorTemperatureC ?? derivedEquatorC;
+var poleTemperatureC = options.PoleTemperatureC ?? derivedPoleC;
+Console.WriteLine($"Klima: rovník={equatorTemperatureC:0.0}°C, póly={poleTemperatureC:0.0}°C (epoch={options.EpochKyr:0} kyr).");
+
 var genOptions = new WorldContentGenerator.Options(
     Count: options.Count,
     Region: options.Region,
@@ -78,6 +85,11 @@ var genOptions = new WorldContentGenerator.Options(
     TectonicPlateCount: tectonicPlateCount,
     TectonicSeed: planet.Seed,
     PlanetRadiusMeters: planet.PlanetRadiusMeters,
+    EquatorTemperatureCelsius: equatorTemperatureC,
+    PoleTemperatureCelsius: poleTemperatureC,
+    HasRings: planet.HasRings,
+    RingMeanOpticalDepth: planet.RingMeanOpticalDepth,
+    RingShadowHalfWidthDeg: planet.PlanetObliquityDeg,
     // Reuses the planet's own seed (already read from the same appsettings.World.json TerraGen
     // reads) so the climate map is reproducible per-planet without a separate CLI flag — same
     // convention as TectonicSeed above.
@@ -115,6 +127,12 @@ internal sealed class CliOptions
     /// count" (whatever TerraGen was run with) — same override convention as TerraGen's own
     /// <c>--tectonic-plates</c>.</summary>
     public int? TectonicPlateCount { get; init; }
+    /// <summary>Thousands of years from the config's own un-shifted obliquity/eccentricity/perihelion state — see PlanetaryTemperatureModel's Milankovitch term. 0 (default) disables it.</summary>
+    public double EpochKyr { get; init; }
+    /// <summary>Overrides the physically-derived equator temperature for this one run. Null (default) uses PlanetaryTemperatureModel's derived value.</summary>
+    public double? EquatorTemperatureC { get; init; }
+    /// <summary>Overrides the physically-derived pole temperature for this one run. Null (default) uses PlanetaryTemperatureModel's derived value.</summary>
+    public double? PoleTemperatureC { get; init; }
     public int? Seed { get; init; }
     /// <summary>Disk override for the food/drink/rest catalog. Defaults to <c>.\Nutrition.csv</c>
     /// in the current directory when present, else <c>null</c> (embedded default catalog is used).</summary>
@@ -145,6 +163,9 @@ internal sealed class CliOptions
                         [--mountain-threshold <metry nadmořské výšky, výchozí 300>]
                         [--coast-radius <metry, výchozí 60>]
                         [--tectonic-plates <počet, výchozí = hodnota z appsettings.World.json>]
+                        [--epoch-kyr <tisíce let od aktuálního stavu obliquity/excentricity, výchozí 0>]
+                        [--equator-temp-c <°C, výchozí = odvozeno z fyziky planety>]
+                        [--pole-temp-c <°C, výchozí = odvozeno z fyziky planety>]
                         [--seed <celé číslo, výchozí náhodné>]
                         [--nutrition-csv <cesta>, výchozí .\Nutrition.csv v aktuální složce,
                                             jinak vestavěný výchozí katalog]
@@ -163,7 +184,10 @@ internal sealed class CliOptions
 
             Každá lokace se klasifikuje podle výšky, sklonu a lehkého klimatického modelu (teplota
             ze zeměpisné šířky + nadmořské výšky, vlhkost z nezávislé šumové vrstvy — žádné
-            sezónnosti/větru, viz WorldGen.Generation.ClimateModel): Mountain (nad
+            sezónnosti/větru, viz WorldGen.Generation.ClimateModel). Rovníková/pólová teplota se
+            teď odvozuje z fyziky planety (hvězda, albedo, skleníkový jev, obliquity — viz
+            PlanetaryTemperatureModel a docs/plans/planet-physics-driven-climate.md), --equator-temp-c
+            / --pole-temp-c ji jen přebijí pro tento běh. Mountain (nad
             --mountain-threshold) → Tundra (pod bodem mrazu) → Coastline (do --coast-radius od
             vody) → Desert/Jungle (horko+sucho/horko+vlhko) → Savanna/Plains (plochý terén, dle
             vlhkosti) → Forest (zbytek, svažitý terén). Dostane náhodně jednu ze tří úrovní
@@ -196,6 +220,9 @@ internal sealed class CliOptions
         var mountainThreshold = 300.0;
         var coastRadius = 60.0;
         int? tectonicPlateCount = null;
+        var epochKyr = 0.0;
+        double? equatorTemperatureC = null;
+        double? poleTemperatureC = null;
         int? seed = null;
         string? nutritionCsvPath = null;
         var generateHouses = true;
@@ -232,6 +259,15 @@ internal sealed class CliOptions
                     break;
                 case "--tectonic-plates" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tp):
                     tectonicPlateCount = tp;
+                    break;
+                case "--epoch-kyr" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var ek):
+                    epochKyr = ek;
+                    break;
+                case "--equator-temp-c" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var eqt):
+                    equatorTemperatureC = eqt;
+                    break;
+                case "--pole-temp-c" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var pt):
+                    poleTemperatureC = pt;
                     break;
                 case "--seed" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var s):
                     seed = s;
@@ -298,6 +334,9 @@ internal sealed class CliOptions
             MountainThresholdMeters = mountainThreshold,
             CoastRadiusMeters = coastRadius,
             TectonicPlateCount = tectonicPlateCount,
+            EpochKyr = epochKyr,
+            EquatorTemperatureC = equatorTemperatureC,
+            PoleTemperatureC = poleTemperatureC,
             Seed = seed,
             NutritionCsvPath = nutritionCsvPath,
             GenerateHouses = generateHouses,
