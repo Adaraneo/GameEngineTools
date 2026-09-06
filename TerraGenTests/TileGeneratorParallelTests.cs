@@ -9,6 +9,84 @@ public class TileGeneratorParallelTests
     private static string TempDbPath() => Path.Combine(Path.GetTempPath(), $"terragen_test_{Guid.NewGuid():N}.db");
 
     [TestMethod]
+    public void ComputeAutoHydrologyDegree_NeverGoesBelowOne()
+    {
+        // A tiny memory budget (less than one chunk's estimated cost) must still return 1, not 0/negative.
+        var degree = TileGenerator.ComputeAutoHydrologyDegree(chunkTilesPerSide: 20, cellsPerTile: 400, availableMemoryBytes: 1024);
+        Assert.AreEqual(1, degree);
+    }
+
+    [TestMethod]
+    public void ComputeAutoHydrologyDegree_NeverExceedsProcessorCount()
+    {
+        // An enormous memory budget must cap at Environment.ProcessorCount, not grow unbounded.
+        var degree = TileGenerator.ComputeAutoHydrologyDegree(chunkTilesPerSide: 1, cellsPerTile: 1, availableMemoryBytes: long.MaxValue / 2);
+        Assert.AreEqual(Environment.ProcessorCount, degree);
+    }
+
+    [TestMethod]
+    public void ComputeAutoHydrologyDegree_ScalesWithAvailableMemory()
+    {
+        var chunkCells = 20L * 20 * 400 * 400;
+        var oneChunkBytes = chunkCells * TileGenerator.EstimatedBytesPerHydrologyChunkCell;
+
+        // Budget for roughly 3 chunks worth of memory (before the 0.5 safety fraction) -> expect ~1 chunk safely.
+        var degreeForOne = TileGenerator.ComputeAutoHydrologyDegree(20, 400, availableMemoryBytes: (long)(oneChunkBytes * 1.5));
+        Assert.AreEqual(1, degreeForOne);
+
+        // Budget for roughly 20 chunks worth (before the safety fraction) -> expect more than 1, capped by cores.
+        var degreeForMany = TileGenerator.ComputeAutoHydrologyDegree(20, 400, availableMemoryBytes: oneChunkBytes * 20);
+        Assert.IsTrue(degreeForMany > degreeForOne, $"Expected more available memory to allow a higher degree (got {degreeForMany} vs {degreeForOne}).");
+        Assert.IsTrue(degreeForMany <= Environment.ProcessorCount);
+    }
+
+    [TestMethod]
+    public void Run_WithAutoHydrologyParallelism_ProducesByteIdenticalOutputToSequential()
+    {
+        var dbPathSeq = TempDbPath();
+        var dbPathAuto = TempDbPath();
+        try
+        {
+            var baseSettings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.008, LonMin: 0.0, LonMax: 0.008,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: new PlanetNoise.Parameters(Seed: 32, AmplitudeMeters: 200.0),
+                ErosionParams: new TileErosion.Parameters(Seed: 32, DropletCount: 200, MaxDropletLifetime: 6),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                HydrologyParams: new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 5.0),
+                HydrologyChunkTilesPerSide: 2);
+
+            using (var dbSeq = new SqliteWorldDatabase(dbPathSeq))
+            {
+                WorldDatabaseSeeder.InitializeTerrainDatabase(dbSeq);
+                TileGenerator.Run(dbSeq, baseSettings);
+            }
+            using (var dbAuto = new SqliteWorldDatabase(dbPathAuto))
+            {
+                WorldDatabaseSeeder.InitializeTerrainDatabase(dbAuto);
+                TileGenerator.Run(dbAuto, baseSettings with { AutoHydrologyParallelism = true });
+            }
+
+            using var readSeq = new SqliteWorldDatabase(dbPathSeq);
+            using var readAuto = new SqliteWorldDatabase(dbPathAuto);
+            Assert.AreEqual(readSeq.LoadAllReaches().Count, readAuto.LoadAllReaches().Count);
+
+            foreach (var summary in readSeq.ListHeightmaps())
+            {
+                var seqTile = readSeq.LoadHeightmap(summary.Id)!;
+                var autoTile = readAuto.LoadHeightmap(summary.Id);
+                Assert.IsNotNull(autoTile, $"Tile {summary.Id} missing from the auto-parallel run.");
+                CollectionAssert.AreEqual(seqTile.Values, autoTile!.Values, $"Tile {summary.Id} differed with AutoHydrologyParallelism on.");
+            }
+        }
+        finally
+        {
+            if (File.Exists(dbPathSeq)) File.Delete(dbPathSeq);
+            if (File.Exists(dbPathAuto)) File.Delete(dbPathAuto);
+        }
+    }
+
+    [TestMethod]
     public void Run_WithParallelTiles_HydrologyDefaultsToSequential()
     {
         // Regression for a reported memory blowup: --parallel used to also parallelize hydrology

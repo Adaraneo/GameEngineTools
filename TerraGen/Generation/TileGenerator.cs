@@ -68,8 +68,10 @@ public static class TileGenerator
         OrographicPrecipitation.Parameters? OrographicParams = null,
         /// <summary>1 (default) keeps every tile fully sequential, byte-identical to before this setting existed. &gt;1 processes independent tiles concurrently — see <see cref="Run"/>'s remarks on the diagonal-wavefront schedule this relies on for correctness. Each in-flight tile costs ~10-20MB, so this scales safely with core count.</summary>
         int MaxDegreeOfParallelism = 1,
-        /// <summary>1 (default) keeps hydrology chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>. A chunk's combined grid is ~(HydrologyChunkTilesPerSide)² times a single tile's cost (several GB at the default 20-tile-per-side chunk), so running many chunks at once the way tiles safely can will exhaust RAM — confirmed live (48GB and climbing) when this was mistakenly defaulted to match tile parallelism. Raise only with HydrologyChunkTilesPerSide lowered to compensate, or with headroom verified first.</summary>
-        int HydrologyMaxDegreeOfParallelism = 1);
+        /// <summary>1 (default) keeps hydrology chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>. A chunk's combined grid is ~(HydrologyChunkTilesPerSide)² times a single tile's cost (several GB at the default 20-tile-per-side chunk), so running many chunks at once the way tiles safely can will exhaust RAM — confirmed live (48GB and climbing) when this was mistakenly defaulted to match tile parallelism. Raise only with HydrologyChunkTilesPerSide lowered to compensate, or with headroom verified first. An explicit value here always wins over <see cref="AutoHydrologyParallelism"/>.</summary>
+        int HydrologyMaxDegreeOfParallelism = 1,
+        /// <summary>Off by default. When true and <see cref="HydrologyMaxDegreeOfParallelism"/> is left at its default (1), <see cref="Run"/> computes a safe degree itself via <see cref="ComputeAutoHydrologyDegree"/> from live <see cref="GC.GetGCMemoryInfo"/> — replacing "guess a number" with "we compute how much is safe" for the same memory risk <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks describe.</summary>
+        bool AutoHydrologyParallelism = false);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -425,6 +427,16 @@ public static class TileGenerator
             }
 
             var hydrologyMaxDegreeOfParallelism = Math.Max(1, s.HydrologyMaxDegreeOfParallelism);
+            if (hydrologyMaxDegreeOfParallelism <= 1 && s.AutoHydrologyParallelism)
+            {
+                var availableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+                hydrologyMaxDegreeOfParallelism = ComputeAutoHydrologyDegree(chunkTilesPerSide, cellsPerTile, availableMemoryBytes);
+                var estimatedChunkMb = chunkTilesPerSide * (long)chunkTilesPerSide * cellsPerTile * (long)cellsPerTile
+                    * EstimatedBytesPerHydrologyChunkCell / 1024.0 / 1024.0;
+                ReportProgress($"hydrologie: auto-zvolený stupeň paralelismu {hydrologyMaxDegreeOfParallelism} " +
+                    $"(odhad {estimatedChunkMb:0} MB/chunk, dostupná paměť {availableMemoryBytes / 1024.0 / 1024.0:0} MB)");
+            }
+
             if (hydrologyMaxDegreeOfParallelism <= 1)
             {
                 foreach (var chunk in chunks) ProcessChunk(chunk);
@@ -456,6 +468,24 @@ public static class TileGenerator
         foreach (var v in values)
             if (!float.IsFinite(v)) return true;
         return false;
+    }
+
+    /// <summary>⚠ Design-simplification safety-padded estimate, not a guarantee: counted directly from the full-grid-sized array allocations in TileHydrology.ComputeDiagnostics (~34B/cell) + RiverMeander.ApplyMeanderWithGraph (~105B/cell) + the combined grid itself (4B/cell) ≈ 143B/cell measured, rounded up for headroom (e.g. doesn't account for GC not yet having freed a just-finished chunk's arrays). See <see cref="ComputeAutoHydrologyDegree"/>.</summary>
+    internal const int EstimatedBytesPerHydrologyChunkCell = 200;
+
+    /// <summary>Fraction of GC-reported available memory <see cref="ComputeAutoHydrologyDegree"/> is willing to budget for concurrently-running hydrology chunks — leaves headroom for the OS and everything else on the machine. ⚠ Tunable, not derived.</summary>
+    internal const double HydrologyMemoryBudgetFraction = 0.5;
+
+    /// <summary>Picks a safe <see cref="RunSettings.HydrologyMaxDegreeOfParallelism"/> from a chunk's estimated memory cost (<see cref="EstimatedBytesPerHydrologyChunkCell"/>) versus <paramref name="availableMemoryBytes"/> (from <see cref="GC.GetGCMemoryInfo"/>) — always at least 1, never more than <see cref="Environment.ProcessorCount"/> (no point exceeding core count).</summary>
+    internal static int ComputeAutoHydrologyDegree(int chunkTilesPerSide, int cellsPerTile, long availableMemoryBytes)
+    {
+        var chunkCells = (long)chunkTilesPerSide * chunkTilesPerSide * cellsPerTile * cellsPerTile;
+        var estimatedBytesPerChunk = chunkCells * (long)EstimatedBytesPerHydrologyChunkCell;
+        if (estimatedBytesPerChunk <= 0) return 1;
+
+        var safetyBudget = availableMemoryBytes * HydrologyMemoryBudgetFraction;
+        var byMemory = (int)Math.Min(int.MaxValue, safetyBudget / estimatedBytesPerChunk);
+        return Math.Clamp(byMemory, 1, Environment.ProcessorCount);
     }
 
     /// <summary>Soft ceiling on a chunk's combined-grid cell count, well under the int.MaxValue array-length limit.</summary>

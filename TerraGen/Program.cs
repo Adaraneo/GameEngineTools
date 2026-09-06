@@ -161,7 +161,8 @@ var runSettings = new TileGenerator.RunSettings(
     IsostasyParams: isostasyParams,
     OrographicParams: orographicParams,
     MaxDegreeOfParallelism: options.ParallelDegree,
-    HydrologyMaxDegreeOfParallelism: options.ParallelHydrologyDegree);
+    HydrologyMaxDegreeOfParallelism: options.ParallelHydrologyDegree,
+    AutoHydrologyParallelism: options.AutoParallelHydrology);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -266,6 +267,8 @@ internal sealed class CliOptions
     public int ParallelDegree { get; init; } = 1;
     /// <summary>Off by default (fully sequential, 1) — deliberately NOT tied to --parallel. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.HydrologyMaxDegreeOfParallelism"/>'s remarks on why (memory, not correctness).</summary>
     public int ParallelHydrologyDegree { get; init; } = 1;
+    /// <summary>Off by default. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.AutoHydrologyParallelism"/>.</summary>
+    public bool AutoParallelHydrology { get; init; }
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -331,6 +334,7 @@ internal sealed class CliOptions
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
                         [--skip-existing] [--spim [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí 270>]]]
                         [--parallel | --parallel-degree <počet vláken>]
+                        [--parallel-hydrology | --parallel-hydrology-degree <počet vláken>]
 
             --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
             TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
@@ -421,6 +425,15 @@ internal sealed class CliOptions
             stroj jader, reálně vyčerpá RAM (ověřeno naživo: desítky GB a stoupá). Zvyšuj jen
             spolu se sníženým --river-chunk-tiles, nebo když sis ověřil, že na to máš paměť.
 
+            --parallel-hydrology (vypnuto výchozí) je bezpečnější varianta — místo ručně
+            uhodnutého čísla si TerraGen sám spočítá, kolik chunků najednou je bezpečných: odhadne
+            paměť na chunk (~200 B/buňku, změřeno přímo z alokací ve FlowRouting/TileHydrology/
+            RiverMeander, se zaokrouhlením nahoru) a porovná ji s tím, co GC.GetGCMemoryInfo()
+            hlásí jako aktuálně dostupnou paměť (bere v úvahu i limity kontejneru, ne jen fyzickou
+            RAM). Zvolený stupeň se vypíše do logu i s odhadem. Je to pořád jen odhad, ne záruka
+            (jiné procesy na stroji se do "dostupné paměti" nepočítají dopředu) — --parallel-
+            hydrology-degree <n> má přednost, když chceš vynutit konkrétní číslo.
+
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
             v aktuálním pracovním adresáři (vytvoří se, pokud tam ještě není).
@@ -503,6 +516,7 @@ internal sealed class CliOptions
         var windDirectionFromDeg = 270.0;
         var parallelDegree = 1;
         var parallelHydrologyDegree = 1;
+        var autoParallelHydrology = false;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -573,6 +587,9 @@ internal sealed class CliOptions
                     break;
                 case "--parallel-hydrology-degree" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var phd):
                     parallelHydrologyDegree = phd;
+                    break;
+                case "--parallel-hydrology":
+                    autoParallelHydrology = true;
                     break;
                 case "--scan":
                     scan = true;
@@ -708,7 +725,7 @@ internal sealed class CliOptions
             Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
             SkipExisting = skipExisting, Spim = spim, RockTypes = rockTypes, Isostasy = isostasy,
             Orographic = orographic, WindDirectionFromDeg = windDirectionFromDeg, ParallelDegree = parallelDegree,
-            ParallelHydrologyDegree = parallelHydrologyDegree,
+            ParallelHydrologyDegree = parallelHydrologyDegree, AutoParallelHydrology = autoParallelHydrology,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
