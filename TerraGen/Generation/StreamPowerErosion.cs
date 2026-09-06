@@ -27,8 +27,8 @@ public static class StreamPowerErosion
     /// <summary>⚠ Design simplification: TectonicPlates' relative-velocity magnitude is a dimensionless sim unit, not m/yr — this is the approach-rate value at which uplift saturates at MaxUpliftMmPerYear (tuned so a typical strong convergent boundary sits near the top of the empirical range).</summary>
     private const double ApproachRateAtMaxUplift = 1.5;
 
-    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written.</summary>
-    public static void Erode(TerrainHeightmap grid, Parameters p, double[] upliftMetersPerYear, bool[]? locked = null)
+    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1.</summary>
+    public static void Erode(TerrainHeightmap grid, Parameters p, double[] upliftMetersPerYear, bool[]? locked = null, double[]? erodibilityPerCell = null)
     {
         if (p.Iterations <= 0 || grid.Width < 2 || grid.Height < 2) return;
 
@@ -61,7 +61,8 @@ public static class StreamPowerErosion
                 var distance = (nextX != idxX && nextY != idxY ? 1.4142135623730951 : 1.0) * cellSize;
 
                 var areaM2 = accumulation[idx] * cellAreaM2;
-                var coeff = dt * p.K * Math.Pow(areaM2, p.M) / distance;
+                var k = erodibilityPerCell?[idx] ?? p.K;
+                var coeff = dt * k * Math.Pow(areaM2, p.M) / distance;
 
                 var upliftTerm = dt * upliftMetersPerYear[idx];
                 var newHeight = (grid.Values[idx] + upliftTerm + coeff * grid.Values[next]) / (1.0 + coeff);

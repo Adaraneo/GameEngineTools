@@ -57,7 +57,9 @@ public static class TileGenerator
         /// <summary>Off by default (always regenerate/overwrite). When true, a tile whose TileId already has a saved heightmap of the expected size skips noise+erosion and reuses the saved elevation; hydrology (if on) still reprocesses its whole chunk.</summary>
         bool SkipExisting = false,
         /// <summary>Null (default) keeps the existing ridged-noise mountain layer unchanged — see <see cref="StreamPowerErosion"/>. Non-null REPLACES it: each tile samples landmass only, then <see cref="StreamPowerErosion.Erode"/> builds relief from an uplift field derived from <see cref="TectonicPlates"/> (Task 1.2.4's confirmed integration mode), before droplet erosion runs as a fine-detail finishing pass. ⚠ Runs per padded tile with the same erosion-margin neighbor-locking as <see cref="TileErosion"/> — a local-drainage approximation, not a whole-region solve; a real basin wider than the margin is truncated at the tile's own padding.</summary>
-        StreamPowerErosion.Parameters? SpimParams = null);
+        StreamPowerErosion.Parameters? SpimParams = null,
+        /// <summary>Null (default) keeps SPIM's scalar Parameters.K everywhere, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) couples erodibility to a per-cell <see cref="RockLayer"/> lithology assignment (Task 2.2.3) instead.</summary>
+        RockLayer.Parameters? RockTypeParams = null);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -221,7 +223,13 @@ public static class TileGenerator
                 if (s.SpimParams is { } spimParams)
                 {
                     var uplift = StreamPowerErosion.UpliftFieldFromPlates(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
-                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked);
+                    double[]? erodibilityPerCell = null;
+                    if (s.RockTypeParams is { } rockTypeParams)
+                    {
+                        var rockTypes = RockLayer.ComputeRockTypeMap(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters, rockTypeParams);
+                        erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes);
+                    }
+                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell);
                 }
 
                 TileErosion.Erode(padded, s.ErosionParams, locked);

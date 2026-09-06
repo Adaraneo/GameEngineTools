@@ -277,6 +277,14 @@ public static class PlanetNoise
         return landmassElevation + mountainElevation;
     }
 
+    /// <summary>Reusable coherent 3D value-noise sample at true (lat,lon), in [-1, 1] — same globally-seamless sphere sampling <see cref="SampleLandmass"/> uses internally, exposed for other layers (e.g. <c>RockLayer</c>'s lithology assignment) that need the same machinery without duplicating it.</summary>
+    public static double SampleCoherentField(double latDeg, double lonDeg, double wavelengthMeters, int seed, double planetRadiusMeters)
+    {
+        var (x, y, z) = LatLonToUnitVector(latDeg, lonDeg);
+        var frequency = Math.Max(planetRadiusMeters, 1.0) / Math.Max(wavelengthMeters, 1.0);
+        return ValueNoise3D(x * frequency, y * frequency, z * frequency, seed);
+    }
+
     /// <summary>True (lat,lon) → unit-sphere position — shared by <see cref="SampleLandmass"/> and
     /// the tectonic-plate lookup in <see cref="SampleCombined"/> so both agree on the exact same
     /// point. Internal (not private) so <see cref="PlanetScanner"/> can reuse it for its own
