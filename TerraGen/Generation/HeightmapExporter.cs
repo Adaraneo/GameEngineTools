@@ -62,4 +62,44 @@ public static class HeightmapExporter
 
         return new ExportResult(tile.Id, rawPath, pngPath, metadataPath);
     }
+
+    /// <summary>Stitches every saved tile overlapping a lat/lon window into ONE combined grid and exports that single grid — instead of one trio per tile — for a Blender batch import. Null if nothing overlaps.</summary>
+    public static ExportResult? ExportRange(
+        IReadOnlyList<TerrainHeightmapSummary> summaries, Func<string, TerrainHeightmap?> loadTile,
+        double latMin, double latMax, double lonMin, double lonMax, double planetRadiusMeters,
+        string outputDir, string planetName, int seed)
+    {
+        var (minX, minY) = PlanetNoise.LatLonToOffset(latMin, lonMin, 0.0, 0.0, planetRadiusMeters);
+        var (maxX, maxY) = PlanetNoise.LatLonToOffset(latMax, lonMax, 0.0, 0.0, planetRadiusMeters);
+        var (combined, _) = TileStitcher.BuildCombinedGrid(summaries, loadTile,
+            Math.Min(minX, maxX), Math.Min(minY, maxY), Math.Max(minX, maxX), Math.Max(minY, maxY));
+        if (combined is null) return null;
+
+        var batchId = $"batch_lat{latMin:0.###}_{latMax:0.###}_lon{lonMin:0.###}_{lonMax:0.###}";
+        return Export(combined with { Id = batchId }, outputDir, planetName, seed);
+    }
+
+    /// <summary>Lat/lon bounding box of every saved tile's corners — lets --export tell the caller what's actually available instead of failing blind when no --lat-range/--lon-range was given.</summary>
+    public static (double LatMin, double LatMax, double LonMin, double LonMax) ComputeCoverage(
+        IReadOnlyList<TerrainHeightmapSummary> summaries, double planetRadiusMeters)
+    {
+        double latMin = double.PositiveInfinity, latMax = double.NegativeInfinity;
+        double lonMin = double.PositiveInfinity, lonMax = double.NegativeInfinity;
+
+        foreach (var s in summaries)
+        {
+            var maxX = s.OriginX + s.Width * s.CellSizeMeters;
+            var maxY = s.OriginY + s.Height * s.CellSizeMeters;
+            foreach (var (x, y) in new[] { (s.OriginX, s.OriginY), (maxX, s.OriginY), (s.OriginX, maxY), (maxX, maxY) })
+            {
+                var (lat, lon) = PlanetNoise.OffsetToLatLon(x, y, 0.0, 0.0, planetRadiusMeters);
+                if (lat < latMin) latMin = lat;
+                if (lat > latMax) latMax = lat;
+                if (lon < lonMin) lonMin = lon;
+                if (lon > lonMax) lonMax = lon;
+            }
+        }
+
+        return (latMin, latMax, lonMin, lonMax);
+    }
 }

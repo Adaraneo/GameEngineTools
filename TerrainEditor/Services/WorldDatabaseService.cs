@@ -39,7 +39,7 @@ public sealed class WorldDatabaseService : IDisposable
     /// <summary>
     /// In-memory cache of decoded heightmaps, keyed by id — avoids re-hitting SQLite and
     /// re-decoding the BLOB every time the same tile is revisited (e.g. panning back and forth
-    /// across a tile boundary, or <see cref="Services.TileStitcher"/> re-stitching a viewport that
+    /// across a tile boundary, or <see cref="TileStitcher"/> re-stitching a viewport that
     /// still includes tiles from the previous combined view). Kept consistent with what's on disk
     /// by <see cref="SaveHeightmap"/> (updates the entry) and <see cref="Close"/> (clears it
     /// entirely — ids aren't guaranteed unique across different terrain.db files).

@@ -1,6 +1,4 @@
-using GameEngineTools.World.Data;
-
-namespace TerrainEditor.Services;
+namespace GameEngineTools.World.Data;
 
 /// <summary>
 /// Stitches whichever ALREADY-SAVED terrain.db tiles overlap a requested world-meters box into

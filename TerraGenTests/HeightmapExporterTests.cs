@@ -107,4 +107,92 @@ public class HeightmapExporterTests
             Directory.Delete(parent, recursive: true);
         }
     }
+
+    #region ExportRange (batch lat/lon export)
+
+    private const double PlanetRadiusMeters = 6_378_100.0;
+    private const double CellSize = 10.0;
+    private const int TileSide = 4;
+
+    private static TerrainHeightmap MakeTile(string id, double originX, double originY, float fill)
+        => new(id, originX, originY, CellSize, TileSide, TileSide, Enumerable.Repeat(fill, TileSide * TileSide).ToArray());
+
+    [TestMethod]
+    public void ExportRange_OnlyStitchesTilesOverlappingTheWindow_NotDistantOnes()
+    {
+        var (inX, inY) = PlanetNoise.LatLonToOffset(0.005, 0.005, 0.0, 0.0, PlanetRadiusMeters);
+        var (outX, outY) = PlanetNoise.LatLonToOffset(10.0, 10.0, 0.0, 0.0, PlanetRadiusMeters);
+        var summaries = new List<TerrainHeightmapSummary>
+        {
+            new("tileIn", inX, inY, CellSize, TileSide, TileSide),
+            new("tileOut", outX, outY, CellSize, TileSide, TileSide),
+        };
+        TerrainHeightmap? LoadTile(string id) => id switch
+        {
+            "tileIn" => MakeTile("tileIn", inX, inY, 1f),
+            "tileOut" => MakeTile("tileOut", outX, outY, 2f),
+            _ => null,
+        };
+
+        var dir = TempDir();
+        try
+        {
+            var result = HeightmapExporter.ExportRange(summaries, LoadTile,
+                latMin: 0.0, latMax: 0.01, lonMin: 0.0, lonMax: 0.01, PlanetRadiusMeters, dir, "Test Planet", 42);
+
+            Assert.IsNotNull(result, "Expected tileIn to overlap the requested window.");
+            Assert.AreEqual(1, Directory.GetFiles(dir, "*.f32").Length, "Expected exactly one combined batch file, not one per tile.");
+
+            var rawBytes = File.ReadAllBytes(result!.RawPath);
+            var floats = new float[rawBytes.Length / sizeof(float)];
+            Buffer.BlockCopy(rawBytes, 0, floats, 0, rawBytes.Length);
+            Assert.IsFalse(floats.Any(v => v == 2f), "The distant, non-overlapping tile's data must not appear in the combined export.");
+            Assert.IsTrue(floats.All(v => v == 1f), "Every sample should come from the overlapping tile.");
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void ExportRange_NoTileOverlapsTheWindow_ReturnsNull()
+    {
+        var (farX, farY) = PlanetNoise.LatLonToOffset(10.0, 10.0, 0.0, 0.0, PlanetRadiusMeters);
+        var summaries = new List<TerrainHeightmapSummary> { new("tileFar", farX, farY, CellSize, TileSide, TileSide) };
+
+        var dir = TempDir();
+        try
+        {
+            var result = HeightmapExporter.ExportRange(summaries, id => MakeTile(id, farX, farY, 1f),
+                latMin: 0.0, latMax: 0.01, lonMin: 0.0, lonMax: 0.01, PlanetRadiusMeters, dir, "Test Planet", 42);
+
+            Assert.IsNull(result);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void ComputeCoverage_ReturnsLatLonBoundingBoxOfAllTiles()
+    {
+        var (nearX, nearY) = PlanetNoise.LatLonToOffset(1.0, 1.0, 0.0, 0.0, PlanetRadiusMeters);
+        var (farX, farY) = PlanetNoise.LatLonToOffset(-5.0, 8.0, 0.0, 0.0, PlanetRadiusMeters);
+        var summaries = new List<TerrainHeightmapSummary>
+        {
+            new("tileNear", nearX, nearY, CellSize, TileSide, TileSide),
+            new("tileFar", farX, farY, CellSize, TileSide, TileSide),
+        };
+
+        var (latMin, latMax, lonMin, lonMax) = HeightmapExporter.ComputeCoverage(summaries, PlanetRadiusMeters);
+
+        Assert.IsTrue(latMin <= -5.0, $"Expected coverage to reach down to the far tile's latitude, got latMin={latMin}.");
+        Assert.IsTrue(latMax >= 1.0, $"Expected coverage to reach up to the near tile's latitude, got latMax={latMax}.");
+        Assert.IsTrue(lonMin <= 1.0, $"Expected coverage to reach the near tile's longitude, got lonMin={lonMin}.");
+        Assert.IsTrue(lonMax >= 8.0, $"Expected coverage to reach the far tile's longitude, got lonMax={lonMax}.");
+    }
+
+    #endregion ExportRange (batch lat/lon export)
 }

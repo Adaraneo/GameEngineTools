@@ -116,14 +116,27 @@ if (options.ExportDir is { } exportDir)
         return 1;
     }
 
-    Console.WriteLine($"Exportuji {summaries.Count} dlaždic do {exportDir} (float32 + 16bit PNG + JSON metadata)...");
-    foreach (var summary in summaries)
+    if (!options.ExportRangeGiven)
     {
-        var tile = exportDb.LoadHeightmap(summary.Id)!;
-        var result = HeightmapExporter.Export(tile, exportDir, planet.PlanetName, planet.Seed);
-        Console.WriteLine($"  {result.TileId}: {Path.GetFileName(result.RawPath)}, {Path.GetFileName(result.PngPath)}, {Path.GetFileName(result.MetadataPath)}");
+        var (covLatMin, covLatMax, covLonMin, covLonMax) = HeightmapExporter.ComputeCoverage(summaries, planet.PlanetRadiusMeters);
+        Console.Error.WriteLine($"--export potřebuje --lat-range/--lon-range (exportuje se vždy jako jedna spojená dlaždice, ne po jedné).");
+        Console.Error.WriteLine($"V {options.DbPath} je vygenerováno {summaries.Count} dlaždic pokrývajících lat [{covLatMin:0.###}:{covLatMax:0.###}] lon [{covLonMin:0.###}:{covLonMax:0.###}].");
+        Console.Error.WriteLine($"Zkus např.: --export {exportDir} --lat-range {covLatMin:0.###}:{covLatMax:0.###} --lon-range {covLonMin:0.###}:{covLonMax:0.###}");
+        return 1;
     }
-    Console.WriteLine($"Hotovo — {summaries.Count} dlaždic exportováno do {exportDir}.");
+
+    Console.WriteLine($"Exportuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}] " +
+                       $"jako jednu spojenou dlaždici do {exportDir} (float32 + 16bit PNG + JSON metadata)...");
+    var batchResult = HeightmapExporter.ExportRange(summaries, exportDb.LoadHeightmap,
+        options.LatMin, options.LatMax, options.LonMin, options.LonMax, planet.PlanetRadiusMeters,
+        exportDir, planet.PlanetName, planet.Seed);
+    if (batchResult is null)
+    {
+        Console.Error.WriteLine("V zadaném lat/lon rozsahu nejsou v --db žádné vygenerované dlaždice.");
+        return 1;
+    }
+    Console.WriteLine($"  {batchResult.TileId}: {Path.GetFileName(batchResult.RawPath)}, {Path.GetFileName(batchResult.PngPath)}, {Path.GetFileName(batchResult.MetadataPath)}");
+    Console.WriteLine($"Hotovo — spojená dlaždice exportována do {exportDir}.");
     return 0;
 }
 
@@ -300,6 +313,8 @@ internal sealed class CliOptions
     /// via <see cref="TerraGen.Generation.HeightmapExporter"/> — e.g. for a Blender Python import
     /// script to consume.</summary>
     public string? ExportDir { get; init; }
+    /// <summary>True when <c>--export</c> was combined with an explicit <c>--lat-range</c>/<c>--lon-range</c> — stitches the matching tiles into one combined batch export instead of one file per tile.</summary>
+    public bool ExportRangeGiven { get; init; }
 
     /// <summary><c>null</c> (default — not passed on the command line) means "use whatever
     /// <c>appsettings.World.json</c>'s <c>PlanetTectonicPlateCount</c> says for this planet" (see
@@ -482,10 +497,16 @@ internal sealed class CliOptions
             není (celé moře/celá pevnina), další úroveň se přiblíží jen ke středu okna.
 
             ── Export (pro Blender / jiné 3D nástroje) ─────────────────────────────────────
-              TerraGen --export <cesta ke složce> [--db <cesta k terrain.db>]
+              TerraGen --export <cesta ke složce> --lat-range <min>:<max> --lon-range <min>:<max>
+                        [--db <cesta k terrain.db>]
 
-            Bere VŠECHNY dlaždice už uložené v --db (žádné --lat-range/--lon-range, žádná nová
-            generace) a pro každou zapíše trojici souborů <tileId>.f32 + .png + .json:
+            Vyžaduje --lat-range/--lon-range (žádná nová generace, jen čtení už uložených
+            dlaždic z --db) — spojí (bez převzorkování, stejně jako TerrainEditor) všechny
+            dlaždice překrývající se s daným oknem do JEDNÉ souvislé mřížky a zapíše jen jednu
+            trojici batch_lat..._lon....f32/.png/.json, pro batch import jednoho kusu terénu do
+            Blenderu místo skládání z mnoha samostatných dlaždic. Bez --lat-range/--lon-range
+            vypíše, jaké lat/lon už --db pokrývá (a rovnou hotový --lat-range/--lon-range k
+            vložení), místo aby exportoval naslepo.
               .f32  — přesná float32 data beze ztráty (little-endian, po řádcích, řádek 0 první;
                       stejné bajty jako v DB) — pro přesný import, žádná kvantizace.
               .png  — 16bitová šedotónová PNG, lineárně škálovaná mezi min/max výškou dlaždice —
@@ -630,6 +651,7 @@ internal sealed class CliOptions
         // used to locate appsettings.World.json (see PlanetSettings.Load), so it's resolved either way.
         dbPath ??= Path.Combine(Directory.GetCurrentDirectory(), "terrain.db");
 
+        var exportRangeGiven = exportDir is not null && latMin is not null && lonMin is not null;
         if (latMin is null || lonMin is null)
         {
             if (!scan && exportDir is null)
@@ -637,10 +659,7 @@ internal sealed class CliOptions
                 Console.Error.WriteLine("Chybí povinné argumenty --lat-range, --lon-range.");
                 return null;
             }
-            // --scan without an explicit window previews the whole planet — that's the point of
-            // running it before deciding which range is even worth generating for real. --export
-            // doesn't use these at all (it just reads whatever tiles are already in --db), but
-            // CliOptions.LatMin etc. are non-nullable, so something must still be filled in.
+            // --scan without a window previews the whole planet; --export without one lists coverage instead (see exportRangeGiven) — CliOptions.LatMin etc. are non-nullable either way.
             latMin = -90.0; latMax = 90.0;
             lonMin = -180.0; lonMax = 180.0;
         }
@@ -730,6 +749,7 @@ internal sealed class CliOptions
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
             ExportDir = exportDir,
+            ExportRangeGiven = exportRangeGiven,
         };
     }
 
