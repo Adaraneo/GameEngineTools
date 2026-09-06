@@ -39,6 +39,18 @@ public static class TileErosion
     {
         if (p.DropletCount <= 0 || grid.Width < 3 || grid.Height < 3) return;
 
+        // Defensive: a non-finite value here always comes from an EARLIER step (e.g. StreamPowerErosion),
+        // not from this method — but left unchecked it corrupts a droplet's position into NaN, which then
+        // fails a bounds check silently (NaN comparisons are always false) and crashes deep inside
+        // SampleHeight with an inscrutable IndexOutOfRangeException far from the real cause. Fail loud here instead.
+        for (var i = 0; i < grid.Values.Length; i++)
+        {
+            if (float.IsFinite(grid.Values[i])) continue;
+            throw new InvalidOperationException(
+                $"TileErosion.Erode received a non-finite height at cell index {i} (value={grid.Values[i]}) — " +
+                "this grid was already corrupted before droplet erosion ran, most likely by an earlier SPIM/isostasy divergence.");
+        }
+
         var rng = new Random(p.Seed);
         var width = grid.Width;
         var height = grid.Height;

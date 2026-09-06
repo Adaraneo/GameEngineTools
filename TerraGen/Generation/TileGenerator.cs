@@ -239,7 +239,8 @@ public static class TileGenerator
                     var precipitationWeight = s.OrographicParams is { } orographicParams
                         ? OrographicPrecipitation.ComputePrecipitationField(padded, orographicParams)
                         : null;
-                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight);
+                    void LogSpimDiagnostic(string message) => onProgress?.Invoke($"[{row},{col}] {id}: {message}");
+                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimDiagnostic);
                 }
 
                 TileErosion.Erode(padded, s.ErosionParams, locked);

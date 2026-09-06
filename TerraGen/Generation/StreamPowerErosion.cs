@@ -27,10 +27,10 @@ public static class StreamPowerErosion
     /// <summary>⚠ Design simplification: TectonicPlates' relative-velocity magnitude is a dimensionless sim unit, not m/yr — this is the approach-rate value at which uplift saturates at MaxUpliftMmPerYear (tuned so a typical strong convergent boundary sits near the top of the empirical range).</summary>
     private const double ApproachRateAtMaxUplift = 1.5;
 
-    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1. <paramref name="isostasyParams"/> (Stage 3.1) turns on the erosion→unloading→rebound feedback loop — when set, accumulated erosional height loss is added DIRECTLY back into <paramref name="grid"/>'s own elevation every recompute interval (a one-time state correction, not a permanent addition to <paramref name="upliftMetersPerYear"/> — the latter compounded without bound across iterations in an earlier version of this method and produced runaway +Infinity terrain); null keeps Stage 1/2 behavior, byte-identical. <paramref name="precipitationWeightPerCell"/> (Stage 4, <see cref="OrographicPrecipitation"/>) replaces bare cell-count drainage area with a precipitation-weighted accumulation computed ONCE up front against the terrain <paramref name="grid"/> has at the moment <see cref="Erode"/> is called (a static-climate approximation — recomputing the FFT every iteration would multiply SPIM's own already-heavy cost by <see cref="Parameters.Iterations"/> for a second-order feedback); null keeps the unweighted D8 count, byte-identical to Stages 1-3.</summary>
+    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1. <paramref name="isostasyParams"/> (Stage 3.1) turns on the erosion→unloading→rebound feedback loop — when set, accumulated erosional height loss is added DIRECTLY back into <paramref name="grid"/>'s own elevation every recompute interval (a one-time state correction, not a permanent addition to <paramref name="upliftMetersPerYear"/> — the latter compounded without bound across iterations in an earlier version of this method and produced runaway +Infinity terrain); null keeps Stage 1/2 behavior, byte-identical. <paramref name="precipitationWeightPerCell"/> (Stage 4, <see cref="OrographicPrecipitation"/>) replaces bare cell-count drainage area with a precipitation-weighted accumulation computed ONCE up front against the terrain <paramref name="grid"/> has at the moment <see cref="Erode"/> is called (a static-climate approximation — recomputing the FFT every iteration would multiply SPIM's own already-heavy cost by <see cref="Parameters.Iterations"/> for a second-order feedback); null keeps the unweighted D8 count, byte-identical to Stages 1-3. <paramref name="onDiagnostic"/> receives one line right before a fail-fast <see cref="InvalidOperationException"/> if any solved height ever comes out non-finite — the exact cell/iteration/parameter dump, instead of that NaN silently propagating into a cryptic crash somewhere downstream (e.g. TileErosion).</summary>
     public static void Erode(TerrainHeightmap grid, Parameters p, double[] upliftMetersPerYear, bool[]? locked = null,
         double[]? erodibilityPerCell = null, Isostasy.Parameters? isostasyParams = null, double[]? crustDensityPerCell = null,
-        double[]? precipitationWeightPerCell = null)
+        double[]? precipitationWeightPerCell = null, Action<string>? onDiagnostic = null)
     {
         if (p.Iterations <= 0 || grid.Width < 2 || grid.Height < 2) return;
 
@@ -78,6 +78,19 @@ public static class StreamPowerErosion
                 var upliftTerm = dt * upliftMetersPerYear[idx];
                 var upliftOnlyHeight = grid.Values[idx] + upliftTerm;
                 var newHeight = (upliftOnlyHeight + coeff * grid.Values[next]) / (1.0 + coeff);
+
+                if (!double.IsFinite(newHeight))
+                {
+                    var message = "SPIM diverged to a non-finite height — " +
+                        $"iter={iter}/{p.Iterations} cell=({idxX},{idxY}) receiver=({nextX},{nextY}) " +
+                        $"h_before={grid.Values[idx]:G9} h_receiver={grid.Values[next]:G9} " +
+                        $"uplift_m_per_yr={upliftMetersPerYear[idx]:G9} k={k:G9} accumulation_cells={accumulation[idx]} " +
+                        $"weighted_accumulation={(weightedAccumulation?[idx].ToString("G9") ?? "n/a")} areaM2={areaM2:G9} " +
+                        $"coeff={coeff:G9} uplift_only_height={upliftOnlyHeight:G9} new_height={newHeight:G9}";
+                    onDiagnostic?.Invoke(message);
+                    throw new InvalidOperationException(message);
+                }
+
                 if (erodedHeightAccumulator is not null)
                     erodedHeightAccumulator[idx] += Math.Max(0.0, upliftOnlyHeight - newHeight);
                 grid.Values[idx] = (float)newHeight;
@@ -87,18 +100,18 @@ public static class StreamPowerErosion
             iterationsSinceRebound++;
             if (iterationsSinceRebound >= Math.Max(1, isostasyParams!.RecomputeIntervalIterations))
             {
-                ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams);
+                ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams, iter, p.Iterations, onDiagnostic);
                 iterationsSinceRebound = 0;
             }
         }
 
         if (erodedHeightAccumulator is not null && iterationsSinceRebound > 0)
-            ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams!);
+            ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams!, p.Iterations - 1, p.Iterations, onDiagnostic);
     }
 
     /// <summary>Converts each cell's accumulated eroded-height loss into an Airy rebound height (<see cref="Isostasy.AiryRootDepth"/>) and adds it DIRECTLY to <paramref name="grid"/>'s current elevation — a one-time state correction proportional to that interval's own erosion, not a rate that persists or compounds into later iterations — then resets the accumulator to 0.</summary>
     private static void ApplyIsostaticRebound(double[] erodedHeightAccumulator, TerrainHeightmap grid,
-        bool[]? locked, double[]? crustDensityPerCell, Isostasy.Parameters isostasyParams)
+        bool[]? locked, double[]? crustDensityPerCell, Isostasy.Parameters isostasyParams, int iter, int totalIterations, Action<string>? onDiagnostic)
     {
         for (var idx = 0; idx < erodedHeightAccumulator.Length; idx++)
         {
@@ -106,7 +119,19 @@ public static class StreamPowerErosion
 
             var crustDensity = crustDensityPerCell?[idx] ?? isostasyParams.DefaultCrustDensityKgM3;
             var rebound = Isostasy.AiryRootDepth(erodedHeightAccumulator[idx], crustDensity, isostasyParams.MantleDensityKgM3);
-            grid.Values[idx] += (float)rebound;
+            var newValue = grid.Values[idx] + rebound;
+
+            if (!double.IsFinite(newValue))
+            {
+                var message = "Isostatic rebound diverged to a non-finite height — " +
+                    $"iter={iter}/{totalIterations} cellIndex={idx} h_before={grid.Values[idx]:G9} " +
+                    $"eroded_height_accumulated={erodedHeightAccumulator[idx]:G9} crust_density={crustDensity:G9} " +
+                    $"mantle_density={isostasyParams.MantleDensityKgM3:G9} rebound={rebound:G9}";
+                onDiagnostic?.Invoke(message);
+                throw new InvalidOperationException(message);
+            }
+
+            grid.Values[idx] = (float)newValue;
             erodedHeightAccumulator[idx] = 0.0;
         }
     }

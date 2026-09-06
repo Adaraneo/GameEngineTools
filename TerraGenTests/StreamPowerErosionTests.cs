@@ -28,6 +28,26 @@ public class StreamPowerErosionTests
     }
 
     [TestMethod]
+    public void Erode_NonFiniteInputHeight_FailsFastWithDiagnosticInsteadOfPropagatingSilently()
+    {
+        // Regression for a reported crash: a non-finite (NaN/Infinity) height reaching this method
+        // used to propagate silently into the rest of the grid, only surfacing much later as an
+        // inscrutable IndexOutOfRangeException deep inside TileErosion. Erode must instead fail
+        // fast, right at the cell/iteration where it first sees the bad value, with a diagnostic.
+        const int size = 10;
+        var grid = MakeGrid(size, size, 1.0, (x, y) => (x + y) * 2.5f);
+        grid.Values[size * size / 2] = float.PositiveInfinity; // simulates corruption from an earlier step
+        var uplift = new double[size * size];
+
+        var diagnostics = new List<string>();
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            StreamPowerErosion.Erode(grid, new StreamPowerErosion.Parameters(Iterations: 5), uplift, onDiagnostic: diagnostics.Add));
+
+        StringAssert.Contains(ex.Message, "non-finite");
+        Assert.IsTrue(diagnostics.Count > 0, "Expected the diagnostic callback to fire before the exception was thrown.");
+    }
+
+    [TestMethod]
     public void Erode_LockedCells_AreNeverWritten()
     {
         const int size = 12;

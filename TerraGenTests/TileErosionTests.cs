@@ -16,6 +16,23 @@ public class TileErosionTests
     }
 
     [TestMethod]
+    public void Erode_NonFiniteInputHeight_ThrowsActionableExceptionInsteadOfCrashingInSampleHeight()
+    {
+        // Regression for a reported crash: a NaN/Infinity height already in the grid (e.g. from an
+        // upstream SPIM divergence) used to corrupt a droplet's position into NaN, which then failed
+        // every bounds check silently (NaN comparisons are always false) and crashed deep inside
+        // SampleHeight with an inscrutable IndexOutOfRangeException. This must fail loud up front instead.
+        const int size = 20;
+        var grid = MakeGrid(size, size, 1.0, (x, y) => (x + y) * 1.5f);
+        grid.Values[size * size / 2] = float.NaN;
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            TileErosion.Erode(grid, new TileErosion.Parameters(Seed: 1, DropletCount: 1000)));
+
+        StringAssert.Contains(ex.Message, "non-finite");
+    }
+
+    [TestMethod]
     public void Erode_LockedCells_AreNeverWritten()
     {
         const int size = 20;
