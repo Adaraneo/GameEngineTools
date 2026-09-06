@@ -505,8 +505,10 @@ public static class RiverMeander
                     }
                 }
 
+                // Regression: nearbyInChain is stale after earlier splices re-wire curDown/curPred, so a short/zero-length "loop" here is a false positive, not a real cutoff — confirmed live (76% of reaches collapsed to 2-point stubs).
                 if (closest < cutoffThreshold && closestJ >= 0 &&
-                    TryFindLoop(i, closestJ, curDown, active, count, out var loopIndices, out var upstreamEnd, out var downstreamEnd))
+                    TryFindLoop(i, closestJ, curDown, active, count, out var loopIndices, out var upstreamEnd, out var downstreamEnd) &&
+                    loopIndices.Count >= chainExclusionHops)
                 {
                     // Genuine neck cutoff: freeze the severed loop as an oxbow, splice the backbone across it.
                     var loopOffsetX = new int[loopIndices.Count];

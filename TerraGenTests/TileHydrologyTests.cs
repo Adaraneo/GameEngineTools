@@ -600,4 +600,46 @@ public class TileHydrologyTests
     }
 
     #endregion D-infinity (Stage 2)
+
+    #region Sea-level exclusion
+
+    [TestMethod]
+    public void ComputeRiverMask_ChannelHeadUnderwater_NeverMarksTheSeabed()
+    {
+        // A steep uniform slope from dry land straight into the sea (height crosses 0 mid-grid) —
+        // same convention as RegionClassifier/LakeGenerator (height<0 = ocean). Every cell would
+        // otherwise qualify as a channel (area×slope² trivially clears a threshold of 1.0), so any
+        // marked cell below sea level is exclusively due to a missing sea-level check, not threshold tuning.
+        const int width = 10, height = 1;
+        var values = new float[width];
+        for (var x = 0; x < width; x++) values[x] = (5 - x) * 10f; // +40 at x=0 down to -40 at x=9, crossing 0 between x=4 and x=5
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 1.0, width, height, values);
+
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 1.0));
+
+        for (var x = 0; x < width; x++)
+        {
+            if (values[x] < 0) Assert.AreEqual(0, mask[x], $"Cell at x={x} (height={values[x]}) is underwater and must not be marked as a river channel.");
+        }
+    }
+
+    [TestMethod]
+    public void ComputeRiverMask_ChannelReachingTheCoast_StopsPropagatingPastSeaLevel()
+    {
+        // A river well-established on dry land must still stop the moment it crosses the coastline —
+        // downstream propagation (once a cell IS a channel, everything downstream is too) must not
+        // carry the mark onto the seabed either.
+        const int width = 12, height = 1;
+        var values = new float[width];
+        for (var x = 0; x < width; x++) values[x] = (7 - x) * 10f; // dry land (height>=0) x=0..7, sea (height<0) x=8..11
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 1.0, width, height, values);
+
+        var mask = TileHydrology.ComputeRiverMask(grid, new TileHydrology.Parameters(ChannelInitiationAreaSlopeSquaredThreshold: 1.0));
+
+        Assert.IsTrue(mask.Take(8).Any(b => b != 0), "Test setup should produce at least one river cell on dry land.");
+        for (var x = 8; x < width; x++)
+            Assert.AreEqual(0, mask[x], $"Cell at x={x} (height={values[x]}) is underwater — the channel must stop at the coast, not continue across the seabed.");
+    }
+
+    #endregion Sea-level exclusion
 }

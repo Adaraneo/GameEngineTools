@@ -537,4 +537,58 @@ public class RiverMeanderTests
     }
 
     #endregion Stream-power meander suppression (Stage 2)
+
+    #region Graph fragmentation regression (production bug)
+
+    /// <summary>Same minimum a real cutoff must clear as <c>chainExclusionHops</c> in <see cref="RiverMeander.ComputeOffsets"/> — kept in sync manually since that constant is private.</summary>
+    private const int ChainExclusionHops = 15;
+
+    [TestMethod]
+    public void ComputeOffsets_BendApproachingNeckBelowCutoffThreshold_SeveredLoopIsNeverShorterThanChainExclusion()
+    {
+        const int width = 20, height = 20;
+        var chain = BuildHookChain(2, 2);
+        var (mask, accumulation, slope, downstream, order) = BuildCutoffTestTopology(width, height, chain);
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+
+        var (_, _, _, _, severedLoops, _, _) =
+            RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters(Iterations: 1));
+
+        Assert.IsTrue(severedLoops.Count > 0, "The hook's near-self-approach should have triggered at least one cutoff.");
+        foreach (var loop in severedLoops)
+            Assert.IsTrue(loop.BackboneIndices.Length >= ChainExclusionHops,
+                $"A recorded severed loop had only {loop.BackboneIndices.Length} cells — shorter than chainExclusionHops ({ChainExclusionHops}) means it was never really excluded as chain-adjacent and is almost certainly a stale-nearbyInChain false positive, not a real neck cutoff.");
+    }
+
+    [TestMethod]
+    public void ComputeOffsets_SecondSelfApproach_BecomesShortAfterFirstSpliceButIsRejected()
+    {
+        // Reproduces the production bug: chainStep 0's cutoff (lowest array index, processed first) splices curDown[0]=92, collapsing chainStep1->chainStep95's hop-distance from ~94 to 4 — below ChainExclusionHops but never excluded by the (stale) nearbyInChain.
+        const int width = 300, height = 300;
+        var chain = new List<(int X, int Y)> { (0, 0) }; // chainStep 0 — lowest possible array index
+        for (var x = 1; x <= 90; x++) chain.Add((x, 1));   // out along row 1
+        for (var y = 2; y <= 90; y++) chain.Add((90, y));  // down the far side
+        for (var x = 89; x >= 2; x--) chain.Add((x, 90));  // back along row 90
+        for (var y = 89; y >= 2; y--) chain.Add((2, y));   // up, ending near chainStep 0
+        chain.Add((1, 0));                                  // chainStep 92 — lands right next to chainStep 0
+        chain.Add((1, 200));                                // chainStep 93 — filler, keeps the tail's array indices high
+        chain.Add((2, 200));                                // chainStep 94 — filler
+        chain.Add((0, 1));                                  // chainStep 95 — lands right next to chainStep 1
+
+        var (mask, accumulation, slope, downstream, order) = BuildCutoffTestTopology(width, height, chain);
+        var grid = new TerrainHeightmap("test", 0.0, 0.0, 5.0, width, height, new float[width * height]);
+
+        var (_, _, effectiveDownstream, active, severedLoops, _, _) =
+            RiverMeander.ComputeOffsets(grid, mask, accumulation, slope, downstream, order, new RiverMeander.Parameters(Iterations: 1));
+
+        Assert.AreEqual(1, severedLoops.Count, "Expected exactly the one legitimate big loop — the near-adjacent second pair must not produce its own severed loop.");
+        Assert.IsTrue(severedLoops[0].BackboneIndices.Length >= ChainExclusionHops);
+
+        var pIdx = chain[1].Y * width + chain[1].X; // (1,1) — untouched by the big loop, right next to its upstream end
+        var qIdx = chain[^1].Y * width + chain[^1].X; // (0,1) — in the tail, right next to P
+        Assert.IsTrue(active[pIdx], "P should remain active — it's outside the legitimate loop.");
+        Assert.IsTrue(active[qIdx], "Q should remain active — the near-adjacent pair must be rejected, not spliced away.");
+    }
+
+    #endregion Graph fragmentation regression (production bug)
 }

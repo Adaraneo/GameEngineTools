@@ -67,6 +67,7 @@ public static class TileHydrology
                 var i = y * width + x;
                 var next = downstream[i];
                 if (next < 0) continue; // no known outflow slope to judge — never a channel head
+                if (grid.Values[i] < 0) continue; // underwater (height<0 = sea, same convention as RegionClassifier/LakeGenerator) — no channel head on the seabed
 
                 var nx = next % width;
                 var ny = next / width;
@@ -100,7 +101,7 @@ public static class TileHydrology
         {
             if (mask[idx] == 0) continue;
             var next = downstream[idx];
-            if (next >= 0) mask[next] = 1;
+            if (next >= 0 && grid.Values[next] >= 0) mask[next] = 1; // stop propagating once the channel reaches the sea — never paint the seabed
         }
 
         // Strahler stream order (Strahler 1952/1957): a headwater reach with no river tributary
