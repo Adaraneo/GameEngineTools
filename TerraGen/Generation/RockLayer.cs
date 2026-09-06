@@ -63,4 +63,13 @@ public static class RockLayer
             result[i] = RockPropertiesTable.Values[rockTypes[i]].ErodibilityK;
         return result;
     }
+
+    /// <summary>Looks up each cell's <see cref="RockProperties.DensityKgM3"/> — Task 3.1.2's reuse of this table for <see cref="Isostasy"/>'s crustal-side density instead of a second hardcoded constant.</summary>
+    public static double[] DensityPerCell(RockType[] rockTypes)
+    {
+        var result = new double[rockTypes.Length];
+        for (var i = 0; i < rockTypes.Length; i++)
+            result[i] = RockPropertiesTable.Values[rockTypes[i]].DensityKgM3;
+        return result;
+    }
 }

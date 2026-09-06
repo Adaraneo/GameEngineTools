@@ -135,6 +135,7 @@ var hydrologyParams = options.Rivers
 
 var spimParams = options.Spim ? new StreamPowerErosion.Parameters() : null;
 var rockTypeParams = options.RockTypes ? new RockLayer.Parameters(Seed: planet.Seed) : null;
+var isostasyParams = options.Isostasy ? new Isostasy.Parameters() : null;
 
 var runSettings = new TileGenerator.RunSettings(
     LatMin: options.LatMin, LatMax: options.LatMax,
@@ -148,7 +149,8 @@ var runSettings = new TileGenerator.RunSettings(
     HydrologyChunkTilesPerSide: options.RiverChunkTiles,
     SkipExisting: options.SkipExisting,
     SpimParams: spimParams,
-    RockTypeParams: rockTypeParams);
+    RockTypeParams: rockTypeParams,
+    IsostasyParams: isostasyParams);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -243,6 +245,8 @@ internal sealed class CliOptions
     public bool Spim { get; init; }
     /// <summary>Off by default. Only meaningful together with <see cref="Spim"/> — see <see cref="TerraGen.Generation.TileGenerator.RunSettings.RockTypeParams"/>.</summary>
     public bool RockTypes { get; init; }
+    /// <summary>Off by default. Only meaningful together with <see cref="Spim"/> — see <see cref="TerraGen.Generation.TileGenerator.RunSettings.IsostasyParams"/>.</summary>
+    public bool Isostasy { get; init; }
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -306,7 +310,7 @@ internal sealed class CliOptions
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
-                        [--skip-existing] [--spim [--rock-types]]
+                        [--skip-existing] [--spim [--rock-types] [--isostasy]]
 
             --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
             TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
@@ -365,6 +369,13 @@ internal sealed class CliOptions
             svor, křemenec, mramor, vápenec, pískovec, jílovec) — měkčí hornina eroduje rychleji,
             tvrdší pomaleji, takže na hranici dvou typů vzniká ostřejší reliéfní stupeň
             (caprock efekt). Bez tektonických desek (--tectonic-plates 0) je všechno kontinentální.
+
+            --isostasy (vypnuto výchozí, jen společně s --spim) zapne Airyho izostatickou zpětnou
+            vazbu: co eroze odnese, se čas od času (přepočet po 10 iteracích) přemění na dodatečný
+            zdvih úměrný poměru hustoty kůry ku (hustota pláště - hustota kůry) — odlehčený sloupec
+            kůry "vyplave" nahoru, takže hory dál drží výšku i po dlouhé erozi, místo aby se plošně
+            sesedly na nulu. S --rock-types navíc použije hustotu podle přiřazené horniny místo
+            jedné globální hodnoty (2670 kg/m³).
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -443,6 +454,7 @@ internal sealed class CliOptions
         var skipExisting = false;
         var spim = false;
         var rockTypes = false;
+        var isostasy = false;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -495,6 +507,9 @@ internal sealed class CliOptions
                     break;
                 case "--rock-types":
                     rockTypes = true;
+                    break;
+                case "--isostasy":
+                    isostasy = true;
                     break;
                 case "--scan":
                     scan = true;
@@ -574,6 +589,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--rock-types má smysl jen společně s --spim.");
             return null;
         }
+        if (isostasy && !spim)
+        {
+            Console.Error.WriteLine("--isostasy má smysl jen společně s --spim.");
+            return null;
+        }
         if (scanLevels > 1 && !scan)
         {
             Console.Error.WriteLine("--scan-levels má smysl jen společně s --scan.");
@@ -608,7 +628,7 @@ internal sealed class CliOptions
             TileKm = tileKm, CellMeters = cellMeters, ErosionStrength = Math.Clamp(erosion, 0, 100),
             TectonicPlateCount = tectonicPlateCount,
             Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
-            SkipExisting = skipExisting, Spim = spim, RockTypes = rockTypes,
+            SkipExisting = skipExisting, Spim = spim, RockTypes = rockTypes, Isostasy = isostasy,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,

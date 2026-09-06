@@ -27,8 +27,9 @@ public static class StreamPowerErosion
     /// <summary>⚠ Design simplification: TectonicPlates' relative-velocity magnitude is a dimensionless sim unit, not m/yr — this is the approach-rate value at which uplift saturates at MaxUpliftMmPerYear (tuned so a typical strong convergent boundary sits near the top of the empirical range).</summary>
     private const double ApproachRateAtMaxUplift = 1.5;
 
-    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1.</summary>
-    public static void Erode(TerrainHeightmap grid, Parameters p, double[] upliftMetersPerYear, bool[]? locked = null, double[]? erodibilityPerCell = null)
+    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1. <paramref name="isostasyParams"/> (Stage 3.1) turns on the erosion→unloading→rebound feedback loop — when set, <paramref name="upliftMetersPerYear"/> is MUTATED in place (rebound is added into it every recompute interval) so later iterations see the compounded effect; null keeps Stage 1/2 behavior, byte-identical.</summary>
+    public static void Erode(TerrainHeightmap grid, Parameters p, double[] upliftMetersPerYear, bool[]? locked = null,
+        double[]? erodibilityPerCell = null, Isostasy.Parameters? isostasyParams = null, double[]? crustDensityPerCell = null)
     {
         if (p.Iterations <= 0 || grid.Width < 2 || grid.Height < 2) return;
 
@@ -36,6 +37,12 @@ public static class StreamPowerErosion
         var cellSize = grid.CellSizeMeters;
         var cellAreaM2 = cellSize * cellSize;
         var dt = p.TimestepYears;
+
+        // Accumulates, per cell, how much LOWER each solved height came out than pure uplift alone
+        // would have produced that iteration — i.e. the erosional height loss the implicit step just
+        // applied — since the combined implicit update doesn't separate the two terms explicitly.
+        var erodedHeightAccumulator = isostasyParams is not null ? new double[grid.Values.Length] : null;
+        var iterationsSinceRebound = 0;
 
         for (var iter = 0; iter < p.Iterations; iter++)
         {
@@ -65,9 +72,38 @@ public static class StreamPowerErosion
                 var coeff = dt * k * Math.Pow(areaM2, p.M) / distance;
 
                 var upliftTerm = dt * upliftMetersPerYear[idx];
-                var newHeight = (grid.Values[idx] + upliftTerm + coeff * grid.Values[next]) / (1.0 + coeff);
+                var upliftOnlyHeight = grid.Values[idx] + upliftTerm;
+                var newHeight = (upliftOnlyHeight + coeff * grid.Values[next]) / (1.0 + coeff);
+                if (erodedHeightAccumulator is not null)
+                    erodedHeightAccumulator[idx] += Math.Max(0.0, upliftOnlyHeight - newHeight);
                 grid.Values[idx] = (float)newHeight;
             }
+
+            if (erodedHeightAccumulator is null) continue;
+            iterationsSinceRebound++;
+            if (iterationsSinceRebound >= Math.Max(1, isostasyParams!.RecomputeIntervalIterations))
+            {
+                ApplyIsostaticRebound(erodedHeightAccumulator, upliftMetersPerYear, locked, crustDensityPerCell, isostasyParams, dt * iterationsSinceRebound);
+                iterationsSinceRebound = 0;
+            }
+        }
+
+        if (erodedHeightAccumulator is not null && iterationsSinceRebound > 0)
+            ApplyIsostaticRebound(erodedHeightAccumulator, upliftMetersPerYear, locked, crustDensityPerCell, isostasyParams!, dt * iterationsSinceRebound);
+    }
+
+    /// <summary>Converts each cell's accumulated eroded-height loss into an isostatic rebound rate (<see cref="Isostasy.ReboundRatePerYear"/>), adds it into the working uplift field, and resets the accumulator to 0 for the next interval.</summary>
+    private static void ApplyIsostaticRebound(double[] erodedHeightAccumulator, double[] upliftMetersPerYear,
+        bool[]? locked, double[]? crustDensityPerCell, Isostasy.Parameters isostasyParams, double intervalYears)
+    {
+        for (var idx = 0; idx < erodedHeightAccumulator.Length; idx++)
+        {
+            if (locked is not null && locked[idx]) { erodedHeightAccumulator[idx] = 0.0; continue; }
+
+            var crustDensity = crustDensityPerCell?[idx] ?? isostasyParams.DefaultCrustDensityKgM3;
+            upliftMetersPerYear[idx] += Isostasy.ReboundRatePerYear(
+                erodedHeightAccumulator[idx], crustDensity, isostasyParams.MantleDensityKgM3, intervalYears);
+            erodedHeightAccumulator[idx] = 0.0;
         }
     }
 
