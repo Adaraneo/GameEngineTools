@@ -78,8 +78,12 @@ public static class StreamPowerErosion
                 var upliftTerm = dt * upliftMetersPerYear[idx];
                 var upliftOnlyHeight = grid.Values[idx] + upliftTerm;
                 var newHeight = (upliftOnlyHeight + coeff * grid.Values[next]) / (1.0 + coeff);
+                // Check the FLOAT this actually gets stored as, not the double — a huge-but-finite
+                // double (e.g. 3.6e38) silently overflows to float.PositiveInfinity on narrowing,
+                // which double.IsFinite alone would miss for at least one extra iteration.
+                var newHeightF = (float)newHeight;
 
-                if (!double.IsFinite(newHeight))
+                if (!float.IsFinite(newHeightF))
                 {
                     var message = "SPIM diverged to a non-finite height — " +
                         $"iter={iter}/{p.Iterations} cell=({idxX},{idxY}) receiver=({nextX},{nextY}) " +
@@ -93,7 +97,7 @@ public static class StreamPowerErosion
 
                 if (erodedHeightAccumulator is not null)
                     erodedHeightAccumulator[idx] += Math.Max(0.0, upliftOnlyHeight - newHeight);
-                grid.Values[idx] = (float)newHeight;
+                grid.Values[idx] = newHeightF;
             }
 
             if (erodedHeightAccumulator is null) continue;
@@ -120,8 +124,9 @@ public static class StreamPowerErosion
             var crustDensity = crustDensityPerCell?[idx] ?? isostasyParams.DefaultCrustDensityKgM3;
             var rebound = Isostasy.AiryRootDepth(erodedHeightAccumulator[idx], crustDensity, isostasyParams.MantleDensityKgM3);
             var newValue = grid.Values[idx] + rebound;
+            var newValueF = (float)newValue; // see Erode's own float-cast-overflow comment
 
-            if (!double.IsFinite(newValue))
+            if (!float.IsFinite(newValueF))
             {
                 var message = "Isostatic rebound diverged to a non-finite height — " +
                     $"iter={iter}/{totalIterations} cellIndex={idx} h_before={grid.Values[idx]:G9} " +
@@ -131,7 +136,7 @@ public static class StreamPowerErosion
                 throw new InvalidOperationException(message);
             }
 
-            grid.Values[idx] = (float)newValue;
+            grid.Values[idx] = newValueF;
             erodedHeightAccumulator[idx] = 0.0;
         }
     }
