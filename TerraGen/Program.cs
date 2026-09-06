@@ -1,9 +1,16 @@
 using System.Globalization;
+using System.Reflection;
 using GameEngineTools.World.Data;
 using TerraGen;
 using TerraGen.Generation;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+// Printed unconditionally, before arg parsing/errors too — so a pasted bug report always names the
+// exact build that produced it, instead of the user having to check TerraGen.csproj by hand.
+var toolVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+Console.WriteLine($"TerraGen {toolVersion ?? "(neznámá verze)"}");
+
 // Every printed number must round-trip through --lat-range/--lon-range's own parser, which reads
 // CultureInfo.InvariantCulture (decimal POINT) — under a comma-decimal OS locale (e.g. Czech),
 // default ToString()/interpolation formatting would print commas instead, so the --scan landmass
