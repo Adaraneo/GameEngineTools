@@ -27,9 +27,10 @@ public static class StreamPowerErosion
     /// <summary>⚠ Design simplification: TectonicPlates' relative-velocity magnitude is a dimensionless sim unit, not m/yr — this is the approach-rate value at which uplift saturates at MaxUpliftMmPerYear (tuned so a typical strong convergent boundary sits near the top of the empirical range).</summary>
     private const double ApproachRateAtMaxUplift = 1.5;
 
-    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1. <paramref name="isostasyParams"/> (Stage 3.1) turns on the erosion→unloading→rebound feedback loop — when set, <paramref name="upliftMetersPerYear"/> is MUTATED in place (rebound is added into it every recompute interval) so later iterations see the compounded effect; null keeps Stage 1/2 behavior, byte-identical.</summary>
+    /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1. <paramref name="isostasyParams"/> (Stage 3.1) turns on the erosion→unloading→rebound feedback loop — when set, <paramref name="upliftMetersPerYear"/> is MUTATED in place (rebound is added into it every recompute interval) so later iterations see the compounded effect; null keeps Stage 1/2 behavior, byte-identical. <paramref name="precipitationWeightPerCell"/> (Stage 4, <see cref="OrographicPrecipitation"/>) replaces bare cell-count drainage area with a precipitation-weighted accumulation computed ONCE up front against the terrain <paramref name="grid"/> has at the moment <see cref="Erode"/> is called (a static-climate approximation — recomputing the FFT every iteration would multiply SPIM's own already-heavy cost by <see cref="Parameters.Iterations"/> for a second-order feedback); null keeps the unweighted D8 count, byte-identical to Stages 1-3.</summary>
     public static void Erode(TerrainHeightmap grid, Parameters p, double[] upliftMetersPerYear, bool[]? locked = null,
-        double[]? erodibilityPerCell = null, Isostasy.Parameters? isostasyParams = null, double[]? crustDensityPerCell = null)
+        double[]? erodibilityPerCell = null, Isostasy.Parameters? isostasyParams = null, double[]? crustDensityPerCell = null,
+        double[]? precipitationWeightPerCell = null)
     {
         if (p.Iterations <= 0 || grid.Width < 2 || grid.Height < 2) return;
 
@@ -50,6 +51,9 @@ public static class StreamPowerErosion
             var downstream = routing.Downstream;
             var stack = routing.Stack; // highest-to-lowest routed elevation
             var accumulation = routing.Accumulation;
+            var weightedAccumulation = precipitationWeightPerCell is not null
+                ? FlowRouting.ComputeWeightedAccumulation(downstream, stack, precipitationWeightPerCell)
+                : null;
 
             // Reverse of the accumulation order: lowest elevation first, so a node's receiver
             // (strictly lower, hence visited earlier here) already holds its updated height.
@@ -67,7 +71,7 @@ public static class StreamPowerErosion
                 var nextY = next / width;
                 var distance = (nextX != idxX && nextY != idxY ? 1.4142135623730951 : 1.0) * cellSize;
 
-                var areaM2 = accumulation[idx] * cellAreaM2;
+                var areaM2 = (weightedAccumulation?[idx] ?? accumulation[idx]) * cellAreaM2;
                 var k = erodibilityPerCell?[idx] ?? p.K;
                 var coeff = dt * k * Math.Pow(areaM2, p.M) / distance;
 

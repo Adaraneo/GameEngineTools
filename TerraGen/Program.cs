@@ -136,6 +136,7 @@ var hydrologyParams = options.Rivers
 var spimParams = options.Spim ? new StreamPowerErosion.Parameters() : null;
 var rockTypeParams = options.RockTypes ? new RockLayer.Parameters(Seed: planet.Seed) : null;
 var isostasyParams = options.Isostasy ? new Isostasy.Parameters() : null;
+var orographicParams = options.Orographic ? new OrographicPrecipitation.Parameters(WindDirectionFromDeg: options.WindDirectionFromDeg) : null;
 
 var runSettings = new TileGenerator.RunSettings(
     LatMin: options.LatMin, LatMax: options.LatMax,
@@ -150,7 +151,8 @@ var runSettings = new TileGenerator.RunSettings(
     SkipExisting: options.SkipExisting,
     SpimParams: spimParams,
     RockTypeParams: rockTypeParams,
-    IsostasyParams: isostasyParams);
+    IsostasyParams: isostasyParams,
+    OrographicParams: orographicParams);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -247,6 +249,10 @@ internal sealed class CliOptions
     public bool RockTypes { get; init; }
     /// <summary>Off by default. Only meaningful together with <see cref="Spim"/> — see <see cref="TerraGen.Generation.TileGenerator.RunSettings.IsostasyParams"/>.</summary>
     public bool Isostasy { get; init; }
+    /// <summary>Off by default. Only meaningful together with <see cref="Spim"/> — see <see cref="TerraGen.Generation.TileGenerator.RunSettings.OrographicParams"/>.</summary>
+    public bool Orographic { get; init; }
+    /// <summary>Compass bearing the wind blows FROM. See <see cref="TerraGen.Generation.OrographicPrecipitation.Parameters.WindDirectionFromDeg"/>.</summary>
+    public double WindDirectionFromDeg { get; init; } = 270.0;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -310,7 +316,7 @@ internal sealed class CliOptions
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
-                        [--skip-existing] [--spim [--rock-types] [--isostasy]]
+                        [--skip-existing] [--spim [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí 270>]]]
 
             --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
             TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
@@ -376,6 +382,14 @@ internal sealed class CliOptions
             kůry "vyplave" nahoru, takže hory dál drží výšku i po dlouhé erozi, místo aby se plošně
             sesedly na nulu. S --rock-types navíc použije hustotu podle přiřazené horniny místo
             jedné globální hodnoty (2670 kg/m³).
+
+            --orographic (vypnuto výchozí, jen společně s --spim) nahradí SPIM prostou počet-buněk
+            odtokovou plochu srážkově váženou (Smith & Barstad 2004, lineární teorie orografických
+            srážek přes FFT): návětrná strana hory dostane víc "srážek" do odtokové plochy, závětrná
+            (déšťový stín) míň — takže eroze i řeky vycházejí nesouměrně podle směru větru, ne
+            symetricky kolem hřebene. --wind-from udává, odkud vítr vane (výchozí 270 = od západu).
+            Srážkové pole se počítá JEDNOU z terénu před SPIM (statická klimatická aproximace,
+            ne přepočet každou iteraci — to by SPIM 200x prodražilo).
 
             --db je čistě terénní databáze (jen dlaždice heightmapy) — TerraGen nikdy neotvírá
             ani nevytváří žádné world.db s lokacemi/spojeními. Bez --db se použije terrain.db
@@ -455,6 +469,8 @@ internal sealed class CliOptions
         var spim = false;
         var rockTypes = false;
         var isostasy = false;
+        var orographic = false;
+        var windDirectionFromDeg = 270.0;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -510,6 +526,12 @@ internal sealed class CliOptions
                     break;
                 case "--isostasy":
                     isostasy = true;
+                    break;
+                case "--orographic":
+                    orographic = true;
+                    break;
+                case "--wind-from" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var wd):
+                    windDirectionFromDeg = wd;
                     break;
                 case "--scan":
                     scan = true;
@@ -594,6 +616,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--isostasy má smysl jen společně s --spim.");
             return null;
         }
+        if (orographic && !spim)
+        {
+            Console.Error.WriteLine("--orographic má smysl jen společně s --spim.");
+            return null;
+        }
         if (scanLevels > 1 && !scan)
         {
             Console.Error.WriteLine("--scan-levels má smysl jen společně s --scan.");
@@ -629,6 +656,7 @@ internal sealed class CliOptions
             TectonicPlateCount = tectonicPlateCount,
             Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
             SkipExisting = skipExisting, Spim = spim, RockTypes = rockTypes, Isostasy = isostasy,
+            Orographic = orographic, WindDirectionFromDeg = windDirectionFromDeg,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,

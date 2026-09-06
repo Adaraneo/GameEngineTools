@@ -24,6 +24,8 @@
 
   <ItemGroup>
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <!-- Stage 4 orographic precipitation (Smith & Barstad 2004) FFT need — added per explicit user sign-off. -->
+    <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>

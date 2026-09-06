@@ -47,6 +47,18 @@ public static class FlowRouting
         return new Result(filled, routed, downstream, stack, accumulation);
     }
 
+    /// <summary>D8-weighted flow accumulation reusing an already-computed <see cref="Result.Downstream"/>/<see cref="Result.Stack"/> — each cell starts with <paramref name="weightPerCell"/> instead of a flat 1 unit, so the result is a precipitation- (or any other per-cell factor-) weighted drainage area, Stage 4's Task 4.1.3.</summary>
+    public static double[] ComputeWeightedAccumulation(int[] downstream, int[] stack, double[] weightPerCell)
+    {
+        var accumulation = (double[])weightPerCell.Clone();
+        foreach (var idx in stack)
+        {
+            var next = downstream[idx];
+            if (next >= 0) accumulation[next] += accumulation[idx];
+        }
+        return accumulation;
+    }
+
     /// <summary>Priority-Flood depression filling. Source: Barnes, Lehman &amp; Mulla (2014), Computers &amp; Geosciences 62:117-127, doi:10.1016/j.cageo.2013.04.024.</summary>
     /// <remarks>⚠ This already IS an O(n log n) priority-flood construction, not the "epsilon-increment" filler the SPIM plan's Task 1.1.2 assumed exists — flagged rather than adding a redundant second algorithm.</remarks>
     internal static float[] FillDepressions(TerrainHeightmap grid)

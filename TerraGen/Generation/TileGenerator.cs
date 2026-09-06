@@ -61,7 +61,9 @@ public static class TileGenerator
         /// <summary>Null (default) keeps SPIM's scalar Parameters.K everywhere, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) couples erodibility to a per-cell <see cref="RockLayer"/> lithology assignment (Task 2.2.3) instead.</summary>
         RockLayer.Parameters? RockTypeParams = null,
         /// <summary>Null (default) leaves SPIM's uplift field untouched by erosion, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) turns on the Stage 3.1 erosion→unloading→rebound feedback (<see cref="Isostasy"/>).</summary>
-        Isostasy.Parameters? IsostasyParams = null);
+        Isostasy.Parameters? IsostasyParams = null,
+        /// <summary>Null (default) keeps SPIM's bare D8 cell-count drainage area, unchanged. Non-null (only meaningful together with <see cref="SpimParams"/>) weights it by <see cref="OrographicPrecipitation"/>'s Smith &amp; Barstad field instead (Stage 4).</summary>
+        OrographicPrecipitation.Parameters? OrographicParams = null);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -233,7 +235,11 @@ public static class TileGenerator
                         erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes);
                         crustDensityPerCell = RockLayer.DensityPerCell(rockTypes);
                     }
-                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell);
+                    // Computed ONCE against the pre-SPIM (landmass-only) terrain — see Erode's remarks on precipitationWeightPerCell.
+                    var precipitationWeight = s.OrographicParams is { } orographicParams
+                        ? OrographicPrecipitation.ComputePrecipitationField(padded, orographicParams)
+                        : null;
+                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight);
                 }
 
                 TileErosion.Erode(padded, s.ErosionParams, locked);
