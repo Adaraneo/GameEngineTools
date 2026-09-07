@@ -34,11 +34,20 @@ public static class PlanetScanner
         /// pure globally-seamless landmass layer alone. Meaningful only for a genuinely local/
         /// zoomed window — at planet scale the mountain layer's flat-plane approximation breaks
         /// down (see <see cref="PlanetNoise"/>'s remarks), so this is opt-in, off by default.</summary>
-        bool Detail = false);
+        bool Detail = false,
+        /// <summary>When true (and <see cref="Planet"/> is set), classifies each land cell's Köppen–Geiger
+        /// climate code via <see cref="ClimateScanModel"/> — see <see cref="Result.KoppenCodes"/>.</summary>
+        bool Climate = false,
+        /// <summary>Required when <see cref="Climate"/> is true — the planet physics <see cref="ClimateScanModel"/> needs.</summary>
+        PlanetSettings.Resolved? Planet = null);
 
     public enum Cell { Ocean, Land, Convergent, Divergent, Transform }
 
-    public sealed record Result(Cell[,] Cells, double[,] ElevationsMeters, Options Options)
+    public sealed record Result(Cell[,] Cells, double[,] ElevationsMeters, Options Options,
+        /// <summary>Per-cell Köppen–Geiger code for land cells (null elsewhere and whenever
+        /// <see cref="Options.Climate"/> was off) — only populated when the caller opted in, since
+        /// it's an extra planet-physics pass over every cell.</summary>
+        string?[,]? KoppenCodes = null)
     {
         public char Symbol(int row, int col) => Cells[row, col] switch
         {
@@ -117,6 +126,30 @@ public static class PlanetScanner
             }
         }
 
-        return new Result(cells, elevations, options);
+        string?[,]? koppenCodes = null;
+        if (options.Climate && options.Planet is { } planet)
+        {
+            // Measured, not config-target — same "measured value" preference the rest of TerraGen's
+            // ocean/land handling follows, and it's free since the scan just computed every cell.
+            var landCells = 0;
+            foreach (var c in cells) if (c != Cell.Ocean) landCells++;
+            var measuredOceanFraction = 1.0 - landCells / (double)(options.Width * options.Height);
+
+            koppenCodes = new string?[options.Height, options.Width];
+            for (var row = 0; row < options.Height; row++)
+            {
+                var t = options.Height <= 1 ? 0.5 : row / (double)(options.Height - 1);
+                var lat = options.LatMax - t * (options.LatMax - options.LatMin);
+                for (var col = 0; col < options.Width; col++)
+                {
+                    if (cells[row, col] == Cell.Ocean) continue;
+                    var u = options.Width <= 1 ? 0.5 : col / (double)(options.Width - 1);
+                    var lon = options.LonMin + u * (options.LonMax - options.LonMin);
+                    koppenCodes[row, col] = ClimateScanModel.Classify(planet, lat, lon, elevations[row, col], measuredOceanFraction);
+                }
+            }
+        }
+
+        return new Result(cells, elevations, options, koppenCodes);
     }
 }

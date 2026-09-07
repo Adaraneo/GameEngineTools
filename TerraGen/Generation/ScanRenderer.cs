@@ -26,6 +26,7 @@ public static class ScanRenderer
                     PlanetScanner.Cell.Convergent => ConsoleColor.Red,
                     PlanetScanner.Cell.Divergent => ConsoleColor.Magenta,
                     PlanetScanner.Cell.Transform => ConsoleColor.DarkYellow,
+                    PlanetScanner.Cell.Land when result.KoppenCodes?[row, col] is { } code => KoppenColor(code),
                     _ => ElevationColor(result.ElevationsMeters[row, col], elevationMin, elevationMax),
                 };
                 Console.Write(LabeledSymbol(result, detection, row, col));
@@ -40,10 +41,11 @@ public static class ScanRenderer
                            $"lon [{options.LonMin:0.0} vlevo .. {options.LonMax:0.0} vpravo]" +
                            (options.Detail ? "  (--scan-detail: včetně vrstvy pohoří)" : ""));
         Console.WriteLine("Legenda: 1-9/A-Z = souš, číslo/písmeno = ID pevniny (viz tabulka níže; barva = " +
-                           "nadmořská/podmořská výška)   ~ = oceán   ^ = sbíhavá hranice (pohoří)   " +
-                           "v = rozbíhavá (rift)   x = transformní");
+                           (result.KoppenCodes is not null ? "Köppen-Geiger klima, viz níže" : "nadmořská/podmořská výška") + ")   " +
+                           "~ = oceán   ^ = sbíhavá hranice (pohoří)   v = rozbíhavá (rift)   x = transformní");
+        if (result.KoppenCodes is not null) Console.WriteLine(KoppenLegend);
 
-        WriteLandmassTable(Console.Out, detection);
+        WriteLandmassTable(Console.Out, detection, result.KoppenCodes);
     }
 
     private static (double Min, double Max) ElevationRange(double[,] elevations)
@@ -93,8 +95,9 @@ public static class ScanRenderer
         }
         writer.WriteLine("Legenda: 1-9/A-Z = souš, číslo/písmeno = ID pevniny (viz tabulka níže)   " +
                           "~ = oceán   ^ = sbíhavá hranice (pohoří)   v = rozbíhavá (rift)   x = transformní");
+        if (result.KoppenCodes is not null) writer.WriteLine(KoppenLegend);
 
-        WriteLandmassTable(writer, detection);
+        WriteLandmassTable(writer, detection, result.KoppenCodes);
     }
 
     /// <summary>Land cells show their owning landmass's label instead of a flat '.'; ocean and
@@ -108,7 +111,21 @@ public static class ScanRenderer
         return rank <= LandmassLabels.Length ? LandmassLabels[rank - 1] : '#';
     }
 
-    private static void WriteLandmassTable(TextWriter writer, LandmassDetector.Detection detection)
+    /// <summary>Warm→cold, wet→dry console coloring by Köppen main group (first letter): A=tropical, B=arid, C=temperate, D=continental, E=polar.</summary>
+    private static ConsoleColor KoppenColor(string code) => code[0] switch
+    {
+        'A' => ConsoleColor.DarkGreen,
+        'B' => code.Length > 1 && code[1] == 'W' ? ConsoleColor.Yellow : ConsoleColor.DarkYellow,
+        'C' => ConsoleColor.Green,
+        'D' => ConsoleColor.DarkCyan,
+        'E' => ConsoleColor.White,
+        _ => ConsoleColor.Gray,
+    };
+
+    private const string KoppenLegend = "Klima (Köppen-Geiger): A=tropické (zelená)  B=aridní, BW=poušť/BS=step (žlutá)  " +
+                                         "C=mírné (světle zelená)  D=kontinentální (azurová)  E=polární (bílá)";
+
+    private static void WriteLandmassTable(TextWriter writer, LandmassDetector.Detection detection, string?[,]? koppenCodes)
     {
         writer.WriteLine();
         writer.WriteLine($"Nalezeno {detection.Landmasses.Count} souvislých pevnin (řazeno podle plochy):");
@@ -116,9 +133,11 @@ public static class ScanRenderer
         foreach (var lm in detection.Landmasses.Take(MaxDetailedLandmasses))
         {
             var label = lm.Rank <= LandmassLabels.Length ? LandmassLabels[lm.Rank - 1].ToString() : "#";
+            var climateSuffix = koppenCodes is not null ? $"   klima převážně {DominantKoppenCode(detection, koppenCodes, lm.Rank)}" : "";
             writer.WriteLine($"  [{label}] {lm.AreaKm2:N0} km²  ({lm.CellCount} buněk skenu)  " +
                               $"střed lat={lm.CentroidLatDeg:0.00} lon={lm.CentroidLonDeg:0.00}   " +
-                              $"--lat-range {lm.LatMin:0.###}:{lm.LatMax:0.###} --lon-range {lm.LonMin:0.###}:{lm.LonMax:0.###}");
+                              $"--lat-range {lm.LatMin:0.###}:{lm.LatMax:0.###} --lon-range {lm.LonMin:0.###}:{lm.LonMax:0.###}" +
+                              climateSuffix);
         }
 
         if (detection.Landmasses.Count > MaxDetailedLandmasses)
@@ -129,5 +148,21 @@ public static class ScanRenderer
 
         writer.WriteLine("Rozsahy jsou hrubé (odhad ze skenu, ne přesná hranice pobřeží) — před skutečným");
         writer.WriteLine("generováním --lat-range/--lon-range mírně přidej rezervu na okraje.");
+    }
+
+    /// <summary>Most frequent Köppen code among this landmass's cells — a simple mode count, not area-weighted per code.</summary>
+    private static string DominantKoppenCode(LandmassDetector.Detection detection, string?[,] koppenCodes, int rank)
+    {
+        var counts = new Dictionary<string, int>();
+        var height = koppenCodes.GetLength(0);
+        var width = koppenCodes.GetLength(1);
+        for (var row = 0; row < height; row++)
+        for (var col = 0; col < width; col++)
+        {
+            if (detection.LandmassRankByCell[row, col] != rank) continue;
+            if (koppenCodes[row, col] is not { } code) continue;
+            counts[code] = counts.GetValueOrDefault(code) + 1;
+        }
+        return counts.Count == 0 ? "?" : counts.MaxBy(kv => kv.Value).Key;
     }
 }

@@ -25,18 +25,27 @@ public static class PlanetSettings
         double GravityMs2, int Seed, int TectonicPlateCount,
         double PlanetObliquityDeg, double PlanetAlbedo, double PlanetGreenhouseWarmingK,
         double PlanetSiderealRotationHrs, double StarLuminosityWatts, double OrbitSemiMajorAxisAu,
-        double OrbitEccentricity, bool HasRings, double RingMeanOpticalDepth, double PlanetOceanFraction);
+        double OrbitEccentricity, bool HasRings, double RingMeanOpticalDepth, double StarMassKg,
+        double PeriapsisPhase, double PlanetOceanFraction);
 
-    /// <summary>Searches upward from <paramref name="dbFilePath"/>'s folder for
-    /// <see cref="SettingsFileName"/>, binds its <c>World:Universe</c> section (falling back to
-    /// Earth/Sol defaults if the file or section is absent), and derives gravity/seed from it.</summary>
+    /// <summary>Searches upward from <paramref name="dbFilePath"/>'s folder for <see cref="SettingsFileName"/>, binds <c>World:Universe</c> (plus <c>World:Astro:Sun</c>'s PeriapsisPhase), falling back to Earth/Sol defaults, and derives gravity/seed from it.</summary>
     public static Resolved Load(string dbFilePath)
     {
         var settingsPath = FindSettingsFile(dbFilePath);
-        var planet = settingsPath is null
-            ? new UniverseConfig()
-            : new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build()
-                .GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
+        UniverseConfig planet;
+        double periapsisPhase;
+        if (settingsPath is null)
+        {
+            planet = new UniverseConfig();
+            periapsisPhase = new SunParamsConfig().PeriapsisPhase;
+        }
+        else
+        {
+            var config = new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build();
+            planet = config.GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
+            periapsisPhase = config.GetSection("World:Astro:Sun").Get<SunParamsConfig>()?.PeriapsisPhase
+                ?? new SunParamsConfig().PeriapsisPhase;
+        }
 
         var radiusMeters = planet.PlanetEquatorialRadiusKm * 1000.0;
         if (radiusMeters <= 0) radiusMeters = EarthRadiusMeters;
@@ -50,7 +59,8 @@ public static class PlanetSettings
             Math.Max(0, planet.PlanetTectonicPlateCount),
             planet.PlanetObliquityDeg, planet.PlanetAlbedo, planet.PlanetGreenhouseWarmingK,
             planet.PlanetSiderealRotationHrs, planet.StarLuminosityWatts, planet.OrbitSemiMajorAxisAu,
-            planet.OrbitEccentricity, planet.HasRings, planet.RingMeanOpticalDepth, planet.PlanetOceanFraction);
+            planet.OrbitEccentricity, planet.HasRings, planet.RingMeanOpticalDepth, planet.StarMassKg,
+            periapsisPhase, planet.PlanetOceanFraction);
     }
 
     /// <summary>Stable FNV-1a hash of the planet's identity — NOT <c>string.GetHashCode()</c>,

@@ -46,7 +46,8 @@ if (options.Scan)
     var scanOptions = new PlanetScanner.Options(
         Width: options.ScanWidth, Height: options.ScanHeight,
         LatMin: options.LatMin, LatMax: options.LatMax, LonMin: options.LonMin, LonMax: options.LonMax,
-        BoundaryInfluenceThreshold: options.ScanBoundaryThreshold, Detail: options.ScanDetail);
+        BoundaryInfluenceThreshold: options.ScanBoundaryThreshold, Detail: options.ScanDetail,
+        Climate: options.ScanClimate, Planet: options.ScanClimate ? planet : null);
 
     if (options.ScanLevels <= 1)
     {
@@ -309,6 +310,10 @@ internal sealed class CliOptions
     /// — meant for a narrow, already-zoomed-in --lat-range/--lon-range (e.g. one landmass a
     /// plain --scan already pointed you at), not the whole planet.</summary>
     public bool ScanDetail { get; init; }
+    /// <summary>Adds a Köppen–Geiger climate-code layer over land cells (see
+    /// <see cref="PlanetScanner.Options.Climate"/>) — colors land by climate group instead of raw
+    /// elevation and adds a per-landmass dominant-climate column to the table.</summary>
+    public bool ScanClimate { get; init; }
 
     /// <summary>1 (default) is a single plain scan. &gt;1 switches to
     /// <see cref="TerraGen.Generation.ProgressiveScanner"/>: repeats the scan, each pass zooming
@@ -478,7 +483,7 @@ internal sealed class CliOptions
                         [--lat-range <min>:<max> --lon-range <min>:<max>, výchozí celá planeta]
                         [--scan-width <znaků, výchozí 120>] [--scan-height <řádků, výchozí 40>]
                         [--scan-boundary-threshold <0-1, výchozí 0.9>]
-                        [--scan-detail]
+                        [--scan-detail] [--scan-climate]
                         [--scan-levels <počet, výchozí 1> --scan-zoom <násobek zúžení, výchozí 4>]
                         [--scan-output <cesta .txt>, volitelně uloží mapu i do souboru]
 
@@ -502,6 +507,14 @@ internal sealed class CliOptions
             zkopíruj její --lat-range/--lon-range → spusť znovu s --scan-detail pro detailnější
             náhled hor/prolomenin → teprve pak skutečné generování (bez --scan) se skutečnou
             erozí.
+
+            --scan-climate obarví souš podle Köppen-Geigerova klimatického kódu (A tropické,
+            B aridní, C mírné, D kontinentální, E polární — vypočtené ze skutečné fyziky planety
+            z appsettings.World.json: obliquity, ozáření hvězdou, dráha, PLUS zaznamenaný
+            oceán/souš poměr TOHOTO skenu, ne configový cíl) místo stínování podle výšky; u každé
+            pevniny v tabulce navíc uvidíš její převažující klimatický kód. Funguje na jakékoli
+            šířce okna (na rozdíl od --scan-detail) — jde o stejnou globálně bezešvou vrstvu jako
+            základní --scan, jen s další fyzikální vrstvou navrch.
 
             --scan-levels > 1 tenhle postup zautomatizuje: místo jednoho skenu proběhne N kol,
             každé s --scan-zoom-krát užším oknem (ve stupních) než to předchozí, VŽDY vystředěné
@@ -559,6 +572,7 @@ internal sealed class CliOptions
         var scanBoundaryThreshold = 0.9;
         string? scanOutputPath = null;
         var scanDetail = false;
+        var scanClimate = false;
         var scanLevels = 1;
         var scanZoomFactor = 4.0;
         string? exportDir = null;
@@ -645,6 +659,9 @@ internal sealed class CliOptions
                 case "--scan-detail":
                     scanDetail = true;
                     break;
+                case "--scan-climate":
+                    scanClimate = true;
+                    break;
                 case "--scan-levels" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var sl):
                     scanLevels = sl;
                     break;
@@ -696,6 +713,11 @@ internal sealed class CliOptions
         if (scanDetail && !scan)
         {
             Console.Error.WriteLine("--scan-detail má smysl jen společně s --scan.");
+            return null;
+        }
+        if (scanClimate && !scan)
+        {
+            Console.Error.WriteLine("--scan-climate má smysl jen společně s --scan.");
             return null;
         }
         if (rockTypes && !spim)
@@ -762,7 +784,7 @@ internal sealed class CliOptions
             ParallelHydrologyDegree = parallelHydrologyDegree, AutoParallelHydrology = autoParallelHydrology,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
-            ScanDetail = scanDetail, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
+            ScanDetail = scanDetail, ScanClimate = scanClimate, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
             ExportDir = exportDir,
             ExportRangeGiven = exportRangeGiven,
         };
