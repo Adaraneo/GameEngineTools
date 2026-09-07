@@ -8,8 +8,8 @@ public static class HemisphericAsymmetryModel
     private const double NorthernWinterSolsticeLambdaDeg = 270.0;
     private const double SouthernWinterSolsticeLambdaDeg = 90.0;
 
-    /// <summary>Additive offset (°C) to the pole temperature for this hemisphere — 0 when OrbitEccentricity=0 or PeriapsisPhase places perihelion at an equinox (both hemispheres symmetric by construction).</summary>
-    public static double PoleOffsetC(PlanetSettings.Resolved planet, bool isNorthernHemisphere)
+    /// <summary>Additive offset (°C) to the pole temperature for this hemisphere — 0 when OrbitEccentricity=0 or PeriapsisPhase places perihelion at an equinox (both hemispheres symmetric by construction). <paramref name="oceanFraction"/> null falls back to planet.PlanetOceanFraction (see SeasonalTemperatureAmplitudeModel).</summary>
+    public static double PoleOffsetC(PlanetSettings.Resolved planet, bool isNorthernHemisphere, double? oceanFraction = null)
     {
         var eccentricity = Math.Clamp(planet.OrbitEccentricity, 0.0, 0.9);
         var periapsisDeg = planet.PeriapsisPhase * 360.0;
@@ -25,7 +25,7 @@ public static class HemisphericAsymmetryModel
         // dependence peaks) as the reference magnitude, instead of an independent flux/damping
         // calculation — keeps this proportionate to (and always smaller than) the obliquity-driven
         // seasonal swing, matching the literature's "pales in comparison to obliquity" framing.
-        var poleAmplitudeC = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, 90.0);
+        var poleAmplitudeC = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, 90.0, oceanFraction);
         return poleAmplitudeC * (distanceFactor - meanDistanceFactor);
     }
 

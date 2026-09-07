@@ -25,7 +25,7 @@ public static class PlanetSettings
         double PlanetObliquityDeg, double PlanetAlbedo, double PlanetGreenhouseWarmingK,
         double PlanetSiderealRotationHrs, double StarLuminosityWatts, double OrbitSemiMajorAxisAu,
         double OrbitEccentricity, bool HasRings, double RingMeanOpticalDepth, double StarMassKg,
-        double PeriapsisPhase);
+        double PeriapsisPhase, double PlanetOceanFraction);
 
     /// <summary>Searches upward from <paramref name="dbFilePath"/>'s folder for
     /// <see cref="SettingsFileName"/>, binds its <c>World:Universe</c> section (falling back to
@@ -65,7 +65,7 @@ public static class PlanetSettings
             planet.PlanetObliquityDeg, planet.PlanetAlbedo, planet.PlanetGreenhouseWarmingK,
             planet.PlanetSiderealRotationHrs, planet.StarLuminosityWatts, planet.OrbitSemiMajorAxisAu,
             planet.OrbitEccentricity, planet.HasRings, planet.RingMeanOpticalDepth, planet.StarMassKg,
-            periapsisPhase);
+            periapsisPhase, planet.PlanetOceanFraction);
     }
 
     /// <summary>Stable FNV-1a hash of the planet's identity — same formula TerraGen's own

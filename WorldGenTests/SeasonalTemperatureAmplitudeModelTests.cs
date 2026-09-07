@@ -70,6 +70,20 @@ public class SeasonalTemperatureAmplitudeModelTests
     }
 
     [TestMethod]
+    public void AmplitudeC_ExplicitOceanFraction_OverridesPlanetConfigTarget()
+    {
+        var planet = EarthDefaults();
+
+        var atConfigDefault = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, 45.0);
+        var atMeasuredMostlyLand = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, 45.0, oceanFraction: 0.1);
+        var atMeasuredMostlyOcean = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, 45.0, oceanFraction: 0.95);
+
+        Assert.AreNotEqual(atConfigDefault, atMeasuredMostlyLand);
+        Assert.IsTrue(atMeasuredMostlyLand > atConfigDefault, "A mostly-land measured fraction should raise the amplitude above the config-default (0.71 ocean) blend.");
+        Assert.IsTrue(atMeasuredMostlyOcean < atConfigDefault, "A mostly-ocean measured fraction should lower the amplitude below the config-default blend.");
+    }
+
+    [TestMethod]
     public void OrbitalPeriodSeconds_EarthDefaults_MatchesOneYear()
     {
         var periodDays = SeasonalTemperatureAmplitudeModel.OrbitalPeriodSeconds(EarthDefaults()) / 86400.0;

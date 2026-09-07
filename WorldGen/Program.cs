@@ -68,6 +68,15 @@ var tectonicPlateCount = options.TectonicPlateCount ?? planet.TectonicPlateCount
 if (tectonicPlateCount > 0)
     Console.WriteLine($"Tektonické desky: {tectonicPlateCount} (seed={planet.Seed}, poloměr={planet.PlanetRadiusMeters / 1000.0:0.0} km).");
 
+// Measured from this run's OWN loaded terrain tiles (below sea level = ocean) rather than trusting
+// planet.PlanetOceanFraction's config TARGET — TerraGen's noise only trends toward that target on
+// average across seeds (docs/plans/planet-physics-driven-climate.md), so the actually-generated
+// planet can differ meaningfully from it. Falls back to the config target when no tiles loaded.
+var measuredOceanFraction = tiles.Count > 0
+    ? tiles.SelectMany(t => t.Values).Count(v => v < 0f) / (double)tiles.Sum(t => t.Values.Length)
+    : planet.PlanetOceanFraction;
+Console.WriteLine($"Naměřený poměr oceán/pevnina: {measuredOceanFraction:0.00} (cíl z appsettings.World.json: {planet.PlanetOceanFraction:0.00}).");
+
 // Derived from the planet's own star/albedo/greenhouse/obliquity physics (docs/plans/planet-physics-driven-climate.md
 // Stage 3/4) instead of the old hardcoded 27C/-25C — --equator-temp-c/--pole-temp-c override for manual tuning.
 var (derivedEquatorC, derivedPoleC) = PlanetaryTemperatureModel.DeriveEquatorPoleTemperatures(planet, options.EpochKyr);
@@ -79,8 +88,8 @@ Console.WriteLine($"Klima: rovník={equatorTemperatureC:0.0}°C, póly={poleTemp
 // Stage 4) -- 0 for both hemispheres unless the planet's OrbitEccentricity/PeriapsisPhase make one
 // hemisphere's winter coincide with perihelion, so this is silent for every existing circular-orbit
 // world.
-var northPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: true);
-var southPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: false);
+var northPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: true, measuredOceanFraction);
+var southPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: false, measuredOceanFraction);
 if (Math.Abs(northPoleTemperatureC - southPoleTemperatureC) > 0.01)
     Console.WriteLine($"Hemisférická asymetrie: severní pól={northPoleTemperatureC:0.0}°C, jižní pól={southPoleTemperatureC:0.0}°C.");
 
@@ -105,6 +114,7 @@ var genOptions = new WorldContentGenerator.Options(
     // (Stage 7/8/9) instead of the ad hoc humidity+temperature thresholds -- off by default, existing
     // worlds/tests keep generating identically without it.
     Planet: options.Koppen ? planet : null,
+    OceanFraction: measuredOceanFraction,
     // Reuses the planet's own seed (already read from the same appsettings.World.json TerraGen
     // reads) so the climate map is reproducible per-planet without a separate CLI flag — same
     // convention as TectonicSeed above.

@@ -48,6 +48,7 @@ public class PlanetSettingsTests
             Assert.IsFalse(resolved.HasRings);
             Assert.AreEqual(1.9885e30, resolved.StarMassKg, 1e24);
             Assert.AreEqual(0.0, resolved.PeriapsisPhase, 1e-9);
+            Assert.AreEqual(0.71, resolved.PlanetOceanFraction, 1e-9);
         }
         finally
         {
@@ -77,7 +78,8 @@ public class PlanetSettingsTests
                       "OrbitEccentricity": 0.2,
                       "HasRings": true,
                       "RingMeanOpticalDepth": 2.5,
-                      "StarMassKg": 3.0e30
+                      "StarMassKg": 3.0e30,
+                      "PlanetOceanFraction": 0.4
                     },
                     "Astro": {
                       "Sun": {
@@ -101,6 +103,7 @@ public class PlanetSettingsTests
             Assert.AreEqual(2.5, resolved.RingMeanOpticalDepth, 1e-9);
             Assert.AreEqual(3.0e30, resolved.StarMassKg, 1e24);
             Assert.AreEqual(0.35, resolved.PeriapsisPhase, 1e-9);
+            Assert.AreEqual(0.4, resolved.PlanetOceanFraction, 1e-9);
         }
         finally
         {

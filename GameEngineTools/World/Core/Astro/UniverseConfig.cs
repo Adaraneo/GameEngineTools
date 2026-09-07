@@ -44,6 +44,10 @@ public sealed record UniverseConfig(
     /// <c>PlanetNoise.Parameters.TectonicPlateCount</c>'s doc comment for what this drives. 0
     /// falls back to TerraGen's original single fixed mountain-belt layer.</summary>
     int PlanetTectonicPlateCount = 10,
+    /// <summary>Target ocean fraction TerraGen's landmass noise calibrates its bias toward — see
+    /// <c>PlanetNoise.Parameters.TargetOceanFraction</c>'s doc comment. Also feeds
+    /// <see cref="ToPlanetConfig"/>'s <c>OceanFraction</c>/<c>LandFraction</c>.</summary>
+    double PlanetOceanFraction = 0.71,
 
     // ── Primary moon — default: Luna ─────────────────────────────────────────
     bool HasMoon = false,
@@ -85,6 +89,7 @@ public sealed record UniverseConfig(
         PlanetArchetype: "RockyTerrestrial",
         PlanetMagneticFieldStrengthVsEarth: 1.0,
         PlanetTectonicPlateCount: 10,
+        PlanetOceanFraction: 0.71,
         HasMoon: false,
         MoonMassKg: 7.342e22,
         MoonMeanRadiusKm: 1_737.4,
@@ -132,8 +137,8 @@ public sealed record UniverseConfig(
         AtmospherePressureBar = PlanetAtmospherePressureBar,
         Atmosphere = Enum.Parse<AtmosphereComposition>(PlanetAtmosphere),
         MagneticFieldStrengthVsEarth = PlanetMagneticFieldStrengthVsEarth,
-        OceanFraction = 0.5,
-        LandFraction = 0.5,
+        OceanFraction = PlanetOceanFraction,
+        LandFraction = 1.0 - PlanetOceanFraction,
         HasPlateTectonics = true,
         PrimaryMoon = ToMoon(),
         Rings = ToRingSystem(),

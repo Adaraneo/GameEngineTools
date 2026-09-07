@@ -53,7 +53,9 @@ public static class PlanetNoise
         /// matching <see cref="TectonicPlates.Plate"/>[] via <see cref="TectonicPlates.Generate"/>
         /// ONCE per run (same Seed, this count) and pass it into every <see cref="SampleCombined"/>
         /// call — see <see cref="TileGenerator"/>.</summary>
-        int TectonicPlateCount = 0)
+        int TectonicPlateCount = 0,
+        /// <summary>Target fraction of the planet's surface this noise construction's landmass bias aims for — see <see cref="ContinentSeaBias"/>'s doc comment. 0.71 (default) matches Earth's real ~71% ocean / 29% land.</summary>
+        double TargetOceanFraction = 0.71)
     {
         /// <summary>Resolves <see cref="MountainBeltDirectionDeg"/>, deriving a deterministic
         /// direction from <see cref="Seed"/> when unset — same value for every tile in a run since
@@ -73,15 +75,44 @@ public static class PlanetNoise
     /// </summary>
     private const double MountainSuppressionBandFraction = 0.08;
 
-    /// <summary>
-    /// Constant added to the continent-shape fBm sum (in its own [-1, 1] units, before scaling to
-    /// meters) so the global land/sea split trends toward Earth's actual ~29% land / 71% ocean
-    /// instead of the ~50/50 split raw symmetric noise lands on by default. Calibrated empirically
-    /// against this construction (pooled samples across many seeds, 71st percentile of the raw
-    /// noise) — a fixed constant can't hit exactly 71% ocean on any ONE seed, but shifts the
-    /// average across seeds to the right place instead of leaving it a coin flip.
-    /// </summary>
-    private const double ContinentSeaBias = -0.12;
+    // Empirically measured mean/std of the pre-bias fBm sum across 30,000 INDEPENDENT seeds (one point per seed -- points within one seed are spatially correlated via shared low-frequency octaves, so many-points-per-few-seeds badly underestimates variance and biases the mean; caught via a failing calibration regression test before landing).
+    private const double LandmassNoiseMeanCalibrated = 0.0;
+    private const double LandmassNoiseStdCalibrated = 0.2237;
+
+    /// <summary>Additive fBm bias shifting the land/sea split toward targetOceanFraction, via the standard-normal quantile function.</summary>
+    private static double ContinentSeaBias(double targetOceanFraction)
+    {
+        var targetLandFraction = Math.Clamp(1.0 - targetOceanFraction, 0.001, 0.999);
+        return LandmassNoiseStdCalibrated * NormalInverseCdf(targetLandFraction) - LandmassNoiseMeanCalibrated;
+    }
+
+    /// <summary>Standard normal quantile function (inverse CDF) -- Acklam's rational approximation, relative error under 1.15e-9. Source: Peter John Acklam, "An algorithm for computing the inverse normal cumulative distribution function" (2003).</summary>
+    private static double NormalInverseCdf(double p)
+    {
+        double[] a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+        double[] b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+        double[] c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+        double[] d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+
+        const double pLow = 0.02425;
+        double q, r;
+        if (p < pLow)
+        {
+            q = Math.Sqrt(-2.0 * Math.Log(p));
+            return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+                / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0);
+        }
+        if (p > 1.0 - pLow)
+        {
+            q = Math.Sqrt(-2.0 * Math.Log(1.0 - p));
+            return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+                / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0);
+        }
+        q = p - 0.5;
+        r = q * q;
+        return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0);
+    }
 
     /// <summary>
     /// Samples ONLY the landmass/coastline layer at true spherical (latitude, longitude)
@@ -125,7 +156,7 @@ public static class PlanetNoise
         }
         var landmassNoise = maxAmplitude > 0 ? sum / maxAmplitude : 0.0; // in [-1, 1]
 
-        landmassNoise = Math.Clamp(landmassNoise + ContinentSeaBias, -1.0, 1.0);
+        landmassNoise = Math.Clamp(landmassNoise + ContinentSeaBias(p.TargetOceanFraction), -1.0, 1.0);
 
         var landmassShare = Math.Clamp(p.LandmassAmplitudeFraction, 0.0, 1.0);
         return landmassNoise * (p.AmplitudeMeters * landmassShare / 2.0);

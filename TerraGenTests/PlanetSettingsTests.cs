@@ -65,6 +65,7 @@ public class PlanetSettingsTests
             Assert.AreEqual(1.000001, resolved.OrbitSemiMajorAxisAu, 1e-6);
             Assert.AreEqual(0.01671022, resolved.OrbitEccentricity, 1e-8);
             Assert.IsFalse(resolved.HasRings);
+            Assert.AreEqual(0.71, resolved.PlanetOceanFraction, 1e-9);
         }
         finally
         {
@@ -93,7 +94,8 @@ public class PlanetSettingsTests
                       "OrbitSemiMajorAxisAu": 1.5,
                       "OrbitEccentricity": 0.2,
                       "HasRings": true,
-                      "RingMeanOpticalDepth": 2.5
+                      "RingMeanOpticalDepth": 2.5,
+                      "PlanetOceanFraction": 0.4
                     }
                   }
                 }
@@ -110,6 +112,7 @@ public class PlanetSettingsTests
             Assert.AreEqual(0.2, resolved.OrbitEccentricity, 1e-9);
             Assert.IsTrue(resolved.HasRings);
             Assert.AreEqual(2.5, resolved.RingMeanOpticalDepth, 1e-9);
+            Assert.AreEqual(0.4, resolved.PlanetOceanFraction, 1e-9);
         }
         finally
         {

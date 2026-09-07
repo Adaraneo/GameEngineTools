@@ -104,6 +104,8 @@ public static class WorldContentGenerator
         double SavannaTemperatureThresholdC = 18.0,
         /// <summary>Null (default) keeps the Desert/Jungle/Savanna/Plains humidity+temperature thresholds above, unchanged. Non-null switches that split to a real Koppen-Geiger classification (Peel 2007) built from Stage 8/9's seasonal-amplitude and precipitation-scale models — see docs/plans/planet-physics-driven-climate.md Stage 7.</summary>
         PlanetSettings.Resolved? Planet = null,
+        /// <summary>Null (default) falls back to Planet.PlanetOceanFraction. Set to the REAL measured ocean fraction from this run's own loaded terrain tiles (see Program.cs) to feed Stage 8's seasonal amplitude / Stage 4's hemispheric asymmetry the actual generated land/sea split instead of the config target.</summary>
+        double? OceanFraction = null,
         /// <summary>Skips <see cref="PickTier"/>'s per-biome weighted roll and always uses this
         /// tier instead — mainly for deterministic tests; leave <c>null</c> for real generation.</summary>
         SettlementTier? ForcedTier = null,

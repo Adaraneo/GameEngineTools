@@ -16,7 +16,7 @@ public static class KoppenWiring
         var (latDeg, _) = PlanetGeometry.OffsetToLatLon(offsetXMeters, offsetYMeters, options.PlanetRadiusMeters);
         var climate = ClimateModel.At(offsetXMeters, offsetYMeters, heightMeters, options);
 
-        var amplitude = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, latDeg);
+        var amplitude = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, latDeg, options.OceanFraction);
         var isNorthernHemisphere = latDeg >= 0.0;
         var peakMonth = isNorthernHemisphere ? NorthernHemispherePeakMonth : SouthernHemispherePeakMonth;
 

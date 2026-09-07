@@ -36,7 +36,7 @@ Console.WriteLine($"Planeta: {planet.PlanetName}  gravitace={planet.GravityMs2:0
 if (options.Scan)
 {
     var scanNoiseParams = new PlanetNoise.Parameters(Seed: planet.Seed, GravityMs2: planet.GravityMs2,
-        TectonicPlateCount: tectonicPlateCount);
+        TectonicPlateCount: tectonicPlateCount, TargetOceanFraction: planet.PlanetOceanFraction);
     var scanPlates = tectonicPlateCount > 0 ? TectonicPlates.Generate(planet.Seed, tectonicPlateCount) : null;
 
     if (options.ScanDetail && options.LonMax - options.LonMin >= 90.0)
@@ -146,7 +146,7 @@ using var db = new SqliteWorldDatabase(options.DbPath);
 WorldDatabaseSeeder.InitializeTerrainDatabase(db);
 
 var noiseParams = new PlanetNoise.Parameters(Seed: planet.Seed, GravityMs2: planet.GravityMs2,
-    TectonicPlateCount: tectonicPlateCount);
+    TectonicPlateCount: tectonicPlateCount, TargetOceanFraction: planet.PlanetOceanFraction);
 var erosionParams = new TileErosion.Parameters(Seed: planet.Seed, DropletCount: options.DropletsPerTile);
 
 var hydrologyParams = options.Rivers
