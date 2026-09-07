@@ -44,8 +44,13 @@ public static class ClimateModel
         var latRad = latDeg * Math.PI / 180.0;
         var latitudeFactor = Math.Sin(latRad) * Math.Sin(latRad); // 0 at the equator, 1 at the poles
 
+        // Signed by hemisphere (not just latitudeFactor's magnitude) for HemisphericAsymmetryModel; null falls back to PoleTemperatureCelsius unchanged.
+        var poleTemperatureCelsius = latDeg >= 0.0
+            ? options.NorthPoleTemperatureCelsius ?? options.PoleTemperatureCelsius
+            : options.SouthPoleTemperatureCelsius ?? options.PoleTemperatureCelsius;
+
         var altitudeAboveSeaKm = Math.Max(heightMeters, 0.0) / 1000.0;
-        var temperature = double.Lerp(options.EquatorTemperatureCelsius, options.PoleTemperatureCelsius, latitudeFactor)
+        var temperature = double.Lerp(options.EquatorTemperatureCelsius, poleTemperatureCelsius, latitudeFactor)
                            - options.LapseRateCPerKm * altitudeAboveSeaKm
                            - RingShadowCoolingC(latDeg, options);
 

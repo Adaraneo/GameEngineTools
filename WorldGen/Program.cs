@@ -75,6 +75,15 @@ var equatorTemperatureC = options.EquatorTemperatureC ?? derivedEquatorC;
 var poleTemperatureC = options.PoleTemperatureC ?? derivedPoleC;
 Console.WriteLine($"Klima: rovník={equatorTemperatureC:0.0}°C, póly={poleTemperatureC:0.0}°C (epoch={options.EpochKyr:0} kyr).");
 
+// Eccentricity/perihelion-timing hemispheric asymmetry (docs/plans/planet-physics-driven-climate.md
+// Stage 4) -- 0 for both hemispheres unless the planet's OrbitEccentricity/PeriapsisPhase make one
+// hemisphere's winter coincide with perihelion, so this is silent for every existing circular-orbit
+// world.
+var northPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: true);
+var southPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: false);
+if (Math.Abs(northPoleTemperatureC - southPoleTemperatureC) > 0.01)
+    Console.WriteLine($"Hemisférická asymetrie: severní pól={northPoleTemperatureC:0.0}°C, jižní pól={southPoleTemperatureC:0.0}°C.");
+
 var genOptions = new WorldContentGenerator.Options(
     Count: options.Count,
     Region: options.Region,
@@ -87,9 +96,15 @@ var genOptions = new WorldContentGenerator.Options(
     PlanetRadiusMeters: planet.PlanetRadiusMeters,
     EquatorTemperatureCelsius: equatorTemperatureC,
     PoleTemperatureCelsius: poleTemperatureC,
+    NorthPoleTemperatureCelsius: northPoleTemperatureC,
+    SouthPoleTemperatureCelsius: southPoleTemperatureC,
     HasRings: planet.HasRings,
     RingMeanOpticalDepth: planet.RingMeanOpticalDepth,
     RingShadowHalfWidthDeg: planet.PlanetObliquityDeg,
+    // --koppen switches the Desert/Jungle/Savanna/Plains split to a real Koppen-Geiger classification
+    // (Stage 7/8/9) instead of the ad hoc humidity+temperature thresholds -- off by default, existing
+    // worlds/tests keep generating identically without it.
+    Planet: options.Koppen ? planet : null,
     // Reuses the planet's own seed (already read from the same appsettings.World.json TerraGen
     // reads) so the climate map is reproducible per-planet without a separate CLI flag — same
     // convention as TectonicSeed above.
@@ -133,6 +148,8 @@ internal sealed class CliOptions
     public double? EquatorTemperatureC { get; init; }
     /// <summary>Overrides the physically-derived pole temperature for this one run. Null (default) uses PlanetaryTemperatureModel's derived value.</summary>
     public double? PoleTemperatureC { get; init; }
+    /// <summary>Off by default. Switches the Desert/Jungle/Savanna/Plains split to a real Koppen-Geiger classification (KoppenWiring, Stage 7) instead of the ad hoc humidity+temperature thresholds.</summary>
+    public bool Koppen { get; init; }
     public int? Seed { get; init; }
     /// <summary>Disk override for the food/drink/rest catalog. Defaults to <c>.\Nutrition.csv</c>
     /// in the current directory when present, else <c>null</c> (embedded default catalog is used).</summary>
@@ -166,6 +183,7 @@ internal sealed class CliOptions
                         [--epoch-kyr <tisíce let od aktuálního stavu obliquity/excentricity, výchozí 0>]
                         [--equator-temp-c <°C, výchozí = odvozeno z fyziky planety>]
                         [--pole-temp-c <°C, výchozí = odvozeno z fyziky planety>]
+                        [--koppen]
                         [--seed <celé číslo, výchozí náhodné>]
                         [--nutrition-csv <cesta>, výchozí .\Nutrition.csv v aktuální složce,
                                             jinak vestavěný výchozí katalog]
@@ -187,7 +205,11 @@ internal sealed class CliOptions
             sezónnosti/větru, viz WorldGen.Generation.ClimateModel). Rovníková/pólová teplota se
             teď odvozuje z fyziky planety (hvězda, albedo, skleníkový jev, obliquity — viz
             PlanetaryTemperatureModel a docs/plans/planet-physics-driven-climate.md), --equator-temp-c
-            / --pole-temp-c ji jen přebijí pro tento běh. Mountain (nad
+            / --pole-temp-c ji jen přebijí pro tento běh. --koppen (vypnuto výchozí) nahradí
+            Desert/Jungle/Savanna/Plains rozdělení skutečnou Köppen-Geigerovou klasifikací (Peel 2007)
+            se sezónní teplotní amplitudou a škálováním srážek podle teploty planety (viz KoppenWiring,
+            SeasonalTemperatureAmplitudeModel, PrecipitationScaleModel) — bez něj se použijí dnešní
+            ad-hoc prahy beze změny. Mountain (nad
             --mountain-threshold) → Tundra (pod bodem mrazu) → Coastline (do --coast-radius od
             vody) → Desert/Jungle (horko+sucho/horko+vlhko) → Savanna/Plains (plochý terén, dle
             vlhkosti) → Forest (zbytek, svažitý terén). Dostane náhodně jednu ze tří úrovní
@@ -223,6 +245,7 @@ internal sealed class CliOptions
         var epochKyr = 0.0;
         double? equatorTemperatureC = null;
         double? poleTemperatureC = null;
+        var koppen = false;
         int? seed = null;
         string? nutritionCsvPath = null;
         var generateHouses = true;
@@ -268,6 +291,9 @@ internal sealed class CliOptions
                     break;
                 case "--pole-temp-c" when i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var pt):
                     poleTemperatureC = pt;
+                    break;
+                case "--koppen":
+                    koppen = true;
                     break;
                 case "--seed" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var s):
                     seed = s;
@@ -337,6 +363,7 @@ internal sealed class CliOptions
             EpochKyr = epochKyr,
             EquatorTemperatureC = equatorTemperatureC,
             PoleTemperatureC = poleTemperatureC,
+            Koppen = koppen,
             Seed = seed,
             NutritionCsvPath = nutritionCsvPath,
             GenerateHouses = generateHouses,

@@ -57,6 +57,10 @@ public static class WorldContentGenerator
         /// <summary>Temperature at the poles at sea level, in °C — the cold end of the same
         /// gradient.</summary>
         double PoleTemperatureCelsius = -25.0,
+        /// <summary>Null (default) uses PoleTemperatureCelsius for the northern hemisphere too. Non-null overrides it — see HemisphericAsymmetryModel, docs/plans/planet-physics-driven-climate.md Stage 4.</summary>
+        double? NorthPoleTemperatureCelsius = null,
+        /// <summary>Null (default) uses PoleTemperatureCelsius for the southern hemisphere too. Non-null overrides it — see HemisphericAsymmetryModel, docs/plans/planet-physics-driven-climate.md Stage 4.</summary>
+        double? SouthPoleTemperatureCelsius = null,
         /// <summary>Temperature drop per kilometer of altitude, in °C/km — the standard
         /// environmental lapse rate (~6.5) unless overridden.</summary>
         double LapseRateCPerKm = 6.5,
@@ -98,6 +102,8 @@ public static class WorldContentGenerator
         double SavannaHumidityThreshold = 0.4,
         /// <summary>Minimum temperature (°C) for the Savanna check above to apply.</summary>
         double SavannaTemperatureThresholdC = 18.0,
+        /// <summary>Null (default) keeps the Desert/Jungle/Savanna/Plains humidity+temperature thresholds above, unchanged. Non-null switches that split to a real Koppen-Geiger classification (Peel 2007) built from Stage 8/9's seasonal-amplitude and precipitation-scale models — see docs/plans/planet-physics-driven-climate.md Stage 7.</summary>
+        PlanetSettings.Resolved? Planet = null,
         /// <summary>Skips <see cref="PickTier"/>'s per-biome weighted roll and always uses this
         /// tier instead — mainly for deterministic tests; leave <c>null</c> for real generation.</summary>
         SettlementTier? ForcedTier = null,
@@ -286,6 +292,18 @@ public static class WorldContentGenerator
         if (height >= options.MountainThresholdMeters) return TerrainType.Mountain;
         if (climate.TemperatureCelsius <= options.TundraTemperatureThresholdC) return TerrainType.Tundra;
         if (IsNearWater(tiles, tile, x, y, options.CoastRadiusMeters)) return TerrainType.Coastline;
+
+        if (options.Planet is not null)
+        {
+            var category = KoppenWiring.ClassifyWarmClimate(x, y, height, options);
+            return category switch
+            {
+                KoppenWiring.WarmClimateCategory.Desert => TerrainType.Desert,
+                KoppenWiring.WarmClimateCategory.Jungle => TerrainType.Jungle,
+                KoppenWiring.WarmClimateCategory.Savanna => TerrainType.Savanna,
+                _ => EstimateSlope(tile, x, y) > options.PlainsSlopeThreshold ? TerrainType.Forest : TerrainType.Plains,
+            };
+        }
 
         if (climate.Humidity <= options.DesertHumidityThreshold && climate.TemperatureCelsius >= options.DesertTemperatureThresholdC)
             return TerrainType.Desert;

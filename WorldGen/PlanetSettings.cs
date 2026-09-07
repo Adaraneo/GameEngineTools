@@ -24,7 +24,8 @@ public static class PlanetSettings
         double GravityMs2, int Seed, int TectonicPlateCount,
         double PlanetObliquityDeg, double PlanetAlbedo, double PlanetGreenhouseWarmingK,
         double PlanetSiderealRotationHrs, double StarLuminosityWatts, double OrbitSemiMajorAxisAu,
-        double OrbitEccentricity, bool HasRings, double RingMeanOpticalDepth);
+        double OrbitEccentricity, bool HasRings, double RingMeanOpticalDepth, double StarMassKg,
+        double PeriapsisPhase);
 
     /// <summary>Searches upward from <paramref name="dbFilePath"/>'s folder for
     /// <see cref="SettingsFileName"/>, binds its <c>World:Universe</c> section (falling back to
@@ -32,10 +33,24 @@ public static class PlanetSettings
     public static Resolved Load(string dbFilePath)
     {
         var settingsPath = FindSettingsFile(dbFilePath);
-        var planet = settingsPath is null
-            ? new UniverseConfig()
-            : new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build()
-                .GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
+        UniverseConfig planet;
+        double periapsisPhase;
+        if (settingsPath is null)
+        {
+            planet = new UniverseConfig();
+            periapsisPhase = new SunParamsConfig().PeriapsisPhase;
+        }
+        else
+        {
+            var config = new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build();
+            planet = config.GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
+            // PeriapsisPhase lives in the SEPARATE World:Astro:Sun section (Characters' own seasonal
+            // model, GameEngineTools.World.Core.Astro.SunParamsConfig) — reused here rather than
+            // duplicated, since it's the same real-world quantity Stage 4's hemispheric-asymmetry
+            // term needs (see docs/plans/planet-physics-driven-climate.md).
+            periapsisPhase = config.GetSection("World:Astro:Sun").Get<SunParamsConfig>()?.PeriapsisPhase
+                ?? new SunParamsConfig().PeriapsisPhase;
+        }
 
         var radiusMeters = planet.PlanetEquatorialRadiusKm * 1000.0;
         if (radiusMeters <= 0) radiusMeters = EarthRadiusMeters;
@@ -49,7 +64,8 @@ public static class PlanetSettings
             Math.Max(0, planet.PlanetTectonicPlateCount),
             planet.PlanetObliquityDeg, planet.PlanetAlbedo, planet.PlanetGreenhouseWarmingK,
             planet.PlanetSiderealRotationHrs, planet.StarLuminosityWatts, planet.OrbitSemiMajorAxisAu,
-            planet.OrbitEccentricity, planet.HasRings, planet.RingMeanOpticalDepth);
+            planet.OrbitEccentricity, planet.HasRings, planet.RingMeanOpticalDepth, planet.StarMassKg,
+            periapsisPhase);
     }
 
     /// <summary>Stable FNV-1a hash of the planet's identity — same formula TerraGen's own
