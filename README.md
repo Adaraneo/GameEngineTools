@@ -1,70 +1,79 @@
 # GameEngineTools (GET)
 
-> **White-box autonomous NPC behavior simulation engine — C# / .NET 8**
+> **A white-box social/physical simulation stack — C# / .NET 8**
 > © 50PSoftware
 
 ![Language](https://img.shields.io/badge/language-C%23-239120?logo=csharp&logoColor=white)
 ![Framework](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
 
-GET is a research-grade simulation platform that exposes the **full internal state** of characters
-for study and iteration. It is not a presentation layer — it is a scientific sandbox for modeling
-human physiology, psychology, memory, relationships, values, identity, and social behavior. Every
-NPC perceives the world as **structured semantic data**, never as pixels, and runs a fixed
-multi-engine pipeline every simulation tick.
+This repository is a multi-tool solution, not a single engine. At its core is **`GameEngineTools`**,
+a research-grade autonomous-NPC simulation library that exposes the full internal state of every
+character (physiology, psychology, memory, relationships, values, identity, social standing) instead
+of hiding it behind a black box. Around that core sit standalone command-line generators for terrain
+and world content, a realtime browser dashboard, and a couple of viewer/authoring apps used while
+building all of the above.
 
 ---
 
-## What You Can Do With It
+## Projects in this repository
 
-- **Simulate a living social world.** Run dozens of autonomous characters that eat, sleep, work to a
-  daily schedule, move between locations, form and decay relationships, gossip, fall in love, have
-  children, age, and die — with no scripted behavior trees.
-- **Inspect everything.** Every character exposes an immutable `EnginesSnapshot` with the live state
-  of all 13 engines (PAD affect, stress/cortisol, needs, goals, beliefs about other people, values,
-  self-esteem, …). Nothing is hidden behind a black box.
+| Project | Kind | What it does |
+|---|---|---|
+| **`GameEngineTools/`** | Library | The NPC simulation engine — see [below](#get-core-the-npc-simulation-engine). |
+| **`EngineTests/`** | MSTest suite | Unit tests for the core library. |
+| **`GameSandbox/`** | Console app | Canonical, fully-wired example that runs a `SimulationScene` end-to-end and prints a Czech-language diary. |
+| **`CharacterGenerator/`** | Console app | Interactive CLI for generating and inspecting single characters/families without running a full scene. |
+| **`TerraGen/`** | Console app | Procedural planet **terrain** generator — noise, tectonic plates, hydraulic/SPIM erosion, rivers, isostasy, orographic precipitation, Köppen-Geiger climate; writes heightmap tiles to a SQLite `terrain.db`. |
+| **`WorldGen/`** | Console app | Procedural **world content** generator that runs on top of a TerraGen `terrain.db` — places settlements, roads, and locations following the terrain (rivers, coastline, slope) and writes `world.db`. |
+| **`WorldObserver/`** | ASP.NET Core + SignalR app | Realtime browser dashboard that runs a live `GameEngineTools` simulation and streams character/world state to the browser (cards, relationship graph, map, charts, playback controls). |
+| **`LogReader/`** | Node.js web app | Streaming JSONL log viewer with interactive charts for physiology/psychology/behavior/relationships and a filterable event table — for post-hoc analysis of a run's logs, independent of WorldObserver's live view. |
+| **`LogsResolver/`** | WPF app | Desktop JSONL log viewer (earlier/alternate approach to `LogReader`, still maintained). |
+| **`TerrainEditor/`** | WPF app | Desktop viewer for TerraGen/WorldGen output — inspect heightmaps, rivers, roads, and locations produced by those tools. |
+| **`RelationshipsGame/`** | WPF app | Early-stage prototype UI built on the relationships/attraction engines. |
+| **`UnityPoC/`** | Unity project | Proof-of-concept for visualizing GET-driven characters in a real-time 3D engine. |
+
+The three data-generation tools chain together: **TerraGen** produces terrain →
+**WorldGen** places settlements/roads/locations on that terrain → **GameSandbox** /
+**WorldObserver** populate the resulting world with `GameEngineTools` characters and simulate them.
+
+---
+
+## GET Core: the NPC simulation engine
+
+GET's character engine runs dozens of autonomous NPCs that eat, sleep, work to a schedule, move
+between locations, form and decay relationships, gossip, grieve, fall in love, marry, have children,
+age, and die — with no scripted behavior trees. Every character perceives the world as **structured
+semantic data**, never pixels, and every character exposes an immutable `EnginesSnapshot` with the
+live state of every engine — nothing is hidden.
+
+### What you can do with it
+
+- **Simulate a living social world.** `SimulationScene` ticks a roster of characters, routes their
+  interactions, applies celestial/ambient context, and produces a narrative diary.
+- **Inspect everything.** PAD affect, stress/cortisol, needs, goals, beliefs about other people,
+  values, self-esteem, social status, grief, economic wealth — all readable off the snapshot.
 - **Generate believable people.** Deterministic, seedable generation of Big Five personality,
   appearance/genetics, attraction preferences, values, interests, and whole nuclear families with
   genetically-inherited children.
 - **Drive psychology from the body and the world.** Pain, hunger, fever, sleep debt, ambient
   temperature, noise, crowding, privacy, daylight, and seasons all feed affect and decision-making.
-- **Model real planetary mechanics.** Optional Kepler orbital stack drives day length, seasons,
+- **Model real planetary mechanics.** An optional Kepler orbital stack drives day length, seasons,
   irradiance, ambient temperature, and gravity from a configurable star/planet/moon/ring system.
-- **Persist and resume.** Characters serialize to/from JSON snapshots; world objects, the map, and
-  social norms persist in SQLite.
-- **Get narrative output.** A Czech-language narrative formatter turns domain events into a readable
-  diary, with full morphological declension/conjugation.
+- **Run a food & money economy.** Characters produce, carry, buy, sell, and eat food with spoilage;
+  wages and posted prices are tracked in a persistent economy ledger.
+- **Model death and its aftermath.** Bereavement (grief decay, widowhood hazard), burial (graves as
+  persistent world objects), and grave visits are first-class, behavior-driven events.
+- **Model social standing.** A two-axis (Dominance/Prestige) status ledger and a community reputation
+  ledger shape deference, stress, and the trust prior a stranger starts from.
+- **Talk.** Characters plan and realize actual Czech sentences (not templated barks) via speech acts,
+  a per-character acquired vocabulary, and a full valency/sentence-planning pipeline.
+- **Persist and resume.** Characters serialize to/from JSON snapshots; world objects, the map, the
+  economy ledger, and social norms persist in SQLite.
 - **Scale with LOD.** Per-character cognitive-resolution tiers (Player / Nearby / Background) control
   how often each character reasons and at what fidelity — so background crowds stay cheap.
 
----
-
-## Table of Contents
-
-1. [Quick Start](#quick-start)
-2. [Usage Recipes](#usage-recipes)
-   - [Run a scene](#run-a-scene)
-   - [Generate characters & families](#generate-characters--families)
-   - [Read a character's state](#read-a-characters-state)
-   - [Drive a character with events](#drive-a-character-with-events)
-   - [Schedules & occupations](#schedules--occupations)
-   - [World, locations & objects](#world-locations--objects)
-   - [Astronomy & seasons](#astronomy--seasons)
-   - [Persistence](#persistence)
-   - [Level of detail (LOD)](#level-of-detail-lod)
-3. [Architecture](#architecture)
-   - [The engine pipeline](#the-engine-pipeline)
-   - [Engine reference](#engine-reference)
-   - [Supporting social systems](#supporting-social-systems)
-   - [Traits](#traits)
-4. [Configuration](#configuration)
-5. [DI Registration](#di-registration)
-6. [Building & Testing](#building--testing)
-7. [Project Layout](#project-layout)
-
----
-
-## Quick Start
+### Quick start
 
 The fastest path to a running world is `GameEngineToolsRuntime`, which builds the DI container,
 configures the world clock/calendar, registers every engine and the generation pipeline, and returns
@@ -106,26 +115,22 @@ await scene.RunAsync();
 If you want to assemble the container yourself instead of using the runtime, register everything via
 DI directly — see [DI Registration](#di-registration).
 
----
+### Usage recipes
 
-## Usage Recipes
-
-### Run a scene
-
-`SimulationScene` owns the clock, ticks every character through the full pipeline in list order,
-routes interaction outcomes between characters, injects ambient/celestial context, runs the
-narrative formatter, and applies LOD. A richer setup:
+**Run a scene.** `SimulationScene` owns the clock, ticks every character through the full pipeline in
+list order, routes interaction outcomes between characters, injects ambient/celestial context, runs
+the narrative formatter, and applies LOD:
 
 ```csharp
 var opts = new SimulationSceneOptions
 {
-    Characters     = roster,                       // tick order = list order (player at index 0 by convention)
-    LocationService = locationService,             // enables ContextChanged dispatch + InteractionSurface
-    SimulationDays = 30,
-    TickStep       = WTimeSpan.FromHours(0.5),
-    InternalSubstep = WTimeSpan.FromMinutes(5),    // finer character-to-character latency
-    AstroConfig    = astroConfig,                  // sun model → ambient temperature & daylight
-    UniverseConfig = universeConfig,               // full Kepler planetary mechanics
+    Characters      = roster,                       // tick order = list order (player at index 0 by convention)
+    LocationService = locationService,               // enables ContextChanged dispatch + InteractionSurface
+    SimulationDays  = 30,
+    TickStep        = WTimeSpan.FromHours(0.5),
+    InternalSubstep = WTimeSpan.FromMinutes(5),      // finer character-to-character latency
+    AstroConfig     = astroConfig,                   // sun model → ambient temperature & daylight
+    UniverseConfig  = universeConfig,                // full Kepler planetary mechanics
 
     NarrativeFormatter = new DefaultNarrativeFormatter(),
     ResolveCharacter   = id => new NarrativeCharacterInfo(name, biology),
@@ -140,13 +145,9 @@ var opts = new SimulationSceneOptions
 await new SimulationScene(clock, opts, lodRuntime).RunAsync();
 ```
 
-The per-step order is: apply LOD → compute celestial context → dispatch location changes → `OnTick`
-callback → tick all characters → route outcomes → sleep prompts → advance clock → emit narrative.
-
-### Generate characters & families
-
-Generation is deterministic when seeded and produces a `HumanBlueprint` (+ immutable
-`GeneticBlueprint`) that `DefaultHumanFactory` turns into a live `OrchestratedHuman`:
+**Generate characters & families.** Generation is deterministic when seeded and produces a
+`HumanBlueprint` (+ immutable `GeneticBlueprint`) that `DefaultHumanFactory` turns into a live
+`OrchestratedHuman`:
 
 ```csharp
 // Single random person (uses the registered HumanBlueprintSpec).
@@ -159,13 +160,8 @@ var familyGraph = services.GetRequiredService<FamilyGraph>();
 NuclearFamily family = familyGen.Generate(new NuclearFamilySpec(/* … */), familyGraph, clock.Now);
 ```
 
-Generators are stadium-aware (`StadiumResolver` maps age → Baby / Child / Teenager / Adult / MidAged
-/ Old). Children born during simulation (`ChildBorn`) are produced by `ChildBlueprintGenerator`
-blending both parents.
-
-### Read a character's state
-
-Everything observable lives on the snapshot — read it directly, no reflection:
+**Read a character's state.** Everything observable lives on the snapshot — read it directly, no
+reflection:
 
 ```csharp
 var s = person.Snapshot;
@@ -192,10 +188,8 @@ if (edges.TryGetValue(otherId, out var edge))
 foreach (var ev in person.LastOutbox) { /* … */ }
 ```
 
-### Drive a character with events
-
-Characters react to external stimuli delivered through the inbox (processed in Phase A of the next
-tick), or immediately via `FlushInbox()` at setup time:
+**Drive a character with events.** Characters react to external stimuli delivered through the inbox
+(processed in Phase A of the next tick), or immediately via `FlushInbox()` at setup time:
 
 ```csharp
 person.ReceiveEvent(new ScheduleSlotTriggered(now, person.Id, slotId, ActionNames.SelfCare, "stables", 0.65));
@@ -206,14 +200,13 @@ person.SetLastName(partner);         // e.g. on marriage
 
 Outside a scene you can also tick a character manually: `person.Tick(now, dt)`.
 
-### Schedules & occupations
+**Schedules & occupations.** A character's day is driven by an occupation looked up in
+`IOccupationRegistry` (built-ins plus custom rows from `SourceFiles/Characters/Occupations.csv`).
+Each `ScheduleSlot` biases a preferred action (and optionally a `MoveTo` toward a location) at a given
+hour, and can be skipped under stress. Occupation schedules drive commuting (`MoveTo:*`) between home
+and workplace.
 
-A character's day is driven by an occupation looked up in `IOccupationRegistry` (built-ins plus
-custom rows from `SourceFiles/Characters/Occupations.csv`). Each `ScheduleSlot` biases a preferred
-action (and optionally a `MoveTo` toward a location) at a given hour, and can be skipped under stress.
-Occupation schedules drive commuting (`MoveTo:*`) between home and workplace.
-
-### World, locations & objects
+**World, locations & objects.**
 
 ```csharp
 var locationService = new DefaultLocationService(socialNormProvider);
@@ -225,18 +218,18 @@ locationService.MoveCharacter(person.Id, "tavern_01"); // updates InteractionSur
 computes a per-tick `InteractionSurface` (noise, crowding, privacy, proxemics) and dispatches
 `ContextChanged` only to characters that moved. **World objects** (`WorldObject`) are perceived as a
 category + a list of affordances; a character that uses one emits `ObjectAffordanceApplied`, which
-Physiology/Psychology consume (e.g. a fireplace warms; a bench rests). Objects persist in SQLite and
-can respawn on a schedule.
+Physiology/Psychology consume (e.g. a fireplace warms; a bench rests). A hard/soft affordance gate
+enforces object presence (`Eat` needs `Food`, `Work` needs `Tool`) and can redirect a gated-out action
+into a `MoveTo:Food`/`MoveTo:Drink` foraging move. Objects — including graves and priced shop goods —
+persist in SQLite and can respawn on a schedule.
 
-### Astronomy & seasons
+**Astronomy & seasons.** Supply an `AstroConfig` (and optionally a `UniverseConfig`) to a scene and
+each tick gets a `CelestialContext` — irradiance, day length, sunrise/sunset, season, and ambient
+temperature. With a `UniverseConfig`, the `Universe/` Kepler stack (`KeplerSolver`, `OrbitalElements`,
+`StarPhysics`, `MoonPhysics`, `RingSystem`, `HabitabilityProfile`) derives those from real orbital
+mechanics for a configurable star/planet/moon/ring system.
 
-Supply an `AstroConfig` (and optionally a `UniverseConfig`) to a scene and each tick gets a
-`CelestialContext` — irradiance, day length, sunrise/sunset, season, and ambient temperature. With a
-`UniverseConfig`, the `Universe/` Kepler stack (`KeplerSolver`, `OrbitalElements`, `StarPhysics`,
-`MoonPhysics`, `RingSystem`, `HabitabilityProfile`) derives those from real orbital mechanics for a
-configurable star/planet/moon/ring system.
-
-### Persistence
+**Persistence.**
 
 ```csharp
 var gf = (GeneratedFile)services.GetRequiredService<IGeneratedFile>();
@@ -246,27 +239,21 @@ NPC restored = gf.ImportNPC("npc_<guid>.jsonl"); // CharacterBase; restored.Pers
 restored.Person.RestoreSnapshot(snapshot, today); // revalidates age-dependent subsystems
 ```
 
-`Characters/Persistence/` handles JSON (de)serialisation of `EnginesSnapshot`. Newer engine fields
-are nullable for backward compatibility with older saves.
+`Characters/Persistence/` handles JSON (de)serialisation of `EnginesSnapshot`. Newer engine fields are
+nullable for backward compatibility with older saves.
 
-### Level of detail (LOD)
+**Level of detail (LOD).** `CognitiveResolutionLevel` (Player / Nearby / Background) controls
+**decision cadence** (how often Behavior reasons, via `IBehaviorCadencePolicy` + `Characters:Lod`) and
+**fidelity** of memory, perception, and social processing (`Characters:Fidelity`). Resolve per
+character with `ResolveCharacterLod`; background crowds reason hourly at reduced fidelity while the
+player reasons every few minutes at full detail.
 
-`CognitiveResolutionLevel` (Player / Nearby / Background) controls **decision cadence** (how often
-Behavior reasons, via `IBehaviorCadencePolicy` + `Characters:Lod`) and **fidelity** of memory,
-perception, and social processing (`Characters:Fidelity`). Resolve per character with
-`ResolveCharacterLod`; background crowds reason hourly at reduced fidelity while the player reasons
-every few minutes at full detail.
-
----
-
-## Architecture
+### Architecture
 
 Each NPC is an **`OrchestratedHuman`**. Engines never call each other directly — they **read** the
 shared per-tick `EnginesSnapshot` through `IHumanContext` and **emit** `IDomainEvent`s into an outbox
 that the orchestrator drains and routes. Every engine implements the same contract
 (`IEngine<TState, TConfig>`): `State`, `Config`, `Tick`, `Handle`, `RestoreState`.
-
-### The engine pipeline
 
 ```
 Phase A  ──  HandleScheduled + HandleInbox
@@ -277,6 +264,7 @@ Phase B  ──  [LifeStage boundary check]
              → Behavior (cadence-gated) → Interactions → ObjectInteraction
              → Relationships → Memory → SemanticMemory
              → Goals → Schedule → Values → SelfConcept → Interests
+             → Bereavement → Status → Economy → Social Comparison
              [final snapshot refresh]
 
 Phase C  ──  SelfDeliver (≤ 8 passes)  →  snapshot refresh  →  PublishOutbox
@@ -289,7 +277,8 @@ Invariants:
   Psychology** lets Behavior read the *current* tick's physio/psych state.
 - **Behavior runs on a cadence** (LOD), while physiology/psychology/memory always advance with world
   time.
-- **Death is terminal** — a dead character runs no engines but stays in the roster.
+- **Death is terminal** — a dead character runs no further engines but stays in the roster (and can
+  trigger bereavement/burial in survivors).
 - **Action slots** (`ActiveActionSlots`) track occupied body/mind channels so Behavior can model
   multitasking instead of committing impossible action combinations.
 
@@ -297,13 +286,14 @@ Invariants:
 
 | Engine | State | What it owns |
 |---|---|---|
-| **Physiology** | `PhysiologyState` | Energy/hunger/thirst/pain/immune/temperature, sleep debt, allostatic load, cortisol, testosterone, nutrition, menstrual cycle, aging, injury, postpartum, mortality. Emits `ChildBorn`, `InjuryReceived`, death. |
+| **Physiology** | `PhysiologyState` | Energy/hunger/thirst/pain/immune/temperature, sleep debt, allostatic load, cortisol, testosterone, nutrition (vitamin D/iron), menstrual cycle, aging, injury, postpartum, mortality. Emits `ChildBorn`, `InjuryReceived`, death. |
 | **Psychology** | `PsychologyState` | PAD affect, stress (HPA), cognitive load, cortisol, mood baseline, discrete emotions + decay, circadian arousal, hormonal/environmental/sickness modulation, stress manifestation. Anger is approach-motivated. |
-| **Behavior** | `BehaviorState` | Decision core: 5 need engines + modifier engines (trait/affect/circadian/habit/memory/affordance/values/goal/schedule/investment) + intent stabilisation + action arbitration + habit learning. Emits `ActionCommitted`, `InteractionProposed`. |
+| **Behavior** | `BehaviorState` | Decision core: need engines (physiological/social/competence/autonomy/foraging) + modifier engines (trait/affect/circadian/habit/memory/affordance/values/goal/schedule) + intent stabilisation + action arbitration + habit learning. Emits `ActionCommitted`, `InteractionProposed`. |
 | **Sleep** | `ISleepSession` | `Falling→Light→Deep→REM→Waking` state machine; nightmares, ambush, consolidation; outside the utility loop. |
-| **Interactions** | `InteractionSurface` | Evaluates proposed social acts (8 `SpeechAct`s, 4 touch levels); misattribution under noise×stress; peak-end valence; sexual-encounter readiness gate; third-party observers. |
-| **Object Interaction** | — | Applies world-object affordances; pickup/ownership routing. Optional engine. |
-| **Relationships** | `RelationshipState` | Asymmetric directed graph: like/trust/closeness/respect/comfort/familiarity, attraction dimensions, communal vs exchange strength, Rusbult investment, transgression residue + repair, Navarro & Dunbar decay, attachment modulation. |
+| **Interactions** | `InteractionSurface` | Evaluates proposed social acts (`SpeechAct`s, touch levels); misattribution under noise×stress; peak-end valence; sexual-encounter readiness gate; third-party observers. |
+| **Dialogue / Language** | — | Turns a chosen speech act into an actual realized Czech sentence via `CzechSpeechActRealizer` (valency/sentence-planning pipeline) and a per-character acquired vocabulary (`LexicalAcquisition`). |
+| **Object Interaction** | — | Applies world-object affordances; pickup/ownership routing. |
+| **Relationships** | `RelationshipState` | Asymmetric directed graph: like/trust/closeness/respect/comfort/familiarity, attraction dimensions, communal vs exchange strength, investment, transgression residue + repair, Navarro & Dunbar decay, attachment modulation. |
 | **Memory** | `MemoryIndex` | Episodic encode/recall/forget: Ebbinghaus decay, spacing, peak-end salience, reconsolidation drift, stress distortion, System-1/2 switching; knowledge facts with confidence. |
 | **Semantic Memory** | `SemanticMemoryState` | Per-person belief sets (Warm/EmotionallySafe/Reliable/Rejecting/Critical) distilled from episodes; attachment-modulated learning; feeds social targeting. |
 | **Goals** | `GoalState` | Persistent long-term drives (existential/survival/career/relational) with salience/progress/frustration; bias utility, don't prescribe plans. |
@@ -311,10 +301,14 @@ Invariants:
 | **Values** | `ValuesState` | Drifting Schwartz `Current` vs immutable `Baseline`; congruence shifts utility & emits guilt on violation. |
 | **Self-Concept** | `SelfConcept` | Perceived Big Five, ideal subset, self-esteem, self-discrepancy; evolves via self-verification; seeds `BuildIdentity` goals. |
 | **Interests** | `InterestState` | Drifting RIASEC `Current` vs immutable `Baseline`; rewarded activity raises matching interest. |
+| **Bereavement** | — | Grief (dual-process model) after a death and widowhood hazard; drives `Bury`/`MournAtGrave` behavior. |
+| **Status** | `StatusLedger` | Two-axis Dominance/Prestige social standing per character; feeds stress via status×stability and deference in interactions. |
+| **Economy** | `EconomyLedger` | Wealth, wages, `Buy`/`Sell` actions, posted prices on `WorldObject`s. |
+| **Social Comparison** | — | Contrast/assimilation against comparison targets; benign/malicious envy; downward mood repair. |
 
 ### Supporting social systems
 
-These are shared math/services, not pipeline engines:
+Shared math/services, not pipeline engines:
 
 - **Theory of Mind** (`ToM/ToMMath`) — recursive belief reasoning with a per-NPC recursion ceiling
   (mean ≈ 4); `MutualKnowledgeFormed` for common knowledge.
@@ -334,19 +328,17 @@ The stable, slow-changing layer (`Characters/Traits/`): **Personality** (Big Fiv
 **PsychologicalProfile**, **SexualResponsiveness** (Dual Control Model SES/SIS), sociosexuality
 (SOI-R), **SexualOrientation**, **PhysicalAppearance** / **Morphology** / **AttractionProfile**.
 
----
-
-## Configuration
+### Configuration
 
 Character config binds from `appsettings.Characters.json` under `Characters:*` via `IOptions<T>`;
 `appsettings.Characters.Default.json` is the documented baseline (override per environment). World
 and astronomy config bind from `appsettings.World.json` under `World:*`. Each config record lives
 beside its engine.
 
-Active `Characters:*` sections: `Physiology`, `MenstrualCycle`, `Psychology`, `Behavior`, `Sleep`,
-`Interactions`, `Relationships`, `Memory`, `SemanticMemory`, `Goals`, `DailySchedule`, `Values`,
-`SelfConcept`, `Interests`, `Lod` (decision cadence per LOD tier), `Fidelity` (memory/perception/
-social fidelity per tier).
+Active `Characters:*` sections include: `Physiology`, `MenstrualCycle`, `Psychology`, `Behavior`,
+`Sleep`, `Interactions`, `Relationships`, `Memory`, `SemanticMemory`, `Goals`, `DailySchedule`,
+`Values`, `SelfConcept`, `Interests`, `Bereavement`, `Status`, `Economy`, `Lod` (decision cadence per
+LOD tier), `Fidelity` (memory/perception/social fidelity per tier).
 
 `World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude & thermal lag),
 `Universe` (full star/planet/moon/ring definition), and `Calendar` (cultural overlay: month count,
@@ -356,13 +348,12 @@ sidereal rotation → hours-per-day, orbit → year length) plus the `World:Cale
 no separate `InitWorldClock` section. The default template is Earth; the sandbox ships an alternate
 "Vigilia Insectianis" world (26-hour day, 10 months, 360-day year, +5 leap days every 4 years).
 
----
+### DI Registration
 
-## DI Registration
-
-`Characters/Hosting/ServiceCollectionExtensions.cs`. The shorthand registers all nine pipeline
-engines at once; Values, SelfConcept, Interests, Goal, and support services come from
-`AddCharactersCore`:
+`Characters/Hosting/ServiceCollectionExtensions.cs`. The shorthand registers the core pipeline engines
+at once; additional engines (Goals, SelfConcept, Interests, Bereavement, Status, Economy, Social
+Comparison, Object Interaction) and support services come from `AddCharactersCore` and their own
+`Add*Engine()` methods:
 
 ```csharp
 services.AddCharacters<
@@ -386,6 +377,84 @@ Each `Add*Engine<T>()` binds its `IOptions<TConfig>` automatically (overridable 
 
 ---
 
+## TerraGen & WorldGen: world data generation
+
+**TerraGen** and **WorldGen** are standalone console tools that generate the physical/geographic world
+GET characters live in. They run as a pipeline: TerraGen writes a `terrain.db`, WorldGen reads it and
+writes a `world.db` next to it.
+
+**TerraGen** (planet terrain):
+- Perlin/simplex noise heightmaps calibrated against real-Earth elevation statistics
+- Optional tectonic plates (convergent/divergent boundaries drive mountains/rifts) with a configurable
+  plate count
+- Hydraulic erosion, plus an optional SPIM (stream-power incision model) path with rock-type
+  hardness, Airy isostatic rebound, and orographic precipitation
+- River network extraction (Montgomery & Dietrich 1992 channel-initiation threshold) as a persisted
+  graph, reused by WorldGen's road pathfinder
+- Köppen-Geiger climate classification and land/ocean-per-hemisphere climate asymmetry
+- `--scan` prints a colored ASCII map of a lat/lon window (elevation, tectonic boundaries, or
+  Köppen-Geiger climate); `--scan-levels` automates a multi-resolution scan
+- Optional parallel tile generation (bit-identical output to sequential)
+- Everything is seeded and deterministic
+
+```bash
+TerraGen.exe --db terrain.db --tectonic-plates 12 --rivers --spim --scan
+```
+
+**WorldGen** (settlements, roads, locations):
+- Reads a TerraGen `terrain.db` and refuses to run without one
+- Places settlements and a road network that respects terrain (rivers, coastline, slope) using the
+  river graph TerraGen already computed
+- Applies a settlement/road placement grammar and writes `LocationDescriptor` rows GET's
+  `DefaultLocationService` can load directly
+- Writes results to `world.db` (also SQLite, via the same `SqliteWorldDatabase` GET uses at runtime)
+
+```bash
+WorldGen.exe --terrain-db terrain.db --world-db world.db
+```
+
+Both tools force invariant culture for numeric I/O, so `--scan`'s printed `--lat-range`/`--lon-range`
+hints always paste back into a follow-up command regardless of OS locale.
+
+---
+
+## WorldObserver: live realtime dashboard
+
+An ASP.NET Core + SignalR web app that boots a `GameEngineTools` world (via `GameEngineToolsRuntime`)
+and streams it live to a browser: character cards, a relationship graph, a map view over
+TerraGen/WorldGen terrain and roads, per-character detail panels, and playback controls (pause, delay,
+world tempo). Intended for watching a simulation run and clicking into individual characters, as
+opposed to GameSandbox's text-diary output or LogReader's after-the-fact log analysis.
+
+---
+
+## LogReader & LogsResolver: log analysis
+
+**`LogReader`** is a Node.js web app that streams JSONL simulation logs (even multi-GB files) without
+loading them into memory, and renders interactive charts (physiology, psychology, behavior needs,
+relationship timelines, event frequency) plus a filterable, paginated event table. Runs via Docker
+Compose or locally with Node 20+. See [`LogReader/README.md`](LogReader/README.md) for setup.
+
+**`LogsResolver`** is a WPF desktop equivalent — a native JSONL log viewer for the same simulation
+output, for users who prefer a local app over a browser/Docker setup.
+
+---
+
+## TerrainEditor
+
+A WPF desktop viewer for inspecting TerraGen/WorldGen output directly — heightmaps, rivers, roads, and
+placed locations — without going through WorldObserver or a full simulation run.
+
+---
+
+## RelationshipsGame & UnityPoC
+
+**`RelationshipsGame`** is an early-stage WPF prototype exploring UI built directly on the
+relationships/attraction engines. **`UnityPoC`** is a Unity project prototyping real-time 3D
+visualization of GET-driven characters. Both are exploratory, pre-production.
+
+---
+
 ## Building & Testing
 
 > **`dotnet build` / `dotnet test` are broken here** — the .NET SDK 10.0.202 install is missing
@@ -401,30 +470,34 @@ Each `Add*Engine<T>()` binds its `IOptions<TConfig>` automatically (overridable 
   "EngineTests/bin/Debug/net8.0/EngineTests.dll" --logger:"console;verbosity=minimal"
 
 # Run a single test / one class
-... vstest.console.exe ... --filter:"TestMethodName"
-... vstest.console.exe ... --filter:"FullyQualifiedName~ClassName"
+... vstest.console.exe ... --TestCaseFilter:"TestMethodName"
+... vstest.console.exe ... --TestCaseFilter:"FullyQualifiedName~ClassName"
 ```
 
 Tests use MSTest. `TestBase` provides DI setup, a `GameEngineToolsManager`, and deterministic test
 doubles (`ZeroRandom`, `NullEventBus`, `NullScheduler`, `TestClock`, `FixedSocialFidelityPolicy`) and
-calls `WWorld.Reset()` for isolation.
+calls `WWorld.Reset()` for isolation. `TerraGenTests`, `WorldGenTests`, `LogsResolverTests`, and
+`TerrainEditorTests` are the matching suites for their respective tools.
 
 ---
 
 ## Project Layout
 
 ```
-GameEngineTools/                 ← Core library (.NET 8)
+GameEngineTools/                 ← Core NPC simulation library (.NET 8)
   Characters/
     Core/                        ← IEngine, OrchestratedHuman, HumanContext, EnginesSnapshot, action slots
     Engines/
       Physiology/ Psychology/    ← body + affect
       Behavior/                  ← needs, modifiers, intent, arbitration, sleep, habits
       Interactions/ Objects/     ← social acts + object interaction
+      Dialogue/ Language/        ← speech-act realization + per-character vocabulary
       Relationships/             ← directed social graph, investment, transgression
       Memory/ SemanticMemory/    ← episodic + person-belief memory
       Goals/ Values/ SelfConcept/ Interests/   ← long-term motivation & identity
       Schedule/                  ← daily routine + occupations
+      Bereavement/               ← grief + widowhood hazard
+      Status/ Economy/ Social/   ← social standing, money/wages, social comparison
       ToM/ Reputation/ LifeStage/ Attraction/  ← supporting social math
     Traits/                      ← Personality, Attachment, Values, Interests, sexual traits, appearance
     Generation/                  ← blueprint/appearance/personality/family generation, Portraits/
@@ -438,9 +511,16 @@ GameEngineTools/                 ← Core library (.NET 8)
   GameEngineToolsRuntime.cs      ← one-call bootstrap (DI + clock + engines + generation)
   GameEngineToolsManager.cs      ← character roster + generation helpers
 
-EngineTests/        ← MSTest suite (build + run target)
-GameSandbox/        ← Console simulation runner (canonical fully-wired example)
-CharacterGenerator/ ← Interactive character-creation CLI
-LogsResolver/       ← WPF JSONL log viewer (+ LogsResolverTests)
-RelationshipsGame/  ← WPF prototype
+EngineTests/         ← MSTest suite for GameEngineTools
+GameSandbox/         ← Console simulation runner (canonical fully-wired example)
+CharacterGenerator/  ← Interactive character-creation CLI
+TerraGen/            ← Planet terrain generator (noise, tectonics, erosion, rivers, climate) → terrain.db
+WorldGen/            ← Settlement/road/location generator on top of terrain.db → world.db
+WorldObserver/       ← ASP.NET Core + SignalR realtime browser dashboard
+LogReader/           ← Node.js streaming JSONL log viewer with charts
+LogsResolver/        ← WPF JSONL log viewer (desktop equivalent of LogReader)
+TerrainEditor/        ← WPF viewer for TerraGen/WorldGen output
+RelationshipsGame/    ← WPF prototype UI on the relationships engines
+UnityPoC/             ← Unity real-time visualization proof-of-concept
+docs/                 ← Design docs, plans, audits
 ```
