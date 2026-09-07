@@ -24,16 +24,14 @@ building all of the above.
 | **`EngineTests/`** | MSTest suite | Unit tests for the core library. |
 | **`GameSandbox/`** | Console app | Canonical, fully-wired example that runs a `SimulationScene` end-to-end and prints a Czech-language diary. |
 | **`CharacterGenerator/`** | Console app | Interactive CLI for generating and inspecting single characters/families without running a full scene. |
-| **`TerraGen/`** | Console app | Procedural planet **terrain** generator — noise, tectonic plates, hydraulic/SPIM erosion, rivers, isostasy, orographic precipitation, Köppen-Geiger climate; writes heightmap tiles to a SQLite `terrain.db`. |
-| **`WorldGen/`** | Console app | Procedural **world content** generator that runs on top of a TerraGen `terrain.db` — places settlements, roads, and locations following the terrain (rivers, coastline, slope) and writes `world.db`. |
+| **`TerraGen/`** | Console app | Procedural planet **terrain** generator — noise, tectonic plates, hydraulic/SPIM erosion, rivers, isostasy, orographic precipitation, Köppen-Geiger climate; writes heightmap tiles to a SQLite `terrain.db`. (test suite: `TerraGenTests/`) |
+| **`WorldGen/`** | Console app | Procedural **world content** generator that runs on top of a TerraGen `terrain.db` — places settlements, roads, and locations following the terrain (rivers, coastline, slope) and writes `world.db`. (test suite: `WorldGenTests/`) |
 | **`WorldObserver/`** | ASP.NET Core + SignalR app | Realtime browser dashboard that runs a live `GameEngineTools` simulation and streams character/world state to the browser (cards, relationship graph, map, charts, playback controls). |
-| **`LogReader/`** | Node.js web app | Streaming JSONL log viewer with interactive charts for physiology/psychology/behavior/relationships and a filterable event table — for post-hoc analysis of a run's logs, independent of WorldObserver's live view. |
-| **`LogsResolver/`** | WPF app | Desktop JSONL log viewer (earlier/alternate approach to `LogReader`, still maintained). |
-| **`TerrainEditor/`** | WPF app | Desktop viewer for TerraGen/WorldGen output — inspect heightmaps, rivers, roads, and locations produced by those tools. |
+| **`LogsResolver/`** | WPF app | Desktop JSONL log viewer for simulation logs. (test suite: `LogsResolverTests/`) |
+| **`TerrainEditor/`** | WPF app | Desktop viewer for TerraGen/WorldGen output — inspect heightmaps, rivers, roads, and locations produced by those tools. (test suite: `TerrainEditorTests/`) |
 | **`RelationshipsGame/`** | WPF app | Early-stage prototype UI built on the relationships/attraction engines. |
-| **`UnityPoC/`** | Unity project | Proof-of-concept for visualizing GET-driven characters in a real-time 3D engine. |
 
-The three data-generation tools chain together: **TerraGen** produces terrain →
+The two data-generation tools chain together: **TerraGen** produces terrain →
 **WorldGen** places settlements/roads/locations on that terrain → **GameSandbox** /
 **WorldObserver** populate the resulting world with `GameEngineTools` characters and simulate them.
 
@@ -424,19 +422,14 @@ An ASP.NET Core + SignalR web app that boots a `GameEngineTools` world (via `Gam
 and streams it live to a browser: character cards, a relationship graph, a map view over
 TerraGen/WorldGen terrain and roads, per-character detail panels, and playback controls (pause, delay,
 world tempo). Intended for watching a simulation run and clicking into individual characters, as
-opposed to GameSandbox's text-diary output or LogReader's after-the-fact log analysis.
+opposed to GameSandbox's text-diary output or LogsResolver's after-the-fact log analysis.
 
 ---
 
-## LogReader & LogsResolver: log analysis
+## LogsResolver: log analysis
 
-**`LogReader`** is a Node.js web app that streams JSONL simulation logs (even multi-GB files) without
-loading them into memory, and renders interactive charts (physiology, psychology, behavior needs,
-relationship timelines, event frequency) plus a filterable, paginated event table. Runs via Docker
-Compose or locally with Node 20+. See [`LogReader/README.md`](LogReader/README.md) for setup.
-
-**`LogsResolver`** is a WPF desktop equivalent — a native JSONL log viewer for the same simulation
-output, for users who prefer a local app over a browser/Docker setup.
+A WPF desktop app that reads JSONL simulation logs and renders them for inspection — a native,
+after-the-fact alternative to watching a simulation live in WorldObserver.
 
 ---
 
@@ -447,11 +440,10 @@ placed locations — without going through WorldObserver or a full simulation ru
 
 ---
 
-## RelationshipsGame & UnityPoC
+## RelationshipsGame
 
-**`RelationshipsGame`** is an early-stage WPF prototype exploring UI built directly on the
-relationships/attraction engines. **`UnityPoC`** is a Unity project prototyping real-time 3D
-visualization of GET-driven characters. Both are exploratory, pre-production.
+An early-stage WPF prototype exploring UI built directly on the relationships/attraction engines.
+Exploratory, pre-production.
 
 ---
 
@@ -515,12 +507,13 @@ EngineTests/         ← MSTest suite for GameEngineTools
 GameSandbox/         ← Console simulation runner (canonical fully-wired example)
 CharacterGenerator/  ← Interactive character-creation CLI
 TerraGen/            ← Planet terrain generator (noise, tectonics, erosion, rivers, climate) → terrain.db
+TerraGenTests/       ← MSTest suite for TerraGen
 WorldGen/            ← Settlement/road/location generator on top of terrain.db → world.db
+WorldGenTests/       ← MSTest suite for WorldGen
 WorldObserver/       ← ASP.NET Core + SignalR realtime browser dashboard
-LogReader/           ← Node.js streaming JSONL log viewer with charts
-LogsResolver/        ← WPF JSONL log viewer (desktop equivalent of LogReader)
-TerrainEditor/        ← WPF viewer for TerraGen/WorldGen output
-RelationshipsGame/    ← WPF prototype UI on the relationships engines
-UnityPoC/             ← Unity real-time visualization proof-of-concept
-docs/                 ← Design docs, plans, audits
+LogsResolver/        ← WPF JSONL log viewer
+LogsResolverTests/   ← Test suite for LogsResolver
+TerrainEditor/       ← WPF viewer for TerraGen/WorldGen output
+TerrainEditorTests/  ← Test suite for TerrainEditor
+RelationshipsGame/   ← WPF prototype UI on the relationships engines
 ```
