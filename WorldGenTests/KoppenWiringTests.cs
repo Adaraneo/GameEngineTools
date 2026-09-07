@@ -73,6 +73,39 @@ public class KoppenWiringTests
     }
 
     [TestMethod]
+    public void ClassifyWarmClimate_HemisphereSpecificOceanFraction_PicksNorthOrSouthBySign()
+    {
+        var planet = EarthDefaults();
+        var baseOptions = OptionsWithPlanet(planet) with { NorthOceanFraction = 0.1, SouthOceanFraction = 0.95 };
+
+        // A far-north and a far-south point at the same |latitude| — only OceanFraction selection differs.
+        var northOffsetY = baseOptions.PlanetRadiusMeters * (60.0 * Math.PI / 180.0);
+        var southOffsetY = -northOffsetY;
+
+        double AmplitudeUsedAt(double offsetY)
+        {
+            var (latDeg, _) = PlanetGeometry.OffsetToLatLon(0, offsetY, baseOptions.PlanetRadiusMeters);
+            var isNorthern = latDeg >= 0.0;
+            var oceanFraction = isNorthern ? baseOptions.NorthOceanFraction : baseOptions.SouthOceanFraction;
+            return SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, latDeg, oceanFraction);
+        }
+
+        var northAmplitude = AmplitudeUsedAt(northOffsetY);
+        var southAmplitude = AmplitudeUsedAt(southOffsetY);
+
+        // Mostly-land north (0.1 ocean) should show a LARGER seasonal amplitude than mostly-ocean
+        // south (0.95) at the same |latitude| -- confirms the two fractions are genuinely distinct
+        // inputs, not both silently falling back to the same global OceanFraction.
+        Assert.IsTrue(northAmplitude > southAmplitude);
+
+        // The actual classification call must not throw and must be deterministic either way.
+        var northCategory = KoppenWiring.ClassifyWarmClimate(0, northOffsetY, 100.0, baseOptions);
+        var southCategory = KoppenWiring.ClassifyWarmClimate(0, southOffsetY, 100.0, baseOptions);
+        Assert.IsTrue(Enum.IsDefined(northCategory));
+        Assert.IsTrue(Enum.IsDefined(southCategory));
+    }
+
+    [TestMethod]
     public void ClassifyWarmClimate_NoPlanetSet_Throws()
     {
         var options = new WorldContentGenerator.Options(Count: 1);

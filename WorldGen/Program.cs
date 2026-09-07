@@ -77,6 +77,11 @@ var measuredOceanFraction = tiles.Count > 0
     : planet.PlanetOceanFraction;
 Console.WriteLine($"Naměřený poměr oceán/pevnina: {measuredOceanFraction:0.00} (cíl z appsettings.World.json: {planet.PlanetOceanFraction:0.00}).");
 
+// Per-hemisphere split (tile CENTER latitude decides the bucket) feeds the DOMINANT real driver of hemispheric asymmetry (Yang et al. 2025: land/ocean, not eccentricity) that Stage 4 originally left out.
+var (northOceanFraction, southOceanFraction) = MeasureOceanFractionByHemisphere(tiles, planet.PlanetRadiusMeters, measuredOceanFraction);
+if (Math.Abs(northOceanFraction - southOceanFraction) > 0.01)
+    Console.WriteLine($"Oceán/pevnina podle polokoule: sever={northOceanFraction:0.00}, jih={southOceanFraction:0.00}.");
+
 // Derived from the planet's own star/albedo/greenhouse/obliquity physics (docs/plans/planet-physics-driven-climate.md
 // Stage 3/4) instead of the old hardcoded 27C/-25C — --equator-temp-c/--pole-temp-c override for manual tuning.
 var (derivedEquatorC, derivedPoleC) = PlanetaryTemperatureModel.DeriveEquatorPoleTemperatures(planet, options.EpochKyr);
@@ -88,8 +93,8 @@ Console.WriteLine($"Klima: rovník={equatorTemperatureC:0.0}°C, póly={poleTemp
 // Stage 4) -- 0 for both hemispheres unless the planet's OrbitEccentricity/PeriapsisPhase make one
 // hemisphere's winter coincide with perihelion, so this is silent for every existing circular-orbit
 // world.
-var northPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: true, measuredOceanFraction);
-var southPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: false, measuredOceanFraction);
+var northPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: true, northOceanFraction);
+var southPoleTemperatureC = poleTemperatureC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: false, southOceanFraction);
 if (Math.Abs(northPoleTemperatureC - southPoleTemperatureC) > 0.01)
     Console.WriteLine($"Hemisférická asymetrie: severní pól={northPoleTemperatureC:0.0}°C, jižní pól={southPoleTemperatureC:0.0}°C.");
 
@@ -115,6 +120,8 @@ var genOptions = new WorldContentGenerator.Options(
     // worlds/tests keep generating identically without it.
     Planet: options.Koppen ? planet : null,
     OceanFraction: measuredOceanFraction,
+    NorthOceanFraction: northOceanFraction,
+    SouthOceanFraction: southOceanFraction,
     // Reuses the planet's own seed (already read from the same appsettings.World.json TerraGen
     // reads) so the climate map is reproducible per-planet without a separate CLI flag — same
     // convention as TectonicSeed above.
@@ -136,6 +143,26 @@ if (result.LocationsPlaced < options.Count)
                        "(nedostatek volné souše, nebo moc málo místa při zadaném --min-distance).");
 
 return 0;
+
+/// <summary>Ocean fraction measured separately for tiles centered north vs south of the equator — see docs/plans/planet-physics-driven-climate.md Stage 4's land/ocean hemispheric-asymmetry addendum.</summary>
+static (double North, double South) MeasureOceanFractionByHemisphere(
+    IReadOnlyList<TerrainHeightmap> tiles, double planetRadiusMeters, double fallback)
+{
+    long northLand = 0, northTotal = 0, southLand = 0, southTotal = 0;
+    foreach (var tile in tiles)
+    {
+        var centerX = tile.OriginX + tile.Width * tile.CellSizeMeters / 2.0;
+        var centerY = tile.OriginY + tile.Height * tile.CellSizeMeters / 2.0;
+        var (latDeg, _) = PlanetGeometry.OffsetToLatLon(centerX, centerY, planetRadiusMeters);
+        var landCells = tile.Values.Count(v => v >= 0f);
+        if (latDeg >= 0.0) { northLand += landCells; northTotal += tile.Values.Length; }
+        else { southLand += landCells; southTotal += tile.Values.Length; }
+    }
+
+    var north = northTotal > 0 ? 1.0 - northLand / (double)northTotal : fallback;
+    var south = southTotal > 0 ? 1.0 - southLand / (double)southTotal : fallback;
+    return (north, south);
+}
 
 /// <summary>Parsed and validated CLI arguments for one WorldGen run.</summary>
 internal sealed class CliOptions

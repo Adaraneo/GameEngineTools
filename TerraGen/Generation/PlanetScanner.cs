@@ -129,11 +129,21 @@ public static class PlanetScanner
         string?[,]? koppenCodes = null;
         if (options.Climate && options.Planet is { } planet)
         {
-            // Measured, not config-target — same "measured value" preference the rest of TerraGen's
-            // ocean/land handling follows, and it's free since the scan just computed every cell.
-            var landCells = 0;
-            foreach (var c in cells) if (c != Cell.Ocean) landCells++;
-            var measuredOceanFraction = 1.0 - landCells / (double)(options.Width * options.Height);
+            // Measured (not config-target), split by hemisphere -- Yang et al. 2025 land/ocean asymmetry, docs/plans/planet-physics-driven-climate.md Stage 4.
+            var northLand = 0; var northTotal = 0; var southLand = 0; var southTotal = 0;
+            for (var row = 0; row < options.Height; row++)
+            {
+                var t = options.Height <= 1 ? 0.5 : row / (double)(options.Height - 1);
+                var rowLat = options.LatMax - t * (options.LatMax - options.LatMin);
+                for (var col = 0; col < options.Width; col++)
+                {
+                    var isLand = cells[row, col] != Cell.Ocean;
+                    if (rowLat >= 0.0) { northTotal++; if (isLand) northLand++; }
+                    else { southTotal++; if (isLand) southLand++; }
+                }
+            }
+            var northOceanFraction = northTotal > 0 ? 1.0 - northLand / (double)northTotal : 1.0 - southLand / (double)Math.Max(southTotal, 1);
+            var southOceanFraction = southTotal > 0 ? 1.0 - southLand / (double)southTotal : northOceanFraction;
 
             koppenCodes = new string?[options.Height, options.Width];
             for (var row = 0; row < options.Height; row++)
@@ -145,7 +155,7 @@ public static class PlanetScanner
                     if (cells[row, col] == Cell.Ocean) continue;
                     var u = options.Width <= 1 ? 0.5 : col / (double)(options.Width - 1);
                     var lon = options.LonMin + u * (options.LonMax - options.LonMin);
-                    koppenCodes[row, col] = ClimateScanModel.Classify(planet, lat, lon, elevations[row, col], measuredOceanFraction);
+                    koppenCodes[row, col] = ClimateScanModel.Classify(planet, lat, lon, elevations[row, col], northOceanFraction, southOceanFraction);
                 }
             }
         }

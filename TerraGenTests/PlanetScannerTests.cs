@@ -1,4 +1,5 @@
 using GameEngineTools.World.Data;
+using TerraGen;
 using TerraGen.Generation;
 
 namespace TerraGenTests;
@@ -240,5 +241,41 @@ public class PlanetScannerTests
         Assert.AreEqual('^', result.Symbol(0, 2));
         Assert.AreEqual('v', result.Symbol(0, 3));
         Assert.AreEqual('x', result.Symbol(0, 4));
+    }
+
+    private static PlanetSettings.Resolved EarthDefaults() =>
+        PlanetSettings.Load(Path.Combine(Directory.CreateTempSubdirectory().FullName, "terrain.db"));
+
+    [TestMethod]
+    public void Scan_ClimateEnabled_PopulatesKoppenCodesForLandCellsOnly()
+    {
+        var planet = EarthDefaults();
+        var options = new PlanetScanner.Options(Width: 20, Height: 10, LatMin: -90, LatMax: 90, LonMin: -180, LonMax: 180,
+            Climate: true, Planet: planet);
+
+        var result = PlanetScanner.Scan(NoiseParams, PlanetRadiusMeters, plates: null, options);
+
+        Assert.IsNotNull(result.KoppenCodes);
+        for (var row = 0; row < 10; row++)
+        for (var col = 0; col < 20; col++)
+        {
+            if (result.Cells[row, col] == PlanetScanner.Cell.Ocean)
+                Assert.IsNull(result.KoppenCodes![row, col]);
+            else
+                Assert.IsNotNull(result.KoppenCodes![row, col]);
+        }
+    }
+
+    [TestMethod]
+    public void Scan_ClimateEnabled_WindowEntirelyInOneHemisphere_DoesNotCrash()
+    {
+        // Exercises the fallback branch when one hemisphere's tile/row count is zero.
+        var planet = EarthDefaults();
+        var options = new PlanetScanner.Options(Width: 15, Height: 8, LatMin: 10, LatMax: 40, LonMin: -10, LonMax: 10,
+            Climate: true, Planet: planet);
+
+        var result = PlanetScanner.Scan(NoiseParams, PlanetRadiusMeters, plates: null, options);
+
+        Assert.IsNotNull(result.KoppenCodes);
     }
 }

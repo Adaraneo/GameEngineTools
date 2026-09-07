@@ -106,6 +106,10 @@ public static class WorldContentGenerator
         PlanetSettings.Resolved? Planet = null,
         /// <summary>Null (default) falls back to Planet.PlanetOceanFraction. Set to the REAL measured ocean fraction from this run's own loaded terrain tiles (see Program.cs) to feed Stage 8's seasonal amplitude / Stage 4's hemispheric asymmetry the actual generated land/sea split instead of the config target.</summary>
         double? OceanFraction = null,
+        /// <summary>Null (default) falls back to OceanFraction for both hemispheres. Set to the real per-hemisphere measured ocean fraction (Program.cs) so KoppenWiring's monthly-temperature synthesis picks up the DOMINANT real driver of hemispheric climate asymmetry (Yang et al. 2025: land/ocean distribution) — see docs/plans/planet-physics-driven-climate.md Stage 4.</summary>
+        double? NorthOceanFraction = null,
+        /// <summary>Southern-hemisphere counterpart to <see cref="NorthOceanFraction"/>.</summary>
+        double? SouthOceanFraction = null,
         /// <summary>Skips <see cref="PickTier"/>'s per-biome weighted roll and always uses this
         /// tier instead — mainly for deterministic tests; leave <c>null</c> for real generation.</summary>
         SettlementTier? ForcedTier = null,

@@ -13,16 +13,15 @@ public static class ClimateScanModel
     private const double Lacunarity = 2.0;
     private const double HumidityPhaseOffset = 7.318;
 
-    /// <summary>Classifies one scan cell. <paramref name="measuredOceanFraction"/> should be the
-    /// scan's OWN land/ocean split (see <see cref="PlanetScanner"/>), not the config target — same
-    /// "measured, not config" preference the rest of the scanner follows.</summary>
+    /// <summary>Classifies one scan cell using the scan's own per-hemisphere measured ocean fraction (Yang et al. 2025 — docs/plans/planet-physics-driven-climate.md Stage 4).</summary>
     public static string Classify(PlanetSettings.Resolved planet, double latDeg, double lonDeg,
-        double elevationMeters, double measuredOceanFraction)
+        double elevationMeters, double northOceanFraction, double southOceanFraction)
     {
         var (equatorC, poleC) = PlanetaryTemperatureModel.DeriveEquatorPoleTemperatures(planet);
         var isNorthernHemisphere = latDeg >= 0.0;
-        var northPoleC = poleC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: true, measuredOceanFraction);
-        var southPoleC = poleC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: false, measuredOceanFraction);
+        var hemisphereOceanFraction = isNorthernHemisphere ? northOceanFraction : southOceanFraction;
+        var northPoleC = poleC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: true, northOceanFraction);
+        var southPoleC = poleC + HemisphericAsymmetryModel.PoleOffsetC(planet, isNorthernHemisphere: false, southOceanFraction);
 
         var latRad = latDeg * Math.PI / 180.0;
         var latitudeFactor = Math.Sin(latRad) * Math.Sin(latRad);
@@ -35,7 +34,7 @@ public static class ClimateScanModel
             offsetY * planet.PlanetRadiusMeters / HumidityWavelengthMeters + HumidityPhaseOffset, planet.Seed);
         var humidity = Math.Clamp((humidityNoise + 1.0) / 2.0 - AltitudeDrynessPerKm * altitudeAboveSeaKm, 0.0, 1.0);
 
-        var amplitude = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, latDeg, measuredOceanFraction);
+        var amplitude = SeasonalTemperatureAmplitudeModel.AmplitudeC(planet, latDeg, hemisphereOceanFraction);
         var peakMonth = isNorthernHemisphere ? NorthernHemispherePeakMonth : SouthernHemispherePeakMonth;
         var monthlyTempC = new double[12];
         for (var m = 0; m < 12; m++)
