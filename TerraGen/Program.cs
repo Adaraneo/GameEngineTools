@@ -267,7 +267,7 @@ internal sealed class CliOptions
     public required double LonMin { get; init; }
     public required double LonMax { get; init; }
     public double TileKm { get; init; } = 1.0;
-    public double CellMeters { get; init; } = 2.5;
+    public double CellMeters { get; init; } = 50.0;
     public double ErosionStrength { get; init; } = 50.0;
 
     /// <summary>Off by default — existing tiles must keep regenerating identically without it.
@@ -373,7 +373,7 @@ internal sealed class CliOptions
             Použití (spouštěj přímo ve složce s databázemi, --db se obvykle nezadává):
               TerraGen --lat-range <min>:<max> --lon-range <min>:<max>
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
-                        [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 2.5>]
+                        [--tile-km <velikost, výchozí 1>] [--cell-m <velikost buňky, výchozí 50>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
@@ -591,7 +591,7 @@ internal sealed class CliOptions
         string? dbPath = null;
         double? latMin = null, latMax = null, lonMin = null, lonMax = null;
         var tileKm = 1.0;
-        var cellMeters = 2.5;
+        var cellMeters = 50.0;
         var erosion = 50.0;
         int? tectonicPlateCount = null;
         var rivers = false;
