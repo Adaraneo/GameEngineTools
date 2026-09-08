@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -73,7 +74,11 @@ public static class TileGenerator
         /// <summary>1 (default) keeps hydrology chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>. A chunk's combined grid is ~(HydrologyChunkTilesPerSide)² times a single tile's cost (several GB at the default 20-tile-per-side chunk), so running many chunks at once the way tiles safely can will exhaust RAM — confirmed live (48GB and climbing) when this was mistakenly defaulted to match tile parallelism. Raise only with HydrologyChunkTilesPerSide lowered to compensate, or with headroom verified first. An explicit value here always wins over <see cref="AutoHydrologyParallelism"/>.</summary>
         int HydrologyMaxDegreeOfParallelism = 1,
         /// <summary>Off by default. When true and <see cref="HydrologyMaxDegreeOfParallelism"/> is left at its default (1), <see cref="Run"/> computes a safe degree itself via <see cref="ComputeAutoHydrologyDegree"/> from live <see cref="GC.GetGCMemoryInfo"/> — replacing "guess a number" with "we compute how much is safe" for the same memory risk <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks describe.</summary>
-        bool AutoHydrologyParallelism = false);
+        bool AutoHydrologyParallelism = false,
+        /// <summary>1 (default) keeps SPIM running per padded TILE exactly as before this setting existed — see <see cref="SpimParams"/>'s remarks on that local-drainage truncation. &gt;1 instead runs SPIM once over a combined grid spanning this many tiles per side (mirroring <see cref="HydrologyChunkTilesPerSide"/>'s pattern), so a real drainage basin only gets truncated at the CHUNK'S padding, not each tile's — dramatically reducing the truncation artifact for any basin narrower than one chunk. Only meaningful together with <see cref="SpimParams"/>.</summary>
+        int SpimChunkTilesPerSide = 1,
+        /// <summary>1 (default) keeps SPIM chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>, same reasoning as <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks: a chunk's combined grid is <see cref="SpimChunkTilesPerSide"/>² times a single tile's cost, and SPIM's own 100-200 iterations make that multiply further, so raise only with chunk size lowered to compensate or with memory headroom verified first.</summary>
+        int SpimMaxDegreeOfParallelism = 1);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -167,6 +172,173 @@ public static class TileGenerator
             lock (progressLock) onTileProgress(done, totalTiles);
         }
 
+        // Populated by RunSpimChunkPass below (SpimChunkTilesPerSide > 1 only) — each tile's SPIM-
+        // eroded interior, computed once over its whole chunk instead of per padded tile, so
+        // GenerateOneTile can use it as its interior fill and skip its own inline SPIM erosion.
+        var spimChunkInterior = new ConcurrentDictionary<(int Row, int Col), float[]>();
+
+        if (s.SpimParams is { } chunkSpimParams && s.SpimChunkTilesPerSide > 1)
+            RunSpimChunkPass(chunkSpimParams);
+
+        void RunSpimChunkPass(StreamPowerErosion.Parameters spimParams)
+        {
+            var chunkTilesPerSide = Math.Max(1, s.SpimChunkTilesPerSide);
+            var chunkGridRows = (int)Math.Ceiling(rows / (double)chunkTilesPerSide);
+            var chunkGridCols = (int)Math.Ceiling(cols / (double)chunkTilesPerSide);
+
+            void ProcessSpimChunk(int chunkRow, int chunkCol)
+            {
+                var minRow = chunkRow * chunkTilesPerSide;
+                var maxRow = Math.Min(rows, minRow + chunkTilesPerSide) - 1;
+                var minCol = chunkCol * chunkTilesPerSide;
+                var maxCol = Math.Min(cols, minCol + chunkTilesPerSide) - 1;
+                var tileRowsInChunk = maxRow - minRow + 1;
+                var tileColsInChunk = maxCol - minCol + 1;
+
+                var chunkBigWidth = tileColsInChunk * cellsPerTile;
+                var chunkBigHeight = tileRowsInChunk * cellsPerTile;
+                var paddedWidth = chunkBigWidth + 2 * margin;
+                var paddedHeight = chunkBigHeight + 2 * margin;
+
+                var chunkOriginX = swX + minCol * s.TileSizeMeters;
+                var chunkOriginY = swY + minRow * s.TileSizeMeters;
+                var paddedOriginX = chunkOriginX - margin * s.CellSizeMeters;
+                var paddedOriginY = chunkOriginY - margin * s.CellSizeMeters;
+
+                var paddedValues = new float[paddedWidth * paddedHeight];
+                for (var gy = 0; gy < paddedHeight; gy++)
+                {
+                    var worldY = paddedOriginY + gy * s.CellSizeMeters;
+                    for (var gx = 0; gx < paddedWidth; gx++)
+                    {
+                        var worldX = paddedOriginX + gx * s.CellSizeMeters;
+                        var (lat, lon) = PlanetNoise.OffsetToLatLon(worldX, worldY, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
+                        paddedValues[gy * paddedWidth + gx] = (float)PlanetNoise.SampleLandmass(lat, lon, s.NoiseParams, s.PlanetRadiusMeters);
+                    }
+                }
+
+                var padded = new TerrainHeightmap("scratch-spim-chunk", paddedOriginX, paddedOriginY,
+                    s.CellSizeMeters, paddedWidth, paddedHeight, paddedValues);
+                var locked = new bool[paddedWidth * paddedHeight];
+
+                // Resolves one bordering tile's elevation, preferring an EARLIER chunk in this same
+                // pre-pass (held in spimChunkInterior) and falling back to db for a tile from an
+                // entirely separate, earlier Run() call — same two-source convention GenerateOneTile's
+                // own LockAgainst uses against the final, fully-generated DB record.
+                TerrainHeightmap? ResolveNeighborTile(int neighborRow, int neighborCol)
+                {
+                    if (neighborRow < 0 || neighborRow >= rows || neighborCol < 0 || neighborCol >= cols) return null;
+
+                    var originX = swX + neighborCol * s.TileSizeMeters;
+                    var originY = swY + neighborRow * s.TileSizeMeters;
+                    if (spimChunkInterior.TryGetValue((neighborRow, neighborCol), out var interior))
+                        return new TerrainHeightmap("scratch-spim-neighbor", originX, originY, s.CellSizeMeters, cellsPerTile, cellsPerTile, interior);
+
+                    var (lat, lon) = TileCenter(neighborRow, neighborCol);
+                    return db.LoadHeightmap(TileId(s.NoiseParams.Seed, lat, lon));
+                }
+
+                var neighborCache = new Dictionary<(int Row, int Col), TerrainHeightmap?>();
+                for (var gy = 0; gy < paddedHeight; gy++)
+                {
+                    var inMarginRow = gy < margin || gy >= paddedHeight - margin;
+                    var worldY = paddedOriginY + gy * s.CellSizeMeters;
+                    var tileRow = (int)Math.Floor((worldY - swY) / s.TileSizeMeters);
+                    for (var gx = 0; gx < paddedWidth; gx++)
+                    {
+                        if (!inMarginRow && gx >= margin && gx < paddedWidth - margin) continue; // interior of this chunk, not a margin cell
+
+                        var worldX = paddedOriginX + gx * s.CellSizeMeters;
+                        var tileCol = (int)Math.Floor((worldX - swX) / s.TileSizeMeters);
+                        if (tileRow >= minRow && tileRow <= maxRow && tileCol >= minCol && tileCol <= maxCol) continue; // still this chunk's own territory
+
+                        // Cardinal-only, like GenerateOneTile's own LockAgainst -- a corner-adjacent chunk sits on the same diagonal, so locking it would race.
+                        var rowInChunkRange = tileRow >= minRow && tileRow <= maxRow;
+                        var colInChunkRange = tileCol >= minCol && tileCol <= maxCol;
+                        if (rowInChunkRange == colInChunkRange) continue; // both true (unreachable here) or both false (corner) -- neither is a cardinal neighbor
+
+                        if (!neighborCache.TryGetValue((tileRow, tileCol), out var neighbor))
+                            neighborCache[(tileRow, tileCol)] = neighbor = ResolveNeighborTile(tileRow, tileCol);
+                        if (neighbor is null) continue;
+
+                        var value = (float)neighbor.SampleAt(worldX, worldY);
+                        if (!float.IsFinite(value)) continue; // defensive: don't smuggle a corrupted neighbor's NaN/Infinity into this chunk
+
+                        var idx = gy * paddedWidth + gx;
+                        padded.Values[idx] = value;
+                        locked[idx] = true;
+                    }
+                }
+
+                var uplift = StreamPowerErosion.UpliftFieldFromPlates(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
+                double[]? erodibilityPerCell = null;
+                double[]? crustDensityPerCell = null;
+                if (s.RockTypeParams is { } rockTypeParams)
+                {
+                    var rockTypes = RockLayer.ComputeRockTypeMap(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters, rockTypeParams);
+                    erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes);
+                    crustDensityPerCell = RockLayer.DensityPerCell(rockTypes);
+                }
+                var precipitationWeight = s.OrographicParams is { } orographicParams
+                    ? OrographicPrecipitation.ComputePrecipitationField(padded, orographicParams)
+                    : null;
+                void LogSpimChunkDiagnostic(string message) => ReportProgress($"[spim-chunk {chunkRow},{chunkCol}]: {message}");
+                StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimChunkDiagnostic);
+
+                for (var r = minRow; r <= maxRow; r++)
+                {
+                    for (var c = minCol; c <= maxCol; c++)
+                    {
+                        var interior = new float[cellsPerTile * cellsPerTile];
+                        var baseX = margin + (c - minCol) * cellsPerTile;
+                        var baseY = margin + (r - minRow) * cellsPerTile;
+                        for (var iy = 0; iy < cellsPerTile; iy++)
+                            Array.Copy(padded.Values, (baseY + iy) * paddedWidth + baseX, interior, iy * cellsPerTile, cellsPerTile);
+                        spimChunkInterior[(r, c)] = interior;
+                    }
+                }
+
+                ReportProgress($"[spim-chunk {chunkRow},{chunkCol}] rows[{minRow}..{maxRow}] cols[{minCol}..{maxCol}] eroded");
+            }
+
+            // Same diagonal-wavefront scheme as the per-tile loop below, at chunk granularity —
+            // a chunk's west/north neighbor chunk always sits on the previous diagonal, so no two
+            // same-diagonal chunks can be each other's neighbor.
+            var spimMaxDegreeOfParallelism = Math.Max(1, s.SpimMaxDegreeOfParallelism);
+            for (var diagonal = 0; diagonal <= chunkGridRows + chunkGridCols - 2; diagonal++)
+            {
+                var minColInDiagonal = Math.Max(0, diagonal - (chunkGridRows - 1));
+                var maxColInDiagonal = Math.Min(chunkGridCols - 1, diagonal);
+                var countInDiagonal = maxColInDiagonal - minColInDiagonal + 1;
+                if (countInDiagonal <= 0) continue;
+
+                void ProcessDiagonalOffset(int offset)
+                {
+                    var chunkCol = minColInDiagonal + offset;
+                    var chunkRow = diagonal - chunkCol;
+                    ProcessSpimChunk(chunkRow, chunkCol);
+                }
+
+                if (spimMaxDegreeOfParallelism <= 1 || countInDiagonal <= 1)
+                {
+                    for (var offset = 0; offset < countInDiagonal; offset++) ProcessDiagonalOffset(offset);
+                }
+                else
+                {
+                    try
+                    {
+                        Parallel.For(0, countInDiagonal,
+                            new ParallelOptions { MaxDegreeOfParallelism = spimMaxDegreeOfParallelism },
+                            ProcessDiagonalOffset);
+                    }
+                    catch (AggregateException ex)
+                    {
+                        throw ex.Flatten().InnerExceptions[0];
+                    }
+                }
+            }
+        }
+
         (TileResult Result, (int Row, int Col, string Id, double CenterLat, double CenterLon, float[] Interior)? BatchEntry) GenerateOneTile(int row, int col)
         {
                 var tileOriginX = swX + col * s.TileSizeMeters;
@@ -206,6 +378,15 @@ public static class TileGenerator
                                 worldX, worldY, refLatDeg, refLonDeg, s.NoiseParams, s.PlanetRadiusMeters, plates);
                         }
                     }
+                }
+
+                // Chunked SPIM already computed this tile's real, whole-chunk-drainage interior
+                // above (RunSpimChunkPass) — use it instead of the padded loop's own landmass-only
+                // fill, so this tile doesn't also run a second, truncated per-tile SPIM pass below.
+                if (s.SpimParams is not null && s.SpimChunkTilesPerSide > 1 && spimChunkInterior.TryGetValue((row, col), out var chunkInterior))
+                {
+                    for (var iy = 0; iy < cellsPerTile; iy++)
+                        Array.Copy(chunkInterior, iy * cellsPerTile, paddedValues, (iy + margin) * paddedSize + margin, cellsPerTile);
                 }
 
                 var padded = new TerrainHeightmap("scratch", paddedOriginX, paddedOriginY,
@@ -253,7 +434,7 @@ public static class TileGenerator
                 LockAgainst(LoadNeighbor(row - 1, col), 0, paddedSize, 0, margin); // south
                 LockAgainst(LoadNeighbor(row + 1, col), 0, paddedSize, paddedSize - margin, paddedSize); // north
 
-                if (s.SpimParams is { } spimParams)
+                if (s.SpimParams is { } spimParams && s.SpimChunkTilesPerSide <= 1)
                 {
                     var uplift = StreamPowerErosion.UpliftFieldFromPlates(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
                     double[]? erodibilityPerCell = null;

@@ -187,7 +187,9 @@ var runSettings = new TileGenerator.RunSettings(
     WindDirectionForLatitudeDeg: windDirectionForLatitudeDeg,
     MaxDegreeOfParallelism: options.ParallelDegree,
     HydrologyMaxDegreeOfParallelism: options.ParallelHydrologyDegree,
-    AutoHydrologyParallelism: options.AutoParallelHydrology);
+    AutoHydrologyParallelism: options.AutoParallelHydrology,
+    SpimChunkTilesPerSide: options.SpimChunkTiles,
+    SpimMaxDegreeOfParallelism: options.ParallelSpimDegree);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -294,6 +296,10 @@ internal sealed class CliOptions
     public int ParallelHydrologyDegree { get; init; } = 1;
     /// <summary>Off by default. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.AutoHydrologyParallelism"/>.</summary>
     public bool AutoParallelHydrology { get; init; }
+    /// <summary>1 (default) keeps SPIM per-tile. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimChunkTilesPerSide"/>.</summary>
+    public int SpimChunkTiles { get; init; } = 1;
+    /// <summary>1 (default, sequential) — deliberately NOT tied to --parallel. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimMaxDegreeOfParallelism"/>.</summary>
+    public int ParallelSpimDegree { get; init; } = 1;
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -363,9 +369,11 @@ internal sealed class CliOptions
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
-                        [--skip-existing] [--spim [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí odvozeno ze šířky/rotace>]]]
+                        [--skip-existing] [--spim [--spim-chunk-tiles <dlaždic na stranu chunku, výchozí 1 = po jedné>]
+                                  [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí odvozeno ze šířky/rotace>]]]
                         [--parallel | --parallel-degree <počet vláken>]
                         [--parallel-hydrology | --parallel-hydrology-degree <počet vláken>]
+                        [--parallel-spim-degree <počet vláken>]
 
             --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
             TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
@@ -414,9 +422,16 @@ internal sealed class CliOptions
             (odvozeným ze sbíhavých/rozbíhavých hranic desek, viz --tectonic-plates) a fluviální
             erozí, ne ze statického šumu. Vyžaduje --tectonic-plates > 0, jinak je zdvih všude
             nulový a --spim jen zplošní terén na samotnou pevninu/oceán vrstvu. Kapkovitá eroze
-            (--erosion) běží i nadále, jako doladění detailu NAD SPIM reliéfem. Běží po jednotlivých
-            dlaždicích se stejným zamykáním okraje jako --erosion — lokální aproximace odtokové
-            oblasti omezené na okraj dlaždice, ne řešení celého povodí.
+            (--erosion) běží i nadále, jako doladění detailu NAD SPIM reliéfem. Výchozí
+            --spim-chunk-tiles 1 běží po jednotlivých dlaždicích se stejným zamykáním okraje jako
+            --erosion — lokální aproximace odtokové oblasti omezené na okraj dlaždice, ne řešení
+            celého povodí (viditelné jako umělá mřížka podle hranic dlaždic v erodovaném reliéfu).
+            --spim-chunk-tiles > 1 (analogicky --river-chunk-tiles) místo toho spočítá odtok JEDNOU
+            přes celý --spim-chunk-tiles×--spim-chunk-tiles velký blok dlaždic — povodí širší než
+            jedna dlaždice se tedy neuřízne na první hranici, jen na hranici chunku. Nákladnější
+            (SPIM běží 100-200 iterací přes celý chunk), proto výchozí 1 a vlastní
+            --parallel-spim-degree (výchozí 1, sekvenční, NEnavázané na --parallel — paměťová
+            opatrnost stejná jako u --parallel-hydrology-degree).
 
             --rock-types (vypnuto výchozí, jen společně s --spim) nahradí SPIM jednu globální
             erodibilitu K per-buňkovou hodnotou podle přiřazeného typu horniny — oceánská kůra
@@ -566,6 +581,8 @@ internal sealed class CliOptions
         var parallelDegree = 1;
         var parallelHydrologyDegree = 1;
         var autoParallelHydrology = false;
+        var spimChunkTiles = 1;
+        var parallelSpimDegree = 1;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -640,6 +657,12 @@ internal sealed class CliOptions
                     break;
                 case "--parallel-hydrology":
                     autoParallelHydrology = true;
+                    break;
+                case "--spim-chunk-tiles" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var sct):
+                    spimChunkTiles = sct;
+                    break;
+                case "--parallel-spim-degree" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var psd):
+                    parallelSpimDegree = psd;
                     break;
                 case "--scan":
                     scan = true;
@@ -770,6 +793,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--river-chunk-tiles musí být kladné.");
             return null;
         }
+        if (spimChunkTiles < 1)
+        {
+            Console.Error.WriteLine("--spim-chunk-tiles musí být kladné.");
+            return null;
+        }
 
         return new CliOptions
         {
@@ -782,6 +810,7 @@ internal sealed class CliOptions
             SkipExisting = skipExisting, Spim = spim, RockTypes = rockTypes, Isostasy = isostasy,
             Orographic = orographic, WindDirectionFromDeg = windDirectionFromDeg, ParallelDegree = parallelDegree,
             ParallelHydrologyDegree = parallelHydrologyDegree, AutoParallelHydrology = autoParallelHydrology,
+            SpimChunkTiles = spimChunkTiles, ParallelSpimDegree = parallelSpimDegree,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanClimate = scanClimate, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,

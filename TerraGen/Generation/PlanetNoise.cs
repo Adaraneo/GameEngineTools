@@ -308,12 +308,40 @@ public static class PlanetNoise
         return landmassElevation + mountainElevation;
     }
 
-    /// <summary>Reusable coherent 3D value-noise sample at true (lat,lon), in [-1, 1] — same globally-seamless sphere sampling <see cref="SampleLandmass"/> uses internally, exposed for other layers (e.g. <c>RockLayer</c>'s lithology assignment) that need the same machinery without duplicating it.</summary>
+    /// <summary>Reusable coherent 3D value-noise sample at true (lat,lon), in [-1, 1] — same globally-seamless sphere sampling <see cref="SampleLandmass"/> uses internally, exposed for other layers (e.g. <c>RockLayer</c>'s lithology assignment) that need the same machinery without duplicating it. 3-octave fBm behind the same domain warp <see cref="SampleLandmass"/> uses (not the raw single-octave lattice sample it used to be) so thresholded consumers like <c>RockLayer</c> get organic, bent boundaries instead of the underlying value-noise lattice's own straight/diamond interpolation artifacts.</summary>
     public static double SampleCoherentField(double latDeg, double lonDeg, double wavelengthMeters, int seed, double planetRadiusMeters)
     {
         var (x, y, z) = LatLonToUnitVector(latDeg, lonDeg);
-        var frequency = Math.Max(planetRadiusMeters, 1.0) / Math.Max(wavelengthMeters, 1.0);
-        return ValueNoise3D(x * frequency, y * frequency, z * frequency, seed);
+        var baseFrequency = Math.Max(planetRadiusMeters, 1.0) / Math.Max(wavelengthMeters, 1.0);
+
+        var warpFrequency = baseFrequency / 4.0;
+        // Scaled to a fraction of ONE wavelength (1/baseFrequency), not SampleLandmass's bare 0.4 —
+        // that constant is only a small fraction of a wavelength at continent-scale baseFrequency
+        // (~6); at RockLayer's much finer baseFrequency (~1275 for a 5km wavelength) the same fixed
+        // 0.4 unit-sphere offset is ~500 lattice cells, scrambling the sample into near-white-noise.
+        var warpStrength = 0.4 / baseFrequency;
+        var warpX = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, seed + 555003) * warpStrength;
+        var warpY = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, seed + 777003) * warpStrength;
+        var warpZ = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, seed + 999003) * warpStrength;
+        var wx = x + warpX;
+        var wy = y + warpY;
+        var wz = z + warpZ;
+
+        const int octaves = 3;
+        const double persistence = 0.5;
+        const double lacunarity = 2.0;
+        var amplitude = 1.0;
+        var frequency = baseFrequency;
+        var sum = 0.0;
+        var maxAmplitude = 0.0;
+        for (var o = 0; o < octaves; o++)
+        {
+            sum += ValueNoise3D(wx * frequency, wy * frequency, wz * frequency, seed + o * 1013) * amplitude;
+            maxAmplitude += amplitude;
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
+        return maxAmplitude > 0 ? sum / maxAmplitude : 0.0;
     }
 
     /// <summary>True (lat,lon) → unit-sphere position — shared by <see cref="SampleLandmass"/> and
