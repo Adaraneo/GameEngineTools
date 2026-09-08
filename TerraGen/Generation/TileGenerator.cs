@@ -75,8 +75,8 @@ public static class TileGenerator
         int HydrologyMaxDegreeOfParallelism = 1,
         /// <summary>Off by default. When true and <see cref="HydrologyMaxDegreeOfParallelism"/> is left at its default (1), <see cref="Run"/> computes a safe degree itself via <see cref="ComputeAutoHydrologyDegree"/> from live <see cref="GC.GetGCMemoryInfo"/> — replacing "guess a number" with "we compute how much is safe" for the same memory risk <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks describe.</summary>
         bool AutoHydrologyParallelism = false,
-        /// <summary>20 (default, matching <see cref="HydrologyChunkTilesPerSide"/>'s own default) runs SPIM once over a combined grid spanning this many tiles per side (mirroring <see cref="HydrologyChunkTilesPerSide"/>'s pattern), so a real drainage basin only gets truncated at the CHUNK'S padding, not each tile's. 1 reverts to the old per-padded-TILE behavior — see <see cref="SpimParams"/>'s remarks on that local-drainage truncation; kept available for a region too large for one chunk's memory budget, or for isolating a regression to this setting. Only meaningful together with <see cref="SpimParams"/>.</summary>
-        int SpimChunkTilesPerSide = 20,
+        /// <summary>0 (default) auto-sizes the chunk to cover the WHOLE requested run region in a single chunk — <c>max(rows, cols)</c> — so a real drainage basin never gets truncated at all, regardless of how the region happens to be tiled. Set explicitly (&gt;1) to cap chunk size for a region too large for one chunk's memory budget (SPIM's own 100-200 iterations over a combined grid <c>N</c>² times a single tile's cost). 1 reverts to the old per-padded-TILE behavior — see <see cref="SpimParams"/>'s remarks on that local-drainage truncation; kept for isolating a regression to this setting. Only meaningful together with <see cref="SpimParams"/>.</summary>
+        int SpimChunkTilesPerSide = 0,
         /// <summary>1 (default) keeps SPIM chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>, same reasoning as <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks: a chunk's combined grid is <see cref="SpimChunkTilesPerSide"/>² times a single tile's cost, and SPIM's own 100-200 iterations make that multiply further, so raise only with chunk size lowered to compensate or with memory headroom verified first.</summary>
         int SpimMaxDegreeOfParallelism = 1);
 
@@ -135,6 +135,8 @@ public static class TileGenerator
         var rows = Math.Max(1, (int)Math.Ceiling(regionHeightMeters / s.TileSizeMeters));
         var cellsPerTile = Math.Max(1, (int)Math.Round(s.TileSizeMeters / s.CellSizeMeters));
         var margin = Math.Max(1, s.ErosionParams.MaxDropletLifetime);
+        // 0 (auto) resolves to the whole region in one chunk -- see RunSettings.SpimChunkTilesPerSide's remarks.
+        var spimChunkTilesPerSide = s.SpimChunkTilesPerSide <= 0 ? Math.Max(rows, cols) : s.SpimChunkTilesPerSide;
 
         (double lat, double lon) TileCenter(int row, int col)
         {
@@ -177,12 +179,12 @@ public static class TileGenerator
         // GenerateOneTile can use it as its interior fill and skip its own inline SPIM erosion.
         var spimChunkInterior = new ConcurrentDictionary<(int Row, int Col), float[]>();
 
-        if (s.SpimParams is { } chunkSpimParams && s.SpimChunkTilesPerSide > 1)
+        if (s.SpimParams is { } chunkSpimParams && spimChunkTilesPerSide > 1)
             RunSpimChunkPass(chunkSpimParams);
 
         void RunSpimChunkPass(StreamPowerErosion.Parameters spimParams)
         {
-            var chunkTilesPerSide = Math.Max(1, s.SpimChunkTilesPerSide);
+            var chunkTilesPerSide = spimChunkTilesPerSide;
             var chunkGridRows = (int)Math.Ceiling(rows / (double)chunkTilesPerSide);
             var chunkGridCols = (int)Math.Ceiling(cols / (double)chunkTilesPerSide);
 
@@ -383,7 +385,7 @@ public static class TileGenerator
                 // Chunked SPIM already computed this tile's real, whole-chunk-drainage interior
                 // above (RunSpimChunkPass) — use it instead of the padded loop's own landmass-only
                 // fill, so this tile doesn't also run a second, truncated per-tile SPIM pass below.
-                if (s.SpimParams is not null && s.SpimChunkTilesPerSide > 1 && spimChunkInterior.TryGetValue((row, col), out var chunkInterior))
+                if (s.SpimParams is not null && spimChunkTilesPerSide > 1 && spimChunkInterior.TryGetValue((row, col), out var chunkInterior))
                 {
                     for (var iy = 0; iy < cellsPerTile; iy++)
                         Array.Copy(chunkInterior, iy * cellsPerTile, paddedValues, (iy + margin) * paddedSize + margin, cellsPerTile);
@@ -434,7 +436,7 @@ public static class TileGenerator
                 LockAgainst(LoadNeighbor(row - 1, col), 0, paddedSize, 0, margin); // south
                 LockAgainst(LoadNeighbor(row + 1, col), 0, paddedSize, paddedSize - margin, paddedSize); // north
 
-                if (s.SpimParams is { } spimParams && s.SpimChunkTilesPerSide <= 1)
+                if (s.SpimParams is { } spimParams && spimChunkTilesPerSide <= 1)
                 {
                     var uplift = StreamPowerErosion.UpliftFieldFromPlates(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
                     double[]? erodibilityPerCell = null;
