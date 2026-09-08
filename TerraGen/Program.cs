@@ -296,8 +296,8 @@ internal sealed class CliOptions
     public int ParallelHydrologyDegree { get; init; } = 1;
     /// <summary>Off by default. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.AutoHydrologyParallelism"/>.</summary>
     public bool AutoParallelHydrology { get; init; }
-    /// <summary>1 (default) keeps SPIM per-tile. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimChunkTilesPerSide"/>.</summary>
-    public int SpimChunkTiles { get; init; } = 1;
+    /// <summary>20 (default). See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimChunkTilesPerSide"/>.</summary>
+    public int SpimChunkTiles { get; init; } = 20;
     /// <summary>1 (default, sequential) — deliberately NOT tied to --parallel. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimMaxDegreeOfParallelism"/>.</summary>
     public int ParallelSpimDegree { get; init; } = 1;
 
@@ -369,7 +369,7 @@ internal sealed class CliOptions
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
-                        [--skip-existing] [--spim [--spim-chunk-tiles <dlaždic na stranu chunku, výchozí 1 = po jedné>]
+                        [--skip-existing] [--spim [--spim-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]
                                   [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí odvozeno ze šířky/rotace>]]]
                         [--parallel | --parallel-degree <počet vláken>]
                         [--parallel-hydrology | --parallel-hydrology-degree <počet vláken>]
@@ -422,16 +422,17 @@ internal sealed class CliOptions
             (odvozeným ze sbíhavých/rozbíhavých hranic desek, viz --tectonic-plates) a fluviální
             erozí, ne ze statického šumu. Vyžaduje --tectonic-plates > 0, jinak je zdvih všude
             nulový a --spim jen zplošní terén na samotnou pevninu/oceán vrstvu. Kapkovitá eroze
-            (--erosion) běží i nadále, jako doladění detailu NAD SPIM reliéfem. Výchozí
-            --spim-chunk-tiles 1 běží po jednotlivých dlaždicích se stejným zamykáním okraje jako
-            --erosion — lokální aproximace odtokové oblasti omezené na okraj dlaždice, ne řešení
-            celého povodí (viditelné jako umělá mřížka podle hranic dlaždic v erodovaném reliéfu).
-            --spim-chunk-tiles > 1 (analogicky --river-chunk-tiles) místo toho spočítá odtok JEDNOU
-            přes celý --spim-chunk-tiles×--spim-chunk-tiles velký blok dlaždic — povodí širší než
-            jedna dlaždice se tedy neuřízne na první hranici, jen na hranici chunku. Nákladnější
-            (SPIM běží 100-200 iterací přes celý chunk), proto výchozí 1 a vlastní
-            --parallel-spim-degree (výchozí 1, sekvenční, NEnavázané na --parallel — paměťová
-            opatrnost stejná jako u --parallel-hydrology-degree).
+            (--erosion) běží i nadále, jako doladění detailu NAD SPIM reliéfem.
+            --spim-chunk-tiles (analogicky --river-chunk-tiles) spočítá odtok JEDNOU přes celý
+            --spim-chunk-tiles×--spim-chunk-tiles velký blok dlaždic (výchozí 20, stejně jako
+            --river-chunk-tiles) — povodí širší než jedna dlaždice se tedy neuřízne na první
+            hranici, jen na hranici chunku. --spim-chunk-tiles 1 vrátí starší chování — odtok se
+            řeší jen po jednotlivých dlaždicích se stejným zamykáním okraje jako --erosion, viditelné
+            jako umělá mřížka podle hranic dlaždic v erodovaném reliéfu — ponecháno pro region
+            příliš velký na paměťový rozpočet jednoho chunku, nebo pro izolaci regrese na tomhle
+            přepínači. Nákladnější než dřív (SPIM běží 100-200 iterací přes celý chunk), proto
+            vlastní --parallel-spim-degree (výchozí 1, sekvenční, NEnavázané na --parallel —
+            paměťová opatrnost stejná jako u --parallel-hydrology-degree).
 
             --rock-types (vypnuto výchozí, jen společně s --spim) nahradí SPIM jednu globální
             erodibilitu K per-buňkovou hodnotou podle přiřazeného typu horniny — oceánská kůra
@@ -581,7 +582,7 @@ internal sealed class CliOptions
         var parallelDegree = 1;
         var parallelHydrologyDegree = 1;
         var autoParallelHydrology = false;
-        var spimChunkTiles = 1;
+        var spimChunkTiles = 20;
         var parallelSpimDegree = 1;
         var scan = false;
         var scanWidth = 120;

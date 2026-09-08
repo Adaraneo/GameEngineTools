@@ -74,7 +74,7 @@ public class TileGeneratorChunkedSpimTests
             using (var db = new SqliteWorldDatabase(dbPathPerTile))
             {
                 WorldDatabaseSeeder.InitializeTerrainDatabase(db);
-                perTileResults = TileGenerator.Run(db, baseSettings); // SpimChunkTilesPerSide defaults to 1 -- old, truncated behavior
+                perTileResults = TileGenerator.Run(db, baseSettings with { SpimChunkTilesPerSide = 1 }); // old, per-tile truncated behavior
             }
 
             IReadOnlyList<TileGenerator.TileResult> chunkedResults;
