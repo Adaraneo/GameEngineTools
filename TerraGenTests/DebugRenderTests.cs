@@ -93,6 +93,38 @@ public class DebugRenderTests
     }
 
     [TestMethod]
+    public void Run_WithSpimIterations_ReportsIterationProgressPerChunk()
+    {
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 9, AmplitudeMeters: 300.0, TectonicPlateCount: 6);
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.008, LonMin: 0.0, LonMax: 0.008,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams,
+                ErosionParams: new TileErosion.Parameters(Seed: 9, DropletCount: 0),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                SpimParams: new StreamPowerErosion.Parameters(Iterations: 6),
+                SpimChunkTilesPerSide: 2); // several chunks, each running its own 6 iterations
+
+            var reports = new List<(int Done, int Total)>();
+            TileGenerator.Run(db, settings, onSpimIterationProgress: (done, total) => reports.Add((done, total)));
+
+            Assert.IsTrue(reports.Count > 6, "Expected iteration reports from more than one chunk (6 iterations each).");
+            Assert.IsTrue(reports.All(r => r.Total == 6), "Every report should carry this run's Iterations=6.");
+            Assert.IsTrue(reports.Count(r => r.Done == 6) > 1, "Expected more than one chunk to reach its own final iteration.");
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
     public void Run_WithoutDebugRenderDirectory_WritesNoFiles()
     {
         var dbPath = TempDbPath();

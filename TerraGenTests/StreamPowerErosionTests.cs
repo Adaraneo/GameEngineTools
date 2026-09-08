@@ -28,6 +28,24 @@ public class StreamPowerErosionTests
     }
 
     [TestMethod]
+    public void Erode_ReportsOneIterationProgressCallPerIteration_ReachingTheTotal()
+    {
+        var grid = MakeGrid(10, 10, 1.0, (x, y) => (x + y) * 2.5f);
+        var uplift = new double[10 * 10];
+        var reports = new List<(int Done, int Total)>();
+
+        StreamPowerErosion.Erode(grid, new StreamPowerErosion.Parameters(Iterations: 7), uplift,
+            onIterationProgress: (done, total) => reports.Add((done, total)));
+
+        Assert.AreEqual(7, reports.Count);
+        for (var i = 0; i < reports.Count; i++)
+        {
+            Assert.AreEqual(i + 1, reports[i].Done);
+            Assert.AreEqual(7, reports[i].Total);
+        }
+    }
+
+    [TestMethod]
     public void Erode_NonFiniteInputHeight_FailsFastWithDiagnosticInsteadOfPropagatingSilently()
     {
         // Regression for a reported crash: a non-finite (NaN/Infinity) height reaching this method

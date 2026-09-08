@@ -242,7 +242,7 @@ Action<int, int> MakeProgressRenderer(string label)
 }
 
 var results = TileGenerator.Run(db, runSettings, WriteLogLine,
-    MakeProgressRenderer("Dlaždice:  "), MakeProgressRenderer("SPIM chunky:"));
+    MakeProgressRenderer("Dlaždice:    "), MakeProgressRenderer("SPIM chunky: "), MakeProgressRenderer("SPIM iterace:"));
 
 // Persisted once per run (idempotent — safe to overwrite with the same values on a re-run) so a
 // consumer like TerrainEditor can recover any saved tile's true (lat,lon) from its OriginX/OriginY

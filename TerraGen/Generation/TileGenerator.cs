@@ -96,7 +96,7 @@ public static class TileGenerator
     /// <remarks>MaxDegreeOfParallelism &gt; 1 batches tiles by anti-diagonal (row+col) instead of one row at a time: a tile's west/south neighbor always sits on the PREVIOUS diagonal, so no two same-diagonal tiles can ever be each other's neighbor — provably independent, safe to run concurrently within a diagonal, with a barrier between diagonals. Neighbor availability at generation time is therefore identical to fully sequential order, so output is byte-identical (see TileGeneratorTests' parallel-vs-sequential regression). Hydrology chunks below are unconditionally independent (no scheme needed, each owns a disjoint tile set and network id) but are NOT parallelized by this same setting — see <see cref="RunSettings.HydrologyMaxDegreeOfParallelism"/>'s remarks on why a chunk's much larger per-unit memory cost needs its own, separately conservative knob.</remarks>
     public static IReadOnlyList<TileResult> Run(SqliteWorldDatabase db, RunSettings s,
         Action<string>? onProgress = null, Action<int, int>? onTileProgress = null,
-        Action<int, int>? onSpimChunkProgress = null)
+        Action<int, int>? onSpimChunkProgress = null, Action<int, int>? onSpimIterationProgress = null)
     {
         var refLatDeg = s.MountainOriginLatDeg;
         var refLonDeg = s.MountainOriginLonDeg;
@@ -183,6 +183,14 @@ public static class TileGenerator
             var done = Interlocked.Increment(ref spimChunksDone);
             if (onSpimChunkProgress is null) return;
             lock (progressLock) onSpimChunkProgress(done, totalChunks);
+        }
+
+        // Interleaves across concurrently-running chunks if SpimMaxDegreeOfParallelism > 1 -- fine
+        // under the default (1, sequential); a meaningful single bar for N>1 isn't well-defined anyway.
+        void ReportSpimIterationProgress(int done, int total)
+        {
+            if (onSpimIterationProgress is null) return;
+            lock (progressLock) onSpimIterationProgress(done, total);
         }
 
         // Populated by RunSpimChunkPass below (SpimChunkTilesPerSide > 1 only) — each tile's SPIM-
@@ -314,7 +322,7 @@ public static class TileGenerator
                 if (precipitationWeight is not null)
                     WriteDebugLayer("4_precipitation", precipitationWeight.Select(v => (float)v).ToArray());
                 void LogSpimChunkDiagnostic(string message) => ReportProgress($"[spim-chunk {chunkRow},{chunkCol}]: {message}");
-                StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimChunkDiagnostic);
+                StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimChunkDiagnostic, ReportSpimIterationProgress);
 
                 WriteDebugLayer("5_elevation", (float[])padded.Values.Clone());
                 if (s.DebugRenderDirectory is not null)
@@ -495,7 +503,7 @@ public static class TileGenerator
                             : orographicParams)
                         : null;
                     void LogSpimDiagnostic(string message) => ReportProgress($"[{row},{col}] {id}: {message}");
-                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimDiagnostic);
+                    StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimDiagnostic, ReportSpimIterationProgress);
                 }
 
                 TileErosion.Erode(padded, s.ErosionParams, locked);
