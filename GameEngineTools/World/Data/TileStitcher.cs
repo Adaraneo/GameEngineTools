@@ -21,9 +21,10 @@ public static class TileStitcher
     /// <see cref="SplitAndSave"/> to write edits back to those same tiles instead of one big
     /// "combined" blob.
     /// </summary>
-    /// <param name="stride">When &gt; 1, the combined grid is decimated (nearest-neighbor, every
-    /// <paramref name="stride"/>-th cell) before being returned — <c>CellSizeMeters</c> scales up
-    /// by the same factor so world-space positioning stays correct, only the cell COUNT shrinks.
+    /// <param name="stride">When &gt; 1, the combined grid is decimated (block-averaged over each
+    /// <paramref name="stride"/>×<paramref name="stride"/> cell block) before being returned —
+    /// <c>CellSizeMeters</c> scales up by the same factor so world-space positioning stays correct,
+    /// only the cell COUNT shrinks.
     /// Lets a heavily zoomed-out view build a proportionally small grid instead of a full-resolution
     /// one that gets thrown away at render time anyway — a real capture showed a 126-tile,
     /// 20-million-cell combined grid at low zoom, retained in memory and iterated over in full by
@@ -75,9 +76,7 @@ public static class TileStitcher
     private static TerrainHeightmap ApplyStride(TerrainHeightmap grid, int stride)
         => stride > 1 ? Decimate(grid, stride) : grid;
 
-    /// <summary>Nearest-neighbor decimation — samples every <paramref name="stride"/>-th cell,
-    /// keeping the same world-space origin but scaling <c>CellSizeMeters</c> up so each remaining
-    /// cell still represents the correct amount of world space.</summary>
+    /// <summary>Block-average decimation (not nearest-neighbor point sampling, which aliased droplet-erosion roughness into a speckled contour overlay at low zoom). RiverMask takes the block's MAX Strahler order instead, so a thin river doesn't average away to 0.</summary>
     private static TerrainHeightmap Decimate(TerrainHeightmap grid, int stride)
     {
         var newWidth = Math.Max(1, (grid.Width + stride - 1) / stride);
@@ -87,16 +86,33 @@ public static class TileStitcher
 
         for (var y = 0; y < newHeight; y++)
         {
-            var gy = Math.Min(y * stride, grid.Height - 1);
-            var srcRow = gy * grid.Width;
+            var gy0 = y * stride;
+            var gy1 = Math.Min(gy0 + stride, grid.Height);
             var dstRow = y * newWidth;
             for (var x = 0; x < newWidth; x++)
             {
-                var gx = Math.Min(x * stride, grid.Width - 1);
-                var srcIdx = srcRow + gx;
-                values[dstRow + x] = grid.Values[srcIdx];
+                var gx0 = x * stride;
+                var gx1 = Math.Min(gx0 + stride, grid.Width);
+
+                double sum = 0;
+                var count = 0;
+                byte maxRiverOrder = 0;
+                for (var sy = gy0; sy < gy1; sy++)
+                {
+                    var srcRow = sy * grid.Width;
+                    for (var sx = gx0; sx < gx1; sx++)
+                    {
+                        var srcIdx = srcRow + sx;
+                        sum += grid.Values[srcIdx];
+                        count++;
+                        if (riverMask is not null && grid.RiverMask![srcIdx] > maxRiverOrder)
+                            maxRiverOrder = grid.RiverMask[srcIdx];
+                    }
+                }
+
+                values[dstRow + x] = (float)(sum / count);
                 if (riverMask is not null)
-                    riverMask[dstRow + x] = grid.RiverMask![srcIdx];
+                    riverMask[dstRow + x] = maxRiverOrder;
             }
         }
 

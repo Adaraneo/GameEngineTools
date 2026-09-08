@@ -171,7 +171,7 @@ public class TileStitcherTests
     }
 
     [TestMethod]
-    public void BuildCombinedGrid_StrideGreaterThanOne_SamplesNearestSourceCellPerDecimatedCell()
+    public void BuildCombinedGrid_StrideGreaterThanOne_AveragesEachBlockOnUniformTiles()
     {
         var west = MakeTile("west", 0, 0, 1f);
         var east = MakeTile("east", 40, 0, 2f);
@@ -180,9 +180,49 @@ public class TileStitcherTests
         var (combined, _) = TileStitcher.BuildCombinedGrid(summaries, id => id == "west" ? west : east, -5, -5, 75, 45, stride: 2);
 
         Assert.IsNotNull(combined);
-        // Decimated grid is 4x2 at 20m cells — first two decimated columns still land in the west
-        // tile's original region, the last two in the east tile's.
+        // Each source tile is uniformly filled, so block-averaging a 2x2 block gives the same
+        // result nearest-neighbor would have -- see the non-uniform test below for the case that
+        // actually distinguishes the two. Decimated grid is 4x2 at 20m cells — first two decimated
+        // columns still land in the west tile's original region, the last two in the east tile's.
         CollectionAssert.AreEqual(new[] { 1f, 1f, 2f, 2f }, combined!.Values[..4]);
+    }
+
+    [TestMethod]
+    public void Decimate_NonUniformBlock_AveragesInsteadOfPointSampling()
+    {
+        // A single 4x4 tile, values 0..15 row-major, decimated at stride 2 -> each destination
+        // cell should be the MEAN of its own 2x2 source block, not just its top-left corner (which
+        // nearest-neighbor point sampling would have picked, silently discarding the other 3 cells'
+        // roughness -- exactly the aliasing this fix addresses).
+        var values = Enumerable.Range(0, 16).Select(i => (float)i).ToArray();
+        var tile = new TerrainHeightmap("t", 0, 0, 10.0, 4, 4, values);
+        var (combined, _) = TileStitcher.BuildCombinedGrid([SummaryOf(tile)], id => tile, -5, -5, 45, 45, stride: 2);
+
+        Assert.IsNotNull(combined);
+        Assert.AreEqual(2, combined!.Width);
+        Assert.AreEqual(2, combined.Height);
+        // Blocks (row-major 4x4): {0,1,4,5}, {2,3,6,7}, {8,9,12,13}, {10,11,14,15}
+        var expected = new[] { 2.5f, 4.5f, 10.5f, 12.5f };
+        CollectionAssert.AreEqual(expected, combined.Values);
+    }
+
+    [TestMethod]
+    public void Decimate_RiverMask_TakesBlockMaxStrahlerOrderInsteadOfAveraging()
+    {
+        // A single thin order-3 river cell inside an otherwise off-river 2x2 block: averaging
+        // would round it away to 0 (3/4 = 0.75 -> 0 as a byte), erasing the river entirely from
+        // the decimated preview. Max must keep it visible instead.
+        var values = new float[16];
+        var riverMask = new byte[16]; // 4x4, all off-river except index 5 (row 1, col 1)
+        riverMask[5] = 3;
+        var tile = new TerrainHeightmap("t", 0, 0, 10.0, 4, 4, values, riverMask);
+        var (combined, _) = TileStitcher.BuildCombinedGrid([SummaryOf(tile)], id => tile, -5, -5, 45, 45, stride: 2);
+
+        Assert.IsNotNull(combined);
+        Assert.IsNotNull(combined!.RiverMask);
+        // Block {0,1,4,5} (top-left decimated cell) contains source index 5 -> must carry order 3.
+        Assert.AreEqual((byte)3, combined.RiverMask![0]);
+        Assert.AreEqual((byte)0, combined.RiverMask[1]); // untouched blocks stay off-river
     }
 
     [TestMethod]
