@@ -198,7 +198,6 @@ Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{optio
 // Pinned bottom line in an interactive terminal (like apt); redirected output falls back to plain lines.
 var progressBarVisible = false;
 var lastProgressBarText = "";
-var lastRedirectedPercent = -1;
 
 void ClearProgressBar()
 {
@@ -214,30 +213,36 @@ void WriteLogLine(string text)
     Console.WriteLine(text);
 }
 
-void RenderProgressBar(int done, int total)
+Action<int, int> MakeProgressRenderer(string label)
 {
-    var fraction = total <= 0 ? 1.0 : (double)done / total;
-    var percent = (int)(fraction * 100);
-    const int barWidth = 30;
-    var filled = (int)Math.Round(fraction * barWidth);
-    var bar = new string('#', filled) + new string('-', barWidth - filled);
-    var text = $"[{bar}] {percent,3}% ({done}/{total})";
-
-    if (Console.IsOutputRedirected)
+    var lastRedirectedPercentForLabel = -1;
+    void Render(int done, int total)
     {
-        if (percent == lastRedirectedPercent && done != total) return;
-        lastRedirectedPercent = percent;
-        Console.WriteLine(text);
-        return;
-    }
+        var fraction = total <= 0 ? 1.0 : (double)done / total;
+        var percent = (int)(fraction * 100);
+        const int barWidth = 30;
+        var filled = (int)Math.Round(fraction * barWidth);
+        var bar = new string('#', filled) + new string('-', barWidth - filled);
+        var text = $"{label} [{bar}] {percent,3}% ({done}/{total})";
 
-    Console.Write("\r" + text);
-    lastProgressBarText = text;
-    progressBarVisible = done < total;
-    if (done >= total) Console.WriteLine();
+        if (Console.IsOutputRedirected)
+        {
+            if (percent == lastRedirectedPercentForLabel && done != total) return;
+            lastRedirectedPercentForLabel = percent;
+            Console.WriteLine(text);
+            return;
+        }
+
+        Console.Write("\r" + text);
+        lastProgressBarText = text;
+        progressBarVisible = done < total;
+        if (done >= total) Console.WriteLine();
+    }
+    return Render;
 }
 
-var results = TileGenerator.Run(db, runSettings, WriteLogLine, RenderProgressBar);
+var results = TileGenerator.Run(db, runSettings, WriteLogLine,
+    MakeProgressRenderer("Dlaždice:  "), MakeProgressRenderer("SPIM chunky:"));
 
 // Persisted once per run (idempotent — safe to overwrite with the same values on a re-run) so a
 // consumer like TerrainEditor can recover any saved tile's true (lat,lon) from its OriginX/OriginY

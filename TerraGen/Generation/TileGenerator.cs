@@ -95,7 +95,8 @@ public static class TileGenerator
     /// <param name="onTileProgress">Optional (done, total) callback after each tile, for a progress bar.</param>
     /// <remarks>MaxDegreeOfParallelism &gt; 1 batches tiles by anti-diagonal (row+col) instead of one row at a time: a tile's west/south neighbor always sits on the PREVIOUS diagonal, so no two same-diagonal tiles can ever be each other's neighbor — provably independent, safe to run concurrently within a diagonal, with a barrier between diagonals. Neighbor availability at generation time is therefore identical to fully sequential order, so output is byte-identical (see TileGeneratorTests' parallel-vs-sequential regression). Hydrology chunks below are unconditionally independent (no scheme needed, each owns a disjoint tile set and network id) but are NOT parallelized by this same setting — see <see cref="RunSettings.HydrologyMaxDegreeOfParallelism"/>'s remarks on why a chunk's much larger per-unit memory cost needs its own, separately conservative knob.</remarks>
     public static IReadOnlyList<TileResult> Run(SqliteWorldDatabase db, RunSettings s,
-        Action<string>? onProgress = null, Action<int, int>? onTileProgress = null)
+        Action<string>? onProgress = null, Action<int, int>? onTileProgress = null,
+        Action<int, int>? onSpimChunkProgress = null)
     {
         var refLatDeg = s.MountainOriginLatDeg;
         var refLonDeg = s.MountainOriginLonDeg;
@@ -176,6 +177,14 @@ public static class TileGenerator
             lock (progressLock) onTileProgress(done, totalTiles);
         }
 
+        var spimChunksDone = 0;
+        void ReportSpimChunkProgress(int totalChunks)
+        {
+            var done = Interlocked.Increment(ref spimChunksDone);
+            if (onSpimChunkProgress is null) return;
+            lock (progressLock) onSpimChunkProgress(done, totalChunks);
+        }
+
         // Populated by RunSpimChunkPass below (SpimChunkTilesPerSide > 1 only) — each tile's SPIM-
         // eroded interior, computed once over its whole chunk instead of per padded tile, so
         // GenerateOneTile can use it as its interior fill and skip its own inline SPIM erosion.
@@ -189,6 +198,7 @@ public static class TileGenerator
             var chunkTilesPerSide = spimChunkTilesPerSide;
             var chunkGridRows = (int)Math.Ceiling(rows / (double)chunkTilesPerSide);
             var chunkGridCols = (int)Math.Ceiling(cols / (double)chunkTilesPerSide);
+            var totalChunks = chunkGridRows * chunkGridCols;
 
             void ProcessSpimChunk(int chunkRow, int chunkCol)
             {
@@ -331,6 +341,7 @@ public static class TileGenerator
                 }
 
                 ReportProgress($"[spim-chunk {chunkRow},{chunkCol}] rows[{minRow}..{maxRow}] cols[{minCol}..{maxCol}] eroded");
+                ReportSpimChunkProgress(totalChunks);
             }
 
             // Same diagonal-wavefront scheme as the per-tile loop below, at chunk granularity —
