@@ -78,7 +78,9 @@ public static class TileGenerator
         /// <summary>0 (default) auto-sizes the chunk to cover the WHOLE requested run region in a single chunk — <c>max(rows, cols)</c> — so a real drainage basin never gets truncated at all, regardless of how the region happens to be tiled. Set explicitly (&gt;1) to cap chunk size for a region too large for one chunk's memory budget (SPIM's own 100-200 iterations over a combined grid <c>N</c>² times a single tile's cost). 1 reverts to the old per-padded-TILE behavior — see <see cref="SpimParams"/>'s remarks on that local-drainage truncation; kept for isolating a regression to this setting. Only meaningful together with <see cref="SpimParams"/>.</summary>
         int SpimChunkTilesPerSide = 0,
         /// <summary>1 (default) keeps SPIM chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>, same reasoning as <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks: a chunk's combined grid is <see cref="SpimChunkTilesPerSide"/>² times a single tile's cost, and SPIM's own 100-200 iterations make that multiply further, so raise only with chunk size lowered to compensate or with memory headroom verified first.</summary>
-        int SpimMaxDegreeOfParallelism = 1);
+        int SpimMaxDegreeOfParallelism = 1,
+        /// <summary>Null (default, no cost) skips debug rendering entirely. Non-null writes one 16-bit grayscale PNG per intermediate SPIM layer (raw landmass, uplift, rock-type index, precipitation weight, final elevation, flow accumulation) per chunk to this directory via <see cref="PngHeightmapWriter"/> — for diagnosing a visual artifact by inspecting each layer in isolation instead of guessing which one produced it, without hand-writing a throwaway test every time. Only meaningful together with <see cref="SpimParams"/> and <see cref="SpimChunkTilesPerSide"/> &gt; 1 (the chunk pass); the per-tile fallback path (SpimChunkTilesPerSide == 1) does not render debug layers.</summary>
+        string? DebugRenderDirectory = null);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -219,6 +221,18 @@ public static class TileGenerator
                     }
                 }
 
+                void WriteDebugLayer(string layerName, float[] layerValues, float? fixedMin = null, float? fixedMax = null)
+                {
+                    if (s.DebugRenderDirectory is null) return;
+                    Directory.CreateDirectory(s.DebugRenderDirectory);
+                    var min = fixedMin ?? layerValues.Min();
+                    var max = fixedMax ?? layerValues.Max();
+                    var path = Path.Combine(s.DebugRenderDirectory, $"spim_chunk_{chunkRow}_{chunkCol}_{layerName}.png");
+                    PngHeightmapWriter.WriteGrayscale16(path, layerValues, paddedWidth, paddedHeight, min, max);
+                }
+
+                WriteDebugLayer("1_landmass", (float[])paddedValues.Clone());
+
                 var padded = new TerrainHeightmap("scratch-spim-chunk", paddedOriginX, paddedOriginY,
                     s.CellSizeMeters, paddedWidth, paddedHeight, paddedValues);
                 var locked = new bool[paddedWidth * paddedHeight];
@@ -273,6 +287,7 @@ public static class TileGenerator
                 }
 
                 var uplift = StreamPowerErosion.UpliftFieldFromPlates(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters);
+                WriteDebugLayer("2_uplift", uplift.Select(v => (float)v).ToArray());
                 double[]? erodibilityPerCell = null;
                 double[]? crustDensityPerCell = null;
                 if (s.RockTypeParams is { } rockTypeParams)
@@ -280,12 +295,27 @@ public static class TileGenerator
                     var rockTypes = RockLayer.ComputeRockTypeMap(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters, rockTypeParams);
                     erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes);
                     crustDensityPerCell = RockLayer.DensityPerCell(rockTypes);
+                    // Fixed [0,8] range (not auto min/max) so the same shade always means the same rock type across chunks/runs.
+                    WriteDebugLayer("3_rocktype", rockTypes.Select(t => (float)(int)t).ToArray(), 0f, 8f);
                 }
                 var precipitationWeight = s.OrographicParams is { } orographicParams
                     ? OrographicPrecipitation.ComputePrecipitationField(padded, orographicParams)
                     : null;
+                if (precipitationWeight is not null)
+                    WriteDebugLayer("4_precipitation", precipitationWeight.Select(v => (float)v).ToArray());
                 void LogSpimChunkDiagnostic(string message) => ReportProgress($"[spim-chunk {chunkRow},{chunkCol}]: {message}");
                 StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimChunkDiagnostic);
+
+                WriteDebugLayer("5_elevation", (float[])padded.Values.Clone());
+                if (s.DebugRenderDirectory is not null)
+                {
+                    // Recomputed purely for this snapshot -- StreamPowerErosion.Erode doesn't expose its
+                    // own per-iteration accumulation, and the FINAL routing is the one worth inspecting.
+                    var finalAccumulation = FlowRouting.Compute(padded).Accumulation;
+                    // Log-scaled: accumulation spans orders of magnitude (single cells to whole basins),
+                    // so a linear grayscale would just show a few bright pixels and everything else black.
+                    WriteDebugLayer("6_accumulation_log", finalAccumulation.Select(a => (float)Math.Log(1.0 + a)).ToArray());
+                }
 
                 for (var r = minRow; r <= maxRow; r++)
                 {

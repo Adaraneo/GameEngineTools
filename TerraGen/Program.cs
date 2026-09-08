@@ -189,7 +189,8 @@ var runSettings = new TileGenerator.RunSettings(
     HydrologyMaxDegreeOfParallelism: options.ParallelHydrologyDegree,
     AutoHydrologyParallelism: options.AutoParallelHydrology,
     SpimChunkTilesPerSide: options.SpimChunkTiles,
-    SpimMaxDegreeOfParallelism: options.ParallelSpimDegree);
+    SpimMaxDegreeOfParallelism: options.ParallelSpimDegree,
+    DebugRenderDirectory: options.DebugRenderDirectory);
 
 Console.WriteLine($"Generuji lat [{options.LatMin}:{options.LatMax}] lon [{options.LonMin}:{options.LonMax}], " +
                    $"dlaždice {options.TileKm} km, buňka {options.CellMeters} m, eroze {options.ErosionStrength}%...");
@@ -300,6 +301,8 @@ internal sealed class CliOptions
     public int SpimChunkTiles { get; init; }
     /// <summary>1 (default, sequential) — deliberately NOT tied to --parallel. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimMaxDegreeOfParallelism"/>.</summary>
     public int ParallelSpimDegree { get; init; } = 1;
+    /// <summary>Null (default) skips debug rendering. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.DebugRenderDirectory"/>.</summary>
+    public string? DebugRenderDirectory { get; init; }
 
     /// <summary>Switches to a fast land/ocean/plate-boundary preview (see
     /// <see cref="TerraGen.Generation.PlanetScanner"/>) instead of real tile generation — no
@@ -374,6 +377,7 @@ internal sealed class CliOptions
                         [--parallel | --parallel-degree <počet vláken>]
                         [--parallel-hydrology | --parallel-hydrology-degree <počet vláken>]
                         [--parallel-spim-degree <počet vláken>]
+                        [--debug-render <adresář>]
 
             --skip-existing (vypnuto výchozí) přeskočí generování (šum + erozi) dlaždice, jejíž
             TileId (odvozené ze seedu a pozice) už v --db existuje ve správné velikosti — použije
@@ -586,6 +590,7 @@ internal sealed class CliOptions
         var autoParallelHydrology = false;
         var spimChunkTiles = 0;
         var parallelSpimDegree = 1;
+        string? debugRenderDirectory = null;
         var scan = false;
         var scanWidth = 120;
         var scanHeight = 40;
@@ -666,6 +671,9 @@ internal sealed class CliOptions
                     break;
                 case "--parallel-spim-degree" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var psd):
                     parallelSpimDegree = psd;
+                    break;
+                case "--debug-render" when i + 1 < args.Length:
+                    debugRenderDirectory = args[++i];
                     break;
                 case "--scan":
                     scan = true;
@@ -814,6 +822,7 @@ internal sealed class CliOptions
             Orographic = orographic, WindDirectionFromDeg = windDirectionFromDeg, ParallelDegree = parallelDegree,
             ParallelHydrologyDegree = parallelHydrologyDegree, AutoParallelHydrology = autoParallelHydrology,
             SpimChunkTiles = spimChunkTiles, ParallelSpimDegree = parallelSpimDegree,
+            DebugRenderDirectory = debugRenderDirectory,
             Scan = scan, ScanWidth = scanWidth, ScanHeight = scanHeight,
             ScanBoundaryThreshold = scanBoundaryThreshold, ScanOutputPath = scanOutputPath,
             ScanDetail = scanDetail, ScanClimate = scanClimate, ScanLevels = scanLevels, ScanZoomFactor = scanZoomFactor,
