@@ -440,6 +440,16 @@ internal sealed class CliOptions
             --parallel-spim-degree (výchozí 1, sekvenční, NEnavázané na --parallel — paměťová
             opatrnost stejná jako u --parallel-hydrology-degree).
 
+            --debug-render <adresář> (vypnuto výchozí, jen společně s --spim a --spim-chunk-tiles
+            &gt; 1) uloží pro každý chunk 16bitové šedotónové PNG každé mezivýsledkové vrstvy zvlášť
+            místo jednoho finálního reliéfu: 1_landmass (pevninová základna před erozí),
+            2_uplift (tektonický zdvih), 3_rocktype (index typu horniny, pevná škála 0-8, jen s
+            --rock-types), 4_precipitation (orografická váha srážek, jen s --orographic),
+            5_elevation (finální výška po SPIM), 6_accumulation_log (log-škálovaná D8 drenážní
+            plocha po erozi). Určeno k rychlé diagnóze vizuálního artefaktu — porovnáním vrstev
+            zvlášť je hned vidět, jestli je problém v šumu (1/3), tektonice (2), klimatu (4) nebo
+            samotné erozi/odtoku (5/6), místo hádání a psaní jednorázových testů pokaždé znovu.
+
             --rock-types (vypnuto výchozí, jen společně s --spim) nahradí SPIM jednu globální
             erodibilitu K per-buňkovou hodnotou podle přiřazeného typu horniny — oceánská kůra
             vždy čedič, kontinentální kůra jeden z 8 typů podle koherentního šumu (žula, rula,
