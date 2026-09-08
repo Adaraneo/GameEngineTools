@@ -435,15 +435,18 @@ internal sealed class CliOptions
             --spim-chunk-tiles (analogicky --river-chunk-tiles) spočítá odtok JEDNOU přes celý
             --spim-chunk-tiles×--spim-chunk-tiles velký blok dlaždic — povodí širší než jedna
             dlaždice se tedy neuřízne na první hranici, jen na hranici chunku. Výchozí 0 =
-            automaticky celý požadovaný region v jednom chunku (max(rows, cols)), takže se povodí
-            neuřízne VŮBEC, ať je region jakkoli velký/malý. Zadej explicitní kladnou hodnotu jen
-            když je region moc velký na paměťový rozpočet jednoho chunku (SPIM běží 100-200 iterací
-            přes celou kombinovanou mřížku, N² dražší než jedna dlaždice). --spim-chunk-tiles 1
-            vrátí starší chování — odtok se řeší jen po jednotlivých dlaždicích se stejným
-            zamykáním okraje jako --erosion, viditelné jako umělá mřížka podle hranic dlaždic
-            v erodovaném reliéfu — ponecháno pro izolaci regrese na tomhle přepínači. Vlastní
-            --parallel-spim-degree (výchozí 1, sekvenční, NEnavázané na --parallel — paměťová
-            opatrnost stejná jako u --parallel-hydrology-degree).
+            CHCE celý požadovaný region v jednom chunku (max(rows, cols)), ale skutečná velikost
+            se ještě zmenší podle živě dostupné paměti (GC.GetGCMemoryInfo, stejná opatrnost jako
+            --parallel-hydrology s auto stupněm) — u opravdu velkého regionu tedy zmenšení hlásí
+            log řádek a povodí se přesto uřízne, jen na hranici toho menšího, paměťově bezpečného
+            chunku. Zadej explicitní kladnou hodnotu, pokud chceš konkrétní velikost VYNUTIT bez
+            paměťové kontroly (SPIM běží 100-200 iterací přes celou kombinovanou mřížku, N² dražší
+            než jedna dlaždice — s explicitní hodnotou je odpovědnost za paměť na tobě).
+            --spim-chunk-tiles 1 vrátí starší chování — odtok se řeší jen po jednotlivých
+            dlaždicích se stejným zamykáním okraje jako --erosion, viditelné jako umělá mřížka
+            podle hranic dlaždic v erodovaném reliéfu — ponecháno pro izolaci regrese na tomhle
+            přepínači. Vlastní --parallel-spim-degree (výchozí 1, sekvenční, NEnavázané na
+            --parallel — paměťová opatrnost stejná jako u --parallel-hydrology-degree).
 
             --debug-render <adresář> (vypnuto výchozí, jen společně s --spim a --spim-chunk-tiles
             &gt; 1) uloží pro každý chunk 16bitové šedotónové PNG každé mezivýsledkové vrstvy zvlášť

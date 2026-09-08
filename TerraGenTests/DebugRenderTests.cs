@@ -125,6 +125,39 @@ public class DebugRenderTests
     }
 
     [TestMethod]
+    public void Run_AutoSpimChunk_StillCoversWholeSmallRegionInOneChunk_UnderAmpleMemory()
+    {
+        // Regression for ComputeAutoSpimChunkTilesPerSide's memory cap: a normal dev machine has
+        // ample headroom for a tiny test region, so auto (0) must still resolve to ONE chunk here,
+        // not silently start sub-chunking (which would reintroduce the truncation this all fixed).
+        var dbPath = TempDbPath();
+        try
+        {
+            using var db = new SqliteWorldDatabase(dbPath);
+            WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+
+            var noiseParams = new PlanetNoise.Parameters(Seed: 9, AmplitudeMeters: 300.0, TectonicPlateCount: 6);
+            var settings = new TileGenerator.RunSettings(
+                LatMin: 0.0, LatMax: 0.006, LonMin: 0.0, LonMax: 0.006,
+                TileSizeMeters: 200.0, CellSizeMeters: 10.0,
+                NoiseParams: noiseParams,
+                ErosionParams: new TileErosion.Parameters(Seed: 9, DropletCount: 0),
+                PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                SpimParams: new StreamPowerErosion.Parameters(Iterations: 5));
+            // SpimChunkTilesPerSide left at its 0 (auto) default.
+
+            var chunkReports = new List<(int Done, int Total)>();
+            TileGenerator.Run(db, settings, onSpimChunkProgress: (done, total) => chunkReports.Add((done, total)));
+
+            Assert.AreEqual(1, chunkReports[0].Total, "Expected the whole (tiny) region to resolve to exactly one SPIM chunk under normal available memory.");
+        }
+        finally
+        {
+            if (File.Exists(dbPath)) File.Delete(dbPath);
+        }
+    }
+
+    [TestMethod]
     public void Run_WithoutDebugRenderDirectory_WritesNoFiles()
     {
         var dbPath = TempDbPath();

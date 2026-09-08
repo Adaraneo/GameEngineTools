@@ -75,7 +75,7 @@ public static class TileGenerator
         int HydrologyMaxDegreeOfParallelism = 1,
         /// <summary>Off by default. When true and <see cref="HydrologyMaxDegreeOfParallelism"/> is left at its default (1), <see cref="Run"/> computes a safe degree itself via <see cref="ComputeAutoHydrologyDegree"/> from live <see cref="GC.GetGCMemoryInfo"/> — replacing "guess a number" with "we compute how much is safe" for the same memory risk <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks describe.</summary>
         bool AutoHydrologyParallelism = false,
-        /// <summary>0 (default) auto-sizes the chunk to cover the WHOLE requested run region in a single chunk — <c>max(rows, cols)</c> — so a real drainage basin never gets truncated at all, regardless of how the region happens to be tiled. Set explicitly (&gt;1) to cap chunk size for a region too large for one chunk's memory budget (SPIM's own 100-200 iterations over a combined grid <c>N</c>² times a single tile's cost). 1 reverts to the old per-padded-TILE behavior — see <see cref="SpimParams"/>'s remarks on that local-drainage truncation; kept for isolating a regression to this setting. Only meaningful together with <see cref="SpimParams"/>.</summary>
+        /// <summary>0 (default) WANTS to cover the WHOLE requested run region in a single chunk — <c>max(rows, cols)</c> — so a real drainage basin never gets truncated. <see cref="TileGenerator.ComputeAutoSpimChunkTilesPerSide"/> caps that against live available memory (same headroom philosophy as <see cref="ComputeAutoHydrologyDegree"/>), so a region too large for the machine's memory budget gets a SMALLER chunk instead of exhausting memory — truncation returns at the shrunk chunk's own boundary, logged via onProgress when it happens. Set explicitly (&gt;1) to force a specific chunk size (still memory-uncapped at that point — an explicit value is trusted, same as an explicit <see cref="HydrologyChunkTilesPerSide"/>). 1 reverts to the old per-padded-TILE behavior — see <see cref="SpimParams"/>'s remarks on that local-drainage truncation; kept for isolating a regression to this setting. Only meaningful together with <see cref="SpimParams"/>.</summary>
         int SpimChunkTilesPerSide = 0,
         /// <summary>1 (default) keeps SPIM chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>, same reasoning as <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks: a chunk's combined grid is <see cref="SpimChunkTilesPerSide"/>² times a single tile's cost, and SPIM's own 100-200 iterations make that multiply further, so raise only with chunk size lowered to compensate or with memory headroom verified first.</summary>
         int SpimMaxDegreeOfParallelism = 1,
@@ -138,8 +138,10 @@ public static class TileGenerator
         var rows = Math.Max(1, (int)Math.Ceiling(regionHeightMeters / s.TileSizeMeters));
         var cellsPerTile = Math.Max(1, (int)Math.Round(s.TileSizeMeters / s.CellSizeMeters));
         var margin = Math.Max(1, s.ErosionParams.MaxDropletLifetime);
-        // 0 (auto) resolves to the whole region in one chunk -- see RunSettings.SpimChunkTilesPerSide's remarks.
-        var spimChunkTilesPerSide = s.SpimChunkTilesPerSide <= 0 ? Math.Max(rows, cols) : s.SpimChunkTilesPerSide;
+        // 0 (auto) WANTS the whole region in one chunk -- see RunSettings.SpimChunkTilesPerSide's
+        // remarks -- but is capped below (once ReportProgress exists) by ComputeAutoSpimChunkTilesPerSide
+        // against live available memory, same safety philosophy as ComputeAutoHydrologyDegree.
+        var desiredSpimChunkTilesPerSide = s.SpimChunkTilesPerSide <= 0 ? Math.Max(rows, cols) : s.SpimChunkTilesPerSide;
 
         (double lat, double lon) TileCenter(int row, int col)
         {
@@ -197,6 +199,23 @@ public static class TileGenerator
         // eroded interior, computed once over its whole chunk instead of per padded tile, so
         // GenerateOneTile can use it as its interior fill and skip its own inline SPIM erosion.
         var spimChunkInterior = new ConcurrentDictionary<(int Row, int Col), float[]>();
+
+        var spimChunkTilesPerSide = desiredSpimChunkTilesPerSide;
+        if (s.SpimParams is not null && s.SpimChunkTilesPerSide <= 0)
+        {
+            var availableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+            spimChunkTilesPerSide = ComputeAutoSpimChunkTilesPerSide(desiredSpimChunkTilesPerSide, cellsPerTile, availableMemoryBytes);
+            if (spimChunkTilesPerSide < desiredSpimChunkTilesPerSide)
+            {
+                var desiredMb = (long)desiredSpimChunkTilesPerSide * desiredSpimChunkTilesPerSide * cellsPerTile * (long)cellsPerTile
+                    * EstimatedBytesPerSpimChunkCell / 1024.0 / 1024.0;
+                var chosenMb = (long)spimChunkTilesPerSide * spimChunkTilesPerSide * cellsPerTile * (long)cellsPerTile
+                    * EstimatedBytesPerSpimChunkCell / 1024.0 / 1024.0;
+                ReportProgress($"spim: celý region v jednom chunku by potřeboval odhadem {desiredMb:0} MB " +
+                    $"(dostupná paměť {availableMemoryBytes / 1024.0 / 1024.0:0} MB) — zmenšeno na {spimChunkTilesPerSide} " +
+                    $"dlaždic/stranu (odhad {chosenMb:0} MB/chunk); povodí širší než tenhle chunk se přesto uřízne na jeho hranici.");
+            }
+        }
 
         if (s.SpimParams is { } chunkSpimParams && spimChunkTilesPerSide > 1)
             RunSpimChunkPass(chunkSpimParams);
@@ -736,5 +755,25 @@ public static class TileGenerator
                 $"Hydrology chunk at tile rows [{minRow}..{maxRowInclusive}], cols [{minCol}..{maxColInclusive}] " +
                 $"would need a {chunkBigWidth}x{chunkBigHeight} combined grid ({chunkBigWidth * chunkBigHeight:N0} cells) " +
                 $"— reduce RunSettings.HydrologyChunkTilesPerSide (currently {chunkTilesPerSide}) or increase CellSizeMeters/decrease TileSizeMeters.");
+    }
+
+    /// <summary>⚠ Design-simplification safety-padded estimate, not a guarantee: measured ~110-120 B/cell peak delta (GC.GetTotalMemory) running the full uplift+rock-type+orographic+SPIM pipeline at 500²-1500² cells, rounded up for headroom the same way <see cref="EstimatedBytesPerHydrologyChunkCell"/> was. Covers the padded grid itself plus uplift/erodibility/density/precipitation-weight (all held for the whole Erode call) — NOT the transient FlowRouting/FFT arrays freed before or reused within a single iteration, which the measurement's peak-sampling already absorbs.</summary>
+    internal const int EstimatedBytesPerSpimChunkCell = 150;
+
+    /// <summary>Fraction of GC-reported available memory <see cref="ComputeAutoSpimChunkTilesPerSide"/> is willing to budget for ONE SPIM chunk — same headroom philosophy as <see cref="HydrologyMemoryBudgetFraction"/>, just for chunk SIZE instead of parallelism DEGREE (SPIM chunks run sequentially by default, see <see cref="RunSettings.SpimMaxDegreeOfParallelism"/>, so only one chunk's memory is normally live at a time).</summary>
+    internal const double SpimMemoryBudgetFraction = 0.5;
+
+    /// <summary>Picks the largest safe chunk size (tiles per side, capped at <paramref name="desiredTilesPerSide"/> — never bigger than what the region actually needs) from <see cref="EstimatedBytesPerSpimChunkCell"/> versus <paramref name="availableMemoryBytes"/> (from <see cref="GC.GetGCMemoryInfo"/>) — always at least 1. Unlike <see cref="ComputeAutoHydrologyDegree"/> (which sizes a parallelism DEGREE against a FIXED chunk size), this sizes the chunk itself, since <see cref="RunSettings.SpimChunkTilesPerSide"/> = 0 means "auto" wants to cover the WHOLE region in one chunk with no inherent size limit.</summary>
+    internal static int ComputeAutoSpimChunkTilesPerSide(int desiredTilesPerSide, int cellsPerTile, long availableMemoryBytes)
+    {
+        if (cellsPerTile <= 0) return Math.Max(1, desiredTilesPerSide);
+
+        var safetyBudget = availableMemoryBytes * SpimMemoryBudgetFraction;
+        var maxCellsForChunk = safetyBudget / EstimatedBytesPerSpimChunkCell;
+        if (maxCellsForChunk <= 0) return 1;
+
+        var maxChunkSideCells = Math.Sqrt(maxCellsForChunk);
+        var maxTilesPerSide = (int)(maxChunkSideCells / cellsPerTile);
+        return Math.Clamp(maxTilesPerSide, 1, Math.Max(1, desiredTilesPerSide));
     }
 }
