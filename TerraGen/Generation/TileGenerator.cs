@@ -137,7 +137,9 @@ public static class TileGenerator
         var cols = Math.Max(1, (int)Math.Ceiling(regionWidthMeters / s.TileSizeMeters));
         var rows = Math.Max(1, (int)Math.Ceiling(regionHeightMeters / s.TileSizeMeters));
         var cellsPerTile = Math.Max(1, (int)Math.Round(s.TileSizeMeters / s.CellSizeMeters));
-        var margin = Math.Max(1, s.ErosionParams.MaxDropletLifetime);
+        // Capped at cellsPerTile -- an uncapped margin wider than a single neighbor tile makes SampleAt's edge-clamp silently repeat a flat "shelf" instead of real terrain (confirmed: a systematic tile-boundary grid in a real 149,410-tile run).
+        // Capped at cellsPerTile -- an uncapped margin wider than a single neighbor tile makes SampleAt's edge-clamp silently repeat a flat "shelf" instead of real terrain.
+        var margin = Math.Clamp(s.ErosionParams.MaxDropletLifetime, 1, cellsPerTile);
         // 0 (auto) WANTS the whole region in one chunk -- see RunSettings.SpimChunkTilesPerSide's
         // remarks -- but is capped below (once ReportProgress exists) by ComputeAutoSpimChunkTilesPerSide
         // against live available memory, same safety philosophy as ComputeAutoHydrologyDegree.
