@@ -16,7 +16,11 @@ public static class StreamPowerErosion
         /// <summary>Source: Cordonnier et al. (2016) report 100-300 iterations to convergence.</summary>
         int Iterations = 200,
         /// <summary>Source: Cordonnier et al. (2016).</summary>
-        double TimestepYears = 2.5e5);
+        double TimestepYears = 2.5e5,
+        /// <summary>Hillslope (Culling 1963, "Soil creep and the development of hillside slopes") linear diffusion coefficient — the missing term that keeps a ridge/interfluve cell (near-zero drainage area, so the fluvial K·A^m·S^n term above is itself near zero) from climbing under sustained uplift for the whole run with essentially nothing to check it. Source: Fernandes &amp; Dietrich (1997), Water Resour. Res. 33(6):1307-1318 — typical soil-mantled hillslopes span ~0.001-0.01 m²/yr; 0 disables it (pre-existing, unbounded-ridge behavior). Applied scaled DOWN by drainage area (see <see cref="HillslopeDiffusionReferenceCellCount"/>) — applying it unweighted also smooths CHANNEL cells, which measurably raises the whole landscape instead of just capping ridges: diffusion pulls a channel's downstream receiver up, weakening the fluvial term's own pull toward it.</summary>
+        double HillslopeDiffusivityM2PerYear = 0.01,
+        /// <summary>Upstream cell count (dimensionless, not area) at which a cell is considered "channelized" enough that hillslope diffusion should mostly defer to the fluvial term above — <see cref="HillslopeDiffusivityM2PerYear"/> is scaled by <c>this / (this + accumulation)</c>, so it's near-full strength on a true ridge/interfluve (accumulation ≈ 0-1) and fades out well before a cell has enough drainage to count as a real channel. ⚠ Design simplification, not a literature-derived channelization threshold — tune to taste.</summary>
+        double HillslopeDiffusionReferenceCellCount = 25.0);
 
     /// <summary>Empirical lower bound on tectonic uplift rate. Source: McGrath et al. (2025).</summary>
     public const double MinUpliftMmPerYear = 0.5;
@@ -101,6 +105,10 @@ public static class StreamPowerErosion
                 grid.Values[idx] = newHeightF;
             }
 
+            if (p.HillslopeDiffusivityM2PerYear > 0.0)
+                ApplyHillslopeDiffusion(grid, locked, accumulation, p.HillslopeDiffusivityM2PerYear,
+                    p.HillslopeDiffusionReferenceCellCount, dt, cellSize, erodedHeightAccumulator);
+
             onIterationProgress?.Invoke(iter + 1, p.Iterations);
 
             if (erodedHeightAccumulator is null) continue;
@@ -114,6 +122,46 @@ public static class StreamPowerErosion
 
         if (erodedHeightAccumulator is not null && iterationsSinceRebound > 0)
             ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams!, p.Iterations - 1, p.Iterations, onDiagnostic);
+    }
+
+    /// <summary>Explicit 5-point Laplacian diffusion, sub-stepped so dt·D_max/dx² never exceeds the ~0.2 explicit-scheme stability bound regardless of caller's CellSizeMeters/TimestepYears — callers never have to hand-tune D against grid resolution (D_max = the unscaled <paramref name="diffusivityM2PerYear"/>, since a low-accumulation cell can sit right next to a high-accumulation one). Locally scaled down by <paramref name="accumulation"/> via <c>referenceCellCount / (referenceCellCount + accumulation)</c> — see <see cref="Parameters.HillslopeDiffusionReferenceCellCount"/>'s remarks on why unweighted diffusion also disturbs channel cells. Non-locked cells only; locked cells still supply fixed boundary values to their neighbors' Laplacian. Height LOST at a cell is added to <paramref name="erodedHeightAccumulator"/> so isostasy (when enabled) responds to hillslope denudation the same way it already does to fluvial erosion.</summary>
+    private static void ApplyHillslopeDiffusion(TerrainHeightmap grid, bool[]? locked, int[] accumulation,
+        double diffusivityM2PerYear, double referenceCellCount, double dtYears, double cellSize, double[]? erodedHeightAccumulator)
+    {
+        var width = grid.Width;
+        var height = grid.Height;
+        var cellSizeSq = cellSize * cellSize;
+
+        var maxStableDt = 0.2 * cellSizeSq / diffusivityM2PerYear;
+        var substeps = Math.Max(1, (int)Math.Ceiling(dtYears / maxStableDt));
+        var subDt = dtYears / substeps;
+
+        var buffer = new float[width * height];
+        for (var sub = 0; sub < substeps; sub++)
+        {
+            for (var y = 0; y < height; y++)
+            {
+                for (var x = 0; x < width; x++)
+                {
+                    var idx = y * width + x;
+                    var here = grid.Values[idx];
+                    if (locked is not null && locked[idx]) { buffer[idx] = here; continue; }
+
+                    var left = x > 0 ? grid.Values[idx - 1] : here;
+                    var right = x < width - 1 ? grid.Values[idx + 1] : here;
+                    var up = y > 0 ? grid.Values[idx - width] : here;
+                    var down = y < height - 1 ? grid.Values[idx + width] : here;
+                    var laplacian = (left + right + up + down - 4.0 * here) / cellSizeSq;
+                    var localD = diffusivityM2PerYear * referenceCellCount / (referenceCellCount + accumulation[idx]);
+                    var newValue = here + subDt * localD * laplacian;
+
+                    if (erodedHeightAccumulator is not null)
+                        erodedHeightAccumulator[idx] += Math.Max(0.0, here - newValue);
+                    buffer[idx] = (float)newValue;
+                }
+            }
+            Array.Copy(buffer, grid.Values, buffer.Length);
+        }
     }
 
     /// <summary>Converts each cell's accumulated eroded-height loss into an isostatic rebound height (<see cref="Isostasy.ErosionalReboundHeight"/>, always &lt; the eroded amount itself) and adds it DIRECTLY to <paramref name="grid"/>'s current elevation — a one-time state correction proportional to that interval's own erosion, not a rate that persists or compounds into later iterations — then resets the accumulator to 0.</summary>

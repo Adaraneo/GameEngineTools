@@ -68,7 +68,10 @@ public class TileGeneratorChunkedSpimTests
                 NoiseParams: noiseParams,
                 ErosionParams: new TileErosion.Parameters(Seed: 77, DropletCount: 0),
                 PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
-                SpimParams: new StreamPowerErosion.Parameters(Iterations: 60));
+                // Diffusion off: this test isolates the chunking-vs-truncation effect specifically;
+                // hillslope diffusion smooths sharp local jumps too, for an unrelated reason, and
+                // would otherwise mask/invert the exact comparison this test is trying to make.
+                SpimParams: new StreamPowerErosion.Parameters(Iterations: 60, HillslopeDiffusivityM2PerYear: 0));
 
             IReadOnlyList<TileGenerator.TileResult> perTileResults;
             using (var db = new SqliteWorldDatabase(dbPathPerTile))
