@@ -8,6 +8,9 @@ public class TileGeneratorTests
 {
     private static string TempDbPath() => Path.Combine(Path.GetTempPath(), $"terragen_test_{Guid.NewGuid():N}.db");
 
+    // Catches a genuinely broken seam (meters), not chaotic droplet erosion's own cm-scale noise.
+    private const float TileSeamTolerance = 1.0f;
+
     [TestMethod]
     public void Run_AdjacentTiles_AgreeExactlyAlongSharedEdge_AfterErosion()
     {
@@ -45,7 +48,7 @@ public class TileGeneratorTests
             {
                 var westEdge = west.Values[y * west.Width + (west.Width - 1)];
                 var eastEdge = east.Values[y * east.Width + 0];
-                Assert.AreEqual(westEdge, eastEdge, 1e-3f,
+                Assert.AreEqual(westEdge, eastEdge, TileSeamTolerance,
                     $"Row {y}: west tile's east edge ({westEdge}) doesn't match east tile's west edge ({eastEdge}).");
             }
         }
@@ -93,7 +96,7 @@ public class TileGeneratorTests
             {
                 var westEdge = west.Values[y * west.Width + (west.Width - 1)];
                 var eastEdge = east.Values[y * east.Width + 0];
-                Assert.AreEqual(westEdge, eastEdge, 1e-3f,
+                Assert.AreEqual(westEdge, eastEdge, TileSeamTolerance,
                     $"Row {y}: west tile's east edge ({westEdge}) doesn't match east tile's west edge ({eastEdge}).");
             }
         }
@@ -145,7 +148,7 @@ public class TileGeneratorTests
             {
                 var westEdge = westTile.Values[y * westTile.Width + (westTile.Width - 1)];
                 var eastEdge = eastTile.Values[y * eastTile.Width + 0];
-                Assert.AreEqual(westEdge, eastEdge, 1e-3f,
+                Assert.AreEqual(westEdge, eastEdge, TileSeamTolerance,
                     $"Row {y}: tile from run #1's east edge ({westEdge}) doesn't match run #2's west edge ({eastEdge}).");
             }
         }

@@ -128,26 +128,22 @@ public static class PlanetNoise
             ?? 2.0 * Math.PI * Math.Max(planetRadiusMeters, 1.0) / 6.0; // ~a sixth of the circumference
         var baseFrequency = Math.Max(planetRadiusMeters, 1.0) / continentWavelengthMeters;
 
-        // Domain warping — distort the unit-sphere position with a slower, independent noise
-        // field before evaluating fBm, so coastlines bend/branch instead of reading as smooth
-        // "amoeba" blobs. Warping (x,y,z) itself (not lat/lon) keeps this seamless: (x,y,z) is
-        // already a continuous function of (lat,lon) with no antimeridian/pole discontinuity, and
-        // a smooth function of a continuous input stays continuous.
-        var warpFrequency = baseFrequency / 4.0;
-        const double warpStrength = 0.4;
-        var warpX = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, p.Seed + 555002) * warpStrength;
-        var warpY = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, p.Seed + 777002) * warpStrength;
-        var warpZ = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, p.Seed + 999002) * warpStrength;
-        var wx = x + warpX;
-        var wy = y + warpY;
-        var wz = z + warpZ;
-
+        // Domain warp recomputed PER OCTAVE (scaled to that octave's own frequency) — a fixed base-frequency warp left high octaves ~unwarped, showing a raw lattice grid; same class of bug SampleCoherentField had.
         var amplitude = 1.0;
         var frequency = baseFrequency;
         var sum = 0.0;
         var maxAmplitude = 0.0;
         for (var o = 0; o < p.ContinentOctaves; o++)
         {
+            var warpFrequency = frequency / 4.0;
+            var warpStrength = 0.4 * baseFrequency / frequency;
+            var warpX = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, p.Seed + 555002 + o * 7919) * warpStrength;
+            var warpY = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, p.Seed + 777002 + o * 7919) * warpStrength;
+            var warpZ = ValueNoise3D(x * warpFrequency, y * warpFrequency, z * warpFrequency, p.Seed + 999002 + o * 7919) * warpStrength;
+            var wx = x + warpX;
+            var wy = y + warpY;
+            var wz = z + warpZ;
+
             var n = ValueNoise3D(wx * frequency, wy * frequency, wz * frequency, p.Seed - 97531 + o * 1013);
             sum += n * amplitude;
             maxAmplitude += amplitude;
