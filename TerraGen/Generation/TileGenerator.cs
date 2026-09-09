@@ -527,7 +527,12 @@ public static class TileGenerator
                     StreamPowerErosion.Erode(padded, spimParams, uplift, locked, erodibilityPerCell, s.IsostasyParams, crustDensityPerCell, precipitationWeight, LogSpimDiagnostic, ReportSpimIterationProgress);
                 }
 
-                TileErosion.Erode(padded, s.ErosionParams, locked);
+                // Seed mixed with (row, col): TileErosion.Erode's own rng is `new Random(p.Seed)`,
+                // so passing the SAME Parameters.Seed for every tile replayed the exact same droplet
+                // start-position sequence in every tile's own local coordinates -- an identical
+                // relative erosion texture repeating every tile, visible as a grid at any zoom.
+                var tileErosionParams = s.ErosionParams with { Seed = HashCode.Combine(s.ErosionParams.Seed, row, col) };
+                TileErosion.Erode(padded, tileErosionParams, locked);
 
                 var interior = new float[cellsPerTile * cellsPerTile];
                 for (var iy = 0; iy < cellsPerTile; iy++)
