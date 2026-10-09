@@ -102,6 +102,13 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <param name="outbox">Event collector for this tick.</param>
         void Interrupt(WDateTime now, InterruptCause cause, IHumanContext ctx, IEventCollector outbox);
 
+        /// <summary>Captures everything needed to resume this session after a save/load, without publishing events.</summary>
+        SleepSessionState Capture();
+
+        /// <summary>Resumes a session from a previously captured state; publishes no events and leaves the session active.</summary>
+        /// <param name="state">State returned by <see cref="Capture"/>.</param>
+        void Restore(SleepSessionState state);
+
         #endregion Lifecycle
     }
 
@@ -112,4 +119,19 @@ namespace GameEngineTools.Characters.Engines.Sleep
     /// <param name="MinHours">Shortest spontaneous sleep; the character does not wake on its own before this.</param>
     /// <param name="ReferenceHours">Duration that counts as fully restorative when scoring the sleep quality of an interrupted sleep.</param>
     public sealed record SpontaneousWake(double MinHours, double ReferenceHours);
+
+    /// <summary>
+    /// Persistable state of an active sleep session (stored in <c>BehaviorState.ActiveSleep</c>), so a character saved asleep wakes up
+    /// normally after loading — with its recovery and <see cref="SleepEnded"/> — instead of keeping a sleep plan without a session.
+    /// </summary>
+    public sealed record SleepSessionState(
+        WDateTime SleepStart,
+        WDateTime PhaseStart,
+        WDateTime PlannedWakeUp,
+        SleepPhase Phase,
+        double HoursSlept,
+        double StressAtSleepStart,
+        bool DreamFiredThisRem,
+        HumanId? Companion,
+        SpontaneousWake? SpontaneousWake);
 }

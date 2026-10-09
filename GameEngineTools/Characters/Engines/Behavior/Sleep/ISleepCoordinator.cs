@@ -14,6 +14,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
 
         BehaviorState Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox, BehaviorState state);
 
-        void RestoreState();
+        void RestoreState(BehaviorState state);
     }
 }

@@ -27,6 +27,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
         private readonly ILogger _log;
         private ISleepSession? _activeSession;
 
+        /// <summary>Session state from a loaded save, turned into a live session on the next tick (the character's RNG is only available then).</summary>
+        private SleepSessionState? _pendingRestore;
+
         #endregion Private fields
 
         #region Construction
@@ -45,17 +48,38 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             var state = context.State;
             var ctx = context.HumanContext;
 
+            // A game restored mid-sleep resumes the session from the state it was saved with.
+            if (_activeSession is null && _pendingRestore is { } saved)
+            {
+                var resumed = new DefaultSleepSession(_sleepCfg, _loggerFactory, ctx.Random);
+                resumed.Restore(saved);
+                _activeSession = resumed;
+            }
+
+            _pendingRestore = null;
+
+            // A session ended outside Tick (an interrupt event), or a Sleep plan without any session (a save from before sessions were
+            // persisted): close the plan so the character is not left "asleep" with no recovery.
+            if (_activeSession is { IsActive: false } || (_activeSession is null && state.CurrentPlan?.Name == Sleep))
+            {
+                _activeSession = null;
+                state = EndSleep(state, ctx);
+            }
+
             // Active sleep sessions own the whole tick until they end naturally or are interrupted.
             if (_activeSession is { IsActive: true })
             {
                 _activeSession.Tick(context.Now, context.Dt, ctx, context.Outbox);
                 if (!_activeSession.IsActive)
                 {
-                    var dict = new Dictionary<string, double>(state.Cooldowns ?? new Dictionary<string, double>()) { [Sleep] = _behaviorCfg.SleepCooldownHours * WWorld.Spec.BodyClockScale };
-                    state = state with { CurrentPlan = null, Cooldowns = dict };
+                    state = EndSleep(state, ctx);
                     _activeSession = null;
-                    using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepSessionEnded(ctx.Id.Value.ToString(), _behaviorCfg.SleepCooldownHours);
                 }
+                else
+                {
+                    state = state with { ActiveSleep = _activeSession.Capture() };
+                }
+
                 return new SleepDecisionResult(true, state);
             }
 
@@ -98,6 +122,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             return new SleepDecisionResult(false, state);
         }
 
+        private BehaviorState EndSleep(BehaviorState state, IHumanContext ctx)
+        {
+            var dict = new Dictionary<string, double>(state.Cooldowns ?? new Dictionary<string, double>()) { [Sleep] = _behaviorCfg.SleepCooldownHours * WWorld.Spec.BodyClockScale };
+            using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepSessionEnded(ctx.Id.Value.ToString(), _behaviorCfg.SleepCooldownHours);
+            return state with { CurrentPlan = null, Cooldowns = dict, ActiveSleep = null };
+        }
+
         public BehaviorState Handle(IDomainEvent @event, IHumanContext ctx, IEventCollector outbox, BehaviorState state)
         {
             switch (@event)
@@ -132,7 +163,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                     session.Begin(sc.OccurredAt, plannedWakeUp, ctx, outbox, sc.Companion, sc.SharedType, spontaneous);
                     _activeSession = session;
                     using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepStarted(ctx.Id.Value.ToString(), sleepHours);
-                    return state with { WaitingForSleepConfirmation = false, SleepGraceExpiresAt = null, SleepDeclineCount = 0, CurrentPlan = new PlannedAction(Sleep, sc.OccurredAt, WTimeSpan.FromHours(sleepHours), 100) };
+                    return state with { WaitingForSleepConfirmation = false, SleepGraceExpiresAt = null, SleepDeclineCount = 0, ActiveSleep = session.Capture(), CurrentPlan = new PlannedAction(Sleep, sc.OccurredAt, WTimeSpan.FromHours(sleepHours), 100) };
 
                 case SleepDeclined sd:
                     var newDeclineCount = state.SleepDeclineCount + 1;
@@ -147,7 +178,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             return state;
         }
 
-        public void RestoreState() => _activeSession = null;
+        public void RestoreState(BehaviorState state)
+        {
+            _activeSession = null;
+            _pendingRestore = state.ActiveSleep;
+        }
 
         #endregion ISleepCoordinator
     }

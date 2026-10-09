@@ -82,6 +82,30 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
         #endregion Constructor
 
+        #region Persistence
+
+        /// <inheritdoc/>
+        public SleepSessionState Capture()
+            => new(_sleepStart, _phaseStart, PlannedWakeUp, CurrentPhase, HoursSlept, _stressAtSleepStart, _dreamFiredThisRem, Companion, _spontaneousWake);
+
+        /// <inheritdoc/>
+        public void Restore(SleepSessionState state)
+        {
+            _sleepStart = state.SleepStart;
+            _phaseStart = state.PhaseStart;
+            PlannedWakeUp = state.PlannedWakeUp;
+            CurrentPhase = state.Phase;
+            HoursSlept = state.HoursSlept;
+            _stressAtSleepStart = state.StressAtSleepStart;
+            _dreamFiredThisRem = state.DreamFiredThisRem;
+            Companion = state.Companion;
+            _spontaneousWake = state.SpontaneousWake;
+            _endedSpontaneously = false;
+            IsActive = true;
+        }
+
+        #endregion Persistence
+
         #region Lifecycle
 
         /// <inheritdoc/>

@@ -158,6 +158,57 @@ namespace EngineTests
                 Assert.IsTrue(all[i].StartHour - (all[i - 1].StartHour + all[i - 1].Hours) <= 40.0, $"More than one day awake. {detail}");
         }
 
+        [TestMethod]
+        public void CharacterSavedMidSleep_StillWakesUpOnItsOwn_AndRecovers()
+        {
+            UseDayLength(24);
+            var generator = ServiceProvider.GetRequiredService<IHumanBlueprintGenerator>();
+            var factory = ServiceProvider.GetRequiredService<IHumanFactory>();
+            var now = WDateTime.New(116, 1, 1, 0);
+            var birth = now.Date.AddYears(-30);
+            var human = factory.Create(generator.Generate(new HumanBlueprintRequest(
+                Sex: SexBiology.Male, MinBirthDate: birth, MaxBirthDate: birth, Seed: 7)));
+            var step = WTimeSpan.FromMinutes(15);
+
+            // Run until the character falls asleep.
+            var ticks = 0;
+            while (human.Snapshot.Behavior.CurrentPlan?.Name != ActionNames.Sleep && ticks++ < 4 * 24 * 3)
+            {
+                human.Tick(now, step);
+                var prompt = human.LastOutbox.OfType<SleepPromptRequested>().FirstOrDefault();
+                if (prompt != null)
+                    human.ReceiveEvent(new SleepConfirmed(now, prompt.Human, default));
+                human.RestoreSnapshot(human.Snapshot with { Physiology = human.Snapshot.Physiology with { Hunger = 15, Thirst = 15 } });
+                now += step;
+            }
+
+            Assert.AreEqual(ActionNames.Sleep, human.Snapshot.Behavior.CurrentPlan?.Name, "The character should have gone to sleep within three days.");
+            var energyAtBedtime = human.Snapshot.Physiology.Energy;
+
+            // Sleep for two hours, then "save and load" the snapshot.
+            for (var i = 0; i < 8; i++)
+            {
+                human.Tick(now, step);
+                now += step;
+            }
+
+            Assert.IsNotNull(human.Snapshot.Behavior.ActiveSleep, "The running session must be part of the snapshot.");
+            human.RestoreSnapshot(human.Snapshot);
+
+            var woke = false;
+            for (var i = 0; i < 4 * 14 && !woke; i++)
+            {
+                human.Tick(now, step);
+                woke = human.LastOutbox.OfType<SleepEnded>().Any();
+                now += step;
+            }
+
+            Assert.IsTrue(woke, "After loading mid-sleep the character must still wake up (SleepEnded), not stay 'asleep' without a session.");
+            Assert.IsNull(human.Snapshot.Behavior.ActiveSleep);
+            Assert.AreNotEqual(ActionNames.Sleep, human.Snapshot.Behavior.CurrentPlan?.Name);
+            Assert.IsTrue(human.Snapshot.Physiology.Energy > energyAtBedtime + 20, "The sleep must have restored energy.");
+        }
+
         private static IHumanContext BuildContext(double? propensity)
         {
             var personality = new Personality(
@@ -215,11 +266,9 @@ namespace EngineTests
                     human.ReceiveEvent(new SleepConfirmed(now, prompt.Human, default));
 
                 var asleep = human.Snapshot.Behavior.CurrentPlan?.Name == ActionNames.Sleep;
-                if (!asleep)
-                {
-                    // No world here, so keep the character fed; restoring while asleep would drop the session.
-                    human.RestoreSnapshot(human.Snapshot with { Physiology = human.Snapshot.Physiology with { Hunger = 15, Thirst = 15 } });
-                }
+                // No world here, so keep the character fed. Restoring the snapshot every tick, asleep or not, also checks that a running
+                // sleep session survives a save/load.
+                human.RestoreSnapshot(human.Snapshot with { Physiology = human.Snapshot.Physiology with { Hunger = 15, Thirst = 15 } });
 
                 var hours = i * 0.25;
                 if (asleep && !wasAsleep) startedAt = hours;

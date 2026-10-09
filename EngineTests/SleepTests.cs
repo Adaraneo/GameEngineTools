@@ -375,6 +375,72 @@ namespace EngineTests
 
         #endregion BehaviorEngine — Sleep Declined
 
+        #region SleepSession — perzistence (uložení uprostřed spánku)
+
+        [TestMethod]
+        public void Session_CapturedMidSleep_ResumesWhereItLeftOff_AndEndsOnSchedule()
+        {
+            var original = BuildSession();
+            var wake = _now + WTimeSpan.FromHours(8);
+            original.Begin(_now, wake, _ctx, _outbox);
+
+            var time = _now;
+            for (var i = 0; i < 12; i++)
+            {
+                time += WTimeSpan.FromMinutes(15);
+                original.Tick(time, WTimeSpan.FromMinutes(15), _ctx, _outbox);
+            }
+
+            var saved = original.Capture();
+            _outbox.Drain();
+
+            var resumed = BuildSession();
+            resumed.Restore(saved);
+
+            Assert.IsTrue(resumed.IsActive);
+            Assert.AreEqual(original.CurrentPhase, resumed.CurrentPhase);
+            Assert.AreEqual(3.0, resumed.HoursSlept, 1e-9);
+            Assert.AreEqual(0, _outbox.Drain().Count, "Restoring must not publish events.");
+
+            while (resumed.IsActive && (time - _now).TotalHours < 12)
+            {
+                time += WTimeSpan.FromMinutes(15);
+                resumed.Tick(time, WTimeSpan.FromMinutes(15), _ctx, _outbox);
+            }
+
+            var ended = _outbox.Drain().OfType<SleepEnded>().Single();
+            Assert.IsFalse(ended.WasInterrupted);
+            Assert.AreEqual(8.0, ended.TotalHoursSlept, 0.3);
+        }
+
+        [TestMethod]
+        public void BehaviorState_WithActiveSleep_RoundTripsThroughJson()
+        {
+            var session = BuildSession();
+            var companion = new HumanId(Guid.NewGuid());
+            session.Begin(_now, _now + WTimeSpan.FromHours(10), _ctx, _outbox, companion, SharedSleepType.Camp, new SpontaneousWake(4, 8));
+            session.Tick(_now + WTimeSpan.FromHours(2), WTimeSpan.FromHours(2), _ctx, _outbox);
+            var state = new BehaviorState(10, 5, 5, 20, 50, 30, null) with { ActiveSleep = session.Capture() };
+
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles,
+                Converters = { new HumanIdJsonConverter(), new WDateTimeJsonConverter(), new WTimeSpanJsonConverter() }
+            };
+            var json = System.Text.Json.JsonSerializer.Serialize(state, options);
+            var back = System.Text.Json.JsonSerializer.Deserialize<BehaviorState>(json, options)!;
+
+            Assert.IsNotNull(back.ActiveSleep);
+            Assert.AreEqual(state.ActiveSleep!.SleepStart, back.ActiveSleep!.SleepStart);
+            Assert.AreEqual(state.ActiveSleep.PlannedWakeUp, back.ActiveSleep.PlannedWakeUp);
+            Assert.AreEqual(state.ActiveSleep.Phase, back.ActiveSleep.Phase);
+            Assert.AreEqual(2.0, back.ActiveSleep.HoursSlept, 1e-9);
+            Assert.AreEqual(companion, back.ActiveSleep.Companion);
+            Assert.AreEqual(new SpontaneousWake(4, 8), back.ActiveSleep.SpontaneousWake);
+        }
+
+        #endregion SleepSession — perzistence (uložení uprostřed spánku)
+
         #region SleepSession — spontánní probuzení (cirkadiánní práh L(t))
 
         private static IHumanContext WithWakeMargin(IHumanContext ctx, double margin)

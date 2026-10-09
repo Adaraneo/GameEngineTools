@@ -265,7 +265,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         }
 
         public void RestoreState(BehaviorState state)
-        { State = state; _sleepCoordinator.RestoreState(); }
+        { State = state; _sleepCoordinator.RestoreState(state); }
 
         #endregion IEngine
 
