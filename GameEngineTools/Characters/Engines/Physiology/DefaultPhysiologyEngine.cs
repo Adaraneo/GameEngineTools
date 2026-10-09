@@ -426,9 +426,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     : SleepRegulationCalculator.BuildupProcessS(processS, h, Config);
                 deficit = SleepRegulationCalculator.UpdateCognitiveDeficit(deficit, processS, h, asleep, Config);
 
+                var clampedS = Math.Clamp(processS, 0.0, 1.0);
+                var fractionalHour = (now.Hour % hoursPerDay) + now.Minute / (double)WWorld.Spec.MinutesPerHour;
                 s = s with
                 {
-                    ProcessS = Math.Clamp(processS, 0.0, 1.0),
+                    ProcessS = clampedS,
+                    SleepPropensity = SleepRegulationCalculator.ComputeSleepPropensity(
+                        clampedS, fractionalHour, hoursPerDay, s.CircadianPhaseShiftHours, Config),
                     CognitiveDeficit = Math.Max(0.0, deficit),
                     // Process S is the single source of truth; SleepDebtHours is its derived view for the other engines.
                     SleepDebtHours = SleepRegulationCalculator.DebtHoursFromProcessS(processS, Config, hoursPerDay)

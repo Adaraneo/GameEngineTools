@@ -154,6 +154,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
         public static double SleepPropensity(double processS, double circadianThreshold)
             => processS - circadianThreshold;
 
+        /// <summary>
+        /// Sleep propensity at a given moment: Process S minus the Process C threshold for the time of day.
+        /// </summary>
+        /// <param name="processS">Current Process S [0..1].</param>
+        /// <param name="hourOfDay">Fractional world hour of the day.</param>
+        /// <param name="hoursPerDay">Hours in a world day.</param>
+        /// <param name="circadianPhaseShiftHours">The character's circadian phase offset (chronotype + jet lag).</param>
+        /// <param name="cfg">Physiology configuration.</param>
+        /// <returns>Sleep propensity (negative while the circadian gate dominates).</returns>
+        public static double ComputeSleepPropensity(
+            double processS, double hourOfDay, double hoursPerDay, double circadianPhaseShiftHours, PhysiologyConfig cfg)
+            => SleepPropensity(processS, CircadianThreshold(hourOfDay, hoursPerDay, circadianPhaseShiftHours, cfg));
+
         #endregion
 
         #region Van Dongen cognitive deficit

@@ -685,7 +685,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// could not produce. Recovers during sleep. <c>null</c> until first initialised.
         /// Source: Van Dongen et al. (2003, <i>Sleep</i> 26(2)).
         /// </summary>
-        double? CognitiveDeficit = null);
+        double? CognitiveDeficit = null,
+        /// <summary>
+        /// Two-process sleep propensity: Process S minus the Process C circadian threshold at the current time of day.
+        /// Positive when the body is both tired and in its circadian night, so it peaks in the evening/night and goes
+        /// negative in the afternoon even after a poor night. <c>null</c> until the first tick; read by Behavior's
+        /// <c>NeedRest</c> so that characters go to bed at night. Source: Borbély (1982); Daan, Beersma &amp; Borbély (1984).
+        /// </summary>
+        double? SleepPropensity = null);
 
     /// <summary>
     /// The physiology engine — first stage of the per-character tick pipeline. Advances
