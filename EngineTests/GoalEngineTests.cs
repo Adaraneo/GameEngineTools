@@ -488,6 +488,37 @@ namespace EngineTests
                 $"Reengagement should raise MoodBaseline (well-being recovery). Before={moodBefore:F2}, After={engine.State.MoodBaseline:F2}");
         }
 
+        [TestMethod]
+        public void ChildBorn_CreatesProtectFamilyGoal_TargetingTheOtherParent()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var partner = new HumanId(Guid.NewGuid());
+            var now = new WDateTime(100);
+
+            engine.Handle(new ChildBorn(now, self, partner), BuildContext(self), new EventCollector());
+            var goal = engine.State.Active.Single(g => g.Kind == PersistentGoalKind.ProtectFamily);
+            Assert.AreEqual(partner, goal.TargetHuman, "The goal needs a target, otherwise nothing ever counts as progress.");
+
+            // And it must now actually progress when the parent reaches out to that person.
+            var before = goal.Progress + goal.Salience;
+            engine.Handle(new ActionCommitted(now, self, ReachOut, WTimeSpan.FromHours(1), TargetHuman: partner), BuildContext(self, engine.State), new EventCollector());
+            var after = engine.State.Active.Single(g => g.Kind == PersistentGoalKind.ProtectFamily);
+            Assert.IsTrue(after.Progress + after.Salience > before, "Reaching out to the co-parent must advance the goal.");
+        }
+
+        [TestMethod]
+        public void ChildBorn_SeenByTheOtherParent_TargetsTheMother()
+        {
+            var engine = BuildEngine();
+            var mother = new HumanId(Guid.NewGuid());
+            var father = new HumanId(Guid.NewGuid());
+
+            engine.Handle(new ChildBorn(new WDateTime(100), mother, father), BuildContext(father), new EventCollector());
+
+            Assert.AreEqual(mother, engine.State.Active.Single(g => g.Kind == PersistentGoalKind.ProtectFamily).TargetHuman);
+        }
+
         // ── Helpers ────────────────────────────────────────────────────────────
 
         private static DefaultGoalEngine BuildEngine(GoalConfig? config = null)

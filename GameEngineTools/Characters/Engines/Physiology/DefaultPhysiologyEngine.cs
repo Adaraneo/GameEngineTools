@@ -526,12 +526,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 if (s.Cycle is { Phase: not CyclePhase.Paused } && ageYears >= Config.MenopauseAge)
                     s = s with { Cycle = s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 1.0 } };
 
-                // Testosterone aging in men (~1%/year after 25)
-                if (s.Testosterone is { } ageTesto && ageYears > Config.AgingTestosteronePenaltyStart)
-                {
-                    var agePenalty = (ageYears - Config.AgingTestosteronePenaltyStart) * Config.AgingTestosteronePenaltyPerYear;
-                    s = s with { Testosterone = ageTesto with { Level = Math.Max(0, ageTesto.Level - agePenalty * h / (365.25 * 24)) } };
-                }
+                // Testosterone aging is applied as a lowered set point in the diurnal block below (a level offset here was erased).
 
                 // Inflammaging: nad 60 → baseline ImmuneLoad pomalu roste
                 if (ageYears > Config.AgingImmuneBaselineStart)
@@ -577,7 +572,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                 // Sarcopenia: decline in muscle mass after age 30
                 var muscleChange = ageYears > Config.SarcopeniaAgeStart
-                    ? -(ageYears - Config.SarcopeniaAgeStart) * Config.SarcopeniaRatePerYear * h / (365.25 * 24)
+                    ? -Config.SarcopeniaRatePerYear * h / (365.25 * 24)
                     : 0.0;
 
                 // Bone density: aging + post-menopause
@@ -633,7 +628,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var diurnal = 20.0 * Math.Exp(-Math.Pow(hoursOfDay - Config.TestosteronePeakHour, 2) / 10.0);
                 var alloSuppression = Math.Max(0, s.AllostaticLoad - 50) / 10.0 * Config.TestosteroneAlloSuppression;
                 var sleepPenalty = Math.Max(0, s.SleepDebtHours - 2) * Config.TestosteroneSleepDebtPenaltyPerHour;
-                var targetLevel = Math.Clamp(50 + diurnal - alloSuppression - sleepPenalty, 0, 100);
+                var agePenalty = Math.Max(0, ComputeAgeYears(now.Date) - Config.AgingTestosteronePenaltyStart) * Config.AgingTestosteronePenaltyPerYear;
+                var targetLevel = Math.Clamp(50 + diurnal - alloSuppression - sleepPenalty - agePenalty, 0, 100);
                 s = s with
                 {
                     Testosterone = testo with
@@ -898,15 +894,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private (int day, CyclePhase phase, int length, int ovulDay) CalculateCycleProgression(MenstrualCycleState c)
         {
-            var length = Math.Max(_cycleCfg.MinCycleLengthDays, Math.Min(_cycleCfg.MaxCycleLengthDays,
-                _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
+            // The length is drawn once per cycle (when it wraps to day 1) and read from the stored value
+            // afterwards; re-rolling it every day made the wrap day, ovulation day and phase flicker.
+            var length = c.CurrentCycleLength;
+            var day = c.DayInCycle + 1;
+            if (day > length)
+            {
+                day = 1;
+                length = Math.Max(_cycleCfg.MinCycleLengthDays, Math.Min(_cycleCfg.MaxCycleLengthDays,
+                    _cycleCfg.MeanCycleLengthDays + (int)Math.Round(Normal(_rng, 0, _cycleCfg.VariabilityDaysStdDev))));
+            }
             // Ovulation = cycle length − mean luteal phase. Luteal length ≈ 11.7-12.4 days across two
             // pooled cohort studies (Najmabadi et al. 2020: 11.7 days SD 2.8; Bull et al. 2019: 12.4 days,
             // 95% CI 7-17) — NOT the textbook fixed 14 days.
             // The follicular phase is the main source of variability — ovulDay changes every cycle.
             var ovulDay = Math.Max(_cycleCfg.MensesMeanDays + 2, length - _cycleCfg.LutealMeanDays);
-            var day = c.DayInCycle + 1;
-            if (day > length) day = 1;
             var phase = PhaseFor(day, length, _cycleCfg.MensesMeanDays, ovulDay);
             return (day, phase, length, ovulDay);
         }

@@ -390,7 +390,9 @@ namespace GameEngineTools.Characters.Engines.Goals
                     0.0,
                     0.0,
                     cb.OccurredAt,
-                    cb.OccurredAt);
+                    cb.OccurredAt,
+                    // The newborn has no HumanId yet, so the co-parent is the family member the goal can target.
+                    TargetHuman: cb.ParentA == ctx.Id ? cb.ParentB : cb.ParentA);
 
                 AddGoal(goal, ctx, outbox);
             }

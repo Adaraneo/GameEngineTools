@@ -1527,6 +1527,42 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Aging_Male_TestosteroneSetPoint_IsLowerForOlderMen()
+        {
+            // The age penalty lives in the diurnal set point; a level offset was erased by the approach toward it.
+            var young = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 25);
+            var old = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 60);
+            var ctx = BuildContextWithAction(null);
+            var start = WDateTime.New(116, 1, 1, 0);
+
+            for (var i = 0; i < 200; i++)
+            {
+                var now = start + WTimeSpan.FromHours(i);
+                young.Tick(now, WTimeSpan.FromHours(1), ctx, new EventCollector());
+                old.Tick(now, WTimeSpan.FromHours(1), ctx, new EventCollector());
+            }
+
+            // (60 - 25) * 0.8 = 28 points of set-point penalty; leave generous margin for the diurnal curve.
+            Assert.IsTrue(young.State.Testosterone!.Level - old.State.Testosterone!.Level > 20,
+                $"Young={young.State.Testosterone.Level:F1}, Old={old.State.Testosterone.Level:F1}");
+        }
+
+        [TestMethod]
+        public void Aging_Sarcopenia_LosesAboutHalfAPercentOfMuscleMassPerYear()
+        {
+            var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 60);
+            var ctx = BuildContextWithAction(null);
+            var before = engine.State.Aging!.MuscleMassFraction;
+            var start = WDateTime.New(116, 1, 1, 0);
+
+            for (var day = 0; day < 365; day++)
+                engine.Tick(start + WTimeSpan.FromHours(day * 24), WTimeSpan.FromHours(24), ctx, new EventCollector());
+
+            var lost = before - engine.State.Aging!.MuscleMassFraction;
+            Assert.AreEqual(0.005, lost, 0.002, $"Documented rate is 0.005 per year (was ~0.15 at age 60 before the fix); lost={lost:F4}");
+        }
+
+        [TestMethod]
         public void Aging_Female_CycleBecomesPaused_AtMenopauseAge()
         {
             // Postava 52 let → menopauza (MenopauseAge = 50)
