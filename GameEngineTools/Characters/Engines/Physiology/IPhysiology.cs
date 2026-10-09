@@ -390,7 +390,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double ProcessSUpperAsymptote = 1.0,
         /// <summary>Lower asymptote of Process S after a long sleep, normalized. Default 0.0.</summary>
         double ProcessSLowerAsymptote = 0.0,
-        /// <summary>Process C upper (daytime) circadian threshold — hardest to fall asleep. Default 0.90.</summary>
+        /// <summary>Process C upper (daytime) circadian threshold — hardest to fall asleep. Default 0.90; deliberately wider than Daan 1984 (0.67 ± 0.12) because waking is not gated by C here.</summary>
         double ProcessCUpperThreshold = 0.90,
         /// <summary>Process C lower (nighttime) circadian threshold — easiest to fall asleep. Default 0.17.</summary>
         double ProcessCLowerThreshold = 0.17,
