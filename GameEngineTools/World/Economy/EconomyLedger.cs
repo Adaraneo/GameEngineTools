@@ -39,33 +39,52 @@ namespace GameEngineTools.World.Economy
         }
 
         /// <summary>
-        /// Adjusts the price for a shop/item-kind pair based on the current stock level relative to the
-        /// configured target band, and returns the new price. Called after every buy/sell/restock — NOT
-        /// on a per-tick timer, to avoid an O(shops×kinds) sweep (LOD discipline, §6/§7).
+        /// Re-prices a shop/item-kind pair for its new stock level and returns the new posted price. Called after every
+        /// buy/sell — NOT on a per-tick timer (LOD discipline, §6/§7).
         /// </summary>
         /// <remarks>
-        /// Below target → price rises (scarcity); above target → price falls (glut). Clamped to
-        /// [<see cref="EconomyConfig.MinPrice"/>, <see cref="EconomyConfig.MaxPrice"/>]. The elasticity
-        /// coefficient is a tuned game-balance parameter, not a literature-derived formula.
+        /// The price is a function of stock, <c>base · exp(elasticity · (target − stock))</c>, clamped to
+        /// [<see cref="EconomyConfig.MinPrice"/>, <see cref="EconomyConfig.MaxPrice"/>] — it does not accumulate, so a constant stock
+        /// gap cannot ratchet the price to a rail. The base (price at target stock) is learned per shop/kind from the observed price and
+        /// stock, so the ledger stays consistent with persisted shop objects after a restart.
         /// </remarks>
-        public double AdjustPriceForStockChange(string shopId, PickupItemKind kind, int newStockCount, EconomyConfig config)
+        /// <param name="shopId">The shop.</param>
+        /// <param name="kind">The item kind.</param>
+        /// <param name="newStockCount">Stock after the transaction.</param>
+        /// <param name="config">Economy tuning.</param>
+        /// <param name="observedPrice">The price actually posted before the transaction, if known (derives the base on a cold ledger).</param>
+        /// <param name="observedStock">The stock the <paramref name="observedPrice"/> was posted at.</param>
+        public double AdjustPriceForStockChange(
+            string shopId, PickupItemKind kind, int newStockCount, EconomyConfig config,
+            double? observedPrice = null, int? observedStock = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(shopId);
             ArgumentNullException.ThrowIfNull(config);
 
-            var current = GetPrice(shopId, kind);
-            var delta = (config.TargetStockLevel - newStockCount) * config.PriceElasticityPerUnit;
-            var adjusted = Math.Clamp(current + delta, config.MinPrice, config.MaxPrice);
+            if (!_bases.TryGetValue((shopId, kind), out var basePrice))
+            {
+                var anchorPrice = observedPrice ?? GetPrice(shopId, kind);
+                var anchorStock = observedStock ?? config.TargetStockLevel;
+                basePrice = anchorPrice / StockMultiplier(anchorStock, config);
+                _bases[(shopId, kind)] = basePrice;
+            }
 
+            var adjusted = Math.Clamp(basePrice * StockMultiplier(newStockCount, config), config.MinPrice, config.MaxPrice);
             _prices[(shopId, kind)] = adjusted;
             return adjusted;
         }
+
+        private static double StockMultiplier(int stock, EconomyConfig config)
+            => Math.Exp(config.PriceElasticityPerUnit * (config.TargetStockLevel - stock));
 
         #endregion Public API
 
         #region Private state
 
         private readonly Dictionary<(string ShopId, PickupItemKind Kind), double> _prices = new();
+
+        /// <summary>Price each shop/kind would post at exactly the target stock level.</summary>
+        private readonly Dictionary<(string ShopId, PickupItemKind Kind), double> _bases = new();
 
         /// <summary>Fallback starting price for a shop/kind pair the ledger has not yet transacted.</summary>
         private static double SeedPrice(PickupItemKind kind) => kind switch

@@ -21,8 +21,14 @@ namespace GameEngineTools.Characters.Engines.Economy
         /// <summary>Target on-hand stock level a shop aims for; drives the price-feedback sign.</summary>
         public int TargetStockLevel { get; set; } = 8;
 
-        /// <summary>Price change per unit of stock away from <see cref="TargetStockLevel"/> (elasticity).</summary>
+        /// <summary>Relative (exponential) price change per unit of stock away from <see cref="TargetStockLevel"/>.</summary>
         public double PriceElasticityPerUnit { get; set; } = 0.15;
+
+        /// <summary>
+        /// Fraction of the shop's current posted price paid to a character who sells an item back. Below 1 so a buy-then-sell round trip
+        /// always loses money (no arbitrage against the shop's own price movement). Game-balance parameter.
+        /// </summary>
+        public double ShopBuyBackFraction { get; set; } = 0.6;
 
         /// <summary>Hard floor on any shop price.</summary>
         public double MinPrice { get; set; } = 0.5;

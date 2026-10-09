@@ -409,17 +409,30 @@ namespace GameEngineTools.Characters.Engines.Objects
             // Recompute the shop's posted price against the reduced stock (excludes the now-held object).
             var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
             var oldPrice = _economyLedger.GetPrice(shopId, kind, price);
-            var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
+            var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig, price, newStock + 1);
+            PostPrice(location, shopId, kind, newPrice);
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
                 _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
         }
 
+        /// <summary>Writes the shop's new posted price onto every in-stock object of that kind, so the next Buy really charges it.</summary>
+        private void PostPrice(string location, string shopId, PickupItemKind kind, double price)
+        {
+            foreach (var stocked in _objectProvider.GetObjectsAt(location).Where(o => o.ShopId == shopId && o.ItemKind == kind).ToList())
+            {
+                if (stocked.Price is { } current && Math.Abs(current - price) < 1e-9)
+                    continue;
+                _objectProvider.RemoveObject(stocked.LocationId, stocked.Id);
+                _objectProvider.AddObject(stocked with { Price = price });
+            }
+        }
+
         /// <summary>
         /// Handles <see cref="ActionNames.Sell"/>: sells a held, still-fresh food/drink item back to a
         /// co-located shop that trades its kind — moving the object into the shop's stock and crediting
-        /// coin (via the emitted <see cref="Sold"/> event). Adjusts the shop's posted price for the
+        /// coin (via the emitted <see cref="Sold"/> event; the shop pays <see cref="EconomyConfig.ShopBuyBackFraction"/> of its ask). Adjusts the shop's posted price for the
         /// increased stock. No-op when the character holds nothing a co-located shop will buy.
         /// </summary>
         private void HandleSell(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
@@ -456,11 +469,13 @@ namespace GameEngineTools.Characters.Engines.Objects
                 return;
 
             var kind = item.ItemKind;
-            var salePrice = shop.Price ?? _economyLedger.GetPrice(shopId, kind);
+            var askPrice = shop.Price ?? _economyLedger.GetPrice(shopId, kind);
+            var salePrice = askPrice * _economyConfig.ShopBuyBackFraction;
+            var oldStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
 
-            // Move the item from the seller's hand into the shop's stock.
+            // Move the item from the seller's hand into the shop's stock, relisted at the shop's ask.
             _objectProvider.RemoveObject(item.LocationId, item.Id);
-            _objectProvider.AddObject(item with { HeldBy = null, LocationId = location, Price = salePrice, ShopId = shopId });
+            _objectProvider.AddObject(item with { HeldBy = null, LocationId = location, Price = askPrice, ShopId = shopId });
 
             var newWealth = (ctx.Snapshot.Economy?.Wealth ?? 0.0) + salePrice;
             outbox.Add(new Sold(now, ctx.Id, item.Id, kind, shopId, salePrice, newWealth));
@@ -471,9 +486,10 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (IsBackground(ctx.Id))
                 return;
 
-            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
-            var oldPrice = _economyLedger.GetPrice(shopId, kind, salePrice);
-            var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig);
+            var newStock = oldStock + 1;
+            var oldPrice = _economyLedger.GetPrice(shopId, kind, askPrice);
+            var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig, askPrice, oldStock);
+            PostPrice(location, shopId, kind, newPrice);
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))

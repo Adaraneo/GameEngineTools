@@ -107,6 +107,87 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void EconomyLedger_ConstantStock_DoesNotRatchetPriceToARail()
+        {
+            var ledger = new EconomyLedger();
+            var cfg = EconomyConfig.Default;
+
+            var first = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, newStockCount: 2, cfg);
+            var last = first;
+            for (var i = 0; i < 50; i++)
+                last = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, newStockCount: 2, cfg);
+
+            Assert.AreEqual(first, last, 1e-9, "The same stock must always yield the same price.");
+            Assert.IsTrue(last < cfg.MaxPrice, "A moderate shortage must not drive the price to the ceiling.");
+        }
+
+        [TestMethod]
+        public void EconomyLedger_PriceReturnsToBase_WhenStockReturnsToTarget()
+        {
+            var ledger = new EconomyLedger();
+            var cfg = EconomyConfig.Default;
+            var atTarget = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, cfg.TargetStockLevel, cfg, observedPrice: 3.0, observedStock: cfg.TargetStockLevel);
+
+            ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, 1, cfg);
+            var back = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, cfg.TargetStockLevel, cfg);
+
+            Assert.AreEqual(3.0, atTarget, 1e-9);
+            Assert.AreEqual(3.0, back, 1e-9, "Price depends on stock only, so restoring the stock restores the price.");
+        }
+
+        [TestMethod]
+        public void EconomyLedger_ColdLedger_DerivesBaseFromObservedPriceAndStock()
+        {
+            var ledger = new EconomyLedger();
+            var cfg = EconomyConfig.Default;
+
+            // A persisted shop posted 6.0 at stock 4 (below target); at target stock it must therefore ask less than 6.0.
+            var atTarget = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, cfg.TargetStockLevel, cfg, observedPrice: 6.0, observedStock: 4);
+
+            Assert.AreEqual(6.0 / Math.Exp(cfg.PriceElasticityPerUnit * (cfg.TargetStockLevel - 4)), atTarget, 1e-9);
+        }
+
+        [TestMethod]
+        public void Buy_WritesTheNewPostedPriceBackToTheRemainingStock()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(PricedFood("bread_1", price: 2.0, shop: "bakery"));
+            provider.AddObject(PricedFood("bread_2", price: 2.0, shop: "bakery"));
+            provider.AddObject(PricedFood("bread_3", price: 2.0, shop: "bakery"));
+            var engine = MakeObjectEngine(provider, lod: null);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Buy, WTimeSpan.FromMinutes(15)), BuyerContext(self, 30.0), outbox);
+
+            var changed = outbox.Drain().OfType<PriceChanged>().Single();
+            var remaining = provider.GetObjectsAt(Loc).Where(o => o.ShopId == "bakery").ToList();
+            Assert.AreEqual(2, remaining.Count);
+            Assert.IsTrue(changed.NewPrice > 2.0, "Fewer loaves left than the target stock: the ask rises.");
+            Assert.IsTrue(remaining.All(o => Math.Abs(o.Price!.Value - changed.NewPrice) < 1e-9),
+                "The posted price on the remaining objects must equal the ledger price, so the next Buy charges it.");
+        }
+
+        [TestMethod]
+        public void BuyThenSell_BackToTheSameShop_LosesMoney()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(PricedFood("bread_1", price: 2.0, shop: "bakery"));
+            provider.AddObject(PricedFood("bread_2", price: 2.0, shop: "bakery"));
+            var engine = MakeObjectEngine(provider, lod: null);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Buy, WTimeSpan.FromMinutes(15)), BuyerContext(self, 30.0), outbox);
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Sell, WTimeSpan.FromMinutes(15)), BuyerContext(self, 30.0), outbox);
+
+            var events = outbox.Drain();
+            var paid = events.OfType<Purchased>().Single().Price;
+            var received = events.OfType<Sold>().Single().Price;
+            Assert.IsTrue(received < paid, $"A round trip must lose money (paid {paid:F2}, got back {received:F2}).");
+        }
+
+        [TestMethod]
         public void EconomyLedger_GetPrice_ColdCacheUsesPersistedFallback_NotSeedPrice()
         {
             var ledger = new EconomyLedger();
@@ -219,7 +300,8 @@ namespace EngineTests
             var sold = outbox.Drain().OfType<Sold>().SingleOrDefault();
             Assert.IsNotNull(sold, "A Sold event must be emitted.");
             Assert.AreEqual(PickupItemKind.Bread, sold!.ItemKind);
-            Assert.AreEqual(2.0, sold.Price, 1e-9, "Sale credits the shop's posted price.");
+            Assert.AreEqual(2.0 * EconomyConfig.Default.ShopBuyBackFraction, sold.Price, 1e-9,
+                "Sale credits the buy-back fraction of the shop's posted price.");
 
             Assert.AreEqual(0, provider.GetHeldBy(self).Count(), "The sold item leaves the seller's hands.");
             Assert.IsTrue(
