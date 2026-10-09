@@ -7,6 +7,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using System.Collections.Generic;
     using System.Linq;
     using GameEngineTools.Characters.Engines.Economy;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
@@ -68,6 +69,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         /// <summary>Below this hunger a character with surplus food may sell it (no urgent need to keep it).</summary>
         private const double MaxNeedToSell = 15.0;
 
+        /// <summary>Fixed utility of Produce/Process for a food-producing occupation on shift (works the chain without hunger).</summary>
+        private const double ShiftProductionUtility = 42.0;
+
+        /// <summary>Fixed utility of selling for a producer on shift; above production so the output reaches the shop.</summary>
+        private const double ShiftSellUtility = 50.0;
+
         /// <summary>Low fixed utility for a surplus-selling candidate — only wins when nothing pressing competes.</summary>
         private const double SellUtility = 12.0;
 
@@ -102,6 +109,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             // ── Food provisioning ladder (Tier 1) + foraging fallback ───────────────────
             // When hungry, offer every actionable way to reach a meal; arbitration picks the
             // best by utility. Options are gated to what is actually possible here-and-now.
+            var onFoodShift = IsOnFoodProductionShift(context);
+
+            if (onFoodShift && context.State.NeedFood < MinNeedToSearch)
+                AddShiftProduction(context, candidates);
+
             if (context.State.NeedFood >= MinNeedToSearch)
             {
                 var need = context.State.NeedFood;
@@ -112,13 +124,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     candidates.Add(new BehaviorCandidate(
                         EatStored,
                         BehaviorMath.Util(need, EatStoredWeight),
-                        WTimeSpan.FromMinutes(15),
+                        WTimeSpan.FromMinutes(30), // same meal length as Eat, since Physiology relieves hunger by duration
                         BehaviorDomain.Physiological,
                         Tags: new[] { "FoodEconomy" }));
                 }
 
                 // 2) Process held/co-located inputs into food at a co-located processing site.
-                if (TryFindSatisfiableRecipe(context.AvailableObjects, context.HeldObjects, out var recipe))
+                var canProcess = TryFindSatisfiableRecipe(context.AvailableObjects, context.HeldObjects, out var recipe);
+                if (canProcess)
                 {
                     candidates.Add(new BehaviorCandidate(
                         Process,
@@ -128,8 +141,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                         Tags: new[] { "FoodEconomy" }));
                 }
 
-                // 3) Harvest raw material at a co-located raw-production site.
-                if (HasRawProductionSite(context.AvailableObjects))
+                // 3) Harvest raw material at a co-located raw-production site — only when there is nothing to process yet,
+                //    otherwise the harvest habit starves the rest of the chain.
+                if (!canProcess && HasRawProductionSite(context.AvailableObjects))
                 {
                     candidates.Add(new BehaviorCandidate(
                         Produce,
@@ -153,8 +167,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                         Tags: new[] { "FoodEconomy" }));
                 }
 
-                // 5) Foraging fallback — no ready Food object here → move toward one.
-                if (!HasCategory(context.AvailableObjects, WorldObjectCategory.Food))
+                // 5) Foraging fallback — no ready Food object here and no way to get a meal here → move toward one.
+                if (!HasCategory(context.AvailableObjects, WorldObjectCategory.Food) && candidates.Count == 0)
                 {
                     candidates.Add(new BehaviorCandidate(
                         MoveToFood,
@@ -187,12 +201,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             // surplus. Low fixed utility — this only wins when no pressing need competes (closes the
             // farmer/baker → coin loop). Affordability is not relevant on the sell side.
             if (context.HeldObjects is { } held2
-                && context.State.NeedFood <= MaxNeedToSell
+                && (context.State.NeedFood <= MaxNeedToSell || (onFoodShift && context.State.NeedFood < ShiftSellMaxNeed))
                 && HasSellableSurplus(held2, context.AvailableObjects, context.Now))
             {
                 candidates.Add(new BehaviorCandidate(
                     Sell,
-                    SellUtility,
+                    onFoodShift ? ShiftSellUtility : SellUtility,
                     WTimeSpan.FromMinutes(15),
                     BehaviorDomain.Physiological,
                     Tags: new[] { "FoodEconomy" }));
@@ -206,6 +220,35 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         #endregion IBehaviorNeedEngine
 
         #region Helpers
+
+        /// <summary>Hunger below which a producer on shift sells instead of keeping his output.</summary>
+        private const double ShiftSellMaxNeed = 50.0;
+
+        /// <summary>True when the active schedule slot is Work and the occupation is one that produces food for the shop.</summary>
+        private static bool IsOnFoodProductionShift(BehaviorContext context)
+        {
+            var schedule = context.HumanContext.Snapshot.Schedule;
+            return schedule?.ActiveSlot is { PreferredAction: Work }
+                   && !string.IsNullOrEmpty(schedule.Occupation)
+                   && OccupationIds.FoodProducerOccupations.Contains(schedule.Occupation);
+        }
+
+        private void AddShiftProduction(BehaviorContext context, List<BehaviorCandidate> candidates)
+        {
+            if (TryFindSatisfiableRecipe(context.AvailableObjects!, context.HeldObjects, out var recipe))
+            {
+                candidates.Add(new BehaviorCandidate(
+                    Process, ShiftProductionUtility, WTimeSpan.FromMinutes(recipe!.DurationMinutes),
+                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy" }));
+            }
+
+            else if (HasRawProductionSite(context.AvailableObjects!))
+            {
+                candidates.Add(new BehaviorCandidate(
+                    Produce, ShiftProductionUtility - 2.0, WTimeSpan.FromMinutes(30),
+                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy" }));
+            }
+        }
 
         /// <summary>
         /// Returns <c>true</c> when at least one object in the list belongs to
@@ -305,7 +348,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         {
             foreach (var obj in held)
             {
-                if (obj.Category == WorldObjectCategory.Food && Spoilage.Freshness(obj, now, _spoilage) > 0.0)
+                if (FoodItemCatalog.IsEdible(obj) && Spoilage.Freshness(obj, now, _spoilage) > 0.0)
                     return true;
             }
             return false;
@@ -358,7 +401,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             IReadOnlyList<WorldObject> availableObjects,
             IReadOnlyList<WorldObject>? heldObjects)
         {
-            var pool = (heldObjects ?? Array.Empty<WorldObject>()).Concat(availableObjects);
+            var pool = (heldObjects ?? Array.Empty<WorldObject>()).Concat(availableObjects.Where(o => o.IsPickable && o.Price is null));
             var usedIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var input in recipe.Inputs)
             {

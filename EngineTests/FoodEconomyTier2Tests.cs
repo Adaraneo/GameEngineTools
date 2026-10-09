@@ -309,6 +309,42 @@ namespace EngineTests
                 "The sold item enters the shop's stock at the current location.");
         }
 
+        [TestMethod]
+        public void Sell_ToAnEmptyShelf_UsesTheCounterAndTheLedgerPrice()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self));
+            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", PickupItemKind.Bread, "Pult"));
+            var engine = MakeObjectEngine(provider);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Sell, WTimeSpan.FromMinutes(15)),
+                BehaviorComponentTestFactory.Context(selfId: self).HumanContext, outbox);
+
+            var sold = outbox.Drain().OfType<Sold>().SingleOrDefault();
+            Assert.IsNotNull(sold, "A counter is enough for the shop to buy.");
+            Assert.IsTrue(sold!.Price > 0.0);
+            Assert.AreEqual(1, provider.GetObjectsAt(Loc).Count(o => o.ShopId == "bakery" && o.Price is not null), "The loaf is now on the shelf.");
+        }
+
+        [TestMethod]
+        public void Process_WithSeveralSitesAtOneLocation_RunsTheOneTheInputsCover()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, PickupItemKind.Flour, "Mlýn"));
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec"));
+            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            var engine = MakeObjectEngine(provider);
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Process, WTimeSpan.FromMinutes(90)),
+                BehaviorComponentTestFactory.Context(selfId: self).HumanContext, new EventCollector());
+
+            Assert.IsTrue(provider.GetHeldBy(self).Any(o => o.ItemKind == PickupItemKind.Bread),
+                "Flour in hand bakes into bread even though the mill is listed first.");
+        }
+
         // ── §6 ContingencySearch Buy branch ──────────────────────────────────────────
 
         [TestMethod]

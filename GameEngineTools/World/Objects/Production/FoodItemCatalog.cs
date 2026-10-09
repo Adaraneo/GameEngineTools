@@ -39,6 +39,10 @@ namespace GameEngineTools.World.Objects.Production
             };
         }
 
+        /// <summary>True for food that can be eaten as it is; raw ingredients (grain, flour) are Food-category but only ownable.</summary>
+        public static bool IsEdible(WorldObject o)
+            => o.Category == WorldObjectCategory.Food && o.Affordances.Any(a => a.Type == AffordanceType.Hunger);
+
         private static (WorldObjectCategory Category, string Name, ImmutableArray<WorldObjectAffordance> Affordances, int Weight)
             Profile(PickupItemKind kind) => kind switch
         {

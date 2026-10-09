@@ -8,6 +8,8 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Behavior.Modifiers;
     using GameEngineTools.Characters.Engines.Behavior.Needs;
     using GameEngineTools.Characters.Engines.Objects;
+    using GameEngineTools.Characters.Engines.Schedule;
+    using GameEngineTools.Characters.Hosting;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
@@ -183,6 +185,108 @@ namespace EngineTests
             Assert.IsTrue(candidates.Any(c => c.Name == Produce), "Produce must survive when a raw site is co-located.");
             Assert.IsFalse(candidates.Any(c => c.Name == Process),
                 "Process must still be gated out — a raw site has no recipe.");
+        }
+
+        // ── Supply chain: fixtures, edibility, shifts ───────────────────────────────
+
+        [TestMethod]
+        public void Process_DoesNotConsumeAProductionSiteFixtureAsAnIngredient()
+        {
+            var provider = new MemProvider();
+            var svc = new ProductionService(provider);
+            var ctx = Ctx(out _);
+            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, PickupItemKind.Flour, "Mlýn"));
+
+            var bread = svc.Process(ctx, Loc, PickupItemKind.Bread, new WDateTime(0));
+
+            Assert.IsNull(bread, "The mill itself (ItemKind Flour) is not flour to bake with.");
+            Assert.IsTrue(provider.GetObjectsAt(Loc).Any(o => o.Id == "mill"), "The mill fixture must survive.");
+        }
+
+        [TestMethod]
+        public void Bridge_RawIngredientsAreNotEatable()
+        {
+            var engine = new ContingencySearchEngine();
+            var held = new List<WorldObject>
+            {
+                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
+                FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), null),
+            };
+
+            var output = engine.Evaluate(BridgeContext(hunger: 80, available: new(), held: held, now: new WDateTime(0)));
+
+            Assert.IsFalse(output.Candidates.Any(c => c.Name == EatStored), "Grain and flour only have an ownership affordance.");
+        }
+
+        [TestMethod]
+        public void Bridge_HungryAtProductionSite_ProducesInsteadOfForagingAway()
+        {
+            var engine = new ContingencySearchEngine();
+            var field = ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole");
+
+            var output = engine.Evaluate(BridgeContext(hunger: 80, available: new() { field }, held: new(), now: new WDateTime(0)));
+
+            Assert.IsTrue(output.Candidates.Any(c => c.Name == Produce));
+            Assert.IsFalse(output.Candidates.Any(c => c.Name == MoveToFood), "A local way to get a meal beats walking off to forage.");
+        }
+
+        [TestMethod]
+        public void Bridge_HungryWithGrainAtMill_ProcessesBeforeHarvestingMore()
+        {
+            var engine = new ContingencySearchEngine();
+            var held = new List<WorldObject>
+            {
+                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
+                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
+            };
+            var available = new List<WorldObject>
+            {
+                ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole"),
+                ProductionSiteFactory.Create("mill", Loc, PickupItemKind.Flour, "Mlýn"),
+            };
+
+            var output = engine.Evaluate(BridgeContext(hunger: 80, available: available, held: held, now: new WDateTime(0)));
+
+            Assert.IsTrue(output.Candidates.Any(c => c.Name == Process));
+            Assert.IsFalse(output.Candidates.Any(c => c.Name == Produce), "Harvest only when there is nothing to process.");
+        }
+
+        [TestMethod]
+        public void Bridge_FarmerOnWorkShift_ProducesWithoutBeingHungry_ButAHealerDoesNot()
+        {
+            var engine = new ContingencySearchEngine();
+            var field = ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole");
+
+            Assert.IsTrue(
+                engine.Evaluate(ShiftContext(OccupationIds.Farmer, field)).Candidates.Any(c => c.Name == Produce),
+                "A farmer on shift works the field even when fed.");
+            Assert.IsFalse(
+                engine.Evaluate(ShiftContext(OccupationIds.Healer, field)).Candidates.Any(c => c.Name == Produce),
+                "Only food-producing occupations produce on shift.");
+        }
+
+        [TestMethod]
+        public void Bridge_ProducerOnShiftHoldingBread_SellsToTheCounterEvenWhenTheShelfIsEmpty()
+        {
+            var engine = new ContingencySearchEngine();
+            var counter = ShopCounterFactory.Create("counter", Loc, "bakery_shop", PickupItemKind.Bread, "Pult");
+            var bread = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null);
+
+            var output = engine.Evaluate(ShiftContext(OccupationIds.Farmer, counter, held: new() { bread }));
+
+            Assert.IsTrue(output.Candidates.Any(c => c.Name == Sell && c.Utility > 40.0),
+                "The shop keeps trading bread after the last loaf is sold, and a working producer takes the sale.");
+        }
+
+        private static BehaviorContext ShiftContext(string occupation, WorldObject fixture, List<WorldObject>? held = null)
+        {
+            var ctx = BehaviorComponentTestFactory.Context(hunger: 10, thirst: 5, now: new WDateTime(0));
+            var slot = new ScheduleSlot("work", 5, Work);
+            ((HumanContext)ctx.HumanContext).Snapshot = ctx.HumanContext.Snapshot with
+            {
+                Schedule = new DailyScheduleState(new[] { slot }, slot, 0, occupation),
+            };
+            return ctx with { AvailableObjects = new List<WorldObject> { fixture }, HeldObjects = held ?? new List<WorldObject>() };
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────────────

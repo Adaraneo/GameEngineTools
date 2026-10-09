@@ -172,7 +172,7 @@ namespace GameEngineTools.World.Objects
         /// <summary>
         /// Identifies which shop's stock this object belongs to, for <c>EconomyLedger</c>
         /// price-adjustment bookkeeping (stock level per shop per <see cref="ItemKind"/>).
-        /// <c>null</c> when <see cref="Price"/> is also <c>null</c>. Food-economy Tier 2.
+        /// <c>null</c> when <see cref="Price"/> is also <c>null</c>, except on a shop counter (<see cref="Production.ShopCounterFactory"/>). Food-economy Tier 2.
         /// </summary>
         public string? ShopId { get; init; } = null;
 

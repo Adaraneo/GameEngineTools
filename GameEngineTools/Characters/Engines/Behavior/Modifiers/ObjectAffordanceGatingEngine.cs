@@ -138,7 +138,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             IReadOnlyList<WorldObject>? heldObjects)
         {
             var hasHeldFood = heldObjects is not null
-                && heldObjects.Any(o => o.Category == WorldObjectCategory.Food);
+                && heldObjects.Any(FoodItemCatalog.IsEdible);
             if (!hasHeldFood)
                 candidates.RemoveAll(c => c.Name == EatStored);
 

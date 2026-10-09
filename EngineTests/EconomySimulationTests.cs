@@ -37,7 +37,7 @@ namespace EngineTests
 
         private sealed record Result(
             List<IHuman> Humans, double StartWealth, double EndWealth, double Wages, double Spent, double Earned,
-            int Bought, int Eaten, List<double> Prices, List<double> BuyPrices, int ShopStock);
+            int Bought, int Eaten, List<double> Prices, List<double> BuyPrices, int ShopStock, double MeanHunger, int Produced, bool SitesIntact);
 
         private Result RunVillage(int days)
         {
@@ -45,12 +45,14 @@ namespace EngineTests
             var humans = BuildVillage(out var occupations);
             var clock = (TestClock)ServiceProvider.GetRequiredService<IClock>();
             var now = clock.Now;
-            var dt = WTimeSpan.FromHours(1);
-            var ticks = (int)(days * WWorld.Spec.HoursPerDay);
+            var dt = WTimeSpan.FromMinutes(30);
+            var ticks = (int)(days * WWorld.Spec.HoursPerDay * 2);
 
             var actions = new Dictionary<string, int>();
             var prices = new List<double>();
             var buyPrices = new List<double>();
+            double hungerSum = 0;
+            var hungerSamples = 0;
             double wages = 0, spent = 0, earned = 0;
             int bought = 0, sold = 0, eaten = 0, produced = 0;
             var startWealth = humans.Sum(h => h.Snapshot.Economy?.Wealth ?? 0.0);
@@ -82,6 +84,12 @@ namespace EngineTests
                     }
                 }
 
+                foreach (var h in humans)
+                {
+                    hungerSum += h.Snapshot.Physiology.Hunger;
+                    hungerSamples++;
+                }
+
                 now += dt;
                 clock.SetNow(now);
             }
@@ -91,6 +99,7 @@ namespace EngineTests
             var stock = _buffer.GetObjectsAt(Village).Count(o => o.ShopId == Shop);
             var all = _buffer.GetAllObjects().Where(o => o.LocationId == Village || o.HeldBy is not null).ToList();
 
+            report.AppendLine($"mean hunger {hungerSum / hungerSamples:F1}");
             report.AppendLine($"days={days} ticks={ticks} humans={humans.Count}");
             report.AppendLine($"wealth {startWealth:F1} -> {endWealth:F1} | wages {wages:F1} spent {spent:F1} earned {earned:F1}");
             report.AppendLine($"bought {bought} sold {sold} eaten {eaten} produced/processed {produced} | shop stock {stock}");
@@ -101,7 +110,8 @@ namespace EngineTests
                 report.AppendLine($"  {occupations[h.Id]}: wealth {(h.Snapshot.Economy?.Wealth ?? 0):F1} hunger {h.Snapshot.Physiology.Hunger:F0}");
             Console.WriteLine(report.ToString());
 
-            return new Result(humans, startWealth, endWealth, wages, spent, earned, bought, eaten, prices, buyPrices, stock);
+            return new Result(humans, startWealth, endWealth, wages, spent, earned, bought, eaten, prices, buyPrices, stock, hungerSum / hungerSamples, produced,
+                new[] { "econ_field", "econ_mill", "econ_oven", "econ_counter" }.All(id => _buffer.FindObject(id) is not null));
         }
 
         [TestMethod]
@@ -120,13 +130,23 @@ namespace EngineTests
         }
 
         [TestMethod]
-        [Ignore("Known gap: nothing restocks the shop, so a closed village starves once the initial stock is sold (docs/todo-list.md).")]
+        public void Village_Run_ProductionChainKeepsRunningAndKeepsItsFixtures()
+        {
+            var r = RunVillage(days: 14);
+
+            Assert.IsTrue(r.SitesIntact, "Field, mill, oven and counter must survive weeks of production.");
+            Assert.IsTrue(r.Produced > 200, $"Grain must be harvested and processed into bread continuously (got {r.Produced}).");
+            Assert.IsTrue(r.Eaten > 100, $"The bread must be eaten (got {r.Eaten}).");
+        }
+
+        [TestMethod]
+        [Ignore("Calibration gap: a loaf costs ~3 labor-hours and relieves one 30-minute meal, so the village sits at mean hunger ~88 and never has surplus to sell (docs/todo-list.md).")]
         public void Village_Run_FeedsItsInhabitantsFromItsOwnProduction()
         {
             var r = RunVillage(days: 28);
 
-            Assert.IsTrue(r.Humans.All(h => h.Snapshot.Physiology.Hunger < 90), "Nobody may be starving after four weeks.");
-            Assert.IsTrue(r.ShopStock > 0 || r.Earned > 0, "Production must reach the shop.");
+            Assert.IsTrue(r.MeanHunger < 60, $"Mean hunger over the run must stay moderate (was {r.MeanHunger:F0}).");
+            Assert.IsTrue(r.Earned > 0, "Surplus must reach the shop.");
         }
 
         [TestMethod]
@@ -168,6 +188,7 @@ namespace EngineTests
             _buffer.AddObject(Fixture("econ_well", "Studna", WorldObjectCategory.Drink, AffordanceType.Thirst));
             for (var b = 0; b < 8; b++)
                 _buffer.AddObject(Fixture($"econ_bed_{b}", "Postel", WorldObjectCategory.Shelter, AffordanceType.Rest));
+            _buffer.AddObject(ShopCounterFactory.Create("econ_counter", Village, Shop, PickupItemKind.Bread, "Pult"));
             for (var i = 0; i < 8; i++)
                 _buffer.AddObject(FoodItemCatalog.Create(PickupItemKind.Bread, Village, now, null) with { Price = 2.0, ShopId = Shop });
 

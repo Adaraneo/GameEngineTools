@@ -73,6 +73,9 @@ namespace GameEngineTools.Characters.Engines.Objects
 
         #region Private helpers
 
+        /// <summary>A recipe input lying about must be a free, pickable item: not a production-site fixture and not priced shop stock.</summary>
+        private static bool IsLooseIngredient(WorldObject o) => o.IsPickable && o.Price is null;
+
         /// <summary>
         /// Checks and removes every recipe input from the character's held inventory or the current
         /// location. All-or-nothing: if any input is short, nothing is consumed.
@@ -81,7 +84,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         {
             var held = _objectProvider.GetHeldBy(ctx.Id).ToList();
             var atLocation = _objectProvider.GetObjectsAt(locationId)
-                .Where(o => o.HeldBy is null && o.IsAvailable)
+                .Where(o => o.HeldBy is null && o.IsAvailable && IsLooseIngredient(o))
                 .ToList();
 
             var usedIds = new HashSet<string>(StringComparer.Ordinal);

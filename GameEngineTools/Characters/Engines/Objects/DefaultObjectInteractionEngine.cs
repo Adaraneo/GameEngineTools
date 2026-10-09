@@ -287,7 +287,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         {
             var now = committed.OccurredAt;
             var held = _objectProvider.GetHeldBy(ctx.Id)
-                                      .Where(o => o.Category == WorldObjectCategory.Food)
+                                      .Where(FoodItemCatalog.IsEdible)
                                       .ToList();
             if (held.Count == 0)
                 return;
@@ -353,11 +353,15 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (locationId is null)
                 return;
 
-            var outputKind = ResolveProductionOutput(locationId, wantRecipe: true);
-            if (outputKind is null)
-                return;
+            // Several processing sites can share a location (mill and oven): run the first one whose recipe the inputs cover.
+            WorldObject? produced = null;
+            foreach (var siteOutput in ResolveProcessingOutputs(locationId))
+            {
+                produced = _production.Process(ctx, locationId, siteOutput, committed.OccurredAt);
+                if (produced is not null)
+                    break;
+            }
 
-            var produced = _production.Process(ctx, locationId, outputKind.Value, committed.OccurredAt);
             if (produced is null)
                 return; // insufficient inputs — nothing consumed
 
@@ -407,7 +411,7 @@ namespace GameEngineTools.Characters.Engines.Objects
                 return;
 
             // Recompute the shop's posted price against the reduced stock (excludes the now-held object).
-            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
+            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o));
             var oldPrice = _economyLedger.GetPrice(shopId, kind, price);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig, price, newStock + 1);
             PostPrice(location, shopId, kind, newPrice);
@@ -420,7 +424,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <summary>Writes the shop's new posted price onto every in-stock object of that kind, so the next Buy really charges it.</summary>
         private void PostPrice(string location, string shopId, PickupItemKind kind, double price)
         {
-            foreach (var stocked in _objectProvider.GetObjectsAt(location).Where(o => o.ShopId == shopId && o.ItemKind == kind).ToList())
+            foreach (var stocked in _objectProvider.GetObjectsAt(location).Where(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o)).ToList())
             {
                 if (stocked.Price is { } current && Math.Abs(current - price) < 1e-9)
                     continue;
@@ -471,7 +475,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             var kind = item.ItemKind;
             var askPrice = shop.Price ?? _economyLedger.GetPrice(shopId, kind);
             var salePrice = askPrice * _economyConfig.ShopBuyBackFraction;
-            var oldStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind);
+            var oldStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o));
 
             // Move the item from the seller's hand into the shop's stock, relisted at the shop's ask.
             _objectProvider.RemoveObject(item.LocationId, item.Id);
@@ -502,6 +506,15 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <c>ItemKind</c> either has a recipe (<paramref name="wantRecipe"/> = true → processing site)
         /// or has none (raw production site). Returns <c>null</c> when no matching site is present.
         /// </summary>
+        private IEnumerable<PickupItemKind> ResolveProcessingOutputs(string locationId)
+        {
+            foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
+            {
+                if (o.Affordances.Any(a => a.Type == AffordanceType.Production) && RecipeRegistry.FindByOutput(o.ItemKind) is not null)
+                    yield return o.ItemKind;
+            }
+        }
+
         private PickupItemKind? ResolveProductionOutput(string locationId, bool wantRecipe)
         {
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))

@@ -62,6 +62,10 @@ namespace GameEngineTools.Characters.Engines.Schedule
         public static IReadOnlySet<string> PhysicalOccupations { get; } =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Guard, Laborer, Farmer };
 
+        /// <summary>Built-in occupations whose working day produces and processes food for the shop.</summary>
+        public static IReadOnlySet<string> FoodProducerOccupations { get; } =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Farmer, Craftsperson };
+
         /// <summary>
         /// Built-in occupations that are sedentary / intellectual.
         /// Only these (plus <see cref="None"/>) are available for <c>Old</c> characters
