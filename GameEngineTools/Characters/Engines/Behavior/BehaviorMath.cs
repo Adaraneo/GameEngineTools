@@ -34,9 +34,14 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         #region Need formulas
 
-        // Scales two-process sleep propensity (about 0.1 around 22:00, 0.3 around midnight) into NeedRest points, so a
-        // moderately tired character crosses the sleep-prompt threshold (70) in the evening rather than after a day awake.
-        internal const double SleepPropensityNeedWeight = 300.0;
+        // Turns sleep propensity (S - H(t), 0 at the model's habitual bedtime) into NeedRest points: 100 points per 0.04 of propensity, so the
+        // existing prompt threshold of 70 is crossed right when S reaches the circadian sleep-onset threshold. Calibrated by simulation
+        // (8 days, 24/26/40 h days, 2 characters): bedtime settles around 23:30-00:00 with 8-9 h of sleep, as the bare model predicts.
+        internal const double SleepPropensityNeedWeight = 2500.0;
+
+        // The prompt comes slightly before S reaches the threshold H(t): getting to bed and falling asleep takes about half an hour,
+        // during which propensity rises by about 0.03.
+        internal const double SleepOnsetLead = 0.03;
 
         internal static BehaviorState ComputeNeedState(IHumanContext ctx, IReadOnlyDictionary<string, double> cooldowns, BehaviorState state)
         {
@@ -47,7 +52,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             return state with
             {
                 NeedRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2
-                    + SleepPropensityNeedWeight * Math.Max(0.0, ph.SleepPropensity ?? 0.0)),
+                    + SleepPropensityNeedWeight * Math.Max(0.0, (ph.SleepPropensity ?? double.NegativeInfinity) + SleepOnsetLead)),
                 NeedFood = Clamp01p(ph.Hunger),
                 NeedWater = Clamp01p(ph.Thirst),
                 // B2: Extraversion modulates social belonging pressure.

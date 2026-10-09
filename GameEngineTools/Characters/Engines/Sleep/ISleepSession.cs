@@ -66,13 +66,18 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <param name="outbox">Event collector for this tick.</param>
         /// <param name="companion">Optional companion for shared sleep.</param>
         /// <param name="sharedType">The shared-sleep type — must be set if <paramref name="companion"/> != null.</param>
+        /// <param name="spontaneousWake">
+        /// When set, <paramref name="plannedWakeUp"/> is only the latest possible wake-up and the session ends on its own once the
+        /// circadian waking threshold is reached (see <see cref="SpontaneousWake"/>). <c>null</c> = fixed wake-up (alarm).
+        /// </param>
         void Begin(
             WDateTime now,
             WDateTime plannedWakeUp,
             IHumanContext ctx,
             IEventCollector outbox,
             HumanId? companion = null,
-            SharedSleepType? sharedType = null);
+            SharedSleepType? sharedType = null,
+            SpontaneousWake? spontaneousWake = null);
 
         /// <summary>
         /// Continuous tick — advances time in the session, switches phases,
@@ -99,4 +104,12 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
         #endregion Lifecycle
     }
+
+    /// <summary>
+    /// Parameters of a sleep that ends spontaneously, when Process S has decayed to the circadian waking threshold
+    /// (Daan, Beersma &amp; Borbély 1984) rather than after a fixed duration.
+    /// </summary>
+    /// <param name="MinHours">Shortest spontaneous sleep; the character does not wake on its own before this.</param>
+    /// <param name="ReferenceHours">Duration that counts as fully restorative when scoring the sleep quality of an interrupted sleep.</param>
+    public sealed record SpontaneousWake(double MinHours, double ReferenceHours);
 }

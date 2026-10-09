@@ -117,8 +117,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                         sleepHours = Math.Max(sleepHours, _behaviorCfg.MinSleepHours);
                     }
 
-                    var plannedWakeUp = sc.PlannedWakeUp != default ? sc.PlannedWakeUp : sc.OccurredAt + WTimeSpan.FromHours(sleepHours);
-                    session.Begin(sc.OccurredAt, plannedWakeUp, ctx, outbox, sc.Companion, sc.SharedType);
+                    // Without an alarm the character wakes on its own when Process S reaches the circadian waking threshold;
+                    // the clamped duration (shortened by hunger) is then only the quality reference and the longest sleep is MaxSleepHours.
+                    var alarm = sc.PlannedWakeUp != default;
+                    var plannedWakeUp = alarm
+                        ? sc.PlannedWakeUp
+                        : sc.OccurredAt + WTimeSpan.FromHours(Math.Max(sleepHours, _behaviorCfg.MaxSleepHours));
+                    var spontaneous = alarm ? null : new SpontaneousWake(_behaviorCfg.MinSleepHours, sleepHours);
+                    session.Begin(sc.OccurredAt, plannedWakeUp, ctx, outbox, sc.Companion, sc.SharedType, spontaneous);
                     _activeSession = session;
                     using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepStarted(ctx.Id.Value.ToString(), sleepHours);
                     return state with { WaitingForSleepConfirmation = false, SleepGraceExpiresAt = null, SleepDeclineCount = 0, CurrentPlan = new PlannedAction(Sleep, sc.OccurredAt, WTimeSpan.FromHours(sleepHours), 100) };

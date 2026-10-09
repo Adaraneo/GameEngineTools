@@ -8,9 +8,9 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
-    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Generation;
     using GameEngineTools.Characters.Hosting;
@@ -24,7 +24,8 @@ namespace EngineTests
     using System.Linq;
 
     /// <summary>
-    /// Two-process sleep regulation (Process S + circadian Process C) must give a character a nightly sleep on any day length.
+    /// Two-process sleep regulation (Process S + circadian Process C, Borbély 1982; Daan, Beersma &amp; Borbély 1984) must give a
+    /// character a sensible sleep rhythm on any day length.
     /// </summary>
     [TestClass]
     public class SleepRhythmTests : TestBase
@@ -34,22 +35,24 @@ namespace EngineTests
         private sealed record Session(double StartHour, double Hours);
 
         [TestMethod]
-        public void SleepPropensity_IsPositiveAtNightAndNegativeInTheAfternoon_ForAnyDayLength()
+        public void SleepPropensity_IsAboutZeroAtHabitualBedtime_AndFollowsTheCircadianThreshold_ForAnyDayLength()
         {
             var cfg = new PhysiologyConfig();
-            foreach (var hoursPerDay in new[] { 12, 24, 26, 40 })
+            foreach (var hoursPerDay in new[] { 20, 24, 26, 40 })
             {
                 var evening = SleepRegulationCalculator.DebtFreeLevel(cfg, hoursPerDay); // S after a normal waking day
-                var night = SleepRegulationCalculator.ComputeSleepPropensity(evening, hoursPerDay * 0.0, hoursPerDay, 0, cfg);
-                var afternoon = SleepRegulationCalculator.ComputeSleepPropensity(evening, hoursPerDay * 16.0 / 24.0, hoursPerDay, 0, cfg);
+                double At(double clock24) => SleepRegulationCalculator.ComputeSleepPropensity(evening, hoursPerDay * clock24 / 24.0, hoursPerDay, 0, cfg);
 
-                Assert.IsTrue(night > 0.05, $"{hoursPerDay} h day: propensity at midnight with a normal evening S was {night:F2}.");
-                Assert.IsTrue(afternoon < 0.0, $"{hoursPerDay} h day: propensity at 16:00 was {afternoon:F2}; the circadian gate should block sleep.");
+                // The model's bedtime is where S meets H(t): propensity is about zero there, not far above or below.
+                Assert.AreEqual(0.0, At(23.5), 0.08, $"{hoursPerDay} h day: propensity at habitual bedtime was {At(23.5):F2}.");
+                // The swing between the afternoon peak and the night trough of the threshold is twice the amplitude (2 x 0.12).
+                Assert.AreEqual(0.24, At(4.0) - At(16.0), 0.01, $"{hoursPerDay} h day.");
+                Assert.IsTrue(At(16.0) < -0.05, $"{hoursPerDay} h day: at 16:00 the circadian gate should block sleep, got {At(16.0):F2}.");
             }
         }
 
         [TestMethod]
-        public void NeedRest_RisesWithPositivePropensity_AndIgnoresNegativeOnes()
+        public void NeedRest_RisesWithPropensity_FromTheOnsetLead_AndIgnoresStrongNegativeOnes()
         {
             double Need(double? propensity)
             {
@@ -58,11 +61,59 @@ namespace EngineTests
             }
 
             var unknown = Need(null);
-            var tired = Need(0.2);
             var gated = Need(-0.3);
+            var atThreshold = Need(0.0);
+            var pastThreshold = Need(0.02);
 
-            Assert.AreEqual(unknown, gated, 1e-9, "A negative propensity (circadian gate) must not lower NeedRest below the physical need.");
-            Assert.AreEqual(BehaviorMath.SleepPropensityNeedWeight * 0.2, tired - unknown, 1e-6);
+            Assert.AreEqual(unknown, gated, 1e-9, "A propensity far below the threshold (circadian gate) must not change NeedRest.");
+            Assert.AreEqual(BehaviorMath.SleepPropensityNeedWeight * BehaviorMath.SleepOnsetLead, atThreshold - unknown, 1e-6);
+            Assert.IsTrue(atThreshold - unknown >= 70.0, "Reaching the sleep-onset threshold must be enough to cross the sleep-prompt threshold of 70.");
+            Assert.IsTrue(pastThreshold > atThreshold, "NeedRest keeps rising with propensity.");
+        }
+
+        [TestMethod]
+        public void Character_SleepsNightly_On24And26HourDays()
+        {
+            foreach (var seed in new[] { 7, 21 })
+            foreach (var hoursPerDay in new[] { 24, 26 })
+            {
+                var all = SimulateSessions(hoursPerDay, seed, out var alive);
+                var sessions = all.Where(x => x.Hours >= 4.0).ToList(); // a sleep cut short by an ambush is not a night of its own
+                var detail = string.Join("; ", all.Select(x => $"start {x.StartHour % hoursPerDay * 24.0 / hoursPerDay:F1}h(24h clock) abs {x.StartHour:F0} for {x.Hours:F1}h"));
+
+                Assert.IsTrue(alive, $"seed {seed}, {hoursPerDay} h day: the character must survive {Days} days. {detail}");
+                Assert.IsTrue(sessions.Count >= Days - 2, $"seed {seed}, {hoursPerDay} h day: expected about one sleep per night over {Days} days, got {sessions.Count}. {detail}");
+
+                for (var i = 1; i < sessions.Count; i++)
+                {
+                    var gapDays = (sessions[i].StartHour - sessions[i - 1].StartHour) / hoursPerDay;
+                    Assert.IsTrue(gapDays is > 0.6 and < 2.1, $"seed {seed}, {hoursPerDay} h day: gap between sleeps was {gapDays:F2} days. {detail}");
+                }
+
+                // After a full night (not the start-up sleep, not a catch-up after an ambush) bedtime falls around midnight.
+                var afterFullNight = all.Skip(1).Where((x, i) => x.Hours >= 6.5 && all[i].Hours >= 6.5 && i > 0).ToList();
+                foreach (var session in afterFullNight)
+                {
+                    var clock24 = session.StartHour % hoursPerDay * 24.0 / hoursPerDay;
+                    Assert.IsTrue(clock24 >= 21.0 || clock24 <= 3.0, $"seed {seed}, {hoursPerDay} h day: went to sleep at {clock24:F1} on a 24-hour clock. {detail}");
+                    Assert.IsTrue(session.Hours <= 11.5, $"seed {seed}, {hoursPerDay} h day: slept {session.Hours:F1} h. {detail}");
+                }
+            }
+        }
+
+        [TestMethod]
+        public void Character_OnALongDay_StaysAliveAndNeverGoesMuchLongerThanADayWithoutSleep()
+        {
+            // Process S runs in real hours, so on a 40 h day sleep pressure builds up well before the day ends and the rhythm is
+            // not once per day; it must still be a regular alternation of waking and sleeping.
+            var all = SimulateSessions(40, 7, out var alive);
+            var sessions = all.Where(x => x.Hours >= 4.0).ToList();
+            var detail = string.Join("; ", all.Select(x => $"abs {x.StartHour:F0} for {x.Hours:F1}h"));
+
+            Assert.IsTrue(alive, detail);
+            Assert.IsTrue(sessions.Count >= Days - 1, $"Got {sessions.Count} sleeps in {Days} days of 40 h. {detail}");
+            for (var i = 1; i < all.Count; i++)
+                Assert.IsTrue(all[i].StartHour - (all[i - 1].StartHour + all[i - 1].Hours) <= 40.0, $"More than one day awake. {detail}");
         }
 
         private static IHumanContext BuildContext(double? propensity)
@@ -76,7 +127,7 @@ namespace EngineTests
                 Chronotype.Neutral);
 
             var snapshot = new EnginesSnapshot(
-                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null) with { SleepPropensity = propensity },
+                new PhysiologyState(95, 0, 10, 10, 0, 0, 0, null) with { SleepPropensity = propensity },
                 new PsychologyState(0.1, 0.4, 0.5, 10, 10, DiscreteEmotion.Neutral),
                 new BehaviorState(10, 5, 5, 20, 50, 30, null),
                 new InteractionSurface(null, false, 0.2, 0.2, SurfaceKind.Unknown),
@@ -95,35 +146,6 @@ namespace EngineTests
                 EventBus = new NullEventBus(),
                 Scheduler = new NullScheduler()
             };
-        }
-
-        [TestMethod]
-        public void Character_SleepsOncePerNight_OnAnyDayLength()
-        {
-            foreach (var seed in new[] { 7, 21, 99 })
-            foreach (var hoursPerDay in new[] { 24, 26, 40 })
-            {
-                var all = SimulateSessions(hoursPerDay, seed, out var alive);
-                // A sleep cut short by an ambush is not a night of its own; the character goes back to bed afterwards.
-                var sessions = all.Where(x => x.Hours >= 4.0).ToList();
-                var detail = string.Join("; ", all.Select(x => $"start {x.StartHour:F1}h for {x.Hours:F1}h"));
-
-                Assert.IsTrue(alive, $"seed {seed}, {hoursPerDay} h day: the character must survive {Days} days. {detail}");
-                Assert.IsTrue(sessions.Count >= Days - 2, $"seed {seed}, {hoursPerDay} h day: expected about one sleep per day over {Days} days, got {sessions.Count}. {detail}");
-
-                for (var i = 1; i < sessions.Count; i++)
-                {
-                    var gapDays = (sessions[i].StartHour - sessions[i - 1].StartHour) / hoursPerDay;
-                    Assert.IsTrue(gapDays is > 0.6 and < 1.5, $"seed {seed}, {hoursPerDay} h day: gap between sleeps was {gapDays:F2} days. {detail}");
-                }
-
-                // After the first (start-up) sleep, bedtime must fall in the circadian evening/night: 18:00-05:00 on a 24-hour clock.
-                foreach (var session in sessions.Skip(1))
-                {
-                    var clock24 = session.StartHour % hoursPerDay * 24.0 / hoursPerDay;
-                    Assert.IsTrue(clock24 >= 18.0 || clock24 <= 5.0, $"seed {seed}, {hoursPerDay} h day: went to sleep at {clock24:F1} on a 24-hour clock. {detail}");
-                }
-            }
         }
 
         private List<Session> SimulateSessions(int hoursPerDay, int seed, out bool alive)

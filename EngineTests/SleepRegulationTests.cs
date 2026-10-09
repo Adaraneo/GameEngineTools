@@ -64,22 +64,85 @@ namespace EngineTests
         #region Homeostatic / circadian dissociation
 
         [TestMethod]
-        public void SleepPropensity_RestedAtTrough_SleepierThan_DeprivedAtPeak()
+        public void SleepPropensity_DeprivedAtThePeak_IsStillSleepierThan_RestedAtTheTrough()
         {
             var cfg = new PhysiologyConfig();
 
-            // Rested character (low S) at the circadian trough (night ~3:00).
-            var thresholdTrough = SleepRegulationCalculator.CircadianThreshold(3.0, HoursPerDay, 0.0, cfg);
-            var restedTrough = SleepRegulationCalculator.SleepPropensity(0.30, thresholdTrough);
+            // Rested (low S) at the circadian trough (04:00): S is far below the sleep-onset threshold H(t) = 0.55 there, so sleep
+            // cannot start yet (sleep onset needs S to reach H, Daan, Beersma & Borbély 1984).
+            var restedTrough = SleepRegulationCalculator.ComputeSleepPropensity(0.30, 4.0, HoursPerDay, 0.0, cfg);
 
-            // Sleep-deprived character (high S) at the circadian alerting peak (afternoon).
-            var thresholdPeak = SleepRegulationCalculator.CircadianThreshold(cfg.ProcessCPeakHour, HoursPerDay, 0.0, cfg);
-            var deprivedPeak = SleepRegulationCalculator.SleepPropensity(0.95, thresholdPeak);
+            // Deprived (high S) at the afternoon peak of the threshold (16:00, H = 0.79): propensity is still positive.
+            var deprivedPeak = SleepRegulationCalculator.ComputeSleepPropensity(0.95, cfg.ProcessCPeakHour, HoursPerDay, 0.0, cfg);
 
-            Assert.IsTrue(restedTrough > deprivedPeak,
-                $"Rested-at-trough propensity ({restedTrough:F3}) must exceed deprived-at-peak ({deprivedPeak:F3}) — " +
-                "the dissociation the old flat sinusoid could not produce.");
-            Assert.IsTrue(restedTrough > 0, "A rested character at the circadian trough is still net sleepy.");
+            Assert.IsTrue(restedTrough < 0, $"A rested character cannot fall asleep at 04:00 ({restedTrough:F3}).");
+            Assert.IsTrue(deprivedPeak > 0, $"A sleep-deprived character is sleepy even at the circadian peak ({deprivedPeak:F3}); the circadian swing (2 x 0.12) cannot offset high pressure.");
+        }
+
+        [TestMethod]
+        public void CircadianThresholds_FollowDaan1984_AndPeakInTheAfternoon()
+        {
+            var cfg = new PhysiologyConfig();
+            double H(double hour) => SleepRegulationCalculator.CircadianThreshold(hour, HoursPerDay, 0.0, cfg);
+            double L(double hour) => SleepRegulationCalculator.WakeThreshold(hour, HoursPerDay, 0.0, cfg);
+
+            Assert.AreEqual(0.79, H(cfg.ProcessCPeakHour), 1e-9, "H0+ 0.67 + a 0.12");
+            Assert.AreEqual(0.55, H(cfg.ProcessCPeakHour + HoursPerDay / 2.0), 1e-9, "H0+ 0.67 - a 0.12, twelve hours later");
+            Assert.AreEqual(0.29, L(cfg.ProcessCPeakHour), 1e-9, "H0- 0.17 + a 0.12");
+            Assert.AreEqual(0.05, L(cfg.ProcessCPeakHour + HoursPerDay / 2.0), 1e-9, "H0- 0.17 - a 0.12");
+        }
+
+        /// <summary>
+        /// Hours slept from <paramref name="bedtimeClock24"/> until S has decayed to the waking threshold (not before 4 h).
+        /// Process S before bed is built up from 0.1 over <paramref name="awakeHours"/>.
+        /// </summary>
+        private static double SimulateSleepLength(double bedtimeClock24, double awakeHours)
+        {
+            var cfg = new PhysiologyConfig();
+            var s = SleepRegulationCalculator.BuildupProcessS(0.1, awakeHours, cfg);
+            const double step = 0.05;
+            for (var t = step; t < 24; t += step)
+            {
+                s = SleepRegulationCalculator.DecayProcessS(s, step, cfg);
+                var hour = (bedtimeClock24 + t) % 24.0;
+                if (t >= 4.0 && s <= SleepRegulationCalculator.WakeThreshold(hour, 24, 0.0, cfg))
+                    return t;
+            }
+
+            return 24;
+        }
+
+        [TestMethod]
+        public void NormalNight_LastsAboutEightHours_AndWakesAroundSevenOrEight()
+        {
+            // Zulley, Wever & Aschoff (1981): in synchronised subjects sleep began ~1.3 h before the temperature minimum and ended ~6.9 h
+            // after it, i.e. lasted ~8.3 h.
+            var length = SimulateSleepLength(bedtimeClock24: 23.0, awakeHours: 16);
+
+            Assert.IsTrue(length is > 7.0 and < 9.5, $"A normal night lasted {length:F1} h.");
+        }
+
+        [TestMethod]
+        public void SleepAfter40HoursAwake_IsOnlyAboutAnHourLonger_ThanAfter16()
+        {
+            // Åkerstedt & Gillberg (1986): after 40 h awake sleep at 23:00 lasted only about one hour longer than after 16 h awake, because
+            // the circadian waking threshold ends it; a pure homeostatic model would predict many more hours.
+            var normal = SimulateSleepLength(23.0, awakeHours: 16);
+            var deprived = SimulateSleepLength(23.0, awakeHours: 40);
+
+            Assert.IsTrue(deprived - normal is > 0.3 and < 2.0, $"Normal {normal:F1} h, after 40 h awake {deprived:F1} h.");
+        }
+
+        [TestMethod]
+        public void SleepStartingAfterTheCircadianMinimum_IsShortened()
+        {
+            // Zulley, Wever & Aschoff (1981): sleep that begins several hours after the temperature minimum lasts less than ~4-5 h,
+            // sleep that begins well before it can last 15 h or more.
+            var morning = SimulateSleepLength(bedtimeClock24: 8.0, awakeHours: 24);
+            var night = SimulateSleepLength(bedtimeClock24: 23.0, awakeHours: 16);
+
+            Assert.IsTrue(morning < 5.5, $"Sleep starting at 08:00 lasted {morning:F1} h.");
+            Assert.IsTrue(night - morning > 2.5, $"Night {night:F1} h vs morning {morning:F1} h.");
         }
 
         #endregion Homeostatic / circadian dissociation

@@ -6,17 +6,18 @@ namespace GameEngineTools.Characters.Engines.Physiology
     using System;
 
     /// <summary>
-    /// Pure, side-effect-free implementation of the Borbély (1982) two-process sleep model and the
+    /// Pure, side-effect-free implementation of the Borbély two-process sleep model and the
     /// Van Dongen (2003) cognitive dose-response. Process S is a saturating homeostatic pressure;
-    /// Process C is a circadian threshold; sleep propensity is the <i>distance</i> of S above the
-    /// C-modulated threshold (subtractive, not additive). Cognitive impairment is a <i>separate</i>
-    /// accumulator that — unlike S — does not saturate, reproducing the homeostatic/behavioural
-    /// dissociation under chronic restriction.
+    /// Process C modulates two thresholds — the upper one, H(t), at which sleep starts and the lower
+    /// one, L(t), at which it ends spontaneously. Sleep propensity is S − H(t), which is the same model
+    /// as an additive S + C interaction seen from the other side (Achermann &amp; Borbély 1994), not a
+    /// different one. Cognitive impairment is a <i>separate</i> accumulator that — unlike S — does not
+    /// saturate, reproducing the homeostatic/behavioural dissociation under chronic restriction.
     /// </summary>
     /// <remarks>
     /// Modelled as static functions (mirroring <see cref="NaturalMortalityCalculator"/>) so the
     /// dynamics can be unit-tested exhaustively and reused by the engine without DI.
-    /// Source: Borbély (1982); Daan, Beersma &amp; Borbély (1984); Van Dongen et al. (2003).
+    /// Source: Borbély (1982); Daan, Beersma &amp; Borbély (1984, Am J Physiol 246:R161); Achermann &amp; Borbély (1994, Biol Cybern 71:115); Van Dongen et al. (2003).
     /// </remarks>
     public static class SleepRegulationCalculator
     {
@@ -143,16 +144,49 @@ namespace GameEngineTools.Characters.Engines.Physiology
         }
 
         /// <summary>
-        /// Sleep propensity = distance of Process S above the Process C threshold. Positive values
+        /// Sleep propensity = Process S minus the circadian sleep-onset threshold H(t). Positive values
         /// mean the homeostatic pressure exceeds the circadian gate — the character is sleepy.
-        /// This threshold/subtractive form (not pure additive) is the defining feature of the
-        /// two-process model.
+        /// Equivalent to an additive S + C interaction (Achermann &amp; Borbély 1994); the literature
+        /// also relates sleepiness linearly to this difference.
         /// </summary>
         /// <param name="processS">Current Process S.</param>
         /// <param name="circadianThreshold">Current Process C threshold (see <see cref="CircadianThreshold"/>).</param>
         /// <returns>Sleep propensity (can be negative when the circadian gate dominates).</returns>
         public static double SleepPropensity(double processS, double circadianThreshold)
             => processS - circadianThreshold;
+
+        /// <summary>
+        /// Spontaneous-waking threshold L(t) = L0 + a·C(t): the same circadian shape and amplitude as the
+        /// sleep-onset threshold H(t) with a lower mean (<see cref="PhysiologyConfig.ProcessCWakeThresholdMean"/>).
+        /// Sleep ends when Process S decays to it; because L(t) rises after the circadian minimum, waking falls at a
+        /// consistent circadian phase (empirically ≈ 6.9 h after the core-temperature minimum, Zulley, Wever &amp;
+        /// Aschoff 1981) and a long period awake lengthens sleep only a little (Åkerstedt &amp; Gillberg 1986).
+        /// </summary>
+        /// <param name="hourOfDay">Fractional world hour of the day.</param>
+        /// <param name="hoursPerDay">Hours in a world day.</param>
+        /// <param name="circadianPhaseShiftHours">The character's circadian phase offset (chronotype + jet lag).</param>
+        /// <param name="cfg">Physiology configuration.</param>
+        /// <returns>The waking threshold in the same scale as Process S.</returns>
+        public static double WakeThreshold(
+            double hourOfDay, double hoursPerDay, double circadianPhaseShiftHours, PhysiologyConfig cfg)
+        {
+            ArgumentNullException.ThrowIfNull(cfg);
+            var amp = (cfg.ProcessCUpperThreshold - cfg.ProcessCLowerThreshold) / 2.0;
+            var peakHour = cfg.ProcessCPeakHour * hoursPerDay / 24.0 + circadianPhaseShiftHours;
+            var phase = (hourOfDay - peakHour) * 2.0 * Math.PI / hoursPerDay;
+            return cfg.ProcessCWakeThresholdMean + amp * Math.Cos(phase);
+        }
+
+        /// <summary>Process S minus the waking threshold L(t); a sleeping character wakes spontaneously once it is ≤ 0.</summary>
+        /// <param name="processS">Current Process S [0..1].</param>
+        /// <param name="hourOfDay">Fractional world hour of the day.</param>
+        /// <param name="hoursPerDay">Hours in a world day.</param>
+        /// <param name="circadianPhaseShiftHours">The character's circadian phase offset (chronotype + jet lag).</param>
+        /// <param name="cfg">Physiology configuration.</param>
+        /// <returns>The wake margin (positive while still too much sleep pressure to wake).</returns>
+        public static double ComputeWakeMargin(
+            double processS, double hourOfDay, double hoursPerDay, double circadianPhaseShiftHours, PhysiologyConfig cfg)
+            => processS - WakeThreshold(hourOfDay, hoursPerDay, circadianPhaseShiftHours, cfg);
 
         /// <summary>
         /// Sleep propensity at a given moment: Process S minus the Process C threshold for the time of day.

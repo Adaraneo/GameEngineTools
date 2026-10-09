@@ -390,11 +390,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double ProcessSUpperAsymptote = 1.0,
         /// <summary>Lower asymptote of Process S after a long sleep, normalized. Default 0.0.</summary>
         double ProcessSLowerAsymptote = 0.0,
-        /// <summary>Process C upper (daytime) circadian threshold — hardest to fall asleep. Default 0.90; deliberately wider than Daan 1984 (0.67 ± 0.12) because waking is not gated by C here.</summary>
-        double ProcessCUpperThreshold = 0.90,
-        /// <summary>Process C lower (nighttime) circadian threshold — easiest to fall asleep. Default 0.17.</summary>
-        double ProcessCLowerThreshold = 0.17,
-        /// <summary>Hour of day at which the Process C alerting threshold peaks (afternoon). Default 16.0.</summary>
+        /// <summary>Highest value of the circadian sleep-onset threshold H(t) (late afternoon/evening, hardest to fall asleep). Default 0.79 = 0.67 + 0.12. Source: Daan, Beersma &amp; Borbély 1984 (H0+ ≈ 0.67, circadian amplitude a ≈ 0.12), as restated in Borbély et al. 2016 and Skeldon et al.</summary>
+        double ProcessCUpperThreshold = 0.79,
+        /// <summary>Lowest value of the circadian sleep-onset threshold H(t) (circadian night, easiest to fall asleep). Default 0.55 = 0.67 − 0.12. Same source.</summary>
+        double ProcessCLowerThreshold = 0.55,
+        /// <summary>Hour of day (24-hour clock) at which the sleep-onset threshold H(t) peaks. Default 16.0 = 12 h after the circadian minimum at 04:00 (Borbély et al. 2016 place the minimum at 04:00-06:00); the evening wake maintenance zone (Lavie 1986) lies on its falling flank.</summary>
         double ProcessCPeakHour = 16.0,
         // ── Van Dongen cognitive deficit (dose-response, separate accumulator from S) ──
         /// <summary>Behavioural cognitive deficit accrued per awake hour (base rate; modulated up when Process S is high). Source: Van Dongen et al. 2003.</summary>
@@ -404,7 +404,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Process S level above which the awake cognitive-deficit accrual is amplified (chronic restriction). Source: Van Dongen et al. 2003.</summary>
         double CognitiveDeficitRestrictionThreshold = 0.55,
         /// <summary>Process S level above which <c>SleepDebtHours</c> accrues. <c>null</c> (default) derives it from the world's day length as the steady-state evening level of a normal waking/sleeping cycle (see <see cref="SleepRegulationCalculator.DebtFreeLevel"/>), so a normal day carries no debt on any planet; chronic restriction is tracked by the cognitive deficit.</summary>
-        double? ProcessSDebtFreeLevel = null)
+        double? ProcessSDebtFreeLevel = null,
+        /// <summary>Mean of the circadian spontaneous-waking threshold L(t) = this + a·C(t); sleep ends when Process S decays to it. Default 0.17. Source: Daan, Beersma &amp; Borbély 1984 (H0− ≈ 0.17); reproduces the ≈ 8 h normal sleep and the only ≈ +1 h of sleep after 40 h awake (Åkerstedt &amp; Gillberg 1986).</summary>
+        double ProcessCWakeThresholdMean = 0.17)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
@@ -672,10 +674,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Borbély Process S — homeostatic sleep pressure [0..1]. Rises (saturating exponential)
         /// while awake with time constant <see cref="PhysiologyConfig.ProcessSBuildupTimeConstantHours"/>
         /// and decays while asleep with <see cref="PhysiologyConfig.ProcessSDecayTimeConstantHours"/>.
-        /// Sleep propensity is the distance of S above the Process-C circadian threshold (subtractive,
-        /// not additive). <c>null</c> until first initialised (seeded from <see cref="SleepDebtHours"/>
-        /// on the first tick); <see cref="SleepDebtHours"/> is retained for save compatibility.
-        /// Source: Borbély (1982); Daan, Beersma &amp; Borbély (1984).
+        /// Sleep starts when S reaches the circadian threshold H(t) and ends when it decays to L(t); see
+        /// <see cref="SleepPropensity"/> and <see cref="WakeMargin"/>. <c>null</c> until first initialised (seeded
+        /// from <see cref="SleepDebtHours"/> on the first tick); afterwards <see cref="SleepDebtHours"/> is derived from S.
+        /// Source: Borbély (1982); Daan, Beersma &amp; Borbély (1984, time constants from EEG slow-wave activity).
         /// </summary>
         double? ProcessS = null,
         /// <summary>
@@ -687,12 +689,18 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         double? CognitiveDeficit = null,
         /// <summary>
-        /// Two-process sleep propensity: Process S minus the Process C circadian threshold at the current time of day.
-        /// Positive when the body is both tired and in its circadian night, so it peaks in the evening/night and goes
-        /// negative in the afternoon even after a poor night. <c>null</c> until the first tick; read by Behavior's
-        /// <c>NeedRest</c> so that characters go to bed at night. Source: Borbély (1982); Daan, Beersma &amp; Borbély (1984).
+        /// Two-process sleep propensity: Process S minus the circadian sleep-onset threshold H(t) at the current time of day.
+        /// About zero at the habitual bedtime (where S meets H), negative while the circadian gate blocks sleep, positive once
+        /// sleep can start; the same as an additive S + C interaction (Achermann &amp; Borbély 1994). <c>null</c> until the first
+        /// tick; read by Behavior's <c>NeedRest</c> so that characters go to bed in the evening. Source: Daan, Beersma &amp; Borbély (1984).
         /// </summary>
-        double? SleepPropensity = null);
+        double? SleepPropensity = null,
+        /// <summary>
+        /// Process S minus the circadian spontaneous-waking threshold L(t). While asleep, the character wakes on its own once this
+        /// drops to zero or below, so the circadian phase (not a fixed duration) ends sleep. <c>null</c> until the first tick.
+        /// Source: Daan, Beersma &amp; Borbély (1984).
+        /// </summary>
+        double? WakeMargin = null);
 
     /// <summary>
     /// The physiology engine — first stage of the per-character tick pipeline. Advances

@@ -38,6 +38,12 @@ namespace GameEngineTools.Characters.Engines.Sleep
         /// <summary>True if a dream event has already been generated during the REM phase.</summary>
         private bool _dreamFiredThisRem;
 
+        /// <summary>Set when the sleep ends on its own at the circadian waking threshold instead of at a fixed time.</summary>
+        private SpontaneousWake? _spontaneousWake;
+
+        /// <summary>True once the session ended at the waking threshold (counts as a complete, restorative sleep).</summary>
+        private bool _endedSpontaneously;
+
         #endregion Private fields
 
         #region Public properties (ISleepSession)
@@ -85,8 +91,11 @@ namespace GameEngineTools.Characters.Engines.Sleep
             IHumanContext ctx,
             IEventCollector outbox,
             HumanId? companion = null,
-            SharedSleepType? sharedType = null)
+            SharedSleepType? sharedType = null,
+            SpontaneousWake? spontaneousWake = null)
         {
+            _spontaneousWake = spontaneousWake;
+            _endedSpontaneously = false;
             _sleepStart = now;
             _phaseStart = now;
             _stressAtSleepStart = ctx.Snapshot.Psychology.Stress;
@@ -124,9 +133,20 @@ namespace GameEngineTools.Characters.Engines.Sleep
             var h = Math.Max(0, dt.TotalHours);
             HoursSlept += h;
 
-            // Natural awakening — the time has elapsed
+            // Natural awakening — the (latest possible) wake-up time has elapsed
             if (now >= PlannedWakeUp)
             {
+                _endedSpontaneously = _spontaneousWake is not null;
+                EndSession(now, wasInterrupted: false, ctx, outbox);
+                return;
+            }
+
+            // Spontaneous awakening — Process S has decayed to the circadian waking threshold L(t)
+            if (_spontaneousWake is { } wake
+                && HoursSlept >= wake.MinHours
+                && ctx.Snapshot.Physiology.WakeMargin is <= 0.0)
+            {
+                _endedSpontaneously = true;
                 EndSession(now, wasInterrupted: false, ctx, outbox);
                 return;
             }
@@ -303,10 +323,12 @@ namespace GameEngineTools.Characters.Engines.Sleep
         {
             // Base: ratio of time slept to the ideal duration
             // The ideal is in BehaviorConfig.BaseSleepHours (passed via the plannedWakeUp duration)
-            var plannedHours = (PlannedWakeUp - _sleepStart).TotalHours;
-            var completionRatio = plannedHours > 0
-                ? Math.Min(1.0, HoursSlept / plannedHours)
-                : 0.5;
+            var plannedHours = _spontaneousWake?.ReferenceHours ?? (PlannedWakeUp - _sleepStart).TotalHours;
+            var completionRatio = _endedSpontaneously
+                ? 1.0 // woke on its own at the circadian waking threshold: the sleep ran its course
+                : plannedHours > 0
+                    ? Math.Min(1.0, HoursSlept / plannedHours)
+                    : 0.5;
 
             var quality = completionRatio * 100.0;
 

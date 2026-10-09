@@ -375,6 +375,89 @@ namespace EngineTests
 
         #endregion BehaviorEngine — Sleep Declined
 
+        #region SleepSession — spontánní probuzení (cirkadiánní práh L(t))
+
+        private static IHumanContext WithWakeMargin(IHumanContext ctx, double margin)
+            => new HumanContext
+            {
+                Id = ctx.Id,
+                Biology = ctx.Biology,
+                Personality = ctx.Personality,
+                Snapshot = ctx.Snapshot with { Physiology = ctx.Snapshot.Physiology with { WakeMargin = margin } },
+                Random = ctx.Random,
+                Logger = ctx.Logger,
+                EventBus = ctx.EventBus,
+                Scheduler = ctx.Scheduler
+            };
+
+        private DefaultSleepSession StartSpontaneousSession(out WDateTime start)
+        {
+            var session = BuildSession();
+            start = _now;
+            session.Begin(_now, _now + WTimeSpan.FromHours(12), _ctx, _outbox, spontaneousWake: new SpontaneousWake(MinHours: 4, ReferenceHours: 8));
+            return session;
+        }
+
+        [TestMethod]
+        public void SpontaneousSleep_EndsOnItsOwn_OnceTheWakeMarginIsReached_AndIsFullyRestorative()
+        {
+            var session = StartSpontaneousSession(out var start);
+            var asleep = WithWakeMargin(_ctx, 0.30);
+            var awake = WithWakeMargin(_ctx, -0.01);
+
+            var time = start;
+            while (session.IsActive && (time - start).TotalHours < 6.0)
+            {
+                time += WTimeSpan.FromMinutes(15);
+                session.Tick(time, WTimeSpan.FromMinutes(15), asleep, _outbox);
+            }
+
+            Assert.IsTrue(session.IsActive, "While Process S is above the waking threshold the character keeps sleeping.");
+
+            time += WTimeSpan.FromMinutes(15);
+            session.Tick(time, WTimeSpan.FromMinutes(15), awake, _outbox);
+
+            Assert.IsFalse(session.IsActive, "Once S has decayed to L(t) the character wakes on its own.");
+            var ended = _outbox.Drain().OfType<SleepEnded>().Single();
+            Assert.IsFalse(ended.WasInterrupted);
+            Assert.AreEqual(100.0, ended.Quality, 1e-9, "A sleep that ran its course at the circadian waking threshold is a complete one.");
+        }
+
+        [TestMethod]
+        public void SpontaneousSleep_DoesNotEndBeforeTheMinimumDuration_EvenWithANegativeWakeMargin()
+        {
+            var session = StartSpontaneousSession(out var start);
+            var awake = WithWakeMargin(_ctx, -0.20);
+
+            var time = start;
+            while (session.IsActive && (time - start).TotalHours < 3.5)
+            {
+                time += WTimeSpan.FromMinutes(15);
+                session.Tick(time, WTimeSpan.FromMinutes(15), awake, _outbox);
+            }
+
+            Assert.IsTrue(session.IsActive, "No spontaneous waking before the 4 h minimum.");
+        }
+
+        [TestMethod]
+        public void SpontaneousSleep_EndsAtTheLatestWakeUp_WhenTheWakeMarginNeverDrops()
+        {
+            var session = StartSpontaneousSession(out var start);
+            var asleep = WithWakeMargin(_ctx, 0.40);
+
+            var time = start;
+            while (session.IsActive && (time - start).TotalHours < 13.0)
+            {
+                time += WTimeSpan.FromMinutes(15);
+                session.Tick(time, WTimeSpan.FromMinutes(15), asleep, _outbox);
+            }
+
+            Assert.IsFalse(session.IsActive, "The planned wake-up stays the hard upper bound.");
+            Assert.AreEqual(12.0, (time - start).TotalHours, 0.3);
+        }
+
+        #endregion SleepSession — spontánní probuzení (cirkadiánní práh L(t))
+
         #region SleepSession — fáze a přirozené probuzení
 
         /// <summary>

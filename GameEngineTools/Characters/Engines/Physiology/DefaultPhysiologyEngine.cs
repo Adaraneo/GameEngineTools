@@ -433,6 +433,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     ProcessS = clampedS,
                     SleepPropensity = SleepRegulationCalculator.ComputeSleepPropensity(
                         clampedS, fractionalHour, hoursPerDay, s.CircadianPhaseShiftHours, Config),
+                    WakeMargin = SleepRegulationCalculator.ComputeWakeMargin(
+                        clampedS, fractionalHour, hoursPerDay, s.CircadianPhaseShiftHours, Config),
                     CognitiveDeficit = Math.Max(0.0, deficit),
                     // Process S is the single source of truth; SleepDebtHours is its derived view for the other engines.
                     SleepDebtHours = SleepRegulationCalculator.DebtHoursFromProcessS(processS, Config, hoursPerDay)
