@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
 {
     using GameEngineTools.Logging;
     using Microsoft.Extensions.Logging;
+    using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>
     /// Resolves the final action choice after needs, modifiers, and intent shaping have run.
@@ -32,6 +33,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
                 var elapsed = context.Now - running.Start;
                 if (elapsed < running.ExpectedDuration)
                 {
+                    // A severe hunger or thirst interrupts a running plan; ordinary needs wait until it has run its course.
+                    if (FindPreemptingCandidate(context, candidates, running) is { } emergency)
+                    {
+                        var preemptPlan = new PlannedAction(emergency.Name, context.Now, emergency.Duration, emergency.Utility, emergency.SocialTargeting?.TargetHuman, emergency.ObjectInteraction);
+                        return new ActionArbitrationResult(false, preemptPlan, emergency, context.State with { CurrentPlan = preemptPlan, Cooldowns = context.Cooldowns }, emergency, $"preempted:{running.Name}");
+                    }
+
                     // Keep the current plan alive until its expected window has elapsed.
                     using (_log.BeginCharacterScope(
                         context.HumanContext.Id.Value,
@@ -54,6 +62,30 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
         }
 
         #endregion IActionArbitrationEngine
+
+        /// <summary>
+        /// The candidate that answers a severe hunger or thirst while an unrelated plan is running, or <c>null</c>. The severity is the raw need
+        /// (<see cref="BehaviorConfig.EmergencyIntentOverrideThreshold"/>), not a modifier-adjusted utility: utilities are need x 1.6-1.7, so the
+        /// utility threshold is crossed at moderate hunger, and discounting could pull a genuine emergency below it.
+        /// </summary>
+        private static BehaviorCandidate? FindPreemptingCandidate(BehaviorContext context, List<BehaviorCandidate> candidates, PlannedAction running)
+        {
+            var threshold = context.Config.EmergencyIntentOverrideThreshold;
+            var answersHunger = context.State.NeedFood >= threshold;
+            var answersThirst = context.State.NeedWater >= threshold;
+            if (!answersHunger && !answersThirst) return null;
+
+            bool Answers(string action)
+                => (answersHunger && action is Eat or EatStored or MoveToFood) || (answersThirst && action is Drink or MoveToDrink);
+
+            // Already responding to the emergency: let the plan finish.
+            if (Answers(running.Name)) return null;
+
+            return candidates
+                .Where(c => c.Utility > 0 && Answers(c.Name))
+                .OrderByDescending(c => c.Utility)
+                .FirstOrDefault();
+        }
 
         private static BehaviorCandidate ChooseWithConflict(BehaviorContext context, List<BehaviorCandidate> candidates, BehaviorCandidate intended, out string? reason)
         {

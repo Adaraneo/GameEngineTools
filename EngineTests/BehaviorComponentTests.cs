@@ -263,6 +263,97 @@ namespace EngineTests
     }
 
     [TestClass]
+    public class PlanPreemptionTests : TestBase
+    {
+        private static DefaultActionArbitrationEngine Engine()
+            => new(LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)).CreateLogger<DefaultActionArbitrationEngine>());
+
+        private static BehaviorContext Context(double hunger, double thirst, PlannedAction running)
+            => BehaviorComponentTestFactory.Context(
+                now: new WDateTime(WTimeSpan.FromMinutes(30).Ticks),
+                hunger: hunger,
+                thirst: thirst,
+                state: new BehaviorState(10, 5, 5, 20, 50, 30, running));
+
+        private static PlannedAction RunningWork() => new(Work, new WDateTime(0), WTimeSpan.FromHours(2), 40);
+
+        [TestMethod]
+        public void SevereHunger_PreemptsARunningPlan_AndNamesWhatWasInterrupted()
+        {
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(Work, 40, WTimeSpan.FromHours(2), BehaviorDomain.Competence),
+                new(Eat, 140, WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological)
+            };
+
+            var result = Engine().Arbitrate(Context(hunger: 85, thirst: 5, RunningWork()), candidates);
+
+            Assert.IsFalse(result.KeepRunningPlan, "A famished character must not finish two hours of work first.");
+            Assert.AreEqual(Eat, result.SelectedCandidate?.Name);
+            Assert.AreEqual(Eat, result.NewState.CurrentPlan?.Name);
+            Assert.AreEqual($"preempted:{Work}", result.ConflictReason);
+        }
+
+        [TestMethod]
+        public void SevereThirst_PreemptsARunningPlan_WithDrink()
+        {
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(Work, 40, WTimeSpan.FromHours(2), BehaviorDomain.Competence),
+                new(Eat, 20, WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological),
+                new(Drink, 130, WTimeSpan.FromMinutes(10), BehaviorDomain.Physiological)
+            };
+
+            var result = Engine().Arbitrate(Context(hunger: 5, thirst: 90, RunningWork()), candidates);
+
+            Assert.IsFalse(result.KeepRunningPlan);
+            Assert.AreEqual(Drink, result.SelectedCandidate?.Name);
+        }
+
+        [TestMethod]
+        public void OrdinaryHunger_DoesNotInterruptARunningPlan()
+        {
+            // The Eat utility (need x 1.7) is already above the intent-override threshold at moderate hunger; only a severe need interrupts.
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(Work, 40, WTimeSpan.FromHours(2), BehaviorDomain.Competence),
+                new(Eat, 85, WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological)
+            };
+
+            var result = Engine().Arbitrate(Context(hunger: 50, thirst: 5, RunningWork()), candidates);
+
+            Assert.IsTrue(result.KeepRunningPlan);
+            Assert.AreEqual(Work, result.NewState.CurrentPlan?.Name);
+        }
+
+        [TestMethod]
+        public void SevereHunger_DoesNotRestartAnAlreadyRunningFoodPlan()
+        {
+            var eating = new PlannedAction(MoveToFood, new WDateTime(0), WTimeSpan.FromHours(1), 120);
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(Eat, 140, WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological),
+                new(MoveToFood, 120, WTimeSpan.FromHours(1), BehaviorDomain.Physiological)
+            };
+
+            var result = Engine().Arbitrate(Context(hunger: 90, thirst: 5, eating), candidates);
+
+            Assert.IsTrue(result.KeepRunningPlan, "A plan that already answers the emergency is left to finish.");
+        }
+
+        [TestMethod]
+        public void SevereHunger_WithNoWayToEat_LeavesTheRunningPlanAlone()
+        {
+            // Hard-gated Eat is removed from the candidates; there is nothing to pre-empt the plan with.
+            var candidates = new List<BehaviorCandidate> { new(Work, 40, WTimeSpan.FromHours(2), BehaviorDomain.Competence) };
+
+            var result = Engine().Arbitrate(Context(hunger: 95, thirst: 5, RunningWork()), candidates);
+
+            Assert.IsTrue(result.KeepRunningPlan);
+        }
+    }
+
+    [TestClass]
     public class HumanInconsistencyArbitrationTests : TestBase
     {
         [TestMethod]
@@ -342,6 +433,35 @@ namespace EngineTests
             var context = BehaviorComponentTestFactory.Context(state: new BehaviorState(10, 5, 5, 20, 50, 30, null, ActiveIntent: intent));
             var state = BuildEngine().UpdateIntent(context, new List<BehaviorCandidate> { new(Work, 10, WTimeSpan.FromHours(1), BehaviorDomain.Competence), new(SelfCare, 80, WTimeSpan.FromHours(1), BehaviorDomain.Physiological) });
             Assert.AreEqual(BehaviorIntentKind.SelfCare, state.ActiveIntent?.Kind);
+        }
+
+        [TestMethod]
+        public void EmergencyInTheCurrentDirection_KeepsTheAccumulatedCommitment()
+        {
+            var intent = new ActiveIntent(BehaviorIntentKind.FoodSeeking, Eat, new WDateTime(0), new WDateTime(0), 90, 5, new WDateTime(WTimeSpan.FromHours(2).Ticks));
+            var context = BehaviorComponentTestFactory.Context(state: new BehaviorState(10, 5, 5, 20, 50, 30, null, ActiveIntent: intent));
+
+            var state = BuildEngine().UpdateIntent(context, new List<BehaviorCandidate> { new(Eat, 120, WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological) });
+
+            Assert.AreEqual(BehaviorIntentKind.FoodSeeking, state.ActiveIntent?.Kind);
+            Assert.AreEqual(5, state.ActiveIntent?.Commitment, "An emergency in the same direction must not reset the commitment every tick.");
+            Assert.AreEqual(120, state.ActiveIntent?.Strength);
+        }
+
+        [TestMethod]
+        public void EmergencyInAnotherDirection_StartsANewIntentWithNoCommitment()
+        {
+            var intent = new ActiveIntent(BehaviorIntentKind.WorkSession, Work, new WDateTime(0), new WDateTime(0), 40, 6, new WDateTime(WTimeSpan.FromHours(2).Ticks));
+            var context = BehaviorComponentTestFactory.Context(state: new BehaviorState(10, 5, 5, 20, 50, 30, null, ActiveIntent: intent));
+
+            var state = BuildEngine().UpdateIntent(context, new List<BehaviorCandidate>
+            {
+                new(Work, 40, WTimeSpan.FromHours(1), BehaviorDomain.Competence),
+                new(Eat, 120, WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological)
+            });
+
+            Assert.AreEqual(BehaviorIntentKind.FoodSeeking, state.ActiveIntent?.Kind);
+            Assert.AreEqual(0, state.ActiveIntent?.Commitment);
         }
 
         [TestMethod]

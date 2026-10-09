@@ -45,7 +45,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
             // Emergency physiological pressure is allowed to override the current direction immediately.
             if (emergency is not null)
             {
-                var overrideIntent = NewIntent(context, emergency.Name, emergency.Utility);
+                // The same direction as the current intent keeps its accumulated commitment; resetting it every tick meant an emergency
+                // intent could never build the commitment that makes intent bias apply.
+                var emergencyKind = BehaviorIntentMapper.Resolve(emergency.Name);
+                var overrideIntent = current is { } same && emergencyKind != BehaviorIntentKind.None && same.Kind == emergencyKind
+                    ? same with
+                    {
+                        TargetAction = emergency.Name,
+                        UpdatedAt = context.Now,
+                        Strength = emergency.Utility,
+                        ExpiresAt = context.Now + WTimeSpan.FromHours(context.Config.IntentTimeoutHours)
+                    }
+                    : NewIntent(context, emergency.Name, emergency.Utility);
                 using (_log.BeginCharacterScope(context.HumanContext.Id.Value, nameof(DefaultIntentManagementEngine), tickKey: context.Now.WorldTicks.ToString()))
                     _log.BehaviorIntentEmergencyOverride(context.HumanContext.Id.Value.ToString(), overrideIntent.Kind.ToString(), overrideIntent.TargetAction ?? string.Empty, overrideIntent.Strength);
                 return context.State with { ActiveIntent = overrideIntent };
