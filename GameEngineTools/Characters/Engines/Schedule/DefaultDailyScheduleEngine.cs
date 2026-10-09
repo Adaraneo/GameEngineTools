@@ -148,7 +148,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
 
             foreach (var slot in State.Slots)
             {
-                var fireAt = dayStart.AddHours(slot.HourOfDay);
+                var fireAt = dayStart + WTimeSpan.FromHours(GameEngineTools.World.Core.Time.WWorld.Spec.FromClock24(slot.HourOfDay));
                 var capturedSlot = slot;  // capture for closure
 
                 scheduler.ScheduleAt(fireAt, (sCtx, sOutbox) =>

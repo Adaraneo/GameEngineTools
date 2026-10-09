@@ -195,7 +195,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         }
 
         private static HabitTimeBand ResolveTimeBand(WDateTime time)
-            => time.Hour switch
+            => GameEngineTools.World.Core.Time.WWorld.Spec.ToClock24(time.Hour) switch
             {
                 >= 5 and < 11 => HabitTimeBand.Morning,
                 >= 11 and < 17 => HabitTimeBand.Day,

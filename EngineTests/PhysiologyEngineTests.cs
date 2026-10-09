@@ -1683,12 +1683,6 @@ namespace EngineTests
 
         #region Proměnná délka dne a roku
 
-        /// <summary>Reconfigures the ambient world calendar with a given day length (TestBase resets it after the test).</summary>
-        private void UseDayLength(int hoursPerDay)
-            => WWorld.Configure(
-                new WorldTimeSpec(10_000_000, 60, 60, hoursPerDay, new FixedMonthsCalendar(Enumerable.Repeat(30, 12).ToArray(), _ => 0)),
-                ServiceProvider.GetRequiredService<IClock>());
-
         [TestMethod]
         public void SleepDebt_NormalDay_CarriesNoDebt_ForAnyDayLength()
         {
@@ -1763,6 +1757,39 @@ namespace EngineTests
                 var lost = before - engine.State.Aging!.MuscleMassFraction;
                 Assert.AreEqual(0.005, lost, 0.0015, $"One 360-day year with {hoursPerDay} h days should cost 0.005 muscle mass; lost {lost:F4}.");
             }
+        }
+
+        [TestMethod]
+        public void Cortisol_DiurnalPeak_SitsAtTheSameFractionOfTheDay_ForAnyDayLength()
+        {
+            double PeakFraction(int hoursPerDay)
+            {
+                UseDayLength(hoursPerDay);
+                var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 30);
+                var ctx = BuildContextWithAction(null);
+                var start = WDateTime.New(116, 1, 1, 0);
+                var bestHour = 0;
+                var best = double.MinValue;
+
+                for (var hour = 0; hour < hoursPerDay * 4; hour++)
+                {
+                    engine.Tick(start + WTimeSpan.FromHours(hour), WTimeSpan.FromHours(1), ctx, new EventCollector());
+                    if (hour >= hoursPerDay * 3 && engine.State.CortisolLevel > best)
+                    {
+                        best = engine.State.CortisolLevel;
+                        bestHour = hour % hoursPerDay;
+                    }
+                }
+
+                return (double)bestHour / hoursPerDay;
+            }
+
+            var earth = PeakFraction(24);
+            var longDay = PeakFraction(40);
+            var shortDay = PeakFraction(12);
+
+            Assert.AreEqual(earth, longDay, 0.09, $"24 h: {earth:F2} of the day, 40 h: {longDay:F2}.");
+            Assert.AreEqual(earth, shortDay, 0.12, $"24 h: {earth:F2} of the day, 12 h: {shortDay:F2}.");
         }
 
         #endregion Proměnná délka dne a roku

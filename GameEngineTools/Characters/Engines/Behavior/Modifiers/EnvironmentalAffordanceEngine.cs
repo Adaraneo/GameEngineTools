@@ -81,9 +81,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             BehaviorCandidateEditor.Add(candidates, MoveToPublic, outdoorBonus * 0.4);
 
             // Darkness pressure: night time × short day (winter nights are strongest)
-            var hoursPerDay = context.HumanContext.Snapshot.Celestial?.DaylightHours is { } dl
-                ? dl : 12.0;
-            var shortDayFactor = Math.Max(0.0, 0.5 - hoursPerDay / 48.0); // max at 0 h, 0 at 24 h
+            var dayLength = (double)GameEngineTools.World.Core.Time.WWorld.Spec.HoursPerDay;
+            var daylightFraction = (context.HumanContext.Snapshot.Celestial?.DaylightHours is { } dl ? dl : dayLength / 2.0) / dayLength;
+            var shortDayFactor = Math.Max(0.0, 0.5 - daylightFraction / 2.0); // max with no daylight, 0 when the whole day is light
             var darknessPressure = (1.0 - celestial.IrradianceFactor) * shortDayFactor * 10.0;
 
             BehaviorCandidateEditor.Add(candidates, MoveToRest, darknessPressure * 0.5);

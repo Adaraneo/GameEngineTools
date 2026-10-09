@@ -137,7 +137,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             ArgumentNullException.ThrowIfNull(cfg);
             var mid = (cfg.ProcessCUpperThreshold + cfg.ProcessCLowerThreshold) / 2.0;
             var amp = (cfg.ProcessCUpperThreshold - cfg.ProcessCLowerThreshold) / 2.0;
-            var peakHour = cfg.ProcessCPeakHour + circadianPhaseShiftHours;
+            var peakHour = cfg.ProcessCPeakHour * hoursPerDay / 24.0 + circadianPhaseShiftHours;
             var phase = (hourOfDay - peakHour) * 2.0 * Math.PI / hoursPerDay;
             return mid + amp * Math.Cos(phase);
         }

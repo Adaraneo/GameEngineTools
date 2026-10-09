@@ -153,7 +153,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 _ => 13.0
             };
 
-            var distance = Math.Abs(now.Hour - peakHour);
+            var distance = Math.Abs(GameEngineTools.World.Core.Time.WWorld.Spec.ToClock24(now.Hour) - peakHour);
             return distance > 6.0 ? 0.0 : Math.Max(0.0, 15.0 * (1.0 - distance / 6.0));
         }
 

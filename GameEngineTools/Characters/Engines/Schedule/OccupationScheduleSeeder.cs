@@ -76,8 +76,6 @@ namespace GameEngineTools.Characters.Engines.Schedule
 
         private static List<ScheduleSlot> ApplyPersonalityModulation(List<ScheduleSlot> slots, Personality personality)
         {
-            var hoursPerDay = WWorld.IsConfigured ? WWorld.Spec.HoursPerDay : 24;
-
             // Chronotype shift
             var hourOffset = personality.Chronotype switch
             {
@@ -93,7 +91,7 @@ namespace GameEngineTools.Characters.Engines.Schedule
             var result = new List<ScheduleSlot>(slots.Count);
             foreach (var slot in slots)
             {
-                var hour = Math.Clamp(slot.HourOfDay + hourOffset, 0, hoursPerDay - 1);
+                var hour = Math.Clamp(slot.HourOfDay + hourOffset, 0, 23); // slot hours are on a 24-hour clock; scaled to the world day when scheduled
                 var strength = slot.BiasStrength;
 
                 if (slot.PreferredAction == ReachOut)

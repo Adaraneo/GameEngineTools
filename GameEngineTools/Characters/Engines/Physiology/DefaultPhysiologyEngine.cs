@@ -268,7 +268,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Anchor the peak at SolarNoon+5h when we have an astronomical context (Waterhouse: body temperature ~5h after noon)
             var circTempPeakHour = ctx.Snapshot.Celestial is { } celT && !double.IsNaN(celT.SolarNoonHour)
                 ? celT.SolarNoonHour + 5.0
-                : Config.CircadianTempPeakHour;
+                : WWorld.Spec.FromClock24(Config.CircadianTempPeakHour);
             // cos: maximum na circTempPeakHour, minimum na ±HalfDay
             var circadianTempComponent = Config.CircadianTempAmplitude
                 * Math.Cos((hoursOfDayT - circTempPeakHour) * 2 * Math.PI / WWorld.Spec.HoursPerDay);
@@ -467,9 +467,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 // Anchor CAR (the Cortisol Awakening Response) at SunriseHour+2h (the light signal sets the peak)
                 var cortisolPeakHour = ctx.Snapshot.Celestial is { } celC && !double.IsNaN(celC.SunriseHour)
                     ? celC.SunriseHour + 2.0
-                    : Config.CortisolDiurnalPeakHour;
+                    : WWorld.Spec.FromClock24(Config.CortisolDiurnalPeakHour);
                 var diurnal = Config.CortisolDiurnalAmplitude
-                              * Math.Exp(-Math.Pow(hoursOfDay - cortisolPeakHour, 2) / 8.0);
+                              * Math.Exp(-Math.Pow(WWorld.Spec.ToClock24(hoursOfDay - cortisolPeakHour), 2) / 8.0);
                 // Hypocortisolism paradox (Fries 2005): under extreme AlloLoad the HPA axis downregulates
                 var alloComponent = s.AllostaticLoad < Config.HypocortisolismAlloThreshold
                     ? s.AllostaticLoad * Config.CortisolAlloWeight
@@ -485,7 +485,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Circadian phase shift — the social jet-lag model
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-                var naturalSleep = (Config.NaturalSleepStartHour - Config.ChronotypeOffsetHours + hoursPerDay) % hoursPerDay;
+                var naturalSleep = (WWorld.Spec.FromClock24(Config.NaturalSleepStartHour) - Config.ChronotypeOffsetHours + hoursPerDay) % hoursPerDay;
                 if (action == Sleep)
                 {
                     var mismatch = Math.Abs(hoursOfDay - naturalSleep);
@@ -629,7 +629,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (s.Testosterone is { } testo)
             {
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-                var diurnal = 20.0 * Math.Exp(-Math.Pow(hoursOfDay - Config.TestosteronePeakHour, 2) / 10.0);
+                var diurnal = 20.0 * Math.Exp(-Math.Pow(WWorld.Spec.ToClock24(hoursOfDay - WWorld.Spec.FromClock24(Config.TestosteronePeakHour)), 2) / 10.0);
                 var alloSuppression = Math.Max(0, s.AllostaticLoad - 50) / 10.0 * Config.TestosteroneAlloSuppression;
                 var sleepPenalty = Math.Max(0, s.SleepDebtHours - 2) * Config.TestosteroneSleepDebtPenaltyPerHour;
                 var agePenalty = Math.Max(0, ComputeAgeYears(now.Date) - Config.AgingTestosteronePenaltyStart) * Config.AgingTestosteronePenaltyPerYear;

@@ -111,6 +111,25 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void SeedFromOccupation_SlotHours_ScaleWithTheWorldDayLength()
+        {
+            UseDayLength(40);
+            var engine = BuildEngine();
+            var scheduler = new RecordingScheduler();
+            var dayStart = WDateTime.New(116, 1, 1, 0);
+
+            engine.SeedFromOccupation(OccupationIds.Craftsperson, BuildPersonality(), dayStart, scheduler, new HumanId(Guid.NewGuid()));
+
+            Assert.AreEqual(engine.State.Slots.Count, scheduler.FireTimes.Count);
+            for (var i = 0; i < engine.State.Slots.Count; i++)
+            {
+                // Slot hours are authored on a 24-hour clock: 08:00 is a third of the day, i.e. world hour 13.33 of 40.
+                var expected = engine.State.Slots[i].HourOfDay * 40.0 / 24.0;
+                Assert.AreEqual(expected, (scheduler.FireTimes[i] - dayStart).TotalHours, 0.01, $"Slot {engine.State.Slots[i].SlotId}.");
+            }
+        }
+
+        [TestMethod]
         public void Tick_NewDay_ReschedulesTomorrowsSlots()
         {
             var config = new DailyScheduleConfig(RescheduleLeadHours: 0.0);
@@ -499,9 +518,12 @@ namespace EngineTests
         {
             public int ScheduledCount { get; private set; }
 
+            public List<WDateTime> FireTimes { get; } = new();
+
             public ScheduledId ScheduleAt(WDateTime when, ScheduledAction action, string? tag = null)
             {
                 ScheduledCount++;
+                FireTimes.Add(when);
                 return new ScheduledId(Guid.NewGuid());
             }
 

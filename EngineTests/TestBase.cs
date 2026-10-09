@@ -85,6 +85,18 @@ namespace EngineTests
 
         #endregion Protected properties
 
+        #region World calendar helpers
+
+        /// <summary>Reconfigures the ambient world calendar with the given day length (12 x 30-day months); the cleanup resets it.</summary>
+        /// <param name="hoursPerDay">Hours in a world day.</param>
+        protected void UseDayLength(int hoursPerDay)
+            => WWorld.Configure(
+                new WorldTimeSpec(10_000_000, 60, 60, hoursPerDay,
+                    new GameEngineTools.World.Core.Calendars.FixedMonthsCalendar(Enumerable.Repeat(30, 12).ToArray(), _ => 0)),
+                ServiceProvider.GetRequiredService<IClock>());
+
+        #endregion World calendar helpers
+
         #region TestInitialize / TestCleanup
 
         /// <summary>

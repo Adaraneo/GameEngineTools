@@ -4,6 +4,7 @@
 namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
@@ -56,6 +57,29 @@ namespace EngineTests
             }
 
             Assert.IsTrue(wraps >= 5, "Over 200 days the cycle should have wrapped several times.");
+        }
+
+        [TestMethod]
+        public void ClockConversion_IsAFractionOfTheDay_AndRoundTrips()
+        {
+            UseDayLength(40);
+            Assert.AreEqual(40.0 / 3.0, WWorld.Spec.FromClock24(8), 1e-9);
+            Assert.AreEqual(8.0, WWorld.Spec.ToClock24(WWorld.Spec.FromClock24(8)), 1e-9);
+
+            UseDayLength(24);
+            Assert.AreEqual(8.0, WWorld.Spec.FromClock24(8), 1e-9);
+        }
+
+        [TestMethod]
+        public void ChronotypeBonus_FollowsTheClockFractionOnALongDay()
+        {
+            UseDayLength(40);
+            // A lark peaks at 08:00 on a 24-hour clock, i.e. world hour 13.3 of 40 (hour 13 here).
+            var atPeak = BehaviorMath.ComputeChronoBonus(WDateTime.New(116, 1, 1, 13), Chronotype.Lark);
+            var offPeak = BehaviorMath.ComputeChronoBonus(WDateTime.New(116, 1, 1, 8), Chronotype.Lark);
+
+            Assert.IsTrue(atPeak > 14.0, $"Lark bonus at its peak was {atPeak:F2}.");
+            Assert.IsTrue(offPeak < atPeak - 5.0, $"World hour 8 is only 04:48 on the 24-hour clock; bonus {offPeak:F2}.");
         }
 
         private static IHumanContext BuildContext()

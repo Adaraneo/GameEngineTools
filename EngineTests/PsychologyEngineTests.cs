@@ -1325,6 +1325,28 @@ namespace EngineTests
                 $"Morning peak (10h) must have higher arousal than night trough (3h). Peak={enginePeak.State.Arousal:F4}, Trough={engineTrough.State.Arousal:F4}");
         }
 
+        [TestMethod]
+        public void Tick_CircadianRhythm_PeaksAtTheSameFractionOfTheDay_OnALongDay()
+        {
+            UseDayLength(40);
+            var cfg = new PsychologyConfig(
+                BaselineAffectVariance: 0.0,
+                StressRecoveryRatePerHour: 0.0,
+                EnableCircadianRhythm: true,
+                CircadianInfluence: 0.15);
+
+            var morning = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
+            var earlier = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: cfg);
+            var start = WDateTime.New(116, 1, 1, 0);
+
+            // On a 40 h day the "10:00 peak" sits at world hour ~16.7; world hour 10 corresponds to ~06:00 on a 24 h clock.
+            morning.Tick(start + WTimeSpan.FromHours(17), WTimeSpan.FromHours(0.1), BuildContext(neuroticism: 0.5), new EventCollector());
+            earlier.Tick(start + WTimeSpan.FromHours(10), WTimeSpan.FromHours(0.1), BuildContext(neuroticism: 0.5), new EventCollector());
+
+            Assert.IsTrue(morning.State.Arousal > earlier.State.Arousal,
+                $"Arousal at the morning peak ({morning.State.Arousal:F4}) must exceed the pre-dawn level ({earlier.State.Arousal:F4}) on a 40 h day.");
+        }
+
         #endregion CircadianRhythm — Phase 4
 
         #region NutritionEffectsOnPsychology — Phase 4

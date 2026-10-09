@@ -50,6 +50,17 @@ namespace GameEngineTools.World.Core.Time
         /// <param name="year">The calendar year.</param>
         public double HoursInYear(int year) => Calendar.DaysInYear(year) * (double)HoursPerDay;
 
+        /// <summary>
+        /// Converts an hour written on a 24-hour clock (how hour-of-day constants such as "cortisol peaks at 8" are
+        /// authored) to the same fraction of this world's day; a 40 h day maps 8 to 13.33.
+        /// </summary>
+        /// <param name="hour24">Hour on a 24-hour clock.</param>
+        public double FromClock24(double hour24) => hour24 * HoursPerDay / 24.0;
+
+        /// <summary>Inverse of <see cref="FromClock24"/>: a world hour (or hour difference) expressed on a 24-hour clock.</summary>
+        /// <param name="worldHours">Hours of this world's day.</param>
+        public double ToClock24(double worldHours) => worldHours * 24.0 / HoursPerDay;
+
         /// <summary>World ticks in one day.</summary>
         public long TicksPerDay => TicksPerHour * HoursPerDay;
 
