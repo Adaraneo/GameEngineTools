@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Bereavement
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Physiology;
+    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -63,9 +64,13 @@ namespace GameEngineTools.Characters.Engines.Bereavement
                 var decay = BereavementMath.DecayPerDay(loss.Trajectory, Config) * days;
                 var intensity = Math.Clamp(loss.GriefIntensity - decay, 0.0, 100.0);
 
-                // Drop fully-resolved losses (a Prolonged trajectory decays so slowly it effectively persists).
+                // Resolved grief is dropped, except a partner loss whose widowhood-hazard window is still open (the record is what drives it).
                 if (intensity <= Config.GriefResolvedThreshold)
+                {
+                    if (loss.KinRole == KinRole.Partner && daysSinceOnset <= Config.WidowhoodTailWindowDays)
+                        updated.Add(loss with { GriefIntensity = intensity, LoRoWeight = 0.0 });
                     continue;
+                }
 
                 // Advance the DPM oscillation; a wave that re-enters loss-orientation fires a pang.
                 var loRo = BereavementMath.LoRoOscillation(daysSinceOnset, Config);

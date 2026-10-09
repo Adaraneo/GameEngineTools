@@ -178,6 +178,31 @@ namespace EngineTests
         #region Widowhood mortality hazard
 
         [TestMethod]
+        public void Tick_ResolvedPartnerLoss_IsKeptUntilTheWidowhoodWindowCloses_OtherLossesAreDropped()
+        {
+            var self = NewId();
+            var partner = NewId();
+            var friend = NewId();
+            var engine = NewEngine();
+            var ctx = BuildContext(self);
+            engine.Handle(new BereavementOnset(new WDateTime(0), self, partner, 80, DeathCause.OldAge, KinRole.Partner), ctx, new EventCollector());
+            engine.Handle(new BereavementOnset(new WDateTime(0), self, friend, 80, DeathCause.OldAge, KinRole.Sibling), ctx, new EventCollector());
+
+            // Grief fades long before the 180-day acute hazard window ends.
+            var t = new WDateTime(0);
+            for (var day = 1; day <= 300; day++)
+            {
+                t = new WDateTime(0) + WTimeSpan.FromDays(day);
+                engine.Tick(t, WTimeSpan.FromDays(1), ctx, new EventCollector());
+            }
+
+            Assert.IsFalse(engine.State.Losses.Any(l => l.DeceasedId == friend), "A resolved non-partner loss is dropped.");
+            var kept = engine.State.Losses.SingleOrDefault(l => l.DeceasedId == partner);
+            Assert.IsNotNull(kept, "The partner loss must outlive the grief while the widowhood hazard window is open.");
+            Assert.IsTrue(BereavementMath.WidowhoodHazardMultiplier(engine.State, SexBiology.Female, t, Cfg) > 1.0);
+        }
+
+        [TestMethod]
         public void Widowhood_PartnerLoss_RaisesHazard_StrongerEarly_AndForMen()
         {
             var now = new WDateTime(0) + WTimeSpan.FromDays(30); // 30 days after the loss
