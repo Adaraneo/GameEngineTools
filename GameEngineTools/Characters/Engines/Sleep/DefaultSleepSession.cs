@@ -133,6 +133,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
 
             // Risk check for the current phase
             CheckAmbush(now, h, ctx, outbox);
+            if (!IsActive) return;
 
             // Phase progression
             var timeInPhase = now - _phaseStart;
@@ -156,6 +157,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
                 case SleepPhase.Rem:
                     // Narrative: dream and nightmare — each only once per REM cycle
                     FireRemEvents(now, ctx, outbox);
+                    if (!IsActive) break;
 
                     if (timeInPhase.TotalHours >= _cfg.RemDurationHours)
                     {

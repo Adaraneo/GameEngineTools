@@ -531,7 +531,7 @@ public static class TileGenerator
                 // so passing the SAME Parameters.Seed for every tile replayed the exact same droplet
                 // start-position sequence in every tile's own local coordinates -- an identical
                 // relative erosion texture repeating every tile, visible as a grid at any zoom.
-                var tileErosionParams = s.ErosionParams with { Seed = HashCode.Combine(s.ErosionParams.Seed, row, col) };
+                var tileErosionParams = s.ErosionParams with { Seed = StableTileSeed(s.ErosionParams.Seed, row, col) };
                 TileErosion.Erode(padded, tileErosionParams, locked);
 
                 var interior = new float[cellsPerTile * cellsPerTile];
@@ -725,6 +725,21 @@ public static class TileGenerator
     }
 
     /// <summary>True if any value in <paramref name="values"/> is NaN or +/-Infinity — see <c>LockAgainst</c>'s neighbor-invalidation check.</summary>
+    /// <summary>FNV-1a over (seed, row, col) — <c>HashCode.Combine</c> is salted per process, so it made erosion differ between runs.</summary>
+    internal static int StableTileSeed(int seed, int row, int col)
+    {
+        var hash = 2166136261u;
+        foreach (var value in new[] { seed, row, col })
+        {
+            for (var shift = 0; shift < 32; shift += 8)
+            {
+                hash ^= (byte)(value >> shift);
+                hash *= 16777619u;
+            }
+        }
+        return unchecked((int)hash);
+    }
+
     private static bool HasNonFiniteValues(float[] values)
     {
         foreach (var v in values)

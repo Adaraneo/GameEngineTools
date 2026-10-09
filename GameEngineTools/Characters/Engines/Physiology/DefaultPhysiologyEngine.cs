@@ -555,7 +555,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 if (ageYears > Config.HairGreyingAgeStart)
                 {
                     greying += (ageYears - Config.HairGreyingAgeStart) * Config.HairGreyingRatePerYear * h / (365.25 * 24);
-                    greying += s.CortisolLevel * Config.HairGreyingCortisolBoost * h;
+                    greying += s.CortisolLevel * Config.HairGreyingCortisolBoost * h / (365.25 * 24);
                 }
 
                 // Hair density: androgenic alopecia (men) + stress
@@ -572,7 +572,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 if (ageYears > Config.WrinklingAgeStart)
                 {
                     wrinkles += (ageYears - Config.WrinklingAgeStart) * Config.WrinklingRatePerYear * h / (365.25 * 24);
-                    wrinkles += s.CortisolLevel * Config.WrinklingCortisolBoost * h;
+                    wrinkles += s.CortisolLevel * Config.WrinklingCortisolBoost * h / (365.25 * 24);
                 }
 
                 // Sarcopenia: decline in muscle mass after age 30

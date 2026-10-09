@@ -212,9 +212,11 @@ namespace GameEngineTools.Characters.Hosting
                 bereavement,
                 economy);
 
-            goal.SeedFromPersonality(b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now);
+            var seedTime = _clock.Now > b.Identity.BirthDate.ToDateTime() ? _clock.Now : b.Identity.BirthDate.ToDateTime();
 
-            schedule.SeedFromOccupation(b.Occupation, b.Personality, _clock.Now > b.Identity.BirthDate.ToDateTime() ? b.Identity.BirthDate.ToDateTime() : _clock.Now, scheduler, b.Id);
+            goal.SeedFromPersonality(b.Personality, seedTime);
+
+            schedule.SeedFromOccupation(b.Occupation, b.Personality, seedTime, scheduler, b.Id);
 
             valuesEngine.SeedFromBaseline(valuesBaseline);
 

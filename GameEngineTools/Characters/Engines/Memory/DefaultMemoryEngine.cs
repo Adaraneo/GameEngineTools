@@ -1077,7 +1077,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 lookup[boosted.Id] = boosted;
             }
 
-            State = new MemoryIndex(lookup.Values.ToList()) { Knowledge = State.Knowledge };
+            State = new MemoryIndex(lookup.Values.ToList()) { Knowledge = State.Knowledge, KnownObjects = State.KnownObjects };
 
             outbox.Add(new MemoryConsolidated(at, ctx.Id, toBoost.Count));
 

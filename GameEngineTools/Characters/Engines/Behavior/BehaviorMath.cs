@@ -55,7 +55,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     - CooldownFor(cooldowns, ReachOut) * 15
                     + (ctx.Personality.BigFive.Extraversion - 0.5) * 20.0),
                 NeedCompetence = Clamp01p(50 + (ctx.Personality.Motivation.Competence - 0.5) * 80 - ps.Stress * 0.2),
-                NeedIntimacy = ComputeIntimacyNeed(ctx, ph, rel, ps) - CooldownFor(cooldowns, InviteIntimacy) * 20
+                NeedIntimacy = Clamp01p(ComputeIntimacyNeed(ctx, ph, rel, ps) - CooldownFor(cooldowns, InviteIntimacy) * 20)
             };
         }
 
