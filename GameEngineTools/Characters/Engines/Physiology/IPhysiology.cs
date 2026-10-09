@@ -344,7 +344,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Energy level at or below which exhaustion mortality can apply.</summary>
         double NaturalMortalityExhaustionEnergyMax = 5.0,
         /// <summary>Sleep-debt hours at or above which exhaustion mortality can apply.</summary>
-        double NaturalMortalityExhaustionSleepDebtMin = 48.0,
+        double NaturalMortalityExhaustionSleepDebtMin = 9.0,
         /// <summary>Hourly risk from extreme energy depletion with sustained sleep debt.</summary>
         double NaturalMortalityExhaustionRisk = 0.001,
         /// <summary>BoneDensity (0..1) below which fragility-fracture mortality applies.</summary>
@@ -402,7 +402,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Behavioural cognitive deficit recovered per hour of sleep. Calibrated so 6 h restriction grows the deficit while 8 h clears it. Source: Van Dongen et al. 2003.</summary>
         double CognitiveDeficitRecoveryPerSleepHour = 0.028,
         /// <summary>Process S level above which the awake cognitive-deficit accrual is amplified (chronic restriction). Source: Van Dongen et al. 2003.</summary>
-        double CognitiveDeficitRestrictionThreshold = 0.55)
+        double CognitiveDeficitRestrictionThreshold = 0.55,
+        /// <summary>Process S level reached after a typical 16-17 h waking day; <c>SleepDebtHours</c> is derived from S only above this level, so a normal day carries no debt (chronic restriction is tracked by the cognitive deficit).</summary>
+        double ProcessSDebtFreeLevel = 0.65)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
@@ -433,7 +435,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // ── Allostatic load ───────────────────────────────────────────────────────
             AllostaticLoadThresholdHunger: 70,
             AllostaticLoadThresholdThirst: 70,
-            AllostaticLoadThresholdSleepDebt: 12,   // CHANGED: 5 → 12 (1 bad night is not enough)
+            AllostaticLoadThresholdSleepDebt: 5,    // derived debt reaches 5 h only after ~27 h awake (an all-nighter is not enough)
             AllostaticLoadThresholdPain: 50,
             AllostaticLoadThresholdImmune: 60,
             AllostaticLoadAccumRatePerHour: 0.15, // CHANGED: 0.5 → 0.15 (slower accumulation)
@@ -549,7 +551,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             NaturalMortalityDehydrationThreshold: 95.0,
             NaturalMortalityDehydrationRisk: 0.008,
             NaturalMortalityExhaustionEnergyMax: 5.0,
-            NaturalMortalityExhaustionSleepDebtMin: 48.0,
+            NaturalMortalityExhaustionSleepDebtMin: 9.0,
             NaturalMortalityExhaustionRisk: 0.001,
             NaturalMortalityBoneFragilityThreshold: 0.25,
             NaturalMortalityBoneFragilityWeight: 0.0002,

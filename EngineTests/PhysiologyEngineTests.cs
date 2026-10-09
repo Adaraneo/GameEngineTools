@@ -1623,6 +1623,61 @@ namespace EngineTests
 
         #endregion Věkové efekty
 
+        #region Spánkový dluh odvozený z Process S
+
+        private static double DebtAfter(DefaultPhysiologyEngine engine, IHumanContext ctx, int hours)
+        {
+            var start = WDateTime.New(116, 1, 1, 0);
+            for (var i = 0; i < hours; i++)
+                engine.Tick(start + WTimeSpan.FromHours(i), WTimeSpan.FromHours(1), ctx, new EventCollector());
+            return engine.State.SleepDebtHours;
+        }
+
+        [TestMethod]
+        public void SleepDebt_NormalWakingDay_CarriesNoDebt()
+        {
+            var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 30);
+            engine.RestoreState(engine.State with { SleepDebtHours = 0, ProcessS = 0.1 });
+
+            var debt = DebtAfter(engine, BuildContextWithAction(null), hours: 16);
+
+            Assert.AreEqual(0.0, debt, 0.5, "A normal 16 h waking day must not register as sleep debt.");
+        }
+
+        [TestMethod]
+        public void SleepDebt_ProlongedWakefulness_AccruesBelowTheCap()
+        {
+            var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 30);
+            engine.RestoreState(engine.State with { SleepDebtHours = 0, ProcessS = 0.1 });
+
+            var debt = DebtAfter(engine, BuildContextWithAction(null), hours: 36);
+
+            Assert.IsTrue(debt > 6.0 && debt <= 12.0, $"36 h awake should give roughly 8 h of debt, got {debt:F2}.");
+        }
+
+        [TestMethod]
+        public void SleepDebt_Sleep_RepaysIt()
+        {
+            var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 30);
+            engine.RestoreState(engine.State with { SleepDebtHours = 8.6, ProcessS = 0.9 });
+
+            var debt = DebtAfter(engine, BuildContextWithAction(GameEngineTools.Characters.Engines.ActionNames.Sleep), hours: 8);
+
+            Assert.AreEqual(0.0, debt, 0.5, "Eight hours of sleep must clear the debt derived from Process S.");
+        }
+
+        [TestMethod]
+        public void SleepDebt_ConsumerThresholds_AreReachableBelowTheCap()
+        {
+            // Derived debt saturates at MaxSleepDebtHours; thresholds above it (48 h, 12 h with '>') made the
+            // exhaustion death and the allostatic sleep-debt term permanently unreachable.
+            var cfg = new PhysiologyConfig();
+            Assert.IsTrue(cfg.NaturalMortalityExhaustionSleepDebtMin < cfg.MaxSleepDebtHours);
+            Assert.IsTrue(cfg.AllostaticLoadThresholdSleepDebt < cfg.MaxSleepDebtHours);
+        }
+
+        #endregion Spánkový dluh odvozený z Process S
+
         #region Antikoncepce (ongoing stav)
 
         [TestMethod]

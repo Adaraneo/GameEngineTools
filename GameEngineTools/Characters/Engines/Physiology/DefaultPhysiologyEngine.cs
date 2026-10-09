@@ -392,7 +392,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var alloAccum = 0.0;
                 if (s.Hunger > Config.AllostaticLoadThresholdHunger) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
                 if (s.Thirst > Config.AllostaticLoadThresholdThirst) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
-                if (s.SleepDebtHours > Config.AllostaticLoadThresholdSleepDebt) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
+                if (s.SleepDebtHours >= Config.AllostaticLoadThresholdSleepDebt) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
                 if (s.Pain > Config.AllostaticLoadThresholdPain) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
                 if (s.ImmuneLoad > Config.AllostaticLoadThresholdImmune) alloAccum += Config.AllostaticLoadAccumRatePerHour * h;
 
@@ -415,7 +415,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 var asleep = action == Sleep;
                 // Seed on first tick from existing sleep debt so restored saves behave sensibly.
-                var processS = s.ProcessS ?? Math.Clamp(0.3 + s.SleepDebtHours / Math.Max(1.0, Config.MaxSleepDebtHours) * 0.5, 0.0, 1.0);
+                var processS = s.ProcessS ?? SleepRegulationCalculator.ProcessSFromDebtHours(s.SleepDebtHours, Config);
                 var deficit = s.CognitiveDeficit ?? 0.0;
 
                 processS = asleep
@@ -426,7 +426,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with
                 {
                     ProcessS = Math.Clamp(processS, 0.0, 1.0),
-                    CognitiveDeficit = Math.Max(0.0, deficit)
+                    CognitiveDeficit = Math.Max(0.0, deficit),
+                    // Process S is the single source of truth; SleepDebtHours is its derived view for the other engines.
+                    SleepDebtHours = SleepRegulationCalculator.DebtHoursFromProcessS(processS, Config)
                 };
             }
 

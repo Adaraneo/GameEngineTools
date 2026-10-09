@@ -54,6 +54,36 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         #endregion
 
+        #region Sleep debt (derived from Process S)
+
+        /// <summary>
+        /// Sleep-debt hours implied by Process S: zero up to <see cref="PhysiologyConfig.ProcessSDebtFreeLevel"/>
+        /// (a normal waking day), rising linearly to <see cref="PhysiologyConfig.MaxSleepDebtHours"/> at the
+        /// upper asymptote (prolonged wakefulness).
+        /// </summary>
+        /// <param name="processS">Current Process S [0..1].</param>
+        /// <param name="cfg">Physiology configuration.</param>
+        /// <returns>Sleep debt in hours, in [0, <see cref="PhysiologyConfig.MaxSleepDebtHours"/>].</returns>
+        public static double DebtHoursFromProcessS(double processS, PhysiologyConfig cfg)
+        {
+            ArgumentNullException.ThrowIfNull(cfg);
+            var span = Math.Max(1e-6, cfg.ProcessSUpperAsymptote - cfg.ProcessSDebtFreeLevel);
+            return Math.Clamp((processS - cfg.ProcessSDebtFreeLevel) / span, 0.0, 1.0) * cfg.MaxSleepDebtHours;
+        }
+
+        /// <summary>Inverse of <see cref="DebtHoursFromProcessS"/>; seeds Process S for characters restored with only a debt value.</summary>
+        /// <param name="debtHours">Sleep debt in hours.</param>
+        /// <param name="cfg">Physiology configuration.</param>
+        /// <returns>The Process S value that yields <paramref name="debtHours"/>.</returns>
+        public static double ProcessSFromDebtHours(double debtHours, PhysiologyConfig cfg)
+        {
+            ArgumentNullException.ThrowIfNull(cfg);
+            var fraction = Math.Clamp(debtHours / Math.Max(1.0, cfg.MaxSleepDebtHours), 0.0, 1.0);
+            return Math.Clamp(cfg.ProcessSDebtFreeLevel + fraction * (cfg.ProcessSUpperAsymptote - cfg.ProcessSDebtFreeLevel), 0.0, 1.0);
+        }
+
+        #endregion
+
         #region Process C (circadian) + sleep propensity
 
         /// <summary>
