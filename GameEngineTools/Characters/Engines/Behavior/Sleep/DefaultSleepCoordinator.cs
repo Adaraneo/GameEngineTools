@@ -9,6 +9,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using static ActionNames;
@@ -50,7 +51,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                 _activeSession.Tick(context.Now, context.Dt, ctx, context.Outbox);
                 if (!_activeSession.IsActive)
                 {
-                    var dict = new Dictionary<string, double>(state.Cooldowns ?? new Dictionary<string, double>()) { [Sleep] = _behaviorCfg.SleepCooldownHours };
+                    var dict = new Dictionary<string, double>(state.Cooldowns ?? new Dictionary<string, double>()) { [Sleep] = _behaviorCfg.SleepCooldownHours * WWorld.Spec.BodyClockScale };
                     state = state with { CurrentPlan = null, Cooldowns = dict };
                     _activeSession = null;
                     using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepSessionEnded(ctx.Id.Value.ToString(), _behaviorCfg.SleepCooldownHours);
@@ -105,7 +106,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                     var ph = ctx.Snapshot.Physiology;
                     // Sleep session creation stays here so the runtime session never leaks into BehaviorState.
                     var session = new DefaultSleepSession(_sleepCfg, _loggerFactory, ctx.Random);
-                    var sleepHours = Math.Clamp(_behaviorCfg.BaseSleepHours + ph.SleepDebtHours * 0.5, _behaviorCfg.MinSleepHours, _behaviorCfg.MaxSleepHours);
+                    // Sleep lengths are written for an Earth body clock; a body adapted to the planet's day stretches or compresses them.
+                    var bodyScale = WWorld.Spec.BodyClockScale;
+                    var minSleep = _behaviorCfg.MinSleepHours * bodyScale;
+                    var maxSleep = _behaviorCfg.MaxSleepHours * bodyScale;
+                    var sleepHours = Math.Clamp((_behaviorCfg.BaseSleepHours + ph.SleepDebtHours * 0.5) * bodyScale, minSleep, maxSleep);
 
                     // Hunger disturbs sleep — high hunger reduces sleep duration.
                     // Biological basis: ghrelin (hunger hormone) promotes wakefulness (Hanlon et al. 2016).
@@ -114,7 +119,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                         var hungerFraction = (ph.Hunger - _sleepCfg.HungerSleepShorteningThreshold)
                                            / (100.0 - _sleepCfg.HungerSleepShorteningThreshold);
                         sleepHours *= (1.0 - hungerFraction * _sleepCfg.HungerSleepShorteningMax);
-                        sleepHours = Math.Max(sleepHours, _behaviorCfg.MinSleepHours);
+                        sleepHours = Math.Max(sleepHours, minSleep);
                     }
 
                     // Without an alarm the character wakes on its own when Process S reaches the circadian waking threshold;
@@ -122,8 +127,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
                     var alarm = sc.PlannedWakeUp != default;
                     var plannedWakeUp = alarm
                         ? sc.PlannedWakeUp
-                        : sc.OccurredAt + WTimeSpan.FromHours(Math.Max(sleepHours, _behaviorCfg.MaxSleepHours));
-                    var spontaneous = alarm ? null : new SpontaneousWake(_behaviorCfg.MinSleepHours, sleepHours);
+                        : sc.OccurredAt + WTimeSpan.FromHours(Math.Max(sleepHours, maxSleep));
+                    var spontaneous = alarm ? null : new SpontaneousWake(minSleep, sleepHours);
                     session.Begin(sc.OccurredAt, plannedWakeUp, ctx, outbox, sc.Companion, sc.SharedType, spontaneous);
                     _activeSession = session;
                     using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultSleepCoordinator))) _log.SleepStarted(ctx.Id.Value.ToString(), sleepHours);

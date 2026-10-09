@@ -26,19 +26,30 @@ namespace GameEngineTools.World.Core.Time
         /// <summary>How many world ticks make up one world second.</summary>
         public readonly long TicksPerSecond;     // kolik worldTicks je jedna “sekunda světa”
 
+        /// <summary>
+        /// Whether the inhabitants' body clock is adapted to this world's day, as it would be for a species that evolved on the planet.
+        /// When <c>true</c> the sleep-regulation time constants and sleep durations scale with the day length (see <see cref="BodyClockScale"/>),
+        /// so the rhythm looks the same as on Earth on any planet. When <c>false</c> they keep their Earth values in real hours (settlers
+        /// whose bodies still run on a 24 h clock; a rhythm that cannot entrain on days far from 24 h).
+        /// </summary>
+        public readonly bool BodyClockFollowsDay;
+
         /// <summary>Creates a world time specification.</summary>
         /// <param name="ticksPerSecond">World ticks per world second.</param>
         /// <param name="secondsPerMinute">Seconds per minute.</param>
         /// <param name="minutesPerHour">Minutes per hour.</param>
         /// <param name="hoursPerDay">Hours per day.</param>
         /// <param name="calendar">The world calendar.</param>
+        /// <param name="bodyClockFollowsDay">See <see cref="BodyClockFollowsDay"/>. Defaults to <c>true</c>.</param>
         public WorldTimeSpec(
             long ticksPerSecond,
             int secondsPerMinute,
             int minutesPerHour,
             int hoursPerDay,
-            IWorldCalendar calendar)
+            IWorldCalendar calendar,
+            bool bodyClockFollowsDay = true)
         {
+            BodyClockFollowsDay = bodyClockFollowsDay;
             TicksPerSecond = ticksPerSecond;
             SecondsPerMinute = secondsPerMinute;
             MinutesPerHour = minutesPerHour;
@@ -60,6 +71,12 @@ namespace GameEngineTools.World.Core.Time
         /// <summary>Inverse of <see cref="FromClock24"/>: a world hour (or hour difference) expressed on a 24-hour clock.</summary>
         /// <param name="worldHours">Hours of this world's day.</param>
         public double ToClock24(double worldHours) => worldHours * 24.0 / HoursPerDay;
+
+        /// <summary>
+        /// How many world hours one hour of the body clock lasts: <c>HoursPerDay / 24</c> when <see cref="BodyClockFollowsDay"/>, otherwise 1.
+        /// Multiplies the time constants of the sleep-regulation model (a 40 h day gives 1.67).
+        /// </summary>
+        public double BodyClockScale => BodyClockFollowsDay ? HoursPerDay / 24.0 : 1.0;
 
         /// <summary>World ticks in one day.</summary>
         public long TicksPerDay => TicksPerHour * HoursPerDay;

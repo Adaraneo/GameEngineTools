@@ -382,9 +382,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double ImmuneDriftAwakePerHour = -0.3,
         double ImmuneDriftSelfCarePerHour = -0.5,
         // ── Borbély 2-process sleep model ──────────────────────────────────────────
-        /// <summary>Process S buildup time constant (hours) while awake — saturating exponential. Source: Daan, Beersma &amp; Borbély 1984.</summary>
+        /// <summary>Process S buildup time constant (Earth hours) while awake — saturating exponential. Multiplied by <c>WorldTimeSpec.BodyClockScale</c> (day length / 24 when the body clock follows the day). Source: Daan, Beersma &amp; Borbély 1984.</summary>
         double ProcessSBuildupTimeConstantHours = 18.2,
-        /// <summary>Process S decay time constant (hours) while asleep. Source: Daan, Beersma &amp; Borbély 1984.</summary>
+        /// <summary>Process S decay time constant (Earth hours) while asleep; scaled like the buildup constant. Source: Daan, Beersma &amp; Borbély 1984 (from the decline of EEG slow-wave activity).</summary>
         double ProcessSDecayTimeConstantHours = 4.2,
         /// <summary>Upper asymptote (ceiling) of Process S, normalized. Default 1.0.</summary>
         double ProcessSUpperAsymptote = 1.0,

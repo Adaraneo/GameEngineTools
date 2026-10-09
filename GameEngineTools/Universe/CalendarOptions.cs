@@ -37,6 +37,10 @@ namespace GameEngineTools.Universe;
 /// 1-based month that receives the leap days. <c>null</c> = the last month; pass <c>2</c> for a
 /// Gregorian February leap day.
 /// </param>
+/// <param name="BodyClockFollowsDay">
+/// Whether the inhabitants' sleep-regulation time constants scale with the planet's day length (a native species) or keep their
+/// Earth values in real hours (settlers). Default <c>true</c>. See <see cref="GameEngineTools.World.Core.Time.WorldTimeSpec.BodyClockFollowsDay"/>.
+/// </param>
 public sealed record CalendarOptions(
     int    MonthCount       = 12,
     int?   TargetYearDays   = null,
@@ -47,4 +51,5 @@ public sealed record CalendarOptions(
     int    LeapExtraDays    = 0,
     int[]? MonthLengths     = null,
     bool   UseGregorianLeap = false,
-    int?   LeapMonth        = null);
+    int?   LeapMonth        = null,
+    bool   BodyClockFollowsDay = true);

@@ -73,7 +73,8 @@ public static class PlanetaryCalendarFactory
             options.SecondsPerMinute,
             options.MinutesPerHour,
             hoursPerDay,
-            calendar);
+            calendar,
+            options.BodyClockFollowsDay);
     }
 
     /// <summary>

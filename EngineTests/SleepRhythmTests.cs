@@ -102,6 +102,48 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Character_SleepsNightly_OnAnyDayLength_WhenTheBodyClockFollowsTheDay()
+        {
+            foreach (var hoursPerDay in new[] { 12, 20, 24, 26, 32, 40, 60 })
+            {
+                var all = SimulateSessions(hoursPerDay, 7, out var alive);
+                var sessions = all.Where(x => x.Hours >= 4.0 * hoursPerDay / 24.0).ToList(); // an ambushed sleep is not a night of its own
+                var detail = string.Join("; ", all.Select(x => $"start {x.StartHour % hoursPerDay * 24.0 / hoursPerDay:F1}h(24h clock) abs {x.StartHour:F0} for {x.Hours:F1}h"));
+
+                Assert.IsTrue(alive, $"{hoursPerDay} h day: the character must survive {Days} days. {detail}");
+                Assert.IsTrue(sessions.Count >= Days - 2, $"{hoursPerDay} h day: expected about one sleep per day over {Days} days, got {sessions.Count}. {detail}");
+
+                for (var i = 1; i < sessions.Count; i++)
+                {
+                    var gapDays = (sessions[i].StartHour - sessions[i - 1].StartHour) / hoursPerDay;
+                    Assert.IsTrue(gapDays is > 0.6 and < 2.1, $"{hoursPerDay} h day: gap between sleeps was {gapDays:F2} days. {detail}");
+                }
+
+                var slept = all.Sum(x => x.Hours) / (Days * hoursPerDay);
+                Assert.IsTrue(slept is > 0.2 and < 0.42, $"{hoursPerDay} h day: slept {slept * 100:F0} % of the time. {detail}");
+
+                var afterFullNight = all.Skip(1).Where((x, i) => x.Hours >= 6.5 * hoursPerDay / 24.0 && all[i].Hours >= 6.5 * hoursPerDay / 24.0 && i > 0).ToList();
+                foreach (var session in afterFullNight)
+                {
+                    var clock24 = session.StartHour % hoursPerDay * 24.0 / hoursPerDay;
+                    Assert.IsTrue(clock24 >= 21.0 || clock24 <= 3.0, $"{hoursPerDay} h day: went to sleep at {clock24:F1} on a 24-hour clock. {detail}");
+                }
+            }
+        }
+
+        [TestMethod]
+        public void SettlersWithAnEarthBodyClock_OnA60HourDay_SleepMoreOftenThanOncePerDay()
+        {
+            // BodyClockFollowsDay = false: the body keeps its Earth time constants in real hours, so sleep pressure builds in ~16-25 h and
+            // the character sleeps several times per 60 h day instead of once.
+            var all = SimulateSessions(60, 7, out var alive, bodyClockFollowsDay: false);
+            var sessions = all.Where(x => x.Hours >= 4.0).ToList();
+
+            Assert.IsTrue(alive);
+            Assert.IsTrue(sessions.Count > Days * 1.5, $"Got {sessions.Count} sleeps in {Days} days of 60 h with an Earth body clock.");
+        }
+
+        [TestMethod]
         public void Character_OnALongDay_StaysAliveAndNeverGoesMuchLongerThanADayWithoutSleep()
         {
             // Process S runs in real hours, so on a 40 h day sleep pressure builds up well before the day ends and the rhythm is
@@ -148,9 +190,9 @@ namespace EngineTests
             };
         }
 
-        private List<Session> SimulateSessions(int hoursPerDay, int seed, out bool alive)
+        private List<Session> SimulateSessions(int hoursPerDay, int seed, out bool alive, bool bodyClockFollowsDay = true)
         {
-            UseDayLength(hoursPerDay);
+            UseDayLength(hoursPerDay, bodyClockFollowsDay);
             var generator = ServiceProvider.GetRequiredService<IHumanBlueprintGenerator>();
             var factory = ServiceProvider.GetRequiredService<IHumanFactory>();
             var now = WDateTime.New(116, 1, 1, 0);

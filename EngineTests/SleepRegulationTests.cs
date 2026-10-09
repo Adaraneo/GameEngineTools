@@ -80,6 +80,32 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void DebtFreeLevel_IsTheSameOnEveryDayLength_WhenTheBodyClockFollowsTheDay()
+        {
+            var cfg = new PhysiologyConfig();
+            var earth = SleepRegulationCalculator.DebtFreeLevel(cfg, 24, 1.0);
+
+            foreach (var hoursPerDay in new[] { 12, 20, 26, 32, 40, 60 })
+            {
+                var scaled = SleepRegulationCalculator.DebtFreeLevel(cfg, hoursPerDay, hoursPerDay / 24.0);
+                Assert.AreEqual(earth, scaled, 1e-9, $"{hoursPerDay} h day with a day-following body clock.");
+            }
+        }
+
+        [TestMethod]
+        public void ProcessS_TimeConstants_StretchWithTheBodyClockScale()
+        {
+            var cfg = new PhysiologyConfig();
+            var earthSixteen = SleepRegulationCalculator.BuildupProcessS(0.1, 16, cfg);
+            var longDaySame = SleepRegulationCalculator.BuildupProcessS(0.1, 16 * 40.0 / 24.0, cfg, 40.0 / 24.0);
+            var earthDecay = SleepRegulationCalculator.DecayProcessS(0.65, 8, cfg);
+            var longDecay = SleepRegulationCalculator.DecayProcessS(0.65, 8 * 40.0 / 24.0, cfg, 40.0 / 24.0);
+
+            Assert.AreEqual(earthSixteen, longDaySame, 1e-9, "26.7 h awake on a 40 h day is what 16 h awake is on Earth.");
+            Assert.AreEqual(earthDecay, longDecay, 1e-9, "13.3 h asleep on a 40 h day is what 8 h asleep is on Earth.");
+        }
+
+        [TestMethod]
         public void CircadianThresholds_FollowDaan1984_AndPeakInTheAfternoon()
         {
             var cfg = new PhysiologyConfig();

@@ -30,12 +30,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <param name="s">Current Process S [0..1].</param>
         /// <param name="dtHours">Elapsed awake hours.</param>
         /// <param name="cfg">Physiology configuration.</param>
+        /// <param name="bodyClockScale">Multiplier of the time constant (<see cref="GameEngineTools.World.Core.Time.WorldTimeSpec.BodyClockScale"/>); 1 = Earth hours.</param>
         /// <returns>The new Process S.</returns>
-        public static double BuildupProcessS(double s, double dtHours, PhysiologyConfig cfg)
+        public static double BuildupProcessS(double s, double dtHours, PhysiologyConfig cfg, double bodyClockScale = 1.0)
         {
             ArgumentNullException.ThrowIfNull(cfg);
             var a = cfg.ProcessSUpperAsymptote;
-            return a - (a - s) * Math.Exp(-Math.Max(0, dtHours) / cfg.ProcessSBuildupTimeConstantHours);
+            return a - (a - s) * Math.Exp(-Math.Max(0, dtHours) / (cfg.ProcessSBuildupTimeConstantHours * bodyClockScale));
         }
 
         /// <summary>
@@ -45,20 +46,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <param name="s">Current Process S [0..1].</param>
         /// <param name="dtHours">Elapsed sleep hours.</param>
         /// <param name="cfg">Physiology configuration.</param>
+        /// <param name="bodyClockScale">Multiplier of the time constant (<see cref="GameEngineTools.World.Core.Time.WorldTimeSpec.BodyClockScale"/>); 1 = Earth hours.</param>
         /// <returns>The new Process S.</returns>
-        public static double DecayProcessS(double s, double dtHours, PhysiologyConfig cfg)
+        public static double DecayProcessS(double s, double dtHours, PhysiologyConfig cfg, double bodyClockScale = 1.0)
         {
             ArgumentNullException.ThrowIfNull(cfg);
             var a = cfg.ProcessSLowerAsymptote;
-            return a + (s - a) * Math.Exp(-Math.Max(0, dtHours) / cfg.ProcessSDecayTimeConstantHours);
+            return a + (s - a) * Math.Exp(-Math.Max(0, dtHours) / (cfg.ProcessSDecayTimeConstantHours * bodyClockScale));
         }
 
         #endregion
 
         #region Sleep debt (derived from Process S)
 
-        // A normal day is awake for two thirds of it, bounded to what a body tolerates (short days still
-        // need ~8 h awake to build any pressure; very long days are not stayed awake for).
+        // A normal day is awake for two thirds of it. For a body on Earth hours that is bounded to what it tolerates (short days
+        // still need ~8 h awake to build any pressure; very long days are not stayed awake for); a body adapted to the day needs no bound.
         private const double AwakeFractionOfDay = 2.0 / 3.0;
         private const double MinAwakeHours = 8.0;
         private const double MaxAwakeHours = 18.0;
@@ -72,17 +74,20 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         /// <param name="cfg">Physiology configuration.</param>
         /// <param name="hoursPerDay">Hours in a world day.</param>
+        /// <param name="bodyClockScale">Scale of the time constants (see <see cref="BuildupProcessS"/>); with a scale other than 1 the level is the same for every day length.</param>
         /// <returns>The Process S level below which no sleep debt is counted.</returns>
-        public static double DebtFreeLevel(PhysiologyConfig cfg, double hoursPerDay)
+        public static double DebtFreeLevel(PhysiologyConfig cfg, double hoursPerDay, double bodyClockScale = 1.0)
         {
             ArgumentNullException.ThrowIfNull(cfg);
             if (cfg.ProcessSDebtFreeLevel is { } fixedLevel)
                 return fixedLevel;
 
-            var awake = Math.Clamp(hoursPerDay * AwakeFractionOfDay, MinAwakeHours, MaxAwakeHours);
+            var awake = bodyClockScale == 1.0
+                ? Math.Clamp(hoursPerDay * AwakeFractionOfDay, MinAwakeHours, MaxAwakeHours)
+                : hoursPerDay * AwakeFractionOfDay;
             var asleep = awake * (1.0 - AwakeFractionOfDay) / AwakeFractionOfDay;
-            var rise = Math.Exp(-awake / cfg.ProcessSBuildupTimeConstantHours);
-            var fall = Math.Exp(-asleep / cfg.ProcessSDecayTimeConstantHours);
+            var rise = Math.Exp(-awake / (cfg.ProcessSBuildupTimeConstantHours * bodyClockScale));
+            var fall = Math.Exp(-asleep / (cfg.ProcessSDecayTimeConstantHours * bodyClockScale));
             var upper = cfg.ProcessSUpperAsymptote;
             var lower = cfg.ProcessSLowerAsymptote;
 
@@ -98,10 +103,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <param name="processS">Current Process S [0..1].</param>
         /// <param name="cfg">Physiology configuration.</param>
         /// <param name="hoursPerDay">Hours in a world day.</param>
+        /// <param name="bodyClockScale">Scale of the time constants (see <see cref="BuildupProcessS"/>).</param>
         /// <returns>Sleep debt in hours, in [0, <see cref="PhysiologyConfig.MaxSleepDebtHours"/>].</returns>
-        public static double DebtHoursFromProcessS(double processS, PhysiologyConfig cfg, double hoursPerDay)
+        public static double DebtHoursFromProcessS(double processS, PhysiologyConfig cfg, double hoursPerDay, double bodyClockScale = 1.0)
         {
-            var free = DebtFreeLevel(cfg, hoursPerDay);
+            var free = DebtFreeLevel(cfg, hoursPerDay, bodyClockScale);
             var span = Math.Max(1e-6, cfg.ProcessSUpperAsymptote - free);
             return Math.Clamp((processS - free) / span, 0.0, 1.0) * cfg.MaxSleepDebtHours;
         }
@@ -110,10 +116,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <param name="debtHours">Sleep debt in hours.</param>
         /// <param name="cfg">Physiology configuration.</param>
         /// <param name="hoursPerDay">Hours in a world day.</param>
+        /// <param name="bodyClockScale">Scale of the time constants (see <see cref="BuildupProcessS"/>).</param>
         /// <returns>The Process S value that yields <paramref name="debtHours"/>.</returns>
-        public static double ProcessSFromDebtHours(double debtHours, PhysiologyConfig cfg, double hoursPerDay)
+        public static double ProcessSFromDebtHours(double debtHours, PhysiologyConfig cfg, double hoursPerDay, double bodyClockScale = 1.0)
         {
-            var free = DebtFreeLevel(cfg, hoursPerDay);
+            var free = DebtFreeLevel(cfg, hoursPerDay, bodyClockScale);
             var fraction = Math.Clamp(debtHours / Math.Max(1.0, cfg.MaxSleepDebtHours), 0.0, 1.0);
             return Math.Clamp(free + fraction * (cfg.ProcessSUpperAsymptote - free), 0.0, 1.0);
         }

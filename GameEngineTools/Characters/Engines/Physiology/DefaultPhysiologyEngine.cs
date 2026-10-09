@@ -417,14 +417,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // Process S saturates; the cognitive deficit does not — preserving the dissociation.
             {
                 var asleep = action == Sleep;
+                // A body adapted to the planet's day runs the sleep model on a stretched or compressed hour (1 on Earth).
+                var bodyScale = WWorld.Spec.BodyClockScale;
                 // Seed on first tick from existing sleep debt so restored saves behave sensibly.
-                var processS = s.ProcessS ?? SleepRegulationCalculator.ProcessSFromDebtHours(s.SleepDebtHours, Config, hoursPerDay);
+                var processS = s.ProcessS ?? SleepRegulationCalculator.ProcessSFromDebtHours(s.SleepDebtHours, Config, hoursPerDay, bodyScale);
                 var deficit = s.CognitiveDeficit ?? 0.0;
 
                 processS = asleep
-                    ? SleepRegulationCalculator.DecayProcessS(processS, h, Config)
-                    : SleepRegulationCalculator.BuildupProcessS(processS, h, Config);
-                deficit = SleepRegulationCalculator.UpdateCognitiveDeficit(deficit, processS, h, asleep, Config);
+                    ? SleepRegulationCalculator.DecayProcessS(processS, h, Config, bodyScale)
+                    : SleepRegulationCalculator.BuildupProcessS(processS, h, Config, bodyScale);
+                deficit = SleepRegulationCalculator.UpdateCognitiveDeficit(deficit, processS, h / bodyScale, asleep, Config);
 
                 var clampedS = Math.Clamp(processS, 0.0, 1.0);
                 var fractionalHour = (now.Hour % hoursPerDay) + now.Minute / (double)WWorld.Spec.MinutesPerHour;
@@ -437,7 +439,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                         clampedS, fractionalHour, hoursPerDay, s.CircadianPhaseShiftHours, Config),
                     CognitiveDeficit = Math.Max(0.0, deficit),
                     // Process S is the single source of truth; SleepDebtHours is its derived view for the other engines.
-                    SleepDebtHours = SleepRegulationCalculator.DebtHoursFromProcessS(processS, Config, hoursPerDay)
+                    SleepDebtHours = SleepRegulationCalculator.DebtHoursFromProcessS(processS, Config, hoursPerDay, bodyScale)
                 };
             }
 
@@ -488,26 +490,32 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with { CortisolLevel = Math.Clamp(Approach(s.CortisolLevel, targetCortisol, cortRate), 0, 100) };
             }
 
-            // Circadian phase shift — the social jet-lag model
+            // Circadian phase shift — the social jet-lag model. The displacement is measured as a fraction of the day (24-hour-clock
+            // hours) and changes per hour of body time, so it behaves the same on any day length; the shift itself is stored in world hours.
             {
-                var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
-                var naturalSleep = (WWorld.Spec.FromClock24(Config.NaturalSleepStartHour) - Config.ChronotypeOffsetHours + hoursPerDay) % hoursPerDay;
+                var spec = WWorld.Spec;
+                var hoursOfDay = (double)(now.Hour % spec.HoursPerDay);
+                var bodyHours = h / spec.BodyClockScale;
+                var naturalSleep = (spec.FromClock24(Config.NaturalSleepStartHour - Config.ChronotypeOffsetHours) + hoursPerDay) % hoursPerDay;
                 if (action == Sleep)
                 {
                     var mismatch = Math.Abs(hoursOfDay - naturalSleep);
                     if (mismatch > hoursPerDay / 2) mismatch = hoursPerDay - mismatch;
-                    if (mismatch > 2.0)
+                    var mismatchClock = spec.ToClock24(mismatch);
+                    if (mismatchClock > 2.0)
                         s = s with
                         {
                             CircadianPhaseShiftHours = Math.Clamp(
-                            s.CircadianPhaseShiftHours + (mismatch - 2.0) * 0.05 * h, -6, 6)
+                                s.CircadianPhaseShiftHours + spec.FromClock24((mismatchClock - 2.0) * 0.05 * bodyHours),
+                                -spec.FromClock24(6.0), spec.FromClock24(6.0))
                         };
                 }
                 // Slow recovery toward the chronotype (the body resynchronizes ~1 h/day)
                 s = s with
                 {
                     CircadianPhaseShiftHours = Approach(
-                    s.CircadianPhaseShiftHours, Config.ChronotypeOffsetHours, Config.CircadianPhaseRecoveryPerHour * h)
+                        s.CircadianPhaseShiftHours, spec.FromClock24(Config.ChronotypeOffsetHours),
+                        spec.FromClock24(Config.CircadianPhaseRecoveryPerHour * bodyHours))
                 };
             }
 

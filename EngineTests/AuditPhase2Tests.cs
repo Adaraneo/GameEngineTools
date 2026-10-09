@@ -60,6 +60,30 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void BodyClockScale_FollowsTheDayLength_UnlessTurnedOff()
+        {
+            UseDayLength(40);
+            Assert.IsTrue(WWorld.Spec.BodyClockFollowsDay, "A native species is the default.");
+            Assert.AreEqual(40.0 / 24.0, WWorld.Spec.BodyClockScale, 1e-9);
+
+            UseDayLength(40, bodyClockFollowsDay: false);
+            Assert.AreEqual(1.0, WWorld.Spec.BodyClockScale, 1e-9, "Settlers keep an Earth body clock.");
+
+            UseDayLength(24);
+            Assert.AreEqual(1.0, WWorld.Spec.BodyClockScale, 1e-9);
+        }
+
+        [TestMethod]
+        public void BodyClockFollowsDay_IsReadFromTheWorldCalendarConfiguration_AndDefaultsToTrue()
+        {
+            Assert.IsTrue(new GameEngineTools.World.Core.Astro.CalendarConfig().BodyClockFollowsDay);
+            Assert.IsTrue(new GameEngineTools.World.Core.Astro.CalendarConfig().ToCalendarOptions().BodyClockFollowsDay);
+
+            var off = new GameEngineTools.World.Core.Astro.CalendarConfig { BodyClockFollowsDay = false };
+            Assert.IsFalse(off.ToCalendarOptions().BodyClockFollowsDay);
+        }
+
+        [TestMethod]
         public void ClockConversion_IsAFractionOfTheDay_AndRoundTrips()
         {
             UseDayLength(40);

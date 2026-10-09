@@ -21,7 +21,8 @@ public sealed record CalendarConfig(
     int    LeapExtraDays    = 0,
     int[]? MonthLengths     = null,       // null = derive months by even division
     bool   UseGregorianLeap = false,      // true = Gregorian 4/100/400 rule
-    int    LeapMonth        = 0)          // 0 = last month; 2 = February (Gregorian)
+    int    LeapMonth        = 0,          // 0 = last month; 2 = February (Gregorian)
+    bool   BodyClockFollowsDay = true)   // true = inhabitants' sleep rhythm scales with the planet's day; false = Earth hours
 {
     /// <summary>Default constructor — a 12-month year derived from the orbit, no leap years.</summary>
     public CalendarConfig() : this(12) { }
@@ -37,5 +38,6 @@ public sealed record CalendarConfig(
         LeapExtraDays:    LeapExtraDays,
         MonthLengths:     MonthLengths,
         UseGregorianLeap: UseGregorianLeap,
-        LeapMonth:        LeapMonth > 0 ? LeapMonth : null);
+        LeapMonth:        LeapMonth > 0 ? LeapMonth : null,
+        BodyClockFollowsDay: BodyClockFollowsDay);
 }
