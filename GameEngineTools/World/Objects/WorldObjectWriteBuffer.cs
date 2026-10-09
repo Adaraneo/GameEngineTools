@@ -112,11 +112,17 @@ namespace GameEngineTools.World.Objects
 
         /// <summary>
         /// Writes immediately — AddObject is rare (seeding, runtime spawns) and must be
-        /// visible to the cache on the next Refresh without waiting for Flush.
+        /// visible to the cache on the next Refresh without waiting for Flush. The write is a full
+        /// upsert, so it supersedes any mutation still buffered for the same object id (otherwise a
+        /// Remove followed by an Add of the same id — how an object is updated — would delete it at Flush).
         /// </summary>
         /// <inheritdoc/>
         public void AddObject(WorldObject obj)
-            => _provider.AddObject(obj);
+        {
+            lock (_lock)
+                _pending.Remove(obj.Id);
+            _provider.AddObject(obj);
+        }
 
         /// <inheritdoc/>
         public bool ConsumeObject(string locationId, string objectId, WDateTime now)
