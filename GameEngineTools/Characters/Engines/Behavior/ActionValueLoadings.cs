@@ -107,7 +107,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// <remarks>
     /// Guilt channel: when the actor's <see cref="ValuesProfile"/> has high weight on
     /// Benevolence or Universalism AND the action's loading on those dimensions is negative,
-    /// <see cref="Modifiers.ValuesBehaviorModifier"/> emits a <c>ValueCongruenceViolated</c> event.
+    /// <see cref="Values.DefaultValuesEngine"/> raises a <c>ValueCongruenceViolated</c> event when such an action is committed.
     /// </remarks>
     public sealed record ValueLoadVector(
         double Benevolence = 0,

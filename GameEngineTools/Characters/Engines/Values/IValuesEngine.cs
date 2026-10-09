@@ -30,7 +30,8 @@ namespace GameEngineTools.Characters.Engines.Values
     public sealed record ValuesState(
         ValuesProfile Current,
         ValuesProfile Baseline,
-        WDateTime?[]? LastAffirmedAt = null)
+        WDateTime?[]? LastAffirmedAt = null,
+        WDateTime?[]? LastViolatedAt = null)
     {
         /// <summary>Creates a state where Current equals Baseline (freshly seeded character).</summary>
         public static ValuesState FromBaseline(ValuesProfile baseline) => new(baseline, baseline);

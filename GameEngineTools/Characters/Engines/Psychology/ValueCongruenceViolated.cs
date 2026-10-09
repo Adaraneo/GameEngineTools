@@ -7,7 +7,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
-    /// Domain event emitted by <see cref="GameEngineTools.Characters.Engines.Behavior.Modifiers.ValuesBehaviorModifier"/>
+    /// Domain event emitted by <see cref="GameEngineTools.Characters.Engines.Values.DefaultValuesEngine"/>
     /// when a character commits an action whose value-congruence with their
     /// <see cref="GameEngineTools.Characters.Traits.ValuesProfile"/> falls below the guilt threshold.
     /// </summary>
@@ -24,8 +24,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
     /// <param name="Actor">The character who committed the value-violating action.</param>
     /// <param name="ActionName">The name of the committed action.</param>
     /// <param name="Congruence">
-    /// The computed congruence score [−1..+1]. Values below −0.30 trigger this event.
-    /// More negative = stronger violation = larger Guilt spike.
+    /// The computed congruence score. The real range is only about [−0.12..+0.12] (a dot product normalised by 10); values below
+    /// −0.01 trigger this event. More negative = stronger violation = larger Guilt spike.
     /// </param>
     /// <param name="DominantViolatedValue">
     /// Human-readable name of the value most strongly violated by this action.

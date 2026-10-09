@@ -15,9 +15,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     /// and the character's <see cref="ValuesProfile"/>.
     /// </summary>
     /// <remarks>
-    /// Architecture: pure <see cref="IBehaviorModifierEngine"/> — reads snapshot, modifies
-    /// utility, and emits <see cref="ValueCongruenceViolated"/> via the outbox when a
-    /// guilt-threshold violation is detected.
+    /// Architecture: pure <see cref="IBehaviorModifierEngine"/> — reads the snapshot and modifies utility only. Guilt is NOT raised here:
+    /// this runs for every candidate, including actions the character never takes. <see cref="Values.DefaultValuesEngine"/> raises
+    /// <see cref="ValueCongruenceViolated"/> when a violating action is actually committed.
     /// <para>
     /// Value-action gap gating (Mieth, Buchner &amp; Bell 2021): under high cognitive load or
     /// stress, the value-congruence contribution to utility is attenuated — simulating
@@ -39,14 +39,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// Tunable via playtest (recommended range 0.25–0.55).
         /// </summary>
         private const double UtilityLambda = 0.40;
-
-        /// <summary>
-        /// Congruence below this threshold emits <see cref="ValueCongruenceViolated"/>
-        /// and triggers a Guilt spike in <c>DefaultPsychologyEngine</c>.
-        /// Calibrated to normalised dot-product / 10: typical violation magnitude is 0.01–0.05,
-        /// so -0.01 captures moderate value-violating actions with matching character profiles.
-        /// </summary>
-        private const double GuiltThreshold = -0.01;
 
         /// <summary>
         /// Cognitive load above this value attenuates the value-utility contribution
@@ -123,59 +115,10 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
                             utilityDelta);
                     }
                 }
-
-                // Emit guilt event if congruence is below the guilt threshold.
-                // Only for the self-transcendence violation path (Benevolence, Universalism).
-                // See Tangney & Dearing (2002): guilt = own action against one's moral standards.
-                if (congruence < GuiltThreshold && loading.HasNegativeLoading)
-                {
-                    var dominantViolated = FindDominantViolatedValue(loading, values);
-                    context.Outbox.Add(new ValueCongruenceViolated(
-                        context.Now,
-                        context.HumanContext.Id,
-                        c.Name,
-                        congruence,
-                        dominantViolated));
-                }
             }
         }
 
         #endregion IBehaviorModifierEngine
 
-        #region Private helpers
-
-        /// <summary>
-        /// Returns the name of the value most strongly violated by this action,
-        /// weighted by the character's value profile.
-        /// </summary>
-        private static string FindDominantViolatedValue(ValueLoadVector loading, ValuesProfile profile)
-        {
-            var worst = 0.0;
-            var worstName = "Unknown";
-
-            Check(loading.Benevolence * profile.Benevolence, nameof(ValuesProfile.Benevolence));
-            Check(loading.Universalism * profile.Universalism, nameof(ValuesProfile.Universalism));
-            Check(loading.SelfDirection * profile.SelfDirection, nameof(ValuesProfile.SelfDirection));
-            Check(loading.Stimulation * profile.Stimulation, nameof(ValuesProfile.Stimulation));
-            Check(loading.Hedonism * profile.Hedonism, nameof(ValuesProfile.Hedonism));
-            Check(loading.Achievement * profile.Achievement, nameof(ValuesProfile.Achievement));
-            Check(loading.Power * profile.Power, nameof(ValuesProfile.Power));
-            Check(loading.Security * profile.Security, nameof(ValuesProfile.Security));
-            Check(loading.Conformity * profile.Conformity, nameof(ValuesProfile.Conformity));
-            Check(loading.Tradition * profile.Tradition, nameof(ValuesProfile.Tradition));
-
-            return worstName;
-
-            void Check(double weightedLoad, string name)
-            {
-                if (weightedLoad < worst)
-                {
-                    worst = weightedLoad;
-                    worstName = name;
-                }
-            }
-        }
-
-        #endregion Private helpers
     }
 }

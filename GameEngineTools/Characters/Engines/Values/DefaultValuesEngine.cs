@@ -131,6 +131,7 @@ namespace GameEngineTools.Characters.Engines.Values
 
                 case ActionCommitted ac when ac.Human == ctx.Id:
                     HandleAffirmation(ac, ctx);
+                    RaiseGuiltIfViolating(ac, ctx, outbox);
                     break;
             }
         }
@@ -145,6 +146,17 @@ namespace GameEngineTools.Characters.Engines.Values
         #endregion IEngine — RestoreState
 
         #region Drift handlers
+
+        /// <summary>
+        /// Guilt belongs to what the character DID: a committed action that violates its current values raises
+        /// <see cref="ValueCongruenceViolated"/> (previously raised for every candidate the behavior modifier scored).
+        /// </summary>
+        private void RaiseGuiltIfViolating(ActionCommitted ac, IHumanContext ctx, IEventCollector outbox)
+        {
+            if (!ValueViolation.TryDetect(ac.ActionName, State.Current, out var congruence, out var dominantViolated)) return;
+
+            outbox.Add(new ValueCongruenceViolated(ac.OccurredAt, ctx.Id, ac.ActionName, congruence, dominantViolated));
+        }
 
         private void HandleViolation(ValueCongruenceViolated vcv, IHumanContext ctx, IEventCollector outbox)
         {
@@ -161,6 +173,17 @@ namespace GameEngineTools.Characters.Engines.Values
             if (violatedIdx < 0)
                 violatedIdx = DominantIndex(loadArr, cur, mostNegative: true);
 
+            // Per-dimension erosion cooldown (mirror of the affirmation cooldown): a value is worn down at most once per window.
+            var stamps = State.LastViolatedAt;
+            if (violatedIdx >= 0
+                && Config.ViolationCooldownDays > 0.0
+                && stamps is not null
+                && stamps[violatedIdx] is { } lastEroded
+                && WDateTime.Difference(vcv.OccurredAt, lastEroded).TotalDays < Config.ViolationCooldownDays)
+            {
+                return;
+            }
+
             if (violatedIdx >= 0)
                 ApplyNudge(cur, violatedIdx, -lr);
 
@@ -169,7 +192,14 @@ namespace GameEngineTools.Characters.Engines.Values
             if (winnerIdx >= 0 && winnerIdx != violatedIdx)
                 ApplyNudge(cur, winnerIdx, +lr);
 
-            State = State with { Current = FromArray(cur) };
+            WDateTime?[]? nextStamps = stamps;
+            if (violatedIdx >= 0)
+            {
+                nextStamps = stamps is null ? new WDateTime?[Dim] : (WDateTime?[])stamps.Clone();
+                nextStamps[violatedIdx] = vcv.OccurredAt;
+            }
+
+            State = State with { Current = FromArray(cur), LastViolatedAt = nextStamps };
 
             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultValuesEngine)))
             {

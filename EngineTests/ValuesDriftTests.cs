@@ -46,7 +46,7 @@ namespace EngineTests
             for (var i = 0; i < 50; i++)
             {
                 var ev = new ValueCongruenceViolated(
-                    OccurredAt: At(100),
+                    OccurredAt: At(100) + WTimeSpan.FromDays(i * 2),
                     Actor: self,
                     ActionName: ActionNames.Work,
                     Congruence: -0.5,
@@ -135,6 +135,66 @@ namespace EngineTests
 
         #endregion Test 3 — external incentive discounts the update (Kelley discounting)
 
+        #region Guilt belongs to the committed action
+
+        [TestMethod]
+        public void Guilt_IsRaisedForACommittedViolation_NotForAnActionThatIsOnlyConsidered()
+        {
+            var values = Neutral() with { Conformity = 0.95, Tradition = 0.95, Hedonism = 0.05, Benevolence = 0.1, Stimulation = 0.1 };
+            var (engine, ctx, self) = MakeEngine(values);
+
+            // Considering the action (the behavior modifier scoring a candidate) must not feel like guilt.
+            var considered = new EventCollector();
+            var candidates = new List<BehaviorCandidate>
+            {
+                new(ActionNames.InviteIntimacy, 50.0, WTimeSpan.FromHours(1), BehaviorDomain.Social)
+            };
+            new ValuesBehaviorModifier().Modify(BuildBehaviorContext(self, engine.State, stress: 10, cogLoad: 20, considered), candidates);
+            Assert.AreEqual(0, considered.Drain().OfType<ValueCongruenceViolated>().Count(), "Scoring a candidate must not raise guilt.");
+
+            // Actually doing it does.
+            var committed = new EventCollector();
+            engine.Handle(new ActionCommitted(At(100), self, ActionNames.InviteIntimacy, WTimeSpan.FromHours(1)), ctx, committed);
+            var violation = committed.Drain().OfType<ValueCongruenceViolated>().Single();
+            Assert.AreEqual(ActionNames.InviteIntimacy, violation.ActionName);
+            Assert.IsTrue(violation.Congruence < ValueViolation.GuiltThreshold);
+        }
+
+        [TestMethod]
+        public void Guilt_IsNotRaisedForAnActionThatFitsTheValues()
+        {
+            var (engine, ctx, self) = MakeEngine(Neutral());
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(At(100), self, ActionNames.ReachOut, WTimeSpan.FromHours(1)), ctx, outbox);
+
+            Assert.AreEqual(0, outbox.Drain().OfType<ValueCongruenceViolated>().Count());
+        }
+
+        [TestMethod]
+        public void ValuesDrift_ErodesTheSameValueOnlyOncePerCooldownWindow()
+        {
+            var baseline = Neutral();
+            var (engine, ctx, self) = MakeEngine(baseline);
+            engine.RestoreState(new ValuesState(baseline with { Benevolence = 0.95 }, baseline));
+            var box = new EventCollector();
+            ValueCongruenceViolated Violation(WDateTime at) => new(at, self, ActionNames.Work, -0.5, nameof(ValuesProfile.Benevolence));
+
+            engine.Handle(Violation(At(100)), ctx, box);
+            var afterFirst = engine.State.Current.Benevolence;
+            for (var i = 0; i < 20; i++)
+                engine.Handle(Violation(At(100) + WTimeSpan.FromHours(i)), ctx, box);
+            var sameDay = engine.State.Current.Benevolence;
+            engine.Handle(Violation(At(100) + WTimeSpan.FromDays(2)), ctx, box);
+            var nextDay = engine.State.Current.Benevolence;
+
+            Assert.IsTrue(afterFirst < 0.95, "The first violation erodes the value.");
+            Assert.AreEqual(afterFirst, sameDay, 1e-9, "Twenty more violations within the cooldown must not erode it further.");
+            Assert.IsTrue(nextDay < sameDay, "After the cooldown the value can be eroded again.");
+        }
+
+        #endregion Guilt belongs to the committed action
+
         #region Test 4 — guilt is keyed to Current, not Baseline
 
         [TestMethod]
@@ -149,15 +209,11 @@ namespace EngineTests
             var congruenceCurrent = loading.Congruence(current);
             var congruenceBaseline = loading.Congruence(baseline);
 
-            var self = new HumanId(Guid.NewGuid());
+            var (engine, ctx, self) = MakeEngine(baseline);
+            engine.RestoreState(new ValuesState(current, baseline));
             var outbox = new EventCollector();
-            var ctx = BuildBehaviorContext(self, new ValuesState(current, baseline), stress: 10, cogLoad: 20, outbox);
-            var candidates = new List<BehaviorCandidate>
-            {
-                new(ActionNames.InviteIntimacy, 50.0, WTimeSpan.FromHours(1), BehaviorDomain.Social)
-            };
 
-            new ValuesBehaviorModifier().Modify(ctx, candidates);
+            engine.Handle(new ActionCommitted(At(100), self, ActionNames.InviteIntimacy, WTimeSpan.FromHours(1)), ctx, outbox);
 
             var violation = outbox.Drain().OfType<ValueCongruenceViolated>().FirstOrDefault();
             Assert.IsNotNull(violation, "A value violation must be detected from the drifted Current profile.");
@@ -186,10 +242,11 @@ namespace EngineTests
             var box = new EventCollector();
             for (var i = 0; i < 40; i++)
             {
-                selfish.Handle(new ValueCongruenceViolated(At(100), selfishSelf, ActionNames.Work, -0.5,
+                var day = At(100) + WTimeSpan.FromDays(i * 2); // one nudge per dimension per day is allowed
+                selfish.Handle(new ValueCongruenceViolated(day, selfishSelf, ActionNames.Work, -0.5,
                     nameof(ValuesProfile.Benevolence)), selfishCtx, box);
 
-                prosocial.Handle(new ActionCommitted(At(100), prosocialSelf, ActionNames.ReachOut, WTimeSpan.FromHours(1)),
+                prosocial.Handle(new ActionCommitted(day, prosocialSelf, ActionNames.ReachOut, WTimeSpan.FromHours(1)),
                     prosocialCtx, box);
             }
 

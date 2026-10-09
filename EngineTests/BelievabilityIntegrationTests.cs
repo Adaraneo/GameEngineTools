@@ -74,6 +74,35 @@ namespace EngineTests
                 "Eroded value must stay clamped at/above 0 — no runaway.");
         }
 
+        [TestMethod]
+        public void CommittingAValueViolatingAction_RaisesGuilt_AndErodesTheValue_ThroughTheWholePipeline()
+        {
+            var factory = ServiceProvider.GetRequiredService<IHumanFactory>();
+            var rngFactory = ServiceProvider.GetRequiredService<IRandomSourceFactory>();
+            var clock = ServiceProvider.GetRequiredService<IClock>();
+            var human = factory.Create(BuildAdultBlueprint(rngFactory, birthYear: clock.Now.Date.Year - 35));
+
+            // A profile that treats InviteIntimacy as a violation: high Conformity/Tradition, little Hedonism/Benevolence/Stimulation.
+            var profile = new ValuesProfile(
+                Benevolence: 0.1, Universalism: 0.5, SelfDirection: 0.5,
+                Stimulation: 0.1, Hedonism: 0.05, Achievement: 0.5,
+                Power: 0.5, Security: 0.5, Conformity: 0.95, Tradition: 0.95);
+            human.RestoreSnapshot(human.Snapshot with { Values = new GameEngineTools.Characters.Engines.Values.ValuesState(profile, profile) });
+            var before = human.Snapshot.Values!.Current;
+            var now = clock.Now;
+
+            human.ReceiveEvent(new ActionCommitted(now, human.Id, ActionNames.InviteIntimacy, WTimeSpan.FromHours(1)));
+            human.Tick(now, WTimeSpan.FromMinutes(1));
+
+            var guilt = human.LastOutbox.OfType<ValueCongruenceViolated>().ToList();
+            Assert.AreEqual(1, guilt.Count, "Exactly one guilt event for the one committed action.");
+            Assert.AreEqual(ActionNames.InviteIntimacy, guilt[0].ActionName);
+
+            var after = human.Snapshot.Values!.Current;
+            Assert.IsTrue(after.Conformity < before.Conformity || after.Tradition < before.Tradition,
+                "The violated value must have been eroded by the self-delivered guilt event.");
+        }
+
         #region Helpers
 
         private static HumanBlueprint BuildAdultBlueprint(IRandomSourceFactory rngFactory, int birthYear)

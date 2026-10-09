@@ -93,11 +93,18 @@ namespace GameEngineTools.Characters.Engines.Values
         /// so an action repeated many times in a single day cannot saturate the value it expresses.
         /// Default 1.0. Set to 0 to disable the cooldown.
         /// </summary>
-        double AffirmationCooldownDays = 1.0
+        double AffirmationCooldownDays = 1.0,
+
+        /// <summary>
+        /// Minimum number of game days before the <i>same</i> value dimension can be eroded by a violation again. Guilt itself is not
+        /// limited; only the lasting change of the value is, so an action repeated many times a day cannot wear a value down to zero.
+        /// Default 1.0. Set to 0 to disable the cooldown.
+        /// </summary>
+        double ViolationCooldownDays = 1.0
     )
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public ValuesConfig() : this(0.02, 0.00023, 0.4, 2.5, 0.5, 0.5, 0.25, 0.04, 1.0)
+        public ValuesConfig() : this(0.02, 0.00023, 0.4, 2.5, 0.5, 0.5, 0.25, 0.04, 1.0, 1.0)
         { }
     }
 }

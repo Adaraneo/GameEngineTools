@@ -314,10 +314,10 @@ namespace EngineTests
 
         #endregion Test 13 — ValuesBehaviorModifier: high Conformity reduces InviteIntimacy utility
 
-        #region Test 14 — ValuesBehaviorModifier: congruence < -0.30 emits ValueCongruenceViolated
+        #region Test 14 — ValuesBehaviorModifier: a violating candidate loses utility but raises no guilt
 
         [TestMethod]
-        public void ValuesBehaviorModifier_GuiltThreshold_EmitsValueCongruenceViolated()
+        public void ValuesBehaviorModifier_ViolatingCandidate_LosesUtility_ButRaisesNoGuilt()
         {
             // Arrange — high Conformity/Tradition, low Hedonism/Benevolence/Stimulation
             // so InviteIntimacy's positive loadings are suppressed by low profile weights
@@ -336,16 +336,13 @@ namespace EngineTests
             // Act
             new ValuesBehaviorModifier().Modify(ctx, candidates);
 
-            // Assert — ValueCongruenceViolated emitted
-            var events = outbox.Drain();
-            var violation = events.OfType<ValueCongruenceViolated>().FirstOrDefault();
-            Assert.IsNotNull(violation,
-                "ValueCongruenceViolated must be emitted when congruence < −0.01.");
-            Assert.IsTrue(violation!.Congruence < 0.0,
-                $"Emitted violation must have negative congruence. Got: {violation.Congruence:F4}");
+            // Assert — the candidate is scored down, but guilt is only raised for a COMMITTED action (see ValuesDriftTests)
+            Assert.IsTrue(candidates[0].Utility < 50.0, "A value-violating candidate must lose utility.");
+            Assert.AreEqual(0, outbox.Drain().OfType<ValueCongruenceViolated>().Count(),
+                "Scoring a candidate must not raise ValueCongruenceViolated.");
         }
 
-        #endregion Test 14 — ValuesBehaviorModifier: congruence < -0.30 emits ValueCongruenceViolated
+        #endregion Test 14 — ValuesBehaviorModifier: a violating candidate loses utility but raises no guilt
 
         #region Test 15 — ValuesBehaviorModifier: high stress attenuates value effect
 
