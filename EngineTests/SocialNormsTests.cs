@@ -381,6 +381,32 @@ namespace EngineTests
 
         #endregion Test 11 — PsychologyEngine: ObserverNormReaction routes VicariousShame only for kin
 
+        #region Anger of the victim is approach-motivated
+
+        [TestMethod]
+        public void PsychologyEngine_ObserverNormReaction_VictimsAnger_RaisesDominance_WhereVicariousShameLowersIt()
+        {
+            // The observer IS the victim, so the reaction is Anger (approach-related, dominant side of PAD), not a shame-like drop.
+            var self = new HumanId(Guid.NewGuid());
+            var actor = new HumanId(Guid.NewGuid());
+            var ctx = BuildPsychologyContext(self, MakePersonality(neuroticism: 0.5, extraversion: 0.5), new Dictionary<HumanId, RelationshipEdge>());
+            var engine = BuildPsychologyEngineAtNeutral();
+
+            engine.Handle(new ObserverNormReaction(
+                OccurredAt: new WDateTime(100),
+                Observer: self,
+                Actor: actor,
+                Victim: self,
+                NormKind: SocialNormKind.RitualContext,
+                ReactionKind: ObserverReactionKind.Anger,
+                ViolationScore: 0.8), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.Dominance > 0.5, $"Anger must raise Dominance above neutral. Got: {engine.State.Dominance:F3}");
+            Assert.IsTrue(engine.State.Valence < 0.0 && engine.State.Arousal > 0.5, "Anger is still unpleasant and aroused.");
+        }
+
+        #endregion Anger of the victim is approach-motivated
+
         #region Test 12 — RelationshipsEngine: ObserverNormReaction routes VicariousShame only for kin
 
         [TestMethod]

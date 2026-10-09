@@ -1323,10 +1323,14 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// Infers the dominant discrete emotion from the continuous PAD state.
         /// Extracted from Tick() local function to be callable from Handle-phase handlers.
         /// </summary>
+        private const double HighStressPositiveMoodCeiling = 0.2;
+
         private static DiscreteEmotion InferEmotion(PsychologyState ps)
         {
-            // High stress — Dominance distinguishes fear vs. anger (PAD model)
-            if (ps.Stress > 70)
+            // High stress — Dominance distinguishes fear vs. anger (PAD model: fear D < 0, anger D > 0; Mehrabian 1996, Gebhard 2005).
+            // Both are negative emotions, so stress on top of a clearly positive mood (excitement, eustress) is neither; the mood
+            // ceiling sits just above the +0.1..+0.2 baseline valence.
+            if (ps.Stress > 70 && ps.Valence <= HighStressPositiveMoodCeiling)
                 return ps.Dominance < 0.4 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
 
             // Surprise — a sudden arousal spike without clear valence
@@ -1347,6 +1351,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Shame — negative + low dominance + low stress (not panic)
             if (ps.Valence < -0.3 && ps.Dominance < 0.3 && ps.Stress < 50)
                 return DiscreteEmotion.Shame;
+
+            // Fear / Anger without extreme stress — clearly negative and highly aroused; Dominance splits them as above. Guilt and Shame
+            // (stress < 50) were tested first and keep their priority, so only states they do not claim reach this rule (fear and anger
+            // in PAD are high-arousal emotions, shame is low-arousal).
+            if (ps.Valence < -0.3 && ps.Arousal > 0.55)
+                return ps.Dominance < 0.4 ? DiscreteEmotion.Fear : DiscreteEmotion.Anger;
 
             // Tenderness — positive + calm + submissive (caregiving)
             if (ps.Valence > 0.3 && ps.Arousal < 0.4 && ps.Dominance < 0.45)
@@ -1498,11 +1508,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
         private static (double deltaValence, double deltaArousal, double deltaDominance, double stressDelta)
         ComputeAngerResponse(double violationScore, double neuroticism)
         {
-            // Anger is approach-motivated: mild dominance drop (confrontational readiness)
+            // Anger is approach-motivated (Carver & Harmon-Jones 2009; Harmon-Jones & Allen 1998) and sits on the dominant side of the PAD
+            // axis (anger D > 0, fear D < 0; Mehrabian 1996, Gebhard 2005): dominance rises with confrontational readiness.
             // High neuroticism amplifies stress response
             var dv = -0.40;  // -0.30 to -0.50 range
             var da = +0.28;  // +0.20 to +0.35 range
-            var dd = -0.32;  // -0.25 to -0.40 range
+            var dd = +0.15;  // +0.10 to +0.20 range
             var stressDelta = 7.0 + neuroticism * 3.0;  // 7–10 range
 
             return (dv, da, dd, stressDelta);

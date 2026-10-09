@@ -748,6 +748,55 @@ namespace EngineTests
                 "Stress > 70 + Dominance >= 0.4 must infer Anger.");
         }
 
+        private DiscreteEmotion InferFrom(double stress, double valence, double arousal, double dominance)
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 20);
+            var ctx = BuildContext(neuroticism: 0.0, physio: MakePhysio(0, 0, 0));
+            engine.RestoreState(engine.State with
+            {
+                Stress = stress,
+                Valence = valence,
+                Arousal = arousal,
+                Dominance = dominance,
+                DominantEmotion = DiscreteEmotion.Neutral
+            });
+
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(0.001), ctx, _outbox);
+            return engine.State.DominantEmotion;
+        }
+
+        /// <summary>High stress on top of a clearly positive mood (excitement, eustress) is neither fear nor anger.</summary>
+        [TestMethod]
+        public void InferEmotion_HighStress_WithClearlyPositiveMood_IsNeitherFearNorAnger()
+        {
+            Assert.AreNotEqual(DiscreteEmotion.Anger, InferFrom(stress: 80, valence: 0.6, arousal: 0.4, dominance: 0.6));
+            Assert.AreNotEqual(DiscreteEmotion.Fear, InferFrom(stress: 80, valence: 0.6, arousal: 0.4, dominance: 0.2));
+        }
+
+        /// <summary>The baseline mood (+0.1..+0.2) under high stress still reads as the stress emotion.</summary>
+        [TestMethod]
+        public void InferEmotion_HighStress_WithBaselineMood_StillInfersFearOrAnger()
+        {
+            Assert.AreEqual(DiscreteEmotion.Anger, InferFrom(stress: 80, valence: 0.2, arousal: 0.4, dominance: 0.6));
+            Assert.AreEqual(DiscreteEmotion.Fear, InferFrom(stress: 80, valence: 0.2, arousal: 0.4, dominance: 0.2));
+        }
+
+        /// <summary>Clearly negative, highly aroused states are anger (dominant) or fear (submissive) even without extreme stress.</summary>
+        [TestMethod]
+        public void InferEmotion_NegativeHighArousal_SplitsAngerAndFearByDominance()
+        {
+            Assert.AreEqual(DiscreteEmotion.Anger, InferFrom(stress: 30, valence: -0.5, arousal: 0.8, dominance: 0.7));
+            Assert.AreEqual(DiscreteEmotion.Fear, InferFrom(stress: 55, valence: -0.5, arousal: 0.8, dominance: 0.2));
+        }
+
+        /// <summary>Guilt and shame keep their priority below stress 50: the new rule must not steal them.</summary>
+        [TestMethod]
+        public void InferEmotion_GuiltAndShame_AreNotStolenByTheAngerFearRule()
+        {
+            Assert.AreEqual(DiscreteEmotion.Guilt, InferFrom(stress: 30, valence: -0.5, arousal: 0.6, dominance: 0.4));
+            Assert.AreEqual(DiscreteEmotion.Shame, InferFrom(stress: 30, valence: -0.5, arousal: 0.3, dominance: 0.2));
+        }
+
         /// <summary>
         /// High Valence (> 0.5) and high Dominance (> 0.7) must infer Pride.
         /// </summary>
