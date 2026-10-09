@@ -58,6 +58,11 @@ live state of every engine — nothing is hidden.
   temperature, noise, crowding, privacy, daylight, and seasons all feed affect and decision-making.
 - **Model real planetary mechanics.** An optional Kepler orbital stack drives day length, seasons,
   irradiance, ambient temperature, and gravity from a configurable star/planet/moon/ring system.
+- **Sleep like the planet's day.** Bedtime and waking come from the Borbély two-process sleep model
+  (homeostatic pressure plus a circadian threshold), so characters go to bed in the evening and wake on
+  their own at a consistent circadian phase. Hour-of-day constants are written for a 24-hour clock and
+  scale to the planet's day length; by default the inhabitants' sleep rhythm follows that day too
+  (`World:Calendar:BodyClockFollowsDay`), so it looks Earth-like on a 12 h or a 60 h day alike.
 - **Run a food & money economy.** Characters produce, carry, buy, sell, and eat food with spoilage;
   wages and posted prices are tracked in a persistent economy ledger.
 - **Model death and its aftermath.** Bereavement (grief decay, widowhood hazard), burial (graves as
@@ -287,7 +292,7 @@ Invariants:
 | **Physiology** | `PhysiologyState` | Energy/hunger/thirst/pain/immune/temperature, sleep debt, allostatic load, cortisol, testosterone, nutrition (vitamin D/iron), menstrual cycle, aging, injury, postpartum, mortality. Emits `ChildBorn`, `InjuryReceived`, death. |
 | **Psychology** | `PsychologyState` | PAD affect, stress (HPA), cognitive load, cortisol, mood baseline, discrete emotions + decay, circadian arousal, hormonal/environmental/sickness modulation, stress manifestation. Anger is approach-motivated. |
 | **Behavior** | `BehaviorState` | Decision core: need engines (physiological/social/competence/autonomy/foraging) + modifier engines (trait/affect/circadian/habit/memory/affordance/values/goal/schedule) + intent stabilisation + action arbitration + habit learning. Emits `ActionCommitted`, `InteractionProposed`. |
-| **Sleep** | `ISleepSession` | `Falling→Light→Deep→REM→Waking` state machine; nightmares, ambush, consolidation; outside the utility loop. |
+| **Sleep** | `ISleepSession` | `Falling→Light→Deep→REM→Waking` state machine; nightmares, ambush, consolidation; outside the utility loop. Timing is driven by two-process regulation: Physiology keeps Process S (sleep pressure) and the day-length-aware circadian thresholds (`SleepPropensity` starts sleep, `WakeMargin` ends it without an alarm). |
 | **Interactions** | `InteractionSurface` | Evaluates proposed social acts (`SpeechAct`s, touch levels); misattribution under noise×stress; peak-end valence; sexual-encounter readiness gate; third-party observers. |
 | **Dialogue / Language** | — | Turns a chosen speech act into an actual realized Czech sentence via `CzechSpeechActRealizer` (valency/sentence-planning pipeline) and a per-character acquired vocabulary (`LexicalAcquisition`). |
 | **Object Interaction** | — | Applies world-object affordances; pickup/ownership routing. |
@@ -329,9 +334,9 @@ The stable, slow-changing layer (`Characters/Traits/`): **Personality** (Big Fiv
 ### Configuration
 
 Character config binds from `appsettings.Characters.json` under `Characters:*` via `IOptions<T>`;
-`appsettings.Characters.Default.json` is the documented baseline (override per environment). World
-and astronomy config bind from `appsettings.World.json` under `World:*`. Each config record lives
-beside its engine.
+the `appsettings.*.Default.json` files next to it are reference copies of the shipped values (they are
+not loaded at runtime and can lag behind the live files). World and astronomy config bind from
+`appsettings.World.json` under `World:*`. Each config record lives beside its engine.
 
 Active `Characters:*` sections include: `Physiology`, `MenstrualCycle`, `Psychology`, `Behavior`,
 `Sleep`, `Interactions`, `Relationships`, `Memory`, `SemanticMemory`, `Goals`, `DailySchedule`,
@@ -340,7 +345,9 @@ LOD tier), `Fidelity` (memory/perception/social fidelity per tier).
 
 `World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude & thermal lag),
 `Universe` (full star/planet/moon/ring definition), and `Calendar` (cultural overlay: month count,
-target year length, time subdivisions, leap rule). The world clock/calendar is **derived from
+target year length, time subdivisions, leap rule, and `BodyClockFollowsDay` — whether the
+inhabitants' sleep rhythm scales with the planet's day, default `true`; set `false` for settlers whose
+bodies keep Earth hours). The world clock/calendar is **derived from
 physics** — `PlanetaryCalendarFactory` builds the `WorldTimeSpec` from `World:Universe` (planet
 sidereal rotation → hours-per-day, orbit → year length) plus the `World:Calendar` overlay; there is
 no separate `InitWorldClock` section. The default template is Earth; the sandbox ships an alternate
