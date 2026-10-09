@@ -33,7 +33,7 @@ namespace EngineTests
             var wraps = 0;
             for (var i = 0; i < 200; i++)
             {
-                engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+                engine.Tick(new WDateTime(0), WTimeSpan.FromDays(1), ctx, new EventCollector());
                 var cur = engine.State.Cycle!;
 
                 Assert.IsTrue(cur.DayInCycle <= cur.CurrentCycleLength,

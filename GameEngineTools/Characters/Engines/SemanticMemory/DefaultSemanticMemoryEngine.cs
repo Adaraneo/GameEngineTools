@@ -47,7 +47,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
 
         public void Tick(WDateTime now, WTimeSpan dt, IHumanContext ctx, IEventCollector outbox)
         {
-            var days = Math.Max(0.0, dt.TotalHours / 24.0);
+            var days = Math.Max(0.0, dt.TotalDays);
             if (days <= 0.0 || State.People.Count == 0)
             {
                 return;

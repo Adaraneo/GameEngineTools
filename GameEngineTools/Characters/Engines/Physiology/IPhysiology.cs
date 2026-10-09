@@ -403,8 +403,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double CognitiveDeficitRecoveryPerSleepHour = 0.028,
         /// <summary>Process S level above which the awake cognitive-deficit accrual is amplified (chronic restriction). Source: Van Dongen et al. 2003.</summary>
         double CognitiveDeficitRestrictionThreshold = 0.55,
-        /// <summary>Process S level reached after a typical 16-17 h waking day; <c>SleepDebtHours</c> is derived from S only above this level, so a normal day carries no debt (chronic restriction is tracked by the cognitive deficit).</summary>
-        double ProcessSDebtFreeLevel = 0.65)
+        /// <summary>Process S level above which <c>SleepDebtHours</c> accrues. <c>null</c> (default) derives it from the world's day length as the steady-state evening level of a normal waking/sleeping cycle (see <see cref="SleepRegulationCalculator.DebtFreeLevel"/>), so a normal day carries no debt on any planet; chronic restriction is tracked by the cognitive deficit.</summary>
+        double? ProcessSDebtFreeLevel = null)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(

@@ -94,7 +94,7 @@ namespace EngineTests
             {
                 var outbox = new EventCollector();
 
-                physioEngine.Tick(now, WTimeSpan.FromHours(24), ctx, outbox);
+                physioEngine.Tick(now, WTimeSpan.FromDays(1), ctx, outbox);
 
                 var events = outbox.Drain();
                 observedEvents.AddRange(events);
@@ -1188,7 +1188,7 @@ namespace EngineTests
 
             for (int i = 0; i < 28; i++)
             {
-                physio.Tick(now, WTimeSpan.FromHours(24), physioCtx, new EventCollector());
+                physio.Tick(now, WTimeSpan.FromDays(1), physioCtx, new EventCollector());
                 var cycle = physio.State.Cycle!;
                 int day = cycle.DayInCycle; // 1..28
 
@@ -1203,7 +1203,7 @@ namespace EngineTests
                 psych.RestoreState(psych.State with { Valence = 0.1 });
                 var cleanPhysio = MakePhysio(0, 0, 0) with { Cycle = cycle };
                 var psychCtx = BuildRawContext(neuroticism: 0.5, physio: cleanPhysio);
-                psych.Tick(now, WTimeSpan.FromHours(24), psychCtx, new EventCollector());
+                psych.Tick(now, WTimeSpan.FromDays(1), psychCtx, new EventCollector());
                 valence[day] = psych.State.Valence;
             }
 

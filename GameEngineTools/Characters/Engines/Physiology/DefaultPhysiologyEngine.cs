@@ -131,9 +131,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// </summary>
         private double ComputeAgeYearsFractional(WDateOnly today)
         {
-            // Approximate days elapsed since birth, divided by mean year length.
+            // Approximate days elapsed since birth, divided by the length of the current calendar year.
             var days = today.DayIndex - _birthDate.DayIndex;
-            return Math.Max(0.0, days / 365.25);
+            return Math.Max(0.0, days / (double)WWorld.Spec.Calendar.DaysInYear(today.Year));
         }
 
         #region Drift computation
@@ -228,6 +228,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             var h = SafeHours(dt);
             var s = State;
+            // Calendar-scale rates follow the world's day and year length, which are configurable per planet.
+            var hoursPerDay = (double)WWorld.Spec.HoursPerDay;
+            var hoursPerYear = WWorld.Spec.HoursInYear(now.Date.Year);
 
             // Dead characters do not drift — death is terminal. This also covers the
             // combat path: once CharacterDied is handled in Phase A (Status → Dead),
@@ -331,12 +334,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 s = s with { Pain = Clamp01p(s.Pain + inj.Severity * 0.05 * h) };
                 if (inj.Type == InjuryType.Infection)
-                    s = s with { ImmuneLoad = Clamp01p(s.ImmuneLoad + Config.InjuryInfectionImmuneLoadPerDay / 24.0 * h) };
+                    s = s with { ImmuneLoad = Clamp01p(s.ImmuneLoad + Config.InjuryInfectionImmuneLoadPerDay / hoursPerDay * h) };
 
                 _injuryAccHours += h;
-                while (_injuryAccHours >= 24.0)
+                while (_injuryAccHours >= hoursPerDay)
                 {
-                    _injuryAccHours -= 24.0;
+                    _injuryAccHours -= hoursPerDay;
                     var recoveryPerDay = action is Sleep or SelfCare
                         ? Config.InjuryRestRecoveryPerDay
                         : Config.InjuryActiveRecoveryPerDay;
@@ -366,9 +369,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     s = s with { Pain = Math.Max(s.Pain, painFloor), Energy = Math.Min(s.Energy, energyCap) };
 
                 _postpartumAccHours += h;
-                while (_postpartumAccHours >= 24.0 && s.Postpartum is not null)
+                while (_postpartumAccHours >= hoursPerDay && s.Postpartum is not null)
                 {
-                    _postpartumAccHours -= 24.0;
+                    _postpartumAccHours -= hoursPerDay;
                     s = AdvancePostpartum(s, now, ctx, outbox);
                 }
             }
@@ -380,9 +383,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
             else if (s.Cycle is not null && s.Cycle.Phase != CyclePhase.Paused)
             {
                 _accHours += h;
-                while (_accHours >= 24.0)
+                while (_accHours >= hoursPerDay)
                 {
-                    _accHours -= 24.0;
+                    _accHours -= hoursPerDay;
                     s = AdvanceCycleDay(s, now, ctx, outbox);
                 }
             }
@@ -415,7 +418,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 var asleep = action == Sleep;
                 // Seed on first tick from existing sleep debt so restored saves behave sensibly.
-                var processS = s.ProcessS ?? SleepRegulationCalculator.ProcessSFromDebtHours(s.SleepDebtHours, Config);
+                var processS = s.ProcessS ?? SleepRegulationCalculator.ProcessSFromDebtHours(s.SleepDebtHours, Config, hoursPerDay);
                 var deficit = s.CognitiveDeficit ?? 0.0;
 
                 processS = asleep
@@ -428,7 +431,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     ProcessS = Math.Clamp(processS, 0.0, 1.0),
                     CognitiveDeficit = Math.Max(0.0, deficit),
                     // Process S is the single source of truth; SleepDebtHours is its derived view for the other engines.
-                    SleepDebtHours = SleepRegulationCalculator.DebtHoursFromProcessS(processS, Config)
+                    SleepDebtHours = SleepRegulationCalculator.DebtHoursFromProcessS(processS, Config, hoursPerDay)
                 };
             }
 
@@ -454,9 +457,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             // Chronic pain — a cumulative counter (Dantzer 2008)
             if (s.Pain > Config.ChronicPainAccumThreshold)
-                s = s with { ChronicPainDays = s.ChronicPainDays + h / 24.0 };
+                s = s with { ChronicPainDays = s.ChronicPainDays + h / hoursPerDay };
             else
-                s = s with { ChronicPainDays = Math.Max(0, s.ChronicPainDays - h / (24.0 * Config.ChronicPainDecayFactor * 2)) };
+                s = s with { ChronicPainDays = Math.Max(0, s.ChronicPainDays - h / (hoursPerDay * Config.ChronicPainDecayFactor * 2)) };
 
             // Cortisol — diurnal curve (HPA axis) + chronic stress + immune elevation
             {
@@ -481,7 +484,6 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             // Circadian phase shift — the social jet-lag model
             {
-                var hoursPerDay = (double)WWorld.Spec.HoursPerDay;
                 var hoursOfDay = (double)(now.Hour % WWorld.Spec.HoursPerDay);
                 var naturalSleep = (Config.NaturalSleepStartHour - Config.ChronotypeOffsetHours + hoursPerDay) % hoursPerDay;
                 if (action == Sleep)
@@ -534,7 +536,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 if (ageYears > Config.AgingImmuneBaselineStart)
                 {
                     var ageImmuneBonus = (ageYears - Config.AgingImmuneBaselineStart) * Config.AgingImmuneBaselinePerYear;
-                    s = s with { ImmuneLoad = Math.Min(100, s.ImmuneLoad + ageImmuneBonus * h / (365.25 * 24)) };
+                    s = s with { ImmuneLoad = Math.Min(100, s.ImmuneLoad + ageImmuneBonus * h / hoursPerYear) };
                 }
             }
 
@@ -551,14 +553,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var greying = 0.0;
                 if (ageYears > Config.HairGreyingAgeStart)
                 {
-                    greying += (ageYears - Config.HairGreyingAgeStart) * Config.HairGreyingRatePerYear * h / (365.25 * 24);
-                    greying += s.CortisolLevel * Config.HairGreyingCortisolBoost * h / (365.25 * 24);
+                    greying += (ageYears - Config.HairGreyingAgeStart) * Config.HairGreyingRatePerYear * h / hoursPerYear;
+                    greying += s.CortisolLevel * Config.HairGreyingCortisolBoost * h / hoursPerYear;
                 }
 
                 // Hair density: androgenic alopecia (men) + stress
                 var densityChange = 0.0;
                 if (s.Testosterone is { } _ && ageYears > Config.HairLossAgeStartMale)
-                    densityChange -= (ageYears - Config.HairLossAgeStartMale) * Config.HairLossRatePerYearMale * h / (365.25 * 24);
+                    densityChange -= (ageYears - Config.HairLossAgeStartMale) * Config.HairLossRatePerYearMale * h / hoursPerYear;
                 if (s.AllostaticLoad > Config.HairLossStressThreshold)
                     densityChange -= Config.HairLossStressRate * h;
                 else
@@ -568,13 +570,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var wrinkles = 0.0;
                 if (ageYears > Config.WrinklingAgeStart)
                 {
-                    wrinkles += (ageYears - Config.WrinklingAgeStart) * Config.WrinklingRatePerYear * h / (365.25 * 24);
-                    wrinkles += s.CortisolLevel * Config.WrinklingCortisolBoost * h / (365.25 * 24);
+                    wrinkles += (ageYears - Config.WrinklingAgeStart) * Config.WrinklingRatePerYear * h / hoursPerYear;
+                    wrinkles += s.CortisolLevel * Config.WrinklingCortisolBoost * h / hoursPerYear;
                 }
 
                 // Sarcopenia: decline in muscle mass after age 30
                 var muscleChange = ageYears > Config.SarcopeniaAgeStart
-                    ? -Config.SarcopeniaRatePerYear * h / (365.25 * 24)
+                    ? -Config.SarcopeniaRatePerYear * h / hoursPerYear
                     : 0.0;
 
                 // Bone density: aging + post-menopause
@@ -583,7 +585,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var boneDeclineRate = ageYears > Config.BoneDensityDeclineAgeStart
                     ? Config.BoneDensityDeclinePerYear * (isPostMenoForBone ? Config.BoneDensityMenopauseMultiplier : 1.0)
                     : 0.0;
-                var newBoneDensity = Math.Max(0.2, aging.BoneDensity - boneDeclineRate * h / (365.25 * 24));
+                var newBoneDensity = Math.Max(0.2, aging.BoneDensity - boneDeclineRate * h / hoursPerYear);
 
                 s = s with
                 {

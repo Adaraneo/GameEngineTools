@@ -46,6 +46,10 @@ namespace GameEngineTools.World.Core.Time
             Calendar = calendar;
         }
 
+        /// <summary>Hours in the given calendar year (days in the year × <see cref="HoursPerDay"/>); varies with the calendar and leap rules.</summary>
+        /// <param name="year">The calendar year.</param>
+        public double HoursInYear(int year) => Calendar.DaysInYear(year) * (double)HoursPerDay;
+
         /// <summary>World ticks in one day.</summary>
         public long TicksPerDay => TicksPerHour * HoursPerDay;
 

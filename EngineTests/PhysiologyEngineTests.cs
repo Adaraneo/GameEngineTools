@@ -12,7 +12,10 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.World.Core.Calendars;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using System;
@@ -249,12 +252,12 @@ namespace EngineTests
                 Cycle = initialCycle with { DayInCycle = 1, Phase = CyclePhase.Menses }
             });
 
-            // Act — advance exactly 30 days (each Tick accumulates 24 h → one cycle-day advance)
+            // Act — advance exactly 30 days (each Tick of one world day → one cycle-day advance)
             int wraps = 0;
             int prevDay = engine.State.Cycle!.DayInCycle;
             for (int i = 0; i < 30; i++)
             {
-                engine.Tick(now, WTimeSpan.FromHours(24), ctx, outbox);
+                engine.Tick(now, WTimeSpan.FromDays(1), ctx, outbox);
                 var newDay = engine.State.Cycle!.DayInCycle;
                 if (newDay < prevDay)
                     wraps++;
@@ -702,7 +705,7 @@ namespace EngineTests
             });
             var ctx = BuildContextWithAction(Sleep);
 
-            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            engine.Tick(new WDateTime(0), WTimeSpan.FromDays(1), ctx, new EventCollector());
 
             Assert.IsTrue(engine.State.Injury == null || engine.State.Injury.Severity < 10,
                 $"Injury must heal during rest. Severity={engine.State.Injury?.Severity:F4}");
@@ -719,7 +722,7 @@ namespace EngineTests
             var ctx = BuildContextWithAction(Sleep);
             var outbox = new EventCollector();
 
-            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, outbox);
+            engine.Tick(new WDateTime(0), WTimeSpan.FromDays(1), ctx, outbox);
 
             var events = outbox.Drain();
             Assert.IsNull(engine.State.Injury, "Injury must be cleared when severity reaches 0.");
@@ -792,7 +795,7 @@ namespace EngineTests
             var ctx = BuildContextWithAction(null);
             var outbox = new EventCollector();
 
-            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, outbox);
+            engine.Tick(new WDateTime(0), WTimeSpan.FromDays(1), ctx, outbox);
 
             var events = outbox.Drain();
             Assert.IsTrue(events.OfType<PostpartumPhaseChanged>().Any(e => e.Phase == PostpartumPhase.FirstWeek),
@@ -1113,7 +1116,7 @@ namespace EngineTests
                     Pain = 0,
                     Cycle = engine.State.Cycle! with { DayInCycle = day, Phase = phase }
                 });
-                engine.Tick(_now, WTimeSpan.FromHours(24), ctx, new EventCollector());
+                engine.Tick(_now, WTimeSpan.FromDays(1), ctx, new EventCollector());
                 return engine.State.Pain;
             }
 
@@ -1145,7 +1148,7 @@ namespace EngineTests
             {
                 Cycle = engine.State.Cycle! with { DayInCycle = targetDay - 1 }
             });
-            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            engine.Tick(new WDateTime(0), WTimeSpan.FromDays(1), ctx, new EventCollector());
             return engine.State.Cycle!;
         }
 
@@ -1401,7 +1404,7 @@ namespace EngineTests
             var ctx = BuildContextWithAction(null);
 
             // 24h tick → přejde na den 8, crash se deaktivuje
-            engine.Tick(new WDateTime(0), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            engine.Tick(new WDateTime(0), WTimeSpan.FromDays(1), ctx, new EventCollector());
 
             Assert.IsFalse(engine.State.Postpartum?.HormonalCrashActive ?? false,
                 "HormonalCrashActive musí být false po 7 dnech.");
@@ -1677,6 +1680,92 @@ namespace EngineTests
         }
 
         #endregion Spánkový dluh odvozený z Process S
+
+        #region Proměnná délka dne a roku
+
+        /// <summary>Reconfigures the ambient world calendar with a given day length (TestBase resets it after the test).</summary>
+        private void UseDayLength(int hoursPerDay)
+            => WWorld.Configure(
+                new WorldTimeSpec(10_000_000, 60, 60, hoursPerDay, new FixedMonthsCalendar(Enumerable.Repeat(30, 12).ToArray(), _ => 0)),
+                ServiceProvider.GetRequiredService<IClock>());
+
+        [TestMethod]
+        public void SleepDebt_NormalDay_CarriesNoDebt_ForAnyDayLength()
+        {
+            foreach (var hoursPerDay in new[] { 12, 20, 24, 26, 36, 40 })
+            {
+                UseDayLength(hoursPerDay);
+                var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 30);
+                var awakeCtx = BuildContextWithAction(null);
+                var sleepCtx = BuildContextWithAction(GameEngineTools.Characters.Engines.ActionNames.Sleep);
+                var awakeHours = (int)Math.Round(Math.Clamp(hoursPerDay * 2.0 / 3.0, 8.0, 18.0));
+                var sleepHours = awakeHours / 2;
+                var clock = WDateTime.New(116, 1, 1, 0);
+                var maxEveningDebt = 0.0;
+
+                for (var day = 0; day < 6; day++)
+                {
+                    for (var i = 0; i < awakeHours; i++, clock += WTimeSpan.FromHours(1))
+                        engine.Tick(clock, WTimeSpan.FromHours(1), awakeCtx, new EventCollector());
+                    if (day >= 2) maxEveningDebt = Math.Max(maxEveningDebt, engine.State.SleepDebtHours);
+                    for (var i = 0; i < sleepHours; i++, clock += WTimeSpan.FromHours(1))
+                        engine.Tick(clock, WTimeSpan.FromHours(1), sleepCtx, new EventCollector());
+                }
+
+                Assert.IsTrue(maxEveningDebt < 0.75,
+                    $"A normal day on a {hoursPerDay} h planet must not look like sleep debt; evening debt was {maxEveningDebt:F2} h.");
+            }
+        }
+
+        [TestMethod]
+        public void SleepDebtFreeLevel_FollowsDayLength_AndRespectsOverride()
+        {
+            var cfg = new PhysiologyConfig();
+            var short12 = SleepRegulationCalculator.DebtFreeLevel(cfg, 12);
+            var earth24 = SleepRegulationCalculator.DebtFreeLevel(cfg, 24);
+            var long40 = SleepRegulationCalculator.DebtFreeLevel(cfg, 40);
+
+            Assert.IsTrue(short12 < earth24 && earth24 < long40, $"12h={short12:F3}, 24h={earth24:F3}, 40h={long40:F3}");
+            Assert.AreEqual(0.62, earth24, 0.03);
+            Assert.AreEqual(0.5, SleepRegulationCalculator.DebtFreeLevel(cfg with { ProcessSDebtFreeLevel = 0.5 }, 40), 1e-9);
+        }
+
+        [TestMethod]
+        public void MenstrualCycle_AdvancesOncePerWorldDay_NotPer24Hours()
+        {
+            UseDayLength(40);
+            var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 25, cycleEnabled: true);
+            engine.RestoreState(engine.State with { Cycle = engine.State.Cycle! with { DayInCycle = 5 } });
+            var ctx = BuildContextWithAction(null);
+            var start = WDateTime.New(116, 1, 1, 0);
+
+            engine.Tick(start, WTimeSpan.FromHours(24), ctx, new EventCollector());
+            Assert.AreEqual(5, engine.State.Cycle!.DayInCycle, "24 h is not yet a full 40 h world day.");
+
+            engine.Tick(start + WTimeSpan.FromHours(24), WTimeSpan.FromHours(24), ctx, new EventCollector());
+            Assert.AreEqual(6, engine.State.Cycle!.DayInCycle, "48 h crosses exactly one 40 h world day.");
+        }
+
+        [TestMethod]
+        public void Aging_YearlyRates_FollowTheCalendarYear_NotTheEarthYear()
+        {
+            foreach (var hoursPerDay in new[] { 12, 26, 40 })
+            {
+                UseDayLength(hoursPerDay);
+                var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears: 60);
+                var ctx = BuildContextWithAction(null);
+                var before = engine.State.Aging!.MuscleMassFraction;
+                var start = WDateTime.New(116, 1, 1, 0);
+
+                for (var day = 0; day < 360; day++)
+                    engine.Tick(start + WTimeSpan.FromDays(day), WTimeSpan.FromDays(1), ctx, new EventCollector());
+
+                var lost = before - engine.State.Aging!.MuscleMassFraction;
+                Assert.AreEqual(0.005, lost, 0.0015, $"One 360-day year with {hoursPerDay} h days should cost 0.005 muscle mass; lost {lost:F4}.");
+            }
+        }
+
+        #endregion Proměnná délka dne a roku
 
         #region Antikoncepce (ongoing stav)
 

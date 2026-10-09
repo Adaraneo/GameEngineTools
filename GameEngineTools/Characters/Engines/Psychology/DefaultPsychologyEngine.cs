@@ -564,7 +564,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 if (ageState.AgeYears > Config.CognitivAgingThreshold)
                 {
                     var cogDecline = (ageState.AgeYears - Config.CognitivAgingThreshold)
-                                    * Config.CognitiveAgingCogLoadPerYear * h / (365.25 * 24);
+                                    * Config.CognitiveAgingCogLoadPerYear * h / GameEngineTools.World.Core.Time.WWorld.Spec.HoursInYear(now.Date.Year);
                     s = s with { CognitiveLoad = Clamp01p(s.CognitiveLoad + cogDecline) };
                 }
                 // Presbyopia/presbycusis: perceptual difficulties raise cognitive load after 50

@@ -805,7 +805,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     _ => 1.0
                 };
 
-                var decayFactor = Math.Exp(-Config.ForgettingRate * emotionMod * (hours / 24.0));
+                var decayFactor = Math.Exp(-Config.ForgettingRate * emotionMod * (hours / GameEngineTools.World.Core.Time.WWorld.Spec.HoursPerDay));
                 var newStrength = Math.Max(0.0, e.Strength * decayFactor);
 
                 episodes[i] = e with { Strength = newStrength };
@@ -825,7 +825,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 var decayedKnowledge = State.Knowledge
                     .Select(f =>
                     {
-                        var newConf = f.Confidence - Config.KnowledgeConfidenceDecayPerDay * (hours / 24.0);
+                        var newConf = f.Confidence - Config.KnowledgeConfidenceDecayPerDay * (hours / GameEngineTools.World.Core.Time.WWorld.Spec.HoursPerDay);
                         return f with { Confidence = newConf };
                     })
                     .Where(f => f.Confidence >= Config.KnowledgePruneThreshold)
@@ -841,7 +841,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 var decayedObjects = State.KnownObjects
                     .Select(f =>
                     {
-                        var newConf = f.Confidence - Config.ObjectLocationDecayPerDay * (hours / 24.0);
+                        var newConf = f.Confidence - Config.ObjectLocationDecayPerDay * (hours / GameEngineTools.World.Core.Time.WWorld.Spec.HoursPerDay);
                         return f with { Confidence = newConf };
                     })
                     .Where(f => f.Confidence >= objectPruneThreshold)

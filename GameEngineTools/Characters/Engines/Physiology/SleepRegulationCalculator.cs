@@ -56,30 +56,65 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         #region Sleep debt (derived from Process S)
 
+        // A normal day is awake for two thirds of it, bounded to what a body tolerates (short days still
+        // need ~8 h awake to build any pressure; very long days are not stayed awake for).
+        private const double AwakeFractionOfDay = 2.0 / 3.0;
+        private const double MinAwakeHours = 8.0;
+        private const double MaxAwakeHours = 18.0;
+
         /// <summary>
-        /// Sleep-debt hours implied by Process S: zero up to <see cref="PhysiologyConfig.ProcessSDebtFreeLevel"/>
-        /// (a normal waking day), rising linearly to <see cref="PhysiologyConfig.MaxSleepDebtHours"/> at the
-        /// upper asymptote (prolonged wakefulness).
+        /// Process S level at the end of a normal waking day: the steady state of alternating
+        /// <see cref="PhysiologyConfig.ProcessSBuildupTimeConstantHours"/> buildup while awake and
+        /// <see cref="PhysiologyConfig.ProcessSDecayTimeConstantHours"/> decay while asleep, for a day of
+        /// <paramref name="hoursPerDay"/> hours. Day length is configurable per world, so this is derived
+        /// rather than a constant (≈0.62 for 24 h, ≈0.65 for 26 h); <see cref="PhysiologyConfig.ProcessSDebtFreeLevel"/> overrides it.
+        /// </summary>
+        /// <param name="cfg">Physiology configuration.</param>
+        /// <param name="hoursPerDay">Hours in a world day.</param>
+        /// <returns>The Process S level below which no sleep debt is counted.</returns>
+        public static double DebtFreeLevel(PhysiologyConfig cfg, double hoursPerDay)
+        {
+            ArgumentNullException.ThrowIfNull(cfg);
+            if (cfg.ProcessSDebtFreeLevel is { } fixedLevel)
+                return fixedLevel;
+
+            var awake = Math.Clamp(hoursPerDay * AwakeFractionOfDay, MinAwakeHours, MaxAwakeHours);
+            var asleep = awake * (1.0 - AwakeFractionOfDay) / AwakeFractionOfDay;
+            var rise = Math.Exp(-awake / cfg.ProcessSBuildupTimeConstantHours);
+            var fall = Math.Exp(-asleep / cfg.ProcessSDecayTimeConstantHours);
+            var upper = cfg.ProcessSUpperAsymptote;
+            var lower = cfg.ProcessSLowerAsymptote;
+
+            // Evening level S_e of the cycle S_e = U - (U - S_w)·rise, S_w = L + (S_e - L)·fall.
+            return (upper - rise * (upper - lower) - rise * fall * lower) / (1.0 - rise * fall);
+        }
+
+        /// <summary>
+        /// Sleep-debt hours implied by Process S: zero up to <see cref="DebtFreeLevel"/> (a normal waking
+        /// day), rising linearly to <see cref="PhysiologyConfig.MaxSleepDebtHours"/> at the upper asymptote
+        /// (prolonged wakefulness).
         /// </summary>
         /// <param name="processS">Current Process S [0..1].</param>
         /// <param name="cfg">Physiology configuration.</param>
+        /// <param name="hoursPerDay">Hours in a world day.</param>
         /// <returns>Sleep debt in hours, in [0, <see cref="PhysiologyConfig.MaxSleepDebtHours"/>].</returns>
-        public static double DebtHoursFromProcessS(double processS, PhysiologyConfig cfg)
+        public static double DebtHoursFromProcessS(double processS, PhysiologyConfig cfg, double hoursPerDay)
         {
-            ArgumentNullException.ThrowIfNull(cfg);
-            var span = Math.Max(1e-6, cfg.ProcessSUpperAsymptote - cfg.ProcessSDebtFreeLevel);
-            return Math.Clamp((processS - cfg.ProcessSDebtFreeLevel) / span, 0.0, 1.0) * cfg.MaxSleepDebtHours;
+            var free = DebtFreeLevel(cfg, hoursPerDay);
+            var span = Math.Max(1e-6, cfg.ProcessSUpperAsymptote - free);
+            return Math.Clamp((processS - free) / span, 0.0, 1.0) * cfg.MaxSleepDebtHours;
         }
 
         /// <summary>Inverse of <see cref="DebtHoursFromProcessS"/>; seeds Process S for characters restored with only a debt value.</summary>
         /// <param name="debtHours">Sleep debt in hours.</param>
         /// <param name="cfg">Physiology configuration.</param>
+        /// <param name="hoursPerDay">Hours in a world day.</param>
         /// <returns>The Process S value that yields <paramref name="debtHours"/>.</returns>
-        public static double ProcessSFromDebtHours(double debtHours, PhysiologyConfig cfg)
+        public static double ProcessSFromDebtHours(double debtHours, PhysiologyConfig cfg, double hoursPerDay)
         {
-            ArgumentNullException.ThrowIfNull(cfg);
+            var free = DebtFreeLevel(cfg, hoursPerDay);
             var fraction = Math.Clamp(debtHours / Math.Max(1.0, cfg.MaxSleepDebtHours), 0.0, 1.0);
-            return Math.Clamp(cfg.ProcessSDebtFreeLevel + fraction * (cfg.ProcessSUpperAsymptote - cfg.ProcessSDebtFreeLevel), 0.0, 1.0);
+            return Math.Clamp(free + fraction * (cfg.ProcessSUpperAsymptote - free), 0.0, 1.0);
         }
 
         #endregion
