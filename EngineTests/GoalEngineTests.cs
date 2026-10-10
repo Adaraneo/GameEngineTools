@@ -291,6 +291,23 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void GoalBehaviorModifier_ManyGoalsOnOneAction_AreCappedAtOneAndAHalfTimesTheMaximum()
+        {
+            var modifier = new GoalBehaviorModifier();
+            var now = new WDateTime(0);
+            var goals = new[]
+            {
+                PersistentGoalKind.MasterCraft, PersistentGoalKind.BuildReputation,
+                PersistentGoalKind.FindMeaning, PersistentGoalKind.BuildIdentity,
+            }.Select(k => new PersistentGoal(Guid.NewGuid(), k, GoalOrigin.Personality, 1.0, 0.0, 0.0, now, now)).ToArray();
+            var candidates = new List<BehaviorCandidate> { new(Work, 50.0, WTimeSpan.FromHours(2), BehaviorDomain.Competence) };
+
+            modifier.Modify(BuildBehaviorContext(new GoalState(goals)), candidates);
+
+            Assert.AreEqual(50.0 + 12.0 * 1.5, candidates[0].Utility, 1e-9, "Four goals would add ~26; the stack is capped at 18.");
+        }
+
+        [TestMethod]
         public void GoalBehaviorModifier_FindPartnerGoal_BoostsInviteIntimacyUtility()
         {
             var modifier = new GoalBehaviorModifier();

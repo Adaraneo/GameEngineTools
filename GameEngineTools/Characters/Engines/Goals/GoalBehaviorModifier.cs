@@ -19,6 +19,9 @@ namespace GameEngineTools.Characters.Engines.Goals
     {
         #region Private fields
 
+        /// <summary>Goals stack on one action, but together may add at most this multiple of the per-goal maximum.</summary>
+        private const double TotalBiasCapFactor = 1.5;
+
         private readonly ILogger? _log;
         private readonly double _maxFlatBiasPerGoal;
         private readonly double _shieldingCommitmentThreshold;
@@ -79,6 +82,8 @@ namespace GameEngineTools.Characters.Engines.Goals
                         }
                     }
                 }
+
+                totalBias = Math.Min(totalBias, maxBias * TotalBiasCapFactor);
 
                 if (totalBias > 0.0)
                 {
