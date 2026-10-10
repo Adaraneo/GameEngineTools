@@ -136,7 +136,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             s = s with
             {
                 Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * vagalTone * circadianVulnerability * h),
-                Valence = Approach(s.Valence, 0, 0.15 * emotionDecayMult * h),
+                Valence = Approach(s.Valence, (s.MoodBaseline - 50.0) / 50.0 * Config.MoodValenceSetPointRange, 0.15 * emotionDecayMult * h),
                 Arousal = Approach(s.Arousal, 0.5, 0.05 * h),
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)
             };

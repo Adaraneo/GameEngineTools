@@ -1120,6 +1120,25 @@ namespace EngineTests
         #region MoodBaseline — Phase 4
 
         [TestMethod]
+        public void Tick_MoodBaseline_SetsTheRestingValence()
+        {
+            double Resting(double baseline)
+            {
+                var engine = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: DefaultCfg with { MoodBaselineRecoveryPerHour = 0.0, BaselineAffectVariance = 0.0 });
+                engine.RestoreState(engine.State with { MoodBaseline = baseline });
+                for (var i = 0; i < 72; i++)
+                    engine.Tick(new WDateTime(0), WTimeSpan.FromHours(1), BuildContext(0.5), new EventCollector());
+                return engine.State.Valence;
+            }
+
+            var low = Resting(10);
+            var neutral = Resting(50);
+            var high = Resting(90);
+
+            Assert.IsTrue(neutral - low > 0.08 && high - neutral > 0.08, $"Resting valence follows the baseline (10 → {low:F3}, 50 → {neutral:F3}, 90 → {high:F3}).");
+        }
+
+        [TestMethod]
         public void Tick_MoodBaseline_RecoveryIsProportionalToTheDistanceFrom50()
         {
             double Recovered(double start)
