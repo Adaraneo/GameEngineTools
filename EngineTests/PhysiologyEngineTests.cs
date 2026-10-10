@@ -869,6 +869,22 @@ namespace EngineTests
                 $"Spánek mimo přirozené okno musí akumulovat CircadianPhaseShiftHours > 0. Aktuálně: {engine.State.CircadianPhaseShiftHours:F4}");
         }
 
+        /// <summary>Sleeping earlier than the natural time advances the clock (negative), later delays it (positive).</summary>
+        [TestMethod]
+        public void Tick_CircadianPhaseShift_IsSignedByWhetherSleepIsEarlierOrLaterThanNatural()
+        {
+            double ShiftAfterSleepAt(double hour)
+            {
+                var engine = BuildEngine(_now);
+                engine.RestoreState(engine.State with { CircadianPhaseShiftHours = 0 });
+                engine.Tick(new WDateTime(WTimeSpan.FromHours(hour).Ticks), WTimeSpan.FromHours(4), BuildContextWithAction(Sleep), new EventCollector());
+                return engine.State.CircadianPhaseShiftHours;
+            }
+
+            Assert.IsTrue(ShiftAfterSleepAt(4) > 0, "Sleeping in the small hours delays the clock.");
+            Assert.IsTrue(ShiftAfterSleepAt(17) < 0, "Sleeping in the late afternoon advances the clock.");
+        }
+
         /// <summary>
         /// Fázový posun se musí pomalu vracet k ChronotypeOffsetHours (=0) při konzistentním rytmu.
         /// </summary>

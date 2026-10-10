@@ -499,14 +499,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var naturalSleep = (spec.FromClock24(Config.NaturalSleepStartHour - Config.ChronotypeOffsetHours) + hoursPerDay) % hoursPerDay;
                 if (action == Sleep)
                 {
-                    var mismatch = Math.Abs(hoursOfDay - naturalSleep);
-                    if (mismatch > hoursPerDay / 2) mismatch = hoursPerDay - mismatch;
-                    var mismatchClock = spec.ToClock24(mismatch);
+                    // Signed: sleeping later than the natural time delays the clock (+), earlier advances it (-); positive = later peaks.
+                    var mismatch = hoursOfDay - naturalSleep;
+                    if (mismatch > hoursPerDay / 2) mismatch -= hoursPerDay;
+                    else if (mismatch < -hoursPerDay / 2) mismatch += hoursPerDay;
+                    var mismatchClock = spec.ToClock24(Math.Abs(mismatch));
                     if (mismatchClock > 2.0)
                         s = s with
                         {
                             CircadianPhaseShiftHours = Math.Clamp(
-                                s.CircadianPhaseShiftHours + spec.FromClock24((mismatchClock - 2.0) * 0.05 * bodyHours),
+                                s.CircadianPhaseShiftHours + Math.Sign(mismatch) * spec.FromClock24((mismatchClock - 2.0) * 0.05 * bodyHours),
                                 -spec.FromClock24(6.0), spec.FromClock24(6.0))
                         };
                 }
@@ -514,7 +516,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 s = s with
                 {
                     CircadianPhaseShiftHours = Approach(
-                        s.CircadianPhaseShiftHours, spec.FromClock24(Config.ChronotypeOffsetHours),
+                        s.CircadianPhaseShiftHours, -spec.FromClock24(Config.ChronotypeOffsetHours),
                         spec.FromClock24(Config.CircadianPhaseRecoveryPerHour * bodyHours))
                 };
             }

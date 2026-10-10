@@ -613,7 +613,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>
         /// Total effective shift of the circadian rhythm from the mean (hours). Combines
         /// the stable chronotype (<see cref="PhysiologyConfig.ChronotypeOffsetHours"/>) and
-        /// the current jet-lag disruption. Positive = morning lark, negative = night owl.
+        /// the current jet-lag disruption. Positive = rhythm shifted later (night owl), negative = earlier (morning lark).
         /// Psychology reads this value and shifts the Gaussian arousal peaks. Range −6..+6.
         /// </summary>
         double CircadianPhaseShiftHours = 0,
