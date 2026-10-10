@@ -1526,6 +1526,27 @@ namespace EngineTests
         #region PMDD — hormone-withdrawal weighting (progesteron + estradiol)
 
         /// <summary>Sestaví PhysiologyState s pozdně-luteálním cyklem a danými hormony pro PMDD testy.</summary>
+        [TestMethod]
+        public void OvulationBoostAndAffectNoise_ScaleWithTheTickLength()
+        {
+            static double Valence(bool ovulating, double variance, double hours)
+            {
+                var cycle = new MenstrualCycleState(CyclePhase.Ovulation, 14, ovulating, 0, 0, 0, 1.0, WDateOnly.New(116, 1, 1), false, 0, 0);
+                var engine = BuildEngine(0.0, 20, cfg: DefaultCfg with { BaselineAffectVariance = variance });
+                var ctx = BuildContext(0.5, new PhysiologyState(70, 0, 20, 15, 0, 5, 0, Cycle: cycle), currentAction: null);
+                engine.Tick(new WDateTime(0), WTimeSpan.FromHours(hours), ctx, new EventCollector());
+                return engine.State.Valence;
+            }
+
+            var shortBoost = Valence(true, 0.0, 0.1) - Valence(false, 0.0, 0.1);
+            var longBoost = Valence(true, 0.0, 1.0) - Valence(false, 0.0, 1.0);
+            Assert.IsTrue(longBoost > 0.0 && shortBoost < longBoost * 0.2, $"The ovulation lift is a rate (6 min {shortBoost:F4} vs 1 h {longBoost:F4}).");
+
+            var shortNoise = Math.Abs(Valence(false, 0.05, 0.1) - Valence(false, 0.0, 0.1));
+            var longNoise = Math.Abs(Valence(false, 0.05, 1.0) - Valence(false, 0.0, 1.0));
+            Assert.IsTrue(longNoise > 0.0 && shortNoise < longNoise * 0.5, $"Affect noise grows with the tick length (6 min {shortNoise:F4} vs 1 h {longNoise:F4}).");
+        }
+
         private static PhysiologyState MakePhysioWithPmdd(double estradiol, double progesterone, bool pmddActive = true)
         {
             var cycle = new MenstrualCycleState(

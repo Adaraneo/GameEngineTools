@@ -31,7 +31,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
     ///   <item><description>PAD drift toward a neutral resting state.</description></item>
     ///   <item><description>Physiology modulation (pain → stress, sleep debt → CogLoad, fever → arousal suppression).</description></item>
     ///   <item><description>Ovulation arousal/valence boost when the cycle window is open.</description></item>
-    ///   <item><description>Random daily affective noise scaled by <c>BaselineAffectVariance</c>.</description></item>
+    ///   <item><description>Random affective noise: <c>BaselineAffectVariance</c> per hour, scaled by √hours so the drift does not depend on the tick length.</description></item>
     ///   <item><description>Discrete emotion inference via the PAD rule table.</description></item>
     /// </list>
     /// </para>
@@ -639,11 +639,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Ovulation – a slight rise in arousal/valence
             if (ph.Cycle?.OvulationWindow == true)
             {
-                s = s with { Arousal = Clamp01(s.Arousal + 0.03), Valence = Clampm1p1(s.Valence + 0.02) };
+                s = s with { Arousal = Clamp01(s.Arousal + 0.03 * h), Valence = Clampm1p1(s.Valence + 0.02 * h) }; // per hour
             }
 
             // Random daily variability
-            var noise = (Config.BaselineAffectVariance <= 0) ? 0.0 : (RandomSym() * Config.BaselineAffectVariance);
+            var noise = (Config.BaselineAffectVariance <= 0) ? 0.0 : (RandomSym() * Config.BaselineAffectVariance * Math.Sqrt(h)); // per-hour amplitude of a random walk
             s = s with { Valence = Clampm1p1(s.Valence + noise) };
 
             var newDom = InferEmotion(s);
