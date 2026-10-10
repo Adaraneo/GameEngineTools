@@ -34,8 +34,11 @@ public static class TileErosion
     /// they're still read normally for gradient/height, just never eroded or deposited into. Used
     /// to hold an already-saved neighbor tile's edge fixed while this tile's own erosion runs, so
     /// two independently-eroded tiles still agree exactly along their shared border.
+    /// <paramref name="globalCellOrigin"/> (global integer cell coordinates of grid cell 0,0) switches droplet seeding from a
+    /// per-grid random sequence to a pure function of global cell coordinates — see <see cref="TileGenerator"/>'s unlocked
+    /// overlapping-tile erosion. <see cref="Parameters.DropletCount"/> then means the expected count over the whole grid.
     /// </summary>
-    public static void Erode(TerrainHeightmap grid, Parameters p, bool[]? locked = null)
+    public static void Erode(TerrainHeightmap grid, Parameters p, bool[]? locked = null, (long X, long Y)? globalCellOrigin = null)
     {
         if (p.DropletCount <= 0 || grid.Width < 3 || grid.Height < 3) return;
 
@@ -51,101 +54,141 @@ public static class TileErosion
                 "this grid was already corrupted before droplet erosion ran, most likely by an earlier SPIM/isostasy divergence.");
         }
 
-        var rng = new Random(p.Seed);
         var width = grid.Width;
         var height = grid.Height;
 
+        if (globalCellOrigin is { } origin)
+        {
+            // Droplet starts are a pure function of GLOBAL cell coordinates, processed in global row-major order, so two
+            // overlapping tiles replay the same droplets in the same order instead of two unrelated random sets.
+            var spawnProbability = Math.Min(1.0, p.DropletCount / (double)(width * height));
+            for (var cy = 0; cy < height - 1; cy++)
+            {
+                for (var cx = 0; cx < width - 1; cx++)
+                {
+                    var h = Mix(Mix(Mix((ulong)p.Seed) ^ (ulong)(origin.X + cx)) ^ (ulong)(origin.Y + cy));
+                    if (Unit(h) >= spawnProbability) continue;
+                    var h2 = Mix(h);
+                    var h3 = Mix(h2);
+                    var angleSeed = (int)(Mix(h3) & 0x7FFFFFFF);
+                    Random? angleRng = null;
+                    RunDroplet(grid, p, locked, cx + Unit(h2) * 0.999, cy + Unit(h3) * 0.999,
+                        () => (angleRng ??= new Random(angleSeed)).NextDouble());
+                }
+            }
+            return;
+        }
+
+        var rng = new Random(p.Seed);
         for (var i = 0; i < p.DropletCount; i++)
         {
             var posX = rng.NextDouble() * (width - 1.001);
             var posY = rng.NextDouble() * (height - 1.001);
-            double dirX = 0, dirY = 0;
-            var speed = p.InitialSpeed;
-            var water = p.InitialWater;
-            var sediment = 0.0;
+            RunDroplet(grid, p, locked, posX, posY, rng.NextDouble);
+        }
+    }
 
-            var step = 0;
-            for (; step < p.MaxDropletLifetime; step++)
+    /// <summary>SplitMix64 finalizer — cheap, well-mixed 64-bit hash step.</summary>
+    private static ulong Mix(ulong z)
+    {
+        z += 0x9E3779B97F4A7C15UL;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+        return z ^ (z >> 31);
+    }
+
+    private static double Unit(ulong h) => (h >> 11) * (1.0 / (1UL << 53));
+
+    private static void RunDroplet(TerrainHeightmap grid, Parameters p, bool[]? locked, double posX, double posY, Func<double> nextRandom)
+    {
+        var width = grid.Width;
+        var height = grid.Height;
+        double dirX = 0, dirY = 0;
+        var speed = p.InitialSpeed;
+        var water = p.InitialWater;
+        var sediment = 0.0;
+
+        var step = 0;
+        for (; step < p.MaxDropletLifetime; step++)
+        {
+            var nodeX = (int)Math.Floor(posX);
+            var nodeY = (int)Math.Floor(posY);
+            if (nodeX < 0 || nodeX >= width - 1 || nodeY < 0 || nodeY >= height - 1)
             {
-                var nodeX = (int)Math.Floor(posX);
-                var nodeY = (int)Math.Floor(posY);
-                if (nodeX < 0 || nodeX >= width - 1 || nodeY < 0 || nodeY >= height - 1)
-                {
-                    DepositAtBilinearCorners(grid, Math.Clamp(nodeX, 0, width - 2), Math.Clamp(nodeY, 0, height - 2), 0, 0, sediment, locked);
-                    sediment = 0;
-                    break;
-                }
-
-                var (oldHeight, gradX, gradY) = HeightAndGradient(grid, posX, posY, nodeX, nodeY);
-
-                dirX = dirX * p.Inertia - gradX * (1 - p.Inertia);
-                dirY = dirY * p.Inertia - gradY * (1 - p.Inertia);
-                var dirLen = Math.Sqrt(dirX * dirX + dirY * dirY);
-                if (dirLen < 1e-8)
-                {
-                    var randomAngle = rng.NextDouble() * Math.PI * 2;
-                    dirX = Math.Cos(randomAngle);
-                    dirY = Math.Sin(randomAngle);
-                }
-                else
-                {
-                    dirX /= dirLen;
-                    dirY /= dirLen;
-                }
-
-                var newPosX = posX + dirX;
-                var newPosY = posY + dirY;
-                if (newPosX < 0 || newPosX >= width - 1 || newPosY < 0 || newPosY >= height - 1)
-                {
-                    DepositAtBilinearCorners(grid, nodeX, nodeY, posX - nodeX, posY - nodeY, sediment, locked);
-                    sediment = 0;
-                    break;
-                }
-
-                var newHeight = SampleHeight(grid, newPosX, newPosY);
-                var deltaHeight = newHeight - oldHeight;
-
-                var capacity = Math.Max(-deltaHeight * speed * water * p.SedimentCapacityFactor, p.MinSedimentCapacity);
-
-                if (sediment > capacity || deltaHeight > 0)
-                {
-                    var amountToDeposit = deltaHeight > 0
-                        ? Math.Min(deltaHeight, sediment)
-                        : (sediment - capacity) * p.DepositSpeed;
-                    sediment -= amountToDeposit;
-                    DepositAtBilinearCorners(grid, nodeX, nodeY, posX - nodeX, posY - nodeY, amountToDeposit, locked);
-                }
-                else
-                {
-                    var amountToErode = Math.Min((capacity - sediment) * p.ErodeSpeed, -deltaHeight);
-                    ErodeAtBilinearCorners(grid, nodeX, nodeY, posX - nodeX, posY - nodeY, amountToErode, locked);
-                    sediment += amountToErode;
-                }
-
-                speed = Math.Sqrt(Math.Max(0, speed * speed + deltaHeight * p.Gravity));
-                water *= 1 - p.EvaporateSpeed;
-
-                posX = newPosX;
-                posY = newPosY;
-
-                if (water < p.MinWaterToContinue)
-                {
-                    var finalNodeX = (int)Math.Floor(posX);
-                    var finalNodeY = (int)Math.Floor(posY);
-                    if (finalNodeX >= 0 && finalNodeX < width - 1 && finalNodeY >= 0 && finalNodeY < height - 1)
-                        DepositAtBilinearCorners(grid, finalNodeX, finalNodeY, posX - finalNodeX, posY - finalNodeY, sediment, locked);
-                    sediment = 0;
-                    break;
-                }
+                DepositAtBilinearCorners(grid, Math.Clamp(nodeX, 0, width - 2), Math.Clamp(nodeY, 0, height - 2), 0, 0, sediment, locked);
+                sediment = 0;
+                break;
             }
 
-            if (step == p.MaxDropletLifetime && sediment > 0)
+            var (oldHeight, gradX, gradY) = HeightAndGradient(grid, posX, posY, nodeX, nodeY);
+
+            dirX = dirX * p.Inertia - gradX * (1 - p.Inertia);
+            dirY = dirY * p.Inertia - gradY * (1 - p.Inertia);
+            var dirLen = Math.Sqrt(dirX * dirX + dirY * dirY);
+            if (dirLen < 1e-8)
+            {
+                var randomAngle = nextRandom() * Math.PI * 2;
+                dirX = Math.Cos(randomAngle);
+                dirY = Math.Sin(randomAngle);
+            }
+            else
+            {
+                dirX /= dirLen;
+                dirY /= dirLen;
+            }
+
+            var newPosX = posX + dirX;
+            var newPosY = posY + dirY;
+            if (newPosX < 0 || newPosX >= width - 1 || newPosY < 0 || newPosY >= height - 1)
+            {
+                DepositAtBilinearCorners(grid, nodeX, nodeY, posX - nodeX, posY - nodeY, sediment, locked);
+                sediment = 0;
+                break;
+            }
+
+            var newHeight = SampleHeight(grid, newPosX, newPosY);
+            var deltaHeight = newHeight - oldHeight;
+
+            var capacity = Math.Max(-deltaHeight * speed * water * p.SedimentCapacityFactor, p.MinSedimentCapacity);
+
+            if (sediment > capacity || deltaHeight > 0)
+            {
+                var amountToDeposit = deltaHeight > 0
+                    ? Math.Min(deltaHeight, sediment)
+                    : (sediment - capacity) * p.DepositSpeed;
+                sediment -= amountToDeposit;
+                DepositAtBilinearCorners(grid, nodeX, nodeY, posX - nodeX, posY - nodeY, amountToDeposit, locked);
+            }
+            else
+            {
+                var amountToErode = Math.Min((capacity - sediment) * p.ErodeSpeed, -deltaHeight);
+                ErodeAtBilinearCorners(grid, nodeX, nodeY, posX - nodeX, posY - nodeY, amountToErode, locked);
+                sediment += amountToErode;
+            }
+
+            speed = Math.Sqrt(Math.Max(0, speed * speed + deltaHeight * p.Gravity));
+            water *= 1 - p.EvaporateSpeed;
+
+            posX = newPosX;
+            posY = newPosY;
+
+            if (water < p.MinWaterToContinue)
             {
                 var finalNodeX = (int)Math.Floor(posX);
                 var finalNodeY = (int)Math.Floor(posY);
                 if (finalNodeX >= 0 && finalNodeX < width - 1 && finalNodeY >= 0 && finalNodeY < height - 1)
                     DepositAtBilinearCorners(grid, finalNodeX, finalNodeY, posX - finalNodeX, posY - finalNodeY, sediment, locked);
+                sediment = 0;
+                break;
             }
+        }
+
+        if (step == p.MaxDropletLifetime && sediment > 0)
+        {
+            var finalNodeX = (int)Math.Floor(posX);
+            var finalNodeY = (int)Math.Floor(posY);
+            if (finalNodeX >= 0 && finalNodeX < width - 1 && finalNodeY >= 0 && finalNodeY < height - 1)
+                DepositAtBilinearCorners(grid, finalNodeX, finalNodeY, posX - finalNodeX, posY - finalNodeY, sediment, locked);
         }
     }
 

@@ -81,7 +81,7 @@ public static class TileGenerator
         int SpimMaxDegreeOfParallelism = 1,
         /// <summary>Null (default, no cost) skips debug rendering entirely. Non-null writes one 16-bit grayscale PNG per intermediate SPIM layer (raw landmass, uplift, rock-type index, precipitation weight, final elevation, flow accumulation) per chunk to this directory via <see cref="PngHeightmapWriter"/> — for diagnosing a visual artifact by inspecting each layer in isolation instead of guessing which one produced it, without hand-writing a throwaway test every time. Only meaningful together with <see cref="SpimParams"/> and <see cref="SpimChunkTilesPerSide"/> &gt; 1 (the chunk pass); the per-tile fallback path (SpimChunkTilesPerSide == 1) does not render debug layers.</summary>
         string? DebugRenderDirectory = null,
-        /// <summary>Width in cells of the band along each tile edge over which the droplet-erosion delta fades to zero — see the taper block in <see cref="GenerateOneTile"/>; 0 disables.</summary>
+        /// <summary>Width in cells of the band along each tile edge over which the droplet-erosion delta fades to zero — see the taper block in <see cref="GenerateOneTile"/>; 0 disables. Only used by the legacy per-tile SPIM path (<c>SpimChunkTilesPerSide</c> 1), where erosion still runs against locked neighbor margins.</summary>
         int ErosionEdgeTaperCells = 6);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
@@ -461,6 +461,23 @@ public static class TileGenerator
                 {
                     for (var iy = 0; iy < cellsPerTile; iy++)
                         Array.Copy(chunkInterior, iy * cellsPerTile, paddedValues, (iy + margin) * paddedSize + margin, cellsPerTile);
+
+                    // The margin must hold the neighbors' real SPIM relief too: left as landmass-only noise it forms a cliff against
+                    // the SPIM interior, which droplets running toward the tile edge then erode into a visible seam.
+                    for (var dRow = -1; dRow <= 1; dRow++)
+                    {
+                        for (var dCol = -1; dCol <= 1; dCol++)
+                        {
+                            if ((dRow == 0 && dCol == 0) || !spimChunkInterior.TryGetValue((row + dRow, col + dCol), out var neighborInterior)) continue;
+                            var ixStart = dCol < 0 ? cellsPerTile - margin : 0;
+                            var ixEnd = dCol > 0 ? margin : cellsPerTile;
+                            var iyStart = dRow < 0 ? cellsPerTile - margin : 0;
+                            var iyEnd = dRow > 0 ? margin : cellsPerTile;
+                            for (var iy = iyStart; iy < iyEnd; iy++)
+                                for (var ix = ixStart; ix < ixEnd; ix++)
+                                    paddedValues[(iy + dRow * cellsPerTile + margin) * paddedSize + ix + dCol * cellsPerTile + margin] = neighborInterior[iy * cellsPerTile + ix];
+                        }
+                    }
                 }
 
                 var padded = new TerrainHeightmap("scratch", paddedOriginX, paddedOriginY,
@@ -472,7 +489,7 @@ public static class TileGenerator
                 // entirely separate Run() call (e.g. filling in the region next to one generated
                 // last week). db.LoadHeightmap simply returns null for a neighbor that doesn't
                 // exist yet in either case, so no run-relative guard is needed.
-                void LockAgainst(TerrainHeightmap? neighbor, int gxStart, int gxEnd, int gyStart, int gyEnd)
+                void LockAgainst(TerrainHeightmap? neighbor, int gxStart, int gxEnd, int gyStart, int gyEnd, bool applyLock = true)
                 {
                     if (neighbor is null) return;
 
@@ -483,6 +500,8 @@ public static class TileGenerator
                         db.DeleteHeightmap(neighbor.Id);
                         return;
                     }
+
+                    if (!applyLock) return;
 
                     for (var gy = gyStart; gy < gyEnd; gy++)
                     {
@@ -503,10 +522,23 @@ public static class TileGenerator
                     return db.LoadHeightmap(TileId(s.NoiseParams.Seed, lat, lon));
                 }
 
-                LockAgainst(LoadNeighbor(row, col - 1), 0, margin, 0, paddedSize); // west
-                LockAgainst(LoadNeighbor(row, col + 1), paddedSize - margin, paddedSize, 0, paddedSize); // east
-                LockAgainst(LoadNeighbor(row - 1, col), 0, paddedSize, 0, margin); // south
-                LockAgainst(LoadNeighbor(row + 1, col), 0, paddedSize, paddedSize - margin, paddedSize); // north
+                // Whole-chunk SPIM (or no SPIM) leaves every tile's pre-erosion margin identical to its neighbors' own view of
+                // it, so droplet erosion can run unlocked on overlapping, globally-keyed droplets; only the legacy per-tile SPIM
+                // still needs neighbor locking.
+                var overlappingErosion = s.SpimParams is null || spimChunkTilesPerSide > 1;
+                if (overlappingErosion)
+                {
+                    // Not locked against, but a corrupted leftover neighbor from an earlier run is still purged.
+                    foreach (var (nRow, nCol) in new[] { (row, col - 1), (row, col + 1), (row - 1, col), (row + 1, col) })
+                        LockAgainst(LoadNeighbor(nRow, nCol), 0, 0, 0, 0, applyLock: false);
+                }
+                else
+                {
+                    LockAgainst(LoadNeighbor(row, col - 1), 0, margin, 0, paddedSize); // west
+                    LockAgainst(LoadNeighbor(row, col + 1), paddedSize - margin, paddedSize, 0, paddedSize); // east
+                    LockAgainst(LoadNeighbor(row - 1, col), 0, paddedSize, 0, margin); // south
+                    LockAgainst(LoadNeighbor(row + 1, col), 0, paddedSize, paddedSize - margin, paddedSize); // north
+                }
 
                 if (s.SpimParams is { } spimParams && spimChunkTilesPerSide <= 1)
                 {
@@ -535,14 +567,18 @@ public static class TileGenerator
                 // relative erosion texture repeating every tile, visible as a grid at any zoom.
                 var tileErosionParams = s.ErosionParams with { Seed = StableTileSeed(s.ErosionParams.Seed, row, col) };
                 var preErosion = (float[])padded.Values.Clone();
-                TileErosion.Erode(padded, tileErosionParams, locked);
+                if (overlappingErosion)
+                    TileErosion.Erode(padded, s.ErosionParams, null,
+                        ((long)Math.Round(paddedOriginX / s.CellSizeMeters), (long)Math.Round(paddedOriginY / s.CellSizeMeters)));
+                else
+                    TileErosion.Erode(padded, tileErosionParams, locked);
 
                 // Droplet erosion against a locked margin behaves differently within a few cells of the
                 // tile edge than in the free interior, which showed up as a visible grid (boundary jump
                 // ~6x the interior one on a smooth ramp; vanishes with --erosion 0). Both tiles sharing an
                 // edge start from the same pre-erosion field, so fading the erosion delta to zero at the
                 // tile edge makes the seam continuous.
-                var edgeTaper = Math.Min(s.ErosionEdgeTaperCells, cellsPerTile / 2);
+                var edgeTaper = overlappingErosion ? 0 : Math.Min(s.ErosionEdgeTaperCells, cellsPerTile / 2);
                 var interior = new float[cellsPerTile * cellsPerTile];
                 for (var iy = 0; iy < cellsPerTile; iy++)
                 {
