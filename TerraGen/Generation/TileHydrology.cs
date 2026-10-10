@@ -169,6 +169,9 @@ public static class TileHydrology
 
     /// <summary>Tarboton's (1997) eight-triangular-facet D-infinity flow direction per cell, as two bounding neighbors plus a fractional weight.</summary>
     internal static (double[] Angle, int[] NeighborA, int[] NeighborB, double[] WeightA) ComputeDInfinityDirections(float[] routed, int width, int height)
+        => ComputeDInfinityDirections(Array.ConvertAll(routed, v => (double)v), width, height);
+
+    internal static (double[] Angle, int[] NeighborA, int[] NeighborB, double[] WeightA) ComputeDInfinityDirections(double[] routed, int width, int height)
     {
         var count = width * height;
         var angle = new double[count];

@@ -5,14 +5,14 @@ namespace TerraGen.Generation;
 /// <summary>Shared D8 flow-routing primitives, extracted out of <see cref="TileHydrology"/> (previously the only consumer) so <see cref="StreamPowerErosion"/> reuses the same routing instead of a second copy.</summary>
 public static class FlowRouting
 {
-    /// <summary>Per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit, keeping the filled surface strictly monotonic toward the tile boundary.</summary>
-    internal const float FillEpsilon = 1e-3f;
+    /// <summary>Per-hop elevation bump <see cref="FillDepressions"/> adds while flooding a pit, keeping the filled surface strictly monotonic toward the tile boundary. Must stay far below real per-cell relief: the earlier 1 mm made the filled surface a distance-to-boundary cone wherever the terrain falls less than ~1 mm per cell (ocean floors, plains), so routing there followed the nearest edge along 45° diagonals instead of the slope — hence the filled/routed surfaces are <c>double</c> (a float cannot hold 1 µm steps at 5 km elevation).</summary>
+    internal const double FillEpsilon = 1e-6;
 
     /// <summary>Near-equal filled-elevation gap (in <see cref="FillEpsilon"/> steps) for two cells to count as the same flat component in <see cref="ResolveFlats"/>.</summary>
-    private const float FlatEqualityTolerance = FillEpsilon * 4f;
+    private const double FlatEqualityTolerance = FillEpsilon * 4.0;
 
     /// <summary>Filled=pit-filled elevation; Routed=Filled+flat-gradient (what Downstream/Stack derive from); Downstream=steepest-descent neighbor index (-1 at grid boundary); Stack=cell indices highest-to-lowest by Routed (Braun &amp; Willett 2013 §2.1 topological order); Accumulation=D8 flow accumulation. All arrays are length grid.Width*grid.Height.</summary>
-    public readonly record struct Result(float[] Filled, float[] Routed, int[] Downstream, int[] Stack, int[] Accumulation);
+    public readonly record struct Result(double[] Filled, double[] Routed, int[] Downstream, int[] Stack, int[] Accumulation);
 
     /// <summary>Computes the full D8 routing package for <paramref name="grid"/>: fill, resolve, direction, topological stack, accumulation.</summary>
     public static Result Compute(TerrainHeightmap grid)
@@ -61,15 +61,15 @@ public static class FlowRouting
 
     /// <summary>Priority-Flood depression filling. Source: Barnes, Lehman &amp; Mulla (2014), Computers &amp; Geosciences 62:117-127, doi:10.1016/j.cageo.2013.04.024.</summary>
     /// <remarks>⚠ This already IS an O(n log n) priority-flood construction, not the "epsilon-increment" filler the SPIM plan's Task 1.1.2 assumed exists — flagged rather than adding a redundant second algorithm.</remarks>
-    internal static float[] FillDepressions(TerrainHeightmap grid)
+    internal static double[] FillDepressions(TerrainHeightmap grid)
     {
         var width = grid.Width;
         var height = grid.Height;
-        var filled = new float[grid.Values.Length];
-        Array.Fill(filled, float.PositiveInfinity);
+        var filled = new double[grid.Values.Length];
+        Array.Fill(filled, double.PositiveInfinity);
 
         var visited = new bool[filled.Length];
-        var queue = new PriorityQueue<int, float>();
+        var queue = new PriorityQueue<int, double>();
 
         for (var y = 0; y < height; y++)
         {
@@ -112,7 +112,7 @@ public static class FlowRouting
     }
 
     /// <summary>Garbrecht &amp; Martz (1997) flat-surface resolution — adds a synthetic gradient per flat component so flow converges to one exit instead of smearing as a sheet.</summary>
-    internal static float[] ResolveFlats(float[] filled, int width, int height)
+    internal static double[] ResolveFlats(double[] filled, int width, int height)
     {
         var count = width * height;
         var componentId = new int[count];
@@ -165,7 +165,7 @@ public static class FlowRouting
             components.Add(members);
         }
 
-        var routed = (float[])filled.Clone();
+        var routed = (double[])filled.Clone();
 
         foreach (var members in components)
         {
@@ -220,7 +220,7 @@ public static class FlowRouting
                 var toLower = distToLower[i] < 0 ? 0 : distToLower[i];
                 var toHigher = distToHigher[i] < 0 ? 0 : distToHigher[i];
                 // +toLower pushes cells far from the exit up; -toHigher pulls cells far from the wall down — sign found live via a propagation regression test.
-                routed[members[i]] = filled[members[i]] + FillEpsilon * (2f * toLower - toHigher);
+                routed[members[i]] = filled[members[i]] + FillEpsilon * (2.0 * toLower - toHigher);
             }
         }
 
@@ -257,7 +257,7 @@ public static class FlowRouting
     }
 
     /// <summary>Index of the steepest-downhill 8-connected neighbor from (x,y) in <paramref name="values"/>, or -1 only at the grid boundary.</summary>
-    internal static int SteepestDescentNeighbor(float[] values, int width, int height, int x, int y)
+    internal static int SteepestDescentNeighbor(double[] values, int width, int height, int x, int y)
     {
         var here = values[y * width + x];
 
