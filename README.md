@@ -290,9 +290,9 @@ Invariants:
 | Engine | State | What it owns |
 |---|---|---|
 | **Physiology** | `PhysiologyState` | Energy/hunger/thirst/pain/immune/temperature, sleep debt, allostatic load, cortisol, testosterone, nutrition (vitamin D/iron), menstrual cycle, aging, injury, postpartum, mortality. Emits `ChildBorn`, `InjuryReceived`, death. |
-| **Psychology** | `PsychologyState` | PAD affect, stress (HPA), cognitive load, cortisol, mood baseline, discrete emotions + decay, circadian arousal, hormonal/environmental/sickness modulation, stress manifestation. Anger is approach-motivated. |
-| **Behavior** | `BehaviorState` | Decision core: need engines (physiological/social/competence/autonomy/foraging) + modifier engines (trait/affect/circadian/habit/memory/affordance/values/goal/schedule) + intent stabilisation + action arbitration + habit learning. Emits `ActionCommitted`, `InteractionProposed`. |
-| **Sleep** | `ISleepSession` | `Falling→Light→Deep→REM→Waking` state machine; nightmares, ambush, consolidation; outside the utility loop. Timing is driven by two-process regulation: Physiology keeps Process S (sleep pressure) and the day-length-aware circadian thresholds (`SleepPropensity` starts sleep, `WakeMargin` ends it without an alarm). |
+| **Psychology** | `PsychologyState` | PAD affect, stress (HPA), cognitive load, cortisol, mood baseline, discrete emotions + decay, circadian arousal (a configurable three-bump curve that follows the planet's day length), hormonal/environmental/sickness modulation, stress manifestation. Anger is approach-motivated (it raises dominance); valence relaxes toward a set point given by the mood baseline, so a persistently low baseline rests on a lower mood; per-tick effects scale with the tick length. |
+| **Behavior** | `BehaviorState` | Decision core: need engines (physiological/social/competence/autonomy/foraging) + modifier engines (trait/affect/circadian/habit/memory/affordance/values/goal/schedule) + intent stabilisation + action arbitration + habit learning. A running plan is pre-empted by severe hunger/thirst; stacked goal bias on one action is capped. Emits `ActionCommitted`, `InteractionProposed`. |
+| **Sleep** | `ISleepSession` | `Falling→Light→Deep→REM→Waking` state machine; nightmares, ambush, consolidation; outside the utility loop. Timing is driven by two-process regulation: Physiology keeps Process S (sleep pressure) and the day-length-aware circadian thresholds (`SleepPropensity` starts sleep, `WakeMargin` ends it without an alarm). A running session is persisted, so a save/load mid-sleep resumes it. |
 | **Interactions** | `InteractionSurface` | Evaluates proposed social acts (`SpeechAct`s, touch levels); misattribution under noise×stress; peak-end valence; sexual-encounter readiness gate; third-party observers. |
 | **Dialogue / Language** | — | Turns a chosen speech act into an actual realized Czech sentence via `CzechSpeechActRealizer` (valency/sentence-planning pipeline) and a per-character acquired vocabulary (`LexicalAcquisition`). |
 | **Object Interaction** | — | Applies world-object affordances; pickup/ownership routing. |
@@ -301,13 +301,13 @@ Invariants:
 | **Semantic Memory** | `SemanticMemoryState` | Per-person belief sets (Warm/EmotionallySafe/Reliable/Rejecting/Critical) distilled from episodes; attachment-modulated learning; feeds social targeting. |
 | **Goals** | `GoalState` | Persistent long-term drives (existential/survival/career/relational) with salience/progress/frustration; bias utility, don't prescribe plans. |
 | **Daily Schedule** | `DailyScheduleState` | Occupation-seeded time-of-day routine slots; biases action + movement; runtime occupation change. |
-| **Values** | `ValuesState` | Drifting Schwartz `Current` vs immutable `Baseline`; congruence shifts utility & emits guilt on violation. |
-| **Self-Concept** | `SelfConcept` | Perceived Big Five, ideal subset, self-esteem, self-discrepancy; evolves via self-verification; seeds `BuildIdentity` goals. |
-| **Interests** | `InterestState` | Drifting RIASEC `Current` vs immutable `Baseline`; rewarded activity raises matching interest. |
-| **Bereavement** | — | Grief (dual-process model) after a death and widowhood hazard; drives `Bury`/`MournAtGrave` behavior. |
+| **Values** | `ValuesState` | Drifting Schwartz `Current` vs immutable `Baseline`; congruence shifts utility; guilt (and erosion of the violated value, at most once per dimension per cooldown) follows a *committed* violating action, not every scored candidate. Drift is scaled by headroom, so values approach the poles instead of pinning at the clamp. |
+| **Self-Concept** | `SelfConcept` | Perceived Big Five, ideal subset, self-esteem, self-discrepancy; evolves via self-verification; seeds `BuildIdentity` goals; self-esteem relaxes toward its personality baseline. |
+| **Interests** | `InterestState` | Drifting RIASEC `Current` vs immutable `Baseline`; rewarded activity raises matching interest, with gains scaled by headroom (no pinning at 1.0). |
+| **Bereavement** | — | Grief (dual-process model) after a death and widowhood hazard; drives `Bury`/`MournAtGrave` behavior. A partner loss is kept until the widowhood-hazard window (180 d acute, 720 d tail) ends, even after grief has resolved. |
 | **Status** | `StatusLedger` | Two-axis Dominance/Prestige social standing per character; feeds stress via status×stability and deference in interactions. |
-| **Economy** | `EconomyLedger` | Wealth, wages, `Buy`/`Sell` actions, posted prices on `WorldObject`s. |
-| **Social Comparison** | — | Contrast/assimilation against comparison targets; benign/malicious envy; downward mood repair. |
+| **Economy** | `EconomyLedger` | Wealth, wages, `Buy`/`Sell` actions, posted prices on `WorldObject`s. A shop's price is a function of its stock (`base·exp(elasticity·(target−stock))`) and is written back to the shelf after every transaction; a seller receives `ShopBuyBackFraction` of the ask, so a buy-and-resell round trip loses money. A shop counter (`ShopCounterFactory`) keeps trading after its shelf empties. Food chain: `Produce`→`Process`→carry→`Eat`/`EatStored`; producing occupations work it on shift. See the known calibration gap in `docs/todo-list.md`. |
+| **Social Comparison** | — | Contrast/assimilation against comparison targets; benign/malicious envy; downward mood repair. Upward contrast stops lowering self-esteem at a floor, so the comparison loop cannot spiral to zero. |
 
 ### Supporting social systems
 
@@ -340,8 +340,9 @@ not loaded at runtime and can lag behind the live files). World and astronomy co
 
 Active `Characters:*` sections include: `Physiology`, `MenstrualCycle`, `Psychology`, `Behavior`,
 `Sleep`, `Interactions`, `Relationships`, `Memory`, `SemanticMemory`, `Goals`, `DailySchedule`,
-`Values`, `SelfConcept`, `Interests`, `Bereavement`, `Status`, `Economy`, `Lod` (decision cadence per
-LOD tier), `Fidelity` (memory/perception/social fidelity per tier).
+`Values`, `SelfConcept`, `Interests`, `SocialComparison`, `Bereavement`, `Status`, `Lod` (decision cadence per
+LOD tier), `Fidelity` (memory/perception/social fidelity per tier). Economy lives in its own
+`appsettings.Economy.json` under `Economy:*` (prices, wages, starting wealth, `ShopBuyBackFraction`).
 
 `World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude & thermal lag),
 `Universe` (full star/planet/moon/ring definition), and `Calendar` (cultural overlay: month count,
