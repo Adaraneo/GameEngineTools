@@ -11,8 +11,8 @@ public static class StreamPowerErosion
         double M = 0.5,
         /// <summary>⚠ Design simplification (not literature consensus): n=1 enables the closed-form implicit update; Harel, Mudd &amp; Attal (2016), Geomorphology 268:184-196 report n&gt;1 in many settings.</summary>
         double N = 1.0,
-        /// <summary>Erodibility (m=0.5, so units 1/yr). Source: Whipple &amp; Tucker (1999) put K at ~1e-6 to 1e-5 for m=0.5; real K spans ~5 orders of magnitude by lithology (Stock &amp; Montgomery 1999) — see Stage 2. Calibrated so the strongest collision on the Vigilia Insectianis plates peaks near 7 km (the old Cordonnier et al. 2016 value 5.61e-7 gave 130 km).</summary>
-        double K = 1e-5,
+        /// <summary>Erodibility (m=0.5, so units 1/yr). Source: Whipple &amp; Tucker (1999) put K at ~1e-6 to 1e-5 for m=0.5; real K spans ~5 orders of magnitude by lithology (Stock &amp; Montgomery 1999) — see Stage 2. Calibrated (with the 200 km uplift belt, rock-type compression, isostasy-net uplift and the 0.7 slope cap) so a 300 km window on the strongest Vigilia Insectianis collision peaks near 8 km (the old Cordonnier et al. 2016 value 5.61e-7 gave 130+ km).</summary>
+        double K = 3e-5,
         /// <summary>Source: Cordonnier et al. (2016) report 100-300 iterations to convergence.</summary>
         int Iterations = 200,
         /// <summary>Source: Cordonnier et al. (2016).</summary>
@@ -20,7 +20,9 @@ public static class StreamPowerErosion
         /// <summary>Hillslope (Culling 1963, "Soil creep and the development of hillside slopes") linear diffusion coefficient — the missing term that keeps a ridge/interfluve cell (near-zero drainage area, so the fluvial K·A^m·S^n term above is itself near zero) from climbing under sustained uplift for the whole run with essentially nothing to check it. Source: Fernandes &amp; Dietrich (1997), Water Resour. Res. 33(6):1307-1318 — typical soil-mantled hillslopes span ~0.001-0.01 m²/yr; 0 disables it (pre-existing, unbounded-ridge behavior). Applied scaled DOWN by drainage area (see <see cref="HillslopeDiffusionReferenceCellCount"/>) — applying it unweighted also smooths CHANNEL cells, which measurably raises the whole landscape instead of just capping ridges: diffusion pulls a channel's downstream receiver up, weakening the fluvial term's own pull toward it.</summary>
         double HillslopeDiffusivityM2PerYear = 0.01,
         /// <summary>Upstream cell count (dimensionless, not area) at which a cell is considered "channelized" enough that hillslope diffusion should mostly defer to the fluvial term above — <see cref="HillslopeDiffusivityM2PerYear"/> is scaled by <c>this / (this + accumulation)</c>, so it's near-full strength on a true ridge/interfluve (accumulation ≈ 0-1) and fades out well before a cell has enough drainage to count as a real channel. ⚠ Design simplification, not a literature-derived channelization threshold — tune to taste.</summary>
-        double HillslopeDiffusionReferenceCellCount = 25.0);
+        double HillslopeDiffusionReferenceCellCount = 25.0,
+        /// <summary>Largest drop-per-distance between a cell and its receiver — the strength limit on hillslopes (rock fails by landsliding well before slopes steepen without bound, while linear diffusion alone lets a ridge climb ~U·L²/2D, i.e. hundreds of km under a 10 mm/yr uplift). Source: Schmidt &amp; Montgomery (1995), Science 270:617-620, "Limits to relief" — rock-strength-limited slopes of ~30-40°. 0 disables.</summary>
+        double MaxHillslopeGradient = 0.7);
 
     /// <summary>Empirical lower bound on tectonic uplift rate. Source: McGrath et al. (2025).</summary>
     public const double MinUpliftMmPerYear = 0.5;
@@ -83,9 +85,16 @@ public static class StreamPowerErosion
                 var k = erodibilityPerCell?[idx] ?? p.K;
                 var coeff = dt * k * Math.Pow(areaM2, p.M) / distance;
 
-                var upliftTerm = dt * upliftMetersPerYear[idx];
+                // The empirical uplift rates are NET rock uplift, i.e. already include isostatic rebound; the explicit rebound feedback below
+                // adds ρc/ρm of every eroded metre back, so the forcing here is only the uncompensated remainder (else steady-state erosion
+                // is 1/(1-ρc/ρm) ≈ 5× the nominal uplift and relief is hundreds of km).
+                var upliftScale = isostasyParams is null ? 1.0 : 1.0 - (crustDensityPerCell?[idx] ?? isostasyParams.DefaultCrustDensityKgM3) / isostasyParams.MantleDensityKgM3;
+                var upliftTerm = dt * upliftMetersPerYear[idx] * upliftScale;
                 var upliftOnlyHeight = grid.Values[idx] + upliftTerm;
                 var newHeight = (upliftOnlyHeight + coeff * grid.Values[next]) / (1.0 + coeff);
+                // The receiver is already final this iteration (lowest-first order), so capping against it bounds every cell's own slope.
+                if (p.MaxHillslopeGradient > 0.0)
+                    newHeight = Math.Min(newHeight, grid.Values[next] + p.MaxHillslopeGradient * distance);
                 // Check the FLOAT this actually gets stored as, not the double — a huge-but-finite
                 // double (e.g. 3.6e38) silently overflows to float.PositiveInfinity on narrowing,
                 // which double.IsFinite alone would miss for at least one extra iteration.

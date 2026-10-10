@@ -56,13 +56,19 @@ public static class RockLayer
     }
 
     /// <summary>Looks up each cell's <see cref="RockProperties.ErodibilityK"/> from <see cref="RockPropertiesTable"/> — the array <see cref="StreamPowerErosion.Erode"/> consumes in place of its scalar <see cref="StreamPowerErosion.Parameters.K"/>.</summary>
-    public static double[] ErodibilityKPerCell(RockType[] rockTypes)
+    public static double[] ErodibilityKPerCell(RockType[] rockTypes, double referenceK = TableReferenceK, double compression = 1.0)
     {
         var result = new double[rockTypes.Length];
         for (var i = 0; i < rockTypes.Length; i++)
-            result[i] = RockPropertiesTable.Values[rockTypes[i]].ErodibilityK;
+            result[i] = referenceK * Math.Pow(RockPropertiesTable.Values[rockTypes[i]].ErodibilityK / TableReferenceK, compression);
         return result;
     }
+
+    /// <summary>Table K (gneiss, mid-table) that maps to the caller's own reference K.</summary>
+    public const double TableReferenceK = 7.5e-6;
+
+    /// <summary>⚠ Design simplification: exponent applied to each rock's K relative to <see cref="TableReferenceK"/>. The table spans 5 decades (Stock &amp; Montgomery 1999 — resistance across ALL lithologies and climates); used verbatim, quartzite/granite (K ≤ 2e-6) barely erode under 5-13 mm/yr uplift and relief grows to hundreds of km. 0.4 compresses that to ~2 decades (quartzite ≈ 0.18×, schist ≈ 18× the reference K).</summary>
+    public const double ErodibilityCompression = 0.4;
 
     /// <summary>Looks up each cell's <see cref="RockProperties.DensityKgM3"/> — Task 3.1.2's reuse of this table for <see cref="Isostasy"/>'s crustal-side density instead of a second hardcoded constant.</summary>
     public static double[] DensityPerCell(RockType[] rockTypes)

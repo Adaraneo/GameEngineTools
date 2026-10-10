@@ -42,6 +42,16 @@ public class RockLayerTests
     }
 
     [TestMethod]
+    public void ErodibilityKPerCell_Compressed_KeepsReferenceRockAtCallersKAndNarrowsSpread()
+    {
+        var k = RockLayer.ErodibilityKPerCell(new[] { RockType.Gneiss, RockType.Quartzite, RockType.Schist }, referenceK: 1e-5, compression: 0.4);
+
+        Assert.AreEqual(1e-5, k[0], 1e-12, "Gneiss is the table's reference rock and must get the caller's K unchanged.");
+        Assert.IsTrue(k[1] < k[0] && k[2] > k[0]);
+        Assert.IsTrue(k[2] / k[1] < 1e3, $"Spread {k[2] / k[1]:G3} should be ~2 decades, not the table's 5.");
+    }
+
+    [TestMethod]
     public void Erode_WithoutErodibilityOverride_MatchesScalarKBehavior()
     {
         // Byte-identical-when-disabled regression: passing erodibilityPerCell: null must behave

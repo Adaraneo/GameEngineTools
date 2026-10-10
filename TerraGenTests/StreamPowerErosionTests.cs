@@ -59,7 +59,7 @@ public class StreamPowerErosionTests
 
         var diagnostics = new List<string>();
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            StreamPowerErosion.Erode(grid, new StreamPowerErosion.Parameters(Iterations: 5), uplift, onDiagnostic: diagnostics.Add));
+            StreamPowerErosion.Erode(grid, new StreamPowerErosion.Parameters(Iterations: 5, MaxHillslopeGradient: 0.0), uplift, onDiagnostic: diagnostics.Add));
 
         StringAssert.Contains(ex.Message, "non-finite");
         Assert.IsTrue(diagnostics.Count > 0, "Expected the diagnostic callback to fire before the exception was thrown.");
@@ -103,7 +103,7 @@ public class StreamPowerErosionTests
     public void Erode_DoublingUplift_RoughlyDoublesSteadyStateMaxRelief()
     {
         const int size = 20;
-        var p = new StreamPowerErosion.Parameters(M: 0.5, N: 1.0, K: 5.61e-7, Iterations: 400, TimestepYears: 2.5e5);
+        var p = new StreamPowerErosion.Parameters(M: 0.5, N: 1.0, K: 5.61e-7, Iterations: 400, TimestepYears: 2.5e5, MaxHillslopeGradient: 0.0);
 
         double RunToSteadyState(double upliftMetersPerYear)
         {
@@ -147,5 +147,22 @@ public class StreamPowerErosionTests
             Assert.IsTrue(Math.Abs(u) <= maxAbsMeters + 1e-9,
                 $"Uplift {u} m/yr exceeds the clamped empirical bound of ±{maxAbsMeters} m/yr.");
         }
+    }
+    [TestMethod]
+    public void Erode_HillslopeGradientCap_LimitsReliefUnderStrongUplift()
+    {
+        double MaxHeight(double cap)
+        {
+            var grid = new TerrainHeightmap("cap", 0, 0, 50.0, 40, 40, new float[40 * 40]);
+            var uplift = Enumerable.Repeat(0.01, 40 * 40).ToArray(); // 10 mm/yr
+            StreamPowerErosion.Erode(grid, new StreamPowerErosion.Parameters(Iterations: 40, HillslopeDiffusivityM2PerYear: 0, MaxHillslopeGradient: cap), uplift);
+            return grid.Values.Max();
+        }
+
+        var uncapped = MaxHeight(0.0);
+        var capped = MaxHeight(0.7);
+
+        Assert.IsTrue(capped < uncapped * 0.5, $"Expected the slope cap to bound relief — uncapped {uncapped:F0} m, capped {capped:F0} m.");
+        Assert.IsTrue(capped < 0.7 * 50.0 * 40, $"Capped max height {capped:F0} m exceeds cap x grid extent.");
     }
 }

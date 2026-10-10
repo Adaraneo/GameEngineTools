@@ -334,7 +334,7 @@ public static class TileGenerator
                 if (s.RockTypeParams is { } rockTypeParams)
                 {
                     var rockTypes = RockLayer.ComputeRockTypeMap(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters, rockTypeParams);
-                    erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes);
+                    erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes, spimParams.K, RockLayer.ErodibilityCompression);
                     crustDensityPerCell = RockLayer.DensityPerCell(rockTypes);
                     // Fixed [0,8] range (not auto min/max) so the same shade always means the same rock type across chunks/runs.
                     WriteDebugLayer("3_rocktype", rockTypes.Select(t => (float)(int)t).ToArray(), 0f, 8f);
@@ -548,7 +548,7 @@ public static class TileGenerator
                     if (s.RockTypeParams is { } rockTypeParams)
                     {
                         var rockTypes = RockLayer.ComputeRockTypeMap(padded, plates, refLatDeg, refLonDeg, s.PlanetRadiusMeters, rockTypeParams);
-                        erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes);
+                        erodibilityPerCell = RockLayer.ErodibilityKPerCell(rockTypes, spimParams.K, RockLayer.ErodibilityCompression);
                         crustDensityPerCell = RockLayer.DensityPerCell(rockTypes);
                     }
                     // Computed ONCE against the pre-SPIM (landmass-only) terrain — see Erode's remarks on precipitationWeightPerCell.

@@ -5,7 +5,7 @@ public static class Isostasy
 {
     public sealed record Parameters(
         /// <summary>How often (in SPIM iterations) accumulated eroded height converts into a direct isostatic rebound height added back into the terrain — exposed rather than hardcoded per the plan's requirement.</summary>
-        int RecomputeIntervalIterations = 10,
+        int RecomputeIntervalIterations = 1,
         /// <summary>Source: Lillie (1999) standard mantle density.</summary>
         double MantleDensityKgM3 = 3300.0,
         /// <summary>Used only where no per-cell crust density (<c>RockLayer.DensityPerCell</c>) is supplied. Source: Lillie (1999) standard continental crust density.</summary>
