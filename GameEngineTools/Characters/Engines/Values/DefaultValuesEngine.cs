@@ -273,6 +273,7 @@ namespace GameEngineTools.Characters.Engines.Values
 
         private static void ApplyNudgeInternal(double[] arr, int idx, double delta, ValuesConfig cfg)
         {
+            delta *= delta >= 0.0 ? 1.0 - arr[idx] : arr[idx]; // headroom-scaled: no hard clamp at the poles
             arr[idx] = Math.Clamp(arr[idx] + delta, 0.0, 1.0);
 
             var opposite = (idx + 5) % Dim;

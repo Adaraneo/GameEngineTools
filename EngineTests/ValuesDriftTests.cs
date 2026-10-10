@@ -317,8 +317,8 @@ namespace EngineTests
                     ctx, new EventCollector());
 
             var afterSameDay = engine.State.Current.SelfDirection;
-            Assert.AreEqual(0.02, afterSameDay - before, 1e-9,
-                "Cooldown must cap same-day affirmations of one dimension to a single LearningRate nudge.");
+            Assert.AreEqual(0.02 * (1.0 - before), afterSameDay - before, 1e-9,
+                "Cooldown must cap same-day affirmations of one dimension to a single headroom-scaled LearningRate nudge.");
 
             // Once the cooldown window elapses, the dimension can be affirmed again.
             var later = now + WTimeSpan.FromDays(2);
@@ -329,6 +329,22 @@ namespace EngineTests
         }
 
         #endregion Test 7 — per-dimension cooldown caps same-day affirmations (saturation fix)
+
+        [TestMethod]
+        public void ValuesReinforcement_ShrinksNearThePole_AndNeverPinsTheClamp()
+        {
+            var cfg = new ValuesConfig();
+            var profile = new[] { 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 };
+            var firstStep = DefaultValuesEngine.ApplyReinforcement(profile, 0, 0.02, cfg)[0] - profile[0];
+
+            var arr = profile;
+            for (var i = 0; i < 400; i++)
+                arr = DefaultValuesEngine.ApplyReinforcement(arr, 0, 0.02, cfg);
+            var lateStep = DefaultValuesEngine.ApplyReinforcement(arr, 0, 0.02, cfg)[0] - arr[0];
+
+            Assert.IsTrue(arr[0] < 1.0, "Repeated affirmation approaches the pole but never pins it.");
+            Assert.IsTrue(lateStep < firstStep * 0.1, $"Near the pole a nudge must be far smaller (first {firstStep:F4}, late {lateStep:F6}).");
+        }
 
         #region Helpers
 

@@ -123,7 +123,7 @@ namespace GameEngineTools.Characters.Engines.Interests
             var gain = Config.LearningRate * learnMult;
 
             var cur = ToArray(State.Current);
-            cur[dim] = Math.Clamp(cur[dim] + gain, 0.0, 1.0);
+            cur[dim] = Math.Clamp(cur[dim] + gain * (1.0 - cur[dim]), 0.0, 1.0); // headroom-scaled: approaches 1 instead of pinning
             State = State with { Current = FromArray(cur) };
         }
 

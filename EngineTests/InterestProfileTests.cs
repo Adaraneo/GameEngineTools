@@ -200,6 +200,22 @@ namespace EngineTests
 
         #endregion Test 6 — a genuinely rewarding moment still raises interest (regression guard)
 
+        [TestMethod]
+        public void InterestProfile_GainShrinksNearThePole_SoMoreFrequentRewardsEndHigherButNeverPin()
+        {
+            var (engine, ctx, self) = MakeEngine(Neutral(), valence: 0.6);
+            var steps = new List<double>();
+            for (var i = 0; i < 300; i++)
+            {
+                var before = engine.State.Current.Social;
+                engine.Handle(new ActionCommitted(At(100), self, ActionNames.ReachOut, WTimeSpan.FromHours(1)), ctx, new EventCollector());
+                steps.Add(engine.State.Current.Social - before);
+            }
+
+            Assert.IsTrue(engine.State.Current.Social < 1.0, "Interest approaches 1.0 but is not clamped to it.");
+            Assert.IsTrue(steps[^1] < steps[0] * 0.01, "A rewarded action near the pole barely moves the interest.");
+        }
+
         #region Helpers
 
         private static InterestProfile Neutral()
