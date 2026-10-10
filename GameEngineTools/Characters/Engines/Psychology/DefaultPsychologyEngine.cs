@@ -602,7 +602,9 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     ? Config.SerotoninMoodRecoveryDampening
                     : 1.0;
                 moodRecovery *= serotoninFactor;
-                s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * alloMoodDampFactor * h), 0, 100) };
+                // Proportional pull: MoodBaselineRecoveryPerHour is the step at a distance of 25, so it fades near 50 and cannot pin the extremes.
+                var moodPull = Math.Abs(50 - s.MoodBaseline) / 25.0;
+                s = s with { MoodBaseline = Math.Clamp(Approach(s.MoodBaseline, 50, moodRecovery * moodPull * alloMoodDampFactor * h), 0, 100) };
             }
 
             // Circadian rhythm — two Gaussian curves (morning + evening) with an afternoon dip.

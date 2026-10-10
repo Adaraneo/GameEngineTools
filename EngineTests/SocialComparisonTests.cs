@@ -47,6 +47,21 @@ namespace EngineTests
             Assert.AreEqual(0.0, r.AchievementMotivationDelta, 1e-9, "Pure contrast gives no inspiration.");
         }
 
+        [TestMethod]
+        public void Math_RepeatedUpwardContrast_CannotDriveSelfEsteemBelowTheFloor()
+        {
+            var esteem = 0.6;
+            for (var i = 0; i < 2000; i++)
+            {
+                var r = SocialComparisonMath.Evaluate(
+                    selfStanding: esteem * 100.0, targetStanding: 95, closeness: 15,
+                    neuroticism: 0.9, agreeableness: 0.5, selfEsteem: esteem, Cfg);
+                esteem = Math.Clamp(esteem + r.SelfEsteemDelta, 0.0, 1.0);
+            }
+
+            Assert.IsTrue(esteem >= Cfg.ContrastEsteemFloor - 1e-6, $"Esteem must settle at the floor, not collapse to 0 (got {esteem:F3}).");
+        }
+
         #endregion Math — contrast is the default upward response
 
         #region Math — assimilation requires attainability + identification

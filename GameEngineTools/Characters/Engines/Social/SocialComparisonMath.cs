@@ -122,7 +122,8 @@ namespace GameEngineTools.Characters.Engines.Social
                 return new SocialComparisonResult(
                     ComparisonDirection.Upward, ComparisonReaction.Contrast,
                     malicious ? ComparisonEnvy.Malicious : ComparisonEnvy.None,
-                    SelfEsteemDelta: -c.ContrastSelfEvalWeight * intensity * gapNorm,
+                    SelfEsteemDelta: -c.ContrastSelfEvalWeight * intensity * gapNorm
+                                     * Math.Clamp((selfEsteem - c.ContrastEsteemFloor) / Math.Max(1e-6, 1.0 - c.ContrastEsteemFloor), 0.0, 1.0),
                     MoodValenceDelta: -c.ContrastMoodDrop * intensity * gapNorm,
                     MoodBaselineDelta: -c.ContrastMoodBaselineDrop * intensity * gapNorm,
                     AchievementMotivationDelta: 0.0,

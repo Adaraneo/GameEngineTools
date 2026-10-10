@@ -57,7 +57,7 @@ namespace GameEngineTools.Characters.Engines.SelfConcept
             // Perceived self starts as the actual self; ideal subset is statically initialised
             // to the actual socially-relevant traits (the R6 life-transition hook shifts it later).
             // Self-esteem is seeded inversely from Neuroticism (high N → lower baseline esteem).
-            var esteem = Math.Clamp(0.55 - (bf.Neuroticism - 0.5) * 0.30, 0.0, 1.0);
+            var esteem = EsteemBaseline(bf.Neuroticism);
 
             var sc = new SelfConcept(
                 PerceivedOpenness: bf.Openness,
@@ -86,6 +86,13 @@ namespace GameEngineTools.Characters.Engines.SelfConcept
             var discrepancy = ComputeDiscrepancy(State);
             if (Math.Abs(discrepancy - State.SelfDiscrepancy) > 1e-9)
                 State = State with { SelfDiscrepancy = discrepancy };
+
+            var regress = Math.Clamp(Config.EsteemRegressionPerDay * Math.Max(0.0, dt.TotalDays), 0.0, 1.0);
+            if (regress > 0.0)
+            {
+                var baseline = EsteemBaseline(ctx.Personality.BigFive.Neuroticism);
+                State = State with { SelfEsteem = State.SelfEsteem + (baseline - State.SelfEsteem) * regress };
+            }
 
             if (discrepancy > Config.DiscrepancyThreshold && !HasActiveBuildIdentity(ctx))
             {
@@ -238,6 +245,8 @@ namespace GameEngineTools.Characters.Engines.SelfConcept
         #endregion Feedback handling
 
         #region Helpers
+
+        private static double EsteemBaseline(double neuroticism) => Math.Clamp(0.55 - (neuroticism - 0.5) * 0.30, 0.0, 1.0);
 
         private static double ComputeDiscrepancy(SelfConcept s)
             => (Math.Abs(s.IdealExtraversion - s.PerceivedExtraversion)

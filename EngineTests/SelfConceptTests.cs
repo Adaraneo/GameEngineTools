@@ -208,6 +208,19 @@ namespace EngineTests
 
         private static WDateTime At(int year) => WDateOnly.New(year, 1, 1).ToDateTime();
 
+        [TestMethod]
+        public void Tick_SelfEsteem_RegressesTowardItsPersonalityBaseline()
+        {
+            var (engine, ctx, _) = MakeEngine(new SelfConceptConfig());
+            var baseline = engine.State.SelfEsteem;
+            engine.RestoreState(engine.State with { SelfEsteem = 0.1 });
+
+            engine.Tick(At(100), WTimeSpan.FromDays(30), ctx, new EventCollector());
+
+            Assert.IsTrue(engine.State.SelfEsteem > 0.1 + 0.3 * (baseline - 0.1), $"Esteem must recover toward {baseline:F2} (got {engine.State.SelfEsteem:F3}).");
+            Assert.IsTrue(engine.State.SelfEsteem <= baseline + 1e-9, "Regression never overshoots the baseline.");
+        }
+
         private InteractionOutcome Accepted(HumanId self)
             => new(At(100), self, new HumanId(Guid.NewGuid()), Accepted: true, "ok", RelationalActKind.SmallTalk);
 

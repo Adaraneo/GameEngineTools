@@ -97,7 +97,14 @@ namespace GameEngineTools.Characters.Engines.Social
         /// Sources: van de Ven (2009); Lange &amp; Crusius (2015) — dark-core amplifies the antagonistic
         /// (malicious) envy branch. Default 0.0 ⇒ no change ⇒ existing tests stay green.
         /// </summary>
-        double DarkCoreMaliciousAmplification = 0.5)
+        double DarkCoreMaliciousAmplification = 0.5,
+
+        // ── Self-esteem floor for contrast ─────────────────────────────────────
+        /// <summary>
+        /// Self-esteem at which upward contrast stops lowering it: the drop scales with <c>(esteem − floor) / (1 − floor)</c>,
+        /// so the self-esteem → standing → gap feedback loop cannot spiral to 0. Default 0.1.
+        /// </summary>
+        double ContrastEsteemFloor = 0.1)
     {
         /// <summary>Parameterless constructor required by DI options binding — all fields use defaults.</summary>
         public SocialComparisonConfig() : this(ComparisonCooldownDays: 0.5)

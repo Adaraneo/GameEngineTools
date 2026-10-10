@@ -44,11 +44,17 @@ namespace GameEngineTools.Characters.Engines.SelfConcept
         /// Minimum perceived-trait or esteem change before a <c>MetaperceptionUpdated</c> event
         /// is emitted. Default 0.01.
         /// </summary>
-        double MetaperceptionEmitThreshold = 0.01
+        double MetaperceptionEmitThreshold = 0.01,
+
+        /// <summary>
+        /// Fraction per day by which self-esteem relaxes toward its personality baseline (stable-trait mean reversion),
+        /// so repeated knocks fade between events. Default 0.02.
+        /// </summary>
+        double EsteemRegressionPerDay = 0.02
     )
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public SelfConceptConfig() : this(0.6, 0.15, 1.7, 0.08, 0.02, 0.35, 0.4, 0.01)
+        public SelfConceptConfig() : this(0.6, 0.15, 1.7, 0.08, 0.02, 0.35, 0.4, 0.01, 0.02)
         { }
     }
 }

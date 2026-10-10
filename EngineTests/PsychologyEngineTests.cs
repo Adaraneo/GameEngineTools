@@ -1120,6 +1120,22 @@ namespace EngineTests
         #region MoodBaseline — Phase 4
 
         [TestMethod]
+        public void Tick_MoodBaseline_RecoveryIsProportionalToTheDistanceFrom50()
+        {
+            double Recovered(double start)
+            {
+                var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+                engine.RestoreState(engine.State with { MoodBaseline = start });
+                engine.Tick(new WDateTime(0), WTimeSpan.FromHours(10), BuildContext(0.5), new EventCollector());
+                return Math.Abs(engine.State.MoodBaseline - start);
+            }
+
+            var far = Recovered(0);
+            var near = Recovered(40);
+            Assert.IsTrue(far > near * 3.0, $"Recovery from the extreme ({far:F2}) must be much faster than near 50 ({near:F2}).");
+        }
+
+        [TestMethod]
         public void Tick_MoodBaseline_DriftsToward50InNeutralConditions()
         {
             var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
