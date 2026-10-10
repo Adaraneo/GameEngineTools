@@ -20,9 +20,10 @@ public static class TectonicPlates
 
     /// <param name="BoundaryInfluence">0 deep inside a plate's own territory, growing toward 1 the
     /// closer a point sits to the Voronoi border with its nearest neighboring plate.</param>
+    /// <param name="BoundaryDistanceUnit">Euclidean distance (unit-sphere chord, multiply by the planet radius for metres) from the point to the bisector plane between its two nearest plates — an absolute distance, unlike <paramref name="BoundaryInfluence"/> which is relative to plate spacing (thousands of km).</param>
     /// <param name="ApproachRate">Signed closing speed between the two nearest plates (same arbitrary units as <see cref="Plate.VelX"/>) — positive=convergent, negative=divergent; consumed by <see cref="StreamPowerErosion"/>'s uplift-field mapping.</param>
     public readonly record struct BoundarySample(
-        int PlateId, bool IsContinental, BoundaryType Boundary, double BoundaryInfluence, double ApproachRate = 0.0);
+        int PlateId, bool IsContinental, BoundaryType Boundary, double BoundaryInfluence, double ApproachRate = 0.0, double BoundaryDistanceUnit = double.MaxValue);
 
     /// <summary>
     /// Builds <paramref name="count"/> plates for <paramref name="seed"/> — pure function of those
@@ -132,7 +133,8 @@ public static class TectonicPlates
                 : BoundaryType.Transform;
         }
 
-        return new BoundarySample(nearest.Id, nearest.IsContinental, boundary, influence, approach);
+        var boundaryDistance = connLen > 1e-9 ? Math.Max(0.0, (secondDist - nearestDist) / (2.0 * connLen)) : double.MaxValue;
+        return new BoundarySample(nearest.Id, nearest.IsContinental, boundary, influence, approach, boundaryDistance);
     }
 
     /// <summary>Orthonormal (tangent, bitangent) basis at a unit-sphere point — used to build a

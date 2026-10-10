@@ -62,8 +62,19 @@ public class TileGeneratorChunkedSpimTests
         try
         {
             var noiseParams = new PlanetNoise.Parameters(Seed: 77, AmplitudeMeters: 400.0, TectonicPlateCount: 4);
+            // The uplift belt is only a few hundred km wide, so the region must sit ON a convergent boundary to have any uplift for SPIM to erode.
+            var plates = TectonicPlates.Generate(77, 4);
+            double lat0 = 0, lon0 = 0, bestDistance = double.MaxValue;
+            for (var la = -80.0; la <= 80; la += 0.5)
+                for (var lo = -179.0; lo <= 179; lo += 0.5)
+                {
+                    var (px, py, pz) = PlanetNoise.LatLonToUnitVector(la, lo);
+                    var b = TectonicPlates.Sample(plates, px, py, pz);
+                    if (b.Boundary == TectonicPlates.BoundaryType.Convergent && b.BoundaryDistanceUnit < bestDistance)
+                        (bestDistance, lat0, lon0) = (b.BoundaryDistanceUnit, la, lo);
+                }
             var baseSettings = new TileGenerator.RunSettings(
-                LatMin: 0.0, LatMax: 0.014, LonMin: 0.0, LonMax: 0.014,
+                LatMin: lat0, LatMax: lat0 + 0.014, LonMin: lon0, LonMax: lon0 + 0.014,
                 TileSizeMeters: 200.0, CellSizeMeters: 10.0,
                 NoiseParams: noiseParams,
                 ErosionParams: new TileErosion.Parameters(Seed: 77, DropletCount: 0),

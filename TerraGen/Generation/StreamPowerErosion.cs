@@ -11,8 +11,8 @@ public static class StreamPowerErosion
         double M = 0.5,
         /// <summary>⚠ Design simplification (not literature consensus): n=1 enables the closed-form implicit update; Harel, Mudd &amp; Attal (2016), Geomorphology 268:184-196 report n&gt;1 in many settings.</summary>
         double N = 1.0,
-        /// <summary>Erodibility. Source: Cordonnier et al. (2016), Computer Graphics Forum 35(2):165-175 — representative mid-range value; real K spans ~5 orders of magnitude by lithology (Stock &amp; Montgomery 1999) — see Stage 2.</summary>
-        double K = 5.61e-7,
+        /// <summary>Erodibility (m=0.5, so units 1/yr). Source: Whipple &amp; Tucker (1999) put K at ~1e-6 to 1e-5 for m=0.5; real K spans ~5 orders of magnitude by lithology (Stock &amp; Montgomery 1999) — see Stage 2. Calibrated so the strongest collision on the Vigilia Insectianis plates peaks near 7 km (the old Cordonnier et al. 2016 value 5.61e-7 gave 130 km).</summary>
+        double K = 1e-5,
         /// <summary>Source: Cordonnier et al. (2016) report 100-300 iterations to convergence.</summary>
         int Iterations = 200,
         /// <summary>Source: Cordonnier et al. (2016).</summary>
@@ -30,6 +30,9 @@ public static class StreamPowerErosion
 
     /// <summary>⚠ Design simplification: TectonicPlates' relative-velocity magnitude is a dimensionless sim unit, not m/yr — this is the approach-rate value at which uplift saturates at MaxUpliftMmPerYear (tuned so a typical strong convergent boundary sits near the top of the empirical range).</summary>
     private const double ApproachRateAtMaxUplift = 1.5;
+
+    /// <summary>Gaussian 1/e half-width of the uplift belt around a plate boundary. ⚠ Design simplification: real orogens are a few hundred km wide (Himalaya/Andes ~200-400 km) — the previous relative-to-plate-spacing falloff made the belt thousands of km wide, i.e. uplift over whole continents, which no erosion rate can balance.</summary>
+    public const double BeltHalfWidthMeters = 200_000.0;
 
     /// <summary>Erodes <paramref name="grid"/> in place by running <see cref="Parameters.Iterations"/> implicit SPIM timesteps. <paramref name="locked"/> (same convention as <see cref="TileErosion.Erode"/>) marks cells read but never written. <paramref name="erodibilityPerCell"/> (Stage 2, <see cref="RockLayer"/>) overrides the scalar <see cref="Parameters.K"/> per cell when given — null keeps the single global K, byte-identical to Stage 1. <paramref name="isostasyParams"/> (Stage 3.1) turns on the erosion→unloading→rebound feedback loop — when set, accumulated erosional height loss is added DIRECTLY back into <paramref name="grid"/>'s own elevation every recompute interval (a one-time state correction, not a permanent addition to <paramref name="upliftMetersPerYear"/> — the latter compounded without bound across iterations in an earlier version of this method and produced runaway +Infinity terrain); null keeps Stage 1/2 behavior, byte-identical. <paramref name="precipitationWeightPerCell"/> (Stage 4, <see cref="OrographicPrecipitation"/>) replaces bare cell-count drainage area with a precipitation-weighted accumulation computed ONCE up front against the terrain <paramref name="grid"/> has at the moment <see cref="Erode"/> is called (a static-climate approximation — recomputing the FFT every iteration would multiply SPIM's own already-heavy cost by <see cref="Parameters.Iterations"/> for a second-order feedback); null keeps the unweighted D8 count, byte-identical to Stages 1-3. <paramref name="onDiagnostic"/> receives one line right before a fail-fast <see cref="InvalidOperationException"/> if any solved height ever comes out non-finite — the exact cell/iteration/parameter dump, instead of that NaN silently propagating into a cryptic crash somewhere downstream (e.g. TileErosion). <paramref name="onIterationProgress"/> fires once per completed iteration with (iter+1, Parameters.Iterations) — a single Erode call can run 100-200 iterations over a large combined chunk grid, so this is what lets a caller show real progress instead of the call just appearing to hang.</summary>
     public static void Erode(TerrainHeightmap grid, Parameters p, double[] upliftMetersPerYear, bool[]? locked = null,
@@ -212,7 +215,8 @@ public static class StreamPowerErosion
                 var (lat, lon) = PlanetNoise.OffsetToLatLon(worldX, worldY, refLatDeg, refLonDeg, planetRadiusMeters);
                 var (px, py, pz) = PlanetNoise.LatLonToUnitVector(lat, lon);
                 var boundary = TectonicPlates.Sample(plates, px, py, pz);
-                var belt = Math.Pow(boundary.BoundaryInfluence, 3.0); // same cubing PlanetNoise.SampleCombined uses so uplift reads as a band near the boundary line
+                var distanceMeters = boundary.BoundaryDistanceUnit * planetRadiusMeters;
+                var belt = Math.Exp(-(distanceMeters * distanceMeters) / (BeltHalfWidthMeters * BeltHalfWidthMeters));
 
                 var upliftMmPerYear = boundary.Boundary switch
                 {
