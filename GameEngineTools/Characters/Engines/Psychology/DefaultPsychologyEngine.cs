@@ -614,10 +614,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                 // The curve below is written for a 24-hour clock; convert so it keeps the same shape on any day length.
                 var hoursOfDay = WWorld.Spec.ToClock24(now.Hour % WWorld.Spec.HoursPerDay);
                 var phaseShift = WWorld.Spec.ToClock24(ph.CircadianPhaseShiftHours);
-                var morningPeak = 0.35 * Math.Exp(-Math.Pow(hoursOfDay - 10.0 - phaseShift, 2) / 16.0);  // σ²=8, peak 10h ± posun
-                var eveningPeak = 0.25 * Math.Exp(-Math.Pow(hoursOfDay - 19.0 - phaseShift, 2) / 12.0);  // σ²=6, peak 19h ± posun
-                var lunchDip = 0.20 * Math.Exp(-Math.Pow(hoursOfDay - 15.0 - phaseShift, 2) / 3.0);   // σ²=1.5, dip 15h ± posun
-                var baseArousal = Math.Clamp(0.60 + morningPeak + eveningPeak - lunchDip, 0.40, 0.95);
+                var c = Config;
+                var morningPeak = c.CircadianMorningPeakAmplitude * Math.Exp(-Math.Pow(hoursOfDay - c.CircadianMorningPeakHour - phaseShift, 2) / (2.0 * c.CircadianMorningPeakVariance));
+                var eveningPeak = c.CircadianEveningPeakAmplitude * Math.Exp(-Math.Pow(hoursOfDay - c.CircadianEveningPeakHour - phaseShift, 2) / (2.0 * c.CircadianEveningPeakVariance));
+                var lunchDip = c.CircadianAfternoonDipDepth * Math.Exp(-Math.Pow(hoursOfDay - c.CircadianAfternoonDipHour - phaseShift, 2) / (2.0 * c.CircadianAfternoonDipVariance));
+                var baseArousal = Math.Clamp(c.CircadianBaseArousal + morningPeak + eveningPeak - lunchDip, c.CircadianArousalFloor, c.CircadianArousalCeiling);
                 var delta = (baseArousal - s.Arousal) * Config.CircadianInfluence * h;
                 s = s with { Arousal = Clamp01(s.Arousal + delta) };
             }

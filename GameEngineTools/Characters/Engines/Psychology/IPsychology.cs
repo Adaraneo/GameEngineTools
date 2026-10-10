@@ -347,7 +347,24 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// Valence the mood relaxes toward at <c>MoodBaseline</c> 0 / 100 (±this; 50 → 0): a persistently low mood baseline
         /// makes the resting valence negative, a high one positive. Default 0.15. Set 0 to relax to neutral as before.
         /// </summary>
-        double MoodValenceSetPointRange = 0.15)
+        double MoodValenceSetPointRange = 0.15,
+
+        /// <summary>
+        /// Circadian arousal curve (three Gaussian bumps over a base level). All hours are on a 24-hour clock and are converted
+        /// to the same fraction of the world day, so the shape follows the planet's day length. Variances are σ² in 24-clock hours.
+        /// </summary>
+        double CircadianBaseArousal = 0.60,
+        double CircadianMorningPeakHour = 10.0,
+        double CircadianMorningPeakAmplitude = 0.35,
+        double CircadianMorningPeakVariance = 8.0,
+        double CircadianEveningPeakHour = 19.0,
+        double CircadianEveningPeakAmplitude = 0.25,
+        double CircadianEveningPeakVariance = 6.0,
+        double CircadianAfternoonDipHour = 15.0,
+        double CircadianAfternoonDipDepth = 0.20,
+        double CircadianAfternoonDipVariance = 1.5,
+        double CircadianArousalFloor = 0.40,
+        double CircadianArousalCeiling = 0.95)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0, 0.57, 0.56, 0.42, 0.47, 0.25, 0.30, 0.5, 25.0, 4.0, 30, 20) { }

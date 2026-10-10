@@ -1431,6 +1431,26 @@ namespace EngineTests
                 $"Arousal at the morning peak ({morning.State.Arousal:F4}) must exceed the pre-dawn level ({earlier.State.Arousal:F4}) on a 40 h day.");
         }
 
+        [TestMethod]
+        public void Tick_CircadianRhythm_PeakHourComesFromConfig_AndStillFollowsTheDayLength()
+        {
+            UseDayLength(40);
+            PsychologyConfig Cfg(double morningPeakHour) => new(
+                BaselineAffectVariance: 0.0, StressRecoveryRatePerHour: 0.0, EnableCircadianRhythm: true, CircadianInfluence: 0.15,
+                CircadianMorningPeakHour: morningPeakHour);
+
+            // 06:00 on the 24 h clock is world hour 10 on a 40 h day.
+            double ArousalAtWorldHour10(double peak)
+            {
+                var engine = BuildEngine(initialValence: 0.0, initialStress: 0, cfg: Cfg(peak));
+                engine.Tick(WDateTime.New(116, 1, 1, 0) + WTimeSpan.FromHours(10), WTimeSpan.FromHours(0.1), BuildContext(neuroticism: 0.5), new EventCollector());
+                return engine.State.Arousal;
+            }
+
+            Assert.IsTrue(ArousalAtWorldHour10(6.0) > ArousalAtWorldHour10(10.0),
+                "Moving the configured morning peak to 06:00 must raise arousal at that clock time, on any day length.");
+        }
+
         #endregion CircadianRhythm — Phase 4
 
         #region NutritionEffectsOnPsychology — Phase 4
