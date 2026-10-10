@@ -55,6 +55,41 @@ public class TileGeneratorChunkedSpimTests
     }
 
     [TestMethod]
+    public void Run_DropletErosionEdgeTaper_RemovesTileBoundaryJump()
+    {
+        double Excess(int taperCells)
+        {
+            var dbPath = TempDbPath();
+            try
+            {
+                var settings = new TileGenerator.RunSettings(
+                    LatMin: -37.9, LatMax: -37.78, LonMin: 147.9, LonMax: 148.02,
+                    TileSizeMeters: 2000.0, CellSizeMeters: 50.0,
+                    NoiseParams: new PlanetNoise.Parameters(Seed: 77, AmplitudeMeters: 400.0),
+                    ErosionParams: new TileErosion.Parameters(Seed: 77),
+                    PlanetRadiusMeters: PlanetNoise.EarthRadiusMeters,
+                    ErosionEdgeTaperCells: taperCells);
+                using var db = new SqliteWorldDatabase(dbPath);
+                WorldDatabaseSeeder.InitializeTerrainDatabase(db);
+                var results = TileGenerator.Run(db, settings);
+                var cellsPerTile = (int)Math.Round(settings.TileSizeMeters / settings.CellSizeMeters);
+                var region = StitchRegion(db, results, cellsPerTile);
+                return MeanBoundaryExcessJump(region.Values, region.Width, region.Height, cellsPerTile);
+            }
+            finally
+            {
+                if (File.Exists(dbPath)) File.Delete(dbPath);
+            }
+        }
+
+        var withoutTaper = Excess(0);
+        var withTaper = Excess(6);
+        Assert.IsTrue(withoutTaper > 0, $"Test precondition: untapered droplet erosion should show a positive boundary jump (got {withoutTaper:G4}).");
+        Assert.IsTrue(withTaper < withoutTaper,
+            $"Expected the edge taper to reduce the droplet-erosion boundary jump — without={withoutTaper:G4}, with={withTaper:G4}.");
+    }
+
+    [TestMethod]
     public void Run_ChunkedSpim_ReducesTileBoundaryDiscontinuityVsPerTileSpim()
     {
         var dbPathPerTile = TempDbPath();

@@ -80,7 +80,9 @@ public static class TileGenerator
         /// <summary>1 (default) keeps SPIM chunks fully sequential — deliberately NOT tied to <see cref="MaxDegreeOfParallelism"/>, same reasoning as <see cref="HydrologyMaxDegreeOfParallelism"/>'s remarks: a chunk's combined grid is <see cref="SpimChunkTilesPerSide"/>² times a single tile's cost, and SPIM's own 100-200 iterations make that multiply further, so raise only with chunk size lowered to compensate or with memory headroom verified first.</summary>
         int SpimMaxDegreeOfParallelism = 1,
         /// <summary>Null (default, no cost) skips debug rendering entirely. Non-null writes one 16-bit grayscale PNG per intermediate SPIM layer (raw landmass, uplift, rock-type index, precipitation weight, final elevation, flow accumulation) per chunk to this directory via <see cref="PngHeightmapWriter"/> — for diagnosing a visual artifact by inspecting each layer in isolation instead of guessing which one produced it, without hand-writing a throwaway test every time. Only meaningful together with <see cref="SpimParams"/> and <see cref="SpimChunkTilesPerSide"/> &gt; 1 (the chunk pass); the per-tile fallback path (SpimChunkTilesPerSide == 1) does not render debug layers.</summary>
-        string? DebugRenderDirectory = null);
+        string? DebugRenderDirectory = null,
+        /// <summary>Width in cells of the band along each tile edge over which the droplet-erosion delta fades to zero — see the taper block in <see cref="GenerateOneTile"/>; 0 disables.</summary>
+        int ErosionEdgeTaperCells = 6);
 
     public sealed record TileResult(int Row, int Col, string Id, double CenterLatDeg, double CenterLonDeg);
 
@@ -532,8 +534,15 @@ public static class TileGenerator
                 // start-position sequence in every tile's own local coordinates -- an identical
                 // relative erosion texture repeating every tile, visible as a grid at any zoom.
                 var tileErosionParams = s.ErosionParams with { Seed = StableTileSeed(s.ErosionParams.Seed, row, col) };
+                var preErosion = (float[])padded.Values.Clone();
                 TileErosion.Erode(padded, tileErosionParams, locked);
 
+                // Droplet erosion against a locked margin behaves differently within a few cells of the
+                // tile edge than in the free interior, which showed up as a visible grid (boundary jump
+                // ~6x the interior one on a smooth ramp; vanishes with --erosion 0). Both tiles sharing an
+                // edge start from the same pre-erosion field, so fading the erosion delta to zero at the
+                // tile edge makes the seam continuous.
+                var edgeTaper = Math.Min(s.ErosionEdgeTaperCells, cellsPerTile / 2);
                 var interior = new float[cellsPerTile * cellsPerTile];
                 for (var iy = 0; iy < cellsPerTile; iy++)
                 {
@@ -541,7 +550,11 @@ public static class TileGenerator
                     for (var ix = 0; ix < cellsPerTile; ix++)
                     {
                         var px = ix + margin;
-                        interior[iy * cellsPerTile + ix] = padded.Values[py * paddedSize + px];
+                        var pIdx = py * paddedSize + px;
+                        var edgeDistance = Math.Min(Math.Min(ix, cellsPerTile - 1 - ix), Math.Min(iy, cellsPerTile - 1 - iy));
+                        var t = edgeTaper > 0 ? Math.Clamp(edgeDistance / (double)edgeTaper, 0.0, 1.0) : 1.0;
+                        var weight = (float)(t * t * (3.0 - 2.0 * t));
+                        interior[iy * cellsPerTile + ix] = preErosion[pIdx] + weight * (padded.Values[pIdx] - preErosion[pIdx]);
                     }
                 }
 
