@@ -277,8 +277,8 @@ internal sealed class CliOptions
     public bool Rivers { get; init; }
     /// <summary>Montgomery &amp; Dietrich (1992) area×slope² channel-initiation threshold, in m² —
     /// see <see cref="TerraGen.Generation.TileHydrology.Parameters.ChannelInitiationAreaSlopeSquaredThreshold"/>.
-    /// Default 2000 is the middle of that source's cited field-measured range [500, 4000].</summary>
-    public double RiverThreshold { get; init; } = 2000.0;
+    /// Default 100000: the source's field range [500, 4000] describes where a channel head first cuts in, but on the cap-steep (slope ~0.7) 50 m terrain SPIM produces it is met by a 2-cell catchment and paints 71% of cells as river (14 km/km²); 100000 gives ~2.7 km/km², the density of mapped blue-line streams.</summary>
+    public double RiverThreshold { get; init; } = 100000.0;
     /// <summary>See <see cref="TerraGen.Generation.TileGenerator.RunSettings.HydrologyChunkTilesPerSide"/>'s
     /// remarks — lower this if a large --lat-range/--lon-range batch throws the
     /// "would need a NxN combined grid" error, or raise it (at the cost of memory) if a smaller
@@ -375,7 +375,7 @@ internal sealed class CliOptions
                         [--db <cesta k terrain.db>, výchozí .\terrain.db v aktuální složce]
                         [--tile-km <velikost, výchozí 5>] [--cell-m <velikost buňky, výchozí 50>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
-                        [--rivers [--river-threshold <plocha×sklon² v m², výchozí 2000>]
+                        [--rivers [--river-threshold <plocha×sklon² v m², výchozí 100000>]
                                   [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
                         [--skip-existing] [--spim [--spim-chunk-tiles <dlaždic na stranu chunku, výchozí 0 = celý region>]
                                   [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí odvozeno ze šířky/rotace>]]]
@@ -420,9 +420,10 @@ internal sealed class CliOptions
             dokonale placaté rovině žádná. Jakmile řeka jednou vznikne, pokračuje dál i přes lokálně
             plošší/šumem zašuměné úseky (jinak by blikala — po erozi je terén na úrovni metrů šumový,
             takže čistě bodové vyhodnocení sklonu v každé buňce zvlášť řeku uprostřed koryta zbytečně
-            přerušuje). Výchozích 2000 je střed reálného rozsahu naměřeného přímo ve zdrojové studii,
-            A·S² ∈ [500, 4000] m² — re-tuň podle bioomu/klimatu stejně naživo jako předchozí lineární
-            model.
+            přerušuje). Výchozích 100000 je kalibrováno na hustotu ~2,7 km/km² (modré čáry
+            topografických map): zdrojová studie uvádí A·S² ∈ [500, 4000] m² pro vznik prvního
+            koryta, ale na strmých (sklon ~0,7) svazích z SPIM s buňkami 50 m ho splní už povodí o
+            2 buňkách a řekou by se stala většina plochy (71 % při 2000). Re-tuň podle bioomu/klimatu.
             Takhle spočtená D8 kostra ale sama o sobě teče geometricky rovně (v každé buňce vybírá
             jeden z 8 pevných směrů, žádná setrvačnost/boční eroze) — proto se na ni ještě aplikuje
             RiverMeander: boční výchylka podle sinusové křivky (Langbein &amp; Leopold 1966), jejíž
@@ -603,7 +604,7 @@ internal sealed class CliOptions
         var erosion = 50.0;
         int? tectonicPlateCount = null;
         var rivers = false;
-        var riverThreshold = 2000.0;
+        var riverThreshold = 100000.0;
         var riverChunkTiles = 20;
         var skipExisting = false;
         var spim = false;
