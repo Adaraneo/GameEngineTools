@@ -165,4 +165,25 @@ public class StreamPowerErosionTests
         Assert.IsTrue(capped < uncapped * 0.5, $"Expected the slope cap to bound relief — uncapped {uncapped:F0} m, capped {capped:F0} m.");
         Assert.IsTrue(capped < 0.7 * 50.0 * 40, $"Capped max height {capped:F0} m exceeds cap x grid extent.");
     }
+    [TestMethod]
+    public void Erode_StrongUpliftWithIsostasy_LeavesNoCellScaleSpikes()
+    {
+        const int n = 80;
+        var grid = new TerrainHeightmap("noise", 0, 0, 50.0, n, n, new float[n * n]);
+        var uplift = Enumerable.Repeat(0.01, n * n).ToArray(); // 10 mm/yr
+        var crust = Enumerable.Repeat(2700.0, n * n).ToArray();
+        StreamPowerErosion.Erode(grid, new StreamPowerErosion.Parameters(K: 3e-5, Iterations: 80), uplift,
+            isostasyParams: new Isostasy.Parameters(), crustDensityPerCell: crust);
+
+        var slopes = new List<double>();
+        for (var y = 1; y < n - 1; y++)
+            for (var x = 1; x < n - 1; x++)
+            {
+                var i = y * n + x;
+                slopes.Add(Math.Max(Math.Abs(grid.Values[i + 1] - grid.Values[i]), Math.Abs(grid.Values[i + n] - grid.Values[i])) / 50.0);
+            }
+        slopes.Sort();
+
+        Assert.IsTrue(slopes[(int)(slopes.Count * 0.99)] < 1.5, $"p99 cell-to-cell slope {slopes[(int)(slopes.Count * 0.99)]:F2} m/m — the 0.7 cap should keep it near that, not at tens.");
+    }
 }

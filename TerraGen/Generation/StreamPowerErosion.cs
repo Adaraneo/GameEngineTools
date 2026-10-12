@@ -22,7 +22,9 @@ public static class StreamPowerErosion
         /// <summary>Upstream cell count (dimensionless, not area) at which a cell is considered "channelized" enough that hillslope diffusion should mostly defer to the fluvial term above — <see cref="HillslopeDiffusivityM2PerYear"/> is scaled by <c>this / (this + accumulation)</c>, so it's near-full strength on a true ridge/interfluve (accumulation ≈ 0-1) and fades out well before a cell has enough drainage to count as a real channel. ⚠ Design simplification, not a literature-derived channelization threshold — tune to taste.</summary>
         double HillslopeDiffusionReferenceCellCount = 25.0,
         /// <summary>Largest drop-per-distance between a cell and its receiver — the strength limit on hillslopes (rock fails by landsliding well before slopes steepen without bound, while linear diffusion alone lets a ridge climb ~U·L²/2D, i.e. hundreds of km under a 10 mm/yr uplift). Source: Schmidt &amp; Montgomery (1995), Science 270:617-620, "Limits to relief" — rock-strength-limited slopes of ~30-40°. 0 disables.</summary>
-        double MaxHillslopeGradient = 0.7);
+        double MaxHillslopeGradient = 0.7,
+        /// <summary>Number of implicit solves per routing: each iteration re-routes once (the expensive sort + fill) and then walks the stack this many times with <c>TimestepYears / SubSteps</c>. One 250 ky step lifts a cell by U·dt ≈ 0.5-2.5 km in a single go, so with 1 the surface is left roughly an uplift step away from consistent with its own routing (hundreds of metres of cell-to-cell noise); smaller steps remove that without paying for a re-route each time.</summary>
+        int SubSteps = 6);
 
     /// <summary>Empirical lower bound on tectonic uplift rate. Source: McGrath et al. (2025).</summary>
     public const double MinUpliftMmPerYear = 0.5;
@@ -67,54 +69,63 @@ public static class StreamPowerErosion
 
             // Reverse of the accumulation order: lowest elevation first, so a node's receiver
             // (strictly lower, hence visited earlier here) already holds its updated height.
-            for (var i = stack.Length - 1; i >= 0; i--)
+            var subSteps = Math.Max(1, p.SubSteps);
+            var stepDt = dt / subSteps;
+            for (var sub = 0; sub < subSteps; sub++)
             {
-                var idx = stack[i];
-                if (locked is not null && locked[idx]) continue;
-
-                var next = downstream[idx];
-                if (next < 0) continue; // grid boundary treated as a fixed base level, same convention FlowRouting's own fill/drain logic uses
-
-                var idxX = idx % width;
-                var idxY = idx / width;
-                var nextX = next % width;
-                var nextY = next / width;
-                var distance = (nextX != idxX && nextY != idxY ? 1.4142135623730951 : 1.0) * cellSize;
-
-                var areaM2 = (weightedAccumulation?[idx] ?? accumulation[idx]) * cellAreaM2;
-                var k = erodibilityPerCell?[idx] ?? p.K;
-                var coeff = dt * k * Math.Pow(areaM2, p.M) / distance;
-
-                // The empirical uplift rates are NET rock uplift, i.e. already include isostatic rebound; the explicit rebound feedback below
-                // adds ρc/ρm of every eroded metre back, so the forcing here is only the uncompensated remainder (else steady-state erosion
-                // is 1/(1-ρc/ρm) ≈ 5× the nominal uplift and relief is hundreds of km).
-                var upliftScale = isostasyParams is null ? 1.0 : 1.0 - (crustDensityPerCell?[idx] ?? isostasyParams.DefaultCrustDensityKgM3) / isostasyParams.MantleDensityKgM3;
-                var upliftTerm = dt * upliftMetersPerYear[idx] * upliftScale;
-                var upliftOnlyHeight = grid.Values[idx] + upliftTerm;
-                var newHeight = (upliftOnlyHeight + coeff * grid.Values[next]) / (1.0 + coeff);
-                // The receiver is already final this iteration (lowest-first order), so capping against it bounds every cell's own slope.
-                if (p.MaxHillslopeGradient > 0.0)
-                    newHeight = Math.Min(newHeight, grid.Values[next] + p.MaxHillslopeGradient * distance);
-                // Check the FLOAT this actually gets stored as, not the double — a huge-but-finite
-                // double (e.g. 3.6e38) silently overflows to float.PositiveInfinity on narrowing,
-                // which double.IsFinite alone would miss for at least one extra iteration.
-                var newHeightF = (float)newHeight;
-
-                if (!float.IsFinite(newHeightF))
+                for (var i = stack.Length - 1; i >= 0; i--)
                 {
-                    var message = "SPIM diverged to a non-finite height — " +
-                        $"iter={iter}/{p.Iterations} cell=({idxX},{idxY}) receiver=({nextX},{nextY}) " +
-                        $"h_before={grid.Values[idx]:G9} h_receiver={grid.Values[next]:G9} " +
-                        $"uplift_m_per_yr={upliftMetersPerYear[idx]:G9} k={k:G9} accumulation_cells={accumulation[idx]} " +
-                        $"weighted_accumulation={(weightedAccumulation?[idx].ToString("G9") ?? "n/a")} areaM2={areaM2:G9} " +
-                        $"coeff={coeff:G9} uplift_only_height={upliftOnlyHeight:G9} new_height={newHeight:G9}";
-                    onDiagnostic?.Invoke(message);
-                    throw new InvalidOperationException(message);
+                    var idx = stack[i];
+                    if (locked is not null && locked[idx]) continue;
+
+                    var next = downstream[idx];
+                    if (next < 0) continue; // grid boundary treated as a fixed base level, same convention FlowRouting's own fill/drain logic uses
+
+                    var idxX = idx % width;
+                    var idxY = idx / width;
+                    var nextX = next % width;
+                    var nextY = next / width;
+                    var distance = (nextX != idxX && nextY != idxY ? 1.4142135623730951 : 1.0) * cellSize;
+
+                    var areaM2 = (weightedAccumulation?[idx] ?? accumulation[idx]) * cellAreaM2;
+                    var k = erodibilityPerCell?[idx] ?? p.K;
+                    var coeff = stepDt * k * Math.Pow(areaM2, p.M) / distance;
+
+                    // The empirical uplift rates are NET rock uplift, i.e. already include isostatic rebound; the explicit rebound feedback below
+                    // adds ρc/ρm of every eroded metre back, so the forcing here is only the uncompensated remainder (else steady-state erosion
+                    // is 1/(1-ρc/ρm) ≈ 5× the nominal uplift and relief is hundreds of km).
+                    var upliftScale = isostasyParams is null ? 1.0 : 1.0 - (crustDensityPerCell?[idx] ?? isostasyParams.DefaultCrustDensityKgM3) / isostasyParams.MantleDensityKgM3;
+                    var upliftTerm = stepDt * upliftMetersPerYear[idx] * upliftScale;
+                    var upliftOnlyHeight = grid.Values[idx] + upliftTerm;
+                    var newHeight = (upliftOnlyHeight + coeff * grid.Values[next]) / (1.0 + coeff);
+                    // The receiver is already final this iteration (lowest-first order), so capping against it bounds every cell's own slope.
+                    if (p.MaxHillslopeGradient > 0.0)
+                        newHeight = Math.Min(newHeight, grid.Values[next] + p.MaxHillslopeGradient * distance);
+                    // Check the FLOAT this actually gets stored as, not the double — a huge-but-finite
+                    // double (e.g. 3.6e38) silently overflows to float.PositiveInfinity on narrowing,
+                    // which double.IsFinite alone would miss for at least one extra iteration.
+                    var newHeightF = (float)newHeight;
+
+                    if (!float.IsFinite(newHeightF))
+                    {
+                        var message = "SPIM diverged to a non-finite height — " +
+                            $"iter={iter}/{p.Iterations} cell=({idxX},{idxY}) receiver=({nextX},{nextY}) " +
+                            $"h_before={grid.Values[idx]:G9} h_receiver={grid.Values[next]:G9} " +
+                            $"uplift_m_per_yr={upliftMetersPerYear[idx]:G9} k={k:G9} accumulation_cells={accumulation[idx]} " +
+                            $"weighted_accumulation={(weightedAccumulation?[idx].ToString("G9") ?? "n/a")} areaM2={areaM2:G9} " +
+                            $"coeff={coeff:G9} uplift_only_height={upliftOnlyHeight:G9} new_height={newHeight:G9}";
+                        onDiagnostic?.Invoke(message);
+                        throw new InvalidOperationException(message);
+                    }
+
+                    if (erodedHeightAccumulator is not null)
+                        erodedHeightAccumulator[idx] += Math.Max(0.0, upliftOnlyHeight - newHeight);
+                    grid.Values[idx] = newHeightF;
                 }
 
-                if (erodedHeightAccumulator is not null)
-                    erodedHeightAccumulator[idx] += Math.Max(0.0, upliftOnlyHeight - newHeight);
-                grid.Values[idx] = newHeightF;
+                // Per sub-step, not per iteration: a lump of rebound big enough to stand above its receiver gets re-cut by the slope cap and re-bounces.
+                if (erodedHeightAccumulator is not null && isostasyParams!.RecomputeIntervalIterations <= 1)
+                    ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams, iter, p.Iterations, onDiagnostic);
             }
 
             if (p.HillslopeDiffusivityM2PerYear > 0.0)
@@ -123,7 +134,7 @@ public static class StreamPowerErosion
 
             onIterationProgress?.Invoke(iter + 1, p.Iterations);
 
-            if (erodedHeightAccumulator is null) continue;
+            if (erodedHeightAccumulator is null || isostasyParams!.RecomputeIntervalIterations <= 1) continue;
             iterationsSinceRebound++;
             if (iterationsSinceRebound >= Math.Max(1, isostasyParams!.RecomputeIntervalIterations))
             {
