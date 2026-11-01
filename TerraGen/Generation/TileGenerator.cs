@@ -59,6 +59,8 @@ public static class TileGenerator
         int HydrologyChunkTilesPerSide = 20,
         /// <summary>Lowest Strahler order whose reaches are saved (<c>1</c> keeps everything). Default 2 drops headwater order-1 rills, which are ~55% of the river length on steep terrain — see <see cref="RiverMeander.DropReachesBelowOrder"/>.</summary>
         int RiverMinStrahlerOrder = 2,
+        /// <summary>Recomputes only the rivers of an already generated region: every tile must already be in the database, noise/SPIM/droplet erosion are skipped, and the river networks inside the region are replaced. Requires <see cref="HydrologyParams"/>; the region, tile size and cell size must match the original run.</summary>
+        bool RiversOnly = false,
         /// <summary>Off by default (always regenerate/overwrite). When true, a tile whose TileId already has a saved heightmap of the expected size skips noise+erosion and reuses the saved elevation; hydrology (if on) still reprocesses its whole chunk.</summary>
         bool SkipExisting = false,
         /// <summary>Null (default) keeps the existing ridged-noise mountain layer unchanged — see <see cref="StreamPowerErosion"/>. Non-null REPLACES it: each tile samples landmass only, then <see cref="StreamPowerErosion.Erode"/> builds relief from an uplift field derived from <see cref="TectonicPlates"/> (Task 1.2.4's confirmed integration mode), before droplet erosion runs as a fine-detail finishing pass. Runs once per <see cref="SpimChunkTilesPerSide"/>-tile chunk by default (see its remarks); <see cref="SpimChunkTilesPerSide"/> = 1 instead runs it per padded tile with the same erosion-margin neighbor-locking as <see cref="TileErosion"/> — a local-drainage approximation, not a whole-region solve, where a real basin wider than the margin is truncated at the tile's own padding.</summary>
@@ -223,7 +225,15 @@ public static class TileGenerator
             }
         }
 
-        if (s.SpimParams is { } chunkSpimParams && spimChunkTilesPerSide > 1)
+        if (s.RiversOnly)
+        {
+            if (s.HydrologyParams is null)
+                throw new InvalidOperationException("RiversOnly needs HydrologyParams (rivers enabled).");
+            var removed = db.DeleteRiverNetworksWithNodesIn(swX, swY, swX + cols * s.TileSizeMeters, swY + rows * s.TileSizeMeters);
+            ReportProgress($"rivers-only: odstraněno {removed} starých říčních sítí v oblasti");
+        }
+
+        if (!s.RiversOnly && s.SpimParams is { } chunkSpimParams && spimChunkTilesPerSide > 1)
             RunSpimChunkPass(chunkSpimParams);
 
         void RunSpimChunkPass(StreamPowerErosion.Parameters spimParams)
@@ -422,7 +432,10 @@ public static class TileGenerator
                 var (centerLat, centerLon) = TileCenter(row, col);
                 var id = TileId(s.NoiseParams.Seed, centerLat, centerLon);
 
-                if (s.SkipExisting && db.LoadHeightmap(id) is { } existing &&
+                if (s.RiversOnly && !(db.LoadHeightmap(id) is { } present && present.Width == cellsPerTile && present.Height == cellsPerTile))
+                    throw new InvalidOperationException($"--rivers-only: dlaždice {id} (řádek {row}, sloupec {col}) v databázi chybí nebo má jinou velikost — region, --tile-km a --cell-m musí odpovídat původnímu generování.");
+
+                if ((s.SkipExisting || s.RiversOnly) && db.LoadHeightmap(id) is { } existing &&
                     existing.Width == cellsPerTile && existing.Height == cellsPerTile)
                 {
                     ReportProgress($"[{row},{col}] {id}: přeskočeno, dlaždice už existuje");

@@ -795,6 +795,29 @@ namespace GameEngineTools.World.Data
             }
         }
 
+        /// <summary>Deletes every river network that has at least one node inside the given rectangle (world offset metres) — whole networks, not clipped — and returns how many were removed. Lets a re-run replace the rivers of a region even when its chunk grid (hence network ids) differs from the original run's.</summary>
+        public int DeleteRiverNetworksWithNodesIn(double minX, double minY, double maxX, double maxY)
+        {
+            lock (_sync)
+            {
+                var ids = new List<string>();
+                using (var cmd = CreateCommand("SELECT DISTINCT NetworkId FROM RiverNode WHERE X >= @x0 AND X <= @x1 AND Y >= @y0 AND Y <= @y1",
+                    ("@x0", minX), ("@x1", maxX), ("@y0", minY), ("@y1", maxY)))
+                using (var reader = cmd.ExecuteReader())
+                    while (reader.Read()) ids.Add(reader.GetString(0));
+
+                using var tx = _connection.BeginTransaction();
+                foreach (var id in ids)
+                {
+                    ExecuteNonQuery("DELETE FROM RiverNode WHERE NetworkId = @id", ("@id", id));
+                    ExecuteNonQuery("DELETE FROM RiverReach WHERE NetworkId = @id", ("@id", id));
+                    ExecuteNonQuery("DELETE FROM RiverOxbow WHERE NetworkId = @id", ("@id", id));
+                }
+                tx.Commit();
+                return ids.Count;
+            }
+        }
+
         /// <summary>Loads the river network saved under <paramref name="networkId"/>, or an empty
         /// network if nothing was ever saved for it.</summary>
         public RiverNetwork LoadRiverNetwork(string networkId)
