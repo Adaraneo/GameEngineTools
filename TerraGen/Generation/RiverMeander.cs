@@ -121,7 +121,11 @@ public static class RiverMeander
         /// <summary>UNCITED PLACEHOLDER stream-power threshold (W/m²); only the ω=ρ·g·Q·S/w form is sourced, not this number.</summary>
         double StreamPowerSuppressionThresholdWPerM2 = 300.0,
         /// <summary>UNCITED PLACEHOLDER discharge-per-contributing-area conversion (m/s), order-of-magnitude only.</summary>
-        double DischargePerContributingAreaM2 = 1e-8)
+        double DischargePerContributingAreaM2 = 1e-8,
+        /// <summary>A migrating point may not move onto terrain more than this many metres above its own backbone cell: the meander belt (up to 4 channel widths) is wider than the valley floor in steep V-shaped valleys, so unconstrained bends climb the valley walls (measured: river height median 48 m above the lowest cell within 3 cells, 72% of length &gt;20 m above it). 0 disables.</summary>
+        double MaxBankClimbMeters = 3.0,
+        /// <summary>Passes of (¼,½,¼) smoothing over each saved reach polyline, end points (nodes) fixed. The migration simulation leaves one-cell sawtooth kinks on gentle ground; this removes them without moving the channel more than a fraction of a cell. 0 disables.</summary>
+        int PolylineSmoothingPasses = 2)
     {
         /// <summary>Throws unless <see cref="CutoffTriggerPerWidth"/> &lt; <see cref="MinSeparationPerWidth"/>.</summary>
         public void Validate()
@@ -463,6 +467,12 @@ public static class RiverMeander
 
                 newPosX[i] = posX[i] + normalX * stepMeters;
                 newPosY[i] = posY[i] + normalY * stepMeters;
+
+                if (p.MaxBankClimbMeters > 0.0 && grid.Values[GridY(newPosY[i]) * width + GridX(newPosX[i])] > grid.Values[i] + p.MaxBankClimbMeters)
+                {
+                    newPosX[i] = posX[i];
+                    newPosY[i] = posY[i];
+                }
             }
 
             // Collision-avoidance: bucket proposed positions; too close either cuts or damps below.
@@ -640,7 +650,7 @@ public static class RiverMeander
 
             if (!nodeIdByIndex.TryGetValue(cur, out var toId)) continue;
 
-            var polyline = pathIndices.Select(i => (posX[i], posY[i])).ToList();
+            var polyline = SmoothPolyline(pathIndices.Select(i => (posX[i], posY[i])).ToList(), p.PolylineSmoothingPasses);
             var widthMeters = pathIndices.Average(i => ChannelWidthAt(i, accumulation, cellSize, p.WidthPerSqrtAreaM2));
 
             reaches.Add(new RiverReach(
@@ -659,6 +669,22 @@ public static class RiverMeander
         }
 
         return new RiverNetwork(networkId, nodes, reaches, oxbows);
+    }
+
+    /// <summary>(¼,½,¼) smoothing, <paramref name="passes"/> times; first and last point stay put so reaches still meet at their nodes.</summary>
+    internal static List<(double X, double Y)> SmoothPolyline(List<(double X, double Y)> points, int passes)
+    {
+        if (passes <= 0 || points.Count < 3) return points;
+        var cur = points;
+        for (var pass = 0; pass < passes; pass++)
+        {
+            var next = new List<(double X, double Y)>(cur.Count) { cur[0] };
+            for (var i = 1; i < cur.Count - 1; i++)
+                next.Add((0.25 * cur[i - 1].X + 0.5 * cur[i].X + 0.25 * cur[i + 1].X, 0.25 * cur[i - 1].Y + 0.5 * cur[i].Y + 0.25 * cur[i + 1].Y));
+            next.Add(cur[^1]);
+            cur = next;
+        }
+        return cur;
     }
 
     /// <summary>Drops every reach below <paramref name="minStrahlerOrder"/> and the nodes only those reaches touched — orders are computed on the full network first, so the kept reaches keep their true order. Order-1 headwater rills are over half the length on steep terrain and swamp the real network (2.6 km/km² vs 1.2 without them); oxbows are kept.</summary>
