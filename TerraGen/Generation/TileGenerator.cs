@@ -57,6 +57,8 @@ public static class TileGenerator
         TileHydrology.Parameters? HydrologyParams = null,
         /// <summary>Tiles per side of a square hydrology chunk, bounding the combined grid so it can't overflow a 32-bit array index on a large region. Default 20 ≈ 64M cells at TileKm=1/CellMeters=2.5.</summary>
         int HydrologyChunkTilesPerSide = 20,
+        /// <summary>Lowest Strahler order whose reaches are saved (<c>1</c> keeps everything). Default 2 drops headwater order-1 rills, which are ~55% of the river length on steep terrain — see <see cref="RiverMeander.DropReachesBelowOrder"/>.</summary>
+        int RiverMinStrahlerOrder = 2,
         /// <summary>Off by default (always regenerate/overwrite). When true, a tile whose TileId already has a saved heightmap of the expected size skips noise+erosion and reuses the saved elevation; hydrology (if on) still reprocesses its whole chunk.</summary>
         bool SkipExisting = false,
         /// <summary>Null (default) keeps the existing ridged-noise mountain layer unchanged — see <see cref="StreamPowerErosion"/>. Non-null REPLACES it: each tile samples landmass only, then <see cref="StreamPowerErosion.Erode"/> builds relief from an uplift field derived from <see cref="TectonicPlates"/> (Task 1.2.4's confirmed integration mode), before droplet erosion runs as a fine-detail finishing pass. Runs once per <see cref="SpimChunkTilesPerSide"/>-tile chunk by default (see its remarks); <see cref="SpimChunkTilesPerSide"/> = 1 instead runs it per padded tile with the same erosion-margin neighbor-locking as <see cref="TileErosion"/> — a local-drainage approximation, not a whole-region solve, where a real basin wider than the margin is truncated at the tile's own padding.</summary>
@@ -720,7 +722,7 @@ public static class TileGenerator
                     db.SaveHeightmap(tile);
                 }
 
-                db.SaveRiverNetwork(riverNetwork);
+                db.SaveRiverNetwork(RiverMeander.DropReachesBelowOrder(riverNetwork, s.RiverMinStrahlerOrder));
 
                 var chunkRiverCells = combinedRiverMask.Count(b => b != 0);
                 Interlocked.Add(ref totalRiverCellsInRun, chunkRiverCells);

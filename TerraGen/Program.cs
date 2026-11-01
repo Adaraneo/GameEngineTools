@@ -179,6 +179,7 @@ var runSettings = new TileGenerator.RunSettings(
     PlanetRadiusMeters: planet.PlanetRadiusMeters,
     HydrologyParams: hydrologyParams,
     HydrologyChunkTilesPerSide: options.RiverChunkTiles,
+    RiverMinStrahlerOrder: options.RiverMinOrder,
     SkipExisting: options.SkipExisting,
     SpimParams: spimParams,
     RockTypeParams: rockTypeParams,
@@ -284,6 +285,8 @@ internal sealed class CliOptions
     /// "would need a NxN combined grid" error, or raise it (at the cost of memory) if a smaller
     /// value is visibly fragmenting rivers across chunk boundaries more than desired.</summary>
     public int RiverChunkTiles { get; init; } = 20;
+    /// <summary>Lowest Strahler order saved (1 = everything). Default 2 drops headwater rills, over half the river length on steep terrain.</summary>
+    public int RiverMinOrder { get; init; } = 2;
     /// <summary>Off by default (always regenerate/overwrite). See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SkipExisting"/>.</summary>
     public bool SkipExisting { get; init; }
     /// <summary>Off by default — existing tiles must keep regenerating identically without it. See <see cref="TerraGen.Generation.TileGenerator.RunSettings.SpimParams"/>.</summary>
@@ -376,7 +379,8 @@ internal sealed class CliOptions
                         [--tile-km <velikost, výchozí 5>] [--cell-m <velikost buňky, výchozí 50>]
                         [--erosion <0-100, výchozí 50>] [--tectonic-plates <počet, výchozí 0 = vypnuto>]
                         [--rivers [--river-threshold <plocha×sklon² v m², výchozí 100000>]
-                                  [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]]
+                                  [--river-chunk-tiles <dlaždic na stranu chunku, výchozí 20>]
+                                  [--river-min-order <nejnižší Strahlerův řád, výchozí 2>]]
                         [--skip-existing] [--spim [--spim-chunk-tiles <dlaždic na stranu chunku, výchozí 0 = celý region>]
                                   [--rock-types] [--isostasy] [--orographic [--wind-from <stupně, výchozí odvozeno ze šířky/rotace>]]]
                         [--parallel | --parallel-degree <počet vláken>]
@@ -424,6 +428,10 @@ internal sealed class CliOptions
             topografických map): zdrojová studie uvádí A·S² ∈ [500, 4000] m² pro vznik prvního
             koryta, ale na strmých (sklon ~0,7) svazích z SPIM s buňkami 50 m ho splní už povodí o
             2 buňkách a řekou by se stala většina plochy (71 % při 2000). Re-tuň podle bioomu/klimatu.
+            --river-min-order <N> — ukládají se jen úseky Strahlerova řádu ≥ N (výchozí 2). Řád se
+            počítá na celé síti PŘED ořezem, takže zbylé úseky mají skutečný řád. Potůčky řádu 1 tvoří
+            na strmém terénu přes polovinu délky řek (hustota 2,6 vs. 1,2 km/km² bez nich) a hlavní
+            síť by zahltily; 1 ukládá všechno.
             Takhle spočtená D8 kostra ale sama o sobě teče geometricky rovně (v každé buňce vybírá
             jeden z 8 pevných směrů, žádná setrvačnost/boční eroze) — proto se na ni ještě aplikuje
             RiverMeander: boční výchylka podle sinusové křivky (Langbein &amp; Leopold 1966), jejíž
@@ -606,6 +614,7 @@ internal sealed class CliOptions
         var rivers = false;
         var riverThreshold = 100000.0;
         var riverChunkTiles = 20;
+        var riverMinOrder = 2;
         var skipExisting = false;
         var spim = false;
         var rockTypes = false;
@@ -662,6 +671,9 @@ internal sealed class CliOptions
                     break;
                 case "--river-chunk-tiles" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rct):
                     riverChunkTiles = rct;
+                    break;
+                case "--river-min-order" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rmo):
+                    riverMinOrder = rmo;
                     break;
                 case "--skip-existing":
                     skipExisting = true;
@@ -826,6 +838,11 @@ internal sealed class CliOptions
             Console.Error.WriteLine("--river-threshold musí být kladné.");
             return null;
         }
+        if (riverMinOrder < 1)
+        {
+            Console.Error.WriteLine("--river-min-order musí být alespoň 1.");
+            return null;
+        }
         if (riverChunkTiles < 1)
         {
             Console.Error.WriteLine("--river-chunk-tiles musí být kladné.");
@@ -844,7 +861,7 @@ internal sealed class CliOptions
             LonMin = lonMin.Value, LonMax = lonMax!.Value,
             TileKm = tileKm, CellMeters = cellMeters, ErosionStrength = Math.Clamp(erosion, 0, 100),
             TectonicPlateCount = tectonicPlateCount,
-            Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles,
+            Rivers = rivers, RiverThreshold = riverThreshold, RiverChunkTiles = riverChunkTiles, RiverMinOrder = riverMinOrder,
             SkipExisting = skipExisting, Spim = spim, RockTypes = rockTypes, Isostasy = isostasy,
             Orographic = orographic, WindDirectionFromDeg = windDirectionFromDeg, ParallelDegree = parallelDegree,
             ParallelHydrologyDegree = parallelHydrologyDegree, AutoParallelHydrology = autoParallelHydrology,
