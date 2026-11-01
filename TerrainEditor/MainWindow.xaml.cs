@@ -811,7 +811,11 @@ public partial class MainWindow : Window
         ContourSupersampleCompensation.ScaleX = 1.0 / supersample;
         ContourSupersampleCompensation.ScaleY = 1.0 / supersample;
 
-        if (supersample == _lastContourSupersample) return;
+        if (supersample == _lastContourSupersample)
+        {
+            ContourSurface.InvalidateVisual(); // river strokes follow the zoom
+            return;
+        }
         _lastContourSupersample = supersample;
         ContourSurface.InvalidateVisual();
     }
@@ -824,6 +828,31 @@ public partial class MainWindow : Window
         if (reaches.Count == 0 && oxbows.Count == 0) return;
 
         _grid = RiverNetworkRasterizer.MaterializeOnto(reaches, oxbows, _grid);
+        _riverReaches = reaches;
+        _riverOxbows = oxbows;
+        ContourSurface.InvalidateVisual();
+    }
+
+    /// <summary>The persisted river graph, drawn as smooth vector paths by <see cref="ContourSurface_PaintSurface"/>. The Graph* raster masks stay on <see cref="_grid"/> for editing/road logic but no longer colour the visible pixels: a one-cell staircase that also drifted off the valleys on the decimated browsing grid.</summary>
+    private IReadOnlyList<RiverReach> _riverReaches = [];
+    private IReadOnlyList<OxbowLoop> _riverOxbows = [];
+
+    private (double OriginX, double OriginY, double Cell, int Width, int Height)? _riverPathsGrid;
+    private Dictionary<int, SKPath> _riverPaths = new();
+    private SKPath? _oxbowPath;
+
+    /// <summary>Rebuilds the per-order river paths when <see cref="_grid"/> changed; the geometry is width-independent, so a zoom change only restrokes them.</summary>
+    private void EnsureRiverPaths()
+    {
+        if (_grid is null) return;
+        var key = (_grid.OriginX, _grid.OriginY, _grid.CellSizeMeters, _grid.Width, _grid.Height);
+        if (_riverPathsGrid == key) return;
+
+        foreach (var path in _riverPaths.Values) path.Dispose();
+        _oxbowPath?.Dispose();
+        _riverPaths = RiverPathBuilder.BuildByOrder(_riverReaches, _grid.OriginX, _grid.OriginY, _grid.CellSizeMeters, _grid.Width, _grid.Height);
+        _oxbowPath = RiverPathBuilder.BuildOxbows(_riverOxbows, _grid.OriginX, _grid.OriginY, _grid.CellSizeMeters, _grid.Width, _grid.Height);
+        _riverPathsGrid = key;
     }
 
     private unsafe void RenderGrid()
@@ -879,9 +908,9 @@ public partial class MainWindow : Window
             for (var bx = 0; bx < bitmapWidth; bx++)
             {
                 var i = rowStart + bx;
-                var shreveMagnitude = grid.ShreveMagnitudeAt(bx, by);
-                if (shreveMagnitude == 0 && grid.IsRiver(bx, by)) shreveMagnitude = 1;
-                var isOxbow = grid.IsOxbow(bx, by);
+                // Only hand-painted rivers/oxbows colour pixels; the persisted river graph is drawn as vector paths (see DrawRivers).
+                var shreveMagnitude = grid.RiverMask is { } painted && painted[i] != 0 ? Math.Max(1, grid.ShreveMagnitude?[i] ?? 0) : 0;
+                var isOxbow = (grid.OxbowMask?[i] ?? 0) != 0;
                 var color = TerrainColorRamp.ForCell(grid.Values[i], min, max, shreveMagnitude, isOxbow);
                 var pixelPtr = rowPtr + bx * 4;
                 pixelPtr[0] = color.B;
@@ -952,7 +981,7 @@ public partial class MainWindow : Window
     {
         var canvas = e.Surface.Canvas;
         canvas.Clear(SKColors.Transparent);
-        if (_grid is null || _currentContours.Count == 0) return;
+        if (_grid is null || (_currentContours.Count == 0 && _riverReaches.Count == 0 && _riverOxbows.Count == 0)) return;
 
         // The surface is rasterized at _lastContourSupersample× the grid's own cell count (see
         // UpdateContourSupersampling) so it stays crisp once WPF's Zoom transform scales it back
@@ -986,6 +1015,35 @@ public partial class MainWindow : Window
         };
         canvas.DrawPath(contourPath, contourPaint);
         canvas.DrawPath(coastlinePath, coastlinePaint);
+        DrawRivers(canvas);
+    }
+
+    /// <summary>Strokes the cached river paths, smallest order first so trunks end up on top. Width is in on-screen pixels (1 px at order 2, +0.8 px per order) converted to canvas units by the current zoom, so a river stays a readable line at any zoom.</summary>
+    private void DrawRivers(SKCanvas canvas)
+    {
+        EnsureRiverPaths();
+        var zoom = Math.Max(_vm.Zoom, 0.02);
+
+        foreach (var (order, path) in _riverPaths.OrderBy(kv => kv.Key))
+        {
+            var color = TerrainColorRamp.RiverColorForOrder(order);
+            using var paint = new SKPaint
+            {
+                Color = new SKColor(color.R, color.G, color.B), IsAntialias = true, Style = SKPaintStyle.Stroke,
+                StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round,
+                StrokeWidth = (float)((1.0 + 0.8 * Math.Max(order - 2, 0)) / zoom),
+            };
+            canvas.DrawPath(path, paint);
+        }
+
+        if (_oxbowPath is null) return;
+        var oxbow = TerrainColorRamp.OxbowLakeColor;
+        using var oxbowPaint = new SKPaint
+        {
+            Color = new SKColor(oxbow.R, oxbow.G, oxbow.B), IsAntialias = true, Style = SKPaintStyle.Stroke,
+            StrokeWidth = (float)(1.6 / zoom),
+        };
+        canvas.DrawPath(_oxbowPath, oxbowPaint);
     }
 
     /// <summary>Draws each Connection: a generated terrain-aware road (dashed, if one has been

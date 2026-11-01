@@ -64,6 +64,13 @@ public static class TerrainColorRamp
         return ForHeight(heightMeters, gridMin, gridMax);
     }
 
+    /// <summary>River colour for a Strahler order (2 = small creek … 8 = trunk), the same light-to-dark ramp <see cref="ForCell"/> uses for Shreve magnitude.</summary>
+    public static Color RiverColorForOrder(int order)
+        => Lerp(RiverColorSmall, RiverColorLarge, Math.Clamp((order - 1) / 7.0, 0.0, 1.0));
+
+    /// <summary>Oxbow tint, for vector drawing.</summary>
+    public static Color OxbowLakeColor => OxbowColor;
+
     private static Color RiverColorForMagnitude(int magnitude)
     {
         var t = Math.Clamp(Math.Log(Math.Max(1, magnitude)) / Math.Log(RiverMagnitudeSaturationPoint), 0.0, 1.0);
