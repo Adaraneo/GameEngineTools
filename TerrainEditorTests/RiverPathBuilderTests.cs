@@ -10,6 +10,16 @@ public class RiverPathBuilderTests
         => new(id, "n", "a", "b", points, order, 1, 1.0);
 
     [TestMethod]
+    public void MinVisibleOrder_HidesLowOrdersAsZoomShrinks()
+    {
+        Assert.AreEqual(2, RiverPathBuilder.MinVisibleOrder(1.0));
+        Assert.AreEqual(2, RiverPathBuilder.MinVisibleOrder(0.5));
+        Assert.AreEqual(3, RiverPathBuilder.MinVisibleOrder(0.4));
+        Assert.AreEqual(4, RiverPathBuilder.MinVisibleOrder(0.2));
+        Assert.AreEqual(8, RiverPathBuilder.MinVisibleOrder(0.001));
+    }
+
+    [TestMethod]
     public void BuildByOrder_GroupsByOrderAndMapsWorldToCellUnits()
     {
         var reaches = new[]

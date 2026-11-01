@@ -6,6 +6,10 @@ namespace TerrainEditor.Rendering;
 /// <summary>Builds smoothed vector paths from the persisted river graph, one per Strahler order, in the canvas space the heightmap uses (1 unit = 1 grid cell). Rivers drawn from these keep their exact world position at any zoom or LOD stride instead of being stair-stepped onto the (possibly decimated) cell grid.</summary>
 public static class RiverPathBuilder
 {
+    /// <summary>Lowest Strahler order still drawn at this zoom: every halving of the zoom below 0.5 hides one more order, so a zoomed-out view shows trunks instead of a dense mesh.</summary>
+    public static int MinVisibleOrder(double zoom)
+        => zoom >= 0.5 ? 2 : Math.Min(2 + (int)Math.Ceiling(Math.Log2(0.5 / Math.Max(zoom, 0.01))), 8);
+
     /// <summary>One path per order (key) from reaches whose polyline bounding box touches the grid; consecutive vertices are joined with midpoint quadratic curves so bends read as curves, not polylines. The caller owns (and must dispose) the returned paths.</summary>
     public static Dictionary<int, SKPath> BuildByOrder(IReadOnlyList<RiverReach> reaches, double originX, double originY, double cellSizeMeters, int widthCells, int heightCells)
     {

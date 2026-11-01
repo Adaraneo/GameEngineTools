@@ -1024,7 +1024,8 @@ public partial class MainWindow : Window
         EnsureRiverPaths();
         var zoom = Math.Max(_vm.Zoom, 0.02);
 
-        foreach (var (order, path) in _riverPaths.OrderBy(kv => kv.Key))
+        var minOrder = RiverPathBuilder.MinVisibleOrder(zoom);
+        foreach (var (order, path) in _riverPaths.Where(kv => kv.Key >= minOrder).OrderBy(kv => kv.Key))
         {
             var color = TerrainColorRamp.RiverColorForOrder(order);
             using var paint = new SKPaint
