@@ -186,4 +186,24 @@ public class StreamPowerErosionTests
 
         Assert.IsTrue(slopes[(int)(slopes.Count * 0.99)] < 1.5, $"p99 cell-to-cell slope {slopes[(int)(slopes.Count * 0.99)]:F2} m/m — the 0.7 cap should keep it near that, not at tens.");
     }
+    [TestMethod]
+    public void Erode_RoutingNoise_IsDeterministicAndKeepsHeightsInRange()
+    {
+        float[] Run(double noise)
+        {
+            const int n = 60;
+            var grid = new TerrainHeightmap("noise", 0, 0, 50.0, n, n, new float[n * n]);
+            var uplift = Enumerable.Repeat(0.005, n * n).ToArray();
+            StreamPowerErosion.Erode(grid, new StreamPowerErosion.Parameters(K: 3e-5, Iterations: 40, RoutingNoiseMeters: noise), uplift);
+            return grid.Values;
+        }
+
+        var a = Run(8.0);
+        var b = Run(8.0);
+        var plain = Run(0.0);
+
+        CollectionAssert.AreEqual(a, b, "The routing offset is a fixed function of the cell index, so two runs must agree exactly.");
+        CollectionAssert.AreNotEqual(plain, a, "A non-zero offset should change the routing, hence the result.");
+        Assert.IsTrue(a.Max() < plain.Max() * 2 + 100, "Routing noise must not blow heights up.");
+    }
 }

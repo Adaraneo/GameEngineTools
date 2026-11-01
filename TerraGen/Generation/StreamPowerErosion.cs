@@ -24,7 +24,9 @@ public static class StreamPowerErosion
         /// <summary>Largest drop-per-distance between a cell and its receiver — the strength limit on hillslopes (rock fails by landsliding well before slopes steepen without bound, while linear diffusion alone lets a ridge climb ~U·L²/2D, i.e. hundreds of km under a 10 mm/yr uplift). Source: Schmidt &amp; Montgomery (1995), Science 270:617-620, "Limits to relief" — rock-strength-limited slopes of ~30-40°. 0 disables.</summary>
         double MaxHillslopeGradient = 0.7,
         /// <summary>Number of implicit solves per routing: each iteration re-routes once (the expensive sort + fill) and then walks the stack this many times with <c>TimestepYears / SubSteps</c>. One 250 ky step lifts a cell by U·dt ≈ 0.5-2.5 km in a single go, so with 1 the surface is left roughly an uplift step away from consistent with its own routing (hundreds of metres of cell-to-cell noise); smaller steps remove that without paying for a re-route each time.</summary>
-        int SubSteps = 6);
+        int SubSteps = 6,
+        /// <summary>Amplitude (m) of a FIXED per-cell offset added to the elevations used for flow ROUTING only (never to the solved heights). On a planar flank D8 has no perturbation to converge on: valleys then follow exact row/column/45° lines and rivers come out as dead-straight grid-aligned lines. A static offset stands in for the bedrock heterogeneity real hillslopes have. 0 disables.</summary>
+        double RoutingNoiseMeters = 8.0);
 
     /// <summary>Empirical lower bound on tectonic uplift rate. Source: McGrath et al. (2025).</summary>
     public const double MinUpliftMmPerYear = 0.5;
@@ -56,10 +58,11 @@ public static class StreamPowerErosion
         // applied — since the combined implicit update doesn't separate the two terms explicitly.
         var erodedHeightAccumulator = isostasyParams is not null ? new double[grid.Values.Length] : null;
         var iterationsSinceRebound = 0;
+        var routingNoise = p.RoutingNoiseMeters > 0.0 ? BuildRoutingNoise(grid.Values.Length, p.RoutingNoiseMeters) : null;
 
         for (var iter = 0; iter < p.Iterations; iter++)
         {
-            var routing = FlowRouting.Compute(grid);
+            var routing = FlowRouting.Compute(routingNoise is null ? grid : grid with { Values = AddRoutingNoise(grid.Values, routingNoise) });
             var downstream = routing.Downstream;
             var stack = routing.Stack; // highest-to-lowest routed elevation
             var accumulation = routing.Accumulation;
@@ -145,6 +148,27 @@ public static class StreamPowerErosion
 
         if (erodedHeightAccumulator is not null && iterationsSinceRebound > 0)
             ApplyIsostaticRebound(erodedHeightAccumulator, grid, locked, crustDensityPerCell, isostasyParams!, p.Iterations - 1, p.Iterations, onDiagnostic);
+    }
+
+    private static double[] BuildRoutingNoise(int count, double amplitudeMeters)
+    {
+        var noise = new double[count];
+        for (var i = 0; i < count; i++)
+        {
+            unchecked
+            {
+                var h = (uint)i * 2654435761u; h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; h *= 3266489917u; h ^= h >> 16;
+                noise[i] = ((h & 0xFFFFFF) / (double)0xFFFFFF * 2.0 - 1.0) * amplitudeMeters;
+            }
+        }
+        return noise;
+    }
+
+    private static float[] AddRoutingNoise(float[] values, double[] noise)
+    {
+        var result = new float[values.Length];
+        for (var i = 0; i < values.Length; i++) result[i] = (float)(values[i] + noise[i]);
+        return result;
     }
 
     /// <summary>Explicit 5-point Laplacian diffusion, sub-stepped so dt·D_max/dx² never exceeds the ~0.2 explicit-scheme stability bound regardless of caller's CellSizeMeters/TimestepYears — callers never have to hand-tune D against grid resolution (D_max = the unscaled <paramref name="diffusivityM2PerYear"/>, since a low-accumulation cell can sit right next to a high-accumulation one). Locally scaled down by <paramref name="accumulation"/> via <c>referenceCellCount / (referenceCellCount + accumulation)</c> — see <see cref="Parameters.HillslopeDiffusionReferenceCellCount"/>'s remarks on why unweighted diffusion also disturbs channel cells. Non-locked cells only; locked cells still supply fixed boundary values to their neighbors' Laplacian. Height LOST at a cell is added to <paramref name="erodedHeightAccumulator"/> so isostasy (when enabled) responds to hillslope denudation the same way it already does to fluvial erosion.</summary>
