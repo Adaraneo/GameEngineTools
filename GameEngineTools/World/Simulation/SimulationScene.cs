@@ -116,6 +116,12 @@ namespace GameEngineTools.World.Simulation
                 throw new ArgumentException(
                     "SimulationScene vyžaduje alespoň jednu postavu v Characters.", nameof(options));
 
+            if (options.TickStep <= WTimeSpan.Zero)
+                throw new ArgumentException("SimulationSceneOptions.TickStep must be positive (a zero step never advances the clock).", nameof(options));
+
+            if (options.SimulationDays < 0)
+                throw new ArgumentException("SimulationSceneOptions.SimulationDays must not be negative.", nameof(options));
+
             _clock = clock;
             _options = options;
             _lodRuntime = characterLodRuntime;
@@ -149,8 +155,18 @@ namespace GameEngineTools.World.Simulation
         /// Ends after <c>SimulationSceneOptions.SimulationYears</c> has elapsed.
         /// </summary>
         /// <returns>A completed task once the simulation ends.</returns>
-        public Task RunAsync()
-            => SimulateAsync();
+        /// <param name="cancellationToken">Stops the run at the next substep boundary; the returned task is then canceled.</param>
+        public Task RunAsync(System.Threading.CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return SimulateAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return Task.FromCanceled(cancellationToken);
+            }
+        }
 
         /// <summary>
         /// Adds a character to a running (or not-yet-started) simulation.
@@ -194,7 +210,7 @@ namespace GameEngineTools.World.Simulation
         /// <summary>
         /// Main simulation loop — iterates until the configured number of game years has elapsed.
         /// </summary>
-        private Task SimulateAsync()
+        private Task SimulateAsync(System.Threading.CancellationToken cancellationToken)
         {
             var startTime = _clock.Now;
             var endTime = _clock.Now.AddDays(_options.SimulationDays);
@@ -208,6 +224,8 @@ namespace GameEngineTools.World.Simulation
 
                 while (macroRemaining > WTimeSpan.Zero && _clock.Now < endTime)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     // Merge any queued additions at this clean boundary, before the per-tick iteration.
                     DrainPendingAdditions();
 

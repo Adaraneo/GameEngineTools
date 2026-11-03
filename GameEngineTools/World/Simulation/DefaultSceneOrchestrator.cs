@@ -319,8 +319,16 @@ namespace GameEngineTools.World.Simulation
             _livingBuffer.Clear();
             foreach (var c in chars)
             {
-                if (!_dead.Contains(c.Id) && c.LastOutbox.OfType<CharacterDied>().Any())
-                    _dead.Add(c.Id);
+                if (!_dead.Contains(c.Id))
+                {
+                    var justDied = c.LastOutbox.OfType<CharacterDied>().Any();
+                    if (justDied || c.Snapshot.Physiology.Status == StatusType.Dead)
+                    {
+                        _dead.Add(c.Id);
+                        if (!justDied)
+                            _locationService.RemoveCharacter(c.Id); // reloaded dead: no death event to retire them through
+                    }
+                }
 
                 if (_dead.Contains(c.Id))
                     continue;
@@ -1093,7 +1101,6 @@ namespace GameEngineTools.World.Simulation
                     using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
                     {
                         _log.SceneMoveToRequested(character.Id.Value.ToString(), requestedType.ToString(), currentLocation ?? "<none>");
-                        Console.WriteLine("[MoveTo] {0} requested {1} but no suitable location exists. Current location: {2}.", character.Id.Value.ToString(), requestedType.ToString(), currentLocation ?? "<none>");
                     }
                     continue;
                 }
@@ -1148,6 +1155,9 @@ namespace GameEngineTools.World.Simulation
 
             var terrain = _locationService.GetDescriptor(target.LocationId)?.Terrain ?? TerrainType.Indoor;
             var speed = _speedProvider.GetSpeedMetersPerMinute(character.Snapshot, terrain);
+            if (speed <= 0.0)
+                return; // cannot move (e.g. immobilised): stay where they are rather than schedule an unbounded trip
+
             var minutes = TravelDurationComputer.ComputeMinutes(target.DistanceMeters, speed);
 
             if (minutes <= 0.0)

@@ -118,6 +118,47 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void ReloadedDeadCharacter_IsTakenOffTheMap()
+        {
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(Room);
+            var orchestrator = BuildOrchestrator(locations, new InMemoryMutableProvider());
+            var id = new HumanId(Guid.NewGuid());
+            var reloaded = new BurialSpy(id, edges: new());
+            reloaded.SetDead();
+            locations.MoveCharacter(id, Room.Id);
+
+            orchestrator.OnTick(Now, new IHuman[] { reloaded });
+
+            Assert.IsNull(locations.GetLocation(id), "A character loaded already dead has no death event but must not stay on the map.");
+        }
+
+        [TestMethod]
+        public void ZeroMovementSpeed_DoesNotStartAnUnboundedTrip()
+        {
+            var home = new LocationDescriptor("home", "Home", 0.05, 0.01, 50, false, LocationType.Social);
+            var tavern = new LocationDescriptor("tavern", "Tavern", 0.10, 0.02, 50, false, LocationType.Social);
+            var map = new WorldMap(
+                new Dictionary<string, LocationDescriptor>(),
+                new Dictionary<string, IReadOnlyList<WorldConnection>> { ["home"] = new List<WorldConnection> { new("tavern", 1600.0) } },
+                new Dictionary<string, IReadOnlyList<string>>());
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(home);
+            locations.RegisterLocation(tavern);
+            var orchestrator = BuildOrchestrator(locations, new InMemoryMutableProvider(), new SceneOrchestratorOptions { EnableTravelTime = true }, map, speedMetersPerMinute: 0.0);
+            var id = new HumanId(Guid.NewGuid());
+            var walker = new BurialSpy(id, edges: new());
+            walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, PickupItemKind.Food));
+            walker.SetLastOutbox(new ActionCommitted(Now, id, ActionNames.MoveToFood, WTimeSpan.FromMinutes(20)));
+            locations.MoveCharacter(id, "home");
+
+            orchestrator.OnTick(Now, new IHuman[] { walker });
+
+            Assert.AreEqual("home", locations.GetLocation(id), "With no movement speed the character stays where it is.");
+            Assert.IsNull(orchestrator.GetTravelDestination(id));
+        }
+
+        [TestMethod]
         public void TwoDeathsInTheSameTick_DoNotMournEachOther()
         {
             var locations = new DefaultLocationService();
@@ -271,7 +312,7 @@ namespace EngineTests
             });
 
         private static DefaultSceneOrchestrator BuildOrchestrator(
-            DefaultLocationService locations, IMutableWorldObjectProvider objects, SceneOrchestratorOptions? options = null, WorldMap? map = null)
+            DefaultLocationService locations, IMutableWorldObjectProvider objects, SceneOrchestratorOptions? options = null, WorldMap? map = null, double speedMetersPerMinute = 80.0)
             => new DefaultSceneOrchestrator(
                 attractionCalculator: new NeutralAttractionCalculator(),
                 locationService: locations,
@@ -282,7 +323,7 @@ namespace EngineTests
                     new Dictionary<string, LocationDescriptor>(),
                     new Dictionary<string, IReadOnlyList<WorldConnection>>(),
                     new Dictionary<string, IReadOnlyList<string>>()),
-                speedProvider: new ConstantSpeedProvider(80.0),
+                speedProvider: new ConstantSpeedProvider(speedMetersPerMinute),
                 rng: new Random(7),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
                 objectProvider: objects,
@@ -325,6 +366,8 @@ namespace EngineTests
             public void SetLastOutbox(params IDomainEvent[] events) => _lastOutbox = events;
 
             public void SetBereavement(BereavementState state) => _snapshot = _snapshot with { Bereavement = state };
+
+            public void SetDead() => _snapshot = _snapshot with { Physiology = _snapshot.Physiology with { Status = StatusType.Dead } };
 
             public void SetKnownObjects(params ObjectLocationFact[] facts)
                 => _snapshot = _snapshot with { Memory = new MemoryIndex(new List<EpisodicMemory>()) { KnownObjects = facts } };
