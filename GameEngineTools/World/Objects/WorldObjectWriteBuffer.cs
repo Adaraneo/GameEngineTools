@@ -19,7 +19,7 @@ namespace GameEngineTools.World.Objects
     /// only mutations are buffered.
     /// Register as a singleton alongside <see cref="SqliteWorldObjectProvider"/>.
     /// </remarks>
-    public sealed class WorldObjectWriteBuffer : IMutableWorldObjectProvider
+    public sealed class WorldObjectWriteBuffer : IMutableWorldObjectProvider, IDisposable
     {
         #region Private types
 
@@ -120,52 +120,85 @@ namespace GameEngineTools.World.Objects
         public void AddObject(WorldObject obj)
         {
             lock (_lock)
-                _pending.Remove(obj.Id);
+            {
+                // A pending consume survives: re-adding a stale copy must not resurrect a consumed object.
+                if (_pending.TryGetValue(obj.Id, out var pending) && pending.Kind != MutationKind.Consumed)
+                    _pending.Remove(obj.Id);
+            }
+
             _provider.AddObject(obj);
         }
 
         /// <inheritdoc/>
         public bool ConsumeObject(string locationId, string objectId, WDateTime now)
         {
-            lock (_lock)
-                _pending[objectId] = new PendingMutation(
-                    MutationKind.Consumed, locationId, objectId,
-                    ConsumedAtTicks: now.WorldTicks,
-                    HolderGuid: null);
+            Enqueue(new PendingMutation(
+                MutationKind.Consumed, locationId, objectId,
+                ConsumedAtTicks: now.WorldTicks,
+                HolderGuid: null));
             return true;
         }
 
         /// <inheritdoc/>
         public bool RestoreObject(string locationId, string objectId)
         {
-            lock (_lock)
-                _pending[objectId] = new PendingMutation(
-                    MutationKind.Restored, locationId, objectId,
-                    ConsumedAtTicks: null,
-                    HolderGuid: null);
+            Enqueue(new PendingMutation(
+                MutationKind.Restored, locationId, objectId,
+                ConsumedAtTicks: null,
+                HolderGuid: null));
             return true;
         }
 
         /// <inheritdoc/>
         public bool SetHeldBy(string locationId, string objectId, HumanId? holder)
         {
-            lock (_lock)
-                _pending[objectId] = new PendingMutation(
-                    MutationKind.HeldBy, locationId, objectId,
-                    ConsumedAtTicks: null,
-                    HolderGuid: holder?.Value.ToString());
+            Enqueue(new PendingMutation(
+                MutationKind.HeldBy, locationId, objectId,
+                ConsumedAtTicks: null,
+                HolderGuid: holder?.Value.ToString()));
             return true;
         }
 
         /// <inheritdoc/>
         public bool RemoveObject(string locationId, string objectId)
         {
-            lock (_lock)
-                _pending[objectId] = new PendingMutation(
-                    MutationKind.Removed, locationId, objectId,
-                    ConsumedAtTicks: null,
-                    HolderGuid: null);
+            Enqueue(new PendingMutation(
+                MutationKind.Removed, locationId, objectId,
+                ConsumedAtTicks: null,
+                HolderGuid: null));
             return true;
+        }
+
+        /// <summary>Number of objects with a buffered mutation (diagnostics and tests).</summary>
+        public int PendingCount
+        {
+            get
+            {
+                lock (_lock)
+                    return _pending.Count;
+            }
+        }
+
+        /// <summary>
+        /// Merges a mutation into the one slot per object: an object that was removed or consumed this substep cannot be
+        /// picked up or restored by a later write (the one that ran first is the truth); otherwise the last write wins.
+        /// </summary>
+        private void Enqueue(PendingMutation mutation)
+        {
+            lock (_lock)
+            {
+                if (_pending.TryGetValue(mutation.ObjectId, out var existing)
+                    && existing.Kind is MutationKind.Removed or MutationKind.Consumed
+                    && mutation.Kind is MutationKind.HeldBy)
+                {
+                    return;
+                }
+
+                if (existing is { Kind: MutationKind.Removed } && mutation.Kind is MutationKind.Consumed or MutationKind.Restored)
+                    return;
+
+                _pending[mutation.ObjectId] = mutation;
+            }
         }
 
         #endregion IMutableWorldObjectProvider — buffered mutations
@@ -199,8 +232,25 @@ namespace GameEngineTools.World.Objects
             }
 
             // Single transaction for all mutations in this substep.
-            _db.ApplyBatch(batch);
+            try
+            {
+                _db.ApplyBatch(batch);
+            }
+            catch
+            {
+                // The transaction rolled back: put the mutations back (a newer write for the same object wins) and retry next flush.
+                lock (_lock)
+                {
+                    foreach (var m in batch)
+                        _pending.TryAdd(m.ObjectId, m);
+                }
+
+                throw;
+            }
         }
+
+        /// <summary>Flushes any buffered mutations so shutting the host down does not lose the last substep.</summary>
+        public void Dispose() => Flush();
 
         #endregion Flush
     }
