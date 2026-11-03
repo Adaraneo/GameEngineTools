@@ -300,6 +300,8 @@ namespace GameEngineTools.World.Simulation
 
                 foreach (var character in chars)
                 {
+                    if (_deadCharacters.Contains(character.Id)) continue; // a dead character's outbox is stale; its death was narrated on the tick it happened
+
                     foreach (var ev in character.LastOutbox)
                     {
                         var entry = formatter.Format(ev, resolver);
@@ -410,26 +412,29 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         /// <param name="sender">The character whose outbox we are currently scanning.</param>
         /// <param name="all">All characters in the scene, for initiator lookup.</param>
-        private static void RouteOutcomes(IHuman sender, IReadOnlyList<IHuman> all)
+        private void RouteOutcomes(IHuman sender, IReadOnlyList<IHuman> all)
         {
             foreach (var outcome in sender.LastOutbox.OfType<InteractionOutcome>())
             {
                 // Find the initiator — the one who originally sent InteractionProposed
                 var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
-                initiator?.ReceiveEvent(outcome);
+                if (initiator is not null && !_deadCharacters.Contains(initiator.Id))
+                    initiator.ReceiveEvent(outcome);
             }
 
             // Touch outcome
             foreach (var outcome in sender.LastOutbox.OfType<TouchOutcome>())
             {
                 var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
-                initiator?.ReceiveEvent(outcome);
+                if (initiator is not null && !_deadCharacters.Contains(initiator.Id))
+                    initiator.ReceiveEvent(outcome);
             }
 
             foreach (var outcome in sender.LastOutbox.OfType<SexualEncounterOutcome>())
             {
                 var initiator = all.FirstOrDefault(c => c.Id == outcome.From);
-                initiator?.ReceiveEvent(outcome);
+                if (initiator is not null && !_deadCharacters.Contains(initiator.Id))
+                    initiator.ReceiveEvent(outcome);
             }
         }
 

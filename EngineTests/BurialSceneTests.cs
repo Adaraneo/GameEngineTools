@@ -97,6 +97,89 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Death_TakesTheCharacterOffTheMap_AndTheStaleOutboxIsNotReplayed()
+        {
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(Room);
+            var objects = new InMemoryMutableProvider();
+            var orchestrator = BuildOrchestrator(locations, objects);
+            var deceasedId = new HumanId(Guid.NewGuid());
+            var deceased = new BurialSpy(deceasedId, edges: new());
+            deceased.SetLastOutbox(new CharacterDied(Now, deceasedId, DeathCause.OldAge),
+                new ActionCommitted(Now, deceasedId, ActionNames.MoveToFood, WTimeSpan.FromMinutes(20)));
+            locations.MoveCharacter(deceasedId, Room.Id);
+
+            for (var i = 0; i < 3; i++)
+                orchestrator.OnTick(Now + WTimeSpan.FromMinutes(i), new IHuman[] { deceased });
+
+            Assert.IsNull(locations.GetLocation(deceasedId), "A dead character is no longer on the map.");
+            Assert.AreEqual(1, objects.GetAllObjects().Count(o => o.Category == WorldObjectCategory.Corpse), "Exactly one corpse, at the place of death.");
+            Assert.AreEqual(Room.Id, objects.GetAllObjects().Single().LocationId);
+        }
+
+        [TestMethod]
+        public void TwoDeathsInTheSameTick_DoNotMournEachOther()
+        {
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(Room);
+            var orchestrator = BuildOrchestrator(locations, new InMemoryMutableProvider());
+            var aId = new HumanId(Guid.NewGuid());
+            var bId = new HumanId(Guid.NewGuid());
+            var a = new BurialSpy(aId, edges: new() { [bId] = Edge(aId, bId, KinRole.Partner, closeness: 85) });
+            var b = new BurialSpy(bId, edges: new() { [aId] = Edge(bId, aId, KinRole.Partner, closeness: 85) });
+            a.SetLastOutbox(new CharacterDied(Now, aId, DeathCause.Combat));
+            b.SetLastOutbox(new CharacterDied(Now, bId, DeathCause.Combat));
+            locations.MoveCharacter(aId, Room.Id);
+            locations.MoveCharacter(bId, Room.Id);
+
+            orchestrator.OnTick(Now, new IHuman[] { a, b });
+
+            Assert.IsFalse(a.ReceivedEvents.OfType<BereavementOnset>().Any() || b.ReceivedEvents.OfType<BereavementOnset>().Any(),
+                "A character that is already dead cannot start grieving.");
+        }
+
+        [TestMethod]
+        public void DeathInTransit_SpawnsTheCorpseAtTheNearerEndOfTheRoad_AndTheDeadNeverArrive()
+        {
+            var home = new LocationDescriptor("home", "Home", 0.05, 0.01, 50, false, LocationType.Social);
+            var tavern = new LocationDescriptor("tavern", "Tavern", 0.10, 0.02, 50, false, LocationType.Social);
+            var map = new WorldMap(
+                new Dictionary<string, LocationDescriptor>(),
+                new Dictionary<string, IReadOnlyList<WorldConnection>>
+                {
+                    ["home"] = new List<WorldConnection> { new("tavern", 1600.0) }, // 20 min at 80 m/min
+                },
+                new Dictionary<string, IReadOnlyList<string>>());
+
+            string CorpseAt(double minutesIntoTrip)
+            {
+                var locations = new DefaultLocationService();
+                locations.RegisterLocation(home);
+                locations.RegisterLocation(tavern);
+                var objects = new InMemoryMutableProvider();
+                var orchestrator = BuildOrchestrator(locations, objects, new SceneOrchestratorOptions { EnableTravelTime = true }, map);
+                var id = new HumanId(Guid.NewGuid());
+                var walker = new BurialSpy(id, edges: new());
+                walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, PickupItemKind.Food));
+                walker.SetLastOutbox(new ActionCommitted(Now, id, ActionNames.MoveToFood, WTimeSpan.FromMinutes(20)));
+                locations.MoveCharacter(id, "home");
+
+                orchestrator.OnTick(Now, new IHuman[] { walker });
+                Assert.IsNull(locations.GetLocation(id), "On the road.");
+
+                walker.SetLastOutbox(new CharacterDied(Now + WTimeSpan.FromMinutes(minutesIntoTrip), id, DeathCause.Combat));
+                orchestrator.OnTick(Now + WTimeSpan.FromMinutes(minutesIntoTrip), new IHuman[] { walker });
+                orchestrator.OnTick(Now + WTimeSpan.FromMinutes(30), new IHuman[] { walker }); // past the planned arrival
+
+                Assert.IsNull(locations.GetLocation(id), "A character who died on the road never arrives.");
+                return objects.GetAllObjects().Single(o => o.Category == WorldObjectCategory.Corpse).LocationId;
+            }
+
+            Assert.AreEqual("home", CorpseAt(5), "Died in the first half: the body is where the trip began.");
+            Assert.AreEqual("tavern", CorpseAt(15), "Died in the second half: the body is at the destination.");
+        }
+
+        [TestMethod]
         public void Burial_PlacesGraveAtCemetery_WhenConfigured()
         {
             var locations = new DefaultLocationService();
@@ -188,14 +271,14 @@ namespace EngineTests
             });
 
         private static DefaultSceneOrchestrator BuildOrchestrator(
-            DefaultLocationService locations, IMutableWorldObjectProvider objects, SceneOrchestratorOptions? options = null)
+            DefaultLocationService locations, IMutableWorldObjectProvider objects, SceneOrchestratorOptions? options = null, WorldMap? map = null)
             => new DefaultSceneOrchestrator(
                 attractionCalculator: new NeutralAttractionCalculator(),
                 locationService: locations,
                 perceptionPolicy: new FullPerceptionPolicy(),
                 perceptionOptions: new CharacterPerceptionOptions(),
                 lodRuntime: new AllBackgroundLodRuntime(),
-                worldMap: new WorldMap(
+                worldMap: map ?? new WorldMap(
                     new Dictionary<string, LocationDescriptor>(),
                     new Dictionary<string, IReadOnlyList<WorldConnection>>(),
                     new Dictionary<string, IReadOnlyList<string>>()),
@@ -242,6 +325,9 @@ namespace EngineTests
             public void SetLastOutbox(params IDomainEvent[] events) => _lastOutbox = events;
 
             public void SetBereavement(BereavementState state) => _snapshot = _snapshot with { Bereavement = state };
+
+            public void SetKnownObjects(params ObjectLocationFact[] facts)
+                => _snapshot = _snapshot with { Memory = new MemoryIndex(new List<EpisodicMemory>()) { KnownObjects = facts } };
 
             public IReadOnlyList<IDomainEvent> ReceivedEvents => _received;
 

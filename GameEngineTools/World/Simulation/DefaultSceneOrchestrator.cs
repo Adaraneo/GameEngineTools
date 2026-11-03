@@ -139,6 +139,12 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private readonly Characters.Engines.Status.StatusLedger? _statusLedger;
 
+        /// <summary>Characters seen dead (a <see cref="CharacterDied"/> in their outbox); excluded from every social/movement step.</summary>
+        private readonly HashSet<HumanId> _dead = new();
+
+        /// <summary>Reused list of the living characters for one <see cref="OnTick"/>.</summary>
+        private readonly List<IHuman> _livingBuffer = new();
+
         /// <summary>Deaths already routed to mourners — prevents re-delivering bereavement every tick.</summary>
         private readonly HashSet<HumanId> _bereavementRouted = new();
 
@@ -308,21 +314,33 @@ namespace GameEngineTools.World.Simulation
             // Nearby/Player → full social participation.
             _socialCharsBuffer.Clear();
 
+            // A dead character's outbox stays frozen on its last tick, so everything below except bereavement/burial
+            // works on the living only; otherwise its last acts, moves and reputation events would re-fire every tick.
+            _livingBuffer.Clear();
             foreach (var c in chars)
             {
+                if (!_dead.Contains(c.Id) && c.LastOutbox.OfType<CharacterDied>().Any())
+                    _dead.Add(c.Id);
+
+                if (_dead.Contains(c.Id))
+                    continue;
+
+                _livingBuffer.Add(c);
                 if (_lodRuntime.Get(c.Id) != CognitiveResolutionLevel.Background)
                     _socialCharsBuffer.Add(c);
             }
 
+            var living = _livingBuffer;
+
             // ── Community reputation ──────────────────────────────────────────────
             // Fold acts witnessed last tick into the scene ledger BEFORE first impressions,
             // so a newcomer met this tick already inherits the up-to-date local reputation.
-            FoldReputationObservations(chars);
+            FoldReputationObservations(living);
 
             // ── Social status ─────────────────────────────────────────────────────
             // Recompute the emergent Dominance/Prestige consensus and push it into every character
             // so this tick's Psychology reads an up-to-date status×stability stress signal.
-            FoldAndPushStatus(chars);
+            FoldAndPushStatus(living);
 
             // ── Bereavement ───────────────────────────────────────────────────────
             // Route this/last tick's deaths to bonded survivors as grief onsets (+ abstract funerals).
@@ -335,11 +353,11 @@ namespace GameEngineTools.World.Simulation
             // Fold last tick's SignificantOtherThresholdCrossed events into full imprints before
             // this tick's FireFirstImpressions, so a newly-crossed threshold is available for
             // resemblance-checking against people met in a later substep.
-            RouteSignificantOtherImprints(now, chars);
+            RouteSignificantOtherImprints(now, living);
 
             // ── Social functions ──────────────────────────────────────────────────
-            FireFirstImpressions(now, chars);
-            RouteMoveTo(now, chars);
+            FireFirstImpressions(now, living);
+            RouteMoveTo(now, living);
 
             if (_socialCharsBuffer.Count > 0)
             {
@@ -434,15 +452,19 @@ namespace GameEngineTools.World.Simulation
             foreach (var deceased in chars)
             {
                 var death = deceased.LastOutbox.OfType<CharacterDied>().FirstOrDefault();
-                if (death is null || _bereavementRouted.Contains(deceased.Id))
+                if (death is null)
                     continue;
 
-                _bereavementRouted.Add(deceased.Id);
+                if (!_bereavementRouted.Add(deceased.Id))
+                {
+                    RetireDeceased(deceased, now); // retry: the place of death may only now be resolvable
+                    continue;
+                }
 
                 var mourners = new List<IHuman>();
                 foreach (var survivor in chars)
                 {
-                    if (survivor.Id == deceased.Id)
+                    if (survivor.Id == deceased.Id || _dead.Contains(survivor.Id))
                         continue;
 
                     if (!IsMourner(survivor, deceased.Id, out var edge))
@@ -455,8 +477,50 @@ namespace GameEngineTools.World.Simulation
                 }
 
                 EmitFunerals(now, deceased.Id, mourners);
-                SpawnCorpse(deceased);
+                RetireDeceased(deceased, now);
             }
+        }
+
+        /// <summary>
+        /// Spawns the corpse where the character died, then takes them off the map (location + transit) so they are no
+        /// longer perceived, targeted or placed by a pending arrival. Retried each tick until the place of death is known.
+        /// </summary>
+        private void RetireDeceased(IHuman deceased, WDateTime now)
+        {
+            if (_retired.Contains(deceased.Id))
+                return;
+
+            if (_mutableObjects is not null && !_corpseSpawned.Contains(deceased.Id))
+            {
+                SpawnCorpse(deceased, now);
+                if (!_corpseSpawned.Contains(deceased.Id))
+                    return;
+            }
+
+            _locationService.RemoveCharacter(deceased.Id);
+            _inTransit.Remove(deceased.Id);
+            _retired.Add(deceased.Id);
+        }
+
+        /// <summary>Characters already removed from the map after death.</summary>
+        private readonly HashSet<HumanId> _retired = new();
+
+        /// <summary>Where a character is, or — in transit — the end of the road they are nearer to.</summary>
+        private string? ResolvePlaceOfDeath(HumanId id, WDateTime now)
+        {
+            if (_locationService.GetLocation(id) is { } here)
+                return here;
+
+            if (_inTransit.TryGetValue(id, out var trip))
+            {
+                var total = (trip.ArriveAt - trip.DepartAt).Ticks;
+                var elapsed = (now - trip.DepartAt).Ticks;
+                var past = total > 0 && elapsed * 2 >= total;
+                var place = past ? trip.Destination : trip.Origin;
+                return string.IsNullOrEmpty(place) ? trip.Destination : place;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -473,12 +537,12 @@ namespace GameEngineTools.World.Simulation
         }
 
         /// <summary>Spawns a corpse object at the place of death (physical burial only; no-op without a mutable provider).</summary>
-        private void SpawnCorpse(IHuman deceased)
+        private void SpawnCorpse(IHuman deceased, WDateTime now)
         {
             if (_mutableObjects is null || _corpseSpawned.Contains(deceased.Id))
                 return;
 
-            var location = _locationService.GetLocation(deceased.Id);
+            var location = ResolvePlaceOfDeath(deceased.Id, now);
             if (location is null)
                 return;
 
