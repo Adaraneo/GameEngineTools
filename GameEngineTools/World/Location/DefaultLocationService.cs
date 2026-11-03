@@ -68,6 +68,12 @@ namespace GameEngineTools.World.Location
         /// </summary>
         private readonly Dictionary<HumanId, string> _lastDispatchedLocation = new();
 
+        /// <summary>Noise/crowding/privacy each character was last told about, to re-announce when occupancy changes them materially.</summary>
+        private readonly Dictionary<HumanId, (double Noise, double Crowding, bool Privacy)> _lastDispatchedEnvironment = new();
+
+        private const double NoiseRedispatchDelta = 0.05;
+        private const double CrowdingRedispatchDelta = 0.1;
+
         #endregion Private state
 
         #region ILocationService — registration
@@ -146,10 +152,6 @@ namespace GameEngineTools.World.Location
                     continue;
                 }
 
-                // Only dispatch if location changed — or if caller forces a full refresh.
-                if (!forceAll && previousLocation == locationId)
-                    continue;
-
                 if (!_descriptors.TryGetValue(locationId, out var desc))
                     continue;
 
@@ -158,6 +160,18 @@ namespace GameEngineTools.World.Location
                 var noise = ComputeNoise(desc, characterCount);
                 var crowding = ComputeCrowding(desc, characterCount);
                 var privacy = desc.AllowsPrivacy && characterCount <= 2;
+
+                // Dispatch when the location changed, when the caller forces a full refresh, or when others arriving/leaving
+                // changed the surface materially (a stale "private" or "quiet" would otherwise stay with the character).
+                if (!forceAll
+                    && previousLocation == locationId
+                    && _lastDispatchedEnvironment.TryGetValue(character.Id, out var last)
+                    && last.Privacy == privacy
+                    && Math.Abs(last.Noise - noise) < NoiseRedispatchDelta
+                    && Math.Abs(last.Crowding - crowding) < CrowdingRedispatchDelta)
+                {
+                    continue;
+                }
 
                 var normContext = desc.NormId is { } normId && _normProvider is not null
                     ? _normProvider.GetNormContext(normId)
@@ -174,6 +188,7 @@ namespace GameEngineTools.World.Location
                     NormContext: normContext));
 
                 _lastDispatchedLocation[character.Id] = locationId;
+                _lastDispatchedEnvironment[character.Id] = (noise, crowding, privacy);
             }
         }
 

@@ -384,6 +384,23 @@ namespace GameEngineTools.World.Simulation
         public void InvalidateLocation(string locationId)
             => _fullyMetLocations.Remove(locationId);
 
+        /// <summary>
+        /// Forgets all per-character and per-location state. Call it together with
+        /// <c>SimulationScene.ResetCharacters()</c> when the roster is replaced, so stale deaths, trips and
+        /// "everyone here has met" flags do not leak into the new world.
+        /// </summary>
+        public void Reset()
+        {
+            _fullyMetLocations.Clear();
+            _socialCharsBuffer.Clear();
+            _livingBuffer.Clear();
+            _dead.Clear();
+            _retired.Clear();
+            _bereavementRouted.Clear();
+            _corpseSpawned.Clear();
+            _inTransit.Clear();
+        }
+
         #endregion Public API
 
         #region Community reputation

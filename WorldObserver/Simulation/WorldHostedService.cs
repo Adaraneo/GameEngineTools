@@ -440,6 +440,7 @@ namespace WorldObserver.Simulation
                     ctx.Locations.RemoveCharacter(c.Id);
 
             scene.ResetCharacters();
+            ctx.Orchestrator.Reset();
             names.Clear();
             _trails.Clear();
             _dialogueLog.Clear();

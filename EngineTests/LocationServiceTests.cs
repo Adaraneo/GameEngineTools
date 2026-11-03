@@ -242,6 +242,27 @@ namespace EngineTests
                 $"Overcrowded location must clamp Noise to 1.0. Actual: {ev.Noise:F4}");
         }
 
+        [TestMethod]
+        public void DispatchContextEvents_OthersArriving_ReannouncesTheChangedSurface_ToThoseAlreadyThere()
+        {
+            _sut.RegisterLocation(Library);
+            var first = NewFakeCharacter();
+            _sut.MoveCharacter(first.Id, Library.Id);
+            _sut.DispatchContextEvents(Now, new[] { first });
+            Assert.AreEqual(1, first.ReceivedEvents.OfType<ContextChanged>().Count());
+
+            // No one else came: nothing to re-announce.
+            _sut.DispatchContextEvents(Now, new[] { first });
+            Assert.AreEqual(1, first.ReceivedEvents.OfType<ContextChanged>().Count(), "An unchanged surface is not re-sent.");
+
+            var crowd = BuildCharactersInLocation(8, Library.Id);
+            _sut.DispatchContextEvents(Now, new[] { first }.Concat(crowd).ToArray());
+
+            var latest = first.ReceivedEvents.OfType<ContextChanged>().Last();
+            Assert.AreEqual(2, first.ReceivedEvents.OfType<ContextChanged>().Count(), "Eight arrivals change noise and crowding materially.");
+            Assert.IsTrue(latest.Crowding > 0.5, $"The stale low crowding must be replaced (got {latest.Crowding:F2}).");
+        }
+
         #endregion Noise — computation
 
         // ════════════════════════════════════════════════════════════════════

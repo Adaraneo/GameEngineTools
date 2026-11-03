@@ -118,6 +118,28 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Reset_ForgetsDeathsSoTheSameIdCanBeRoutedAgainInANewWorld()
+        {
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(Room);
+            var objects = new InMemoryMutableProvider();
+            var orchestrator = BuildOrchestrator(locations, objects);
+            var id = new HumanId(Guid.NewGuid());
+            var spy = new BurialSpy(id, edges: new());
+            spy.SetLastOutbox(new CharacterDied(Now, id, DeathCause.OldAge));
+            locations.MoveCharacter(id, Room.Id);
+            orchestrator.OnTick(Now, new IHuman[] { spy });
+            Assert.AreEqual(1, objects.GetAllObjects().Count(o => o.Category == WorldObjectCategory.Corpse));
+
+            orchestrator.Reset();
+            locations.MoveCharacter(id, Room.Id);
+            orchestrator.OnTick(Now, new IHuman[] { spy });
+
+            Assert.AreEqual(1, objects.GetAllObjects().Count(o => o.Category == WorldObjectCategory.Corpse), "Same id, same corpse object id: re-spawned, not duplicated.");
+            Assert.IsNull(locations.GetLocation(id), "After the reset the death is processed afresh and the character is retired again.");
+        }
+
+        [TestMethod]
         public void ReloadedDeadCharacter_IsTakenOffTheMap()
         {
             var locations = new DefaultLocationService();
