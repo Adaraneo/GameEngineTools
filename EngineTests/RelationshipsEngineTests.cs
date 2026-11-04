@@ -88,6 +88,28 @@ namespace EngineTests
         /// (50 + (prior − 0.4) × ReputationTrustPriorWeight).
         /// </summary>
         [TestMethod]
+        public void Decay_OverTheEdgeCap_ForgetsTheWeakestAcquaintances_ButNeverKin()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var engine = BuildEngine(DefaultCfg with { MaxEdges = 3 });
+            var ctx = BuildContext(self);
+            var strangers = Enumerable.Range(0, 6).Select(_ => new HumanId(Guid.NewGuid())).ToList();
+            foreach (var other in strangers)
+                engine.Handle(new FirstImpressionFormed(_now, self, other, Like: 50, Attraction: 40), ctx, _outbox);
+            var sibling = new HumanId(Guid.NewGuid());
+            engine.Handle(new FirstImpressionFormed(_now, self, sibling, Like: 50, Attraction: 40), ctx, _outbox);
+            engine.RestoreState(new RelationshipState(engine.State.Edges.ToDictionary(
+                kv => kv.Key, kv => kv.Key == sibling ? kv.Value with { KinRole = KinRole.Sibling } : kv.Value)));
+            var outbox = new EventCollector();
+
+            engine.Tick(_now + WTimeSpan.FromDays(1), WTimeSpan.FromDays(1), ctx, outbox);
+
+            Assert.IsTrue(engine.State.Edges.ContainsKey(sibling), "Kin are never pruned.");
+            Assert.IsTrue(engine.State.Edges.Count <= 4, $"Cap 3 plus the protected sibling; got {engine.State.Edges.Count}.");
+            Assert.AreEqual(7 - engine.State.Edges.Count, outbox.Drain().OfType<EdgePruned>().Count(), "One EdgePruned per dropped edge.");
+        }
+
+        [TestMethod]
         public void Handle_FirstImpression_TrustPrior_ShiftsSeededTrust()
         {
             // Arrange — three independent meetings, identical attraction, differing reputation prior.

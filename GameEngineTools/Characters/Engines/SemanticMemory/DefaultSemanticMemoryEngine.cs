@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
     using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Traits;
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
@@ -99,6 +100,10 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
             {
                 case MemoryEncoded encoded:
                     HandleMemoryEncoded(encoded, ctx, outbox);
+                    break;
+
+                case EdgePruned pruned when pruned.Human == ctx.Id:
+                    ForgetPerson(pruned.Other);
                     break;
 
                 case SignificantOtherImprintCaptured soic when soic.Self == ctx.Id:

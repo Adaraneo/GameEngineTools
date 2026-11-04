@@ -1209,6 +1209,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
                 dict[kv.Key] = decayed;
             }
 
+            PruneWeakestEdges(dict, ctx, now, outbox);
+
             State = new RelationshipState(dict);
 
             using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultRelationshipsEngine)))
@@ -1398,6 +1400,28 @@ namespace GameEngineTools.Characters.Engines.Relationships
         #endregion Observer norm reactions
 
         #region RestoreState
+
+        /// <summary>Drops the weakest removable acquaintances while the graph is over <see cref="RelationshipsConfig.MaxEdges"/>.</summary>
+        private void PruneWeakestEdges(Dictionary<HumanId, RelationshipEdge> dict, IHumanContext ctx, WDateTime now, IEventCollector outbox)
+        {
+            var excess = dict.Count - Config.MaxEdges;
+            if (excess <= 0)
+                return;
+
+            var victims = dict.Values
+                .Where(e => e.KinRole == KinRole.None && !e.IsContemptuouslyDestroyed)
+                .OrderBy(e => e.Familiarity + e.Closeness)
+                .ThenBy(e => e.B.Value)
+                .Take(excess)
+                .Select(e => e.B)
+                .ToList();
+
+            foreach (var other in victims)
+            {
+                dict.Remove(other);
+                outbox.Add(new EdgePruned(now, ctx.Id, other));
+            }
+        }
 
         /// <inheritdoc/>
         public void RestoreState(RelationshipState state) => State = state;

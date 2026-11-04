@@ -542,6 +542,23 @@ namespace EngineTests
                 Significance: significance);
 
         [TestMethod]
+        public void PrunedRelationshipEdge_MakesTheCharacterForgetThePerson()
+        {
+            var engine = BuildEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildContext(self);
+            engine.Handle(new MemoryEncoded(new WDateTime(0), self, Guid.NewGuid(), 0.5,
+                "Interaction:Validation:accepted", "PerceivedWarmth:Interaction:Validation:accepted",
+                other, new PersonBeliefEvidence(other, PersonBeliefKind.Warm, 0.5, "test")), ctx, new EventCollector());
+            Assert.IsNotNull(engine.State.GetBeliefs(other));
+
+            engine.Handle(new EdgePruned(new WDateTime(0), self, other), ctx, new EventCollector());
+
+            Assert.IsNull(engine.State.GetBeliefs(other), "A person the character no longer has a relationship with is forgotten.");
+        }
+
+        [TestMethod]
         public void SignificantOthers_SurvivesForgetPerson()
         {
             var engine = BuildEngine();

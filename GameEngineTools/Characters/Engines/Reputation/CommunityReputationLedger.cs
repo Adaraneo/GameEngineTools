@@ -26,8 +26,25 @@ namespace GameEngineTools.Characters.Engines.Reputation
 
         /// <summary>Creates a ledger with the given reputation decay half-life.</summary>
         /// <param name="halfLifeInteractions">Number of interactions over which reputation weight halves.</param>
-        public CommunityReputationLedger(double halfLifeInteractions = ReputationMath.DefaultHalfLifeInteractions)
-            => _halfLife = halfLifeInteractions;
+        /// <param name="maxEntries">Cap on stored (subject, locale) reputations; the stalest are dropped past it.</param>
+        public CommunityReputationLedger(double halfLifeInteractions = ReputationMath.DefaultHalfLifeInteractions, int maxEntries = 5000)
+        {
+            _halfLife = halfLifeInteractions;
+            _maxEntries = maxEntries;
+        }
+
+        private readonly int _maxEntries;
+
+        private void TrimStalest()
+        {
+            if (_map.Count <= _maxEntries)
+                return;
+
+            // Drop down to 90 % of the cap in one go so trimming is not paid on every observation.
+            var keep = (int)(_maxEntries * 0.9);
+            foreach (var key in _map.OrderBy(kv => kv.Value.LastUpdatedAt.WorldTicks).Take(_map.Count - keep).Select(kv => kv.Key).ToList())
+                _map.Remove(key);
+        }
 
         /// <summary>Forgets every recorded reputation (a replaced world starts from scratch).</summary>
         public void Clear() => _map.Clear();
@@ -59,6 +76,8 @@ namespace GameEngineTools.Characters.Engines.Reputation
                 Spread = ReputationMath.UpdateSpread(current.Spread),
                 LastUpdatedAt = now
             };
+
+            TrimStalest();
         }
 
         /// <summary>Convenience overload that folds a domain event at a given locale.</summary>

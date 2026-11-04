@@ -374,7 +374,14 @@ namespace GameEngineTools.Characters.Engines.Relationships
         /// design — the decision spike used a larger placeholder; 4.0 keeps per-act shifts (~±0.5) in
         /// line with the other interaction Respect deltas.
         /// </summary>
-        double PowerRespectGain = 4.0)
+        double PowerRespectGain = 4.0,
+
+        /// <summary>
+        /// Soft cap on the number of relationship edges a character keeps. Past it the weakest acquaintances (lowest
+        /// familiarity + closeness; kin, partners and contemptuously-destroyed bonds are never dropped) are forgotten, so state
+        /// stays bounded in a large world. Default 500.
+        /// </summary>
+        int MaxEdges = 500)
     {
         /// <summary>
         /// Parameterless constructor required by DI options binding.
@@ -429,7 +436,8 @@ namespace GameEngineTools.Characters.Engines.Relationships
             CommitmentDecayResistance: 0.6,
             DissolutionCommitmentThreshold: 15.0,
             EnablePowerRespectPropagation: false,
-            PowerRespectGain: 4.0)
+            PowerRespectGain: 4.0,
+            MaxEdges: 500)
         { }
     }
 }

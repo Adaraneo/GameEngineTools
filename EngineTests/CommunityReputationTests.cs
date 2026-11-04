@@ -45,6 +45,19 @@ namespace EngineTests
         #region Test 2 — recency decay half-life
 
         [TestMethod]
+        public void Reputation_OverTheCap_DropsTheStalestEntries()
+        {
+            var ledger = new CommunityReputationLedger(maxEntries: 10);
+            var subjects = Enumerable.Range(0, 25).Select(_ => new HumanId(Guid.NewGuid())).ToList();
+            for (var i = 0; i < subjects.Count; i++)
+                ledger.Observe(subjects[i], "square", ThirdPartyObservationType.PositiveAct, At(100) + WTimeSpan.FromDays(i));
+
+            Assert.IsTrue(ledger.Snapshot().Count <= 10, $"The cap holds (got {ledger.Snapshot().Count}).");
+            Assert.IsNotNull(ledger.Get(subjects[^1], "square"), "The freshest reputation survives.");
+            Assert.IsNull(ledger.Get(subjects[0], "square"), "The stalest is the first to go.");
+        }
+
+        [TestMethod]
         public void Reputation_Clear_ForgetsEverySubject()
         {
             var ledger = new CommunityReputationLedger();
