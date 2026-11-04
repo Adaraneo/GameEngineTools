@@ -52,7 +52,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
         private readonly IRandomSource _rng;
         private readonly Status.StatusConfig _statusConfig;
         private WDateTime? _stressAbove70Since;
-        private double _previousAllostaticLoad;
+        private double? _previousAllostaticLoad; // null until seen once, so a loaded character does not fire a spurious crossing
 
         // Listener-side interpretation goes through the ambient SpeechActInterpretation.Current
         // (WWorld-style): hosts can enable the connotation layer once at startup and Psychology +
@@ -673,12 +673,13 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
             foreach (var threshold in new[] { 60.0, 80.0 })
             {
-                if (_previousAllostaticLoad < threshold && ph.AllostaticLoad >= threshold)
+                var previousLoad = _previousAllostaticLoad ?? ph.AllostaticLoad;
+                if (previousLoad < threshold && ph.AllostaticLoad >= threshold)
                 {
                     using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultPsychologyEngine)))
                     {
                         _log.AllostaticLoadMilestone(ctx.Id.Value.ToString(),
-                            threshold, _previousAllostaticLoad, ph.AllostaticLoad, ph.CortisolLevel);
+                            threshold, previousLoad, ph.AllostaticLoad, ph.CortisolLevel);
                     }
                 }
             }

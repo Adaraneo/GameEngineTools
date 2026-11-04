@@ -689,7 +689,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             #endregion Natural mortality check
 
-            State = s;
+            State = s with
+            {
+                DayAccumulatorHours = _accHours,
+                InjuryAccumulatorHours = _injuryAccHours,
+                PostpartumAccumulatorHours = _postpartumAccHours,
+            };
         }
 
         /// <summary>
@@ -1411,7 +1416,20 @@ namespace GameEngineTools.Characters.Engines.Physiology
         }
 
         /// <inheritdoc/>
-        public void RestoreState(PhysiologyState state) => State = state;
+        public void RestoreState(PhysiologyState state)
+        {
+            State = state;
+            RestoreAccumulators(state);
+        }
+
+        /// <summary>Reinstates the partial-day counters and the menses flag the engine keeps outside its state record.</summary>
+        private void RestoreAccumulators(PhysiologyState state)
+        {
+            _accHours = state.DayAccumulatorHours ?? 0.0;
+            _injuryAccHours = state.InjuryAccumulatorHours ?? 0.0;
+            _postpartumAccHours = state.PostpartumAccumulatorHours ?? 0.0;
+            _mensesOn = state.Cycle?.Phase == CyclePhase.Menses;
+        }
 
         /// <summary>
         /// Replaces the current state with the provided snapshot.
@@ -1430,6 +1448,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 state = state with { Cycle = null };
 
             State = state;
+            RestoreAccumulators(state);
         }
 
         #region Object affordance application

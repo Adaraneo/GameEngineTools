@@ -1621,6 +1621,44 @@ namespace EngineTests
             // (konkrétní assertování vyžaduje specializovaný kontext se správným OccurredAt)
         }
 
+        [TestMethod]
+        public void RestoreState_KeepsThePartialDayCounter_SoALoadedCharacterContinuesTheCycleOnSchedule()
+        {
+            var ctx = BuildContextWithAction(null);
+            var start = WDateTime.New(116, 1, 1, 0);
+            var step = WTimeSpan.FromHours(11);
+
+            var continuous = BuildEngineForBiologyAge(SexBiology.Female, 25, cycleEnabled: true);
+            for (var i = 0; i < 6; i++)
+                continuous.Tick(start + WTimeSpan.FromHours(11 * i), step, ctx, new EventCollector());
+
+            var first = BuildEngineForBiologyAge(SexBiology.Female, 25, cycleEnabled: true);
+            for (var i = 0; i < 3; i++)
+                first.Tick(start + WTimeSpan.FromHours(11 * i), step, ctx, new EventCollector());
+            var resumed = BuildEngineForBiologyAge(SexBiology.Female, 25, cycleEnabled: true);
+            resumed.RestoreState(first.State);
+            for (var i = 3; i < 6; i++)
+                resumed.Tick(start + WTimeSpan.FromHours(11 * i), step, ctx, new EventCollector());
+
+            Assert.IsNotNull(first.State.DayAccumulatorHours, "The counter is part of the state.");
+            Assert.AreEqual(continuous.State.Cycle!.DayInCycle, resumed.State.Cycle!.DayInCycle,
+                "Save/load in the middle of a day must not lose the hours already counted.");
+        }
+
+        [TestMethod]
+        public void RestoreState_InMenses_DoesNotAnnounceMensesStartingAgain()
+        {
+            var engine = BuildEngineForBiologyAge(SexBiology.Female, 25, cycleEnabled: true);
+            var state = engine.State with { Cycle = engine.State.Cycle! with { Phase = CyclePhase.Menses, DayInCycle = 2 } };
+            var fresh = BuildEngineForBiologyAge(SexBiology.Female, 25, cycleEnabled: true);
+            fresh.RestoreState(state);
+            var events = new EventCollector();
+
+            fresh.Tick(WDateTime.New(116, 1, 1, 0), WTimeSpan.FromMinutes(5), BuildContextWithAction(null), events);
+
+            Assert.IsFalse(events.Drain().OfType<MensesStarted>().Any(), "A character loaded during menses is already menstruating.");
+        }
+
         private static DefaultPhysiologyEngine BuildEngineForBiologyAge(
             SexBiology biology, int ageYears, bool cycleEnabled = false)
         {

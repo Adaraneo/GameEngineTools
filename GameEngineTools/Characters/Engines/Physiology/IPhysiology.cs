@@ -700,7 +700,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// drops to zero or below, so the circadian phase (not a fixed duration) ends sleep. <c>null</c> until the first tick.
         /// Source: Daan, Beersma &amp; Borbély (1984).
         /// </summary>
-        double? WakeMargin = null);
+        double? WakeMargin = null,
+        /// <summary>Hours of the current world day already counted toward the next cycle-day advance (kept so a save/load does not lose them). <c>null</c> in older saves.</summary>
+        double? DayAccumulatorHours = null,
+        /// <summary>Hours toward the next injury-healing day. <c>null</c> in older saves.</summary>
+        double? InjuryAccumulatorHours = null,
+        /// <summary>Hours toward the next postpartum day. <c>null</c> in older saves.</summary>
+        double? PostpartumAccumulatorHours = null);
 
     /// <summary>
     /// The physiology engine — first stage of the per-character tick pipeline. Advances
