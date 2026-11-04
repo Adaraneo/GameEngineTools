@@ -71,6 +71,7 @@ namespace GameEngineTools.FileSystem
                 ReferenceHandler = ReferenceHandler.IgnoreCycles,
                 Converters =
                 {
+                    new JsonStringEnumConverter(), // enums as names: reordering one in code must not change what a saved character means
                     new HumanIdJsonConverter(),
                     new WDateTimeJsonConverter(),
                     new WTimeSpanJsonConverter(),
@@ -203,6 +204,7 @@ namespace GameEngineTools.FileSystem
         private CharacterData BuildCharacterData(CharacterBase character) => new()
         {
             Vocabulary = _lexicon?.SnapshotFor(character.Person.Id),
+            SchemaVersion = CharacterData.CurrentSchemaVersion,
             Id = character.Person.Id,
             Identity = character.Person.Identity,
             Biology = character.Person.Biology,
@@ -256,15 +258,22 @@ namespace GameEngineTools.FileSystem
         private void WriteJson(string path, CharacterData data)
         {
             var json = JsonSerializer.Serialize(data, _jsonOptions);
-            using var file = new StreamWriter(File.Create(path));
-            file.Write(json);
+
+            // Write beside the target and rename over it, so a crash never leaves a half-written (unreadable) character.
+            var temp = path + ".tmp";
+            File.WriteAllText(temp, json);
+            File.Move(temp, path, overwrite: true);
         }
 
         /// <summary>Loads and deserializes a <see cref="CharacterData"/> from a file.</summary>
         private CharacterData ReadJson(string path)
         {
             using var file = new StreamReader(File.OpenRead(path));
-            return JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions)!;
+            var data = JsonSerializer.Deserialize<CharacterData>(file.ReadToEnd(), _jsonOptions)!;
+            if (data.SchemaVersion > CharacterData.CurrentSchemaVersion)
+                throw new InvalidDataException(
+                    $"Character file is format version {data.SchemaVersion}, newer than this build reads ({CharacterData.CurrentSchemaVersion}).");
+            return data;
         }
 
         #endregion Privátní pomocné metody

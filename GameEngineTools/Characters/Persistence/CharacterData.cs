@@ -15,6 +15,12 @@ namespace GameEngineTools.Characters.Persistence
     /// </summary>
     public sealed record CharacterData
     {
+        /// <summary>The file format version this build writes and reads (a file without one is version 0 and still loads).</summary>
+        public const int CurrentSchemaVersion = 1;
+
+        /// <summary>Gets the format version of the file; a file from a newer build than this one is refused on import.</summary>
+        public int SchemaVersion { get; init; }
+
         /// <summary>Gets the unique identifier of the character.</summary>
         public HumanId Id { get; init; }
 

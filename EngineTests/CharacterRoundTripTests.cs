@@ -8,6 +8,7 @@ namespace EngineTests
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
+    using System.IO;
     using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
@@ -73,6 +74,48 @@ namespace EngineTests
             Assert.IsTrue(a.Snapshot.Relationships.Edges.ContainsKey(b.Id), "The scenario must produce a relationship edge.");
             Assert.IsTrue(a.Snapshot.Memory.Episodes.Count > 0, "The scenario must produce memories.");
             AssertRoundTrips(a);
+        }
+
+        [TestMethod]
+        public void ExportedFile_CarriesAFormatVersionAndWritesEnumsAsNames_WithoutLeavingATempFile()
+        {
+            var person = CharacterManager.RandomizePerson(maxAge: 40, sexBiology: GameEngineTools.Characters.Core.SexBiology.Female, minAge: 25);
+
+            var file = GeneratedFile.Export(new NPC(100, person));
+            var path = Path.Combine(GeneratedFile.NPCDirectory, file);
+            var json = File.ReadAllText(path);
+
+            StringAssert.Contains(json, "\"SchemaVersion\": 1");
+            StringAssert.Contains(json, "\"Biology\": \"Female\"");
+            Assert.IsFalse(File.Exists(path + ".tmp"), "The temp file is renamed away.");
+        }
+
+        [TestMethod]
+        public void LegacyFile_WithoutVersionAndWithNumericEnums_StillImports()
+        {
+            var person = CharacterManager.RandomizePerson(maxAge: 40, sexBiology: GameEngineTools.Characters.Core.SexBiology.Female, minAge: 25);
+            var file = GeneratedFile.Export(new NPC(100, person));
+            var path = Path.Combine(GeneratedFile.NPCDirectory, file);
+            var legacy = File.ReadAllText(path)
+                .Replace("\"SchemaVersion\": 1,", string.Empty)
+                .Replace("\"Biology\": \"Female\"", $"\"Biology\": {(int)GameEngineTools.Characters.Core.SexBiology.Female}");
+            File.WriteAllText(path, legacy);
+
+            var imported = GeneratedFile.ImportNPC(file).Person;
+
+            Assert.AreEqual(person.Id, imported.Id);
+            Assert.AreEqual(GameEngineTools.Characters.Core.SexBiology.Female, imported.Biology);
+        }
+
+        [TestMethod]
+        public void FileFromANewerBuild_IsRefused()
+        {
+            var person = CharacterManager.RandomizePerson(maxAge: 40, sexBiology: null, minAge: 25);
+            var file = GeneratedFile.Export(new NPC(100, person));
+            var path = Path.Combine(GeneratedFile.NPCDirectory, file);
+            File.WriteAllText(path, File.ReadAllText(path).Replace("\"SchemaVersion\": 1", "\"SchemaVersion\": 99"));
+
+            Assert.Throws<InvalidDataException>(() => GeneratedFile.ImportNPC(file));
         }
 
         private void AssertRoundTrips(GameEngineTools.Characters.Core.IHuman person)
