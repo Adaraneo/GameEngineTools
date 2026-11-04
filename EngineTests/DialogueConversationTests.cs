@@ -102,6 +102,63 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Coordinator_ActAfterTheExchangeWentIdle_StartsTheTurnCountAgain()
+        {
+            var coord = new ConversationCoordinator(idleTimeout: WTimeSpan.FromHours(2));
+            for (var i = 0; i < 10; i++) // a long exchange that reaches the safety limit on obligation-driven replies
+            {
+                var speaker = i % 2 == 0 ? A : B;
+                var addressee = i % 2 == 0 ? B : A;
+                coord.Observe(Act(RelationalActKind.Question, speaker, addressee, 1000 + i), speaker, addressee, new WDateTime(1000 + i));
+            }
+
+            var later = new WDateTime(1100) + WTimeSpan.FromHours(5);
+            coord.Observe(Act(RelationalActKind.Question, A, B, later.WorldTicks), A, B, later);
+
+            Assert.IsTrue(coord.TryGetObligation(B, later, out var partner, out _), "A new exchange after a long silence is not held back by the old turn count.");
+            Assert.AreEqual(A, partner);
+        }
+
+        [TestMethod]
+        public void Coordinator_Sweep_DropsIdleConversationsNobodyAskedAbout()
+        {
+            var coord = new ConversationCoordinator(idleTimeout: WTimeSpan.FromHours(2));
+            coord.Observe(Act(RelationalActKind.Question, A, B, 1000), A, B, new WDateTime(1000));
+            Assert.AreEqual(1, coord.ActiveCount);
+
+            coord.Sweep(new WDateTime(1000) + WTimeSpan.FromHours(3));
+
+            Assert.AreEqual(0, coord.ActiveCount);
+        }
+
+        [TestMethod]
+        public void Coordinator_TwoEquallyFreshQuestions_AreAnsweredInTheSameOrderWhateverWasObservedFirst()
+        {
+            var c = new HumanId(Guid.Parse("cccccccc-0000-0000-0000-000000000003"));
+            var now = new WDateTime(1000);
+
+            HumanId Pick(bool aFirst)
+            {
+                var coord = new ConversationCoordinator();
+                if (aFirst)
+                {
+                    coord.Observe(Act(RelationalActKind.Question, A, B, 1000), A, B, now);
+                    coord.Observe(Act(RelationalActKind.Question, c, B, 1000), c, B, now);
+                }
+                else
+                {
+                    coord.Observe(Act(RelationalActKind.Question, c, B, 1000), c, B, now);
+                    coord.Observe(Act(RelationalActKind.Question, A, B, 1000), A, B, now);
+                }
+
+                Assert.IsTrue(coord.TryGetObligation(B, now, out var partner, out _));
+                return partner;
+            }
+
+            Assert.AreEqual(Pick(aFirst: true), Pick(aFirst: false), "Insertion order must not decide who is answered first.");
+        }
+
+        [TestMethod]
         public void Coordinator_NonObligingAct_OwesNothing()
         {
             var coord = new ConversationCoordinator();

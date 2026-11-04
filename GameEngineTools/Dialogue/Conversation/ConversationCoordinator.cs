@@ -5,6 +5,7 @@ namespace GameEngineTools.Dialogue.Conversation
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Utils.Time;
 
@@ -79,8 +80,25 @@ namespace GameEngineTools.Dialogue.Conversation
         {
             ArgumentNullException.ThrowIfNull(act);
             var key = Key(speaker, addressee);
-            var turns = _active.TryGetValue(key, out var existing) ? existing.TurnCount + 1 : 1;
+
+            // An exchange that went idle is over: a new act starts it afresh instead of continuing the old turn count.
+            var continuing = _active.TryGetValue(key, out var existing)
+                             && now.WorldTicks - existing.LastActivity.WorldTicks <= IdleTicks;
+            var turns = continuing ? existing.TurnCount + 1 : 1;
             _active[key] = new ConversationContext(act, speaker, now, turns);
+
+            if (++_observations % SweepEveryObservations == 0)
+                Sweep(now);
+        }
+
+        private const int SweepEveryObservations = 64;
+        private int _observations;
+
+        /// <summary>Drops every conversation idle for longer than the idle timeout, so entries that are never asked about do not pile up.</summary>
+        public void Sweep(WDateTime now)
+        {
+            foreach (var key in _active.Where(kv => now.WorldTicks - kv.Value.LastActivity.WorldTicks > IdleTicks).Select(kv => kv.Key).ToList())
+                _active.Remove(key);
         }
 
         /// <summary>
@@ -185,7 +203,9 @@ namespace GameEngineTools.Dialogue.Conversation
                     continue;              // the act does not oblige a response
                 }
 
-                if (convo.LastActivity.WorldTicks > bestActivity)
+                // Freshest question wins; at equal time the lower partner id does, so the choice never depends on insertion order.
+                if (convo.LastActivity.WorldTicks > bestActivity
+                    || (convo.LastActivity.WorldTicks == bestActivity && found && partner.Value.CompareTo(other.Value) < 0))
                 {
                     bestActivity = convo.LastActivity.WorldTicks;
                     other = partner;
