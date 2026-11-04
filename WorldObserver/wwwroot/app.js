@@ -157,7 +157,8 @@ async function exportCharacters() {
     a.download = "world_" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
     a.click();
     URL.revokeObjectURL(a.href);
-    toast(`Exportováno ${files.length} postav + čas světa do souboru.`);
+    const charCount = files.filter((f) => f.fileName !== "_worldstate.json").length;
+    toast(`Exportováno ${charCount} postav + čas a stav světa do souboru.`);
 }
 
 async function postImport(files, replace, worldTimeTicks) {

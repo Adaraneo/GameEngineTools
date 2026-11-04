@@ -15,6 +15,7 @@ namespace WorldObserver.Simulation
     using GameEngineTools.Dialogue.Hosting;
     using GameEngineTools.FileSystem;
     using GameEngineTools.Narrative;
+    using GameEngineTools.World.Persistence;
     using GameEngineTools.World.Simulation;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.AspNetCore.SignalR;
@@ -55,6 +56,9 @@ namespace WorldObserver.Simulation
         private readonly Dictionary<HumanId, object> _lastRecordedAct = new();
 
         private long _lastPushTicks;
+
+        /// <summary>Name of the extra bundle entry that carries the shared world state (prices, reputations, standing, trips).</summary>
+        private const string WorldStateFileName = "_worldstate.json";
 
         /// <summary>Creates the service with the SignalR hub context, control state and options.</summary>
         public WorldHostedService(
@@ -118,7 +122,12 @@ namespace WorldObserver.Simulation
             var genFile = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
             _liveChars = ctx.Characters;
             // Export bundles the current world clock (portable WorldTicks) with the characters.
-            _port.Configure(() => new ExportBundleDto(ctx.Clock.Now.WorldTicks, ExportLiveCharacters(genFile)));
+            _port.Configure(() =>
+            {
+                var files = ExportLiveCharacters(genFile);
+                files.Add(CaptureWorldStateFile(ctx, runtime.Services));
+                return new ExportBundleDto(ctx.Clock.Now.WorldTicks, files);
+            });
 
             // Mutable so newborns can be added to the narrative resolver as they are born.
             var names = ctx.Characters.ToDictionary(
@@ -171,12 +180,23 @@ namespace WorldObserver.Simulation
                             _log.LogInformation("World clock restored to {Time}.", ctx.Clock.Now);
                         }
 
+                        var worldFile = importFiles.FirstOrDefault(IsWorldStateFile);
+                        importFiles = importFiles.Where(f => !IsWorldStateFile(f)).ToList();
+                        WorldSaveState? savedWorld = replace && worldFile is not null
+                            ? ApplySavedWorld(worldFile, ctx, runtime.Services)
+                            : null;
+
                         var batch = new HashSet<HumanId>();
                         foreach (var f in importFiles)
                         {
                             try { ApplyImport(f, genFile, ctx, scene, names, replace, batch); }
                             catch (Exception ex) { _log.LogWarning(ex, "Import of a character failed."); }
                         }
+
+                        // Put the characters that came with the save back where they stood (others keep the place import gave them).
+                        if (savedWorld is not null)
+                            foreach (var p in savedWorld.Placements.Where(p => batch.Contains(p.Character)))
+                                ctx.Locations.MoveCharacter(p.Character, p.LocationId);
                     }
 
                     // (3c) Push bereavement domain events as Czech narrative lines.
@@ -395,6 +415,48 @@ namespace WorldObserver.Simulation
         /// world: generates it from both parents, wires family bonds, places it at the mother's location,
         /// registers its name for narration, and adds it to the running scene. Needs both parents present.
         /// </summary>
+        private static bool IsWorldStateFile(CharacterFileDto f)
+            => string.Equals(f.FileName, WorldStateFileName, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>Captures the shared world state (prices, reputations, standing, placements, trips) as one bundle entry.</summary>
+        private static CharacterFileDto CaptureWorldStateFile(WorldContext ctx, IServiceProvider services)
+        {
+            var state = WorldStateStore.Capture(
+                ctx.Clock.Now,
+                services.GetService<GameEngineTools.World.Economy.EconomyLedger>(),
+                services.GetService<GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger>(),
+                ctx.StatusLedger,
+                ctx.Locations as GameEngineTools.World.Location.DefaultLocationService,
+                ctx.Orchestrator);
+            return new CharacterFileDto(WorldStateFileName, WorldStateStore.ToJson(state));
+        }
+
+        /// <summary>
+        /// Restores the saved ledgers and orchestrator bookkeeping (not the placements: those depend on which characters are imported).
+        /// Returns the state so the caller can place the imported characters, or <c>null</c> if the file is unusable.
+        /// </summary>
+        private WorldSaveState? ApplySavedWorld(CharacterFileDto file, WorldContext ctx, IServiceProvider services)
+        {
+            try
+            {
+                var state = WorldStateStore.FromJson(file.Json);
+                WorldStateStore.Apply(
+                    state,
+                    services.GetService<GameEngineTools.World.Economy.EconomyLedger>(),
+                    services.GetService<GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger>(),
+                    ctx.StatusLedger,
+                    locations: null,
+                    ctx.Orchestrator);
+                _log.LogInformation("Shared world state restored ({Prices} prices, {Reputations} reputations).", state.Prices.Count, state.Reputations.Count);
+                return state;
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "The saved world state could not be applied; continuing without it.");
+                return null;
+            }
+        }
+
         /// <summary>Serializes the current live characters to CharacterData JSON (one entry each).</summary>
         private List<CharacterFileDto> ExportLiveCharacters(GeneratedFile genFile)
         {
