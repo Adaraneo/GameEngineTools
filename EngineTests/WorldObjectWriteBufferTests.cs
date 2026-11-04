@@ -31,6 +31,20 @@ namespace EngineTests
         private static WorldObject Bread() => FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null);
 
         [TestMethod]
+        public void ProducedAt_SurvivesTheDatabase_SoSpoilageIsNotResetByAReload()
+        {
+            var (buffer, provider, _) = Build();
+            var produced = new WDateTime(123_456_789);
+            var bread = Bread() with { ProducedAt = produced };
+
+            buffer.AddObject(bread);
+            buffer.SetHeldBy(Loc, bread.Id, new HumanId(Guid.NewGuid()));
+            buffer.Flush();
+
+            Assert.AreEqual(produced, provider.FindObject(bread.Id)!.ProducedAt, "The spoilage clock must be stored with the object.");
+        }
+
+        [TestMethod]
         public void ConsumeThenPickUp_LeavesTheObjectConsumed()
         {
             var (buffer, provider, _) = Build();

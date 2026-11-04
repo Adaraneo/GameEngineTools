@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS WorldObjects (
     RespawnMinutes    INTEGER NOT NULL DEFAULT 1440,
     Price             REAL            DEFAULT NULL,
     ShopId            TEXT            DEFAULT NULL,
+    ProducedAt        INTEGER         DEFAULT NULL,
     HeldBy            TEXT            DEFAULT NULL,
     ConsumedAt        INTEGER         DEFAULT NULL
 );

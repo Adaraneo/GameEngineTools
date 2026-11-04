@@ -40,6 +40,7 @@ namespace EngineTests
             foreach (var column in new[] { "X", "Y", "AltitudeMeters", "TemperatureCelsius", "Humidity" })
                 Assert.IsTrue(db.HasColumn("Locations", column), $"Locations.{column} must be added.");
             Assert.IsTrue(db.HasColumn("WorldObjects", "Price") && db.HasColumn("WorldObjects", "ShopId"));
+            Assert.IsTrue(db.HasColumn("WorldObjects", "ProducedAt"), "WorldObjects.ProducedAt must be added.");
         }
 
         [TestMethod]

@@ -26,6 +26,8 @@ namespace GameEngineTools.World.Data
                 db.AddColumnIfMissing("WorldObjects", "Price", "REAL DEFAULT NULL");
                 db.AddColumnIfMissing("WorldObjects", "ShopId", "TEXT DEFAULT NULL");
             }),
+            new SchemaMigration(4, "WorldObjects.ProducedAt (spoilage clock of produced food)", db =>
+                db.AddColumnIfMissing("WorldObjects", "ProducedAt", "INTEGER DEFAULT NULL")),
         };
 
         /// <summary>Migrations of the terrain database (<c>terrain.db</c>).</summary>
