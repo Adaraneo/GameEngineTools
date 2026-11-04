@@ -34,6 +34,8 @@ namespace GameEngineTools.Characters.Engines.Goals
 
         private readonly ILogger _log;
 
+        private readonly IdSequence _ids = new("goal");
+
         public DefaultGoalEngine(IOptions<GoalConfig> cfg, ILogger<DefaultGoalEngine> log)
         {
             Config = cfg.Value;
@@ -334,7 +336,7 @@ namespace GameEngineTools.Characters.Engines.Goals
         private void HandleGoalInjected(GoalInjected inj, IHumanContext ctx, IEventCollector outbox)
         {
             var goal = new PersistentGoal(
-                Guid.NewGuid(),
+                _ids.Next(inj.OccurredAt, ctx.Id),
                 inj.Kind,
                 GoalOrigin.Scripted,
                 Clamp01(inj.InitialSalience),
@@ -383,7 +385,7 @@ namespace GameEngineTools.Characters.Engines.Goals
             if (!IsGoalActive(PersistentGoalKind.ProtectFamily))
             {
                 var goal = new PersistentGoal(
-                    Guid.NewGuid(),
+                    _ids.Next(cb.OccurredAt, ctx.Id),
                     PersistentGoalKind.ProtectFamily,
                     GoalOrigin.Event,
                     0.8,
@@ -541,8 +543,8 @@ namespace GameEngineTools.Characters.Engines.Goals
             };
         }
 
-        private static PersistentGoal BuildGoal(PersistentGoalKind kind, GoalOrigin origin, double salience, WDateTime now)
-            => new(Guid.NewGuid(), kind, origin, salience, 0.0, 0.0, now, now);
+        private PersistentGoal BuildGoal(PersistentGoalKind kind, GoalOrigin origin, double salience, WDateTime now)
+            => new(_ids.Next(now), kind, origin, salience, 0.0, 0.0, now, now);
 
         private static double Clamp01(double v) => Math.Clamp(v, 0.0, 1.0);
 

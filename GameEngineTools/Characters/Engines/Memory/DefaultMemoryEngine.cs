@@ -51,6 +51,8 @@ namespace GameEngineTools.Characters.Engines.Memory
         #region Privátní pole
 
         private readonly ILogger _log;
+
+        private readonly IdSequence _ids = new("memory");
         private readonly IMemoryFidelityPolicy? _memoryFidelityPolicy;
 
         // Listener-side interpretation goes through the ambient SpeechActInterpretation.Current —
@@ -345,7 +347,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
             Encode(
                 new EpisodicMemory(
-                    Guid.NewGuid(),
+                    _ids.Next(proposed.OccurredAt, ctx.Id),
                     proposed.OccurredAt,
                     what,
                     Salience,
@@ -490,7 +492,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var acEmotion = EmotionFor(ac.ActionName, ctx.Snapshot.Psychology.Valence);
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(ac.OccurredAt, ctx.Id),
                             ac.OccurredAt,
                             what,
                             acSalience,
@@ -511,7 +513,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var emotion = io.Accepted ? EmotionalTag.Positive : EmotionalTag.Negative;
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(io.OccurredAt, ctx.Id),
                             io.OccurredAt,
                             what,
                             salience,
@@ -555,7 +557,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var other = ResolveOtherPerson(ctx.Id, fi.A, fi.B);
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(fi.OccurredAt, ctx.Id),
                             fi.OccurredAt,
                             what,
                             Salience: 0.85,   // první dojem je velmi salinetní — evolučně důležitý
@@ -574,7 +576,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var what = MemoryWhatFactory.RelationMicroPositive(mp.Kind, new HumanId(fromId), ctx.Id);
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(mp.OccurredAt, ctx.Id),
                             mp.OccurredAt,
                             what,
                             Salience: 0.6,
@@ -594,7 +596,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var what = MemoryWhatFactory.RelationMicroNegative(mn.Kind, new HumanId(fromId), ctx.Id);
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(mn.OccurredAt, ctx.Id),
                             mn.OccurredAt,
                             what,
                             Salience: 0.65,
@@ -618,7 +620,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var emotion = ra.Accepted ? EmotionalTag.Positive : EmotionalTag.Mixed;
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(ra.OccurredAt, ctx.Id),
                             ra.OccurredAt,
                             what,
                             Salience: 0.8,   // smíření/odmítnutí smíru je výrazná událost
@@ -637,7 +639,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var what = $"SexualEncounter:{(se.Accepted ? "Accepted" : "Declined")}|from={se.From.Value}|to={se.To.Value}";
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(se.OccurredAt, ctx.Id),
                             se.OccurredAt,
                             what,
                             Salience: 0.95,
@@ -679,7 +681,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                         var what = MemoryWhatParser.Nightmare(nt.StressAtSleepStart);
 
                         Encode(new EpisodicMemory(
-                            Guid.NewGuid(),
+                            _ids.Next(nt.OccurredAt, ctx.Id),
                             nt.OccurredAt,
                             what,
                             Salience: 0.9,
@@ -949,7 +951,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             {
                 updated = State.Knowledge.ToList();
                 updated.Add(new KnowledgeFact(
-                    Id: Guid.NewGuid(),
+                    Id: _ids.Next(now),
                     LearnedAt: now,
                     Subject: subject,
                     Object: objectId,
@@ -1015,7 +1017,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             var what = $"NormViolation:{nv.NormKind}|from={nv.Actor.Value}|score={nv.ViolationScore:F2}|audience={nv.HasAudience}";
 
             Encode(new EpisodicMemory(
-                Guid.NewGuid(),
+                _ids.Next(nv.OccurredAt, ctx.Id),
                 nv.OccurredAt,
                 what,
                 Salience: salience,
