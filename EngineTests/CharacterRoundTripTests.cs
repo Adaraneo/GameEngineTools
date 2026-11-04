@@ -50,6 +50,31 @@ namespace EngineTests
             AssertRoundTrips(person);
         }
 
+        [TestMethod]
+        public void ExportThenImport_WithRelationshipsAndMemories_KeepsThem()
+        {
+            var a = CharacterManager.RandomizePerson(maxAge: 40, sexBiology: null, minAge: 25);
+            var b = CharacterManager.RandomizePerson(maxAge: 40, sexBiology: null, minAge: 25);
+            var now = WDateTime.New(WDateOnly.New(100, 1, 1));
+            var dt = WTimeSpan.FromHours(1);
+
+            a.ReceiveEvent(new GameEngineTools.Characters.Engines.Relationships.FirstImpressionFormed(now, a.Id, b.Id, Like: 60, Attraction: 50));
+            for (var day = 0; day < 10; day++)
+            {
+                a.ReceiveEvent(new GameEngineTools.Characters.Engines.Interactions.InteractionOutcome(
+                    now, a.Id, b.Id, Accepted: day % 4 != 3, "talk", GameEngineTools.Dialogue.Contracts.RelationalActKind.SmallTalk));
+                for (var h = 0; h < 24; h++)
+                {
+                    a.Tick(now, dt);
+                    now += dt;
+                }
+            }
+
+            Assert.IsTrue(a.Snapshot.Relationships.Edges.ContainsKey(b.Id), "The scenario must produce a relationship edge.");
+            Assert.IsTrue(a.Snapshot.Memory.Episodes.Count > 0, "The scenario must produce memories.");
+            AssertRoundTrips(a);
+        }
+
         private void AssertRoundTrips(GameEngineTools.Characters.Core.IHuman person)
         {
             var file = GeneratedFile.Export(new NPC(100, person));
