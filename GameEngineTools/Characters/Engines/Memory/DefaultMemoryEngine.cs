@@ -817,6 +817,12 @@ namespace GameEngineTools.Characters.Engines.Memory
             episodes = episodes
                 .Where(e => e.Strength >= Config.PruneThreshold)
                 .ToList();
+            if (episodes.Count > Config.MaxEpisodes)
+            {
+                var keep = episodes.OrderByDescending(e => e.Strength).ThenByDescending(e => e.When.WorldTicks)
+                    .Take(Config.MaxEpisodes).Select(e => e.Id).ToHashSet();
+                episodes = episodes.Where(e => keep.Contains(e.Id)).ToList();
+            }
 
             // Preserve existing Knowledge facts when rebuilding episodic state
             State = new MemoryIndex(episodes) { Knowledge = State.Knowledge, KnownObjects = State.KnownObjects };
@@ -832,6 +838,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                     })
                     .Where(f => f.Confidence >= Config.KnowledgePruneThreshold)
                     .ToList();
+                if (decayedKnowledge.Count > Config.MaxKnowledgeFacts)
+                    decayedKnowledge = decayedKnowledge.OrderByDescending(f => f.Confidence).Take(Config.MaxKnowledgeFacts).ToList();
 
                 State = State with { Knowledge = decayedKnowledge };
             }
@@ -848,6 +856,8 @@ namespace GameEngineTools.Characters.Engines.Memory
                     })
                     .Where(f => f.Confidence >= objectPruneThreshold)
                     .ToList();
+                if (decayedObjects.Count > Config.MaxKnownObjects)
+                    decayedObjects = decayedObjects.OrderByDescending(f => f.Confidence).Take(Config.MaxKnownObjects).ToList();
 
                 State = State with { KnownObjects = decayedObjects };
             }

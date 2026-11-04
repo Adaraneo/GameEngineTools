@@ -70,10 +70,16 @@ namespace GameEngineTools.Characters.Engines.Memory
         /// recall (the robust clinical depression finding). Source: Matt, Vázquez &amp; Campbell 1992;
         /// Faul &amp; LaBar 2023. Default −0.4.
         /// </summary>
-        double DepressionNegativeBiasThreshold = -0.4)
+        double DepressionNegativeBiasThreshold = -0.4,
+        /// <summary>Hard cap on stored episodes; past it the weakest are dropped (a safety net behind the strength-based forgetting). Default 2000.</summary>
+        int MaxEpisodes = 2000,
+        /// <summary>Hard cap on knowledge facts; past it the least certain are dropped. Default 1000.</summary>
+        int MaxKnowledgeFacts = 1000,
+        /// <summary>Hard cap on remembered object locations; past it the least certain are dropped. Default 1000.</summary>
+        int MaxKnownObjects = 1000)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35, 0.04, 0.65, 0.90, 0.35, 0.005, 0.05, 0.05, 0.04, -0.4) { }
+        public MemoryConfig() : this(0.5, 0.12, 0.06, 0.01, 0.15, 0.5, 0.35, 0.04, 0.65, 0.90, 0.35, 0.005, 0.05, 0.05, 0.04, -0.4, 2000, 1000, 1000) { }
     }
 
     /// <summary>

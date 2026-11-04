@@ -11,6 +11,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Traits;
+    using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
@@ -710,6 +711,28 @@ namespace EngineTests
         // ------------------------------------------------------------------
         // Test 4: confidence na znalosti klesá po Tick() s dlouhým dt
         // ------------------------------------------------------------------
+
+        [TestMethod]
+        public void Tick_OverTheHardCaps_KeepsTheStrongestEpisodesAndTheMostCertainFacts()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var engine = BuildMemoryEngine(new MemoryConfig(MaxEpisodes: 5, MaxKnowledgeFacts: 3, MaxKnownObjects: 2));
+            var ctx = BuildMemoryContext(self);
+            var episodes = Enumerable.Range(0, 12)
+                .Select(i => new EpisodicMemory(Guid.NewGuid(), _now, $"What{i}", 0.5, EmotionalTag.Neutral, Strength: 0.2 + i * 0.05))
+                .ToList();
+            var objects = Enumerable.Range(0, 6)
+                .Select(i => new ObjectLocationFact($"o{i}", "loc", _now, 0.3 + i * 0.1, PickupItemKind.Food))
+                .ToList();
+            engine.RestoreState(new MemoryIndex(episodes) { KnownObjects = objects });
+
+            engine.Tick(_now, WTimeSpan.FromMinutes(1), ctx, _outbox);
+
+            Assert.AreEqual(5, engine.State.Episodes.Count, "Episodes are capped.");
+            Assert.IsTrue(engine.State.Episodes.All(e => e.What is "What11" or "What10" or "What9" or "What8" or "What7"), "The strongest episodes survive.");
+            Assert.AreEqual(2, engine.State.KnownObjects.Count, "Object locations are capped.");
+            Assert.IsTrue(engine.State.KnownObjects.All(o => o.ObjectId is "o5" or "o4"), "The most certain locations survive.");
+        }
 
         [TestMethod]
         public void Knowledge_DecaysOver_Time()
