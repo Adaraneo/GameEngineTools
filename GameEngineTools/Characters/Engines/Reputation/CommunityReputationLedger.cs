@@ -3,7 +3,9 @@
 
 namespace GameEngineTools.Characters.Engines.Reputation
 {
+    using System;
     using System.Collections.Generic;
+    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.World.Utils.Time;
@@ -29,6 +31,19 @@ namespace GameEngineTools.Characters.Engines.Reputation
 
         /// <summary>Forgets every recorded reputation (a replaced world starts from scratch).</summary>
         public void Clear() => _map.Clear();
+
+        /// <summary>Captures every recorded reputation for a world save.</summary>
+        public IReadOnlyList<World.Persistence.ReputationEntry> Snapshot()
+            => _map.Values.Select(r => new World.Persistence.ReputationEntry(r.Subject, r.LocationId, r.Score, r.Spread, r.LastUpdatedAt)).ToList();
+
+        /// <summary>Replaces the ledger's state with a previously captured one.</summary>
+        public void Restore(IEnumerable<World.Persistence.ReputationEntry> entries)
+        {
+            ArgumentNullException.ThrowIfNull(entries);
+            _map.Clear();
+            foreach (var e in entries)
+                _map[(e.Subject, e.LocationId)] = new CommunityReputation(e.Subject, e.LocationId, e.Score, e.Spread, e.LastUpdatedAt);
+        }
 
         /// <summary>Folds one observed act about <paramref name="subject"/> at a locale into the aggregate.</summary>
         public void Observe(HumanId subject, string locationId, ThirdPartyObservationType type, WDateTime now)

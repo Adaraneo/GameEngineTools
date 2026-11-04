@@ -3,7 +3,9 @@
 
 namespace GameEngineTools.Characters.Engines.Status
 {
+    using System;
     using System.Collections.Generic;
+    using System.Linq;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Relationships;
 
@@ -47,6 +49,29 @@ namespace GameEngineTools.Characters.Engines.Status
             _prevSalience.Clear();
             _scratch.Clear();
             _stability = 1.0;
+        }
+
+        /// <summary>Captures every agent's standing and the hierarchy stability for a world save.</summary>
+        public World.Persistence.StatusLedgerState Snapshot()
+            => new(
+                _status.Select(kv => new World.Persistence.StatusEntry(
+                    kv.Key, kv.Value.DominanceStatus, kv.Value.PrestigeStatus,
+                    _prevSalience.TryGetValue(kv.Key, out var s) ? s : null)).ToList(),
+                _stability);
+
+        /// <summary>Replaces the ledger's state with a previously captured one.</summary>
+        public void Restore(World.Persistence.StatusLedgerState state)
+        {
+            ArgumentNullException.ThrowIfNull(state);
+            Clear();
+            foreach (var a in state.Agents)
+            {
+                _status[a.Agent] = new SocietalStatus(a.Dominance, a.Prestige);
+                if (a.PreviousSalience is { } p)
+                    _prevSalience[a.Agent] = p;
+            }
+
+            _stability = state.Stability;
         }
 
         /// <summary>Creates a ledger with the given tuning configuration (defaults when omitted).</summary>

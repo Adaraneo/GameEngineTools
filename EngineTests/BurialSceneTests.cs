@@ -140,6 +140,36 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void OrchestratorState_RoundTrip_KeepsATripInProgressAndWhoIsDead()
+        {
+            var home = new LocationDescriptor("home", "Home", 0.05, 0.01, 50, false, LocationType.Social);
+            var tavern = new LocationDescriptor("tavern", "Tavern", 0.10, 0.02, 50, false, LocationType.Social);
+            var map = new WorldMap(
+                new Dictionary<string, LocationDescriptor>(),
+                new Dictionary<string, IReadOnlyList<WorldConnection>> { ["home"] = new List<WorldConnection> { new("tavern", 1600.0) } },
+                new Dictionary<string, IReadOnlyList<string>>());
+            var locations = new DefaultLocationService();
+            locations.RegisterLocation(home);
+            locations.RegisterLocation(tavern);
+            var orchestrator = BuildOrchestrator(locations, new InMemoryMutableProvider(), new SceneOrchestratorOptions { EnableTravelTime = true }, map);
+            var id = new HumanId(Guid.NewGuid());
+            var walker = new BurialSpy(id, edges: new());
+            walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, PickupItemKind.Food));
+            walker.SetLastOutbox(new ActionCommitted(Now, id, ActionNames.MoveToFood, WTimeSpan.FromMinutes(20)));
+            locations.MoveCharacter(id, "home");
+            orchestrator.OnTick(Now, new IHuman[] { walker });
+            var saved = orchestrator.CaptureState();
+
+            var fresh = BuildOrchestrator(new DefaultLocationService(), new InMemoryMutableProvider(), new SceneOrchestratorOptions { EnableTravelTime = true }, map);
+            fresh.RestoreState(saved);
+
+            Assert.AreEqual("tavern", fresh.GetTravelDestination(id), "The trip survives a save/load.");
+            var transit = fresh.GetTransit(id, Now + WTimeSpan.FromMinutes(10));
+            Assert.IsNotNull(transit);
+            Assert.AreEqual(0.5, transit!.Value.Progress, 1e-6, "Progress is measured against the saved departure and arrival.");
+        }
+
+        [TestMethod]
         public void ReloadedDeadCharacter_IsTakenOffTheMap()
         {
             var locations = new DefaultLocationService();

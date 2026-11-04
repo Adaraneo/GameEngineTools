@@ -384,6 +384,31 @@ namespace GameEngineTools.World.Simulation
         public void InvalidateLocation(string locationId)
             => _fullyMetLocations.Remove(locationId);
 
+        /// <summary>Captures the death and trip bookkeeping for a world save.</summary>
+        public Persistence.OrchestratorState CaptureState()
+            => new(
+                _dead.ToList(), _retired.ToList(), _bereavementRouted.ToList(), _corpseSpawned.ToList(),
+                _inTransit.Select(kv => new Persistence.TransitEntry(
+                    kv.Key, kv.Value.Origin, kv.Value.Destination, kv.Value.DepartAt, kv.Value.ArriveAt)).ToList());
+
+        /// <summary>Replaces the death and trip bookkeeping with a saved one (first-impression flags are recomputed, not saved).</summary>
+        public void RestoreState(Persistence.OrchestratorState state)
+        {
+            ArgumentNullException.ThrowIfNull(state);
+            _fullyMetLocations.Clear();
+            _dead.Clear();
+            _dead.UnionWith(state.Dead);
+            _retired.Clear();
+            _retired.UnionWith(state.Retired);
+            _bereavementRouted.Clear();
+            _bereavementRouted.UnionWith(state.BereavementRouted);
+            _corpseSpawned.Clear();
+            _corpseSpawned.UnionWith(state.CorpseSpawned);
+            _inTransit.Clear();
+            foreach (var t in state.Transits)
+                _inTransit[t.Character] = new TransitState(t.Origin, t.Destination, t.DepartAt, t.ArriveAt);
+        }
+
         /// <summary>
         /// Forgets all per-character and per-location state it owns or shares: deaths, trips, first-impression flags, the status and
         /// reputation ledgers, the conversation coordinator and the location service's dispatch cache. Character positions are left to the host. Call it together with

@@ -6,7 +6,9 @@ namespace GameEngineTools.World.Economy
     using System;
     using System.Collections.Generic;
     using GameEngineTools.Characters.Engines.Economy;
+    using System.Linq;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Persistence;
 
     /// <summary>
     /// Scene-level singleton tracking per-shop, per-item-kind posted prices with stock feedback.
@@ -76,6 +78,26 @@ namespace GameEngineTools.World.Economy
 
         private static double StockMultiplier(int stock, EconomyConfig config)
             => Math.Exp(config.PriceElasticityPerUnit * (config.TargetStockLevel - stock));
+
+        /// <summary>Captures every known shop price and learned base for a world save.</summary>
+        public IReadOnlyList<PriceEntry> Snapshot()
+            => _prices.Select(kv => new PriceEntry(
+                kv.Key.ShopId, kv.Key.Kind, kv.Value,
+                _bases.TryGetValue(kv.Key, out var b) ? b : null)).ToList();
+
+        /// <summary>Replaces the ledger's state with a previously captured one.</summary>
+        public void Restore(IEnumerable<PriceEntry> entries)
+        {
+            ArgumentNullException.ThrowIfNull(entries);
+            _prices.Clear();
+            _bases.Clear();
+            foreach (var e in entries)
+            {
+                _prices[(e.ShopId, e.Kind)] = e.Price;
+                if (e.Base is { } b)
+                    _bases[(e.ShopId, e.Kind)] = b;
+            }
+        }
 
         #endregion Public API
 

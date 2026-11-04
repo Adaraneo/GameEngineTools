@@ -103,6 +103,23 @@ namespace GameEngineTools.World.Location
             _lastDispatchedEnvironment.Remove(characterId);
         }
 
+        /// <summary>Captures who stands where for a world save (characters in transit are not placed and so not listed).</summary>
+        public IReadOnlyList<Persistence.PlacementEntry> SnapshotPlacements()
+            => _characterLocation.Select(kv => new Persistence.PlacementEntry(kv.Key, kv.Value)).ToList();
+
+        /// <summary>
+        /// Replaces every placement with a saved one and forgets the dispatch cache, so the next dispatch announces
+        /// each character's surroundings afresh.
+        /// </summary>
+        public void RestorePlacements(IEnumerable<Persistence.PlacementEntry> placements)
+        {
+            ArgumentNullException.ThrowIfNull(placements);
+            _characterLocation.Clear();
+            foreach (var p in placements)
+                _characterLocation[p.Character] = p.LocationId;
+            ResetDispatchState();
+        }
+
         /// <inheritdoc/>
         public void ResetDispatchState()
         {
