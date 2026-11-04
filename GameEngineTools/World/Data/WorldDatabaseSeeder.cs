@@ -103,7 +103,7 @@ namespace GameEngineTools.World.Data
             ArgumentNullException.ThrowIfNull(db);
             var schemaSql = SqlScriptLoader.Load(TerrainSchemaScript);
             db.ExecuteScript(schemaSql);
-            db.MigrateTerrainHeightmapColumns(); // idempotent; protects very old terrain.db files
+            SchemaMigrator.Apply(db, SchemaMigrator.Terrain);
         }
 
         /// <summary>Applies the main world schema (Locations/Connections/WorldObjects/... — no
@@ -115,11 +115,8 @@ namespace GameEngineTools.World.Data
             var schemaSql = SqlScriptLoader.Load(SchemaScript);
             db.ExecuteScript(schemaSql);
 
-            // Migrate databases created before spatial coordinates existed — CREATE TABLE
-            // IF NOT EXISTS above is a no-op on an existing Locations table, so older
-            // databases need an explicit ALTER TABLE to gain the X/Y columns.
-            db.MigrateLocationCoordinateColumns();
-            db.MigrateLocationClimateColumns();
+            // CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so older files gain new columns through versioned migrations.
+            SchemaMigrator.Apply(db, SchemaMigrator.World);
         }
 
         #endregion Public API

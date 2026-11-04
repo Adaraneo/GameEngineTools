@@ -1074,6 +1074,57 @@ namespace GameEngineTools.World.Data
 
         #region Private helpers — query execution
 
+        /// <summary>The file's <c>PRAGMA user_version</c> (0 for a fresh or pre-versioning database).</summary>
+        internal int UserVersion
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    using var cmd = _connection.CreateCommand();
+                    cmd.CommandText = "PRAGMA user_version;";
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+            set
+            {
+                lock (_sync)
+                    Execute($"PRAGMA user_version = {value};");
+            }
+        }
+
+        /// <summary>True when <paramref name="table"/> has a column named <paramref name="column"/>.</summary>
+        internal bool HasColumn(string table, string column)
+        {
+            lock (_sync)
+            {
+                using var cmd = CreateCommand($"PRAGMA table_info({table})");
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                return false;
+            }
+        }
+
+        /// <summary>Adds a column to an existing table when it is missing; a table that does not exist yet is left alone.</summary>
+        internal void AddColumnIfMissing(string table, string column, string definition)
+        {
+            lock (_sync)
+            {
+                var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var cmd = CreateCommand($"PRAGMA table_info({table})"))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                        existing.Add(reader.GetString(1));
+                }
+
+                if (existing.Count > 0 && !existing.Contains(column))
+                    Execute($"ALTER TABLE {table} ADD COLUMN {column} {definition};");
+            }
+        }
+
         private void Execute(string sql)
         {
             using var cmd = _connection.CreateCommand();
