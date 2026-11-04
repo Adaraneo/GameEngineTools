@@ -385,8 +385,8 @@ namespace GameEngineTools.World.Simulation
             => _fullyMetLocations.Remove(locationId);
 
         /// <summary>
-        /// Forgets the orchestrator's own per-character and per-location state (deaths, trips, first-impression flags); the shared
-        /// ledgers (status, reputation), the conversation coordinator and the location service's dispatch cache are NOT cleared. Call it together with
+        /// Forgets all per-character and per-location state it owns or shares: deaths, trips, first-impression flags, the status and
+        /// reputation ledgers, the conversation coordinator and the location service's dispatch cache. Character positions are left to the host. Call it together with
         /// <c>SimulationScene.ResetCharacters()</c> when the roster is replaced, so stale deaths, trips and
         /// "everyone here has met" flags do not leak into the new world.
         /// </summary>
@@ -400,6 +400,10 @@ namespace GameEngineTools.World.Simulation
             _bereavementRouted.Clear();
             _corpseSpawned.Clear();
             _inTransit.Clear();
+            _statusLedger?.Clear();
+            _reputationLedger?.Clear();
+            _conversation.Reset();
+            _locationService.ResetDispatchState();
         }
 
         #endregion Public API
@@ -524,6 +528,7 @@ namespace GameEngineTools.World.Simulation
             }
 
             _locationService.RemoveCharacter(deceased.Id);
+            _locationService.ForgetDispatchState(deceased.Id);
             _inTransit.Remove(deceased.Id);
             _retired.Add(deceased.Id);
         }

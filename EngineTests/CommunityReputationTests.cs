@@ -45,6 +45,19 @@ namespace EngineTests
         #region Test 2 — recency decay half-life
 
         [TestMethod]
+        public void Reputation_Clear_ForgetsEverySubject()
+        {
+            var ledger = new CommunityReputationLedger();
+            var subject = new HumanId(Guid.NewGuid());
+            ledger.Observe(subject, "town-square", ThirdPartyObservationType.PositiveAct, At(100));
+            Assert.IsNotNull(ledger.Get(subject, "town-square"));
+
+            ledger.Clear();
+
+            Assert.IsNull(ledger.Get(subject, "town-square"), "A replaced world must not inherit reputations.");
+        }
+
+        [TestMethod]
         public void Reputation_RecencyDecay_HalfLife()
         {
             const double halfLife = 7.0;

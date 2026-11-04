@@ -97,6 +97,20 @@ namespace GameEngineTools.World.Location
         }
 
         /// <inheritdoc/>
+        public void ForgetDispatchState(HumanId characterId)
+        {
+            _lastDispatchedLocation.Remove(characterId);
+            _lastDispatchedEnvironment.Remove(characterId);
+        }
+
+        /// <inheritdoc/>
+        public void ResetDispatchState()
+        {
+            _lastDispatchedLocation.Clear();
+            _lastDispatchedEnvironment.Clear();
+        }
+
+        /// <inheritdoc/>
         public void RemoveCharacter(HumanId characterId)
             => _characterLocation.Remove(characterId);
 

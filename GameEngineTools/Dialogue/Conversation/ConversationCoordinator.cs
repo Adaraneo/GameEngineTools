@@ -71,6 +71,9 @@ namespace GameEngineTools.Dialogue.Conversation
         /// </remarks>
         private const int MaxObligationTurns = 8;
 
+        /// <summary>Drops every active conversation (a replaced world starts from scratch).</summary>
+        public void Reset() => _active.Clear();
+
         /// <summary>Records an act between <paramref name="speaker"/> and <paramref name="addressee"/>.</summary>
         public void Observe(SpeechAct act, HumanId speaker, HumanId addressee, WDateTime now)
         {

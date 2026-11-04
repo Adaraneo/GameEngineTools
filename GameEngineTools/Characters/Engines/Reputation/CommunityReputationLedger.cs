@@ -27,6 +27,9 @@ namespace GameEngineTools.Characters.Engines.Reputation
         public CommunityReputationLedger(double halfLifeInteractions = ReputationMath.DefaultHalfLifeInteractions)
             => _halfLife = halfLifeInteractions;
 
+        /// <summary>Forgets every recorded reputation (a replaced world starts from scratch).</summary>
+        public void Clear() => _map.Clear();
+
         /// <summary>Folds one observed act about <paramref name="subject"/> at a locale into the aggregate.</summary>
         public void Observe(HumanId subject, string locationId, ThirdPartyObservationType type, WDateTime now)
         {

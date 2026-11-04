@@ -263,6 +263,37 @@ namespace EngineTests
             Assert.IsTrue(latest.Crowding > 0.5, $"The stale low crowding must be replaced (got {latest.Crowding:F2}).");
         }
 
+        [TestMethod]
+        public void ForgetDispatchState_MakesTheNextPlacementAtTheSameLocationAnnouncedAgain()
+        {
+            _sut.RegisterLocation(Library);
+            var character = NewFakeCharacter();
+            _sut.MoveCharacter(character.Id, Library.Id);
+            _sut.DispatchContextEvents(Now, new[] { character });
+
+            _sut.RemoveCharacter(character.Id);
+            _sut.ForgetDispatchState(character.Id);
+            _sut.MoveCharacter(character.Id, Library.Id);
+            _sut.DispatchContextEvents(Now, new[] { character });
+
+            Assert.AreEqual(2, character.ReceivedEvents.OfType<ContextChanged>().Count(), "A forgotten cache means the same place is announced again.");
+        }
+
+        [TestMethod]
+        public void ResetDispatchState_ForgetsEveryone_ButKeepsThePositions()
+        {
+            _sut.RegisterLocation(Library);
+            var character = NewFakeCharacter();
+            _sut.MoveCharacter(character.Id, Library.Id);
+            _sut.DispatchContextEvents(Now, new[] { character });
+
+            _sut.ResetDispatchState();
+            _sut.DispatchContextEvents(Now, new[] { character });
+
+            Assert.AreEqual(Library.Id, _sut.GetLocation(character.Id));
+            Assert.AreEqual(2, character.ReceivedEvents.OfType<ContextChanged>().Count());
+        }
+
         #endregion Noise — computation
 
         // ════════════════════════════════════════════════════════════════════

@@ -40,6 +40,15 @@ namespace GameEngineTools.Characters.Engines.Status
 
         private double _stability = 1.0;
 
+        /// <summary>Forgets every agent's standing and the hierarchy stability (a replaced world starts from scratch).</summary>
+        public void Clear()
+        {
+            _status.Clear();
+            _prevSalience.Clear();
+            _scratch.Clear();
+            _stability = 1.0;
+        }
+
         /// <summary>Creates a ledger with the given tuning configuration (defaults when omitted).</summary>
         /// <param name="config">Tuning configuration.</param>
         /// <param name="ascribed">

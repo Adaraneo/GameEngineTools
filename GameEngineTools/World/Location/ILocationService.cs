@@ -154,6 +154,18 @@ namespace GameEngineTools.World.Location
         void RemoveCharacter(HumanId characterId);
 
         /// <summary>
+        /// Forgets what a character was last told about its surroundings, so a later placement is announced afresh.
+        /// Call it for a character who is gone for good (dead); a character merely in transit must keep it. Default: no-op.
+        /// </summary>
+        /// <param name="characterId">The character whose dispatch cache to drop.</param>
+        void ForgetDispatchState(HumanId characterId)
+        { }
+
+        /// <summary>Forgets the dispatch cache of every character (a replaced world). Positions are not touched. Default: no-op.</summary>
+        void ResetDispatchState()
+        { }
+
+        /// <summary>
         /// Emits a <see cref="ContextChanged"/> event to every character
         /// whose current location has changed since the last dispatch,
         /// or to all characters if <paramref name="forceAll"/> is true.
