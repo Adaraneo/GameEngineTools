@@ -397,6 +397,24 @@ namespace EngineTests
                 "Male biology must never start a pregnancy.");
         }
 
+        [TestMethod]
+        public void Conception_IsImpossible_WithoutAnActiveCycle()
+        {
+            var ctx = BuildContextForConception(SexBiology.Female, alwaysChance: true);
+            var encounter = MakeEncounter(ctx.Id, ReproductiveIntent.TryingForChild, ContraceptionLevel.None);
+
+            foreach (var phase in new CyclePhase?[] { null, CyclePhase.Paused })
+            {
+                var engine = BuildEngineWithCycle(_now, ovulationWindowOpen: true, alwaysConceive: true);
+                engine.RestoreState(engine.State with { Cycle = phase is null ? null : engine.State.Cycle! with { Phase = phase.Value, OvulationWindow = false } });
+                var outbox = new EventCollector();
+
+                engine.Handle(encounter, ctx, outbox);
+
+                Assert.IsFalse(outbox.Drain().OfType<PregnancyStarted>().Any(), $"No conception without a cycling body (cycle phase: {phase?.ToString() ?? "none"}).");
+            }
+        }
+
         #endregion Conception chance
 
         #region Pregnancy discovery timing

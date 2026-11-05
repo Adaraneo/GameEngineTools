@@ -228,6 +228,36 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Navarro_RecentEvidenceOnAnyBelief_MeansRecentContact()
+        {
+            var now = WDateTime.New(100, 5, 1, 0);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
+
+            PersonBelief Belief(PersonBeliefKind kind, WDateTime updated) => new(other, kind, 0.80, 0.10, 3, updated, "test");
+            SemanticMemoryState Build(WDateTime warmUpdated) => new(new Dictionary<HumanId, PersonBeliefSet>
+            {
+                [other] = new PersonBeliefSet(other, new Dictionary<PersonBeliefKind, PersonBelief>
+                {
+                    [PersonBeliefKind.Reliable] = Belief(PersonBeliefKind.Reliable, now - WTimeSpan.FromDays(200)),
+                    [PersonBeliefKind.Warm] = Belief(PersonBeliefKind.Warm, warmUpdated)
+                })
+            });
+
+            var recent = BuildEngine();
+            var stale = BuildEngine();
+            recent.RestoreState(Build(now - WTimeSpan.FromDays(1)));
+            stale.RestoreState(Build(now - WTimeSpan.FromDays(200)));
+            recent.Tick(now, WTimeSpan.FromDays(1), ctx, new EventCollector());
+            stale.Tick(now, WTimeSpan.FromDays(1), ctx, new EventCollector());
+
+            var recentDecay = 0.80 - recent.State.GetStrength(other, PersonBeliefKind.Reliable);
+            var staleDecay = 0.80 - stale.State.GetStrength(other, PersonBeliefKind.Reliable);
+            Assert.IsTrue(staleDecay > recentDecay * 2.5, $"A fresh belief means recent contact, so no gap acceleration. recent={recentDecay:F4}, stale={staleDecay:F4}");
+        }
+
+        [TestMethod]
         public void Navarro_GapBelowCritical_NormalDecay()
         {
             // Gap = 5 dní << 168 → gapMultiplier = 1.0 → normální decay

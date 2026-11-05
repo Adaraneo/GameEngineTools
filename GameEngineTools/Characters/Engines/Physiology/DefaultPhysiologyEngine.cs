@@ -1090,6 +1090,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 return s;
             }
 
+            // No cycle (before menarche) or a paused one (menopause, postpartum) cannot conceive.
+            if (s.Cycle is null || s.Cycle.Phase == CyclePhase.Paused)
+            {
+                return s;
+            }
+
             var otherParent = encounter.From == ctx.Id
                 ? encounter.To
                 : encounter.From;

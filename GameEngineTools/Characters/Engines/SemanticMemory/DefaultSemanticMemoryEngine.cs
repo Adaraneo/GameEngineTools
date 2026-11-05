@@ -68,11 +68,11 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                     : 21.0;
                 var navarroThreshold = expectedIntervalDays * Config.NavarroCriticalMultiple;
 
-                var oldestBelief = set.Beliefs.Values
-                    .OrderBy(b => b.LastUpdatedAt.WorldTicks)
+                var newestBelief = set.Beliefs.Values
+                    .OrderByDescending(b => b.LastUpdatedAt.WorldTicks)
                     .FirstOrDefault();
-                var daysSinceContact = oldestBelief is not null
-                    ? Math.Max(0.0, (now - oldestBelief.LastUpdatedAt).TotalDays)
+                var daysSinceContact = newestBelief is not null
+                    ? Math.Max(0.0, (now - newestBelief.LastUpdatedAt).TotalDays)
                     : 0.0;
 
                 var gapMultiplier = daysSinceContact > navarroThreshold
