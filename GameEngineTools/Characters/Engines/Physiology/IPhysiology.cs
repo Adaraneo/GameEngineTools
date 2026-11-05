@@ -18,6 +18,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// <param name="EnableMenstrualCycle">When <c>true</c>, female characters run the menstrual-cycle module.</param>
     /// <param name="MenstrualCycleBeginsInAge">Earliest possible age of menarche; each woman draws her own around <c>MenarcheMeanAge</c>.</param>
     /// <param name="MenarcheMeanAge">Mean age at menarche (cohort surveys: 12.5–12.7, SD ≈ 1.05).</param>
+    /// <param name="MalePubertyOnsetMeanAge">Mean age at which a boy's testosterone starts to rise (genital stage 2: 10.1 in NHANES III, 11.5 in lab references); adult levels follow after <c>MalePubertyDurationYears</c>.</param>
     /// <param name="EnergyRecoveryPerSleepHour">Energy points restored per hour of sleep.</param>
     /// <param name="PainPassiveRecoveryPerHour">Pain points decayed per hour while awake and idle.</param>
     /// <param name="PainSleepRecoveryPerHour">Pain points decayed per hour of sleep.</param>
@@ -144,6 +145,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double MenarcheAgeStdDev = 1.05,
         int LactationFertilityDays = 180,
         double LactationConceptionMultiplier = 0.1,
+        double MalePubertyOnsetMeanAge = 11.0,
+        double MalePubertyOnsetAgeStdDev = 1.0,
+        double MalePubertyDurationYears = 6.0,
+        double PrepubertalTestosteroneFraction = 0.04,
         double EnergyRecoveryPerSleepHour = 10.0,
         double PainPassiveRecoveryPerHour = 0.3,
         double PainSleepRecoveryPerHour = 0.5,
@@ -428,6 +433,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
             MenarcheAgeStdDev: 1.05,
             LactationFertilityDays: 180,
             LactationConceptionMultiplier: 0.1,
+            MalePubertyOnsetMeanAge: 11.0,
+            MalePubertyOnsetAgeStdDev: 1.0,
+            MalePubertyDurationYears: 6.0,
+            PrepubertalTestosteroneFraction: 0.04,
             EnergyRecoveryPerSleepHour: 10.0,
             PainPassiveRecoveryPerHour: 0.3,
             PainSleepRecoveryPerHour: 0.5,

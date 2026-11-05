@@ -416,6 +416,28 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Testosterone_RisesThroughPuberty_AndBoysDoNotHaveAdultLevels()
+        {
+            double LevelAtAge(int ageYears)
+            {
+                var engine = BuildEngineForBiologyAge(SexBiology.Male, ageYears);
+                var ctx = BuildContextWithAction(null);
+                var start = WDateTime.New(116, 1, 1, 0);
+                for (var i = 0; i < 72; i++)
+                    engine.Tick(start + WTimeSpan.FromHours(i), WTimeSpan.FromHours(1), ctx, new EventCollector());
+                return engine.State.Testosterone!.Level;
+            }
+
+            var boy = LevelAtAge(8);
+            var midPuberty = LevelAtAge(14);
+            var man = LevelAtAge(20);
+
+            Assert.IsTrue(boy < 8, $"A prepubertal boy sits at a few percent of the adult level, got {boy:F1}.");
+            Assert.IsTrue(midPuberty > boy + 15 && midPuberty < man - 10, $"A 14-year-old is between: {boy:F1} < {midPuberty:F1} < {man:F1}.");
+            Assert.IsTrue(man > 40, $"A young man has the adult level, got {man:F1}.");
+        }
+
+        [TestMethod]
         public void Menarche_AgeIsIndividual_NotTheSameForEveryGirl()
         {
             DefaultPhysiologyEngine Girl(IRandomSource rng) => new(

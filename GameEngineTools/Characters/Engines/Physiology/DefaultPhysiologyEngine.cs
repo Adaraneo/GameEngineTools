@@ -38,6 +38,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
         private readonly double _menarcheAge;
+        private readonly double _pubertyOnsetAge;
         private readonly MenstrualCycleConfig _cycleCfg;
 
         private double _accHours;
@@ -95,8 +96,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 
+            _pubertyOnsetAge = biology == SexBiology.Male
+                ? Math.Clamp(Config.MalePubertyOnsetMeanAge + Normal(rng, 0, Config.MalePubertyOnsetAgeStdDev), 8.0, Config.MalePubertyOnsetMeanAge + 3 * Config.MalePubertyOnsetAgeStdDev)
+                : 0.0;
+
             var initialTestosterone = (Config.EnableTestosteroneCycle && biology == SexBiology.Male)
-                ? new TestosteroneState()
+                ? new TestosteroneState(Level: 60 * (now != default ? PubertyFactor(ComputeAgeYears(now)) : 1.0))
                 : null;
 
             _objectProvider = objectProvider;
@@ -659,7 +664,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var alloSuppression = Math.Max(0, s.AllostaticLoad - 50) / 10.0 * Config.TestosteroneAlloSuppression;
                 var sleepPenalty = Math.Max(0, s.SleepDebtHours - 2) * Config.TestosteroneSleepDebtPenaltyPerHour;
                 var agePenalty = Math.Max(0, ComputeAgeYears(now.Date) - Config.AgingTestosteronePenaltyStart) * Config.AgingTestosteronePenaltyPerYear;
-                var targetLevel = Math.Clamp(50 + diurnal - alloSuppression - sleepPenalty - agePenalty, 0, 100);
+                var targetLevel = Math.Clamp((50 + diurnal - alloSuppression - sleepPenalty - agePenalty) * PubertyFactor(ComputeAgeYearsFractional(now.Date)), 0, 100);
                 s = s with
                 {
                     Testosterone = testo with
@@ -955,6 +960,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
             <= 5.0 => 0.3 + 0.55 * (yearsSinceMenarche - 2.0) / 3.0,
             _ => Math.Min(1.0, 0.85 + 0.15 * (yearsSinceMenarche - 5.0) / 3.0)
         };
+
+        // Share of the adult testosterone level: prepubertal boys sit at a few percent (<7–20 vs 300–1200 ng/dL), adult range from 17–18.
+        private double PubertyFactor(double ageYears)
+        {
+            var progress = Math.Clamp((ageYears - _pubertyOnsetAge) / Config.MalePubertyDurationYears, 0.0, 1.0);
+            return Config.PrepubertalTestosteroneFraction + (1.0 - Config.PrepubertalTestosteroneFraction) * progress;
+        }
 
         private PhysiologyState EmitCycleProgressionEvents(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box, int day, CyclePhase phase, int length, int ovulDay)
         {
