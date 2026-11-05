@@ -20,7 +20,8 @@ namespace GameEngineTools.Characters.Engines.Interests
     /// <param name="Current">The drifting profile.</param>
     /// <param name="Baseline">The profile seeded at creation that Current regresses toward.</param>
     /// <param name="LastReinforcedTicks">World ticks of the last reinforcement per RIASEC dimension (−1 = never); drives the per-day cooldown.</param>
-    public sealed record InterestState(InterestProfile Current, InterestProfile Baseline, long[]? LastReinforcedTicks = null)
+    /// <param name="LastWorkFitTicks">World ticks of the last <see cref="WorkFitFelt"/>, for its per-day cooldown.</param>
+    public sealed record InterestState(InterestProfile Current, InterestProfile Baseline, long[]? LastReinforcedTicks = null, long? LastWorkFitTicks = null)
     {
         /// <summary>Creates a state where Current equals Baseline.</summary>
         public static InterestState FromBaseline(InterestProfile baseline) => new(baseline, baseline);

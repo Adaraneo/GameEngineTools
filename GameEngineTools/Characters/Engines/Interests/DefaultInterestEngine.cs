@@ -96,6 +96,7 @@ namespace GameEngineTools.Characters.Engines.Interests
             {
                 case ActionCommitted ac when ac.Human == ctx.Id:
                     HandleAction(ac, ctx);
+                    if (ac.ActionName == Work) HandleWorkFit(ac, ctx, outbox);
                     break;
             }
         }
@@ -113,7 +114,7 @@ namespace GameEngineTools.Characters.Engines.Interests
 
         private void HandleAction(ActionCommitted ac, IHumanContext ctx)
         {
-            var dim = MapActionToDimension(ac.ActionName, ctx.Snapshot.Schedule?.Occupation);
+            var dim = InterestActionMap.DimensionOf(ac.ActionName, ctx.Snapshot.Schedule?.Occupation);
             if (dim < 0) return;
 
             // Only rewarding experiences raise interest (high positive valence at the time).
@@ -134,29 +135,15 @@ namespace GameEngineTools.Characters.Engines.Interests
 
         private static long[] NeverReinforced() => new long[] { -1, -1, -1, -1, -1, -1 };
 
-        private static int MapActionToDimension(string actionName, string? occupation) => actionName switch
+        private void HandleWorkFit(ActionCommitted ac, IHumanContext ctx, IEventCollector outbox)
         {
-            Create => Artistic,
-            Work => WorkDimension(occupation),
-            Produce or Process => Realistic,
-            Sell => Enterprising,
-            ReachOut => Social,
-            _ => -1
-        };
+            var dim = InterestActionMap.WorkDimension(ctx.Snapshot.Schedule?.Occupation);
+            if (dim < 0) return;
+            if (State.LastWorkFitTicks is { } last && (ac.OccurredAt - new WDateTime(last)).TotalDays < Config.ReinforcementCooldownDays) return;
 
-        // Holland's dominant theme of the occupation's work (R things, I analysis, A creating, S helping, E persuading, C data and order); unknown occupations drift nothing.
-        private static readonly Dictionary<string, int> WorkThemeByOccupation = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["craftsperson"] = Realistic, ["farmer"] = Realistic, ["guard"] = Realistic, ["laborer"] = Realistic,
-            ["merchant"] = Enterprising, ["scholar"] = Investigative, ["healer"] = Social, ["artist"] = Artistic,
-            ["baker"] = Realistic, ["chef"] = Realistic, ["farmhand"] = Realistic, ["food_worker"] = Realistic, ["orchardist"] = Realistic,
-            ["barista"] = Enterprising, ["barkeeper"] = Enterprising, ["shopkeeper"] = Enterprising,
-            ["clerk"] = Conventional, ["librarian"] = Conventional,
-            ["doctor"] = Investigative, ["programmer"] = Investigative, ["trainer"] = Social,
-        };
-
-        private static int WorkDimension(string? occupation)
-            => occupation is not null && WorkThemeByOccupation.TryGetValue(occupation, out var dim) ? dim : -1;
+            State = State with { LastWorkFitTicks = ac.OccurredAt.WorldTicks };
+            outbox.Add(new WorkFitFelt(ac.OccurredAt, ctx.Id, InterestActionMap.Relative(State.Current, dim)));
+        }
 
         #endregion Reward handling
 

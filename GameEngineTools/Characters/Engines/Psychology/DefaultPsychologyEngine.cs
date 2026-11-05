@@ -1144,6 +1144,11 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = HandleValueCongruenceViolated(vcv, s, ctx, outbox);
                     break;
 
+                // Interest–job fit moves stress a little either way (satisfaction–congruence correlation ≈ .1–.2).
+                case Interests.WorkFitFelt wf when wf.Human == ctx.Id:
+                    s = s with { Stress = Math.Clamp(s.Stress - wf.Fit * 10.0, 0, 100) };
+                    break;
+
                 // Object affordance applied via UseInPlace (AffordanceApplicationService).
                 // Physiology handles Hunger/Thirst — Psychology owns the affective layer:
                 // MoodBoost, Warmth, Social, and StressRaise.

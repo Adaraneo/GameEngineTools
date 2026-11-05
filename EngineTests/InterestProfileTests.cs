@@ -7,7 +7,10 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
+    using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Behavior.Modifiers;
     using GameEngineTools.Characters.Engines.Interests;
+    using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
@@ -149,6 +152,65 @@ namespace EngineTests
 
             Assert.AreEqual(0.5 + 0.0003 * 0.5, afterBurst, 1e-9, "Fifty rewarding commits within one day count once.");
             Assert.IsTrue(engine.State.Current.Artistic > afterBurst, "The next day reinforces again.");
+        }
+
+        [TestMethod]
+        public void InterestModifier_NudgesUtilityTowardTheRelativeInterest_AndLeavesOtherActionsAlone()
+        {
+            double Utility(InterestProfile profile, string action, string? occupation = null)
+            {
+                var (_, ctx, _) = MakeEngine(profile, valence: 0.0);
+                ((HumanContext)ctx).Snapshot = ctx.Snapshot with
+                {
+                    Interests = InterestState.FromBaseline(profile),
+                    Schedule = new DailyScheduleState(Array.Empty<ScheduleSlot>(), null, -1, occupation)
+                };
+                var context = new BehaviorContext(new WDateTime(0), WTimeSpan.FromHours(1), ctx, new EventCollector(),
+                    new BehaviorState(10, 5, 5, 20, 50, 30, null), new BehaviorConfig(), new Dictionary<string, double>());
+                var candidates = new List<BehaviorCandidate> { new(action, 50.0, WTimeSpan.FromHours(1), BehaviorDomain.Competence) };
+                new InterestBehaviorModifier().Modify(context, candidates);
+                return candidates[0].Utility;
+            }
+
+            var artistic = new InterestProfile(0.5, 0.5, 0.8, 0.5, 0.5, 0.5);
+            var unartistic = new InterestProfile(0.5, 0.5, 0.2, 0.5, 0.5, 0.5);
+
+            Assert.IsTrue(Utility(artistic, ActionNames.Create) > 50.0 + 2.0, "An artistic person is drawn to creating.");
+            Assert.IsTrue(Utility(unartistic, ActionNames.Create) < 50.0 - 2.0, "A person with little artistic interest is less drawn to it.");
+            Assert.AreEqual(50.0, Utility(Neutral(), ActionNames.Create), 1e-9, "A flat profile has no preference.");
+            Assert.AreEqual(50.0, Utility(artistic, ActionNames.Eat), 1e-9, "Actions that exercise no theme are untouched.");
+            var investigative = new InterestProfile(0.5, 0.8, 0.5, 0.5, 0.5, 0.5);
+            Assert.IsTrue(Utility(investigative, ActionNames.Work, "scholar") > 50.0, "A scholar who likes analysis is drawn to work.");
+            Assert.AreEqual(50.0, Utility(investigative, ActionNames.Work, null), 1e-9, "Work without a known occupation has no theme.");
+        }
+
+        [TestMethod]
+        public void WorkFit_IsFeltOncePerDay_AndMovesStressBothWays()
+        {
+            var likes = new InterestProfile(0.5, 0.8, 0.5, 0.5, 0.5, 0.5);
+            var (engine, ctx, self) = MakeEngine(likes, valence: 0.0);
+            ((HumanContext)ctx).Snapshot = ctx.Snapshot with { Schedule = new DailyScheduleState(Array.Empty<ScheduleSlot>(), null, -1, "scholar") };
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(At(100), self, ActionNames.Work, WTimeSpan.FromHours(1)), ctx, outbox);
+            engine.Handle(new ActionCommitted(At(100), self, ActionNames.Work, WTimeSpan.FromHours(1)), ctx, outbox);
+            engine.Handle(new ActionCommitted(At(100) + WTimeSpan.FromDays(1), self, ActionNames.Work, WTimeSpan.FromHours(1)), ctx, outbox);
+            var felt = outbox.Drain().OfType<WorkFitFelt>().ToList();
+
+            Assert.AreEqual(2, felt.Count, "Once on the first day, once on the next.");
+            Assert.IsTrue(felt[0].Fit > 0.2, $"A liked job fits well, got {felt[0].Fit:F2}.");
+
+            double StressAfter(double fit)
+            {
+                var psychology = new DefaultPsychologyEngine(Options.Create(new PsychologyConfig(BaselineAffectVariance: 0.0, StressRecoveryRatePerHour: 0.0, EnableCircadianRhythm: false)),
+                    LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)), new ZeroRandom());
+                psychology.RestoreState(new PsychologyState(0.0, 0.4, 0.5, 30, 10, DiscreteEmotion.Neutral));
+                psychology.Handle(new WorkFitFelt(At(100), self, fit), ctx, new EventCollector());
+                return psychology.State.Stress;
+            }
+
+            Assert.IsTrue(StressAfter(+0.3) < 30.0, "A job you like relieves stress.");
+            Assert.IsTrue(StressAfter(-0.3) > 30.0, "A job against your grain adds stress.");
         }
 
         [TestMethod]
