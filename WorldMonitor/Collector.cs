@@ -28,7 +28,7 @@ namespace WorldMonitor
         private long _lastSampleSlot = -1;
         private readonly Dictionary<HumanId, bool> _wasAsleep = new();
         private readonly HashSet<(long, HumanId, HumanId)> _seenOutcomes = new();
-        private readonly HashSet<(long, HumanId)> _seenOther = new();
+        private readonly HashSet<(long, HumanId, Type)> _seenOther = new();
 
         public Collector(double sampleEveryHours) => _sampleEveryHours = sampleEveryHours;
 
@@ -109,16 +109,16 @@ namespace WorldMonitor
                     case InteractionOutcome io when _seenOutcomes.Add((io.OccurredAt.WorldTicks, io.From, io.To)):
                         if (io.Accepted) InteractionsAccepted++; else InteractionsRejected++;
                         break;
-                    case SexualEncounterOutcome se when se.Accepted && _seenOther.Add((se.OccurredAt.WorldTicks, se.From)):
+                    case SexualEncounterOutcome se when se.Accepted && _seenOther.Add((se.OccurredAt.WorldTicks, se.From, e.GetType())):
                         SexualEncounters++;
                         break;
-                    case PregnancyStarted ps when _seenOther.Add((ps.OccurredAt.WorldTicks, ps.Human)):
+                    case PregnancyStarted ps when _seenOther.Add((ps.OccurredAt.WorldTicks, ps.Human, e.GetType())):
                         Pregnancies++;
                         break;
-                    case ChildBorn cb when _seenOther.Add((cb.OccurredAt.WorldTicks, cb.ParentA)):
+                    case ChildBorn cb when _seenOther.Add((cb.OccurredAt.WorldTicks, cb.ParentA, e.GetType())):
                         Births++;
                         break;
-                    case CharacterDied cd when _seenOther.Add((cd.OccurredAt.WorldTicks, cd.VictimId)):
+                    case CharacterDied cd when _seenOther.Add((cd.OccurredAt.WorldTicks, cd.VictimId, e.GetType())):
                         Deaths++;
                         break;
                 }

@@ -38,10 +38,14 @@ namespace WorldMonitor
                 SubstepMinutes = IntOverride(overrides, "substep", profile.SubstepMinutes),
             };
 
+            var sampleEveryHours = section.GetValue("SampleEveryHours", 6.0);
+            if (sampleEveryHours <= 0 || profile.Days < 1 || profile.Characters < 1 || profile.TickStepMinutes < 1 || profile.SubstepMinutes < 1)
+                throw new InvalidOperationException("SampleEveryHours, Days, Characters, TickStepMinutes and SubstepMinutes must all be positive.");
+
             return new MonitorOptions(
                 profileName,
                 profile,
-                section.GetValue("SampleEveryHours", 6.0),
+                sampleEveryHours,
                 overrides.GetValueOrDefault("out") ?? section["OutputDir"] ?? "reports",
                 section.GetSection("Thresholds").Get<Thresholds>() ?? new Thresholds());
         }

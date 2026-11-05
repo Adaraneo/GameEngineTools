@@ -91,20 +91,27 @@ namespace WorldMonitor
         {
             var checks = new List<Check>();
 
+            // A run that measured nothing must not pass: every check below would otherwise read an empty set as healthy.
+            if (c.Ticks == 0 || c.Samples.Count == 0)
+            {
+                checks.Add(new Check("data collected", false, "no ticks or samples were recorded"));
+                return checks;
+            }
+
             if (limits.MaxMedianStress is { } maxStress)
             {
                 // Judged on the second half of the run, after the characters have settled.
                 var lastDay = c.Samples.Count == 0 ? 0 : c.Samples[^1].Day;
                 var stress = c.Samples.Where(s => s.Day * 2 >= lastDay).SelectMany(s => s.Stress).OrderBy(x => x).ToList();
-                var median = stress.Count == 0 ? 0 : Percentile(stress, 0.5);
-                checks.Add(new Check("median stress in the second half", median <= maxStress, $"{median:F1} (limit {maxStress})"));
+                var median = Percentile(stress, 0.5);
+                checks.Add(new Check("median stress in the second half", stress.Count > 0 && median <= maxStress, $"{median:F1} (limit {maxStress})"));
             }
 
             if (limits.MinSleepWithPrivacyPercent is { } minPrivacy)
             {
                 var asleep = c.Days.Values.Sum(d => d.Asleep);
-                var privacy = asleep == 0 ? 100.0 : 100.0 * c.Days.Values.Sum(d => d.AsleepPrivate) / asleep;
-                checks.Add(new Check("sleep with privacy", privacy >= minPrivacy, $"{privacy:F1}% (limit {minPrivacy}%)"));
+                var privacy = asleep == 0 ? 0.0 : 100.0 * c.Days.Values.Sum(d => d.AsleepPrivate) / asleep;
+                checks.Add(new Check("sleep with privacy", asleep > 0 && privacy >= minPrivacy, $"{privacy:F1}% (limit {minPrivacy}%)"));
             }
 
             if (limits.MaxDeaths is { } maxDeaths)
