@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WorldMonitor</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GameEngineTools\GameEngineTools.csproj" />
+    <!-- WorldBootstrap (the world and its characters) lives in WorldObserver; the monitor runs the same world without the web host. -->
+    <ProjectReference Include="..\WorldObserver\WorldObserver.csproj" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+  </ItemGroup>
+
+  <!-- The engine reads its config and SourceFiles relative to the working directory, so the monitor carries WorldObserver's. -->
+  <ItemGroup>
+    <Content Include="..\WorldObserver\appsettings.Characters.json" Link="appsettings.Characters.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\WorldObserver\appsettings.World.json" Link="appsettings.World.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\WorldObserver\appsettings.Economy.json" Link="appsettings.Economy.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\WorldObserver\SourceFiles\**\*" Exclude="..\WorldObserver\SourceFiles\**\world.db*" Link="SourceFiles\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The referenced WorldObserver also ships an appsettings.json; the monitor must keep its own. -->
+  <Target Name="KeepOwnAppSettings" AfterTargets="CopyFilesToOutputDirectory">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\appsettings.json" DestinationFolder="$(OutDir)" />
+  </Target>
+
+</Project>

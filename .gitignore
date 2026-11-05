@@ -381,3 +381,6 @@ FodyWeavers.xsd
 # Unity PoC scratch project (not part of the main solution)
 UnityPoC/
 /tools/
+
+# WorldMonitor reports
+/WorldMonitor/reports/
