@@ -22,13 +22,13 @@ namespace WorldMonitor
 
             sb.AppendLine("## Per world day");
             var level = options.Thresholds.ChronicStressLevel;
-            sb.AppendLine($"| day | stress mean | median | p90 | max | above {level:F0} % | privacy % | at home % | asleep % | asleep with privacy % |");
-            sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+            sb.AppendLine($"| day | stress mean | median | p90 | max | above {level:F0} % | privacy % | at home % | asleep % | asleep with privacy % | awake with company % |");
+            sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
             foreach (var (day, counters) in c.Days)
             {
                 var stress = c.Samples.Where(s => s.Day == day).SelectMany(s => s.Stress).OrderBy(x => x).ToList();
                 var row = stress.Count == 0 ? "| - | - | - | - | -" : $"| {stress.Average():F1} | {Percentile(stress, 0.5):F1} | {Percentile(stress, 0.9):F1} | {stress[^1]:F0} | {100.0 * stress.Count(x => x > level) / stress.Count:F1}";
-                sb.AppendLine($"| {day} {row} | {Pct(counters.Private, counters.Total)} | {Pct(counters.AtHome, counters.Total)} | {Pct(counters.Asleep, counters.Total)} | {Pct(counters.AsleepPrivate, counters.Asleep)} |");
+                sb.AppendLine($"| {day} {row} | {Pct(counters.Private, counters.Total)} | {Pct(counters.AtHome, counters.Total)} | {Pct(counters.Asleep, counters.Total)} | {Pct(counters.AsleepPrivate, counters.Asleep)} | {Pct(counters.AwakeWithCompany, counters.Awake)} |");
             }
 
             sb.AppendLine();
@@ -68,6 +68,7 @@ namespace WorldMonitor
             }
 
             AppendCharacters(sb, options, c);
+            AppendIntimacy(sb, c);
 
             sb.AppendLine();
             sb.AppendLine("## Most frequent actions and places (seen at tick boundaries)");
@@ -86,6 +87,19 @@ namespace WorldMonitor
             return sb.ToString().Replace("\r\n", "\n");
 
             string Pct(long part, long whole) => whole == 0 ? "-" : (100.0 * part / whole).ToString("F1", inv);
+        }
+
+        private static void AppendIntimacy(StringBuilder sb, Collector c)
+        {
+            if (c.People.Count == 0) return;
+
+            sb.AppendLine();
+            sb.AppendLine("## Intimacy (what the characters felt and tried; highest value seen during the run)");
+            sb.AppendLine("The gate for starting an invitation needs closeness of 24-50 (lower with a more permissive SOI-R attitude), plus trust and comfort at the same scale for restricted characters.");
+            sb.AppendLine("| name | sex | SOI-R attitude | need intimacy | sexual interest | intimate affinity | closeness | trust | comfort | invitations tried |");
+            sb.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+            foreach (var p in c.People.Values.OrderByDescending(p => p.MaxCloseness))
+                sb.AppendLine($"| {p.Name} | {p.Sex} | {p.SociosexualityAttitude:F2} | {p.MaxNeedIntimacy:F0} | {p.MaxSexualInterest:F0} | {p.MaxIntimateAffinity:F0} | {p.MaxCloseness:F0} | {p.MaxTrust:F0} | {p.MaxComfort:F0} | {p.Invites} |");
         }
 
         private static void AppendCharacters(StringBuilder sb, MonitorOptions options, Collector c)

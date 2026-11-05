@@ -4,6 +4,7 @@
 namespace WorldMonitor
 {
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.Characters.Engines;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Bereavement;
     using GameEngineTools.Characters.Engines.Interactions;
@@ -26,6 +27,9 @@ namespace WorldMonitor
         public int Edges;
         public int Accepted, Rejected;
         public int? DiedOnDay;
+        public double MaxNeedIntimacy, MaxSexualInterest, MaxIntimateAffinity, MaxCloseness, MaxTrust, MaxComfort;
+        public double SociosexualityAttitude;
+        public int Invites;
         public double LastHunger, LastThirst, MaxHunger, MaxThirst;
         public string LastLocation = "?";
         public string LastAction = "-";
@@ -38,7 +42,7 @@ namespace WorldMonitor
     /// <summary>Per-world-day counters taken at every tick.</summary>
     public sealed class DayCounters
     {
-        public long Total, Private, AtHome, Asleep, AsleepPrivate;
+        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany;
     }
 
     /// <summary>Gathers the measurements of a run; <see cref="Record"/> is called once per scene tick.</summary>
@@ -86,6 +90,11 @@ namespace WorldMonitor
             if (!Days.TryGetValue(day, out var counters))
                 Days[day] = counters = new DayCounters();
 
+            var peopleAt = characters
+                .Where(h => !_dead.Contains(h.Id))
+                .GroupBy(h => h.Snapshot.InteractionSurface.Location ?? "?")
+                .ToDictionary(g => g.Key, g => g.Count());
+
             foreach (var c in characters)
             {
                 if (!People.TryGetValue(c.Id, out var person)) People[c.Id] = person = Describe(c);
@@ -98,6 +107,15 @@ namespace WorldMonitor
                 person.LastThirst = ph.Thirst;
                 person.MaxHunger = Math.Max(person.MaxHunger, ph.Hunger);
                 person.MaxThirst = Math.Max(person.MaxThirst, ph.Thirst);
+                person.MaxNeedIntimacy = Math.Max(person.MaxNeedIntimacy, c.Snapshot.Behavior.NeedIntimacy);
+                foreach (var edge in c.Snapshot.Relationships.Edges.Values)
+                {
+                    person.MaxSexualInterest = Math.Max(person.MaxSexualInterest, edge.SexualInterest);
+                    person.MaxIntimateAffinity = Math.Max(person.MaxIntimateAffinity, edge.IntimateAffinity);
+                    person.MaxCloseness = Math.Max(person.MaxCloseness, edge.Closeness);
+                    person.MaxTrust = Math.Max(person.MaxTrust, edge.Trust);
+                    person.MaxComfort = Math.Max(person.MaxComfort, edge.Comfort);
+                }
 
                 var surface = c.Snapshot.InteractionSurface;
                 var location = surface.Location ?? "?";
@@ -109,6 +127,7 @@ namespace WorldMonitor
                 if (surface.HasPrivacy) counters.Private++;
                 if (atHome) counters.AtHome++;
                 if (asleep) { counters.Asleep++; if (surface.HasPrivacy) counters.AsleepPrivate++; }
+                else { counters.Awake++; if (peopleAt.GetValueOrDefault(location) > 1) counters.AwakeWithCompany++; }
                 LocationTicks[location] = LocationTicks.GetValueOrDefault(location) + 1;
 
                 NoteSleepStart(c, asleep, atHome, surface.HasPrivacy);
@@ -146,7 +165,7 @@ namespace WorldMonitor
                 {
                     case ActionCommitted ac:
                         Actions[ac.ActionName] = Actions.GetValueOrDefault(ac.ActionName) + 1;
-                        if (People.TryGetValue(ac.Human, out var actor)) actor.LastAction = ac.ActionName;
+                        if (People.TryGetValue(ac.Human, out var actor)) { actor.LastAction = ac.ActionName; if (ac.ActionName == ActionNames.InviteIntimacy) actor.Invites++; }
                         break;
                     case InteractionOutcome io when _seenOutcomes.Add((io.OccurredAt.WorldTicks, io.From, io.To)):
                         if (io.Accepted) InteractionsAccepted++; else InteractionsRejected++;
@@ -188,6 +207,7 @@ namespace WorldMonitor
             Neuroticism = c.Personality.BigFive.Neuroticism,
             Extraversion = c.Personality.BigFive.Extraversion,
             AttachmentAnxiety = c.Personality.Attachment.Anxiety,
+            SociosexualityAttitude = c.Personality.Sociosexuality.Attitude,
         };
 
         private void UpdatePeople(int day, IReadOnlyList<IHuman> characters)
