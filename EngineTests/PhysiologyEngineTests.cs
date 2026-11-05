@@ -416,6 +416,96 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Menarche_AgeIsIndividual_NotTheSameForEveryGirl()
+        {
+            DefaultPhysiologyEngine Girl(IRandomSource rng) => new(
+                Options.Create(new PhysiologyConfig(EnableMenstrualCycle: true)), Options.Create(new MenstrualCycleConfig()),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)), rng,
+                biology: SexBiology.Female, birthDate: WDateOnly.New(104, 1, 1), now: WDateOnly.New(116, 1, 1));
+
+            Assert.IsNull(Girl(new ZeroRandom()).State.Cycle, "A 12-year-old of average maturation has no cycle yet.");
+            Assert.IsNotNull(Girl(new FixedUnitRandom(0.5)).State.Cycle, "An early maturer (−1.2 SD) already cycles at 12.");
+        }
+
+        [TestMethod]
+        public void FirstCyclesAfterMenarche_AreMostlyAnovulatory_AdultCyclesAreNot()
+        {
+            bool NextCycleIsImmature(int ageYears)
+            {
+                var engine = BuildEngineForBiologyAge(SexBiology.Female, ageYears, cycleEnabled: true);
+                engine.RestoreState(engine.State with { Cycle = engine.State.Cycle! with { DayInCycle = engine.State.Cycle.CurrentCycleLength } });
+                engine.Tick(WDateTime.New(116, 1, 1, 0), WTimeSpan.FromDays(1), BuildContextWithAction(null), new EventCollector());
+                Assert.AreEqual(1, engine.State.Cycle!.DayInCycle, "The cycle must have wrapped to day 1.");
+                return engine.State.Cycle.ImmatureAnovulatoryCycle;
+            }
+
+            Assert.IsTrue(NextCycleIsImmature(14), "Fourteen is 1.4 years after the average menarche; ZeroRandom rolls the anovulatory outcome.");
+            Assert.IsFalse(NextCycleIsImmature(25), "An adult's cycle is ovulatory.");
+        }
+
+        [TestMethod]
+        public void ConceptionChance_FollowsTheSixDayFertileWindow_OfWilcox1995()
+        {
+            double ChanceAt(int dayInCycle)
+            {
+                var recorder = new RecordingChanceRandom();
+                var ctx = BuildContextForConception(SexBiology.Female, random: recorder);
+                var engine = BuildEngineWithCycle(_now, ovulationWindowOpen: true);
+                engine.RestoreState(engine.State with { Cycle = engine.State.Cycle! with { CurrentCycleLength = 28, DayInCycle = dayInCycle } });
+                engine.Handle(MakeEncounter(ctx.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.None), ctx, new EventCollector());
+                return recorder.LastChance;
+            }
+
+            // A 28-day cycle with a 12-day luteal phase ovulates on day 16.
+            var peak = ChanceAt(16);
+            Assert.IsTrue(peak > 0.0);
+            Assert.AreEqual(0.10 / 0.33, ChanceAt(11) / peak, 0.01, "Five days before ovulation the chance is 0.10 against 0.33 on the day.");
+            Assert.AreEqual(0.0, ChanceAt(10), 1e-9, "Six days before ovulation is outside the window.");
+            Assert.AreEqual(0.0, ChanceAt(17), 1e-9, "After ovulation there is no chance.");
+        }
+
+        [TestMethod]
+        public void ConceptionChance_IsLowWhileBreastfeeding_AndAnovulatoryCyclesCannotConceive()
+        {
+            double ChanceWith(Func<PhysiologyState, PhysiologyState> change)
+            {
+                var recorder = new RecordingChanceRandom();
+                var ctx = BuildContextForConception(SexBiology.Female, random: recorder);
+                var engine = BuildEngineWithCycle(_now, ovulationWindowOpen: true);
+                engine.RestoreState(change(engine.State));
+                engine.Handle(MakeEncounter(ctx.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.None), ctx, new EventCollector());
+                return recorder.LastChance;
+            }
+
+            var normal = ChanceWith(s => s);
+            var lactating = ChanceWith(s => s with { Postpartum = new PostpartumState(90, PostpartumPhase.FullRecovery, IsBreastfeeding: true) });
+            var immature = ChanceWith(s => s with { Cycle = s.Cycle! with { ImmatureAnovulatoryCycle = true } });
+
+            Assert.AreEqual(0.1, lactating / normal, 0.01, "Breastfeeding within six months cuts the chance to a tenth.");
+            Assert.AreEqual(0.0, immature, 1e-9, "An anovulatory cycle cannot conceive.");
+        }
+
+        [TestMethod]
+        public void Postpartum_RecordOutlivesTheSixWeeks_WhileBreastfeeding_ThenEnds()
+        {
+            var engine = BuildEngineWithCycle(_now, ovulationWindowOpen: false);
+            var ctx = BuildContextWithAction(null);
+            engine.RestoreState(engine.State with
+            {
+                Postpartum = new PostpartumState(40, PostpartumPhase.SixWeeks, IsBreastfeeding: true),
+                Cycle = engine.State.Cycle! with { Phase = CyclePhase.Paused, OvulationWindow = false }
+            });
+
+            var start = WDateTime.New(116, 1, 1, 0);
+            engine.Tick(start, WTimeSpan.FromDays(5), ctx, new EventCollector());
+            Assert.IsNotNull(engine.State.Postpartum, "A breastfeeding mother keeps the record after day 42.");
+            Assert.AreNotEqual(CyclePhase.Paused, engine.State.Cycle!.Phase, "The cycle has resumed.");
+
+            engine.Tick(start + WTimeSpan.FromDays(5), WTimeSpan.FromDays(150), ctx, new EventCollector());
+            Assert.IsNull(engine.State.Postpartum, "Past 180 days the suppression window closes.");
+        }
+
+        [TestMethod]
         public void ConceptionChance_FallsWithAge_AsInDunson2002()
         {
             double ChanceAt(int age)
@@ -1725,11 +1815,11 @@ namespace EngineTests
             var girl = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 10, cycleEnabled: true);
             Assert.IsNull(girl.State.Cycle, "A 10-year-old has no cycle.");
 
-            girl.Tick(WDateTime.New(117, 1, 2, 0), WTimeSpan.FromHours(1), ctx, new EventCollector());
-            Assert.IsNull(girl.State.Cycle, "At 11 there is still no cycle.");
-
             girl.Tick(WDateTime.New(118, 1, 2, 0), WTimeSpan.FromHours(1), ctx, new EventCollector());
-            Assert.IsNotNull(girl.State.Cycle, "At the onset age (12) the first cycle begins.");
+            Assert.IsNull(girl.State.Cycle, "At 12.0 she is still before the mean menarche age (12.6).");
+
+            girl.Tick(WDateTime.New(119, 1, 2, 0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+            Assert.IsNotNull(girl.State.Cycle, "At 13 the first cycle has begun.");
             Assert.AreEqual(CyclePhase.Menses, girl.State.Cycle!.Phase, "The first cycle begins with menses.");
 
             var woman = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 60, cycleEnabled: true);
@@ -2715,6 +2805,15 @@ namespace EngineTests
         /// Random source that always returns true for <c>Chance()</c>, used to guarantee
         /// conception in tests that verify the conception code path.
         /// </summary>
+        private sealed class FixedUnitRandom(double unit) : IRandomSource
+        {
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => unit;
+
+            public bool Chance(double p) => false;
+        }
+
         private sealed class RecordingChanceRandom : IRandomSource
         {
             public double LastChance { get; private set; } = -1;

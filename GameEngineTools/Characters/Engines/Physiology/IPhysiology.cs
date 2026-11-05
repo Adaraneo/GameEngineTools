@@ -16,7 +16,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// <param name="RestingMetabolicRate">Resting metabolic rate (kcal/day) used as the metabolic baseline.</param>
     /// <param name="MaxSleepDebtHours">Upper bound on accumulated sleep-debt hours.</param>
     /// <param name="EnableMenstrualCycle">When <c>true</c>, female characters run the menstrual-cycle module.</param>
-    /// <param name="MenstrualCycleBeginsInAge">Age (years) at which menarche begins.</param>
+    /// <param name="MenstrualCycleBeginsInAge">Earliest possible age of menarche; each woman draws her own around <c>MenarcheMeanAge</c>.</param>
+    /// <param name="MenarcheMeanAge">Mean age at menarche (cohort surveys: 12.5–12.7, SD ≈ 1.05).</param>
     /// <param name="EnergyRecoveryPerSleepHour">Energy points restored per hour of sleep.</param>
     /// <param name="PainPassiveRecoveryPerHour">Pain points decayed per hour while awake and idle.</param>
     /// <param name="PainSleepRecoveryPerHour">Pain points decayed per hour of sleep.</param>
@@ -138,7 +139,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double RestingMetabolicRate = 1600,
         double MaxSleepDebtHours = 12,
         bool EnableMenstrualCycle = true,
-        int MenstrualCycleBeginsInAge = 12,
+        int MenstrualCycleBeginsInAge = 9,
+        double MenarcheMeanAge = 12.6,
+        double MenarcheAgeStdDev = 1.05,
+        int LactationFertilityDays = 180,
+        double LactationConceptionMultiplier = 0.1,
         double EnergyRecoveryPerSleepHour = 10.0,
         double PainPassiveRecoveryPerHour = 0.3,
         double PainSleepRecoveryPerHour = 0.5,
@@ -418,7 +423,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
             RestingMetabolicRate: 1600,
             MaxSleepDebtHours: 12,
             EnableMenstrualCycle: true,
-            MenstrualCycleBeginsInAge: 12,
+            MenstrualCycleBeginsInAge: 9,
+            MenarcheMeanAge: 12.6,
+            MenarcheAgeStdDev: 1.05,
+            LactationFertilityDays: 180,
+            LactationConceptionMultiplier: 0.1,
             EnergyRecoveryPerSleepHour: 10.0,
             PainPassiveRecoveryPerHour: 0.3,
             PainSleepRecoveryPerHour: 0.5,
@@ -899,7 +908,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// peak (~day 20–24), then falls before menses. Negatively modulates desire and underlies
         /// late-luteal symptoms / PMDD. Source: progesteron− → touha (β ≈ −0.10..−0.20; replicated).
         /// </summary>
-        double Progesterone = 10.0);
+        double Progesterone = 10.0,
+
+        /// <summary>True when this cycle is anovulatory because the axis is still maturing after menarche (rolled once per cycle).</summary>
+        bool ImmatureAnovulatoryCycle = false);
 
     /// <summary>State of the character's ongoing pregnancy.</summary>
     /// <param name="OtherParent">Identity of the other parent.</param>

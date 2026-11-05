@@ -37,6 +37,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private readonly ILogger _log;
         private readonly IRandomSource _rng;
+        private readonly double _menarcheAge;
         private readonly MenstrualCycleConfig _cycleCfg;
 
         private double _accHours;
@@ -86,7 +87,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
             _log = loggerFactory.CreateLogger<DefaultPhysiologyEngine>();
             _rng = rng;
 
-            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && ComputeAgeYears(now) >= Config.MenstrualCycleBeginsInAge && now != default)
+            _menarcheAge = biology == SexBiology.Female
+                ? Math.Clamp(Config.MenarcheMeanAge + Normal(rng, 0, Config.MenarcheAgeStdDev), Config.MenstrualCycleBeginsInAge, Config.MenarcheMeanAge + 3 * Config.MenarcheAgeStdDev)
+                : 0.0;
+
+            var initialCycle = (Config.EnableMenstrualCycle && biology == SexBiology.Female && ComputeAgeYears(now) >= Math.Ceiling(_menarcheAge) && now != default)
                 ? SeedCycle(_cycleCfg, rng, now)
                 : null;
 
@@ -548,7 +553,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                 // Menarche: a girl who had no cycle at construction starts cycling when she reaches the onset age.
                 if (s.Cycle is null && Config.EnableMenstrualCycle && _biology == SexBiology.Female && s.Pregnancy is null && s.Postpartum is null
-                    && ageYears >= Config.MenstrualCycleBeginsInAge && ageYears < Config.MenopauseAge)
+                    && ComputeAgeYearsFractional(now.Date) >= _menarcheAge && ageYears < Config.MenopauseAge)
                     s = s with { Cycle = SeedCycle(_cycleCfg, ctx.Random, now.Date, startAtMenses: true) };
 
                 // Testosterone aging is applied as a lowered set point in the diurnal block below (a level offset here was erased).
@@ -943,6 +948,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return (day, phase, length, ovulDay);
         }
 
+        // Share of ovulatory cycles by years since menarche: anovulatory 55–82 % in the first two years, 10–20 % up to five (1997 review); linear in between, full by year 8.
+        private static double OvulatoryFraction(double yearsSinceMenarche) => yearsSinceMenarche switch
+        {
+            <= 2.0 => 0.3,
+            <= 5.0 => 0.3 + 0.55 * (yearsSinceMenarche - 2.0) / 3.0,
+            _ => Math.Min(1.0, 0.85 + 0.15 * (yearsSinceMenarche - 5.0) / 3.0)
+        };
+
         private PhysiologyState EmitCycleProgressionEvents(PhysiologyState s, WDateTime now, IHumanContext ctx, IEventCollector box, int day, CyclePhase phase, int length, int ovulDay)
         {
             var c = s.Cycle!;
@@ -955,7 +968,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // High/Moderate contraception suppresses ovulation
             // AnovulatoryCycleActive suppresses ovulation due to HPA suppression.
             var contraceptionSuppressesOvul = s.CurrentContraception is ContraceptionLevel.High or ContraceptionLevel.Moderate;
-            var ovulWindow = phase == CyclePhase.Ovulation && !contraceptionSuppressesOvul && !s.Cycle!.AnovulatoryCycleActive;
+            // A new cycle after menarche is often anovulatory while the axis matures (rolled once, on day 1).
+            var ovulatoryShare = OvulatoryFraction(ComputeAgeYearsFractional(now.Date) - _menarcheAge);
+            var immature = day == 1 ? ovulatoryShare < 1.0 && !ctx.Random.Chance(ovulatoryShare) : c.ImmatureAnovulatoryCycle;
+            var ovulWindow = phase == CyclePhase.Ovulation && !contraceptionSuppressesOvul && !s.Cycle!.AnovulatoryCycleActive && !immature;
             if (_cycleCfg.EnableOvulationWindowEvents && ovulWindow && !c.OvulationWindow)
                 box.Add(new OvulationWindowOpened(now, ctx.Id));
 
@@ -967,6 +983,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 DayInCycle = day,
                 Phase = phase,
                 OvulationWindow = ovulWindow,
+                ImmatureAnovulatoryCycle = immature,
                 LastMensesStart = (day == 1) ? now.Date : c.LastMensesStart,
                 CurrentCycleLength = currentLength
             };
@@ -1076,10 +1093,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             if (newPhase == PostpartumPhase.FullRecovery)
             {
+                // The cycle resumes now; breastfeeding keeps the record (and its fertility suppression) up to LactationFertilityDays.
+                var lactating = pp.IsBreastfeeding && days < Config.LactationFertilityDays;
                 return s with
                 {
-                    Postpartum = null,
-                    Cycle = s.Cycle is null ? null : s.Cycle with { Phase = CyclePhase.Follicular, LibidoMod = 1.0 }
+                    Postpartum = lactating ? pp with { DaysSinceBirth = days, Phase = newPhase, HormonalCrashActive = false } : null,
+                    Cycle = s.Cycle is { Phase: CyclePhase.Paused } ? s.Cycle with { Phase = CyclePhase.Follicular, LibidoMod = 1.0 } : s.Cycle
                 };
             }
 
@@ -1172,9 +1191,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var ageYears = s.Aging?.AgeYears ?? 0;
             chance *= Math.Clamp(1.0 - Math.Max(0, ageYears - Config.FertilityDeclineStartAge) * Config.FertilityDeclinePerYear, 0.0, 1.0);
 
-            if (s.Cycle?.OvulationWindow == true)
+            // Wilcox 1995: pregnancies occur only within the six days ending on the ovulation day (0.10 five days before, 0.33 on the day).
+            if (s.Cycle is { AnovulatoryCycleActive: false, ImmatureAnovulatoryCycle: false } cycle)
             {
-                chance *= Config.OvulationConceptionMultiplier;
+                var ovulationDay = Math.Max(_cycleCfg.MensesMeanDays + 2, cycle.CurrentCycleLength - _cycleCfg.LutealMeanDays);
+                var daysBeforeOvulation = ovulationDay - cycle.DayInCycle;
+                chance *= daysBeforeOvulation is >= 0 and <= 5
+                    ? Config.OvulationConceptionMultiplier * (0.10 + 0.23 * (5 - daysBeforeOvulation) / 5.0) / 0.33
+                    : 0.0;
+            }
+            else
+            {
+                chance = 0.0;
+            }
+
+            if (s.Postpartum is { IsBreastfeeding: true })
+            {
+                chance *= Config.LactationConceptionMultiplier;
             }
 
             chance *= encounter.Intent switch
@@ -1458,7 +1491,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (state.Aging is not null)
                 state = state with { Aging = state.Aging with { AgeYears = ageYears } };
 
-            if (state.Cycle is not null && ageYears > 0 && ageYears < Config.MenstrualCycleBeginsInAge)
+            if (state.Cycle is not null && ageYears > 0 && ageYears < Math.Floor(_menarcheAge))
                 state = state with { Cycle = null };
 
             State = state;
