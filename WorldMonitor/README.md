@@ -17,6 +17,8 @@ Each run writes `report-<profile>-<time>.md` and `samples-<profile>-<time>.csv` 
 
 The report also lists every character (personality, relationships, accepted/rejected interactions, stress over the second half) with the chronically stressed ones marked, and the circumstances of each death. A character that has died is dropped from the statistics from then on, because the scene keeps passing it with its last state frozen.
 
+Several monitors can run at the same time (each uses about 80-90 MB and one core): every run copies the config and SourceFiles into its own temporary folder, because the engine keeps its world database at a fixed path under the working directory and runs sharing a folder would rewrite each other's world. Report files carry the process id so parallel runs never collide.
+
 Runs are not reproducible: the world and the orchestrator use unseeded random sources, so two runs of one profile differ (a stress mean of 3 or 23 on the last day is within what was seen).
 
 Newborns are counted but not added to the scene, as WorldObserver's own birth handling lives in its hosted service.
