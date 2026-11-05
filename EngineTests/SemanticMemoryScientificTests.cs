@@ -258,6 +258,40 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Navarro_RecentContactOnTheRelationshipEdge_SuppressesTheGapAcceleration()
+        {
+            var now = WDateTime.New(100, 5, 1, 0);
+            var self = new HumanId(Guid.NewGuid());
+            var other = new HumanId(Guid.NewGuid());
+            var old = now - WTimeSpan.FromDays(200);
+
+            IHumanContext CtxWithContact(WDateTime? lastContact)
+            {
+                var ctx = BuildCtxWith(self, AttachmentProfile.Secure);
+                ((HumanContext)ctx).Snapshot = ctx.Snapshot with
+                {
+                    Relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
+                    {
+                        [other] = new RelationshipEdge(self, other, 60, 60, 50, 50, 50, 50, 50, 30, 50, 50,
+                            new DomainBreakdown(50, 50, 50, 50, 50), LastContactTime: lastContact)
+                    })
+                };
+                return ctx;
+            }
+
+            var met = BuildEngine();
+            var forgotten = BuildEngine();
+            met.RestoreState(BeliefState(other, PersonBeliefKind.Warm, 0.80, 0.10, old));
+            forgotten.RestoreState(BeliefState(other, PersonBeliefKind.Warm, 0.80, 0.10, old));
+            met.Tick(now, WTimeSpan.FromDays(1), CtxWithContact(now - WTimeSpan.FromDays(2)), new EventCollector());
+            forgotten.Tick(now, WTimeSpan.FromDays(1), CtxWithContact(old), new EventCollector());
+
+            var metDecay = 0.80 - met.State.GetStrength(other, PersonBeliefKind.Warm);
+            var forgottenDecay = 0.80 - forgotten.State.GetStrength(other, PersonBeliefKind.Warm);
+            Assert.IsTrue(forgottenDecay > metDecay * 2.5, $"A recent contact on the edge is recent contact. met={metDecay:F4}, forgotten={forgottenDecay:F4}");
+        }
+
+        [TestMethod]
         public void Navarro_GapBelowCritical_NormalDecay()
         {
             // Gap = 5 dní << 168 → gapMultiplier = 1.0 → normální decay

@@ -81,6 +81,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// <param name="CircadianTempAmplitude">Amplitude of the circadian body-temperature oscillation (Waterhouse 2005).</param>
     /// <param name="CircadianTempPeakHour">Hour of day at which body temperature peaks.</param>
     /// <param name="MenopauseAge">Age at which menopause occurs.</param>
+    /// <param name="FertilityDeclineStartAge">Age from which conception chance falls (Dunson 2002: ages 19–26 are twice as fertile as 35–39).</param>
+    /// <param name="FertilityDeclinePerYear">Fraction of full fertility lost per year past the start age; the default halves it at 37 and extrapolates linearly to zero at 47 (extrapolation, not measured).</param>
     /// <param name="AgingEnergyRecoveryPenaltyStart">Age at which energy-recovery aging penalty begins.</param>
     /// <param name="AgingEnergyRecoveryPenaltyPerYear">Energy-recovery penalty accrued per year past the start age.</param>
     /// <param name="AgingImmuneBaselineStart">Age at which the immune baseline begins to drift upward.</param>
@@ -238,6 +240,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double CircadianTempPeakHour = 17.0,
         // Age effects
         int MenopauseAge = 50,
+        int FertilityDeclineStartAge = 27,
+        double FertilityDeclinePerYear = 0.05,
         double AgingEnergyRecoveryPenaltyStart = 40,
         double AgingEnergyRecoveryPenaltyPerYear = 0.005,
         double AgingImmuneBaselineStart = 60,
@@ -493,6 +497,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             ChronicPainDecayFactor: 0.5,
             // ── Age effects ───────────────────────────────────────────────────────────
             MenopauseAge: 50,
+            FertilityDeclineStartAge: 27,
+            FertilityDeclinePerYear: 0.05,
             AgingEnergyRecoveryPenaltyStart: 40,
             AgingEnergyRecoveryPenaltyPerYear: 0.005,
             AgingImmuneBaselineStart: 60,

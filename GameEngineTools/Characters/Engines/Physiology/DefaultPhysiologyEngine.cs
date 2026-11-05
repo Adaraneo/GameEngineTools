@@ -546,6 +546,11 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 if (s.Cycle is { Phase: not CyclePhase.Paused } && ageYears >= Config.MenopauseAge)
                     s = s with { Cycle = s.Cycle with { Phase = CyclePhase.Paused, OvulationWindow = false, LibidoMod = 1.0 } };
 
+                // Menarche: a girl who had no cycle at construction starts cycling when she reaches the onset age.
+                if (s.Cycle is null && Config.EnableMenstrualCycle && _biology == SexBiology.Female && s.Pregnancy is null && s.Postpartum is null
+                    && ageYears >= Config.MenstrualCycleBeginsInAge && ageYears < Config.MenopauseAge)
+                    s = s with { Cycle = SeedCycle(_cycleCfg, ctx.Random, now.Date, startAtMenses: true) };
+
                 // Testosterone aging is applied as a lowered set point in the diurnal block below (a level offset here was erased).
 
                 // Inflammaging: nad 60 → baseline ImmuneLoad pomalu roste
@@ -1164,6 +1169,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             var chance = Config.BaseConceptionChancePerEncounter;
 
+            var ageYears = s.Aging?.AgeYears ?? 0;
+            chance *= Math.Clamp(1.0 - Math.Max(0, ageYears - Config.FertilityDeclineStartAge) * Config.FertilityDeclinePerYear, 0.0, 1.0);
+
             if (s.Cycle?.OvulationWindow == true)
             {
                 chance *= Config.OvulationConceptionMultiplier;
@@ -1346,13 +1354,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return CyclePhase.Luteal;
         }
 
-        private static MenstrualCycleState SeedCycle(MenstrualCycleConfig cfg, IRandomSource rng, WDateOnly now)
+        private static MenstrualCycleState SeedCycle(MenstrualCycleConfig cfg, IRandomSource rng, WDateOnly now, bool startAtMenses = false)
         {
             // Sample the length of this initialization cycle from the same distribution as at runtime.
             var cycleLength = Math.Max(cfg.MinCycleLengthDays, Math.Min(cfg.MaxCycleLengthDays,
                 cfg.MeanCycleLengthDays + (int)Math.Round(Normal(rng, 0, cfg.VariabilityDaysStdDev))));
             var ovulDay = Math.Max(cfg.MensesMeanDays + 2, cycleLength - cfg.LutealMeanDays);
-            var day = rng.Next(1, Math.Max(2, cycleLength));
+            var day = startAtMenses ? 1 : rng.Next(1, Math.Max(2, cycleLength));
             day = Math.Clamp(day, 1, cfg.MaxCycleLengthDays);
             var phase = PhaseFor(day, cycleLength, cfg.MensesMeanDays, ovulDay);
 

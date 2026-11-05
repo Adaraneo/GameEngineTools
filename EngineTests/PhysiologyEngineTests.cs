@@ -415,6 +415,27 @@ namespace EngineTests
             }
         }
 
+        [TestMethod]
+        public void ConceptionChance_FallsWithAge_AsInDunson2002()
+        {
+            double ChanceAt(int age)
+            {
+                var recorder = new RecordingChanceRandom();
+                var ctx = BuildContextForConception(SexBiology.Female, random: recorder);
+                var engine = BuildEngineWithCycle(_now, ovulationWindowOpen: true);
+                engine.RestoreState(engine.State, WDateOnly.New(101 + age, 1, 1));
+                engine.Handle(MakeEncounter(ctx.Id, ReproductiveIntent.OpenToPregnancy, ContraceptionLevel.None), ctx, new EventCollector());
+                return recorder.LastChance;
+            }
+
+            var young = ChanceAt(24);
+            var late = ChanceAt(37);
+
+            Assert.IsTrue(young > 0.0, "A young woman in the ovulation window can conceive.");
+            Assert.AreEqual(0.5, late / young, 0.02, "At 35–39 the chance is about half of the 19–26 level.");
+            Assert.AreEqual(0.0, ChanceAt(48), 1e-9, "Fertility is exhausted before menopause.");
+        }
+
         #endregion Conception chance
 
         #region Pregnancy discovery timing
@@ -1696,6 +1717,27 @@ namespace EngineTests
                 now: WDateOnly.New(currentYear, 1, 1));
         }
 
+        [TestMethod]
+        public void Menarche_StartsTheCycleWhenAGirlReachesTheOnsetAge_AndNeverForOlderWomen()
+        {
+            var ctx = BuildContextWithAction(null);
+
+            var girl = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 10, cycleEnabled: true);
+            Assert.IsNull(girl.State.Cycle, "A 10-year-old has no cycle.");
+
+            girl.Tick(WDateTime.New(117, 1, 2, 0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+            Assert.IsNull(girl.State.Cycle, "At 11 there is still no cycle.");
+
+            girl.Tick(WDateTime.New(118, 1, 2, 0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+            Assert.IsNotNull(girl.State.Cycle, "At the onset age (12) the first cycle begins.");
+            Assert.AreEqual(CyclePhase.Menses, girl.State.Cycle!.Phase, "The first cycle begins with menses.");
+
+            var woman = BuildEngineForBiologyAge(SexBiology.Female, ageYears: 60, cycleEnabled: true);
+            woman.RestoreState(woman.State with { Cycle = null });
+            woman.Tick(WDateTime.New(116, 1, 2, 0), WTimeSpan.FromHours(1), ctx, new EventCollector());
+            Assert.IsNull(woman.State.Cycle, "A post-menopausal woman never restarts cycling.");
+        }
+
         #endregion Věkové efekty
 
         #region Spánkový dluh odvozený z Process S
@@ -2538,7 +2580,7 @@ namespace EngineTests
         /// <summary>
         /// Builds a context for conception tests with configurable biology and chance outcome.
         /// </summary>
-        private static IHumanContext BuildContextForConception(SexBiology biology, bool alwaysChance = true)
+        private static IHumanContext BuildContextForConception(SexBiology biology, bool alwaysChance = true, IRandomSource? random = null)
         {
             var physio = new PhysiologyState(70, 2, 25, 20, 5, 10, 0, null);
             var psych = new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral);
@@ -2550,7 +2592,7 @@ namespace EngineTests
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(new List<EpisodicMemory>()));
 
-            IRandomSource rng = alwaysChance ? new AlwaysConceiveRandom() : (IRandomSource)new ZeroRandom();
+            IRandomSource rng = random ?? (alwaysChance ? new AlwaysConceiveRandom() : (IRandomSource)new ZeroRandom());
 
             return new HumanContext
             {
@@ -2673,6 +2715,21 @@ namespace EngineTests
         /// Random source that always returns true for <c>Chance()</c>, used to guarantee
         /// conception in tests that verify the conception code path.
         /// </summary>
+        private sealed class RecordingChanceRandom : IRandomSource
+        {
+            public double LastChance { get; private set; } = -1;
+
+            public int Next(int min, int max) => min;
+
+            public double NextUnit() => 0.0;
+
+            public bool Chance(double p)
+            {
+                LastChance = p;
+                return false;
+            }
+        }
+
         private sealed class AlwaysConceiveRandom : IRandomSource
         {
             public int Next(int min, int max) => min;

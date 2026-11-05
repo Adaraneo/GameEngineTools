@@ -71,8 +71,15 @@ namespace GameEngineTools.Characters.Engines.SemanticMemory
                 var newestBelief = set.Beliefs.Values
                     .OrderByDescending(b => b.LastUpdatedAt.WorldTicks)
                     .FirstOrDefault();
-                var daysSinceContact = newestBelief is not null
-                    ? Math.Max(0.0, (now - newestBelief.LastUpdatedAt).TotalDays)
+                // Last contact is the later of the newest evidence and the relationship's own contact stamp.
+                var lastContact = newestBelief?.LastUpdatedAt;
+                if (edge?.LastContactTime is { } edgeContact && (lastContact is null || edgeContact > lastContact.Value))
+                {
+                    lastContact = edgeContact;
+                }
+
+                var daysSinceContact = lastContact is { } contact
+                    ? Math.Max(0.0, (now - contact).TotalDays)
                     : 0.0;
 
                 var gapMultiplier = daysSinceContact > navarroThreshold
