@@ -34,9 +34,11 @@ namespace EngineTests
     public sealed class SoakDeterminismTests : TestBase
     {
         private const int Characters = 8;
-        private sealed record Outcome(IReadOnlyList<IHuman> Humans, IReadOnlyList<(int Day, string Metrics)> Samples);
+        private static readonly string[] Occupations = { "scholar", "clerk", "farmer", "artist", "merchant", "healer", "laborer", "craftsperson" };
 
-        private Outcome RunSociety(int seed, int days)
+        private sealed record Outcome(IReadOnlyList<IHuman> Humans, IReadOnlyList<(int Day, string Metrics)> Samples, IReadOnlyDictionary<string, int> Events);
+
+        private Outcome RunSociety(int seed, int days, bool occupations = false)
         {
             var rngFactory = ServiceProvider.GetRequiredService<IRandomSourceFactory>();
             var factory = ServiceProvider.GetRequiredService<IHumanFactory>();
@@ -57,7 +59,7 @@ namespace EngineTests
             var humans = new List<IHuman>();
             for (var i = 0; i < Characters; i++)
             {
-                var human = factory.Create(Blueprint(rngFactory, seed, i));
+                var human = factory.Create(Blueprint(rngFactory, seed, i, occupations ? Occupations[i % Occupations.Length] : null));
                 locations.MoveCharacter(human.Id, square.Id);
                 humans.Add(human);
             }
@@ -84,6 +86,7 @@ namespace EngineTests
 
             var samples = new List<(int, string)>();
             var acts = new Dictionary<string, int>();
+            var events = new Dictionary<string, int>();
             var tickDay = -1;
             var options = new SimulationSceneOptions
             {
@@ -100,8 +103,11 @@ namespace EngineTests
                     orchestrator.OnTick(now, chars);
                     foreach (var c in chars)
                         foreach (var e in c.LastOutbox)
+                        {
+                            events[e.GetType().Name] = events.GetValueOrDefault(e.GetType().Name) + 1;
                             if (e is GameEngineTools.Characters.Engines.Behavior.ActionCommitted ac)
                                 acts[ac.ActionName] = acts.GetValueOrDefault(ac.ActionName) + 1;
+                        }
                     var day = (int)(WDateTime.Difference(now, WDateTime.New(WDateOnly.New(100, 1, 1))).TotalDays);
                     if (day != tickDay && day % 10 == 0)
                         samples.Add((day, Describe(chars, reputation)));
@@ -113,7 +119,7 @@ namespace EngineTests
                 .RunAsync().GetAwaiter().GetResult();
 
             samples.Add((days, Describe(humans, reputation) + " | actions: " + string.Join(", ", acts.OrderByDescending(a => a.Value).Take(8).Select(a => $"{a.Key}={a.Value}"))));
-            return new Outcome(humans, samples);
+            return new Outcome(humans, samples, events);
         }
 
         private static string Describe(IReadOnlyList<IHuman> humans, CommunityReputationLedger reputation)
@@ -123,8 +129,21 @@ namespace EngineTests
             var beliefs = humans.Max(h => h.Snapshot.SemanticMemory?.People.Count ?? 0);
             var goals = humans.Max(h => h.Snapshot.Goals?.Goals.Count ?? 0);
             var known = humans.Max(h => h.Snapshot.Memory.Knowledge?.Count ?? 0);
-            return $"maxEdges={edges} maxEpisodes={episodes} maxBeliefPeople={beliefs} maxGoals={goals} maxKnowledge={known} reputations={reputation.Snapshot().Count}";
+            var drift = InterestDrift(humans);
+            var stress = humans.Average(h => h.Snapshot.Psychology.Stress);
+            var body = $"energy={humans.Average(h => h.Snapshot.Physiology.Energy):F0} hunger={humans.Average(h => h.Snapshot.Physiology.Hunger):F0} thirst={humans.Average(h => h.Snapshot.Physiology.Thirst):F0} sleepDebt={humans.Average(h => h.Snapshot.Physiology.SleepDebtHours):F1} valence={humans.Average(h => h.Snapshot.Psychology.Valence):F2} allostatic={humans.Average(h => h.Snapshot.Physiology.AllostaticLoad):F0} needSocial={humans.Average(h => h.Snapshot.Psychology.Motivations?.NeedSocial ?? 0):F0}";
+            return $"maxEdges={edges} maxEpisodes={episodes} maxBeliefPeople={beliefs} maxGoals={goals} maxKnowledge={known} reputations={reputation.Snapshot().Count} interestDrift={drift:F3} meanStress={stress:F1} {body}";
         }
+
+        private static double InterestDrift(IReadOnlyList<IHuman> humans) => humans
+            .Where(h => h.Snapshot.Interests is not null)
+            .Select(h => h.Snapshot.Interests!)
+            .Max(s => new[]
+            {
+                s.Current.Realistic - s.Baseline.Realistic, s.Current.Investigative - s.Baseline.Investigative,
+                s.Current.Artistic - s.Baseline.Artistic, s.Current.Social - s.Baseline.Social,
+                s.Current.Enterprising - s.Baseline.Enterprising, s.Current.Conventional - s.Baseline.Conventional,
+            }.Max(Math.Abs));
 
         private static void SeedEnvironment(WorldObjectWriteBuffer buffer, string locationId)
         {
@@ -155,7 +174,7 @@ namespace EngineTests
             buffer.Flush();
         }
 
-        private static HumanBlueprint Blueprint(IRandomSourceFactory rngFactory, int seed, int index)
+        private static HumanBlueprint Blueprint(IRandomSourceFactory rngFactory, int seed, int index, string? occupation = null)
         {
             var id = new HumanId(new Guid(seed, 0, (short)index, new byte[8]));
             var identity = new Identity(
@@ -171,7 +190,24 @@ namespace EngineTests
                 Chronotype.Neutral);
             var sex = index % 2 == 0 ? SexBiology.Female : SexBiology.Male;
             var genes = new AppearanceGenerator(rngFactory).GenerateBlueprint(sex, seed: seed * 100 + index);
-            return new HumanBlueprint(id, identity, sex, personality, genes, Seed: seed * 100 + index);
+            return new HumanBlueprint(id, identity, sex, personality, genes, Seed: seed * 100 + index, Occupation: occupation);
+        }
+
+        /// <summary>On-demand long run: set SOAK_DAYS (e.g. 90) to see how reproduction, interests and stress behave over months.</summary>
+        [TestMethod]
+        public void Society_WithOccupations_ReportsReproductionInterestsAndStress()
+        {
+            var days = int.TryParse(Environment.GetEnvironmentVariable("SOAK_DAYS"), out var requested) ? requested : 6;
+            var outcome = RunSociety(seed: 31, days: days, occupations: Environment.GetEnvironmentVariable("SOAK_NO_OCC") != "1");
+
+            foreach (var (day, metrics) in outcome.Samples)
+                Console.WriteLine($"day {day,3}: {metrics}");
+            Console.WriteLine("top events: " + string.Join(", ", outcome.Events.OrderByDescending(e => e.Value).Take(25).Select(e => $"{e.Key}={e.Value}")));
+            foreach (var name in new[] { "SexualEncounterOutcome", "PregnancyStarted", "ChildBorn", "CharacterDied", "WorkFitFelt", "ActionCommitted" })
+                Console.WriteLine($"{name}: {outcome.Events.GetValueOrDefault(name)}");
+
+            Assert.IsTrue(InterestDrift(outcome.Humans) < 0.25, "Interests stay within a modest distance of their baseline.");
+            Assert.AreEqual(0, outcome.Events.GetValueOrDefault("CharacterDied"), "Nobody dies in a fed, sheltered society.");
         }
 
         [TestMethod]
