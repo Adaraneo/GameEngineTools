@@ -21,6 +21,7 @@ using GameEngineTools.World.Core.Astro;
 using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Movement;
+using GameEngineTools.World.Persistence;
 using GameEngineTools.World.Objects;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
@@ -36,6 +37,11 @@ using TFSC = GameEngineTools.Constants.TestFSConstatns;
 var gameTimePath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
     "gametime.bin");
+
+// Shared world state (prices, reputations, standing, trips, deaths) saved beside the game time.
+var worldStatePath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+    "gameworld.json");
 
 var spec = GameEngineToolsRuntime.LoadSpec();
 var defaultTicks = spec.Calendar.DaysFromDate(1, 1, 1) * spec.TicksPerDay;
@@ -328,6 +334,21 @@ foreach (var ch in manager.Characters)
 
 var mutableObjectProvider = runtime.Services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>();
 var mainSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger, statusLedger, mutableObjectProvider);
+
+// Restore the shared world state of the previous run. Placements are not restored: characters are placed in their homes above.
+var economyLedger = runtime.Services.GetService<GameEngineTools.World.Economy.EconomyLedger>();
+if (File.Exists(worldStatePath))
+{
+    try
+    {
+        WorldStateStore.Apply(WorldStateStore.Load(worldStatePath), economyLedger, reputationLedger, statusLedger, locations: null, mainSceneOrchestrator);
+        Console.WriteLine($"World state restored from {worldStatePath}.");
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"World state could not be restored ({ex.Message}); starting with an empty one.");
+    }
+}
 //var bgSceneOrchestrator = new DefaultSceneOrchestrator(attractionCalculator, locationService, perceptionPolicy, perceptionOptions, lodRuntime, worldMap, speedProvider, rng, orchestratorLogger, objectProvider, sceneOrchestratorOptions, reputationLedger);
 
 var writeBuffer = runtime.Services.GetRequiredService<WorldObjectWriteBuffer>();
@@ -470,6 +491,8 @@ foreach (var entry in diary.OrderBy(e => e.OccurredAt))
 }
 
 await File.WriteAllTextAsync(gameTimePath, clock.Now.WorldTicks.ToString());
+WorldStateStore.Save(worldStatePath, WorldStateStore.Capture(
+    clock.Now, economyLedger, reputationLedger, statusLedger, locationService as DefaultLocationService, mainSceneOrchestrator));
 
 gf.Export(player);
 gf.Export((NPC)significantOther);
