@@ -38,6 +38,7 @@ foreach (var file in new[] { "world.db", "world.db-wal", "world.db-shm" })
 
 var collector = new Collector(options.SampleEveryHours);
 var stopwatch = Stopwatch.StartNew();
+var progress = new Progress(options.Run.Days, stopwatch);
 
 await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     consoleLogs: false,
@@ -62,6 +63,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
         {
             world.Orchestrator.OnTick(now, characters);
             collector.Record(now, characters);
+            progress.Update(collector.WorldDays, collector.Samples.Count > 0 ? collector.Samples[^1].Stress.Average() : null, collector.Ticks);
         },
     };
 
@@ -69,6 +71,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
 }
 
 stopwatch.Stop();
+progress.Finish();
 
 var checks = Report.Evaluate(options.Thresholds, collector);
 var markdown = Report.Build(options, collector, stopwatch.Elapsed, checks);

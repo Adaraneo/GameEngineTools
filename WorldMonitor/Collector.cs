@@ -47,6 +47,9 @@ namespace WorldMonitor
         public long Ticks { get; private set; }
         public int CharactersSeen { get; private set; }
 
+        /// <summary>World days elapsed at the latest tick.</summary>
+        public double WorldDays { get; private set; }
+
         public void Record(WDateTime now, IReadOnlyList<IHuman> characters)
         {
             _start ??= now;
@@ -54,7 +57,8 @@ namespace WorldMonitor
             CharactersSeen = Math.Max(CharactersSeen, characters.Count);
 
             var hours = WDateTime.Difference(now, _start.Value).TotalHours;
-            var day = (int)(hours / WWorld.Spec.HoursPerDay);
+            WorldDays = hours / WWorld.Spec.HoursPerDay;
+            var day = (int)WorldDays;
             if (!Days.TryGetValue(day, out var counters))
                 Days[day] = counters = new DayCounters();
 
