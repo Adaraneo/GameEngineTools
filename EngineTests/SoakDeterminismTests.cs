@@ -33,12 +33,12 @@ namespace EngineTests
     [TestClass]
     public sealed class SoakDeterminismTests : TestBase
     {
-        private const int Characters = 8;
+        private static int Characters => int.TryParse(Environment.GetEnvironmentVariable("SOAK_CHARS"), out var n) ? n : 8;
         private static readonly string[] Occupations = { "scholar", "clerk", "farmer", "artist", "merchant", "healer", "laborer", "craftsperson" };
 
         private sealed record Outcome(IReadOnlyList<IHuman> Humans, IReadOnlyList<(int Day, string Metrics)> Samples, IReadOnlyDictionary<string, int> Events);
 
-        private Outcome RunSociety(int seed, int days, bool occupations = false)
+        private Outcome RunSociety(int seed, int days, bool occupations = false, bool homes = false)
         {
             var rngFactory = ServiceProvider.GetRequiredService<IRandomSourceFactory>();
             var factory = ServiceProvider.GetRequiredService<IHumanFactory>();
@@ -46,12 +46,24 @@ namespace EngineTests
             var worldClock = ServiceProvider.GetRequiredService<IWorldClock>();
             var spec = ServiceProvider.GetRequiredService<WorldTimeSpec>();
 
-            var square = new LocationDescriptor($"square_{seed}", "Square", 0.05, 0.01, 50, false, LocationType.Social);
+            var square = new LocationDescriptor($"square_{seed}", "Square", 0.05, 0.01, 50, Environment.GetEnvironmentVariable("SOAK_PRIVATE") == "1", LocationType.Social);
             locations.RegisterLocation(square);
 
             ServiceProvider.GetRequiredService<SqliteWorldDatabase>().InsertLocation(square, "r");
             var buffer = ServiceProvider.GetRequiredService<WorldObjectWriteBuffer>();
-            SeedEnvironment(buffer, square.Id);
+            var homeIds = new List<string>();
+            if (homes)
+            {
+                for (var i = 0; i < Characters; i++)
+                {
+                    var home = new LocationDescriptor($"home_{seed}_{i}", $"Home {i}", 0.02, 0.01, 2, true, LocationType.Rest);
+                    locations.RegisterLocation(home);
+                    ServiceProvider.GetRequiredService<SqliteWorldDatabase>().InsertLocation(home, "r");
+                    homeIds.Add(home.Id);
+                }
+            }
+
+            SeedEnvironment(buffer, square.Id, homeIds);
 
             var clock = new SystemClock(worldClock, spec);
             clock.SetNow(WDateTime.New(WDateOnly.New(100, 1, 1)));
@@ -145,15 +157,15 @@ namespace EngineTests
                 s.Current.Enterprising - s.Baseline.Enterprising, s.Current.Conventional - s.Baseline.Conventional,
             }.Max(Math.Abs));
 
-        private static void SeedEnvironment(WorldObjectWriteBuffer buffer, string locationId)
+        private static void SeedEnvironment(WorldObjectWriteBuffer buffer, string locationId, IReadOnlyList<string> homeIds)
         {
-            WorldObject Fixture(string id, WorldObjectCategory category, AffordanceType affordance, bool pickable = false, bool respawns = false)
+            WorldObject Fixture(string id, WorldObjectCategory category, AffordanceType affordance, bool pickable = false, bool respawns = false, string? at = null)
                 => new()
                 {
                     Id = id,
                     DisplayName = id,
                     Category = category,
-                    LocationId = locationId,
+                    LocationId = at ?? locationId,
                     IsAvailable = true,
                     IsPickable = pickable,
                     Respawns = respawns,
@@ -166,7 +178,7 @@ namespace EngineTests
             for (var i = 0; i < Characters; i++)
             {
                 buffer.AddObject(Fixture($"food_{i}", WorldObjectCategory.Food, AffordanceType.Hunger, pickable: true, respawns: true));
-                buffer.AddObject(Fixture($"bed_{i}", WorldObjectCategory.Shelter, AffordanceType.Rest));
+                buffer.AddObject(Fixture($"bed_{i}", WorldObjectCategory.Shelter, AffordanceType.Rest, at: homeIds.Count > 0 ? homeIds[i] : null));
             }
 
             buffer.AddObject(Fixture("well", WorldObjectCategory.Drink, AffordanceType.Thirst));
@@ -198,7 +210,7 @@ namespace EngineTests
         public void Society_WithOccupations_ReportsReproductionInterestsAndStress()
         {
             var days = int.TryParse(Environment.GetEnvironmentVariable("SOAK_DAYS"), out var requested) ? requested : 6;
-            var outcome = RunSociety(seed: 31, days: days, occupations: Environment.GetEnvironmentVariable("SOAK_NO_OCC") != "1");
+            var outcome = RunSociety(seed: 31, days: days, occupations: Environment.GetEnvironmentVariable("SOAK_NO_OCC") != "1", homes: Environment.GetEnvironmentVariable("SOAK_HOMES") == "1");
 
             foreach (var (day, metrics) in outcome.Samples)
                 Console.WriteLine($"day {day,3}: {metrics}");

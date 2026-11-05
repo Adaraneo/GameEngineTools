@@ -183,8 +183,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double AllostaticLoadThresholdSleepDebt = 5,
         double AllostaticLoadThresholdPain = 50,
         double AllostaticLoadThresholdImmune = 60,
-        double AllostaticLoadAccumRatePerHour = 0.5,
-        double AllostaticLoadDecayRatePerHour = 0.1,
+        double AllostaticLoadAccumRatePerHour = 0.15,
+        double AllostaticLoadDecayRatePerHour = 0.35,
         /// <summary>
         /// Fraction of <see cref="AllostaticLoadDecayRatePerHour"/> applied during Idle.
         /// Science: passive rest (TV, phone, lying around) has negligible effect on allostatic
