@@ -14,6 +14,27 @@ namespace WorldMonitor
     /// <summary>The stress of everyone at one moment of the run.</summary>
     public sealed record Sample(int Day, double ClockHour24, IReadOnlyList<double> Stress, int Private, int AtHome, int Asleep, double NeedSocial, double Energy, double InterestDrift);
 
+    /// <summary>What the monitor knows about one character: who they are and how their stress and social life went.</summary>
+    public sealed class PersonRecord
+    {
+        public string Name = "";
+        public string Sex = "";
+        public int Age;
+        public double Neuroticism, Extraversion, AttachmentAnxiety;
+        public string Occupation = "-";
+        public string Home = "-";
+        public int Edges;
+        public int Accepted, Rejected;
+        public int? DiedOnDay;
+        public double LastHunger, LastThirst, MaxHunger, MaxThirst;
+        public string LastLocation = "?";
+        public string LastAction = "-";
+        public List<(int Day, double Stress)> Stress { get; } = new();
+    }
+
+    /// <summary>One death seen during the run.</summary>
+    public sealed record DeathRecord(int Day, string Who, string Cause, string Context);
+
     /// <summary>Per-world-day counters taken at every tick.</summary>
     public sealed class DayCounters
     {
@@ -27,12 +48,15 @@ namespace WorldMonitor
         private WDateTime? _start;
         private long _lastSampleSlot = -1;
         private readonly Dictionary<HumanId, bool> _wasAsleep = new();
+        private readonly HashSet<HumanId> _dead = new();
         private readonly HashSet<(long, HumanId, HumanId)> _seenOutcomes = new();
         private readonly HashSet<(long, HumanId, Type)> _seenOther = new();
 
         public Collector(double sampleEveryHours) => _sampleEveryHours = sampleEveryHours;
 
         public List<Sample> Samples { get; } = new();
+        public Dictionary<HumanId, PersonRecord> People { get; } = new();
+        public List<DeathRecord> DeathLog { get; } = new();
         public SortedDictionary<int, DayCounters> Days { get; } = new();
         public Dictionary<string, long> LocationTicks { get; } = new();
         public Dictionary<string, int> SleepStarts { get; } = new();
@@ -64,8 +88,20 @@ namespace WorldMonitor
 
             foreach (var c in characters)
             {
+                if (!People.TryGetValue(c.Id, out var person)) People[c.Id] = person = Describe(c);
+
+                // A character that has died stays in the roster with its last state frozen; it must not feed the statistics.
+                if (_dead.Contains(c.Id)) continue;
+
+                var ph = c.Snapshot.Physiology;
+                person.LastHunger = ph.Hunger;
+                person.LastThirst = ph.Thirst;
+                person.MaxHunger = Math.Max(person.MaxHunger, ph.Hunger);
+                person.MaxThirst = Math.Max(person.MaxThirst, ph.Thirst);
+
                 var surface = c.Snapshot.InteractionSurface;
                 var location = surface.Location ?? "?";
+                person.LastLocation = location;
                 var asleep = c.Snapshot.Behavior.ActiveSleep is not null;
                 var atHome = c.Identity.HomeLocationId == location;
 
@@ -84,6 +120,7 @@ namespace WorldMonitor
             {
                 _lastSampleSlot = slot;
                 Samples.Add(Take(day, now, characters));
+                UpdatePeople(day, characters);
             }
         }
 
@@ -109,9 +146,11 @@ namespace WorldMonitor
                 {
                     case ActionCommitted ac:
                         Actions[ac.ActionName] = Actions.GetValueOrDefault(ac.ActionName) + 1;
+                        if (People.TryGetValue(ac.Human, out var actor)) actor.LastAction = ac.ActionName;
                         break;
                     case InteractionOutcome io when _seenOutcomes.Add((io.OccurredAt.WorldTicks, io.From, io.To)):
                         if (io.Accepted) InteractionsAccepted++; else InteractionsRejected++;
+                        if (People.TryGetValue(io.From, out var sender)) { if (io.Accepted) sender.Accepted++; else sender.Rejected++; }
                         break;
                     case SexualEncounterOutcome se when se.Accepted && _seenOther.Add((se.OccurredAt.WorldTicks, se.From, e.GetType())):
                         SexualEncounters++;
@@ -124,8 +163,44 @@ namespace WorldMonitor
                         break;
                     case CharacterDied cd when _seenOther.Add((cd.OccurredAt.WorldTicks, cd.VictimId, e.GetType())):
                         Deaths++;
+                        _dead.Add(cd.VictimId);
+                        if (People.TryGetValue(cd.VictimId, out var victim))
+                        {
+                            victim.DiedOnDay = (int)WorldDays;
+                            DeathLog.Add(new DeathRecord((int)WorldDays, $"{victim.Name} ({victim.Sex}, {victim.Age}, {victim.Occupation})", cd.Cause.ToString(),
+                                $"last at {victim.LastLocation} doing {victim.LastAction}; hunger {victim.LastHunger:F0} (max {victim.MaxHunger:F0}), thirst {victim.LastThirst:F0} (max {victim.MaxThirst:F0}), stress {victim.Stress.LastOrDefault().Stress:F0}"));
+                        }
+                        else
+                        {
+                            DeathLog.Add(new DeathRecord((int)WorldDays, "?", cd.Cause.ToString(), "unknown character"));
+                        }
+
                         break;
                 }
+            }
+        }
+
+        private static PersonRecord Describe(IHuman c) => new()
+        {
+            Name = c.Identity.FirstName.Original,
+            Sex = c.Biology.ToString(),
+            Age = c.Age,
+            Neuroticism = c.Personality.BigFive.Neuroticism,
+            Extraversion = c.Personality.BigFive.Extraversion,
+            AttachmentAnxiety = c.Personality.Attachment.Anxiety,
+        };
+
+        private void UpdatePeople(int day, IReadOnlyList<IHuman> characters)
+        {
+            foreach (var c in characters)
+            {
+                if (_dead.Contains(c.Id)) continue;
+                if (!People.TryGetValue(c.Id, out var person)) People[c.Id] = person = Describe(c);
+                person.Age = c.Age;
+                person.Occupation = c.Snapshot.Schedule?.Occupation is { Length: > 0 } occupation ? occupation : "-";
+                person.Home = c.Identity.HomeLocationId ?? "-";
+                person.Edges = c.Snapshot.Relationships.Edges.Count;
+                person.Stress.Add((day, c.Snapshot.Psychology.Stress));
             }
         }
 

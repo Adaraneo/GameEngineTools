@@ -21,12 +21,13 @@ namespace WorldMonitor
             sb.AppendLine();
 
             sb.AppendLine("## Per world day");
-            sb.AppendLine("| day | stress mean | median | p90 | max | privacy % | at home % | asleep % | asleep with privacy % |");
-            sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+            var level = options.Thresholds.ChronicStressLevel;
+            sb.AppendLine($"| day | stress mean | median | p90 | max | above {level:F0} % | privacy % | at home % | asleep % | asleep with privacy % |");
+            sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
             foreach (var (day, counters) in c.Days)
             {
                 var stress = c.Samples.Where(s => s.Day == day).SelectMany(s => s.Stress).OrderBy(x => x).ToList();
-                var row = stress.Count == 0 ? "| - | - | - | -" : $"| {stress.Average():F1} | {Percentile(stress, 0.5):F1} | {Percentile(stress, 0.9):F1} | {stress[^1]:F0}";
+                var row = stress.Count == 0 ? "| - | - | - | - | -" : $"| {stress.Average():F1} | {Percentile(stress, 0.5):F1} | {Percentile(stress, 0.9):F1} | {stress[^1]:F0} | {100.0 * stress.Count(x => x > level) / stress.Count:F1}";
                 sb.AppendLine($"| {day} {row} | {Pct(counters.Private, counters.Total)} | {Pct(counters.AtHome, counters.Total)} | {Pct(counters.Asleep, counters.Total)} | {Pct(counters.AsleepPrivate, counters.Asleep)} |");
             }
 
@@ -58,6 +59,16 @@ namespace WorldMonitor
                 sb.AppendLine($"- NeedSocial mean: {first.NeedSocial:F0} -> {last.NeedSocial:F0}; energy mean: {first.Energy:F0} -> {last.Energy:F0}; max interest drift: {last.InterestDrift:F3}");
             }
 
+            if (c.DeathLog.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("## Deaths");
+                foreach (var d in c.DeathLog)
+                    sb.AppendLine($"- day {d.Day}: {d.Who}, {d.Cause}; {d.Context}");
+            }
+
+            AppendCharacters(sb, options, c);
+
             sb.AppendLine();
             sb.AppendLine("## Most frequent actions and places (seen at tick boundaries)");
             sb.AppendLine("- actions: " + string.Join(", ", c.Actions.OrderByDescending(a => a.Value).Take(10).Select(a => $"{a.Key} {a.Value}")));
@@ -75,6 +86,44 @@ namespace WorldMonitor
             return sb.ToString().Replace("\r\n", "\n");
 
             string Pct(long part, long whole) => whole == 0 ? "-" : (100.0 * part / whole).ToString("F1", inv);
+        }
+
+        private static void AppendCharacters(StringBuilder sb, MonitorOptions options, Collector c)
+        {
+            if (c.People.Count == 0 || c.Samples.Count == 0) return;
+
+            var level = options.Thresholds.ChronicStressLevel;
+            var lastDay = c.Samples[^1].Day;
+            var rows = c.People.Values
+                .Select(p =>
+                {
+                    var late = p.Stress.Where(x => x.Day * 2 >= lastDay).Select(x => x.Stress).ToList();
+                    return (Person: p, Mean: late.Count == 0 ? 0 : late.Average(), Share: late.Count == 0 ? 0 : 100.0 * late.Count(x => x > level) / late.Count);
+                })
+                .OrderByDescending(r => r.Share).ThenByDescending(r => r.Mean)
+                .ToList();
+
+            sb.AppendLine();
+            sb.AppendLine($"## Characters (stress over the second half; * = above {level:F0} in at least half of the samples)");
+            sb.AppendLine("| | name | sex | age | N | E | attach. anxiety | occupation | relationships | accepted / rejected | stress mean | above % |");
+            sb.AppendLine("|---|---|---|---:|---:|---:|---:|---|---:|---:|---:|---:|");
+            foreach (var (p, mean, share) in rows)
+                sb.AppendLine($"| {(p.DiedOnDay is { } died ? $"died day {died}" : share >= 50 ? "*" : "")} | {p.Name} | {p.Sex} | {p.Age} | {p.Neuroticism:F2} | {p.Extraversion:F2} | {p.AttachmentAnxiety:F2} | {p.Occupation} | {p.Edges} | {p.Accepted} / {p.Rejected} | {mean:F1} | {share:F0} |");
+
+            var chronic = rows.Where(r => r.Share >= 50).Select(r => r.Person).ToList();
+            var others = rows.Where(r => r.Share < 50).Select(r => r.Person).ToList();
+            if (chronic.Count > 0 && others.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"Chronically stressed ({chronic.Count}) vs the rest ({others.Count}): neuroticism {chronic.Average(p => p.Neuroticism):F2} vs {others.Average(p => p.Neuroticism):F2}, extraversion {chronic.Average(p => p.Extraversion):F2} vs {others.Average(p => p.Extraversion):F2}, " +
+                    $"relationships {chronic.Average(p => p.Edges):F1} vs {others.Average(p => p.Edges):F1}, rejection share {RejectionShare(chronic):F0}% vs {RejectionShare(others):F0}%.");
+            }
+
+            static double RejectionShare(IReadOnlyList<PersonRecord> people)
+            {
+                var total = people.Sum(p => p.Accepted + p.Rejected);
+                return total == 0 ? 0 : 100.0 * people.Sum(p => p.Rejected) / total;
+            }
         }
 
         public static string BuildCsv(Collector c)
@@ -105,6 +154,15 @@ namespace WorldMonitor
                 var stress = c.Samples.Where(s => s.Day * 2 >= lastDay).SelectMany(s => s.Stress).OrderBy(x => x).ToList();
                 var median = Percentile(stress, 0.5);
                 checks.Add(new Check("median stress in the second half", stress.Count > 0 && median <= maxStress, $"{median:F1} (limit {maxStress})"));
+            }
+
+            if (limits.MaxChronicStressPercent is { } maxChronic)
+            {
+                // The median hides a stuck minority, so the second half is also judged by how many readings sit above the chronic level.
+                var lastDay = c.Samples[^1].Day;
+                var readings = c.Samples.Where(s => s.Day * 2 >= lastDay).SelectMany(s => s.Stress).ToList();
+                var share = readings.Count == 0 ? 100.0 : 100.0 * readings.Count(x => x > limits.ChronicStressLevel) / readings.Count;
+                checks.Add(new Check($"readings above {limits.ChronicStressLevel:F0} in the second half", readings.Count > 0 && share <= maxChronic, $"{share:F1}% (limit {maxChronic}%)"));
             }
 
             if (limits.MinSleepWithPrivacyPercent is { } minPrivacy)
