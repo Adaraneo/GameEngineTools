@@ -44,6 +44,18 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AtomicScript_WithAFailingStatement_AppliesNothing()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            db.ExecuteScript(WorldDatabaseSchema.CreateTables);
+
+            Assert.ThrowsExactly<Microsoft.Data.Sqlite.SqliteException>(() => db.ExecuteScriptAtomically(
+                "INSERT INTO Locations (Id, DisplayName, Type) VALUES ('half', 'Half', 'Social'); INSERT INTO NoSuchTable VALUES (1);"));
+
+            Assert.AreEqual(0, db.GetKnownLocationIds().Count, "The first statement must be rolled back with the failing one.");
+        }
+
+        [TestMethod]
         public void Migrating_Twice_ChangesNothing()
         {
             using var db = new SqliteWorldDatabase(":memory:");

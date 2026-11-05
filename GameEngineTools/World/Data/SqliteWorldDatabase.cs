@@ -1150,19 +1150,28 @@ namespace GameEngineTools.World.Data
             return cmd;
         }
 
+        /// <summary>Executes a multi-statement script in ONE transaction: if any statement fails nothing is applied (used for seed data).</summary>
+        /// <param name="sql">Full SQL script content.</param>
+        public void ExecuteScriptAtomically(string sql)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sql);
+
+            lock (_sync)
+            {
+                using var tx = _connection.BeginTransaction();
+                using var cmd = _connection.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = sql;
+                cmd.ExecuteNonQuery();
+                tx.Commit(); // a failing statement leaves the transaction uncommitted: it rolls back on dispose
+            }
+        }
+
         /// <summary>
-        /// Executes a multi-statement SQL script against the database connection.
-        /// Used by <see cref="WorldDatabaseSeeder"/> to apply schema and seed data.
+        /// Executes a multi-statement SQL script; each statement commits on its own and a failure propagates immediately
+        /// (no rollback). Used to apply the idempotent schema; use <see cref="ExecuteScriptAtomically"/> for data.
         /// </summary>
-        /// <param name="sql">
-        /// Full SQL script content. May contain multiple statements separated by
-        /// semicolons and SQL comments (<c>--</c>).
-        /// </param>
-        /// <remarks>
-        /// Each statement is executed in sequence. If any statement fails, the
-        /// exception propagates immediately — no partial rollback.
-        /// For atomic multi-statement operations, wrap in a transaction externally.
-        /// </remarks>
+        /// <param name="sql">Full SQL script content.</param>
         public void ExecuteScript(string sql)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(sql);

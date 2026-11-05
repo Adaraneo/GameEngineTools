@@ -71,7 +71,7 @@ namespace GameEngineTools.World.Data
                 db.InsertSocialNorm(norm);
 
             var seedSql = SqlScriptLoader.Load(SeedDataScript);
-            db.ExecuteScript(seedSql);
+            db.ExecuteScriptAtomically(seedSql);
         }
 
         /// <summary>
