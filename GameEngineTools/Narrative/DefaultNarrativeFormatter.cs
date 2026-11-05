@@ -6,10 +6,14 @@ namespace GameEngineTools.Narrative
     using System;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
+    using GameEngineTools.Characters.Engines.Bereavement;
+    using GameEngineTools.Characters.Engines.Economy;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Sleep;
+    using GameEngineTools.World.Objects;
     using Grammar.Core.Enums;
     using Grammar.Czech;
     using Grammar.Czech.Models;
@@ -84,6 +88,22 @@ namespace GameEngineTools.Narrative
                 // Why? MemoryEncoded without a Kind is narratively blind — we only have a GUID.
                 MemoryEncoded { What: not null } me => FormatMemoryEncoded(me, resolveCharacter),
                 MemoryConsolidated mc => FormatMemoryConsolidated(mc, resolveCharacter),
+
+                // ── Life, death and the body ───────────────────────────────────────
+                CharacterDied cd => FormatDeath(cd, resolveCharacter),
+                BereavementOnset bo => FormatBereavement(bo, resolveCharacter),
+                FuneralHeld fh => FormatFuneral(fh, resolveCharacter),
+                Buried bu => FormatBuried(bu, resolveCharacter),
+                GraveVisited gv => FormatGraveVisit(gv, resolveCharacter),
+                ChildBorn cb => FormatChildBorn(cb, resolveCharacter),
+                PregnancyDiscovered pd => FormatPregnancyDiscovered(pd, resolveCharacter),
+                InjuryReceived ir => FormatInjury(ir, resolveCharacter),
+                InjuryHealed ih => FormatInjuryHealed(ih, resolveCharacter),
+
+                // ── Economy and norms ──────────────────────────────────────────────
+                Purchased pu => FormatPurchase(pu, resolveCharacter),
+                Sold so => FormatSale(so, resolveCharacter),
+                NormViolationOccurred nv => FormatNormViolation(nv, resolveCharacter),
 
                 // ── Deliberately ignored events ─────────────────────────────────────
                 // SleepPhaseChanged  → debug info, not story
@@ -648,6 +668,140 @@ namespace GameEngineTools.Narrative
         // ══════════════════════════════════════════════════════════════════════════
         // Private helper methods — grammar
         // ══════════════════════════════════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // Life, death, body, economy and norms
+        // ══════════════════════════════════════════════════════════════════════════
+
+        #region Život a smrt
+
+        private NarrativeEntry FormatDeath(CharacterDied cd, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var who = resolve(cd.VictimId);
+            var cause = cd.Cause switch
+            {
+                DeathCause.Combat => "v boji",
+                DeathCause.Starvation => "hladem",
+                DeathCause.Dehydration => "žízní",
+                DeathCause.Exhaustion => "vyčerpáním",
+                DeathCause.SystemicFailure => "selháním organismu",
+                DeathCause.OldAge => "stářím",
+                _ => "z neznámé příčiny",
+            };
+
+            return new NarrativeEntry(cd.OccurredAt, cd.VictimId, $"{who.Name} {Conj(who, "zemřel", "zemřela")} — {cause}.", NarrativePriority.High);
+        }
+
+        private NarrativeEntry FormatBereavement(BereavementOnset bo, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var mourner = resolve(bo.Human);
+            var deceased = resolve(bo.Deceased);
+            return new NarrativeEntry(bo.OccurredAt, bo.Human,
+                $"{mourner.Name} oplakává ztrátu {Decl(deceased, Grammar.Core.Enums.Case.Genitive)}.", NarrativePriority.High);
+        }
+
+        private NarrativeEntry FormatFuneral(FuneralHeld fh, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var mourner = resolve(fh.Human);
+            var deceased = resolve(fh.Deceased);
+            return new NarrativeEntry(fh.OccurredAt, fh.Human,
+                $"{mourner.Name} {Conj(mourner, "se zúčastnil", "se zúčastnila")} pohřbu {Decl(deceased, Grammar.Core.Enums.Case.Genitive)} (přítomných: {fh.Attendees}).",
+                NarrativePriority.Medium);
+        }
+
+        private NarrativeEntry FormatBuried(Buried bu, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var mourner = resolve(bu.Human);
+            var deceased = resolve(bu.Deceased);
+            return new NarrativeEntry(bu.OccurredAt, bu.Human,
+                $"{Decl(deceased, Grammar.Core.Enums.Case.Nominative)} {Conj(deceased, "byl pohřben", "byla pohřbena")}; {mourner.Name} {Conj(mourner, "stál", "stála")} u hrobu.",
+                NarrativePriority.Medium);
+        }
+
+        private NarrativeEntry FormatGraveVisit(GraveVisited gv, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var visitor = resolve(gv.Human);
+            var deceased = resolve(gv.Deceased);
+            return new NarrativeEntry(gv.OccurredAt, gv.Human,
+                $"{visitor.Name} {Conj(visitor, "navštívil", "navštívila")} hrob {Decl(deceased, Grammar.Core.Enums.Case.Genitive)}.", NarrativePriority.Low);
+        }
+
+        private NarrativeEntry FormatChildBorn(ChildBorn cb, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var a = resolve(cb.ParentA);
+            var b = resolve(cb.ParentB);
+            return new NarrativeEntry(cb.OccurredAt, cb.ParentA,
+                $"{a.Name} a {b.Name} se stali rodiči — narodilo se dítě.", NarrativePriority.High);
+        }
+
+        private NarrativeEntry FormatPregnancyDiscovered(PregnancyDiscovered pd, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var who = resolve(pd.Human);
+            return new NarrativeEntry(pd.OccurredAt, pd.Human,
+                $"{who.Name} {Conj(who, "zjistil", "zjistila")}, že je těhotná.", NarrativePriority.High);
+        }
+
+        private NarrativeEntry FormatInjury(InjuryReceived ir, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var who = resolve(ir.Human);
+            var kind = ir.Type switch
+            {
+                InjuryType.Sprain => "podvrtnutí",
+                InjuryType.Infection => "infekce",
+                InjuryType.Wound => "rána",
+                _ => "zranění",
+            };
+
+            return new NarrativeEntry(ir.OccurredAt, ir.Human,
+                $"{who.Name} {Conj(who, "se zranil", "se zranila")} ({kind}).",
+                ir.Severity >= 6.0 ? NarrativePriority.High : NarrativePriority.Medium);
+        }
+
+        private NarrativeEntry FormatInjuryHealed(InjuryHealed ih, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var who = resolve(ih.Human);
+            return new NarrativeEntry(ih.OccurredAt, ih.Human, $"{who.Name} {Conj(who, "se uzdravil", "se uzdravila")}.", NarrativePriority.Medium);
+        }
+
+        #endregion Život a smrt
+
+        #region Ekonomika a normy
+
+        private static string ItemName(PickupItemKind kind) => kind switch
+        {
+            PickupItemKind.Bread => "chléb",
+            PickupItemKind.Cheese => "sýr",
+            PickupItemKind.Flour => "mouku",
+            PickupItemKind.Grain => "obilí",
+            PickupItemKind.Milk => "mléko",
+            PickupItemKind.Food => "jídlo",
+            PickupItemKind.Drink => "pití",
+            _ => "zboží",
+        };
+
+        private NarrativeEntry FormatPurchase(Purchased pu, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var who = resolve(pu.Actor);
+            return new NarrativeEntry(pu.OccurredAt, pu.Actor,
+                $"{who.Name} {Conj(who, "koupil", "koupila")} {ItemName(pu.ItemKind)} za {pu.Price:0.0}.", NarrativePriority.Low);
+        }
+
+        private NarrativeEntry FormatSale(Sold so, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var who = resolve(so.Actor);
+            return new NarrativeEntry(so.OccurredAt, so.Actor,
+                $"{who.Name} {Conj(who, "prodal", "prodala")} {ItemName(so.ItemKind)} za {so.Price:0.0}.", NarrativePriority.Low);
+        }
+
+        private NarrativeEntry FormatNormViolation(NormViolationOccurred nv, Func<HumanId, NarrativeCharacterInfo> resolve)
+        {
+            var who = resolve(nv.Actor);
+            var audience = nv.HasAudience ? " před lidmi" : string.Empty;
+            return new NarrativeEntry(nv.OccurredAt, nv.Actor,
+                $"{who.Name} {Conj(who, "porušil", "porušila")} společenskou normu{audience}.", NarrativePriority.Medium);
+        }
+
+        #endregion Ekonomika a normy
 
         #region Pomocné — gramatika
 
