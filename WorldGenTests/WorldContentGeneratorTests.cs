@@ -559,6 +559,59 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
+    public void Generate_WorkplacesEnabled_GivesTownsWorkstationsBenchesAndHousesABedAndATable()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
+            GenerateHouses: true, HousesPerTown: 2, GenerateWorkplaces: true);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(57), Catalog);
+
+        var locations = db.GetAllLocations().Select(l => l.Descriptor).ToList();
+        var town = locations.Single(l => l.Type == LocationType.Public);
+        var townObjects = db.GetAllObjectsAt(town.Id);
+        Assert.AreEqual(3, townObjects.Count(o => o.Category == WorldObjectCategory.Tool && o.Affordances.Any(a => a.Type == AffordanceType.Work)), "A town has three workstations.");
+        Assert.IsTrue(townObjects.Any(o => o.Category == WorldObjectCategory.Furniture), "And a bench.");
+        Assert.IsTrue(db.GetAllObjectsAt(locations.Single(l => l.Type == LocationType.Social).Id).Count(o => o.Category == WorldObjectCategory.Furniture) >= 2, "The square has benches.");
+        foreach (var house in locations.Where(l => l.Type == LocationType.Rest))
+        {
+            var inside = db.GetAllObjectsAt(house.Id);
+            Assert.IsTrue(inside.Any(o => o.Category == WorldObjectCategory.Shelter), $"{house.Id} needs a bed to sleep at home.");
+            Assert.IsTrue(inside.Any(o => o.Category == WorldObjectCategory.Furniture), $"{house.Id} needs furniture for SelfCare.");
+        }
+    }
+
+    [TestMethod]
+    public void Generate_WorkplacesDisabledByDefault_CreatesNoToolsOrFurniture()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(Count: 3, MinDistanceMeters: 20.0, GenerateHouses: true);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(58), Catalog);
+
+        var all = db.GetAllLocations().SelectMany(l => db.GetAllObjectsAt(l.Descriptor.Id)).ToList();
+        Assert.IsFalse(all.Any(o => o.Category is WorldObjectCategory.Tool or WorldObjectCategory.Furniture));
+    }
+
+    [TestMethod]
+    public void Generate_WorkplacesEnabled_DoesNotChangeWhereSettlementsAreAndHowTheyAreConnected()
+    {
+        List<(string Id, double X, double Y)> Layout(bool workplaces)
+        {
+            using var db = NewWorldDb();
+            var options = new WorldContentGenerator.Options(
+                Count: 4, MinDistanceMeters: 20.0, GenerateHouses: true, GenerateWorkplaces: workplaces);
+            WorldContentGenerator.Generate(db, new[] { FlatTile(50.0) }, options, new Random(59), Catalog);
+            return db.GetAllLocations().Select(l => (l.Descriptor.Id, l.Descriptor.X, l.Descriptor.Y)).OrderBy(l => l.Item1, StringComparer.Ordinal).ToList();
+        }
+
+        CollectionAssert.AreEqual(Layout(false), Layout(true), "Workplaces use no random numbers: the same seed must give the same world layout.");
+    }
+
+    [TestMethod]
     public void Generate_ProductionChainEnabled_AttachedToLargestSettlementOnly()
     {
         using var db = NewWorldDb();

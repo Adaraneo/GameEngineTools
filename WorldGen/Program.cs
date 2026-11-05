@@ -128,7 +128,8 @@ var genOptions = new WorldContentGenerator.Options(
     ClimateSeed: planet.Seed,
     GenerateHouses: options.GenerateHouses,
     GenerateCemetery: options.GenerateCemetery,
-    GenerateProductionChain: options.GenerateProductionChain);
+    GenerateProductionChain: options.GenerateProductionChain,
+    GenerateWorkplaces: options.GenerateWorkplaces);
 
 Console.WriteLine($"Generuji {options.Count} lokací v regionu '{options.Region}'...");
 
@@ -201,6 +202,8 @@ internal sealed class CliOptions
     /// <summary>Whether a field→mill→bakery production chain is attached to the largest placed
     /// settlement (<c>--no-production</c> disables).</summary>
     public bool GenerateProductionChain { get; init; } = true;
+    /// <summary>Whether settlements and houses get workstations, benches, beds and tables (<c>--no-workplaces</c> disables).</summary>
+    public bool GenerateWorkplaces { get; init; } = true;
 
     public static void PrintUsage()
     {
@@ -224,7 +227,7 @@ internal sealed class CliOptions
                         [--seed <celé číslo, výchozí náhodné>]
                         [--nutrition-csv <cesta>, výchozí .\Nutrition.csv v aktuální složce,
                                             jinak vestavěný výchozí katalog]
-                        [--no-houses] [--no-cemetery] [--no-production]
+                        [--no-houses] [--no-cemetery] [--no-production] [--no-workplaces]
 
             Kromě samotných osad (ve výchozím nastavení) přidá ke každé vesnici/městu pár
             obytných Rest lokací ("domů"), jeden hřbitov na deterministickém id
@@ -288,6 +291,7 @@ internal sealed class CliOptions
         var generateHouses = true;
         var generateCemetery = true;
         var generateProductionChain = true;
+        var generateWorkplaces = true;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -346,6 +350,9 @@ internal sealed class CliOptions
                     break;
                 case "--no-production":
                     generateProductionChain = false;
+                    break;
+                case "--no-workplaces":
+                    generateWorkplaces = false;
                     break;
                 default:
                     Console.Error.WriteLine($"Neznámý nebo neúplný argument: {args[i]}");
@@ -406,6 +413,7 @@ internal sealed class CliOptions
             GenerateHouses = generateHouses,
             GenerateCemetery = generateCemetery,
             GenerateProductionChain = generateProductionChain,
+            GenerateWorkplaces = generateWorkplaces,
         };
     }
 }

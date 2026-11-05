@@ -130,7 +130,12 @@ public static class WorldContentGenerator
         /// <summary>Whether a field→mill→bakery production-fixture chain (see
         /// <see cref="ProductionSiteFactory"/>) is attached to the largest settlement placed this
         /// run. Opt-in here for the same reason as <see cref="GenerateHouses"/>.</summary>
-        bool GenerateProductionChain = false);
+        bool GenerateProductionChain = false,
+        /// <summary>Whether settlements get workstations (<c>Tool</c>) and benches (<c>Furniture</c>), houses a bed
+        /// (<c>Shelter</c>) and a table (<c>Furniture</c>), and town squares benches — what <c>Work</c>, <c>Create</c>,
+        /// <c>SelfCare</c> and sleeping at home are gated on. Placed deterministically (no RNG), so the same seed still
+        /// yields the same layout. Opt-in here for the same reason as <see cref="GenerateHouses"/>.</summary>
+        bool GenerateWorkplaces = false);
 
     public sealed record Result(int LocationsPlaced, int ConnectionsCreated, int ObjectsCreated, string? CemeteryLocationId = null);
 
@@ -245,6 +250,9 @@ public static class WorldContentGenerator
 
         if (options.GenerateProductionChain)
             objectsCreated += AddProductionChain(worldDb, placed);
+
+        if (options.GenerateWorkplaces)
+            objectsCreated += AddWorkplacesAndFurniture(worldDb, placed);
 
         return new Result(placed.Count, connectionsCreated, objectsCreated, cemeteryLocationId);
     }
@@ -762,6 +770,58 @@ public static class WorldContentGenerator
     /// <summary>Attaches the field→mill→bakery <see cref="ProductionSiteFactory"/> fixture chain to
     /// the single largest-tier settlement placed this run (Town preferred, else Village) — skipped
     /// entirely when only Camps were placed (too small to support a production chain).</summary>
+    /// <summary>Gives every settlement workstations and a bench, every town square benches, and every house a bed and a
+    /// table. Deterministic: counts depend only on the settlement tier.</summary>
+    private static int AddWorkplacesAndFurniture(SqliteWorldDatabase worldDb, List<Placed> placed)
+    {
+        var created = 0;
+        var locations = worldDb.GetAllLocations().Select(l => l.Descriptor).ToList();
+
+        foreach (var parent in placed)
+        {
+            var workstations = parent.Tier switch { SettlementTier.Town => 3, SettlementTier.Village => 2, _ => 1 };
+            for (var i = 1; i <= workstations; i++)
+                created += AddFixture(worldDb, $"{parent.Id}_workstation_{i:D2}", "Pracovní stanice", WorldObjectCategory.Tool, parent.Id, AffordanceType.Work, 0.8, PickupItemKind.Tool);
+
+            created += AddFixture(worldDb, $"{parent.Id}_bench_01", "Lavička", WorldObjectCategory.Furniture, parent.Id, AffordanceType.Rest, 0.4);
+
+            var squareId = $"{parent.Id}_square";
+            if (locations.Any(l => l.Id == squareId))
+            {
+                created += AddFixture(worldDb, $"{squareId}_bench_01", "Lavička", WorldObjectCategory.Furniture, squareId, AffordanceType.Rest, 0.4);
+                created += AddFixture(worldDb, $"{squareId}_bench_02", "Lavička", WorldObjectCategory.Furniture, squareId, AffordanceType.Rest, 0.4);
+            }
+
+            foreach (var house in locations.Where(l => l.Type == LocationType.Rest && l.Id.StartsWith($"{parent.Id}_house_", StringComparison.Ordinal)))
+            {
+                created += AddFixture(worldDb, $"{house.Id}_bed", "Postel", WorldObjectCategory.Shelter, house.Id, AffordanceType.Rest, 0.8);
+                created += AddFixture(worldDb, $"{house.Id}_table", "Stůl a židle", WorldObjectCategory.Furniture, house.Id, AffordanceType.Rest, 0.3);
+            }
+        }
+
+        return created;
+    }
+
+    private static int AddFixture(
+        SqliteWorldDatabase worldDb, string id, string name, WorldObjectCategory category, string locationId,
+        AffordanceType affordance, double satisfaction, PickupItemKind kind = PickupItemKind.None)
+    {
+        worldDb.AddObject(new WorldObject
+        {
+            Id = id,
+            DisplayName = name,
+            Category = category,
+            LocationId = locationId,
+            IsAvailable = true,
+            IsPickable = false,
+            Respawns = false,
+            WeightGrams = 500_000,
+            ItemKind = kind,
+            Affordances = [new WorldObjectAffordance(affordance, satisfaction)],
+        });
+        return 1;
+    }
+
     private static int AddProductionChain(SqliteWorldDatabase worldDb, List<Placed> placed)
     {
         var anchor = placed
