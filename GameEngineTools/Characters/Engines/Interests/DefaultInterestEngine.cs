@@ -4,6 +4,7 @@
 namespace GameEngineTools.Characters.Engines.Interests
 {
     using System;
+    using System.Collections.Generic;
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Traits;
@@ -112,29 +113,50 @@ namespace GameEngineTools.Characters.Engines.Interests
 
         private void HandleAction(ActionCommitted ac, IHumanContext ctx)
         {
-            var dim = MapActionToDimension(ac.ActionName);
+            var dim = MapActionToDimension(ac.ActionName, ctx.Snapshot.Schedule?.Occupation);
             if (dim < 0) return;
 
             // Only rewarding experiences raise interest (high positive valence at the time).
             var valence = ctx.Snapshot.Psychology.Valence;
             if (valence < Config.RewardValenceThreshold) return;
 
+            var stamps = State.LastReinforcedTicks is { Length: Dim } known ? (long[])known.Clone() : NeverReinforced();
+            if (stamps[dim] >= 0 && (ac.OccurredAt - new WDateTime(stamps[dim])).TotalDays < Config.ReinforcementCooldownDays) return;
+            stamps[dim] = ac.OccurredAt.WorldTicks;
+
             var learnMult = IsPlastic(ctx, ac.OccurredAt) ? Config.YoungLearningMultiplier : 1.0;
             var gain = Config.LearningRate * learnMult;
 
             var cur = ToArray(State.Current);
             cur[dim] = Math.Clamp(cur[dim] + gain * (1.0 - cur[dim]), 0.0, 1.0); // headroom-scaled: approaches 1 instead of pinning
-            State = State with { Current = FromArray(cur) };
+            State = State with { Current = FromArray(cur), LastReinforcedTicks = stamps };
         }
 
-        private static int MapActionToDimension(string actionName) => actionName switch
+        private static long[] NeverReinforced() => new long[] { -1, -1, -1, -1, -1, -1 };
+
+        private static int MapActionToDimension(string actionName, string? occupation) => actionName switch
         {
             Create => Artistic,
-            Work => Conventional,
+            Work => WorkDimension(occupation),
+            Produce or Process => Realistic,
+            Sell => Enterprising,
             ReachOut => Social,
-            InviteIntimacy => Social,
             _ => -1
         };
+
+        // Holland's dominant theme of the occupation's work (R things, I analysis, A creating, S helping, E persuading, C data and order); unknown occupations drift nothing.
+        private static readonly Dictionary<string, int> WorkThemeByOccupation = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["craftsperson"] = Realistic, ["farmer"] = Realistic, ["guard"] = Realistic, ["laborer"] = Realistic,
+            ["merchant"] = Enterprising, ["scholar"] = Investigative, ["healer"] = Social, ["artist"] = Artistic,
+            ["baker"] = Realistic, ["chef"] = Realistic, ["farmhand"] = Realistic, ["food_worker"] = Realistic, ["orchardist"] = Realistic,
+            ["barista"] = Enterprising, ["barkeeper"] = Enterprising, ["shopkeeper"] = Enterprising,
+            ["clerk"] = Conventional, ["librarian"] = Conventional,
+            ["doctor"] = Investigative, ["programmer"] = Investigative, ["trainer"] = Social,
+        };
+
+        private static int WorkDimension(string? occupation)
+            => occupation is not null && WorkThemeByOccupation.TryGetValue(occupation, out var dim) ? dim : -1;
 
         #endregion Reward handling
 

@@ -8,6 +8,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Interests;
+    using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Memory;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
@@ -114,17 +115,61 @@ namespace EngineTests
         [TestMethod]
         public void Interests_RewardingEpisodes_RaiseDimension()
         {
-            var baseline = Neutral();
-            var (engine, ctx, self) = MakeEngine(baseline, valence: 0.5); // rewarding context
+            var (engine, ctx, self) = MakeEngine(Neutral(), valence: 0.5);
             var before = engine.State.Current.Artistic;
 
-            for (var i = 0; i < 10; i++)
-                engine.Handle(new ActionCommitted(At(100), self, ActionNames.Create, WTimeSpan.FromHours(1)),
-                    ctx, new EventCollector());
+            DailyFor(engine, ctx, self, ActionNames.Create, days: 360);
 
-            var after = engine.State.Current.Artistic;
-            Assert.IsTrue(after > before + 0.10,
-                $"~10 rewarding Create episodes must push Artistic into the maintained band. before={before:F3}, after={after:F3}");
+            var gain = engine.State.Current.Artistic - before;
+            Assert.IsTrue(gain is > 0.02 and < 0.07,
+                $"A year of daily rewarding practice moves an adult's interest by a few hundredths (mean-level change is d≈0.1 per developmental period). gain={gain:F3}");
+        }
+
+        [TestMethod]
+        public void Interests_AdolescentsDriftFasterThanAdults()
+        {
+            var (adult, adultCtx, adultSelf) = MakeEngine(Neutral(), valence: 0.5, birthYear: 70);
+            var (teen, teenCtx, teenSelf) = MakeEngine(Neutral(), valence: 0.5, birthYear: 86);
+
+            DailyFor(adult, adultCtx, adultSelf, ActionNames.Create, days: 360);
+            DailyFor(teen, teenCtx, teenSelf, ActionNames.Create, days: 360);
+
+            Assert.IsTrue(teen.State.Current.Artistic > adult.State.Current.Artistic + 0.02, "Interests are most fluid until the early twenties (Low 2005).");
+        }
+
+        [TestMethod]
+        public void Interests_ReinforceOncePerDayPerDimension()
+        {
+            var (engine, ctx, self) = MakeEngine(Neutral(), valence: 0.5);
+
+            for (var i = 0; i < 50; i++)
+                engine.Handle(new ActionCommitted(At(100), self, ActionNames.Create, WTimeSpan.FromHours(1)), ctx, new EventCollector());
+            var afterBurst = engine.State.Current.Artistic;
+            engine.Handle(new ActionCommitted(At(100) + WTimeSpan.FromDays(1), self, ActionNames.Create, WTimeSpan.FromHours(1)), ctx, new EventCollector());
+
+            Assert.AreEqual(0.5 + 0.0003 * 0.5, afterBurst, 1e-9, "Fifty rewarding commits within one day count once.");
+            Assert.IsTrue(engine.State.Current.Artistic > afterBurst, "The next day reinforces again.");
+        }
+
+        [TestMethod]
+        public void Interests_WorkReinforcesTheOccupationsTheme_NotAlwaysConventional()
+        {
+            double Gain(string? occupation, string action, Func<InterestProfile, double> dimension)
+            {
+                var (engine, ctx, self) = MakeEngine(Neutral(), valence: 0.5);
+                ((HumanContext)ctx).Snapshot = ctx.Snapshot with { Schedule = new DailyScheduleState(Array.Empty<ScheduleSlot>(), null, -1, occupation) };
+                engine.Handle(new ActionCommitted(At(100), self, action, WTimeSpan.FromHours(1)), ctx, new EventCollector());
+                return dimension(engine.State.Current) - dimension(Neutral());
+            }
+
+            Assert.IsTrue(Gain("scholar", ActionNames.Work, p => p.Investigative) > 0, "A scholar's work is analytic.");
+            Assert.AreEqual(0.0, Gain("scholar", ActionNames.Work, p => p.Conventional), 1e-12, "It is not clerical.");
+            Assert.IsTrue(Gain("clerk", ActionNames.Work, p => p.Conventional) > 0);
+            Assert.IsTrue(Gain("farmer", ActionNames.Work, p => p.Realistic) > 0);
+            Assert.AreEqual(0.0, Gain(null, ActionNames.Work, p => p.Conventional), 1e-12, "Work without a known occupation teaches nothing.");
+            Assert.IsTrue(Gain(null, ActionNames.Produce, p => p.Realistic) > 0, "Producing goods is hands-on.");
+            Assert.IsTrue(Gain(null, ActionNames.Sell, p => p.Enterprising) > 0, "Selling is persuading.");
+            Assert.AreEqual(0.0, Gain(null, ActionNames.InviteIntimacy, p => p.Social), 1e-12, "An intimate invitation is not a vocational interest.");
         }
 
         #endregion Test 3 — rewarding episodes raise the matching dimension
@@ -137,14 +182,13 @@ namespace EngineTests
             var baseline = Neutral();
             var (engine, ctx, self) = MakeEngine(baseline, valence: 0.5);
 
-            // Drive Artistic up with rewarding episodes.
-            for (var i = 0; i < 10; i++)
-                engine.Handle(new ActionCommitted(At(100), self, ActionNames.Create, WTimeSpan.FromHours(1)),
-                    ctx, new EventCollector());
+            // Five years of daily reinforcement still settles a modest distance from baseline.
+            DailyFor(engine, ctx, self, ActionNames.Create, days: 1800);
             var peak = engine.State.Current.Artistic;
+            Assert.IsTrue(peak - baseline.Artistic < 0.12, $"The sustained drift is bounded by the regression brake. peak={peak:F3}");
 
             // Then stop. Over time it must regress back toward baseline (no runaway to 1.0).
-            engine.Tick(At(100), WTimeSpan.FromDays(300), ctx, new EventCollector());
+            engine.Tick(At(100) + WTimeSpan.FromDays(1800), WTimeSpan.FromDays(300), ctx, new EventCollector());
             var afterRest = engine.State.Current.Artistic;
 
             Assert.IsTrue(afterRest < peak,
@@ -165,9 +209,7 @@ namespace EngineTests
             // Documented baseline PAD valence is +0.1..+0.2: a contented, neutral mood — not a reward.
             var (engine, ctx, self) = MakeEngine(baseline, valence: 0.15);
 
-            for (var i = 0; i < 500; i++)
-                engine.Handle(new ActionCommitted(At(100), self, ActionNames.ReachOut, WTimeSpan.FromHours(1)),
-                    ctx, new EventCollector());
+            DailyFor(engine, ctx, self, ActionNames.ReachOut, days: 500);
 
             var social = engine.State.Current.Social;
             Assert.IsTrue(Math.Abs(social - baseline.Social) < 0.2,
@@ -188,12 +230,10 @@ namespace EngineTests
             var (engine, ctx, self) = MakeEngine(baseline, valence: 0.6);
             var before = engine.State.Current.Social;
 
-            for (var i = 0; i < 5; i++)
-                engine.Handle(new ActionCommitted(At(100), self, ActionNames.ReachOut, WTimeSpan.FromHours(1)),
-                    ctx, new EventCollector());
+            DailyFor(engine, ctx, self, ActionNames.ReachOut, days: 100);
 
             var after = engine.State.Current.Social;
-            Assert.IsTrue(after > before + 0.05,
+            Assert.IsTrue(after > before + 0.005,
                 $"A genuinely rewarding moment must still raise interest after the threshold change. " +
                 $"before={before:F3}, after={after:F3}");
         }
@@ -203,17 +243,15 @@ namespace EngineTests
         [TestMethod]
         public void InterestProfile_GainShrinksNearThePole_SoMoreFrequentRewardsEndHigherButNeverPin()
         {
-            var (engine, ctx, self) = MakeEngine(Neutral(), valence: 0.6);
-            var steps = new List<double>();
-            for (var i = 0; i < 300; i++)
+            double StepFrom(double start)
             {
-                var before = engine.State.Current.Social;
+                var (engine, ctx, self) = MakeEngine(new InterestProfile(0.5, 0.5, 0.5, start, 0.5, 0.5), valence: 0.6);
                 engine.Handle(new ActionCommitted(At(100), self, ActionNames.ReachOut, WTimeSpan.FromHours(1)), ctx, new EventCollector());
-                steps.Add(engine.State.Current.Social - before);
+                return engine.State.Current.Social - start;
             }
 
-            Assert.IsTrue(engine.State.Current.Social < 1.0, "Interest approaches 1.0 but is not clamped to it.");
-            Assert.IsTrue(steps[^1] < steps[0] * 0.01, "A rewarded action near the pole barely moves the interest.");
+            Assert.AreEqual(StepFrom(0.5) / 5.0, StepFrom(0.9), 1e-12, "The gain is proportional to the headroom (1 − interest).");
+            Assert.IsTrue(StepFrom(1.0) == 0.0, "At the pole nothing moves.");
         }
 
         #region Helpers
@@ -222,6 +260,16 @@ namespace EngineTests
             => new InterestProfile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5);
 
         private static WDateTime At(int year) => WDateOnly.New(year, 1, 1).ToDateTime();
+
+        private static void DailyFor(DefaultInterestEngine engine, IHumanContext ctx, HumanId self, string action, int days)
+        {
+            for (var day = 0; day < days; day++)
+            {
+                var now = At(100) + WTimeSpan.FromDays(day);
+                engine.Handle(new ActionCommitted(now, self, action, WTimeSpan.FromHours(1)), ctx, new EventCollector());
+                engine.Tick(now, WTimeSpan.FromDays(1), ctx, new EventCollector());
+            }
+        }
 
         private (DefaultInterestEngine engine, IHumanContext ctx, HumanId self) MakeEngine(
             InterestProfile baseline, double valence, int birthYear = 70)
