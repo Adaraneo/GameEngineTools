@@ -93,6 +93,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             }
 
             var ph = ctx.Snapshot.Physiology;
+            // Urgent (bedtime or exhaustion) bypasses the sleep cooldown; only a depleted body, not mere bedtime, sleeps on the spot instead of going to bed.
+            var bodyEmergency = BehaviorMath.BodyNeedRest(ph, ctx.Snapshot.Psychology) >= _sleepCfg.EmergencyNeedRestThreshold || ph.Energy <= _sleepCfg.EmergencyEnergyThreshold;
             var isEmergency = state.NeedRest >= _sleepCfg.EmergencyNeedRestThreshold || ph.Energy <= _sleepCfg.EmergencyEnergyThreshold;
 
             // Moderate sleepiness still yields to critical hunger or thirst unless the character is collapsing.
@@ -107,11 +109,23 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             {
                 var surface = ctx.Snapshot.InteractionSurface;
                 var inRestLocation = surface.Kind == SurfaceKind.Rest || surface.Kind == SurfaceKind.Private;
-                if (!inRestLocation && !isEmergency)
+                // A character in no known kind of place keeps the earlier rule (sleep in place only once bedtime is urgent); one standing somewhere goes to bed unless its body is depleted.
+                var placed = surface.Kind != SurfaceKind.Unknown;
+                var sleepsOnTheSpot = placed ? bodyEmergency : isEmergency;
+                if (!inRestLocation && !sleepsOnTheSpot)
                 {
-                    var moveDur = WTimeSpan.FromMinutes(20);
-                    context.Outbox.Add(new ActionCommitted(context.Now, ctx.Id, MoveToRest, moveDur));
-                    return new SleepDecisionResult(true, state with { CurrentPlan = new PlannedAction(MoveToRest, context.Now, moveDur, state.NeedRest) });
+                    if (placed && state.CurrentPlan is { Name: MoveToRest } onTheWay)
+                    {
+                        // Still on the way; once the plan has run out without reaching a bed, the trip failed and they sleep where they stand.
+                        if (context.Now < onTheWay.Start + onTheWay.ExpectedDuration)
+                            return new SleepDecisionResult(true, state);
+                    }
+                    else
+                    {
+                        var moveDur = WTimeSpan.FromMinutes(20);
+                        context.Outbox.Add(new ActionCommitted(context.Now, ctx.Id, MoveToRest, moveDur));
+                        return new SleepDecisionResult(true, state with { CurrentPlan = new PlannedAction(MoveToRest, context.Now, moveDur, state.NeedRest) });
+                    }
                 }
 
                 context.Outbox.Add(new SleepPromptRequested(context.Now, ctx.Id, state.NeedRest));

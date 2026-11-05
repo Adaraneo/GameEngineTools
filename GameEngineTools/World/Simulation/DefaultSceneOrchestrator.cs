@@ -1289,6 +1289,18 @@ namespace GameEngineTools.World.Simulation
             if (currentLocationId is null)
                 return null;
 
+            // Resting means going home when the character has one that can be rested in.
+            if (requestedType == LocationType.Rest
+                && character.Identity.HomeLocationId is { } home
+                && _locationService.GetDescriptor(home) is { Type: LocationType.Rest or LocationType.Private })
+            {
+                if (home == currentLocationId)
+                    return null;
+
+                var edge = _worldMap.GetConnections(currentLocationId).FirstOrDefault(c => c.TargetLocationId == home);
+                return new MoveTarget(home, edge?.DistanceMeters ?? _options.FallbackTravelDistanceMeters);
+            }
+
             // Prefer adjacent locations of the requested type, ordered by travel time.
             // Speed is computed per-candidate because each connection may lead into a
             // different terrain, which affects travel duration.

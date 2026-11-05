@@ -43,6 +43,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
         // during which propensity rises by about 0.03.
         internal const double SleepOnsetLead = 0.03;
 
+        /// <summary>The part of NeedRest that comes from the body (debt, energy, stress) — without the circadian push toward bedtime.</summary>
+        internal static double BodyNeedRest(PhysiologyState ph, PsychologyState ps) => 20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2;
+
         internal static BehaviorState ComputeNeedState(IHumanContext ctx, IReadOnlyDictionary<string, double> cooldowns, BehaviorState state)
         {
             var ph = ctx.Snapshot.Physiology;
@@ -51,7 +54,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
             return state with
             {
-                NeedRest = Clamp01p(20 + 6 * ph.SleepDebtHours + (100 - ph.Energy) * 0.5 + ps.Stress * 0.2
+                NeedRest = Clamp01p(BodyNeedRest(ph, ps)
                     + SleepPropensityNeedWeight * Math.Max(0.0, (ph.SleepPropensity ?? double.NegativeInfinity) + SleepOnsetLead)),
                 NeedFood = Clamp01p(ph.Hunger),
                 NeedWater = Clamp01p(ph.Thirst),
