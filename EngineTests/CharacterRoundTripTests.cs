@@ -118,6 +118,32 @@ namespace EngineTests
             Assert.Throws<InvalidDataException>(() => GeneratedFile.ImportNPC(file));
         }
 
+        [TestMethod]
+        public void LoadedCharacter_ResumesItsDailyScheduleAfterOneTick()
+        {
+            var generator = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+                .GetRequiredService<GameEngineTools.Characters.Generation.IHumanBlueprintGenerator>(ServiceProvider);
+            var factory = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+                .GetRequiredService<GameEngineTools.Characters.Hosting.IHumanFactory>(ServiceProvider);
+            var person = factory.Create(generator.Generate() with { Occupation = "farmer" });
+            var now = WDateTime.New(WDateOnly.New(100, 1, 1));
+            var dt = WTimeSpan.FromHours(1);
+            for (var i = 0; i < 24 * 3 && person.Snapshot.Schedule?.ActiveSlot is null; i++)
+            {
+                person.Tick(now, dt);
+                now += dt;
+            }
+
+            Assert.IsNotNull(person.Snapshot.Schedule?.ActiveSlot, "The scenario must reach a running schedule slot.");
+            var imported = GeneratedFile.ImportNPC(GeneratedFile.Export(new NPC(100, person))).Person;
+            Assert.IsNotNull(imported.Snapshot.Schedule, "The schedule state is part of the saved snapshot.");
+
+            imported.Tick(now, dt);
+
+            Assert.IsNotNull(imported.Snapshot.Schedule!.ActiveSlot,
+                "The scheduler's callbacks are not saved; the engine re-registers today's slots, and the past ones fire at once.");
+        }
+
         private void AssertRoundTrips(GameEngineTools.Characters.Core.IHuman person)
         {
             var file = GeneratedFile.Export(new NPC(100, person));
