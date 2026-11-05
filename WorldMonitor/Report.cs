@@ -69,6 +69,7 @@ namespace WorldMonitor
 
             AppendCharacters(sb, options, c);
             AppendIntimacy(sb, c);
+            AppendSituations(sb, c);
 
             sb.AppendLine();
             sb.AppendLine("## Most frequent actions and places (seen at tick boundaries)");
@@ -87,6 +88,23 @@ namespace WorldMonitor
             return sb.ToString().Replace("\r\n", "\n");
 
             string Pct(long part, long whole) => whole == 0 ? "-" : (100.0 * part / whole).ToString("F1", inv);
+        }
+
+        private static void AppendSituations(StringBuilder sb, Collector c)
+        {
+            if (c.Situations.Count == 0) return;
+
+            var total = c.Situations.Values.Sum(v => v.N);
+            sb.AppendLine();
+            sb.AppendLine("## What awake characters do, by situation (ticks; plans are the running plan)");
+            sb.AppendLine("| period | situation | share % | need belonging | need social | stress | valence | most common plans |");
+            sb.AppendLine("|---|---|---:|---:|---:|---:|---:|---|");
+            foreach (var (key, v) in c.Situations)
+            {
+                var parts = key.Split('|');
+                var plans = string.Join(", ", v.Plans.OrderByDescending(p => p.Value).Take(5).Select(p => $"{p.Key} {100.0 * p.Value / v.N:F0}%"));
+                sb.AppendLine($"| {parts[0]} | {parts[1]} | {100.0 * v.N / total:F1} | {v.Belonging / v.N:F0} | {v.NeedSocial / v.N:F0} | {v.Stress / v.N:F1} | {v.Valence / v.N:F2} | {plans} |");
+            }
         }
 
         private static void AppendIntimacy(StringBuilder sb, Collector c)

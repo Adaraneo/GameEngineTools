@@ -32,7 +32,7 @@ var outputDir = Path.GetFullPath(options.OutputDir, AppContext.BaseDirectory);
 var runDir = RunDirectory.Create();
 Directory.SetCurrentDirectory(runDir);
 
-var collector = new Collector(options.SampleEveryHours);
+var collector = new Collector(options.SampleEveryHours, options.Run.Days);
 var stopwatch = Stopwatch.StartNew();
 var progress = new Progress(options.Run.Days, stopwatch);
 

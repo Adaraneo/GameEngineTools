@@ -36,6 +36,14 @@ namespace WorldMonitor
         public List<(int Day, double Stress)> Stress { get; } = new();
     }
 
+    /// <summary>How awake characters in one situation (and half of the run) behaved and felt.</summary>
+    public sealed class SituationStats
+    {
+        public long N;
+        public double Belonging, NeedSocial, Stress, Valence;
+        public Dictionary<string, long> Plans { get; } = new();
+    }
+
     /// <summary>One death seen during the run.</summary>
     public sealed record DeathRecord(int Day, string Who, string Cause, string Context);
 
@@ -56,7 +64,16 @@ namespace WorldMonitor
         private readonly HashSet<(long, HumanId, HumanId)> _seenOutcomes = new();
         private readonly HashSet<(long, HumanId, Type)> _seenOther = new();
 
-        public Collector(double sampleEveryHours) => _sampleEveryHours = sampleEveryHours;
+        private readonly int _totalDays;
+
+        public Collector(double sampleEveryHours, int totalDays = 0)
+        {
+            _sampleEveryHours = sampleEveryHours;
+            _totalDays = totalDays;
+        }
+
+        /// <summary>Key "first half|home alone" and so on; the halves split the run at its middle.</summary>
+        public SortedDictionary<string, SituationStats> Situations { get; } = new();
 
         public List<Sample> Samples { get; } = new();
         public Dictionary<HumanId, PersonRecord> People { get; } = new();
@@ -127,7 +144,13 @@ namespace WorldMonitor
                 if (surface.HasPrivacy) counters.Private++;
                 if (atHome) counters.AtHome++;
                 if (asleep) { counters.Asleep++; if (surface.HasPrivacy) counters.AsleepPrivate++; }
-                else { counters.Awake++; if (peopleAt.GetValueOrDefault(location) > 1) counters.AwakeWithCompany++; }
+                else
+                {
+                    counters.Awake++;
+                    var withCompany = peopleAt.GetValueOrDefault(location) > 1;
+                    if (withCompany) counters.AwakeWithCompany++;
+                    NoteSituation(c, day, atHome, withCompany);
+                }
                 LocationTicks[location] = LocationTicks.GetValueOrDefault(location) + 1;
 
                 NoteSleepStart(c, asleep, atHome, surface.HasPrivacy);
@@ -141,6 +164,22 @@ namespace WorldMonitor
                 Samples.Add(Take(day, now, characters));
                 UpdatePeople(day, characters);
             }
+        }
+
+        private void NoteSituation(IHuman c, int day, bool atHome, bool withCompany)
+        {
+            var half = _totalDays > 0 && day * 2 >= _totalDays ? "second half" : "first half";
+            var key = $"{half}|{(atHome ? "home" : "away")} {(withCompany ? "with company" : "alone")}";
+            if (!Situations.TryGetValue(key, out var stats)) Situations[key] = stats = new SituationStats();
+
+            var b = c.Snapshot.Behavior;
+            var plan = b.CurrentPlan?.Name ?? "(none)";
+            stats.N++;
+            stats.Belonging += b.NeedBelonging;
+            stats.NeedSocial += c.Snapshot.Psychology.Motivations?.NeedSocial ?? 0;
+            stats.Stress += c.Snapshot.Psychology.Stress;
+            stats.Valence += c.Snapshot.Psychology.Valence;
+            stats.Plans[plan] = stats.Plans.GetValueOrDefault(plan) + 1;
         }
 
         private void NoteSleepStart(IHuman c, bool asleep, bool atHome, bool hasPrivacy)
