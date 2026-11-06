@@ -1568,7 +1568,16 @@ namespace GameEngineTools.World.Simulation
                     character, chars, _locationService, _perceptionPolicy, _perceptionOptions);
 
                 if (candidates.Count == 0)
+                {
+                    // Nobody here to talk to: someone who wants company goes where people are, instead of reaching out to an empty room.
+                    if (!(_options.EnableTravelTime && _inTransit.ContainsKey(character.Id))
+                        && FindBestMoveTarget(character, locationId, LocationType.Social) is { } company)
+                    {
+                        CommitMove(character, company, now);
+                    }
+
                     continue;
+                }
 
                 var targetMode = character.Snapshot.Behavior.NeedIntimacy >= 55
                     ? SocialTargetMode.Intimacy
