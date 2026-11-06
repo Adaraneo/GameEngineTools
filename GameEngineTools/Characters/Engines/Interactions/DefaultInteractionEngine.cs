@@ -224,6 +224,15 @@ namespace GameEngineTools.Characters.Engines.Interactions
         /// so the <c>RelationshipsEngine</c> knows which domain to update.
         /// </para>
         /// </remarks>
+        // Friendly overtures are almost never turned down (Epley & Schroeder 2014, commuters); heavier acts start lower. Closeness, comfort, trust and mood add to it.
+        private static double BaseAcceptance(RelationalActKind kind) => kind switch
+        {
+            RelationalActKind.SmallTalk or RelationalActKind.Question or RelationalActKind.Humor or RelationalActKind.Validation => 0.70,
+            RelationalActKind.SelfDisclosure => 0.50,
+            RelationalActKind.Meta => 0.45,
+            _ => 0.30
+        };
+
         private void HandleInteractionProposed(InteractionProposed p, IHumanContext ctx, IEventCollector outbox)
         {
             var rels = ctx.Snapshot.Relationships.Edges;
@@ -242,7 +251,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
             // B4: Agreeableness modulates willingness to accept — high-A characters are more receptive
             // (+0.10 at full Agreeableness, −0.10 at zero); the ±0.10 range is conservative.
             var agreeablenessBias = (ctx.Personality.BigFive.Agreeableness - 0.5) * 0.20;
-            var baseP = 0.30
+            var baseP = BaseAcceptance(p.Content.SpeechAct.RelationalKind)
                         + 0.0025 * closeness
                         + 0.0020 * comfort
                         + 0.0020 * trust
