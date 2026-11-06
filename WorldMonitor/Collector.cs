@@ -27,6 +27,7 @@ namespace WorldMonitor
         public int Edges;
         public int Accepted, Rejected;
         public int? DiedOnDay;
+        public Dictionary<HumanId, double> Closeness { get; } = new();
         public double MaxNeedIntimacy, MaxSexualInterest, MaxIntimateAffinity, MaxCloseness, MaxTrust, MaxComfort;
         public double SociosexualityAttitude;
         public int Invites;
@@ -78,6 +79,11 @@ namespace WorldMonitor
         public List<Sample> Samples { get; } = new();
         public Dictionary<HumanId, PersonRecord> People { get; } = new();
         public List<DeathRecord> DeathLog { get; } = new();
+
+        /// <summary>Hours two characters were awake in the same place (sampled at tick boundaries), by pair.</summary>
+        public Dictionary<(HumanId, HumanId), double> PairHours { get; } = new();
+
+        private WDateTime? _lastTickTime;
         public SortedDictionary<int, DayCounters> Days { get; } = new();
         public Dictionary<string, long> LocationTicks { get; } = new();
         public Dictionary<string, int> SleepStarts { get; } = new();
@@ -158,6 +164,24 @@ namespace WorldMonitor
 
                 NoteSleepStart(c, asleep, atHome, surface.HasPrivacy);
                 CountEvents(c);
+            }
+
+            var tickHours = _lastTickTime is { } previous ? WDateTime.Difference(now, previous).TotalHours : 0.0;
+            _lastTickTime = now;
+            if (tickHours > 0)
+            {
+                foreach (var group in characters
+                    .Where(h => !_dead.Contains(h.Id) && h.Snapshot.Behavior.ActiveSleep is null)
+                    .GroupBy(h => h.Snapshot.InteractionSurface.Location ?? "?"))
+                {
+                    var here = group.Select(h => h.Id).ToList();
+                    for (var i = 0; i < here.Count; i++)
+                        for (var j = i + 1; j < here.Count; j++)
+                        {
+                            var key = here[i].Value.CompareTo(here[j].Value) < 0 ? (here[i], here[j]) : (here[j], here[i]);
+                            PairHours[key] = PairHours.GetValueOrDefault(key) + tickHours;
+                        }
+                }
             }
 
             var slot = (long)(hours / _sampleEveryHours);
@@ -267,6 +291,8 @@ namespace WorldMonitor
                 person.Occupation = c.Snapshot.Schedule?.Occupation is { Length: > 0 } occupation ? occupation : "-";
                 person.Home = c.Identity.HomeLocationId ?? "-";
                 person.Edges = c.Snapshot.Relationships.Edges.Count;
+                foreach (var edge in c.Snapshot.Relationships.Edges.Values)
+                    person.Closeness[edge.B] = edge.Closeness;
                 person.Stress.Add((day, c.Snapshot.Psychology.Stress));
             }
         }

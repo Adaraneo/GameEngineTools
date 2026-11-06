@@ -3,6 +3,7 @@
 
 namespace WorldMonitor
 {
+    using GameEngineTools.Characters.Core;
     using System.Globalization;
     using System.Text;
 
@@ -70,6 +71,7 @@ namespace WorldMonitor
             AppendCharacters(sb, options, c);
             AppendIntimacy(sb, c);
             AppendSituations(sb, c);
+            AppendFriendship(sb, c);
 
             sb.AppendLine();
             sb.AppendLine("## Most frequent actions and places (seen at tick boundaries)");
@@ -88,6 +90,34 @@ namespace WorldMonitor
             return sb.ToString().Replace("\r\n", "\n");
 
             string Pct(long part, long whole) => whole == 0 ? "-" : (100.0 * part / whole).ToString("F1", inv);
+        }
+
+        private static void AppendFriendship(StringBuilder sb, Collector c)
+        {
+            if (c.PairHours.Count == 0) return;
+
+            // Closeness of a pair = the mean of the two directed edges (0 when neither character has an edge).
+            double CloseOf(HumanId a, HumanId b)
+            {
+                var values = new List<double>();
+                if (c.People.TryGetValue(a, out var pa) && pa.Closeness.TryGetValue(b, out var ab)) values.Add(ab);
+                if (c.People.TryGetValue(b, out var pb) && pb.Closeness.TryGetValue(a, out var ba)) values.Add(ba);
+                return values.Count == 0 ? 0 : values.Average();
+            }
+
+            var rows = c.PairHours.Select(kv => (Hours: kv.Value, Close: CloseOf(kv.Key.Item1, kv.Key.Item2))).ToList();
+            sb.AppendLine();
+            sb.AppendLine("## Time together and closeness (Hall 2018: about 50 h to a casual friend, 90 h to a friend, over 200 h to a close friend)");
+            sb.AppendLine("| hours awake in the same place | pairs | closeness mean | median | share with closeness 30+ | share 55+ | share 80+ |");
+            sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|");
+            foreach (var (from, to) in new[] { (0.0, 5.0), (5.0, 15.0), (15.0, 30.0), (30.0, 50.0), (50.0, 90.0), (90.0, 1e9) })
+            {
+                var bucket = rows.Where(r => r.Hours >= from && r.Hours < to).Select(r => r.Close).OrderBy(x => x).ToList();
+                var label = to > 1e8 ? $"{from:F0}+" : $"{from:F0}-{to:F0}";
+                sb.AppendLine(bucket.Count == 0
+                    ? $"| {label} | 0 | - | - | - | - | - |"
+                    : $"| {label} | {bucket.Count} | {bucket.Average():F0} | {bucket[bucket.Count / 2]:F0} | {100.0 * bucket.Count(x => x >= 30) / bucket.Count:F0}% | {100.0 * bucket.Count(x => x >= 55) / bucket.Count:F0}% | {100.0 * bucket.Count(x => x >= 80) / bucket.Count:F0}% |");
+            }
         }
 
         private static void AppendSituations(StringBuilder sb, Collector c)
