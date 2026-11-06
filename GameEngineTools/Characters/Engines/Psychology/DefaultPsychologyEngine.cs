@@ -135,7 +135,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
             // Base drift: stress falls toward baseline (modulated by vagal tone + circadian vulnerability)
             s = s with
             {
-                Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * vagalTone * circadianVulnerability * h),
+                Stress = Clamp01p(s.Stress - Config.StressRecoveryRatePerHour * Math.Clamp(s.Stress / Config.StressRecoveryReferenceLevel, 0.0, 2.0) * vagalTone * circadianVulnerability * h),
                 Valence = Approach(s.Valence, (s.MoodBaseline - 50.0) / 50.0 * Config.MoodValenceSetPointRange, 0.15 * emotionDecayMult * h),
                 Arousal = Approach(s.Arousal, 0.5, 0.05 * h),
                 Dominance = Approach(s.Dominance, 0.5, 0.03 * h)

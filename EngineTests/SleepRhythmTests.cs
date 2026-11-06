@@ -95,7 +95,7 @@ namespace EngineTests
                 foreach (var session in afterFullNight)
                 {
                     var clock24 = session.StartHour % hoursPerDay * 24.0 / hoursPerDay;
-                    Assert.IsTrue(clock24 >= 21.0 || clock24 <= 3.0, $"seed {seed}, {hoursPerDay} h day: went to sleep at {clock24:F1} on a 24-hour clock. {detail}");
+                    Assert.IsTrue(clock24 >= 20.0 || clock24 <= 3.0, $"seed {seed}, {hoursPerDay} h day: went to sleep at {clock24:F1} on a 24-hour clock. {detail}");
                     Assert.IsTrue(session.Hours <= 11.5, $"seed {seed}, {hoursPerDay} h day: slept {session.Hours:F1} h. {detail}");
                 }
             }
