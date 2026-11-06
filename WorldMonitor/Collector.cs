@@ -36,6 +36,7 @@ namespace WorldMonitor
         public string LastAction = "-";
         public List<string> History { get; } = new();
         public string LastHistoryKey = "";
+        public string LastBody = "";
         public List<(int Day, double Stress)> Stress { get; } = new();
     }
 
@@ -150,6 +151,7 @@ namespace WorldMonitor
                 var surface = c.Snapshot.InteractionSurface;
                 var location = surface.Location ?? "?";
                 person.LastLocation = location;
+                person.LastBody = $"allostatic {ph.AllostaticLoad:F0}, immune {ph.ImmuneLoad:F0}, energy {ph.Energy:F0}, sleep debt {ph.SleepDebtHours:F1} h";
                 var historyKey = $"{location}|{c.Snapshot.Behavior.CurrentPlan?.Name ?? "(none)"}|{c.Snapshot.Behavior.ActiveSleep is not null}";
                 if (historyKey != person.LastHistoryKey)
                 {
@@ -270,7 +272,7 @@ namespace WorldMonitor
                         {
                             victim.DiedOnDay = (int)WorldDays;
                             DeathLog.Add(new DeathRecord((int)WorldDays, $"{victim.Name} ({victim.Sex}, {victim.Age}, {victim.Occupation})", cd.Cause.ToString(),
-                                $"last at {victim.LastLocation} doing {victim.LastAction}; hunger {victim.LastHunger:F0} (max {victim.MaxHunger:F0}), thirst {victim.LastThirst:F0} (max {victim.MaxThirst:F0}), stress {victim.Stress.LastOrDefault().Stress:F0}" + " | history: " + string.Join(" ; ", victim.History)));
+                                $"last at {victim.LastLocation} doing {victim.LastAction}; hunger {victim.LastHunger:F0} (max {victim.MaxHunger:F0}), thirst {victim.LastThirst:F0} (max {victim.MaxThirst:F0}), stress {victim.Stress.LastOrDefault().Stress:F0}; {victim.LastBody}" + " | history: " + string.Join(" ; ", victim.History)));
                         }
                         else
                         {
