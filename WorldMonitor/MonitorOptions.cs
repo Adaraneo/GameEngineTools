@@ -6,7 +6,7 @@ namespace WorldMonitor
     using Microsoft.Extensions.Configuration;
 
     /// <summary>One named speed/size preset of a run.</summary>
-    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15);
+    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0);
 
     /// <summary>Pass/fail limits; a missing value means the check is not made.</summary>
     public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80);
@@ -36,6 +36,7 @@ namespace WorldMonitor
                 Days = IntOverride(overrides, "days", profile.Days),
                 TickStepMinutes = IntOverride(overrides, "tick", profile.TickStepMinutes),
                 SubstepMinutes = IntOverride(overrides, "substep", profile.SubstepMinutes),
+                Couples = IntOverride(overrides, "couples", profile.Couples),
             };
 
             var sampleEveryHours = section.GetValue("SampleEveryHours", 6.0);

@@ -104,7 +104,7 @@ namespace WorldObserver.Simulation
                 configureServices: static s => s.AddLexicalAcquisition());
 
             var characterCount = Math.Max(1, _options.CharacterCount);
-            var ctx = WorldBootstrap.Build(runtime, characterCount);
+            var ctx = WorldBootstrap.Build(runtime, characterCount, _options.CouplesAtStart);
             _startTime = ctx.Clock.Now; // world clock at launch — basis for game "elapsed since start"
             _realStartTicks = Environment.TickCount64; // wall-clock basis for real run time
             _log.LogInformation("World ready: {Count} characters.", ctx.Characters.Count);

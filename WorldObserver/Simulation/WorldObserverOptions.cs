@@ -11,6 +11,9 @@ namespace WorldObserver.Simulation
         /// <summary>Number of characters generated into the fresh world at startup.</summary>
         public int CharacterCount { get; set; } = 6;
 
+        /// <summary>Pairs of characters that start as an established couple sharing a flat (clamped to half the characters).</summary>
+        public int CouplesAtStart { get; set; } = 3;
+
         /// <summary>
         /// Initial real-time delay applied after every tick, in milliseconds (higher = slower).
         /// The browser speed slider overrides this live; this is just the starting tempo.

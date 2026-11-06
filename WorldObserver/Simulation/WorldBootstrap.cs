@@ -48,7 +48,7 @@ namespace WorldObserver.Simulation
               "baker", "farmhand", "food_worker", "orchardist" };
 
         /// <summary>Loads the world and returns the pieces the host wires into a scene.</summary>
-        public static WorldContext Build(GameEngineToolsRuntimeHandle runtime, int characterCount)
+        public static WorldContext Build(GameEngineToolsRuntimeHandle runtime, int characterCount, int coupleCount = 0)
         {
             var services = runtime.Services;
             var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
@@ -88,19 +88,42 @@ namespace WorldObserver.Simulation
                 homes = allLocations;
 
             var people = new List<IHuman>(characterCount);
-            for (var i = 0; i < characterCount; i++)
+            var couples = Math.Clamp(coupleCount, 0, characterCount / 2);
+            var homeIndex = 0;
+
+            void Settle(IHuman person, string home, int index)
+            {
+                person.SetHomeLocation(home);
+                locations.MoveCharacter(person.Id, home); // start the day at home
+
+                // Modern occupation (re-seeds the daily schedule with city work hours/locations).
+                person.ChangeOccupation(ModernOccupations[index % ModernOccupations.Length]);
+            }
+
+            // Partners start as an established couple: a seeded partner bond and one shared flat.
+            for (var c = 0; c < couples; c++)
+            {
+                var woman = manager.RandomizePerson(maxAge: 40, sexBiology: SexBiology.Female, minAge: 22);
+                var man = manager.RandomizePerson(maxAge: 40, sexBiology: SexBiology.Male, minAge: 22);
+                manager.Characters.Add(new NPC(100, woman));
+                manager.Characters.Add(new NPC(100, man));
+                FamilyBuilder.Wire(familyGraph, woman, man, Array.Empty<IHuman>(), clock.Now);
+                people.Add(woman);
+                people.Add(man);
+
+                var home = homes[homeIndex++ % homes.Count];
+                Settle(woman, home, people.Count - 2);
+                Settle(man, home, people.Count - 1);
+            }
+
+            while (people.Count < characterCount)
             {
                 var person = manager.RandomizePerson(maxAge: 40, sexBiology: null, minAge: 18);
                 manager.Characters.Add(new NPC(100, person));
                 familyGraph.Register(person);
                 people.Add(person);
 
-                var home = homes[i % homes.Count];
-                person.SetHomeLocation(home);
-                locations.MoveCharacter(person.Id, home); // start the day at home
-
-                // Modern occupation (re-seeds the daily schedule with city work hours/locations).
-                person.ChangeOccupation(ModernOccupations[i % ModernOccupations.Length]);
+                Settle(person, homes[homeIndex++ % homes.Count], people.Count - 1);
             }
 
             // ── Lexical acquisition ──────────────────────────────────────────────────

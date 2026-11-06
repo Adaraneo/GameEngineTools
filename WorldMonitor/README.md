@@ -9,7 +9,7 @@ WorldMonitor/bin/Debug/net8.0/WorldMonitor.exe --profile Full
 WorldMonitor/bin/Debug/net8.0/WorldMonitor.exe --days 30 --characters 8 --tick 64
 ```
 
-Speed and size come from `appsettings.json` (`WorldMonitor:Profiles`: characters, days, tick and substep minutes; `Quick` is about half a minute to a few minutes, `Full` 5-8 minutes, `Long` much longer). Command-line `--profile`, `--days`, `--characters`, `--tick`, `--substep` and `--out` override it. A tick is observed once per `TickStepMinutes`, so counts of actions and events are sampled, not exhaustive.
+Speed and size come from `appsettings.json` (`WorldMonitor:Profiles`: characters, days, tick and substep minutes; `Quick` is about half a minute to a few minutes, `Full` 5-8 minutes, `Long` much longer). Command-line `--profile`, `--days`, `--characters`, `--couples`, `--tick`, `--substep` and `--out` override it (`Couples` is the number of pairs that start as an established couple sharing a flat). A tick is observed once per `TickStepMinutes`, so counts of actions and events are sampled, not exhaustive.
 
 While it runs it shows a progress bar with the current world day, elapsed time, an ETA and the latest mean stress (one line per world day when the output is redirected).
 

@@ -44,7 +44,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     writeTextLogs: false,
     configureServices: static s => s.AddLexicalAcquisition()))
 {
-    var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters));
+    var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples);
 
     var sceneOptions = new SimulationSceneOptions
     {
