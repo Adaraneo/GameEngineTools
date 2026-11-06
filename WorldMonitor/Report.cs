@@ -113,6 +113,11 @@ namespace WorldMonitor
 
             sb.AppendLine();
             sb.AppendLine("## Intimacy (what the characters felt and tried; highest value seen during the run)");
+            sb.AppendLine("Outcomes by speech act (seen at the speaker's tick; an invitation needs a private place and, to become an encounter, closeness 55-70 and interest 50-65 on the other side):");
+            foreach (var (act, counts) in c.ActOutcomes)
+                sb.AppendLine($"- {act}: accepted {counts.Accepted}, rejected {counts.Rejected}");
+            sb.AppendLine($"- events: InteractionProposed {c.Events.GetValueOrDefault("InteractionProposed")}, SexualEncounterProposed {c.Events.GetValueOrDefault("SexualEncounterProposed")}, SexualEncounterOutcome {c.Events.GetValueOrDefault("SexualEncounterOutcome")}");
+            sb.AppendLine();
             sb.AppendLine("The gate for starting an invitation needs closeness of 24-50 (lower with a more permissive SOI-R attitude), plus trust and comfort at the same scale for restricted characters.");
             sb.AppendLine("| name | sex | SOI-R attitude | need intimacy | sexual interest | intimate affinity | closeness | trust | comfort | invitations tried |");
             sb.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");

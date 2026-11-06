@@ -83,6 +83,9 @@ namespace WorldMonitor
         public Dictionary<string, int> SleepStarts { get; } = new();
         public Dictionary<string, long> Actions { get; } = new();
         public Dictionary<string, long> Events { get; } = new();
+
+        /// <summary>Accepted and rejected interactions by speech act; invitations are split by whether the speaker stood somewhere private.</summary>
+        public SortedDictionary<string, (int Accepted, int Rejected)> ActOutcomes { get; } = new();
         public int InteractionsAccepted { get; private set; }
         public int InteractionsRejected { get; private set; }
         public int SexualEncounters { get; private set; }
@@ -208,6 +211,11 @@ namespace WorldMonitor
                         break;
                     case InteractionOutcome io when _seenOutcomes.Add((io.OccurredAt.WorldTicks, io.From, io.To)):
                         if (io.Accepted) InteractionsAccepted++; else InteractionsRejected++;
+                        var actKey = io.Act == GameEngineTools.Dialogue.Contracts.RelationalActKind.Invite
+                            ? $"Invite ({(c.Snapshot.InteractionSurface.HasPrivacy ? "private place" : "no privacy")})"
+                            : io.Act.ToString();
+                        var counts = ActOutcomes.GetValueOrDefault(actKey);
+                        ActOutcomes[actKey] = io.Accepted ? (counts.Accepted + 1, counts.Rejected) : (counts.Accepted, counts.Rejected + 1);
                         if (People.TryGetValue(io.From, out var sender)) { if (io.Accepted) sender.Accepted++; else sender.Rejected++; }
                         break;
                     case SexualEncounterOutcome se when se.Accepted && _seenOther.Add((se.OccurredAt.WorldTicks, se.From, e.GetType())):
