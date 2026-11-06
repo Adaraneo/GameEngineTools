@@ -413,6 +413,7 @@ namespace GameEngineTools.Narrative
             {
                 InterruptCause.Ambush => Conj(actor, "byl přepaden", "byla přepadena"),
                 InterruptCause.Pain => Conj(actor, "byl probuzen bolestí", "byla probuzena bolestí"),
+                InterruptCause.Deprivation => Conj(actor, "se probudil žízní", "se probudila žízní"),
                 InterruptCause.External => Conj(actor, "byl vyrušen zvenku", "byla vyrušena zvenku"),
                 _ => Conj(actor, "byl přerušen", "byla přerušena")
             };

@@ -38,6 +38,9 @@ namespace GameEngineTools.Characters.Engines.Sleep
         Pain,
 
         /// <summary>External interruption (noise, another character, environment event).</summary>
-        External
+        External,
+
+        /// <summary>Thirst grew critical during the night; the sleeper wakes to drink (dehydration kills within days, hunger is slower).</summary>
+        Deprivation
     }
 }

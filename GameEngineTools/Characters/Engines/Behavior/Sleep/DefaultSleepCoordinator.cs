@@ -69,6 +69,17 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             // Active sleep sessions own the whole tick until they end naturally or are interrupted.
             if (_activeSession is { IsActive: true })
             {
+                var sleeperBody = ctx.Snapshot.Physiology;
+                if (sleeperBody.Thirst >= _sleepCfg.ThirstSleepBlockThreshold + 10.0)
+                {
+                    _activeSession.Interrupt(context.Now, InterruptCause.Deprivation, ctx, context.Outbox);
+                    _activeSession = null;
+                    state = EndSleep(state, ctx);
+                }
+            }
+
+            if (_activeSession is { IsActive: true })
+            {
                 _activeSession.Tick(context.Now, context.Dt, ctx, context.Outbox);
                 if (!_activeSession.IsActive)
                 {

@@ -34,6 +34,8 @@ namespace WorldMonitor
         public double LastHunger, LastThirst, MaxHunger, MaxThirst;
         public string LastLocation = "?";
         public string LastAction = "-";
+        public List<string> History { get; } = new();
+        public string LastHistoryKey = "";
         public List<(int Day, double Stress)> Stress { get; } = new();
     }
 
@@ -148,6 +150,13 @@ namespace WorldMonitor
                 var surface = c.Snapshot.InteractionSurface;
                 var location = surface.Location ?? "?";
                 person.LastLocation = location;
+                var historyKey = $"{location}|{c.Snapshot.Behavior.CurrentPlan?.Name ?? "(none)"}|{c.Snapshot.Behavior.ActiveSleep is not null}";
+                if (historyKey != person.LastHistoryKey)
+                {
+                    person.LastHistoryKey = historyKey;
+                    person.History.Add($"day {day} {(hours % WWorld.Spec.HoursPerDay):F0}h {historyKey} thirst {ph.Thirst:F0} hunger {ph.Hunger:F0}");
+                    if (person.History.Count > 14) person.History.RemoveAt(0);
+                }
                 var asleep = c.Snapshot.Behavior.ActiveSleep is not null;
                 var atHome = c.Identity.HomeLocationId == location;
 
@@ -261,7 +270,7 @@ namespace WorldMonitor
                         {
                             victim.DiedOnDay = (int)WorldDays;
                             DeathLog.Add(new DeathRecord((int)WorldDays, $"{victim.Name} ({victim.Sex}, {victim.Age}, {victim.Occupation})", cd.Cause.ToString(),
-                                $"last at {victim.LastLocation} doing {victim.LastAction}; hunger {victim.LastHunger:F0} (max {victim.MaxHunger:F0}), thirst {victim.LastThirst:F0} (max {victim.MaxThirst:F0}), stress {victim.Stress.LastOrDefault().Stress:F0}"));
+                                $"last at {victim.LastLocation} doing {victim.LastAction}; hunger {victim.LastHunger:F0} (max {victim.MaxHunger:F0}), thirst {victim.LastThirst:F0} (max {victim.MaxThirst:F0}), stress {victim.Stress.LastOrDefault().Stress:F0}" + " | history: " + string.Join(" ; ", victim.History)));
                         }
                         else
                         {

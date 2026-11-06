@@ -174,6 +174,20 @@ namespace EngineTests
     public class SleepCoordinatorTests : TestBase
     {
         [TestMethod]
+        public void Tick_ASleeperWhoGetsCriticallyThirsty_Wakes()
+        {
+            var engine = new DefaultSleepCoordinator(new SleepConfig(), new BehaviorConfig(), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+            var calm = BehaviorComponentTestFactory.Context(thirst: 20);
+            var started = engine.Handle(new SleepConfirmed(calm.Now, calm.HumanContext.Id, default), calm.HumanContext, calm.Outbox, calm.State);
+
+            var parched = BehaviorComponentTestFactory.Context(thirst: 95, state: started, selfId: calm.HumanContext.Id);
+            var result = engine.Tick(parched);
+
+            Assert.IsTrue(parched.Outbox.Drain().OfType<SleepInterrupted>().Any(x => x.Cause == InterruptCause.Deprivation));
+            Assert.IsNull(result.NewState.ActiveSleep);
+        }
+
+        [TestMethod]
         public void Tick_HighRestNeed_RequestsSleepPrompt()
         {
             var cfg = new SleepConfig() with { SleepPromptThreshold = 20 }; var engine = new DefaultSleepCoordinator(cfg, new BehaviorConfig(), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))); var context = BehaviorComponentTestFactory.Context(state: new BehaviorState(90, 5, 5, 20, 50, 30, null), surfaceKind: SurfaceKind.Private); var result = engine.Tick(context); Assert.IsTrue(result.ConsumedTick); Assert.IsTrue(context.Outbox.Drain().OfType<SleepPromptRequested>().Any());
