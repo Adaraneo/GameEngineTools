@@ -270,6 +270,10 @@ namespace GameEngineTools.Characters.Engines.Psychology
                     s = s with { Stress = Math.Max(0, s.Stress - (testo.Level - 50) * Config.TestosteroneStressResilienceWeight * h) };
             }
 
+            // Loneliness builds up with time and is relieved by accepted contact (Hawkley & Cacioppo 2010)
+            if (s.Motivations is { } lonelyMotiv)
+                s = s with { Motivations = lonelyMotiv with { NeedSocial = Math.Min(100, lonelyMotiv.NeedSocial + Config.SocialNeedGrowthPerHour * h) } };
+
             // Wanting vs. Liking: stres amplifikuje wanting/craving (Berridge 2025)
             // Liking suppression is already covered by anhedonia; the missing part: dopaminergic wanting under stress
             if (s.Stress > Config.WantingStressThreshold && s.Motivations is { } wantingMotiv)
@@ -798,7 +802,7 @@ namespace GameEngineTools.Characters.Engines.Psychology
                             MoodBaseline = Math.Clamp(s.MoodBaseline + 5.0, 0, 100),
                             Motivations = prevMotivAcc with
                             {
-                                NeedSocial = Math.Clamp(prevMotivAcc.NeedSocial + 3.0 * anhedoniaMult, 0, 100)
+                                NeedSocial = Math.Clamp(prevMotivAcc.NeedSocial - Config.AcceptedContactSatiation * anhedoniaMult, 0, 100)
                             }
                         };
                         if (s.Motivations != prevMotivAcc)

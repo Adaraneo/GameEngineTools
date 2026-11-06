@@ -1253,7 +1253,7 @@ namespace EngineTests
         #region MotivationState — Phase 4
 
         [TestMethod]
-        public void Handle_InteractionAccepted_IncreasesNeedSocial()
+        public void Handle_InteractionAccepted_RelievesNeedSocial()
         {
             var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
             engine.RestoreState(engine.State with { Motivations = new MotivationState() });
@@ -1265,8 +1265,20 @@ namespace EngineTests
 
             engine.Handle(outcome, ctx, _outbox);
 
-            Assert.IsTrue(engine.State.Motivations!.NeedSocial > before,
-                $"Accepted interaction must increase NeedSocial. Before={before:F4}, After={engine.State.Motivations.NeedSocial:F4}");
+            Assert.IsTrue(engine.State.Motivations!.NeedSocial < before,
+                $"Accepted interaction must relieve NeedSocial. Before={before:F4}, After={engine.State.Motivations.NeedSocial:F4}");
+        }
+
+        [TestMethod]
+        public void Tick_WithoutContact_NeedSocialBuildsUp()
+        {
+            var engine = BuildEngine(initialValence: 0.0, initialStress: 0);
+            engine.RestoreState(engine.State with { Motivations = new MotivationState(NeedSocial: 20) });
+            var ctx = BuildContext(neuroticism: 0.5);
+
+            engine.Tick(WDateTime.New(100, 1, 1), WTimeSpan.FromHours(10), ctx, _outbox);
+
+            Assert.IsTrue(engine.State.Motivations!.NeedSocial > 20 + 4.0, $"{engine.State.Motivations.NeedSocial:F1}");
         }
 
         [TestMethod]

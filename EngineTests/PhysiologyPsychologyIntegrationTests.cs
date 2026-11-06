@@ -598,7 +598,7 @@ namespace EngineTests
         /// Pozitivní interakce musí méně zvyšovat NeedSocial u nemocného NPC (anhedonie).
         /// </summary>
         [TestMethod]
-        public void SicknessBehavior_Anhedonia_ReducesNeedSocialGainOnAccepted()
+        public void SicknessBehavior_Anhedonia_ReducesNeedSocialReliefOnAccepted()
         {
             var psychCfg = Options.Create(new PsychologyConfig(
                 BaselineAffectVariance: 0.0,
@@ -631,8 +631,8 @@ namespace EngineTests
             healthyPsych.Handle(io, healthyCtx, new EventCollector());
 
             Assert.IsTrue(
-                healthyPsych.State.Motivations!.NeedSocial > sickPsych.State.Motivations!.NeedSocial,
-                $"Zdravé NPC musí získat více NeedSocial než nemocné. " +
+                healthyPsych.State.Motivations!.NeedSocial < sickPsych.State.Motivations!.NeedSocial,
+                $"Zdravé NPC musí mít po kontaktu menší NeedSocial než nemocné. " +
                 $"Zdravý={healthyPsych.State.Motivations.NeedSocial:F4}, " +
                 $"Nemocný={sickPsych.State.Motivations.NeedSocial:F4}");
         }
