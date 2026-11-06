@@ -76,7 +76,7 @@ namespace EngineTests
 
             Console.WriteLine($"routine (16 h private, 8 h public): {routine:F1}; all public: {allPublic:F1}; all private: {allPrivate:F1}");
             Assert.IsTrue(routine < 40.0, $"A normal day with a home settles at a modest stress, got {routine:F1}.");
-            Assert.IsTrue(allPublic > routine + 30.0, $"Living in a place without privacy keeps stress high, got {allPublic:F1} vs {routine:F1}.");
+            Assert.IsTrue(allPublic > routine + 20.0, $"Living in a place without privacy keeps stress high, got {allPublic:F1} vs {routine:F1}.");
         }
     }
 }

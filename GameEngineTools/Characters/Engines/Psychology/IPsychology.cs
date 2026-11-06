@@ -370,10 +370,12 @@ namespace GameEngineTools.Characters.Engines.Psychology
         /// <summary>Loneliness build-up per world hour without contact. Own design value, set so about four accepted contacts a day keep NeedSocial level.</summary>
         double SocialNeedGrowthPerHour = 0.5,
         /// <summary>NeedSocial relief per accepted interaction (blunted by sickness anhedonia). Own design value.</summary>
-        double AcceptedContactSatiation = 6.0)
+        double AcceptedContactSatiation = 6.0,
+        /// <summary>Share of the privacy-deficit stress felt in an empty place without privacy; it scales up to 1 as the place fills (Altman 1975: stress comes from unwanted contact). Own design value.</summary>
+        double CrowdingStressFloor = 0.3)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
-        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 70.0, 60.0, 0.6, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 3.0, 0.8, 0.55, 0.08, 0.4, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.5, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0, 0.57, 0.56, 0.42, 0.47, 0.25, 0.30, 0.5, 25.0, 4.0, 30, 20, 0.15, 0.60, 10.0, 0.35, 8.0, 19.0, 0.25, 6.0, 15.0, 0.20, 1.5, 0.40, 0.95, 50.0, 0.5, 6.0) { }
+        public PsychologyConfig() : this(0.02, 1.5, 0.5, 1.8, 0.4, 0.3, 5.0, 8.0, 0.04, true, 0.15, 0.5, 80.0, 0.3, 70.0, 4.0, 0.0003, 0.2, 0.4, 0.15, 0.008, 0.3, 0.008, 1.5, 70.0, 0.015, 0.25, 50.0, 0.5, 0.008, 3.0, 0.6, 70.0, 20.0, 0.0008, 0.005, 0.5, 35.0, 0.003, 4.0, 55.0, 75.0, 1.0, 0.002, 0.5, 70.0, 60.0, 0.6, 0.05, 0.3, 27.0, 15.0, 0.008, 0.005, 1.0, 50.0, 3.0, 40.0, 0.5, 7.0, 0.002, 0.05, 0.3, 50.0, 60.0, 0.3, 60.0, 0.4, 0.2, 2500.0, 2.0, 0.5, 0.8, 1.0, 4.0, 1.5, 6.0, 3.0, 0.8, 0.55, 0.08, 0.4, 60.0, 0.3, 50.0, 0.005, 0.002, 3.0, 3.0, 2.5, 1.0, 0.8, 0.7, 0.6, 0.4, 0.5, 0.06, 60.0, 0.7, -0.55, -0.65, 0.25, 0.10, 2.0, 4.0, 0.08, 12.0, 0.57, 0.56, 0.42, 0.47, 0.25, 0.30, 0.5, 25.0, 4.0, 30, 20, 0.15, 0.60, 10.0, 0.35, 8.0, 19.0, 0.25, 6.0, 15.0, 0.20, 1.5, 0.40, 0.95, 50.0, 0.5, 6.0, 0.3) { }
     }
 
     /// <summary>

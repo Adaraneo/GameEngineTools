@@ -362,7 +362,8 @@ namespace GameEngineTools.Characters.Engines.Psychology
 
                     // Crowding: actual < desired (too little privacy)
                     var crowdingDeficit = Math.Max(0.0, desiredPrivacy - actualPrivacy);
-                    var crowdingStress = crowdingDeficit * Config.PrivacyMismatchStressWeight * stressGrowthMult * h;
+                    var crowdedness = Config.CrowdingStressFloor + (1.0 - Config.CrowdingStressFloor) * Math.Clamp(surface.Crowding, 0.0, 1.0);
+                    var crowdingStress = crowdingDeficit * Config.PrivacyMismatchStressWeight * crowdedness * stressGrowthMult * h;
 
                     // Isolation stress — Social Baseline Theory (Coan & Sbarra 2015).
                     // The brain treats social proximity as its metabolic baseline, so EVERY
