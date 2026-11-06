@@ -1555,7 +1555,7 @@ namespace GameEngineTools.World.Simulation
             {
                 var reachOut = character.LastOutbox
                     .OfType<ActionCommitted>()
-                    .FirstOrDefault(a => a.ActionName == ReachOut);
+                    .FirstOrDefault(a => a.ActionName is ReachOut or InviteIntimacy);
 
                 if (reachOut is null)
                     continue;
@@ -1579,7 +1579,9 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
-                var targetMode = character.Snapshot.Behavior.NeedIntimacy >= 55
+                // A committed InviteIntimacy is an invitation to whoever is here; nothing else turns it into an interaction.
+                var inviting = reachOut.ActionName == InviteIntimacy;
+                var targetMode = inviting || character.Snapshot.Behavior.NeedIntimacy >= 55
                     ? SocialTargetMode.Intimacy
                     : SocialTargetMode.ReachOut;
 
@@ -1614,12 +1616,12 @@ namespace GameEngineTools.World.Simulation
                 // žebrat by the speaker's felt power, and urgency (how far above threshold) pushes a
                 // low-power speaker toward pleading. First heuristic trigger — a pending conversational
                 // response still wins (the planner prioritises it).
-                var intent = selection.Act;
+                var intent = inviting ? RelationalActKind.Invite : selection.Act;
                 var urgency = 0.0;
                 var neediness = Math.Max(
                     character.Snapshot.Psychology.Motivations?.NeedCare ?? 0.0,
                     Math.Max(character.Snapshot.Physiology.Hunger, character.Snapshot.Physiology.Thirst));
-                if (neediness >= RequestNeedThreshold)
+                if (!inviting && neediness >= RequestNeedThreshold)
                 {
                     intent = RelationalActKind.Request;
                     urgency = Math.Clamp((neediness - RequestNeedThreshold) / (100.0 - RequestNeedThreshold), 0.0, 1.0);

@@ -46,7 +46,12 @@ namespace EngineTests
         private const string Flat = "flat";
         private const string Pub = "pub";
 
-        private static string RunReachOut(int othersInTheFlat)
+        private static string RunReachOut(int othersInTheFlat, string action = ActionNames.ReachOut)
+        {
+            return Run(othersInTheFlat, action, bonded: false).Location;
+        }
+
+        private static (string Location, MoverSpyHuman? Partner) Run(int othersInTheFlat, string action, bool bonded)
         {
             var locationService = new DefaultLocationService();
             var map = new WorldMap(
@@ -67,16 +72,23 @@ namespace EngineTests
                 NullLogger<DefaultSceneOrchestrator>.Instance, new EmptyWorldObjectProvider(), new SceneOrchestratorOptions());
 
             var people = new List<IHuman>();
-            var seeker = BuildPerson(reachOut: true);
+            var seeker = BuildPerson(action, bonded ? Sociosexuality.Unrestricted : null);
             people.Add(seeker);
+            MoverSpyHuman? partner = null;
             for (var i = 0; i < othersInTheFlat; i++)
-                people.Add(BuildPerson(reachOut: false));
+            {
+                partner = BuildPerson(null);
+                people.Add(partner);
+            }
+
+            if (bonded && partner is not null)
+                seeker.SetSnapshot(seeker.Snapshot with { Relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge> { [partner.Id] = Bond(seeker.Id, partner.Id) }) });
 
             foreach (var person in people)
                 locationService.MoveCharacter(person.Id, Flat);
 
             orchestrator.OnTick(Now, people);
-            return locationService.GetLocation(seeker.Id)!;
+            return (locationService.GetLocation(seeker.Id)!, partner);
         }
 
         [TestMethod]
@@ -87,16 +99,34 @@ namespace EngineTests
         public void ReachOutWithSomeoneAround_KeepsTheCharacterWhereItIs()
             => Assert.AreEqual(Flat, RunReachOut(othersInTheFlat: 1));
 
+        [TestMethod]
+        public void InviteIntimacyWithNobodyAround_AlsoSendsTheCharacterToASocialPlace()
+            => Assert.AreEqual(Pub, RunReachOut(othersInTheFlat: 0, ActionNames.InviteIntimacy));
+
+        [TestMethod]
+        public void InviteIntimacyWithABondedPartnerHere_DeliversAnInvitation()
+        {
+            var (_, partner) = Run(othersInTheFlat: 1, ActionNames.InviteIntimacy, bonded: true);
+
+            var proposals = partner!.ReceivedEvents.OfType<InteractionProposed>().ToList();
+            Assert.AreEqual(1, proposals.Count, "The partner is asked once.");
+            Assert.AreEqual(GameEngineTools.Dialogue.Contracts.RelationalActKind.Invite, proposals[0].Content.SpeechAct.RelationalKind);
+        }
+
+        private static RelationshipEdge Bond(HumanId from, HumanId to) => new(
+            from, to, Like: 70, Trust: 80, Familiarity: 70, AestheticAttraction: 70, PhysicalAttraction: 70, IntimateAffinity: 65, SexualInterest: 70,
+            Closeness: 85, Respect: 70, Comfort: 85, Breakdown: new DomainBreakdown(60, 60, 60, 60, 60), PositiveInteractionCount: 30);
+
         private static LocationDescriptor Place(string id, LocationType type) => new(
             Id: id, DisplayName: id, BaseNoise: 0.05, NoisePerPerson: 0.01, Capacity: 8,
             AllowsPrivacy: type == LocationType.Rest, Type: type, Terrain: TerrainType.Indoor);
 
-        private static MoverSpyHuman BuildPerson(bool reachOut)
+        private static MoverSpyHuman BuildPerson(string? action, Sociosexuality? sociosexuality = null)
         {
             var id = new HumanId(Guid.NewGuid());
             var personality = new Personality(
                 new BigFive(0.5, 0.5, 0.5, 0.5, 0.5), AttachmentProfile.Secure, CommunicationStyle.Direct,
-                new MotivationWeights(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5), Sociosexuality.Intermediate, Chronotype.Neutral);
+                new MotivationWeights(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5), sociosexuality ?? Sociosexuality.Intermediate, Chronotype.Neutral);
             var snapshot = new EnginesSnapshot(
                 new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
                 new PsychologyState(0.0, 0.5, 0.5, 10, 10, DiscreteEmotion.Neutral),
@@ -105,8 +135,8 @@ namespace EngineTests
                 new RelationshipState(new Dictionary<HumanId, RelationshipEdge>()),
                 new MemoryIndex(new List<EpisodicMemory>()));
             var human = new MoverSpyHuman(id, personality, snapshot);
-            if (reachOut)
-                human.SetLastOutbox(new ActionCommitted(Now, id, ActionNames.ReachOut, WTimeSpan.FromHours(1)));
+            if (action is not null)
+                human.SetLastOutbox(new ActionCommitted(Now, id, action, WTimeSpan.FromHours(1)));
             return human;
         }
 
@@ -173,6 +203,8 @@ namespace EngineTests
 
             public void Tick(WDateTime now, WTimeSpan dt)
             { }
+
+            public void SetSnapshot(EnginesSnapshot snapshot) => _snapshot = snapshot;
 
             public void RestoreSnapshot(EnginesSnapshot snapshot, WDateOnly today = default)
                 => _snapshot = snapshot;
