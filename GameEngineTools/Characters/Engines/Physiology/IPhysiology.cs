@@ -23,7 +23,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// <param name="PainPassiveRecoveryPerHour">Pain points decayed per hour while awake and idle.</param>
     /// <param name="PainSleepRecoveryPerHour">Pain points decayed per hour of sleep.</param>
     /// <param name="BaseConceptionChancePerEncounter">Base conception probability per reproductively-relevant encounter.</param>
-    /// <param name="OvulationConceptionMultiplier">Multiplier applied to conception chance during the ovulation window.</param>
+    /// <param name="OvulationConceptionMultiplier">Multiplier on the base chance on the day of ovulation; base × this = 0.33, the peak of Wilcox 1995 (unprotected).</param>
     /// <param name="PregnancyDiscoveryMinDays">Minimum days after conception before pregnancy can be discovered.</param>
     /// <param name="PregnancyTermDays">Gestation length in days from conception to birth.</param>
     /// <param name="EnableNutrition">When <c>true</c>, the nutrition sub-state (calories, vitamins, glucose) is tracked.</param>
@@ -153,7 +153,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double PainPassiveRecoveryPerHour = 0.3,
         double PainSleepRecoveryPerHour = 0.5,
         double BaseConceptionChancePerEncounter = 0.03,
-        double OvulationConceptionMultiplier = 4.0,
+        double OvulationConceptionMultiplier = 11.0,
         int PregnancyDiscoveryMinDays = 21,
         int PregnancyTermDays = 280,
         bool EnableNutrition = true,
@@ -442,7 +442,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             PainSleepRecoveryPerHour: 0.5,
             // ── Conception & pregnancy ────────────────────────────────────────────────
             BaseConceptionChancePerEncounter: 0.03,
-            OvulationConceptionMultiplier: 4.0,
+            OvulationConceptionMultiplier: 11.0,
             PregnancyDiscoveryMinDays: 21,
             PregnancyTermDays: 280,
             // ── Nutrition ─────────────────────────────────────────────────────────────
