@@ -623,11 +623,12 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 return false;
             }
 
-            if (ctx.Snapshot.Psychology.Stress > 35 || expectedAcceptance < 0.74)
-            {
-                return false;
-            }
+            return ctx.Random.Chance(SexualEncounterReadinessProbability(edge, ctx.Snapshot.Psychology.Stress));
+        }
 
+        /// <summary>Smooth chance that an accepted invitation turns into an encounter: relationship quality × calm.</summary>
+        internal static double SexualEncounterReadinessProbability(RelationshipEdge edge, double stress)
+        {
             var relationalReadiness =
                 edge.Trust * 0.24
                 + edge.Comfort * 0.28
@@ -635,11 +636,9 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 + edge.IntimateAffinity * 0.14
                 + edge.SexualInterest * 0.14;
 
-            return edge.Trust >= 72
-                && edge.Comfort >= 72
-                && edge.Closeness >= 70
-                && edge.SexualInterest >= 68
-                && relationalReadiness >= 72.0;
+            var relationship = Math.Clamp((relationalReadiness - 35.0) / 40.0, 0.0, 1.0);
+            var calm = 1.0 - Math.Clamp((stress - 20.0) / 50.0, 0.0, 1.0);
+            return relationship * relationship * (3.0 - 2.0 * relationship) * calm;
         }
 
         private double ComputeMisattributionPenalty(

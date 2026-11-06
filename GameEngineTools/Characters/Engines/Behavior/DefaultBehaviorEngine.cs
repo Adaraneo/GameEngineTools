@@ -16,6 +16,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.Characters.Engines.Sleep;
     using GameEngineTools.Logging;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -260,6 +261,15 @@ namespace GameEngineTools.Characters.Engines.Behavior
             if (@event is ActionCommitted committed)
             {
                 State = BehaviorHabitLearning.LearnFromCommitment(State, committed, ctx, Config, _log);
+            }
+
+            if (@event is SexualEncounterOutcome { Accepted: true } encounter && (encounter.From == ctx.Id || encounter.To == ctx.Id))
+            {
+                var dict = new Dictionary<string, double>(State.Cooldowns ?? new Dictionary<string, double>())
+                {
+                    [InviteIntimacy] = Config.SexualRefractoryDays * WWorld.Spec.HoursPerDay
+                };
+                State = State with { Cooldowns = dict };
             }
 
             State = _sleepCoordinator.Handle(@event, ctx, outbox, State);

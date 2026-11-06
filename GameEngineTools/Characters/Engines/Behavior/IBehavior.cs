@@ -220,7 +220,13 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// (<c>urgency = threat × Sensitivity × this</c>). Designer-tunable — no established human
     /// quantitative parameter exists. Default 15.0.
     /// </summary>
-    double FFFSEscapeMagnitude = 15.0)
+    double FFFSEscapeMagnitude = 15.0,
+
+    /// <summary>
+    /// World days after a sexual encounter during which neither partner invites again. Own estimate (not a literature value),
+    /// set so that couples land near the ≈1 act/week of Twenge 2017 together with the readiness probability.
+    /// </summary>
+    double SexualRefractoryDays = 3.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }

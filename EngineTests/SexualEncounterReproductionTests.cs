@@ -29,7 +29,7 @@ namespace EngineTests
             var to = new HumanId(Guid.NewGuid());
             var relationships = new RelationshipState(new Dictionary<HumanId, RelationshipEdge>
             {
-                [from] = Edge(to, from)
+                [from] = Acquaintance(to, from)
             });
             var ctx = AdultContext(to, SexBiology.Female, relationships, new AlwaysAcceptRandom());
             var engine = InteractionEngine();
@@ -312,6 +312,22 @@ namespace EngineTests
                 Respect: 70,
                 Comfort: 76,
                 Breakdown: new DomainBreakdown(60, 60, 60, 60, 80));
+
+        private static RelationshipEdge Acquaintance(HumanId self, HumanId other)
+            => new(
+                self,
+                other,
+                Like: 60,
+                Trust: 40,
+                Familiarity: 50,
+                AestheticAttraction: 70,
+                PhysicalAttraction: 75,
+                IntimateAffinity: 20,
+                SexualInterest: 30,
+                Closeness: 30,
+                Respect: 55,
+                Comfort: 40,
+                Breakdown: new DomainBreakdown(50, 50, 50, 50, 60));
 
         private static SemanticMemoryState PositiveSemanticMemory(HumanId other)
             => new(new Dictionary<HumanId, PersonBeliefSet>
