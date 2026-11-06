@@ -118,7 +118,15 @@ namespace WorldMonitor
                     ? $"| {label} | 0 | - | - | - | - | - |"
                     : $"| {label} | {bucket.Count} | {bucket.Average():F0} | {bucket[bucket.Count / 2]:F0} | {100.0 * bucket.Count(x => x >= 30) / bucket.Count:F0}% | {100.0 * bucket.Count(x => x >= 55) / bucket.Count:F0}% | {100.0 * bucket.Count(x => x >= 80) / bucket.Count:F0}% |");
             }
+            sb.AppendLine();
+            sb.AppendLine("Closest pairs (hours awake together, of them in a place with privacy):");
+            sb.AppendLine("| pair | closeness | hours together | hours with privacy |");
+            sb.AppendLine("|---|---:|---:|---:|");
+            foreach (var kv in c.PairHours.OrderByDescending(kv => CloseOf(kv.Key.Item1, kv.Key.Item2)).Take(8))
+                sb.AppendLine($"| {Name(c, kv.Key.Item1)} + {Name(c, kv.Key.Item2)} | {CloseOf(kv.Key.Item1, kv.Key.Item2):F0} | {kv.Value:F0} | {c.PrivatePairHours.GetValueOrDefault(kv.Key):F0} |");
         }
+
+        private static string Name(Collector c, HumanId id) => c.People.TryGetValue(id, out var p) ? p.Name : id.Value.ToString()[..4];
 
         private static void AppendSituations(StringBuilder sb, Collector c)
         {

@@ -83,6 +83,8 @@ namespace WorldMonitor
         /// <summary>Hours two characters were awake in the same place (sampled at tick boundaries), by pair.</summary>
         public Dictionary<(HumanId, HumanId), double> PairHours { get; } = new();
 
+        public Dictionary<(HumanId, HumanId), double> PrivatePairHours { get; } = new();
+
         private WDateTime? _lastTickTime;
         public SortedDictionary<int, DayCounters> Days { get; } = new();
         public Dictionary<string, long> LocationTicks { get; } = new();
@@ -180,6 +182,7 @@ namespace WorldMonitor
                         {
                             var key = here[i].Value.CompareTo(here[j].Value) < 0 ? (here[i], here[j]) : (here[j], here[i]);
                             PairHours[key] = PairHours.GetValueOrDefault(key) + tickHours;
+                            if (group.First().Snapshot.InteractionSurface.HasPrivacy) PrivatePairHours[key] = PrivatePairHours.GetValueOrDefault(key) + tickHours;
                         }
                 }
             }
