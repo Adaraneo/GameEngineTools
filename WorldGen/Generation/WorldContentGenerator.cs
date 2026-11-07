@@ -898,9 +898,9 @@ public static class WorldContentGenerator
 
     private static int ObjectDepthForTier(SettlementTier tier) => tier switch
     {
-        SettlementTier.Camp => 1,
-        SettlementTier.Village => 2,
-        SettlementTier.Town => 3,
+        SettlementTier.Camp => 2,
+        SettlementTier.Village => 3,
+        SettlementTier.Town => 4,
         _ => 1,
     };
 

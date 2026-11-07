@@ -45,8 +45,11 @@ forest_nuts;Lesní ořechy;Forest;Hunger;0.35;Food;100;1440;true;28;5.0;2.0;;3;;
 forest_stream;Lesní potok;Forest;Thirst;0.85;Drink;500;120;false;0;;;;85;;
 
 # ── Mountain ──────────────────────────────────────────────────────────────────
-mountain_jerky;Sušené maso;Mountain;Hunger;0.55;Food;120;1440;true;55;40.0;12.0;;1;0.4;
-mountain_berries;Horské plody;Mountain;Hunger;0.15;Food;40;1440;true;10;0.5;1.0;;18;;
+mountain_jerky;Sušené maso;Mountain;Hunger;0.55;Food;120;720;true;55;40.0;12.0;;1;0.4;
+mountain_berries;Horské plody;Mountain;Hunger;0.15;Food;40;360;true;10;0.5;1.0;;18;;
+mountain_pine_nuts;Piniové oříšky;Mountain;Hunger;0.35;Food;60;720;true;30;5.5;2.0;;2;;
+mountain_trout;Horský pstruh;Mountain;Hunger;0.45;Food;100;480;true;28;18.0;1.5;10;8;0.3;
+mountain_cheese;Ovčí sýr;Mountain;Hunger;0.45;Food;80;720;true;38;12.0;0.5;3;3;;
 mountain_snow;Roztátý sníh;Mountain;Thirst;0.80;Drink;500;60;false;0;;;;80;;
 
 # ── Plains ────────────────────────────────────────────────────────────────────

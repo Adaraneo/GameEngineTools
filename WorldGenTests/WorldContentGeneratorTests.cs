@@ -242,24 +242,40 @@ public class WorldContentGeneratorTests
     {
         using var db = NewWorldDb();
         var tiles = new[] { FlatTile(50.0) };
-        // Force Camp tier so the "exactly one object per need" expectation is deterministic —
+        // Force Camp tier so the object count is deterministic (Plains: 1 Hunger, 2 Thirst, 1 Rest) —
         // Village/Town depth is covered separately below.
         var options = new WorldContentGenerator.Options(
             Count: 3, MinDistanceMeters: 20.0, ForcedTier: WorldContentGenerator.SettlementTier.Camp);
 
         var result = WorldContentGenerator.Generate(db, tiles, options, new Random(9), Catalog);
 
-        Assert.AreEqual(9, result.ObjectsCreated); // 3 objects per location
+        Assert.AreEqual(12, result.ObjectsCreated); // 4 objects per location
         foreach (var (descriptor, _) in db.GetAllLocations())
         {
             var objects = db.GetAllObjectsAt(descriptor.Id);
-            Assert.AreEqual(3, objects.Count);
+            Assert.AreEqual(4, objects.Count);
 
             var affordanceTypes = objects.SelectMany(o => o.Affordances).Select(a => a.Type).ToHashSet();
             Assert.IsTrue(affordanceTypes.Contains(AffordanceType.Hunger));
             Assert.IsTrue(affordanceTypes.Contains(AffordanceType.Thirst));
             Assert.IsTrue(affordanceTypes.Contains(AffordanceType.Rest));
         }
+    }
+
+    [TestMethod]
+    public void Generate_MountainCamp_OffersEnoughFoodForOneCharacterPerDay()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(500.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Camp);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(4), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        var food = db.GetAllObjectsAt(descriptor.Id).Where(o => o.Category == WorldObjectCategory.Food).ToList();
+        var mealsPerDay = food.Sum(o => 1440.0 / o.RespawnMinutes);
+        Assert.IsTrue(mealsPerDay >= 4.0, $"A mountain camp must renew at least 4 meals a day, got {mealsPerDay:F1}.");
     }
 
     [TestMethod]
