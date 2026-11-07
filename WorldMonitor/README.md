@@ -21,4 +21,6 @@ Several monitors can run at the same time (each uses about 80-90 MB and one core
 
 Runs are not reproducible: the world and the orchestrator use unseeded random sources, so two runs of one profile differ (a stress mean of 3 or 23 on the last day is within what was seen).
 
+The intimacy part lists outcomes by speech act (invitations split by privacy) and the characters' desire, closeness and invitations tried; a further table lists the closest pairs with the hours they were awake together and how many of those were in a place with privacy. The death log also carries each character's recent plan and place changes, so the cause of a death can be read off the report.
+
 Newborns are counted but not added to the scene, as WorldObserver's own birth handling lives in its hosted service.

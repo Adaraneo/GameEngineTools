@@ -27,6 +27,7 @@ building all of the above.
 | **`TerraGen/`** | Console app | Procedural planet **terrain** generator — noise, tectonic plates, hydraulic/SPIM erosion, rivers, isostasy, orographic precipitation, Köppen-Geiger climate; writes heightmap tiles to a SQLite `terrain.db`. (test suite: `TerraGenTests/`) |
 | **`WorldGen/`** | Console app | Procedural **world content** generator that runs on top of a TerraGen `terrain.db` — places settlements, roads, and locations following the terrain (rivers, coastline, slope) and writes `world.db`. (test suite: `WorldGenTests/`) |
 | **`WorldObserver/`** | ASP.NET Core + SignalR app | Realtime browser dashboard that runs a live `GameEngineTools` simulation and streams character/world state to the browser (cards, relationship graph, map, charts, playback controls). |
+| **`WorldMonitor/`** | Console app | Runs WorldObserver's world headlessly and reports how it behaves over time (stress, sleep, social life, intimacy, pregnancies, deaths) with pass/fail checks and Markdown/CSV reports. Run profiles live in its `appsettings.json`. |
 | **`LogsResolver/`** | WPF app | Desktop JSONL log viewer for simulation logs. (test suite: `LogsResolverTests/`) |
 | **`TerrainEditor/`** | WPF app | Desktop viewer for TerraGen/WorldGen output — inspect heightmaps, rivers, roads, and locations produced by those tools. (test suite: `TerrainEditorTests/`) |
 | **`RelationshipsGame/`** | WPF app | Early-stage prototype UI built on the relationships/attraction engines. |
@@ -432,6 +433,23 @@ TerraGen/WorldGen terrain and roads, per-character detail panels, and playback c
 world tempo). Intended for watching a simulation run and clicking into individual characters, as
 opposed to GameSandbox's text-diary output or LogsResolver's after-the-fact log analysis.
 
+Settings are in `WorldObserver/appsettings.json` under `WorldObserver`: `CharacterCount`, `DefaultDelayMs`, `TickStepMinutes`, `TrailLength` and
+`CouplesAtStart` (how many pairs start as established couples sharing a flat; `0` turns them off). Engine tuning lives in
+`appsettings.Characters.json`, `appsettings.Economy.json` and `appsettings.World.json` next to it.
+
+---
+
+## WorldMonitor: headless world report
+
+Runs the same world as WorldObserver without the web host or any pacing and writes a report on how the population behaves over a
+number of world days: stress by day and time of day, where characters sleep, interactions by speech act, intimacy and pregnancies,
+time spent together versus closeness, per-character table, the closest pairs (hours together and hours in a place with privacy),
+and the circumstances of each death (last plans, hunger, thirst, allostatic and immune load). Profiles (`Quick`, `Full`, `Long`) set the
+number of characters, days, couples and tick size in `WorldMonitor/appsettings.json`; `WorldMonitor:Thresholds` turn the report into
+pass/fail checks (exit code 0 ok, 1 configuration error, 2 failed check). Several monitors can run side by side, each in its own
+temporary working folder. Runs are not reproducible (the world uses unseeded random sources), so compare several runs rather than one.
+See [`WorldMonitor/README.md`](WorldMonitor/README.md).
+
 ---
 
 ## LogsResolver: log analysis
@@ -519,6 +537,7 @@ TerraGenTests/       ← MSTest suite for TerraGen
 WorldGen/            ← Settlement/road/location generator on top of terrain.db → world.db
 WorldGenTests/       ← MSTest suite for WorldGen
 WorldObserver/       ← ASP.NET Core + SignalR realtime browser dashboard
+WorldMonitor/        ← console tool: runs WorldObserver's world headlessly and writes a stress/sleep/social/population report
 LogsResolver/        ← WPF JSONL log viewer
 LogsResolverTests/   ← Test suite for LogsResolver
 TerrainEditor/       ← WPF viewer for TerraGen/WorldGen output
