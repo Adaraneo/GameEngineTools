@@ -54,7 +54,8 @@ namespace WorldMonitor
     /// <summary>Per-world-day counters taken at every tick.</summary>
     public sealed class DayCounters
     {
-        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany;
+        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany, HungryReadings, ThirstyReadings, Meals, Drinks;
+        public double HungerSum, ThirstSum;
     }
 
     /// <summary>Gathers the measurements of a run; <see cref="Record"/> is called once per scene tick.</summary>
@@ -69,6 +70,7 @@ namespace WorldMonitor
         private readonly HashSet<(long, HumanId, Type)> _seenOther = new();
 
         private readonly int _totalDays;
+        private const double HungerLevel = 80;
 
         public Collector(double sampleEveryHours, int totalDays = 0)
         {
@@ -163,6 +165,10 @@ namespace WorldMonitor
                 var atHome = c.Identity.HomeLocationId == location;
 
                 counters.Total++;
+                counters.HungerSum += ph.Hunger;
+                counters.ThirstSum += ph.Thirst;
+                if (ph.Hunger >= HungerLevel) counters.HungryReadings++;
+                if (ph.Thirst >= HungerLevel) counters.ThirstyReadings++;
                 if (surface.HasPrivacy) counters.Private++;
                 if (atHome) counters.AtHome++;
                 if (asleep) { counters.Asleep++; if (surface.HasPrivacy) counters.AsleepPrivate++; }
@@ -245,6 +251,11 @@ namespace WorldMonitor
                 {
                     case ActionCommitted ac:
                         Actions[ac.ActionName] = Actions.GetValueOrDefault(ac.ActionName) + 1;
+                        if (Days.TryGetValue((int)WorldDays, out var today))
+                        {
+                            if (ac.ActionName is ActionNames.Eat or ActionNames.EatStored) today.Meals++;
+                            else if (ac.ActionName == ActionNames.Drink) today.Drinks++;
+                        }
                         if (People.TryGetValue(ac.Human, out var actor)) { actor.LastAction = ac.ActionName; if (ac.ActionName == ActionNames.InviteIntimacy) actor.Invites++; }
                         break;
                     case InteractionOutcome io when _seenOutcomes.Add((io.OccurredAt.WorldTicks, io.From, io.To)):

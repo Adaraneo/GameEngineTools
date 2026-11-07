@@ -11,8 +11,8 @@ namespace WorldMonitor
     /// </summary>
     public static class RunDirectory
     {
-        /// <summary>Creates a fresh folder holding copies of the config files and SourceFiles (without any world.db).</summary>
-        public static string Create()
+        /// <summary>Creates a fresh folder holding copies of the config files and SourceFiles (without any world.db unless <paramref name="worldDb"/> supplies a ready one).</summary>
+        public static string Create(string? worldDb = null)
         {
             var path = Path.Combine(Path.GetTempPath(), "WorldMonitor", $"{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}");
             Directory.CreateDirectory(path);
@@ -23,6 +23,8 @@ namespace WorldMonitor
 
             CopyTree(Path.Combine(AppContext.BaseDirectory, "SourceFiles"), Path.Combine(path, "SourceFiles"));
             Directory.CreateDirectory(Path.Combine(path, "SourceFiles", "World"));
+            if (worldDb is not null)
+                File.Copy(worldDb, Path.Combine(path, "SourceFiles", "World", "world.db"), overwrite: true);
             return path;
         }
 

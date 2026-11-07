@@ -443,7 +443,7 @@ Settings are in `WorldObserver/appsettings.json` under `WorldObserver`: `Charact
 
 Runs the same world as WorldObserver without the web host or any pacing and writes a report on how the population behaves over a
 number of world days: stress by day and time of day, where characters sleep, interactions by speech act, intimacy and pregnancies,
-time spent together versus closeness, per-character table, the closest pairs (hours together and hours in a place with privacy),
+time spent together versus closeness, per-character table, the closest pairs (hours together and hours in a place with privacy), a food and water table per day (hunger, thirst, meals and drinks), `--world-db FILE` to run in a ready world,
 and the circumstances of each death (last plans, hunger, thirst, allostatic and immune load). Profiles (`Quick`, `Full`, `Long`) set the
 number of characters, days, couples and tick size in `WorldMonitor/appsettings.json`; `WorldMonitor:Thresholds` turn the report into
 pass/fail checks (exit code 0 ok, 1 configuration error, 2 failed check). Several monitors can run side by side, each in its own

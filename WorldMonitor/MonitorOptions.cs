@@ -12,9 +12,9 @@ namespace WorldMonitor
     public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80);
 
     /// <summary>The <c>WorldMonitor</c> section of appsettings.json, with command-line overrides applied.</summary>
-    public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds)
+    public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null)
     {
-        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c> override it.</summary>
+        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c> override it.</summary>
         public static MonitorOptions Load(string[] args)
         {
             var overrides = ParseArgs(args);
@@ -48,7 +48,8 @@ namespace WorldMonitor
                 profile,
                 sampleEveryHours,
                 overrides.GetValueOrDefault("out") ?? section["OutputDir"] ?? "reports",
-                section.GetSection("Thresholds").Get<Thresholds>() ?? new Thresholds());
+                section.GetSection("Thresholds").Get<Thresholds>() ?? new Thresholds(),
+                overrides.GetValueOrDefault("world-db"));
         }
 
         private static int IntOverride(Dictionary<string, string> overrides, string key, int fallback)

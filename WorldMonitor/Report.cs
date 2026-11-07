@@ -33,6 +33,17 @@ namespace WorldMonitor
             }
 
             sb.AppendLine();
+            sb.AppendLine("## Food and water per world day (readings at every tick; meals and drinks are committed Eat/EatStored and Drink actions)");
+            sb.AppendLine("| day | hunger mean | hunger 80+ % | thirst mean | thirst 80+ % | meals per character | drinks per character |");
+            sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|");
+            foreach (var (day, counters) in c.Days)
+            {
+                var people = Math.Max(1, c.CharactersSeen);
+                var readings = Math.Max(1, counters.Total);
+                sb.AppendLine($"| {day} | {counters.HungerSum / readings:F1} | {100.0 * counters.HungryReadings / readings:F1} | {counters.ThirstSum / readings:F1} | {100.0 * counters.ThirstyReadings / readings:F1} | {(double)counters.Meals / people:F1} | {(double)counters.Drinks / people:F1} |");
+            }
+
+            sb.AppendLine();
             sb.AppendLine("## Stress by time of day (24-hour clock)");
             sb.AppendLine("| hours | samples | mean | median | p90 |");
             sb.AppendLine("|---|---:|---:|---:|---:|");

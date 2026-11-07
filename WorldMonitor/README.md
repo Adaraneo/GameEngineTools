@@ -9,7 +9,7 @@ WorldMonitor/bin/Debug/net8.0/WorldMonitor.exe --profile Full
 WorldMonitor/bin/Debug/net8.0/WorldMonitor.exe --days 30 --characters 8 --tick 64
 ```
 
-Speed and size come from `appsettings.json` (`WorldMonitor:Profiles`: characters, days, tick and substep minutes; `Quick` is about half a minute to a few minutes, `Full` 5-8 minutes, `Long` much longer). Command-line `--profile`, `--days`, `--characters`, `--couples`, `--tick`, `--substep` and `--out` override it (`Couples` is the number of pairs that start as an established couple sharing a flat). A tick is observed once per `TickStepMinutes`, so counts of actions and events are sampled, not exhaustive.
+Speed and size come from `appsettings.json` (`WorldMonitor:Profiles`: characters, days, tick and substep minutes; `Quick` is about half a minute to a few minutes, `Full` 5-8 minutes, `Long` much longer). Command-line `--profile`, `--days`, `--characters`, `--couples`, `--tick`, `--substep`, `--out` and `--world-db` override it (`Couples` is the number of pairs that start as an established couple sharing a flat). `--world-db FILE` runs the same characters in a ready world (for example one made by WorldGen, to see whether its food and water suffice) instead of the built-in city; it must contain locations, otherwise the city seed is loaded. A tick is observed once per `TickStepMinutes`, so counts of actions and events are sampled, not exhaustive.
 
 While it runs it shows a progress bar with the current world day, elapsed time, an ETA and the latest mean stress (one line per world day when the output is redirected).
 
@@ -24,3 +24,5 @@ Runs are not reproducible: the world and the orchestrator use unseeded random so
 The intimacy part lists outcomes by speech act (invitations split by privacy) and the characters' desire, closeness and invitations tried; a further table lists the closest pairs with the hours they were awake together and how many of those were in a place with privacy. The death log also carries each character's recent plan and place changes, so the cause of a death can be read off the report.
 
 Newborns are counted but not added to the scene, as WorldObserver's own birth handling lives in its hosted service.
+
+The food and water table gives per world day the mean hunger and thirst, the share of readings at 80 or more, and the meals and drinks (committed Eat, EatStored and Drink actions) per character.
