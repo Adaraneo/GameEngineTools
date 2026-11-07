@@ -73,26 +73,62 @@ namespace GameEngineTools.Characters.Engines.Physiology
         }
 
         /// <summary>
-        /// Resolves the most appropriate <see cref="DeathCause"/> from the physiological state.
-        /// Priority order: <see cref="DeathCause.Starvation"/> → <see cref="DeathCause.Dehydration"/>
-        /// → <see cref="DeathCause.Exhaustion"/> → <see cref="DeathCause.SystemicFailure"/>
-        /// → <see cref="DeathCause.OldAge"/>.
+        /// Resolves the <see cref="DeathCause"/> from the risk source contributing most to the hourly hazard.
+        /// Age, bone and muscle frailty map to <see cref="DeathCause.OldAge"/>; allostatic and immune load to
+        /// <see cref="DeathCause.SystemicFailure"/>.
         /// </summary>
         internal static DeathCause ResolveCause(PhysiologyState s, int ageYears, PhysiologyConfig cfg)
         {
-            if (s.Hunger >= cfg.NaturalMortalityStarvationThreshold)
-                return DeathCause.Starvation;
+            var cause = DeathCause.OldAge;
+            var best = AgeFrailtyRisk(s, ageYears, cfg);
 
-            if (s.Thirst >= cfg.NaturalMortalityDehydrationThreshold)
-                return DeathCause.Dehydration;
+            void Consider(DeathCause candidate, double risk)
+            {
+                if (risk <= best) return;
+                best = risk;
+                cause = candidate;
+            }
 
-            if (s.Energy <= cfg.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= cfg.NaturalMortalityExhaustionSleepDebtMin)
-                return DeathCause.Exhaustion;
+            Consider(DeathCause.SystemicFailure, SystemicRisk(s, cfg));
+            Consider(DeathCause.Starvation, s.Hunger >= cfg.NaturalMortalityStarvationThreshold ? cfg.NaturalMortalityStarvationRisk : 0.0);
+            Consider(DeathCause.Dehydration, s.Thirst >= cfg.NaturalMortalityDehydrationThreshold ? cfg.NaturalMortalityDehydrationRisk : 0.0);
+            Consider(DeathCause.Exhaustion,
+                s.Energy <= cfg.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= cfg.NaturalMortalityExhaustionSleepDebtMin
+                    ? cfg.NaturalMortalityExhaustionRisk : 0.0);
+            return cause;
+        }
 
-            if (s.AllostaticLoad >= cfg.NaturalMortalityAlloThreshold || s.ImmuneLoad >= cfg.NaturalMortalityImmuneThreshold)
-                return DeathCause.SystemicFailure;
+        private static double AgeFrailtyRisk(PhysiologyState s, int ageYears, PhysiologyConfig cfg)
+        {
+            var risk = 0.0;
+            if (ageYears >= cfg.NaturalMortalityGompertzStart)
+                risk += cfg.NaturalMortalityAgeBaseline * Math.Exp(cfg.NaturalMortalityGompertzScale * (ageYears - cfg.NaturalMortalityGompertzStart));
+            if (s.Aging is { } bone && bone.BoneDensity < cfg.NaturalMortalityBoneFragilityThreshold)
+                risk += cfg.NaturalMortalityBoneFragilityWeight
+                        * (cfg.NaturalMortalityBoneFragilityThreshold - bone.BoneDensity) / cfg.NaturalMortalityBoneFragilityThreshold;
+            if (s.Aging is { } a && a.MuscleMassFraction < cfg.SarcopeniaMuscleMin * 1.2)
+                risk += cfg.NaturalMortalitySarcopeniaWeight * (cfg.SarcopeniaMuscleMin * 1.2 - a.MuscleMassFraction);
+            return risk;
+        }
 
-            return DeathCause.OldAge;
+        private static double SystemicRisk(PhysiologyState s, PhysiologyConfig cfg)
+        {
+            var risk = 0.0;
+            if (s.AllostaticLoad > cfg.NaturalMortalityAlloThreshold)
+            {
+                risk += cfg.NaturalMortalityAlloWeight * (s.AllostaticLoad - cfg.NaturalMortalityAlloThreshold);
+                if (s.AllostaticLoad > cfg.NaturalMortalityAlloSpikeThreshold)
+                    risk += cfg.NaturalMortalityAlloWeight * cfg.NaturalMortalityAlloSpikeMultiplier
+                            * (s.AllostaticLoad - cfg.NaturalMortalityAlloSpikeThreshold);
+            }
+            if (s.ImmuneLoad > cfg.NaturalMortalityImmuneThreshold)
+            {
+                risk += cfg.NaturalMortalityImmuneWeight * (s.ImmuneLoad - cfg.NaturalMortalityImmuneThreshold);
+                if (s.ImmuneLoad > cfg.NaturalMortalityImmuneSpikeThreshold)
+                    risk += cfg.NaturalMortalityImmuneWeight * cfg.NaturalMortalityImmuneSpikeMultiplier
+                            * (s.ImmuneLoad - cfg.NaturalMortalityImmuneSpikeThreshold);
+            }
+            return risk;
         }
     }
 }

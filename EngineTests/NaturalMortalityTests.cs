@@ -109,16 +109,26 @@ namespace EngineTests
 
         #endregion Section 1 — ComputeHourlyRisk unit tests
 
-        #region Section 2 — ResolveCause priority order
+        #region Section 2 — ResolveCause dominant risk source
 
         [TestMethod]
         public void ResolveCause_HungerTerminal_ReturnsStarvation()
         {
-            var state = NominalState() with { Hunger = 100, Thirst = 100 };
+            var state = NominalState() with { Hunger = 100, Thirst = 20 };
             var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30, DefaultCfg);
 
             Assert.AreEqual(DeathCause.Starvation, cause,
-                "Hunger=100 + Thirst=100 must resolve to Starvation.");
+                "Terminal hunger with normal thirst must resolve to Starvation.");
+        }
+
+        [TestMethod]
+        public void ResolveCause_DehydrationOutweighsStarvation_WhenBothTerminal()
+        {
+            var state = NominalState() with { Hunger = 100, Thirst = 100 };
+            var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30, DefaultCfg);
+
+            Assert.AreEqual(DeathCause.Dehydration, cause,
+                "Dehydration carries the larger hourly risk, so it is the cause when both are terminal.");
         }
 
         [TestMethod]
@@ -152,17 +162,17 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void ResolveCause_StarvationBeatsExhaustion_WhenBothPresent()
+        public void ResolveCause_StarvationOutweighsExhaustion_WhenBothPresent()
         {
-            // Both starvation AND exhaustion conditions true — Starvation has higher priority
-            var state = NominalState() with { Hunger = 100, Thirst = 100, Energy = 0, SleepDebtHours = 60 };
+            // Both conditions true — starvation has the larger hourly risk
+            var state = NominalState() with { Hunger = 100, Thirst = 20, Energy = 0, SleepDebtHours = 60 };
             var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30, DefaultCfg);
 
             Assert.AreEqual(DeathCause.Starvation, cause,
-                "Starvation must take priority over Exhaustion when both conditions are met.");
+                "Starvation carries the larger risk than Exhaustion when both conditions are met.");
         }
 
-        #endregion Section 2 — ResolveCause priority order
+        #endregion Section 2 — ResolveCause dominant risk source
 
         #region Section 3 — DefaultPhysiologyEngine integration
 
