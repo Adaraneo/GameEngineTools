@@ -371,6 +371,30 @@ namespace GameEngineTools.Characters.Engines.Objects
             var recipe = RecipeRegistry.FindByOutput(produced.ItemKind);
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
                 _logger.ItemProcessed(ctx.Id.ToString(), recipe?.Id ?? "?", produced.ItemKind.ToString(), produced.Id, locationId);
+
+            if (_economyConfig.BarterOnly)
+                DeliverSurplus(produced, locationId, committed.OccurredAt, ctx, outbox);
+        }
+
+        /// <summary>
+        /// Barter mode: a worker keeps the first food they hold and delivers further output to a co-located shop that trades its kind, earning
+        /// labor credit (through <see cref="Sold"/>). Nothing happens when there is no such shop or the worker holds no other food.
+        /// </summary>
+        private void DeliverSurplus(WorldObject produced, string locationId, WDateTime now, IHumanContext ctx, IEventCollector outbox)
+        {
+            var shop = _objectProvider.GetObjectsAt(locationId).FirstOrDefault(o => o.ShopId is not null && o.ItemKind == produced.ItemKind);
+            if (shop?.ShopId is not { } shopId)
+                return;
+            if (!_objectProvider.GetHeldBy(ctx.Id).Any(h => h.Id != produced.Id && FoodItemCatalog.IsEdible(h)))
+                return;
+
+            var askPrice = _economyLedger.GetPrice(shopId, produced.ItemKind);
+            _objectProvider.RemoveObject(produced.LocationId, produced.Id);
+            _objectProvider.AddObject(produced with { HeldBy = null, LocationId = locationId, Price = askPrice, ShopId = shopId, ProducedAt = null });
+
+            outbox.Add(new Sold(now, ctx.Id, produced.Id, produced.ItemKind, shopId, askPrice * _economyConfig.ShopBuyBackFraction, 0.0));
+            if (!IsBackground(ctx.Id))
+                Reprice(locationId, shopId, produced.ItemKind, askPrice, stockChange: 1, ctx, now, outbox);
         }
 
         /// <summary>

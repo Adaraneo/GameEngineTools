@@ -512,6 +512,43 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void BarterMode_BakerDeliversSurplusLoafToTheShop_AndKeepsTheFirst()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec"));
+            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", PickupItemKind.Bread, "Pult"));
+            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self));
+            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            var engine = MakeObjectEngine(provider, economy: Barter3);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Process, WTimeSpan.FromMinutes(90)), LaborContext(self, 0.0), outbox);
+
+            var sold = outbox.Drain().OfType<Sold>().Single();
+            Assert.IsTrue(sold.Price > 0.0);
+            Assert.AreEqual(1, provider.GetObjectsAt(Loc).Count(ShopCounterFactory.IsStock), "The new loaf is on the shelf.");
+            Assert.AreEqual(1, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Bread), "The first loaf stayed with the baker.");
+        }
+
+        [TestMethod]
+        public void BarterMode_BakerWithoutOwnFoodKeepsTheLoaf()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec"));
+            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", PickupItemKind.Bread, "Pult"));
+            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            var engine = MakeObjectEngine(provider, economy: Barter3);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Process, WTimeSpan.FromMinutes(90)), LaborContext(self, 0.0), outbox);
+
+            Assert.IsFalse(outbox.Drain().OfType<Sold>().Any());
+            Assert.AreEqual(1, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Bread), "A hungry baker eats the first loaf.");
+        }
+
+        [TestMethod]
         public void Barter_Gate_NeedsAnOffer_AndBuyIsDroppedInBarterMode()
         {
             var gate = new ObjectAffordanceGatingEngine(Barter3);
@@ -564,7 +601,7 @@ namespace EngineTests
             => new(Options.Create(EconomyConfig.Default), NullLoggerFactory.Instance);
 
         private static DefaultObjectInteractionEngine MakeObjectEngine(
-            MemProvider provider, ICognitiveResolutionLevelRuntime? lod = null)
+            MemProvider provider, ICognitiveResolutionLevelRuntime? lod = null, EconomyConfig? economy = null)
             => new(
                 provider,
                 new FixedLocationService(Loc),
@@ -572,7 +609,7 @@ namespace EngineTests
                 new ProductionService(provider),
                 SpoilageConfig.Default,
                 new GameEngineTools.World.Economy.EconomyLedger(),
-                Options.Create(EconomyConfig.Default),
+                Options.Create(economy ?? EconomyConfig.Default),
                 NullLogger<DefaultObjectInteractionEngine>.Instance,
                 lod);
 
