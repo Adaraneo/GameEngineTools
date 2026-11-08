@@ -1339,17 +1339,17 @@ namespace GameEngineTools.World.Data
             }
 
             // ── Load stack sizes and crop states ─────────────────────────────
-            var quantityMap = new Dictionary<string, int>(StringComparer.Ordinal);
-            using (var cmd = CreateCommand($"SELECT ObjectId, Quantity FROM ObjectQuantities WHERE ObjectId IN ({inClause})", inParams))
+            var quantityMap = new Dictionary<string, (int Quantity, bool Stock)>(StringComparer.Ordinal);
+            using (var cmd = CreateCommand($"SELECT ObjectId, Quantity, Stock FROM ObjectQuantities WHERE ObjectId IN ({inClause})", inParams))
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
-                    quantityMap[reader.GetString(0)] = reader.GetInt32(1);
+                    quantityMap[reader.GetString(0)] = (reader.GetInt32(1), reader.GetInt32(2) != 0);
             }
 
             var fieldMap = new Dictionary<string, GameEngineTools.World.Objects.Crops.FieldState>(StringComparer.Ordinal);
             using (var cmd = CreateCommand(
-                $"SELECT ObjectId, Stage, AreaHectares, SownAt, RipeAt, DegreeDays, SeedUnits, YearFactor FROM FieldStates WHERE ObjectId IN ({inClause})", inParams))
+                $"SELECT ObjectId, Stage, AreaHectares, SownAt, RipeAt, DegreeDays, SeedUnits, YearFactor, WorkDoneHours, PendingUnits, ThreshHoursRemaining, ReapedYear FROM FieldStates WHERE ObjectId IN ({inClause})", inParams))
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
@@ -1361,7 +1361,11 @@ namespace GameEngineTools.World.Data
                         reader.IsDBNull(4) ? null : new WDateTime(reader.GetInt64(4)),
                         reader.GetDouble(5),
                         reader.GetInt32(6),
-                        reader.GetDouble(7));
+                        reader.GetDouble(7),
+                        reader.GetDouble(8),
+                        reader.GetInt32(9),
+                        reader.GetDouble(10),
+                        reader.IsDBNull(11) ? null : reader.GetInt32(11));
                 }
             }
 
@@ -1371,7 +1375,8 @@ namespace GameEngineTools.World.Data
                 {
                     Affordances = affordanceMap[o.Id].ToImmutable(),
                     NutritionalProfile = profileMap.GetValueOrDefault(o.Id),
-                    Quantity = quantityMap.GetValueOrDefault(o.Id, 1),
+                    Quantity = quantityMap.TryGetValue(o.Id, out var stack) ? stack.Quantity : 1,
+                    IsStock = quantityMap.TryGetValue(o.Id, out var stockFlag) && stockFlag.Stock,
                     Field = fieldMap.GetValueOrDefault(o.Id),
                 })
                 .ToList();
@@ -1442,13 +1447,13 @@ namespace GameEngineTools.World.Data
             ExecuteNonQuery("DELETE FROM ObjectQuantities WHERE ObjectId = @id", ("@id", obj.Id));
             ExecuteNonQuery("DELETE FROM FieldStates WHERE ObjectId = @id", ("@id", obj.Id));
 
-            if (obj.Quantity != 1)
-                ExecuteNonQuery("INSERT INTO ObjectQuantities (ObjectId, Quantity) VALUES (@id, @q)", ("@id", obj.Id), ("@q", obj.Quantity));
+            if (obj.Quantity != 1 || obj.IsStock)
+                ExecuteNonQuery("INSERT INTO ObjectQuantities (ObjectId, Quantity, Stock) VALUES (@id, @q, @stock)", ("@id", obj.Id), ("@q", obj.Quantity), ("@stock", obj.IsStock ? 1 : 0));
 
             if (obj.Field is { } f)
             {
                 ExecuteNonQuery(
-                    "INSERT INTO FieldStates (ObjectId, Stage, AreaHectares, SownAt, RipeAt, DegreeDays, SeedUnits, YearFactor) VALUES (@id, @stage, @area, @sown, @ripe, @dd, @seed, @year)",
+                    "INSERT INTO FieldStates (ObjectId, Stage, AreaHectares, SownAt, RipeAt, DegreeDays, SeedUnits, YearFactor, WorkDoneHours, PendingUnits, ThreshHoursRemaining, ReapedYear) VALUES (@id, @stage, @area, @sown, @ripe, @dd, @seed, @year, @work, @pending, @thresh, @reaped)",
                     ("@id", obj.Id),
                     ("@stage", f.Stage.ToString()),
                     ("@area", f.AreaHectares),
@@ -1456,7 +1461,11 @@ namespace GameEngineTools.World.Data
                     ("@ripe", f.RipeAt is { } r ? r.WorldTicks : DBNull.Value),
                     ("@dd", f.DegreeDays),
                     ("@seed", f.SeedUnits),
-                    ("@year", f.YearFactor));
+                    ("@year", f.YearFactor),
+                    ("@work", f.WorkDoneHours),
+                    ("@pending", f.PendingUnits),
+                    ("@thresh", f.ThreshHoursRemaining),
+                    ("@reaped", f.ReapedYear is { } ry ? ry : DBNull.Value));
             }
         }
 

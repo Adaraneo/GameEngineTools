@@ -35,6 +35,10 @@ namespace GameEngineTools.World.Objects.Crops
     /// <param name="DegreeDays">Thermal time collected since sowing, in degree-days above the crop's base temperature.</param>
     /// <param name="SeedUnits">Seed that went into the ground, in storage units.</param>
     /// <param name="YearFactor">Multiplier on the expected yield for this crop (weather of the season); 1 is a normal year.</param>
+    /// <param name="WorkDoneHours">Labor already put into the current task (ploughing, sowing or reaping) of this field.</param>
+    /// <param name="PendingUnits">Reaped grain still in the sheaf, waiting to be threshed.</param>
+    /// <param name="ThreshHoursRemaining">Labor still needed to thresh the pending grain.</param>
+    /// <param name="ReapedYear">The calendar year of the last harvest, which decides when the field may be sown again.</param>
     public sealed record FieldState(
         FieldStage Stage,
         double AreaHectares,
@@ -42,5 +46,9 @@ namespace GameEngineTools.World.Objects.Crops
         WDateTime? RipeAt = null,
         double DegreeDays = 0.0,
         int SeedUnits = 0,
-        double YearFactor = 1.0);
+        double YearFactor = 1.0,
+        double WorkDoneHours = 0.0,
+        int PendingUnits = 0,
+        double ThreshHoursRemaining = 0.0,
+        int? ReapedYear = null);
 }

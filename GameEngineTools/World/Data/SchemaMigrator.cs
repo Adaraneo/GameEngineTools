@@ -29,6 +29,14 @@ namespace GameEngineTools.World.Data
             new SchemaMigration(4, "WorldObjects.ProducedAt (spoilage clock of produced food)", db =>
                 db.AddColumnIfMissing("WorldObjects", "ProducedAt", "INTEGER DEFAULT NULL")),
             new SchemaMigration(5, "ObjectQuantities and FieldStates tables (stacks and the crop cycle)", db => db.MigrateObjectStateTables()),
+            new SchemaMigration(6, "Field work progress, unthreshed grain, harvest year; finite-stock flag", db =>
+            {
+                db.AddColumnIfMissing("ObjectQuantities", "Stock", "INTEGER NOT NULL DEFAULT 0");
+                db.AddColumnIfMissing("FieldStates", "WorkDoneHours", "REAL NOT NULL DEFAULT 0.0");
+                db.AddColumnIfMissing("FieldStates", "PendingUnits", "INTEGER NOT NULL DEFAULT 0");
+                db.AddColumnIfMissing("FieldStates", "ThreshHoursRemaining", "REAL NOT NULL DEFAULT 0.0");
+                db.AddColumnIfMissing("FieldStates", "ReapedYear", "INTEGER DEFAULT NULL");
+            }),
         };
 
         /// <summary>Migrations of the terrain database (<c>terrain.db</c>).</summary>

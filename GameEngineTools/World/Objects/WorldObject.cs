@@ -119,6 +119,9 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public int Quantity { get; init; } = 1;
 
+        /// <summary>A finite stock used up unit by unit (a granary, a seed bin); unlike a fountain or a fixture it runs out.</summary>
+        public bool IsStock { get; init; } = false;
+
         /// <summary>The crop state when this object is a field being farmed; <c>null</c> for everything else.</summary>
         public GameEngineTools.World.Objects.Crops.FieldState? Field { get; init; } = null;
 

@@ -33,6 +33,33 @@ namespace GameEngineTools.World.Objects.Crops
         /// <summary>Share of stored dry grain lost per year; 0.05, FAO on traditional storage (about 5% or less; Purdue review 1.3-7.3%).</summary>
         public double StorageLossPerYear { get; set; } = 0.05;
 
+        /// <summary>Labor to plough one hectare by hand; 224 h (28 person-days of 8 h), my split of Columella's 44 person-days a hectare for everything but the harvest.</summary>
+        public double PloughHoursPerHectare { get; set; } = 224.0;
+
+        /// <summary>Labor to sow one hectare; 32 h (4 person-days), my share of Columella's 44 person-days a hectare before the harvest.</summary>
+        public double SowHoursPerHectare { get; set; } = 32.0;
+
+        /// <summary>Labor to reap one hectare with a sickle; 160 h (20 person-days), inside the 10-30 person-days (Cucuteni-Trypillia paper) and 185-340 h (wheat, India) found.</summary>
+        public double ReapHoursPerHectare { get; set; } = 160.0;
+
+        /// <summary>Labor to thresh and winnow one hectare's crop by flail; 160 h (20 person-days), "about the same as reaping" (Cucuteni-Trypillia paper).</summary>
+        public double ThreshHoursPerHectare { get; set; } = 160.0;
+
+        /// <summary>Hours of one work session on a field, the length of the action; 4, a half working day (my pick).</summary>
+        public double WorkSessionHours { get; set; } = 4.0;
+
+        /// <summary>Start of the sowing window as a share of the year counted from the vernal equinox; 0.49, mid-September (my reading of autumn sowing of winter wheat).</summary>
+        public double SowingWindowStart { get; set; } = 0.49;
+
+        /// <summary>End of the sowing window as a share of the year counted from the vernal equinox; 0.62, end of October (my reading of autumn sowing of winter wheat).</summary>
+        public double SowingWindowEnd { get; set; } = 0.62;
+
+        /// <summary>Air temperature below which the ground is too cold to work; 2 degC (my pick, frozen soil cannot be dug).</summary>
+        public double MinWorkTemperatureCelsius { get; set; } = 2.0;
+
+        /// <summary>Years a field rests after a harvest before it is sown again; 1, the two-field system (my pick; three-field rotation rests a third).</summary>
+        public double FallowYears { get; set; } = 1.0;
+
         /// <summary>World days between two applications of the storage loss (rounded to whole units each time).</summary>
         public double StorageLossIntervalDays { get; set; } = 30.0;
 

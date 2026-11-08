@@ -103,10 +103,11 @@ CREATE TABLE IF NOT EXISTS Affordances (
 -- ── Nutritional Profiles ──────────────────────────────────────────────────────
 -- All gain columns are nullable: NULL means "use engine config default".
 
--- ObjectQuantities: only objects standing for more than one unit have a row (absence = 1).
+-- ObjectQuantities: only objects standing for more than one unit, or marked as a finite stock, have a row (absence = one ordinary unit).
 CREATE TABLE IF NOT EXISTS ObjectQuantities (
     ObjectId TEXT    PRIMARY KEY REFERENCES WorldObjects(Id) ON DELETE CASCADE,
-    Quantity INTEGER NOT NULL
+    Quantity INTEGER NOT NULL,
+    Stock    INTEGER NOT NULL DEFAULT 0
 );
 
 -- FieldStates: the crop cycle of a field object (absence = not a farmed field).
@@ -118,7 +119,11 @@ CREATE TABLE IF NOT EXISTS FieldStates (
     RipeAt        INTEGER DEFAULT NULL,
     DegreeDays    REAL    NOT NULL DEFAULT 0.0,
     SeedUnits     INTEGER NOT NULL DEFAULT 0,
-    YearFactor    REAL    NOT NULL DEFAULT 1.0
+    YearFactor    REAL    NOT NULL DEFAULT 1.0,
+    WorkDoneHours REAL    NOT NULL DEFAULT 0.0,
+    PendingUnits  INTEGER NOT NULL DEFAULT 0,
+    ThreshHoursRemaining REAL NOT NULL DEFAULT 0.0,
+    ReapedYear    INTEGER DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS NutritionalProfiles (
