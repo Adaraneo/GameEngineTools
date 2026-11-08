@@ -29,7 +29,7 @@ Console.WriteLine($"WorldMonitor: profile {options.ProfileName} — {options.Run
 // The engine reads its config and SourceFiles (and keeps world.db) under the working directory. Each run gets its own copy,
 // so several monitors can run at the same time without touching each other's world.
 var outputDir = Path.GetFullPath(options.OutputDir, AppContext.BaseDirectory);
-var runDir = RunDirectory.Create(options.WorldDb);
+var runDir = RunDirectory.Create(options.WorldDb, options.Barter);
 Directory.SetCurrentDirectory(runDir);
 
 var collector = new Collector(options.SampleEveryHours, options.Run.Days);

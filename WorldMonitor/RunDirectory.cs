@@ -12,7 +12,7 @@ namespace WorldMonitor
     public static class RunDirectory
     {
         /// <summary>Creates a fresh folder holding copies of the config files and SourceFiles (without any world.db unless <paramref name="worldDb"/> supplies a ready one).</summary>
-        public static string Create(string? worldDb = null)
+        public static string Create(string? worldDb = null, bool barter = false)
         {
             var path = Path.Combine(Path.GetTempPath(), "WorldMonitor", $"{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}");
             Directory.CreateDirectory(path);
@@ -23,9 +23,20 @@ namespace WorldMonitor
 
             CopyTree(Path.Combine(AppContext.BaseDirectory, "SourceFiles"), Path.Combine(path, "SourceFiles"));
             Directory.CreateDirectory(Path.Combine(path, "SourceFiles", "World"));
+            if (barter)
+                EnableBarter(Path.Combine(path, "appsettings.Economy.json"));
             if (worldDb is not null)
                 File.Copy(worldDb, Path.Combine(path, "SourceFiles", "World", "world.db"), overwrite: true);
             return path;
+        }
+
+        private static void EnableBarter(string file)
+        {
+            var root = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file))!.AsObject();
+            var economy = root["Economy"]?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
+            economy["BarterOnly"] = true;
+            root["Economy"] = economy;
+            File.WriteAllText(file, root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         }
 
         /// <summary>Removes the folder; SQLite may still hold the database for a moment, so it retries.</summary>

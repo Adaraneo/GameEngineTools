@@ -44,6 +44,8 @@ namespace WorldMonitor
             }
 
             sb.AppendLine();
+            sb.AppendLine("Trade and production actions committed: " + string.Join(", ", new[] { "Produce", "Process", "Sell", "Buy", "Barter", "EatStored" }.Select(a => $"{a} {c.Actions.GetValueOrDefault(a)}")) + ".");
+            sb.AppendLine();
             sb.AppendLine("## Stress by time of day (24-hour clock)");
             sb.AppendLine("| hours | samples | mean | median | p90 |");
             sb.AppendLine("|---|---:|---:|---:|---:|");

@@ -63,7 +63,13 @@ namespace GameEngineTools.Characters.Engines.Economy
                     break;
 
                 case Sold sale when sale.Actor == ctx.Id:
-                    State = ApplySale(State, sale.Price);
+                    State = Config.BarterOnly
+                        ? State with { LaborHours = State.LaborHours + sale.Price * Config.LaborHoursPerValue }
+                        : ApplySale(State, sale.Price);
+                    break;
+
+                case Bartered barter when barter.Actor == ctx.Id:
+                    State = State with { LaborHours = Math.Max(0.0, State.LaborHours - barter.LaborHoursSpent) };
                     break;
             }
         }
@@ -86,7 +92,7 @@ namespace GameEngineTools.Characters.Engines.Economy
             if (hoursWorked < 0) throw new ArgumentOutOfRangeException(nameof(hoursWorked));
 
             var wealth = (current?.Wealth ?? 0.0) + wagePerHour * hoursWorked;
-            return new EconomyState(wealth);
+            return (current ?? EconomyState.Zero) with { Wealth = wealth };
         }
 
         /// <summary>
@@ -102,14 +108,14 @@ namespace GameEngineTools.Characters.Engines.Economy
             if (current.Wealth < price)
                 throw new InvalidOperationException("Purchase committed without sufficient wealth — gating bug.");
 
-            return new EconomyState(current.Wealth - price);
+            return current with { Wealth = current.Wealth - price };
         }
 
         /// <summary>Applies a sale (surplus item → shop, coin → character).</summary>
         public EconomyState ApplySale(EconomyState? current, double price)
         {
             if (price < 0) throw new ArgumentOutOfRangeException(nameof(price));
-            return new EconomyState((current?.Wealth ?? 0.0) + price);
+            return (current ?? EconomyState.Zero) with { Wealth = (current?.Wealth ?? 0.0) + price };
         }
 
         #endregion Wealth transitions
@@ -130,6 +136,12 @@ namespace GameEngineTools.Characters.Engines.Economy
             var hours = Math.Max(0.0, work.Duration.TotalHours);
             if (hours <= 0.0)
                 return;
+
+            if (Config.BarterOnly)
+            {
+                State = State with { LaborHours = State.LaborHours + hours };
+                return;
+            }
 
             var wagePerHour = Config.WagePerHour(occupation);
             State = ApplyWage(State, wagePerHour, hours);

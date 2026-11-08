@@ -343,7 +343,10 @@ Active `Characters:*` sections include: `Physiology`, `MenstrualCycle`, `Psychol
 `Sleep`, `Interactions`, `Relationships`, `Memory`, `SemanticMemory`, `Goals`, `DailySchedule`,
 `Values`, `SelfConcept`, `Interests`, `SocialComparison`, `Bereavement`, `Status`, `Lod` (decision cadence per
 LOD tier), `Fidelity` (memory/perception/social fidelity per tier). Economy lives in its own
-`appsettings.Economy.json` under `Economy:*` (prices, wages, starting wealth, `ShopBuyBackFraction`).
+`appsettings.Economy.json` under `Economy:*` (prices, wages, starting wealth, `ShopBuyBackFraction`). `BarterOnly: true` switches the shop to
+barter (GameSandbox ships with it on): no coin changes hands, working or delivering goods earns labor credit in hours (`LaborHoursPerValue`
+hours per unit of value, a 2-unit loaf is 3 h), and the `Barter` action takes shop food for that credit or for a held item worth at least its price
+(reference price times `ShopBuyBackFraction`). WorldGen's settlement with the production chain gets the shop: a counter and a starting shelf of bread and cheese.
 
 `World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude & thermal lag),
 `Universe` (full star/planet/moon/ring definition), and `Calendar` (cultural overlay: month count,

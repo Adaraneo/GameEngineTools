@@ -57,5 +57,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// <c>Snapshot.Economy</c> for food-economy Tier 2 <c>Buy</c> gating and willingness-to-pay.
         /// <c>0</c> when the economy engine is not wired (backward compatible).
         /// </summary>
-        double Wealth = 0.0);
+        double Wealth = 0.0,
+
+        /// <summary>Barter-mode labor credit in hours, from <c>Snapshot.Economy</c>; <c>0</c> when the economy engine is not wired.</summary>
+        double LaborHours = 0.0);
 }

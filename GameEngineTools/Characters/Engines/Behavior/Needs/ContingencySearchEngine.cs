@@ -1,4 +1,4 @@
-﻿// ContingencySearchEngine.cs
+// ContingencySearchEngine.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.Engines.Behavior.Needs
@@ -65,6 +65,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         // depends on affordability + need via WillingnessToPay; the fixed weight only sets its rank
         // once offered. Generalizes diet-breadth from "labor cost" to "cheapest path to satiety".
         private const double BuyBaseWeight = 1.10; // between EatStored and Process
+
+        // Bartering for a meal ranks with buying: it costs credit or goods, not time.
+        private const double BarterWeight = 1.10;
 
         /// <summary>Below this hunger a character with surplus food may sell it (no urgent need to keep it).</summary>
         private const double MaxNeedToSell = 15.0;
@@ -156,7 +159,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 // 4) Buy from a co-located shop (Tier 2) — a priced Food object is present and the
                 //    character is willing to spend given wealth + hunger. Affordability itself is
                 //    enforced by the gate; here we only decide whether buying is worth offering.
-                if (HasPricedFood(context.AvailableObjects)
+                if (!_economy.BarterOnly
+                    && HasPricedFood(context.AvailableObjects)
                     && WillingnessToPay(context.Wealth, need, _economy) > 0.0)
                 {
                     candidates.Add(new BehaviorCandidate(
@@ -167,8 +171,20 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                         Tags: new[] { "FoodEconomy" }));
                 }
 
+                // 4b) Barter at a co-located shop: labor credit or a held item of equal value for its stock.
+                if (BarterRules.FindOffer(context.AvailableObjects, context.HeldObjects, context.LaborHours, _economy,
+                        o => Spoilage.Freshness(o, context.Now, _spoilage) > 0.0) is not null)
+                {
+                    candidates.Add(new BehaviorCandidate(
+                        Barter,
+                        BehaviorMath.Util(need, BarterWeight),
+                        WTimeSpan.FromMinutes(15),
+                        BehaviorDomain.Physiological,
+                        Tags: new[] { "FoodEconomy" }));
+                }
+
                 // 5) Foraging fallback — no ready Food object here and no way to get a meal here → move toward one.
-                if (!HasCategory(context.AvailableObjects, WorldObjectCategory.Food) && candidates.Count == 0)
+                if (!HasFreeFood(context.AvailableObjects) && candidates.Count == 0)
                 {
                     candidates.Add(new BehaviorCandidate(
                         MoveToFood,
@@ -264,6 +280,17 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     return true;
             }
 
+            return false;
+        }
+
+        /// <summary>True when a food object can be taken for free; shop stock (priced) has to be paid for and does not count.</summary>
+        private static bool HasFreeFood(IReadOnlyList<WorldObject> objects)
+        {
+            foreach (var obj in objects)
+            {
+                if (obj.Category == WorldObjectCategory.Food && obj.Price is null)
+                    return true;
+            }
             return false;
         }
 

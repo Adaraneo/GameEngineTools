@@ -47,6 +47,20 @@ namespace GameEngineTools.Characters.Engines.Economy
         double NewWealth) : IDomainEvent;
 
     /// <summary>
+    /// Fired by the object-interaction commit path when a character barters at a shop: takes <see cref="ItemKind"/> and pays with a
+    /// held item of kind <see cref="GivenKind"/>, or with <see cref="LaborHoursSpent"/> hours of labor credit when nothing was given.
+    /// <see cref="DefaultEconomyEngine"/> consumes it to spend the credit. Tier 2, barter mode.
+    /// </summary>
+    public sealed record Bartered(
+        WDateTime OccurredAt,
+        HumanId Actor,
+        string ObjectId,
+        PickupItemKind ItemKind,
+        string ShopId,
+        PickupItemKind? GivenKind,
+        double LaborHoursSpent) : IDomainEvent;
+
+    /// <summary>
     /// Fired when a shop's posted price for an item kind changes after a buy/sell/restock. Purely a
     /// notification for logging and observers — the authoritative price lives in the scene's
     /// <c>EconomyLedger</c>. Food-economy Tier 2.

@@ -117,6 +117,9 @@ namespace GameEngineTools.Characters.Engines.Objects
                     case ActionNames.Sell:
                         HandleSell(committed, ctx, outbox);
                         break;
+                    case ActionNames.Barter:
+                        HandleBarter(committed, ctx, outbox);
+                        break;
                 }
                 return;
             }
@@ -414,6 +417,62 @@ namespace GameEngineTools.Characters.Engines.Objects
             var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o));
             var oldPrice = _economyLedger.GetPrice(shopId, kind, price);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig, price, newStock + 1);
+            PostPrice(location, shopId, kind, newPrice);
+
+            outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
+            using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
+                _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
+        }
+
+        /// <summary>
+        /// Handles <see cref="ActionNames.Barter"/>: takes the cheapest shop food the character can pay for (labor credit or a held
+        /// item of equal value, see <see cref="BarterRules"/>) into their hand; a given item goes into the shop's stock. No coin moves.
+        /// Both kinds are re-priced for their changed stock.
+        /// </summary>
+        private void HandleBarter(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var now = committed.OccurredAt;
+            var location = _locations.GetLocation(ctx.Id);
+            if (location is null)
+                return;
+
+            var offer = BarterRules.FindOffer(
+                _objectProvider.GetObjectsAt(location), _objectProvider.GetHeldBy(ctx.Id), ctx.Snapshot.Economy?.LaborHours ?? 0.0,
+                _economyConfig, o => Spoilage.Freshness(o, now, _spoilage) > 0.0);
+            if (offer is null)
+                return;
+
+            var take = offer.Take;
+            var shopId = take.ShopId ?? "shop";
+
+            _objectProvider.RemoveObject(take.LocationId, take.Id);
+            _objectProvider.AddObject(take with { HeldBy = ctx.Id, LocationId = location, Price = null, ShopId = null });
+
+            PickupItemKind? givenKind = null;
+            if (offer.Give is { } give)
+            {
+                givenKind = give.ItemKind;
+                _objectProvider.RemoveObject(give.LocationId, give.Id);
+                _objectProvider.AddObject(give with { HeldBy = null, LocationId = location, Price = _economyLedger.GetPrice(shopId, give.ItemKind), ShopId = shopId });
+            }
+
+            outbox.Add(new Bartered(now, ctx.Id, take.Id, take.ItemKind, shopId, givenKind, offer.LaborHours));
+
+            // LOD §7: background characters skip the per-shop price formation entirely.
+            if (IsBackground(ctx.Id))
+                return;
+
+            Reprice(location, shopId, take.ItemKind, take.Price ?? _economyLedger.GetPrice(shopId, take.ItemKind), stockChange: -1, ctx, now, outbox);
+            if (givenKind is { } given)
+                Reprice(location, shopId, given, _economyLedger.GetPrice(shopId, given), stockChange: 1, ctx, now, outbox);
+        }
+
+        /// <summary>Re-prices a shop's kind against its current stock after a swap and posts the new price on the shelf.</summary>
+        private void Reprice(string location, string shopId, PickupItemKind kind, double observedPrice, int stockChange, IHumanContext ctx, WDateTime now, IEventCollector outbox)
+        {
+            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o));
+            var oldPrice = _economyLedger.GetPrice(shopId, kind, observedPrice);
+            var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig, observedPrice, newStock - stockChange);
             PostPrice(location, shopId, kind, newPrice);
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));

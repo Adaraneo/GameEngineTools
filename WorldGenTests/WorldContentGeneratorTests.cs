@@ -4,6 +4,7 @@
 using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Objects;
+using GameEngineTools.World.Objects.Production;
 using WorldGen.Generation;
 
 namespace WorldGenTests;
@@ -643,6 +644,26 @@ public class WorldContentGeneratorTests
         Assert.IsTrue(itemKinds.Contains(PickupItemKind.Grain));
         Assert.IsTrue(itemKinds.Contains(PickupItemKind.Flour));
         Assert.IsTrue(itemKinds.Contains(PickupItemKind.Bread));
+    }
+
+    [TestMethod]
+    public void Generate_ProductionChainEnabled_AddsAShopWithPricedNonSpoilingStock()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
+            GenerateProductionChain: true);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        var inShop = db.GetAllObjectsAt(descriptor.Id).Where(o => o.ShopId is not null).ToList();
+        var stock = inShop.Where(ShopCounterFactory.IsStock).ToList();
+        Assert.AreEqual(2, inShop.Count - stock.Count, "A counter per traded kind.");
+        Assert.AreEqual(7, stock.Count);
+        Assert.IsTrue(stock.All(o => o.Category == WorldObjectCategory.Food && o.ProducedAt is null && o.Price > 0), "Stock is priced food that never spoils.");
+        Assert.IsTrue(stock.Any(o => o.ItemKind == PickupItemKind.Bread) && stock.Any(o => o.ItemKind == PickupItemKind.Cheese));
     }
 
     [TestMethod]

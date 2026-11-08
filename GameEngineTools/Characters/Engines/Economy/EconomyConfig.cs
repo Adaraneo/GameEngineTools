@@ -30,6 +30,15 @@ namespace GameEngineTools.Characters.Engines.Economy
         /// </summary>
         public double ShopBuyBackFraction { get; set; } = 0.6;
 
+        /// <summary>
+        /// Barter mode: no coin changes hands. A <c>Work</c> shift and a delivery to the shop earn labor credit (hours), and a shop
+        /// gives stock in exchange for credit or for a held item of equal value (<c>Barter</c>); <c>Buy</c> is not offered.
+        /// </summary>
+        public bool BarterOnly { get; set; }
+
+        /// <summary>Labor credit (hours) that one unit of shop value costs or earns in barter mode; a 2-unit loaf is 3 hours. Game-balance parameter.</summary>
+        public double LaborHoursPerValue { get; set; } = 1.5;
+
         /// <summary>Hard floor on any shop price.</summary>
         public double MinPrice { get; set; } = 0.5;
 

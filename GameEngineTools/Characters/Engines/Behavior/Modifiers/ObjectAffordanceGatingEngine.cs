@@ -5,6 +5,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 {
     using System.Collections.Generic;
     using System.Linq;
+    using GameEngineTools.Characters.Engines.Economy;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
     using static ActionNames;
@@ -32,6 +33,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     /// </remarks>
     internal sealed class ObjectAffordanceGatingEngine : IBehaviorModifierEngine
     {
+        private readonly EconomyConfig _economy;
+
+        /// <summary>Creates the gate; the economy config (barter mode) defaults to <see cref="EconomyConfig.Default"/>.</summary>
+        public ObjectAffordanceGatingEngine(EconomyConfig? economy = null) => _economy = economy ?? EconomyConfig.Default;
+
         #region Action requirement map
 
         /// <summary>
@@ -79,7 +85,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
             ApplyGates(candidates, context.AvailableObjects);
             ApplyFoodEconomyGates(candidates, context.AvailableObjects, context.HeldObjects);
-            ApplyEconomyTradeGates(candidates, context.AvailableObjects, context.HeldObjects, context.Wealth);
+            ApplyEconomyTradeGates(candidates, context.AvailableObjects, context.HeldObjects, context.Wealth, context.LaborHours);
         }
 
         #endregion IBehaviorModifierEngine
@@ -202,14 +208,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         ///   co-located shop trades (has stock of the same <see cref="WorldObject.ItemKind"/>).</item>
         /// </list>
         /// </summary>
-        private static void ApplyEconomyTradeGates(
+        private void ApplyEconomyTradeGates(
             List<BehaviorCandidate> candidates,
             IReadOnlyList<WorldObject> availableObjects,
             IReadOnlyList<WorldObject>? heldObjects,
-            double wealth)
+            double wealth,
+            double laborHours)
         {
-            if (!CanBuyHere(availableObjects, wealth))
+            if (_economy.BarterOnly || !CanBuyHere(availableObjects, wealth))
                 candidates.RemoveAll(c => c.Name == Buy);
+
+            if (BarterRules.FindOffer(availableObjects, heldObjects, laborHours, _economy, _ => true) is null)
+                candidates.RemoveAll(c => c.Name == Barter);
 
             if (!CanSellHere(availableObjects, heldObjects))
                 candidates.RemoveAll(c => c.Name == Sell);

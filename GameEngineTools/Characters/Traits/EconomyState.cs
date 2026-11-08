@@ -17,7 +17,10 @@ namespace GameEngineTools.Characters.Traits
     /// <param name="Wealth">
     /// Current wealth in abstract currency units. Never negative — Buy/Sell gating enforces this.
     /// </param>
-    public sealed record EconomyState(double Wealth)
+    /// <param name="LaborHours">
+    /// Barter mode only: labor credit in hours earned by working or delivering goods, redeemable for shop stock.
+    /// </param>
+    public sealed record EconomyState(double Wealth, double LaborHours = 0.0)
     {
         /// <summary>A character with no money — the seed for anyone lacking economic state.</summary>
         public static readonly EconomyState Zero = new(0.0);

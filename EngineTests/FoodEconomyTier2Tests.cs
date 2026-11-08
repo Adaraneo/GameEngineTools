@@ -419,6 +419,129 @@ namespace EngineTests
                 "A fully-simulated buy adjusts the shop's posted price (PriceChanged emitted).");
         }
 
+        // ── Barter ───────────────────────────────────────────────────────────────────
+
+        private static readonly EconomyConfig Barter3 = new() { BarterOnly = true };
+
+        [TestMethod]
+        public void BarterRules_LaborCredit_PaysTheCheapestStock()
+        {
+            var stock = new List<WorldObject> { PricedFood("cheese_1", 3.0, "shop", PickupItemKind.Cheese), PricedFood("bread_1", 2.0, "shop") };
+
+            var offer = BarterRules.FindOffer(stock, null, laborHours: 3.0, Barter3, _ => true);
+
+            Assert.IsNotNull(offer);
+            Assert.AreEqual("bread_1", offer.Take.Id);
+            Assert.IsNull(offer.Give);
+            Assert.AreEqual(3.0, offer.LaborHours, 1e-9, "A 2.0 loaf costs 2.0 x 1.5 labor hours.");
+        }
+
+        [TestMethod]
+        public void BarterRules_NotEnoughLaborAndNothingHeld_NoOffer()
+        {
+            var stock = new List<WorldObject> { PricedFood("bread_1", 2.0, "shop") };
+
+            Assert.IsNull(BarterRules.FindOffer(stock, new List<WorldObject>(), laborHours: 2.9, Barter3, _ => true));
+        }
+
+        [TestMethod]
+        public void BarterRules_HeldItem_PaysOnlyWhenWorthTheStock()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var cheese = FoodItemCatalog.Create(PickupItemKind.Cheese, Loc, new WDateTime(0), self);
+            var cheap = new List<WorldObject> { PricedFood("bread_1", 1.5, "shop") };
+            var dear = new List<WorldObject> { PricedFood("bread_1", 2.0, "shop") };
+
+            Assert.AreEqual(cheese.Id, BarterRules.FindOffer(cheap, new[] { cheese }, 0.0, Barter3, _ => true)?.Give?.Id);
+            Assert.IsNull(BarterRules.FindOffer(dear, new[] { cheese }, 0.0, Barter3, _ => true), "The shop keeps its margin: 1.8 does not cover 2.0.");
+        }
+
+        [TestMethod]
+        public void BarterRules_SameKindSpoiledOrAbsentItem_IsNotSwapped()
+        {
+            var self = new HumanId(Guid.NewGuid());
+            var bread = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self);
+            var cheese = FoodItemCatalog.Create(PickupItemKind.Cheese, Loc, new WDateTime(0), self);
+            var stock = new List<WorldObject> { PricedFood("bread_1", 1.0, "shop") };
+
+            Assert.IsNull(BarterRules.FindOffer(stock, new[] { bread }, 0.0, Barter3, _ => true), "Bread for bread is pointless.");
+            Assert.IsNull(BarterRules.FindOffer(stock, new[] { cheese }, 0.0, Barter3, _ => false), "Spoiled goods are not accepted.");
+            Assert.IsNull(BarterRules.FindOffer(new List<WorldObject>(), new[] { cheese }, 0.0, Barter3, _ => true), "No stock, nothing to take.");
+        }
+
+        [TestMethod]
+        public void Barter_Handler_SpendsLaborHoursAndMovesStockToHand_WithoutCoin()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(PricedFood("bread_1", 2.0, "bakery"));
+            provider.AddObject(PricedFood("bread_2", 2.0, "bakery"));
+            var engine = MakeObjectEngine(provider, lod: null);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Barter, WTimeSpan.FromMinutes(15)), LaborContext(self, 4.0), outbox);
+
+            var events = outbox.Drain();
+            var bartered = events.OfType<Bartered>().Single();
+            Assert.AreEqual(3.0, bartered.LaborHoursSpent, 1e-9);
+            Assert.IsNull(bartered.GivenKind);
+            Assert.IsFalse(events.OfType<Purchased>().Any(), "Barter moves no coin.");
+            Assert.AreEqual(1, provider.GetHeldBy(self).Count(), "The taken loaf is in hand.");
+            Assert.AreEqual(1, provider.GetObjectsAt(Loc).Count(o => o.ShopId == "bakery"), "One loaf is left on the shelf.");
+            Assert.IsTrue(events.OfType<PriceChanged>().Any(), "The shorter stock is re-priced.");
+        }
+
+        [TestMethod]
+        public void Barter_Handler_HeldItemGoesIntoTheShopsStock()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Cheese, Loc, new WDateTime(0), self));
+            provider.AddObject(PricedFood("bread_1", 1.5, "bakery"));
+            var engine = MakeObjectEngine(provider, lod: null);
+            var outbox = new EventCollector();
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Barter, WTimeSpan.FromMinutes(15)), LaborContext(self, 0.0), outbox);
+
+            var bartered = outbox.Drain().OfType<Bartered>().Single();
+            Assert.AreEqual(PickupItemKind.Cheese, bartered.GivenKind);
+            Assert.AreEqual(PickupItemKind.Bread, provider.GetHeldBy(self).Single().ItemKind, "The character now holds the bread.");
+            var shelf = provider.GetObjectsAt(Loc).Single(o => o.ShopId == "bakery");
+            Assert.AreEqual(PickupItemKind.Cheese, shelf.ItemKind, "The cheese was relisted as shop stock.");
+            Assert.IsNotNull(shelf.Price);
+        }
+
+        [TestMethod]
+        public void Barter_Gate_NeedsAnOffer_AndBuyIsDroppedInBarterMode()
+        {
+            var gate = new ObjectAffordanceGatingEngine(Barter3);
+            var stock = PricedFood("bread_1", 2.0, "bakery");
+
+            var broke = new List<BehaviorCandidate> { Cand(Barter), Cand(Buy) };
+            gate.Modify(EconContext(new() { stock }, new(), wealth: 50.0) with { LaborHours = 1.0 }, broke);
+            Assert.IsFalse(broke.Any(c => c.Name == Barter), "No labor credit and nothing to give: no Barter.");
+            Assert.IsFalse(broke.Any(c => c.Name == Buy), "Buy is not offered in barter mode even with coin.");
+
+            var worked = new List<BehaviorCandidate> { Cand(Barter) };
+            gate.Modify(EconContext(new() { stock }, new(), wealth: 0.0) with { LaborHours = 3.0 }, worked);
+            Assert.IsTrue(worked.Any(c => c.Name == Barter), "Enough labor credit for a loaf keeps Barter.");
+        }
+
+        [TestMethod]
+        public void EconomyEngine_BarterMode_SaleEarnsLaborCredit_AndBarterSpendsIt()
+        {
+            var engine = new DefaultEconomyEngine(Options.Create(Barter3), NullLoggerFactory.Instance);
+            var self = new HumanId(Guid.NewGuid());
+            var ctx = BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
+
+            engine.Handle(new Sold(new WDateTime(0), self, "bread_1", PickupItemKind.Bread, "bakery", 2.0, 0.0), ctx, new EventCollector());
+            Assert.AreEqual(3.0, engine.State.LaborHours, 1e-9, "Delivering a 2.0 loaf earns 3 hours of credit.");
+            Assert.AreEqual(0.0, engine.State.Wealth, 1e-9, "No coin changes hands in barter mode.");
+
+            engine.Handle(new Bartered(new WDateTime(0), self, "bread_2", PickupItemKind.Bread, "bakery", null, 3.0), ctx, new EventCollector());
+            Assert.AreEqual(0.0, engine.State.LaborHours, 1e-9);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────────────
 
         /// <summary>An <see cref="IHumanContext"/> whose snapshot carries the given wealth (for Buy affordability).</summary>
@@ -426,6 +549,14 @@ namespace EngineTests
         {
             var ctx = (HumanContext)BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
             ctx.Snapshot = ctx.Snapshot with { Economy = new EconomyState(wealth) };
+            return ctx;
+        }
+
+        /// <summary>An <see cref="IHumanContext"/> whose snapshot carries the given barter labor credit.</summary>
+        private static IHumanContext LaborContext(HumanId self, double hours)
+        {
+            var ctx = (HumanContext)BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
+            ctx.Snapshot = ctx.Snapshot with { Economy = new EconomyState(0.0, hours) };
             return ctx;
         }
 

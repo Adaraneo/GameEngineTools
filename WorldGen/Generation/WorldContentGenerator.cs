@@ -3,6 +3,7 @@
 
 using GameEngineTools.Characters.Engines.Physiology;
 using GameEngineTools.World.Data;
+using GameEngineTools.World.Economy;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Objects;
 using GameEngineTools.World.Objects.Production;
@@ -833,8 +834,38 @@ public static class WorldContentGenerator
         worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_field", anchor.Id, PickupItemKind.Grain, "Obilné pole"));
         worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_mill", anchor.Id, PickupItemKind.Flour, "Mlýn"));
         worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_bakery", anchor.Id, PickupItemKind.Bread, "Pekárna"));
-        return 3;
+        return 3 + AddShop(worldDb, anchor.Id);
     }
+
+    /// <summary>The settlement's shop: a counter per traded kind and a starting shelf, priced at each kind's reference price.</summary>
+    private static int AddShop(SqliteWorldDatabase worldDb, string locationId)
+    {
+        var shopId = $"{locationId}_shop";
+        var created = 0;
+        foreach (var (kind, label, units) in new[] { (PickupItemKind.Bread, "chléb", StarterShelfBread), (PickupItemKind.Cheese, "sýr", StarterShelfCheese) })
+        {
+            worldDb.AddObject(ShopCounterFactory.Create($"{shopId}_counter_{kind.ToString().ToLowerInvariant()}", locationId, shopId, kind, $"Pult – {label}"));
+            created++;
+            for (var i = 1; i <= units; i++)
+            {
+                // No production time: the starting shelf does not spoil.
+                var unit = FoodItemCatalog.Create(kind, locationId, default, null) with
+                {
+                    Id = $"{shopId}_{kind.ToString().ToLowerInvariant()}_{i:D2}",
+                    ProducedAt = null,
+                    ShopId = shopId,
+                    Price = EconomyLedger.ReferencePrice(kind),
+                };
+                worldDb.AddObject(unit);
+                created++;
+            }
+        }
+
+        return created;
+    }
+
+    private const int StarterShelfBread = 4;
+    private const int StarterShelfCheese = 3;
 
     /// <summary>Adds up to <see cref="Options.ForcedTier"/>-driven object depth per need (1 for
     /// Camp, 2 for Village, 3 for Town — see <see cref="ObjectDepthForTier"/>) so a settlement

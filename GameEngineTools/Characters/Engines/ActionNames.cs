@@ -1,4 +1,4 @@
-﻿// ActionNames.cs
+// ActionNames.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.Characters.Engines
@@ -134,6 +134,12 @@ namespace GameEngineTools.Characters.Engines
         /// into the shop's stock and credits coin to the seller. Gated by held stock + shop demand.
         /// </summary>
         public const string Sell = "Sell";
+
+        /// <summary>
+        /// Barter at a co-located shop: hand over a held item (or spend labor credit) and take shop stock of equal value, no coin.
+        /// Gated by a feasible swap.
+        /// </summary>
+        public const string Barter = "Barter";
 
         #endregion Food economy (Tier 2)
     }

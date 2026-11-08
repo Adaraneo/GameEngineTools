@@ -108,8 +108,10 @@ namespace GameEngineTools.World.Economy
         /// <summary>Price each shop/kind would post at exactly the target stock level.</summary>
         private readonly Dictionary<(string ShopId, PickupItemKind Kind), double> _bases = new();
 
-        /// <summary>Fallback starting price for a shop/kind pair the ledger has not yet transacted.</summary>
-        private static double SeedPrice(PickupItemKind kind) => kind switch
+        private static double SeedPrice(PickupItemKind kind) => ReferencePrice(kind);
+
+        /// <summary>Fallback starting price for a shop/kind pair the ledger has not yet transacted; also the barter value of a held item.</summary>
+        public static double ReferencePrice(PickupItemKind kind) => kind switch
         {
             PickupItemKind.Bread => 2.0,
             PickupItemKind.Cheese => 3.0,
