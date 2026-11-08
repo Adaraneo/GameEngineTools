@@ -278,6 +278,21 @@ namespace EngineTests
                 "A location whose food is consumed must not be chosen while another one has ready food.");
         }
 
+        /// <summary>No adjacent food: the character walks to the closer of two distant meals, not to the first one listed.</summary>
+        [TestMethod]
+        public void RouteMoveTo_NoAdjacentFood_ChoosesNearestByPathLength()
+        {
+            var worldMap = BuildMap(new[] { (HomeId, TavernId, 50.0), (TavernId, MarketId, 50.0), (TavernId, ForestId, 500.0) });
+            var character = BuildForagingHuman(HomeId, MoveToFood, Array.Empty<ObjectLocationFact>());
+            var provider = new ConsumingWorldObjectProvider(
+                new[] { MakeFoodObject("forest_berries", ForestId), MakeFoodObject("market_bread", MarketId) }, consumedIds: Array.Empty<string>());
+
+            BuildOrchestrator(worldMap, provider).OnTick(Now, new[] { character });
+
+            Assert.AreEqual(MarketId, _locationService.GetLocation(character.Id),
+                "With no adjacent food the nearest reachable meal (market, 100 m) must beat the farther one (forest, 550 m).");
+        }
+
         /// <summary>All food in the world is consumed: there is nowhere to go, so the character stays put.</summary>
         [TestMethod]
         public void RouteMoveTo_AllProviderFoodConsumed_CharacterStaysInPlace()

@@ -1401,10 +1401,40 @@ namespace GameEngineTools.World.Simulation
             if (adjacentMatch is not null)
                 return adjacentMatch;
 
-            // Fallback: pick arbitrarily from all known locations with ready objects.
-            // No graph edge, so assume the configured cross-locale distance.
+            // No adjacent match: the nearest ready location along the connection graph, travelled by its path length.
+            if (NearestByPath(currentLocationId, id => candidateLocations.Contains(id) && HasReadyObject(id)) is { } nearest)
+                return nearest;
+
+            // Not connected to any: pick one arbitrarily and assume the configured cross-locale distance.
             var anywhere = candidateLocations.FirstOrDefault(HasReadyObject);
             return anywhere is null ? null : new MoveTarget(anywhere, _options.FallbackTravelDistanceMeters);
+        }
+
+        /// <summary>Dijkstra over the connection graph: the closest location (other than the start) that satisfies <paramref name="accept"/>, with its path length.</summary>
+        private MoveTarget? NearestByPath(string startId, Func<string, bool> accept)
+        {
+            var best = new Dictionary<string, double>(StringComparer.Ordinal) { [startId] = 0.0 };
+            var queue = new PriorityQueue<string, double>();
+            queue.Enqueue(startId, 0.0);
+
+            while (queue.TryDequeue(out var node, out var distance))
+            {
+                if (distance > best[node])
+                    continue;
+                if (node != startId && accept(node))
+                    return new MoveTarget(node, distance);
+
+                foreach (var connection in _worldMap.GetConnections(node))
+                {
+                    var next = distance + connection.DistanceMeters;
+                    if (best.TryGetValue(connection.TargetLocationId, out var known) && known <= next)
+                        continue;
+                    best[connection.TargetLocationId] = next;
+                    queue.Enqueue(connection.TargetLocationId, next);
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
