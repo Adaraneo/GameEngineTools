@@ -66,6 +66,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         // once offered. Generalizes diet-breadth from "labor cost" to "cheapest path to satiety".
         private const double BuyBaseWeight = 1.10; // between EatStored and Process
 
+        // Building a missing link of the chain beats leaving to forage (1.0) but not eating, bartering or producing.
+        private const double BuildWeight = 1.05;
+
+        // Only a character that is hungry enough to care yet not desperate considers building (hours of work with no meal in it).
+        private const double BuildMinNeed = 25.0;
+        private const double BuildMaxNeed = 60.0;
+
         // Bartering for a meal ranks with buying: it costs credit or goods, not time.
         private const double BarterWeight = 1.10;
 
@@ -179,6 +186,19 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                         Barter,
                         BehaviorMath.Util(need, BarterWeight),
                         WTimeSpan.FromMinutes(15),
+                        BehaviorDomain.Physiological,
+                        Tags: new[] { "FoodEconomy" }));
+                }
+
+                // 4c) Build the settlement's missing field, mill or bakery.
+                if (need is >= BuildMinNeed and <= BuildMaxNeed
+                    && SiteBuilding.IsSettlement(context.AvailableObjects)
+                    && SiteBuilding.NextSite(context.AvailableObjects) is not null)
+                {
+                    candidates.Add(new BehaviorCandidate(
+                        Build,
+                        BehaviorMath.Util(need, BuildWeight),
+                        WTimeSpan.FromHours(3),
                         BehaviorDomain.Physiological,
                         Tags: new[] { "FoodEconomy" }));
                 }

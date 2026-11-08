@@ -539,6 +539,90 @@ namespace EngineTests
             Assert.AreEqual(0, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Flour), "One flour went in.");
         }
 
+        // ── Build ────────────────────────────────────────────────────────────────────
+
+        private static WorldObject FreeFood(string id)
+            => new() { Id = id, DisplayName = id, Category = WorldObjectCategory.Food, LocationId = Loc, ItemKind = PickupItemKind.Food, IsPickable = true };
+
+        [TestMethod]
+        public void SiteBuilding_NextSite_FollowsTheChainOrderUntilComplete()
+        {
+            var here = new List<WorldObject>();
+            Assert.AreEqual(PickupItemKind.Grain, SiteBuilding.NextSite(here));
+
+            here.Add(ProductionSiteFactory.Create("f", Loc, PickupItemKind.Grain, "Pole"));
+            Assert.AreEqual(PickupItemKind.Flour, SiteBuilding.NextSite(here));
+
+            here.Add(ProductionSiteFactory.Create("m", Loc, PickupItemKind.Flour, "Mlyn"));
+            Assert.AreEqual(PickupItemKind.Bread, SiteBuilding.NextSite(here));
+
+            here.Add(ProductionSiteFactory.Create("o", Loc, PickupItemKind.Bread, "Pec"));
+            Assert.IsNull(SiteBuilding.NextSite(here), "A complete chain leaves nothing to build.");
+        }
+
+        [TestMethod]
+        public void SiteBuilding_IsSettlement_NeedsFreeFoodOrASite()
+        {
+            Assert.IsTrue(SiteBuilding.IsSettlement(new[] { FreeFood("berries") }));
+            Assert.IsTrue(SiteBuilding.IsSettlement(new[] { ProductionSiteFactory.Create("f", Loc, PickupItemKind.Grain, "Pole") }));
+            Assert.IsFalse(SiteBuilding.IsSettlement(new[] { PricedFood("loaf", 2.0, "shop") }), "Shop stock alone is not a settlement.");
+            Assert.IsFalse(SiteBuilding.IsSettlement(Array.Empty<WorldObject>()), "A bare house or road.");
+        }
+
+        [TestMethod]
+        public void Build_Gate_KeepsBuildOnlyWhereSomethingIsMissingInASettlement()
+        {
+            var gate = new ObjectAffordanceGatingEngine();
+            var settlement = new List<WorldObject> { FreeFood("berries") };
+            var complete = new List<WorldObject>
+            {
+                ProductionSiteFactory.Create("f", Loc, PickupItemKind.Grain, "Pole"),
+                ProductionSiteFactory.Create("m", Loc, PickupItemKind.Flour, "Mlyn"),
+                ProductionSiteFactory.Create("o", Loc, PickupItemKind.Bread, "Pec"),
+            };
+
+            var inSettlement = new List<BehaviorCandidate> { Cand(Build) };
+            gate.Modify(EconContext(settlement, new(), 0.0), inSettlement);
+            Assert.IsTrue(inSettlement.Any(c => c.Name == Build));
+
+            var inCompleteChain = new List<BehaviorCandidate> { Cand(Build) };
+            gate.Modify(EconContext(complete, new(), 0.0), inCompleteChain);
+            Assert.IsFalse(inCompleteChain.Any(c => c.Name == Build), "Nothing left to build.");
+
+            var inHouse = new List<BehaviorCandidate> { Cand(Build) };
+            gate.Modify(EconContext(new(), new(), 0.0), inHouse);
+            Assert.IsFalse(inHouse.Any(c => c.Name == Build), "Not a settlement.");
+        }
+
+        [TestMethod]
+        public void Build_Candidate_OfferedToAModeratelyHungryCharacterInASettlement()
+        {
+            var engine = new ContingencySearchEngine();
+            var settlement = new List<WorldObject> { FreeFood("berries") };
+
+            Assert.IsTrue(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 40)).Candidates.Any(c => c.Name == Build));
+            Assert.IsFalse(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 10)).Candidates.Any(c => c.Name == Build), "Not hungry enough to care.");
+            Assert.IsFalse(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 85)).Candidates.Any(c => c.Name == Build), "Too hungry for hours of work.");
+        }
+
+        [TestMethod]
+        public void Build_Handler_AddsFieldThenMillThenBakery_ThenNothing()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(FreeFood("berries"));
+            var engine = MakeObjectEngine(provider);
+            var outbox = new EventCollector();
+
+            for (var i = 0; i < 4; i++)
+                engine.Handle(new ActionCommitted(new WDateTime(0), self, Build, WTimeSpan.FromHours(3)), LaborContext(self, 0.0), outbox);
+
+            var built = outbox.Drain().OfType<SiteBuilt>().Select(e => e.OutputKind).ToList();
+            CollectionAssert.AreEqual(new[] { PickupItemKind.Grain, PickupItemKind.Flour, PickupItemKind.Bread }, built, "Three builds, then the chain is complete.");
+            var field = provider.GetAllObjectsAt(Loc).Single(o => o.ItemKind == PickupItemKind.Grain && o.Affordances.Any(a => a.Type == AffordanceType.Production));
+            Assert.AreEqual(3.0, field.Affordances.Single(a => a.Type == AffordanceType.Production).Satisfaction, "A built field is a standard field.");
+        }
+
         [TestMethod]
         public void BarterMode_BakerDeliversSurplusLoafToTheShop_AndKeepsTheFirst()
         {

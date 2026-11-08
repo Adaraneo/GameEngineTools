@@ -60,6 +60,14 @@ namespace GameEngineTools.Characters.Engines.Economy
         PickupItemKind? GivenKind,
         double LaborHoursSpent) : IDomainEvent;
 
+    /// <summary>Fired by the object-interaction commit path when a character finishes building a production site.</summary>
+    public sealed record SiteBuilt(
+        WDateTime OccurredAt,
+        HumanId Builder,
+        string SiteId,
+        PickupItemKind OutputKind,
+        string LocationId) : IDomainEvent;
+
     /// <summary>
     /// Fired when a shop's posted price for an item kind changes after a buy/sell/restock. Purely a
     /// notification for logging and observers — the authoritative price lives in the scene's

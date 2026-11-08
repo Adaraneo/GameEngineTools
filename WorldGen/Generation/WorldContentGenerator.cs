@@ -828,9 +828,9 @@ public static class WorldContentGenerator
         var created = 0;
         foreach (var anchor in placed.Where(p => p.Tier is SettlementTier.Town or SettlementTier.Village))
         {
-            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_field", anchor.Id, PickupItemKind.Grain, "Obilné pole", FieldYield));
-            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_mill", anchor.Id, PickupItemKind.Flour, "Mlýn", MillYield));
-            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_bakery", anchor.Id, PickupItemKind.Bread, "Pekárna", OvenYield));
+            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_field", anchor.Id, PickupItemKind.Grain, "Obilné pole", SiteBuilding.StandardYield(PickupItemKind.Grain)));
+            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_mill", anchor.Id, PickupItemKind.Flour, "Mlýn", SiteBuilding.StandardYield(PickupItemKind.Flour)));
+            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_bakery", anchor.Id, PickupItemKind.Bread, "Pekárna", SiteBuilding.StandardYield(PickupItemKind.Bread)));
             created += 3 + AddShop(worldDb, anchor.Id);
         }
 
@@ -863,11 +863,6 @@ public static class WorldContentGenerator
 
         return created;
     }
-
-    // Outputs per action; a loaf then costs about 1.3 labor hours instead of 3.25. Own estimate, aimed at roughly 5 hours of food work per person-day.
-    private const double FieldYield = 3.0;
-    private const double MillYield = 2.0;
-    private const double OvenYield = 2.0;
 
     private const int StarterShelfBread = 4;
     private const int StarterShelfCheese = 3;

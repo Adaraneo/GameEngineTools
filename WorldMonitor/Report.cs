@@ -44,8 +44,8 @@ namespace WorldMonitor
             }
 
             sb.AppendLine();
-            sb.AppendLine("Trade and production actions committed: " + string.Join(", ", new[] { "Produce", "Process", "Sell", "Buy", "Barter", "EatStored" }.Select(a => $"{a} {c.Actions.GetValueOrDefault(a)}"))
-                + $"; events Sold {c.Events.GetValueOrDefault("Sold")}, Bartered {c.Events.GetValueOrDefault("Bartered")}.");
+            sb.AppendLine("Trade and production actions committed: " + string.Join(", ", new[] { "Produce", "Process", "Sell", "Buy", "Barter", "Build", "EatStored" }.Select(a => $"{a} {c.Actions.GetValueOrDefault(a)}"))
+                + $"; events Sold {c.Events.GetValueOrDefault("Sold")}, Bartered {c.Events.GetValueOrDefault("Bartered")}, SiteBuilt {c.Events.GetValueOrDefault("SiteBuilt")}.");
             sb.AppendLine();
             sb.AppendLine("## Stress by time of day (24-hour clock)");
             sb.AppendLine("| hours | samples | mean | median | p90 |");

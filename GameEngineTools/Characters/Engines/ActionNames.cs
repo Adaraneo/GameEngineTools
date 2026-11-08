@@ -141,6 +141,12 @@ namespace GameEngineTools.Characters.Engines
         /// </summary>
         public const string Barter = "Barter";
 
+        /// <summary>
+        /// Build the first missing link (field, mill, bakery) of the food chain at a settlement; takes hours of labor and adds a standard
+        /// production site at the current location.
+        /// </summary>
+        public const string Build = "Build";
+
         #endregion Food economy (Tier 2)
     }
 }

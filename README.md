@@ -346,7 +346,7 @@ LOD tier), `Fidelity` (memory/perception/social fidelity per tier). Economy live
 `appsettings.Economy.json` under `Economy:*` (prices, wages, starting wealth, `ShopBuyBackFraction`). `BarterOnly: true` switches the shop to
 barter (GameSandbox ships with it on): no coin changes hands, working or delivering goods earns labor credit in hours (`LaborHoursPerValue`
 hours per unit of value, a 2-unit loaf is 3 h), and the `Barter` action takes shop food for that credit or for a held item worth at least its price
-(reference price times `ShopBuyBackFraction`). WorldGen's settlement with the production chain gets the shop: a counter and a starting shelf of bread and cheese.
+(reference price times `ShopBuyBackFraction`). WorldGen gives every village and town a production chain (field 3, mill 2, oven 2 outputs per action) and a shop (counters and a starting shelf of bread and cheese). A hungry but not desperate character in a settlement lacking a link of the chain can `Build` it (a standard site, 3 hours), so camps grow their own food production.
 
 `World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude & thermal lag),
 `Universe` (full star/planet/moon/ring definition), and `Calendar` (cultural overlay: month count,

@@ -120,6 +120,9 @@ namespace GameEngineTools.Characters.Engines.Objects
                     case ActionNames.Barter:
                         HandleBarter(committed, ctx, outbox);
                         break;
+                    case ActionNames.Build:
+                        HandleBuild(committed, ctx, outbox);
+                        break;
                 }
                 return;
             }
@@ -374,6 +377,25 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             if (_economyConfig.BarterOnly)
                 DeliverSurplus(produced, locationId, committed.OccurredAt, ctx, outbox);
+        }
+
+        /// <summary>
+        /// Handles <see cref="ActionNames.Build"/>: adds the first missing standard site (field, mill, bakery) of the chain at the
+        /// builder's settlement. No-op when the place is not a settlement or already has the whole chain.
+        /// </summary>
+        private void HandleBuild(ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var location = _locations.GetLocation(ctx.Id);
+            if (location is null)
+                return;
+
+            var here = _objectProvider.GetAllObjectsAt(location).ToList();
+            if (!SiteBuilding.IsSettlement(here) || SiteBuilding.NextSite(here) is not { } kind)
+                return;
+
+            var site = SiteBuilding.Create(kind, location);
+            _objectProvider.AddObject(site);
+            outbox.Add(new SiteBuilt(committed.OccurredAt, ctx.Id, site.Id, kind, location));
         }
 
         /// <summary>Outputs one action makes at the site producing <paramref name="kind"/> here: its Production affordance, rounded, at least 1.</summary>
