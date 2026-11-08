@@ -700,7 +700,7 @@ namespace EngineTests
         [TestMethod]
         public void Build_Gate_KeepsBuildOnlyWhereSomethingIsMissingInASettlement()
         {
-            var gate = new ObjectAffordanceGatingEngine();
+            var gate = new ObjectAffordanceGatingEngine(new EconomyConfig { BuildEnabled = true });
             var settlement = new List<WorldObject> { FreeFood("berries") };
             var complete = new List<WorldObject>
             {
@@ -725,9 +725,10 @@ namespace EngineTests
         [TestMethod]
         public void Build_Candidate_OfferedToAModeratelyHungryCharacterInASettlement()
         {
-            var engine = new ContingencySearchEngine();
+            var engine = new ContingencySearchEngine(economy: new EconomyConfig { BuildEnabled = true });
             var settlement = new List<WorldObject> { FreeFood("berries") };
 
+            Assert.IsFalse(new ContingencySearchEngine().Evaluate(EconContext(settlement, new(), 0.0, hunger: 40)).Candidates.Any(c => c.Name == Build), "Off by default.");
             Assert.IsTrue(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 40)).Candidates.Any(c => c.Name == Build));
             Assert.IsFalse(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 10)).Candidates.Any(c => c.Name == Build), "Not hungry enough to care.");
             Assert.IsFalse(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 85)).Candidates.Any(c => c.Name == Build), "Too hungry for hours of work.");

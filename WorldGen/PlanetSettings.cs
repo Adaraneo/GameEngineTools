@@ -68,6 +68,18 @@ public static class PlanetSettings
             periapsisPhase, planet.PlanetOceanFraction);
     }
 
+    /// <summary>The grain-cycle settings (<c>World:Crops</c>) from the same settings file, or the defaults when it or the section is absent.</summary>
+    public static GameEngineTools.World.Objects.Crops.CropConfig LoadCrops(string dbFilePath)
+    {
+        var settingsPath = FindSettingsFile(dbFilePath);
+        if (settingsPath is null)
+            return new GameEngineTools.World.Objects.Crops.CropConfig();
+
+        var config = new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build();
+        return config.GetSection("World:Crops").Get<GameEngineTools.World.Objects.Crops.CropConfig>()
+            ?? new GameEngineTools.World.Objects.Crops.CropConfig();
+    }
+
     /// <summary>Stable FNV-1a hash of the planet's identity — same formula TerraGen's own
     /// <c>PlanetSettings.ComputeSeed</c> uses, so both tools agree on one planet's seed.</summary>
     public static int ComputeSeed(string planetName, double planetMassKg, double planetEquatorialRadiusKm)

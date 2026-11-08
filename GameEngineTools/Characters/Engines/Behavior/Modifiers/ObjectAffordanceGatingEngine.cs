@@ -221,7 +221,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             if (BarterRules.FindOffer(availableObjects, heldObjects, laborHours, _economy, _ => true) is null)
                 candidates.RemoveAll(c => c.Name == Barter);
 
-            if (!SiteBuilding.IsSettlement(availableObjects) || SiteBuilding.NextSite(availableObjects) is null)
+            if (!_economy.BuildEnabled || !SiteBuilding.IsSettlement(availableObjects) || SiteBuilding.NextSite(availableObjects) is null)
                 candidates.RemoveAll(c => c.Name == Build);
 
             if (!CanSellHere(availableObjects, heldObjects))

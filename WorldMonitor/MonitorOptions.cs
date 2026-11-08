@@ -6,7 +6,7 @@ namespace WorldMonitor
     using Microsoft.Extensions.Configuration;
 
     /// <summary>One named speed/size preset of a run.</summary>
-    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0);
+    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0, bool Seasons = false);
 
     /// <summary>Pass/fail limits; a missing value means the check is not made.</summary>
     public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80);
@@ -14,7 +14,7 @@ namespace WorldMonitor
     /// <summary>The <c>WorldMonitor</c> section of appsettings.json, with command-line overrides applied.</summary>
     public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null, bool Barter = false)
     {
-        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c> override it.</summary>
+        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c>, <c>--seasons true</c> override it.</summary>
         public static MonitorOptions Load(string[] args)
         {
             var overrides = ParseArgs(args);
@@ -37,6 +37,7 @@ namespace WorldMonitor
                 TickStepMinutes = IntOverride(overrides, "tick", profile.TickStepMinutes),
                 SubstepMinutes = IntOverride(overrides, "substep", profile.SubstepMinutes),
                 Couples = IntOverride(overrides, "couples", profile.Couples),
+                Seasons = overrides.TryGetValue("seasons", out var seasonsText) ? seasonsText is "true" or "1" : profile.Seasons,
             };
 
             var sampleEveryHours = section.GetValue("SampleEveryHours", 6.0);

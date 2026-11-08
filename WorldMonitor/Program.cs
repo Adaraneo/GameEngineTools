@@ -6,6 +6,7 @@ using GameEngineTools;
 using GameEngineTools.Dialogue.Hosting;
 using GameEngineTools.World.Simulation;
 using GameEngineTools.World.Utils.Time;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WorldMonitor;
 using WorldObserver.Simulation;
@@ -45,9 +46,17 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     configureServices: static s => s.AddLexicalAcquisition()))
 {
     var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples);
+    var objects = runtime.Services.GetRequiredService<GameEngineTools.World.Objects.IWorldObjectProvider>();
+    collector.FarmSampler = () => objects.GetAllObjects();
+
+    var worldConfig = options.Run.Seasons
+        ? new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddJsonFile(Path.Combine(runDir, "appsettings.World.json"), optional: false).Build()
+        : null;
 
     var sceneOptions = new SimulationSceneOptions
     {
+        AstroConfig = worldConfig?.GetSection("World:Astro").Get<GameEngineTools.World.Core.Astro.AstroConfig>(),
+        UniverseConfig = worldConfig?.GetSection("World:Universe").Get<GameEngineTools.World.Core.Astro.UniverseConfig>(),
         Characters = world.Characters,
         LocationService = world.Locations,
         SimulationDays = options.Run.Days,

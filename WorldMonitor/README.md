@@ -9,7 +9,7 @@ WorldMonitor/bin/Debug/net8.0/WorldMonitor.exe --profile Full
 WorldMonitor/bin/Debug/net8.0/WorldMonitor.exe --days 30 --characters 8 --tick 64
 ```
 
-Speed and size come from `appsettings.json` (`WorldMonitor:Profiles`: characters, days, tick and substep minutes; `Quick` is about half a minute to a few minutes, `Full` 5-8 minutes, `Long` much longer). Command-line `--profile`, `--days`, `--characters`, `--couples`, `--tick`, `--substep`, `--out`, `--world-db` and `--barter true` (runs with `Economy:BarterOnly`) override it (`Couples` is the number of pairs that start as an established couple sharing a flat). `--world-db FILE` runs the same characters in a ready world (for example one made by WorldGen, to see whether its food and water suffice) instead of the built-in city; it must contain locations, otherwise the city seed is loaded. A tick is observed once per `TickStepMinutes`, so counts of actions and events are sampled, not exhaustive.
+Speed and size come from `appsettings.json` (`WorldMonitor:Profiles`: characters, days, tick and substep minutes; `Quick` is about half a minute to a few minutes, `Full` 5-8 minutes, `Long` much longer). Command-line `--profile`, `--days`, `--characters`, `--couples`, `--tick`, `--substep`, `--out`, `--world-db` and `--barter true` (runs with `Economy:BarterOnly`) and `--seasons true` (turns on the celestial model, so fields get the weather of the year) override it (`Couples` is the number of pairs that start as an established couple sharing a flat). `--world-db FILE` runs the same characters in a ready world (for example one made by WorldGen, to see whether its food and water suffice) instead of the built-in city; it must contain locations, otherwise the city seed is loaded. A tick is observed once per `TickStepMinutes`, so counts of actions and events are sampled, not exhaustive.
 
 While it runs it shows a progress bar with the current world day, elapsed time, an ETA and the latest mean stress (one line per world day when the output is redirected).
 
@@ -26,3 +26,7 @@ The intimacy part lists outcomes by speech act (invitations split by privacy) an
 Newborns are counted but not added to the scene, as WorldObserver's own birth handling lives in its hosted service.
 
 The food and water table gives per world day the mean hunger and thirst, the share of readings at 80 or more, and the meals and drinks (committed Eat, EatStored and Drink actions) per character.
+
+The `Year` profile runs 360 days with seasons on and adds a farms table by 30-day period: grain in the food stores and seed bins, unthreshed sheaves, how many
+fields are in each stage (fallow, ploughed, sown, ripe, reaped), the jobs done (plough, sow, reap, thresh) and the hunger and meals of that period.
+Use it with a world made by `worldgen --farm-people N` for the number of characters you run.

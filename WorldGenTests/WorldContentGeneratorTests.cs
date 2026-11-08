@@ -4,6 +4,7 @@
 using GameEngineTools.World.Data;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Objects;
+using GameEngineTools.World.Objects.Crops;
 using GameEngineTools.World.Objects.Production;
 using WorldGen.Generation;
 
@@ -629,45 +630,51 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
-    public void Generate_ProductionChainEnabled_AttachedToTownsAndVillages()
+    public void Generate_Farms_VillageGetsTwoFieldsInRotationAndStores()
     {
         using var db = NewWorldDb();
         var tiles = new[] { FlatTile(50.0) };
         var options = new WorldContentGenerator.Options(
-            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Village,
             GenerateProductionChain: true);
 
         WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
 
         var (descriptor, _) = db.GetAllLocations().Single();
-        var itemKinds = db.GetAllObjectsAt(descriptor.Id).Select(o => o.ItemKind).ToHashSet();
-        Assert.IsTrue(itemKinds.Contains(PickupItemKind.Grain));
-        Assert.IsTrue(itemKinds.Contains(PickupItemKind.Flour));
-        Assert.IsTrue(itemKinds.Contains(PickupItemKind.Bread));
+        var objects = db.GetAllObjectsAt(descriptor.Id);
+        var fields = objects.Where(o => o.Field is not null).OrderBy(o => o.Id).ToList();
+        var crops = new CropConfig();
+
+        Assert.AreEqual(2, fields.Count);
+        Assert.AreEqual(7.2, fields[0].Field!.AreaHectares, 1e-9, "A village of 18 farms 0.4 ha a person.");
+        Assert.AreEqual(FieldStage.Sown, fields[0].Field!.Stage, "One field carries last autumn's crop...");
+        Assert.AreEqual(FieldStage.Fallow, fields[1].Field!.Stage, "...the other rests until it is ploughed and sown.");
+
+        var seedBin = objects.Single(GrainStores.IsSeedBin);
+        var food = objects.Single(GrainStores.IsFoodStore);
+        Assert.AreEqual(CropMath.SeedUnits(7.2, crops), seedBin.Quantity, "Seed for the autumn sowing.");
+        Assert.AreEqual(18 * 610, food.Quantity, "Food until the first harvest.");
     }
 
     [TestMethod]
-    public void Generate_ProductionChainEnabled_AddsAShopWithPricedNonSpoilingStock()
+    public void Generate_Farms_SizeFollowsTheFarmedPeopleAndTheUnitSize()
     {
         using var db = NewWorldDb();
         var tiles = new[] { FlatTile(50.0) };
         var options = new WorldContentGenerator.Options(
             Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
-            GenerateProductionChain: true);
+            GenerateProductionChain: true, FarmedPeople: 10, Crops: new CropConfig { GramsPerUnit = 300.0 });
 
         WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
 
         var (descriptor, _) = db.GetAllLocations().Single();
-        var inShop = db.GetAllObjectsAt(descriptor.Id).Where(o => o.ShopId is not null).ToList();
-        var stock = inShop.Where(ShopCounterFactory.IsStock).ToList();
-        Assert.AreEqual(2, inShop.Count - stock.Count, "A counter per traded kind.");
-        Assert.AreEqual(7, stock.Count);
-        Assert.IsTrue(stock.All(o => o.Category == WorldObjectCategory.Food && o.ProducedAt is null && o.Price > 0), "Stock is priced food that never spoils.");
-        Assert.IsTrue(stock.Any(o => o.ItemKind == PickupItemKind.Bread) && stock.Any(o => o.ItemKind == PickupItemKind.Cheese));
+        var objects = db.GetAllObjectsAt(descriptor.Id);
+        Assert.AreEqual(4.0, objects.First(o => o.Field is not null).Field!.AreaHectares, 1e-9, "10 people, 0.4 ha each.");
+        Assert.AreEqual(2000, objects.Single(GrainStores.IsSeedBin).Quantity, "600 kg of seed in 300 g units.");
     }
 
     [TestMethod]
-    public void Generate_ProductionChainEnabled_EveryVillageGetsItsOwnChainAndShop()
+    public void Generate_Farms_EveryVillageAndTownHasItsOwn()
     {
         using var db = NewWorldDb();
         var tiles = new[] { FlatTile(50.0) };
@@ -680,33 +687,13 @@ public class WorldContentGeneratorTests
         foreach (var (descriptor, _) in db.GetAllLocations())
         {
             var objects = db.GetAllObjectsAt(descriptor.Id);
-            Assert.IsTrue(objects.Any(o => o.ItemKind == PickupItemKind.Grain && o.Affordances.Any(a => a.Type == AffordanceType.Production)), $"{descriptor.Id} has a field.");
-            Assert.IsTrue(objects.Any(ShopCounterFactory.IsStock), $"{descriptor.Id} has shop stock.");
+            Assert.AreEqual(2, objects.Count(o => o.Field is not null), $"{descriptor.Id} has two fields.");
+            Assert.IsTrue(objects.Any(GrainStores.IsFoodStore), $"{descriptor.Id} has a food store.");
         }
     }
 
     [TestMethod]
-    public void Generate_ProductionChain_SitesYieldSeveralOutputsPerAction()
-    {
-        using var db = NewWorldDb();
-        var tiles = new[] { FlatTile(50.0) };
-        var options = new WorldContentGenerator.Options(
-            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
-            GenerateProductionChain: true);
-
-        WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
-
-        var (descriptor, _) = db.GetAllLocations().Single();
-        double YieldOf(PickupItemKind kind) => db.GetAllObjectsAt(descriptor.Id)
-            .Single(o => o.ItemKind == kind && o.Affordances.Any(a => a.Type == AffordanceType.Production))
-            .Affordances.Single(a => a.Type == AffordanceType.Production).Satisfaction;
-        Assert.AreEqual(3.0, YieldOf(PickupItemKind.Grain));
-        Assert.AreEqual(2.0, YieldOf(PickupItemKind.Flour));
-        Assert.AreEqual(2.0, YieldOf(PickupItemKind.Bread));
-    }
-
-    [TestMethod]
-    public void Generate_ProductionChainEnabled_CampOnlySkipsChain()
+    public void Generate_Farms_CampIsTooSmallToFarm()
     {
         using var db = NewWorldDb();
         var tiles = new[] { FlatTile(50.0) };
@@ -714,11 +701,10 @@ public class WorldContentGeneratorTests
             Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Camp,
             GenerateProductionChain: true);
 
-        var result = WorldContentGenerator.Generate(db, tiles, options, new Random(56), Catalog);
+        WorldContentGenerator.Generate(db, tiles, options, new Random(56), Catalog);
 
         var (descriptor, _) = db.GetAllLocations().Single();
-        var itemKinds = db.GetAllObjectsAt(descriptor.Id).Select(o => o.ItemKind).ToHashSet();
-        Assert.IsFalse(itemKinds.Contains(PickupItemKind.Grain), "Camp tier is too small to host a production chain.");
+        Assert.IsFalse(db.GetAllObjectsAt(descriptor.Id).Any(o => o.Field is not null), "A camp forages and does not farm.");
     }
 
     [TestMethod]

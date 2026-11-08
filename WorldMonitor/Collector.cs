@@ -12,6 +12,9 @@ namespace WorldMonitor
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
 
+    /// <summary>The farms at one moment: grain in the food stores and seed bins, unthreshed grain in sheaves, and how many fields are in each stage.</summary>
+    public sealed record FarmSample(int Day, long FoodUnits, long SeedUnits, long SheafUnits, IReadOnlyDictionary<GameEngineTools.World.Objects.Crops.FieldStage, int> Stages);
+
     /// <summary>The stress of everyone at one moment of the run.</summary>
     public sealed record Sample(int Day, double ClockHour24, IReadOnlyList<double> Stress, int Private, int AtHome, int Asleep, double NeedSocial, double Energy, double InterestDrift);
 
@@ -54,7 +57,7 @@ namespace WorldMonitor
     /// <summary>Per-world-day counters taken at every tick.</summary>
     public sealed class DayCounters
     {
-        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany, HungryReadings, ThirstyReadings, Meals, Drinks;
+        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany, HungryReadings, ThirstyReadings, Meals, Drinks, Ploughed, Sowed, Reaped, Threshed;
         public double HungerSum, ThirstSum;
     }
 
@@ -110,6 +113,23 @@ namespace WorldMonitor
 
         /// <summary>World days elapsed at the latest tick.</summary>
         public double WorldDays { get; private set; }
+
+        /// <summary>Returns every world object (set by the host when farms are wanted in the report).</summary>
+        public Func<IEnumerable<GameEngineTools.World.Objects.WorldObject>>? FarmSampler { get; set; }
+
+        public List<FarmSample> FarmSamples { get; } = new();
+
+        private FarmSample TakeFarm(int day)
+        {
+            var objects = FarmSampler!().ToList();
+            var stages = objects.Where(o => o.Field is not null).GroupBy(o => o.Field!.Stage).ToDictionary(g => g.Key, g => g.Count());
+            return new FarmSample(
+                day,
+                objects.Where(GameEngineTools.World.Objects.Crops.GrainStores.IsFoodStore).Sum(o => (long)o.Quantity),
+                objects.Where(GameEngineTools.World.Objects.Crops.GrainStores.IsSeedBin).Sum(o => (long)o.Quantity),
+                objects.Where(o => o.Field is not null).Sum(o => (long)o.Field!.PendingUnits),
+                stages);
+        }
 
         public void Record(WDateTime now, IReadOnlyList<IHuman> characters)
         {
@@ -209,6 +229,8 @@ namespace WorldMonitor
             {
                 _lastSampleSlot = slot;
                 Samples.Add(Take(day, now, characters));
+                if (FarmSampler is not null)
+                    FarmSamples.Add(TakeFarm(day));
                 UpdatePeople(day, characters);
             }
         }
@@ -255,6 +277,10 @@ namespace WorldMonitor
                         {
                             if (ac.ActionName is ActionNames.Eat or ActionNames.EatStored) today.Meals++;
                             else if (ac.ActionName == ActionNames.Drink) today.Drinks++;
+                            else if (ac.ActionName == ActionNames.Plough) today.Ploughed++;
+                            else if (ac.ActionName == ActionNames.Sow) today.Sowed++;
+                            else if (ac.ActionName == ActionNames.Reap) today.Reaped++;
+                            else if (ac.ActionName == ActionNames.Thresh) today.Threshed++;
                         }
                         if (People.TryGetValue(ac.Human, out var actor)) { actor.LastAction = ac.ActionName; if (ac.ActionName == ActionNames.InviteIntimacy) actor.Invites++; }
                         break;

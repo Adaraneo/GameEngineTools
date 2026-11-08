@@ -191,7 +191,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 }
 
                 // 4c) Build the settlement's missing field, mill or bakery.
-                if (need is >= BuildMinNeed and <= BuildMaxNeed
+                if (_economy.BuildEnabled
+                    && need is >= BuildMinNeed and <= BuildMaxNeed
                     && SiteBuilding.IsSettlement(context.AvailableObjects)
                     && SiteBuilding.NextSite(context.AvailableObjects) is not null)
                 {

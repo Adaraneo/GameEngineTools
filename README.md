@@ -346,7 +346,10 @@ LOD tier), `Fidelity` (memory/perception/social fidelity per tier). Economy live
 `appsettings.Economy.json` under `Economy:*` (prices, wages, starting wealth, `ShopBuyBackFraction`). `BarterOnly: true` switches the shop to
 barter (GameSandbox ships with it on): no coin changes hands, working or delivering goods earns labor credit in hours (`LaborHoursPerValue`
 hours per unit of value, a 2-unit loaf is 3 h), and the `Barter` action takes shop food for that credit or for a held item worth at least its price
-(reference price times `ShopBuyBackFraction`). WorldGen gives every village and town a production chain (field 3, mill 2, oven 2 outputs per action) and a shop (counters and a starting shelf of bread and cheese). A hungry but not desperate character in a settlement lacking a link of the chain can `Build` it (a standard site, 3 hours), so camps grow their own food production.
+(reference price times `ShopBuyBackFraction`). WorldGen gives every village and town two fields in rotation (about 0.3 ha of crop a person, `--farm-people N` sizes them for N people), a seed bin and a food store.
+The fields run a seasonal cycle: `Plough`, `Sow` (autumn window), `Reap` and `Thresh` are sessions of labor offered by `FieldWorkNeedEngine` according to the field stage,
+the season fraction and the air temperature; threshed grain fills the seed bin first and then the food store, which people eat from one unit a meal.
+The shop, `Barter` and the instant `Build` of free production sites still exist in the engine (`Economy:BarterOnly`, `Economy:BuildEnabled`) but are off.
 
 `World:Crops` sets the grain cycle (thermal time to maturity, sowing rate, yield ratio, `GramsPerUnit` = grams of grain in one storage unit, shatter and storage loss);
 each default is annotated with its source or marked as an estimate in `CropConfig`. A field object carries a `FieldState` (fallow, ploughed, sown, ripe, reaped)

@@ -20,15 +20,16 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     /// </summary>
     internal sealed class FieldWorkNeedEngine : IBehaviorNeedEngine
     {
-        // Reaping cannot wait (the crop shatters), sowing has a window, threshing and ploughing fit the quiet months.
-        private const double ReapUtility = 46.0;
-        private const double SowUtility = 44.0;
-        private const double ThreshUtility = 34.0;
-        private const double PloughUtility = 32.0;
+        // On the scale of the other candidates at a farm (Work 62-82, Eat above 100): reaping cannot wait (the crop shatters), sowing has a window,
+        // threshing and ploughing fit the quiet months and compete with ordinary work.
+        private const double ReapUtility = 90.0;
+        private const double SowUtility = 88.0;
+        private const double ThreshUtility = 70.0;
+        private const double PloughUtility = 74.0;
 
-        // A farmer on shift puts the field first; everyone else helps, but less.
-        private const double FarmerOnShiftBonus = 12.0;
-        private const double HelperFactor = 0.75;
+        // A farmer on shift puts the field first; everyone else helps, a little less.
+        private const double FarmerOnShiftBonus = 10.0;
+        private const double HelperFactor = 0.9;
 
         // Too hungry to work; eating comes first.
         private const double MaxNeedFoodToWork = 70.0;

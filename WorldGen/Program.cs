@@ -129,7 +129,9 @@ var genOptions = new WorldContentGenerator.Options(
     GenerateHouses: options.GenerateHouses,
     GenerateCemetery: options.GenerateCemetery,
     GenerateProductionChain: options.GenerateProductionChain,
-    GenerateWorkplaces: options.GenerateWorkplaces);
+    GenerateWorkplaces: options.GenerateWorkplaces,
+    FarmedPeople: options.FarmedPeople,
+    Crops: WorldGen.PlanetSettings.LoadCrops(options.TerrainDbPath));
 
 Console.WriteLine($"Generuji {options.Count} lokací v regionu '{options.Region}'...");
 
@@ -199,11 +201,13 @@ internal sealed class CliOptions
     /// <summary>Whether a single deterministic-id cemetery location is created
     /// (<c>--no-cemetery</c> disables).</summary>
     public bool GenerateCemetery { get; init; } = true;
-    /// <summary>Whether a field→mill→bakery production chain is attached to the largest placed
-    /// settlement (<c>--no-production</c> disables).</summary>
+    /// <summary>Whether every village and town gets two fields in rotation with a seed bin and a food store
+    /// (<c>--no-production</c> disables).</summary>
     public bool GenerateProductionChain { get; init; } = true;
     /// <summary>Whether settlements and houses get workstations, benches, beds and tables (<c>--no-workplaces</c> disables).</summary>
     public bool GenerateWorkplaces { get; init; } = true;
+    /// <summary>People each village and town farm feeds (<c>--farm-people N</c>); <c>null</c> means the settlement's capacity.</summary>
+    public int? FarmedPeople { get; init; }
 
     public static void PrintUsage()
     {
@@ -227,7 +231,7 @@ internal sealed class CliOptions
                         [--seed <celé číslo, výchozí náhodné>]
                         [--nutrition-csv <cesta>, výchozí .\Nutrition.csv v aktuální složce,
                                             jinak vestavěný výchozí katalog]
-                        [--no-houses] [--no-cemetery] [--no-production] [--no-workplaces]
+                        [--no-houses] [--no-cemetery] [--no-production] [--no-workplaces] [--farm-people N]
 
             Kromě samotných osad (ve výchozím nastavení) přidá ke každé vesnici/městu pár
             obytných Rest lokací ("domů"), jeden hřbitov na deterministickém id
@@ -292,6 +296,7 @@ internal sealed class CliOptions
         var generateCemetery = true;
         var generateProductionChain = true;
         var generateWorkplaces = true;
+        int? farmedPeople = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -341,6 +346,9 @@ internal sealed class CliOptions
                     break;
                 case "--nutrition-csv" when i + 1 < args.Length:
                     nutritionCsvPath = args[++i];
+                    break;
+                case "--farm-people" when i + 1 < args.Length && int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out var fp) && fp > 0:
+                    farmedPeople = fp;
                     break;
                 case "--no-houses":
                     generateHouses = false;
@@ -413,6 +421,7 @@ internal sealed class CliOptions
             GenerateHouses = generateHouses,
             GenerateCemetery = generateCemetery,
             GenerateProductionChain = generateProductionChain,
+            FarmedPeople = farmedPeople,
             GenerateWorkplaces = generateWorkplaces,
         };
     }

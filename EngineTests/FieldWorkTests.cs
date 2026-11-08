@@ -63,6 +63,21 @@ namespace EngineTests
             Assert.AreEqual(FieldTask.Plough, FieldWork.Available(reapedIn2025, Summer(2025), continuous), "With no fallow year it is ploughed at once.");
         }
 
+        // ── Stores ───────────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public void SeedBin_IsFilledForTheFieldsSownInOneYear_NotForAllOfThem()
+        {
+            var provider = new CropCycleTests.MemoryProvider();
+            provider.AddObject(new GameEngineTools.World.Objects.WorldObject { Id = "f1", DisplayName = "Pole", Category = GameEngineTools.World.Objects.WorldObjectCategory.Ambient, LocationId = "farm", Field = new FieldState(FieldStage.Fallow, 2.0) });
+            provider.AddObject(new GameEngineTools.World.Objects.WorldObject { Id = "f2", DisplayName = "Pole", Category = GameEngineTools.World.Objects.WorldObjectCategory.Ambient, LocationId = "farm", Field = new FieldState(FieldStage.Fallow, 2.0) });
+
+            GrainStores.Deposit(provider, "farm", 5000, Cfg);
+
+            Assert.AreEqual(2000, provider.FindObject(GrainStores.SeedBinId("farm"))!.Quantity, "Two fields in a two-year rotation: seed for one (2 ha x 1000 units).");
+            Assert.AreEqual(3000, provider.FindObject(GrainStores.FoodStoreId("farm"))!.Quantity);
+        }
+
         // ── Labor moves the field on ─────────────────────────────────────────────────
 
         [TestMethod]
@@ -141,7 +156,7 @@ namespace EngineTests
                       + FieldWork.RequiredHours(FieldTask.Thresh, new FieldState(FieldStage.Fallow, 1.0), Cfg);
 
             Assert.AreEqual(576.0, hours, 1e-9);
-            Assert.IsTrue(hours * 0.3 is > 150 and < 250, "About 0.3 ha feeds a person, so 150-250 h of grain work a person-year, as estimated from the sources.");
+            Assert.IsTrue(hours * 0.4 is > 150 and < 250, "About 0.4 ha feeds a person on grain alone, so 150-250 h of grain work a person-year, as estimated from the sources.");
         }
     }
 }

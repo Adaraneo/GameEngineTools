@@ -6,6 +6,7 @@ using GameEngineTools.World.Data;
 using GameEngineTools.World.Economy;
 using GameEngineTools.World.Location;
 using GameEngineTools.World.Objects;
+using GameEngineTools.World.Objects.Crops;
 using GameEngineTools.World.Objects.Production;
 
 namespace WorldGen.Generation;
@@ -136,7 +137,12 @@ public static class WorldContentGenerator
         /// (<c>Shelter</c>) and a table (<c>Furniture</c>), and town squares benches — what <c>Work</c>, <c>Create</c>,
         /// <c>SelfCare</c> and sleeping at home are gated on. Placed deterministically (no RNG), so the same seed still
         /// yields the same layout. Opt-in here for the same reason as <see cref="GenerateHouses"/>.</summary>
-        bool GenerateWorkplaces = false);
+        bool GenerateWorkplaces = false,
+        /// <summary>People each village and town farm is sized for; <c>null</c> sizes it for the settlement's capacity. A farm is sized
+        /// for the people it feeds (about 0.3 ha of crop a person a year), so a lightly populated world should set this lower.</summary>
+        int? FarmedPeople = null,
+        /// <summary>The grain-cycle settings the farms are built from (seed per hectare, size of a storage unit); defaults when <c>null</c>.</summary>
+        GameEngineTools.World.Objects.Crops.CropConfig? Crops = null);
 
     public sealed record Result(int LocationsPlaced, int ConnectionsCreated, int ObjectsCreated, string? CemeteryLocationId = null);
 
@@ -250,7 +256,7 @@ public static class WorldContentGenerator
         }
 
         if (options.GenerateProductionChain)
-            objectsCreated += AddProductionChain(worldDb, placed);
+            objectsCreated += AddFarms(worldDb, placed, options.FarmedPeople, options.Crops ?? new GameEngineTools.World.Objects.Crops.CropConfig());
 
         if (options.GenerateWorkplaces)
             objectsCreated += AddWorkplacesAndFurniture(worldDb, placed);
@@ -823,49 +829,49 @@ public static class WorldContentGenerator
         return 1;
     }
 
-    private static int AddProductionChain(SqliteWorldDatabase worldDb, List<Placed> placed)
+    private static int AddFarms(SqliteWorldDatabase worldDb, List<Placed> placed, int? farmedPeople, CropConfig crops)
     {
         var created = 0;
-        foreach (var anchor in placed.Where(p => p.Tier is SettlementTier.Town or SettlementTier.Village))
+        foreach (var settlement in placed.Where(p => p.Tier is SettlementTier.Town or SettlementTier.Village))
         {
-            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_field", anchor.Id, PickupItemKind.Grain, "Obilné pole", SiteBuilding.StandardYield(PickupItemKind.Grain)));
-            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_mill", anchor.Id, PickupItemKind.Flour, "Mlýn", SiteBuilding.StandardYield(PickupItemKind.Flour)));
-            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_bakery", anchor.Id, PickupItemKind.Bread, "Pekárna", SiteBuilding.StandardYield(PickupItemKind.Bread)));
-            created += 3 + AddShop(worldDb, anchor.Id);
+            var people = farmedPeople ?? TierProfile(settlement.Tier).Capacity;
+            var area = Math.Round(people * CroppedHectaresPerPerson, 2);
+            var seed = CropMath.SeedUnits(area, crops);
+
+            // Two fields in rotation: one carries last autumn's crop, the other rests until it is ploughed and sown this autumn.
+            worldDb.AddObject(Field($"{settlement.Id}_field_1", settlement.Id, new FieldState(FieldStage.Sown, area, DegreeDays: DegreeDaysAtSpringStart, SeedUnits: seed)));
+            worldDb.AddObject(Field($"{settlement.Id}_field_2", settlement.Id, new FieldState(FieldStage.Fallow, area)));
+
+            // Seed for the autumn sowing, and food to live on until the first harvest.
+            worldDb.AddObject(GrainStores.CreateSeedBin(settlement.Id, seed));
+            worldDb.AddObject(GrainStores.CreateFoodStore(settlement.Id, people * StartingMealsPerPerson));
+            created += 4;
         }
 
         return created;
     }
 
-    /// <summary>The settlement's shop: a counter per traded kind and a starting shelf, priced at each kind's reference price.</summary>
-    private static int AddShop(SqliteWorldDatabase worldDb, string locationId)
-    {
-        var shopId = $"{locationId}_shop";
-        var created = 0;
-        foreach (var (kind, label, units) in new[] { (PickupItemKind.Bread, "chléb", StarterShelfBread), (PickupItemKind.Cheese, "sýr", StarterShelfCheese) })
+    private static WorldObject Field(string id, string locationId, FieldState state)
+        => new()
         {
-            worldDb.AddObject(ShopCounterFactory.Create($"{shopId}_counter_{kind.ToString().ToLowerInvariant()}", locationId, shopId, kind, $"Pult – {label}"));
-            created++;
-            for (var i = 1; i <= units; i++)
-            {
-                // No production time: the starting shelf does not spoil.
-                var unit = FoodItemCatalog.Create(kind, locationId, default, null) with
-                {
-                    Id = $"{shopId}_{kind.ToString().ToLowerInvariant()}_{i:D2}",
-                    ProducedAt = null,
-                    ShopId = shopId,
-                    Price = EconomyLedger.ReferencePrice(kind),
-                };
-                worldDb.AddObject(unit);
-                created++;
-            }
-        }
+            Id = id,
+            DisplayName = "Pole",
+            Category = WorldObjectCategory.Ambient,
+            LocationId = locationId,
+            ItemKind = PickupItemKind.Grain,
+            IsPickable = false,
+            WeightGrams = 500_000,
+            Field = state,
+        };
 
-        return created;
-    }
+    // Cropped area per person a year; my calculation: 2200 kcal a day from grain alone at 3.4 kcal/g is 236 kg a year, at 600 kg/ha net about 0.4 ha.
+    private const double CroppedHectaresPerPerson = 0.4;
 
-    private const int StarterShelfBread = 4;
-    private const int StarterShelfCheese = 3;
+    // Degree-days a winter crop sown the previous autumn has by early spring; my estimate, the rest of the 2800 comes with the warm months.
+    private const double DegreeDaysAtSpringStart = 700.0;
+
+    // Meals of grain per person in the starting store: about 135 days at 4.5 meals, until the first harvest.
+    private const int StartingMealsPerPerson = 610;
 
     /// <summary>Adds up to <see cref="Options.ForcedTier"/>-driven object depth per need (1 for
     /// Camp, 2 for Village, 3 for Town — see <see cref="ObjectDepthForTier"/>) so a settlement

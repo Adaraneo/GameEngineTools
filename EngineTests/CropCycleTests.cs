@@ -226,7 +226,7 @@ namespace EngineTests
 
         // ── Stubs ────────────────────────────────────────────────────────────────────
 
-        private sealed class MemoryProvider : IMutableWorldObjectProvider
+        internal sealed class MemoryProvider : IMutableWorldObjectProvider
         {
             private readonly Dictionary<string, WorldObject> _objects = new();
 

@@ -57,7 +57,7 @@ namespace GameEngineTools.World.Objects.Crops
         public const double PorridgeSatisfaction = 0.4;
 
         /// <summary>
-        /// Puts threshed grain into the settlement's stores: first the seed bin up to what the fields will need next sowing, the rest into
+        /// Puts threshed grain into the settlement's stores: first the seed bin up to what the fields sown in one year need, the rest into
         /// the food store. Creates a store that does not exist yet.
         /// </summary>
         public static void Deposit(IMutableWorldObjectProvider provider, string locationId, int units, CropConfig cfg)
@@ -67,7 +67,9 @@ namespace GameEngineTools.World.Objects.Crops
 
             var here = provider.GetAllObjectsAt(locationId).Where(o => o.HeldBy is null).ToList();
             var seedBin = here.FirstOrDefault(IsSeedBin);
-            var seedWanted = here.Where(o => o.Field is not null).Sum(o => CropMath.SeedUnits(o.Field!.AreaHectares, cfg));
+            var fields = here.Where(o => o.Field is not null).ToList();
+            var croppedPerYear = Math.Max(1, (int)Math.Round(fields.Count / (1.0 + cfg.FallowYears)));
+            var seedWanted = fields.OrderByDescending(o => o.Field!.AreaHectares).Take(croppedPerYear).Sum(o => CropMath.SeedUnits(o.Field!.AreaHectares, cfg));
             var toSeed = Math.Clamp(seedWanted - (seedBin?.Quantity ?? 0), 0, units);
             var toFood = units - toSeed;
 
