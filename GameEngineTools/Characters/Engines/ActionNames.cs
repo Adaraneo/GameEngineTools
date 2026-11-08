@@ -148,5 +148,21 @@ namespace GameEngineTools.Characters.Engines
         public const string Build = "Build";
 
         #endregion Food economy (Tier 2)
+
+        #region Field work
+
+        /// <summary>Turn over a field by hand; a session of hours that adds to the field's progress.</summary>
+        public const string Plough = "Plough";
+
+        /// <summary>Put seed into a ploughed field, in the autumn sowing window.</summary>
+        public const string Sow = "Sow";
+
+        /// <summary>Cut a ripe crop with a sickle.</summary>
+        public const string Reap = "Reap";
+
+        /// <summary>Beat the reaped sheaves with a flail; the grain goes to the settlement's stores.</summary>
+        public const string Thresh = "Thresh";
+
+        #endregion Field work
     }
 }

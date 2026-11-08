@@ -134,7 +134,7 @@ namespace EngineTests
             => new() { Id = "field_1", DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemKind = PickupItemKind.Grain, Field = state };
 
         private static WorldObject Store(int units)
-            => new() { Id = "store_1", DisplayName = "Sypka", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemKind = PickupItemKind.Grain, Quantity = units };
+            => new() { Id = "store_1", DisplayName = "Sypka", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemKind = PickupItemKind.Grain, Quantity = units, IsStock = true };
 
         [TestMethod]
         public void Service_AddsHeatToSownFieldsOncePerHour_AndRipensThem()

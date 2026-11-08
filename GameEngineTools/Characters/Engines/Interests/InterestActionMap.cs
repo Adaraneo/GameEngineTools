@@ -35,7 +35,7 @@ namespace GameEngineTools.Characters.Engines.Interests
         {
             Create => Artistic,
             Work => WorkDimension(occupation),
-            Produce or Process => Realistic,
+            Produce or Process or Plough or Sow or Reap or Thresh => Realistic,
             Sell => Enterprising,
             ReachOut => Social,
             _ => -1

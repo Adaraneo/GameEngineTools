@@ -12,6 +12,7 @@ namespace GameEngineTools.Characters.Engines.Objects
     using GameEngineTools.World.Economy;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Crops;
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
@@ -33,6 +34,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         private readonly EconomyConfig _economyConfig;
         private readonly ICognitiveResolutionLevelRuntime? _lodRuntime;
         private readonly ILogger<DefaultObjectInteractionEngine> _logger;
+        private readonly CropConfig _cropConfig;
 
         /// <summary>Creates the engine with its world-object, location, policy, production, economy and logging dependencies.</summary>
         /// <param name="objectProvider">Provider of mutable world objects.</param>
@@ -58,8 +60,10 @@ namespace GameEngineTools.Characters.Engines.Objects
             EconomyLedger economyLedger,
             IOptions<EconomyConfig> economyConfig,
             ILogger<DefaultObjectInteractionEngine> logger,
-            ICognitiveResolutionLevelRuntime? lodRuntime = null)
+            ICognitiveResolutionLevelRuntime? lodRuntime = null,
+            IOptions<CropConfig>? cropConfig = null)
         {
+            _cropConfig = cropConfig?.Value ?? CropConfig.Default;
             _objectProvider = objectProvider;
             _locations = locations;
             _policy = policy;
@@ -123,6 +127,18 @@ namespace GameEngineTools.Characters.Engines.Objects
                     case ActionNames.Build:
                         HandleBuild(committed, ctx, outbox);
                         break;
+                    case ActionNames.Plough:
+                        HandleFieldWork(FieldTask.Plough, committed, ctx, outbox);
+                        break;
+                    case ActionNames.Sow:
+                        HandleFieldWork(FieldTask.Sow, committed, ctx, outbox);
+                        break;
+                    case ActionNames.Reap:
+                        HandleFieldWork(FieldTask.Reap, committed, ctx, outbox);
+                        break;
+                    case ActionNames.Thresh:
+                        HandleFieldWork(FieldTask.Thresh, committed, ctx, outbox);
+                        break;
                 }
                 return;
             }
@@ -167,8 +183,10 @@ namespace GameEngineTools.Characters.Engines.Objects
                 case ObjectInteractionKind.UseInPlace:
                     // Apply non-Ownership affordances; consume the object if it is a one-use type
                     AffordanceApplicationService.Apply(obj, ctx, outbox, committed.OccurredAt);
-                    var wasConsumed = obj.IsPickable; // pickable single-use objects are consumed on use
-                    if (wasConsumed)
+                    var wasConsumed = obj.IsPickable || obj.IsStock; // pickable single-use objects and finite stocks are used up
+                    if (obj.IsStock)
+                        GrainStores.Take(_objectProvider, obj, 1);
+                    else if (wasConsumed)
                         _objectProvider.ConsumeObject(data.LocationId, data.ObjectId, committed.OccurredAt);
                     outbox.Add(new ObjectUsed(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId, wasConsumed));
 
@@ -257,9 +275,11 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (obj is null)
                 return;
 
-            // Consume the object if it is a one-use type.
-            var wasConsumed = obj.IsPickable;
-            if (wasConsumed)
+            // A finite stock gives up one unit; a pickable one-use object is consumed whole.
+            var wasConsumed = obj.IsPickable || obj.IsStock;
+            if (obj.IsStock)
+                GrainStores.Take(_objectProvider, obj, 1);
+            else if (wasConsumed)
                 _objectProvider.ConsumeObject(locationId, obj.Id, committed.OccurredAt);
 
             outbox.Add(new ObjectUsed(committed.OccurredAt, ctx.Id, obj.Id, locationId, wasConsumed));
@@ -377,6 +397,38 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             if (_economyConfig.BarterOnly)
                 DeliverSurplus(produced, locationId, committed.OccurredAt, ctx, outbox);
+        }
+
+        /// <summary>
+        /// Handles the field jobs (<see cref="ActionNames.Plough"/>, <see cref="ActionNames.Sow"/>, <see cref="ActionNames.Reap"/>,
+        /// <see cref="ActionNames.Thresh"/>): adds the session's hours to the first field here that can take the job now, moves it to its
+        /// next stage when the labor is spent, takes seed from the bin when sowing is finished and puts threshed grain into the stores.
+        /// </summary>
+        private void HandleFieldWork(FieldTask task, ActionCommitted committed, IHumanContext ctx, IEventCollector outbox)
+        {
+            var location = _locations.GetLocation(ctx.Id);
+            if (location is null || ctx.Snapshot.Celestial is not { } celestial)
+                return;
+
+            var here = _objectProvider.GetAllObjectsAt(location).Where(o => o.HeldBy is null).ToList();
+            var seedBin = here.FirstOrDefault(GrainStores.IsSeedBin);
+            var season = new FieldSeason(celestial.SeasonFraction, ctx.Snapshot.AmbientTemperature, committed.OccurredAt.Year, seedBin?.Quantity ?? 0);
+
+            var fieldObject = here.FirstOrDefault(o => o.Field is { } f && FieldWork.Available(f, season, _cropConfig) == task);
+            if (fieldObject?.Field is not { } field)
+                return;
+
+            var result = FieldWork.Apply(task, field, committed.Duration.TotalHours, committed.OccurredAt, season.Year, _cropConfig);
+
+            _objectProvider.RemoveObject(fieldObject.LocationId, fieldObject.Id);
+            _objectProvider.AddObject(fieldObject with { Field = result.Field });
+
+            if (result.SeedConsumed > 0 && seedBin is not null)
+                GrainStores.Take(_objectProvider, seedBin, result.SeedConsumed);
+            if (result.ThreshedUnits > 0)
+                GrainStores.Deposit(_objectProvider, location, result.ThreshedUnits, _cropConfig);
+            if (result.Completed)
+                outbox.Add(new FieldStageChanged(committed.OccurredAt, ctx.Id, fieldObject.Id, location, field.Stage, result.Field.Stage));
         }
 
         /// <summary>

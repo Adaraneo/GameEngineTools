@@ -60,6 +60,15 @@ namespace GameEngineTools.Characters.Engines.Economy
         PickupItemKind? GivenKind,
         double LaborHoursSpent) : IDomainEvent;
 
+    /// <summary>Fired by the object-interaction commit path when field work finishes a job and the field moves to its next stage.</summary>
+    public sealed record FieldStageChanged(
+        WDateTime OccurredAt,
+        HumanId Worker,
+        string FieldId,
+        string LocationId,
+        GameEngineTools.World.Objects.Crops.FieldStage From,
+        GameEngineTools.World.Objects.Crops.FieldStage To) : IDomainEvent;
+
     /// <summary>Fired by the object-interaction commit path when a character finishes building a production site.</summary>
     public sealed record SiteBuilt(
         WDateTime OccurredAt,

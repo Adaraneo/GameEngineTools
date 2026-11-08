@@ -51,6 +51,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 [UseObjectForMood] = ActionSlotMask.None,
                 [GatherAtObject] = ActionSlotMask.None,
 
+                // ── Field work — hands and the whole body ──────────────────────
+                [Plough] = ActionSlotMask.Hands | ActionSlotMask.Posture,
+                [Sow] = ActionSlotMask.Hands | ActionSlotMask.Posture,
+                [Reap] = ActionSlotMask.Hands | ActionSlotMask.Posture,
+                [Thresh] = ActionSlotMask.Hands | ActionSlotMask.Posture,
+
                 // ── Idle ───────────────────────────────────────────────────────
                 [Idle] = ActionSlotMask.None,
 

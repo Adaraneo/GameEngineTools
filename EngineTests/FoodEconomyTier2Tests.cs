@@ -14,6 +14,7 @@ namespace EngineTests
     using GameEngineTools.World.Economy;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Crops;
     using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging.Abstractions;
@@ -509,6 +510,133 @@ namespace EngineTests
             var shelf = provider.GetObjectsAt(Loc).Single(o => o.ShopId == "bakery");
             Assert.AreEqual(PickupItemKind.Cheese, shelf.ItemKind, "The cheese was relisted as shop stock.");
             Assert.IsNotNull(shelf.Price);
+        }
+
+        // ── Field work ───────────────────────────────────────────────────────────────
+
+        private static WorldObject FieldObject(FieldState state, string id = "field_1", string location = Loc)
+            => new() { Id = id, DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = location, ItemKind = PickupItemKind.Grain, Field = state };
+
+        /// <summary>A worker whose snapshot carries the season (fraction of the year since the equinox) and the air temperature.</summary>
+        private static IHumanContext FarmerContext(HumanId self, double seasonFraction, double temperature)
+        {
+            var ctx = (HumanContext)BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
+            ctx.Snapshot = ctx.Snapshot with
+            {
+                AmbientTemperature = temperature,
+                Celestial = new GameEngineTools.World.Core.Astro.CelestialContext(0.5, 12.0, 6.0, 18.0, 12.0, seasonFraction, 0.0, true, temperature),
+            };
+            return ctx;
+        }
+
+        private static ActionCommitted Session(HumanId self, string action, double hours = 4.0)
+            => new(new WDateTime(0), self, action, WTimeSpan.FromHours(hours));
+
+        [TestMethod]
+        public void FieldHandler_ReapFinishesTheCrop_AndLeavesSheavesToThresh()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            var t0 = new WDateTime(0);
+            provider.AddObject(FieldObject(new FieldState(FieldStage.Ripe, 1.0, t0, t0, 2800.0, SeedUnits: 1000, WorkDoneHours: 158.0)));
+            var engine = MakeObjectEngine(provider);
+            var outbox = new EventCollector();
+
+            engine.Handle(Session(self, Reap), FarmerContext(self, 0.33, 18.0), outbox);
+
+            var field = provider.FindObject("field_1")!.Field!;
+            Assert.AreEqual(FieldStage.Reaped, field.Stage);
+            Assert.AreEqual(5000, field.PendingUnits);
+            var changed = outbox.Drain().OfType<FieldStageChanged>().Single();
+            Assert.AreEqual(FieldStage.Ripe, changed.From);
+            Assert.AreEqual(FieldStage.Reaped, changed.To);
+        }
+
+        [TestMethod]
+        public void FieldHandler_ThreshFillsTheSeedBinFirst_ThenTheFoodStore()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(FieldObject(new FieldState(FieldStage.Reaped, 1.0, SeedUnits: 1000, PendingUnits: 5000, ThreshHoursRemaining: 160.0, ReapedYear: 2025)));
+            var engine = MakeObjectEngine(provider);
+
+            for (var session = 0; session < 40; session++)
+                engine.Handle(Session(self, Thresh), FarmerContext(self, 0.80, -3.0), new EventCollector());
+
+            Assert.AreEqual(FieldStage.Fallow, provider.FindObject("field_1")!.Field!.Stage, "All the grain is out of the sheaves.");
+            var seedBin = provider.FindObject(GrainStores.SeedBinId(Loc))!;
+            var food = provider.FindObject(GrainStores.FoodStoreId(Loc))!;
+            Assert.AreEqual(1000, seedBin.Quantity, "The seed for next year's sowing is kept back first.");
+            Assert.AreEqual(4000, food.Quantity, "The rest is food.");
+            Assert.IsTrue(food.IsStock && food.Category == WorldObjectCategory.Food);
+        }
+
+        [TestMethod]
+        public void FieldHandler_SowTakesTheSeedFromTheBin()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(FieldObject(new FieldState(FieldStage.Ploughed, 1.0, WorkDoneHours: 28.0)));
+            provider.AddObject(GrainStores.CreateSeedBin(Loc, 1500));
+            var engine = MakeObjectEngine(provider);
+
+            engine.Handle(Session(self, Sow), FarmerContext(self, 0.55, 8.0), new EventCollector());
+
+            Assert.AreEqual(FieldStage.Sown, provider.FindObject("field_1")!.Field!.Stage);
+            Assert.AreEqual(500, provider.FindObject(GrainStores.SeedBinId(Loc))!.Quantity, "A hectare takes 1000 units of seed.");
+        }
+
+        [TestMethod]
+        public void FieldHandler_OutOfSeason_DoesNothing()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(FieldObject(new FieldState(FieldStage.Ploughed, 1.0)));
+            provider.AddObject(GrainStores.CreateSeedBin(Loc, 1500));
+            var engine = MakeObjectEngine(provider);
+
+            engine.Handle(Session(self, Sow), FarmerContext(self, 0.33, 18.0), new EventCollector());
+
+            Assert.AreEqual(0.0, provider.FindObject("field_1")!.Field!.WorkDoneHours, "Nobody sows in July.");
+        }
+
+        [TestMethod]
+        public void EatingFromTheFoodStore_UsesOneUnitAMeal_AndTheEmptyStoreIsGone()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(GrainStores.CreateFoodStore(Loc, 2));
+            var engine = MakeObjectEngine(provider);
+            var ctx = LaborContext(self, 0.0);
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Eat, WTimeSpan.FromMinutes(30)), ctx, new EventCollector());
+            Assert.AreEqual(1, provider.FindObject(GrainStores.FoodStoreId(Loc))!.Quantity);
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Eat, WTimeSpan.FromMinutes(30)), ctx, new EventCollector());
+            Assert.IsNull(provider.FindObject(GrainStores.FoodStoreId(Loc)), "The last unit empties the store.");
+        }
+
+        [TestMethod]
+        public void FieldNeed_OffersTheJobTheFieldNeeds_OnlyWithASeasonAndAnEmptyEnoughStomach()
+        {
+            var engine = new FieldWorkNeedEngine();
+            var self = new HumanId(Guid.NewGuid());
+            var ripe = new List<WorldObject> { FieldObject(new FieldState(FieldStage.Ripe, 1.0)) };
+
+            BehaviorContext Ctx(double hunger, double season, double temp, List<WorldObject> objects)
+                => BehaviorComponentTestFactory.Context(selfId: self, hunger: hunger, thirst: 5, now: new WDateTime(0)) with
+                {
+                    AvailableObjects = objects,
+                    HumanContext = FarmerContext(self, season, temp),
+                };
+
+            Assert.AreEqual(Reap, engine.Evaluate(Ctx(20, 0.33, 18.0, ripe)).Candidates.Single().Name);
+            Assert.AreEqual(0, engine.Evaluate(Ctx(85, 0.33, 18.0, ripe)).Candidates.Count, "Too hungry to work: eating comes first.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(20, 0.33, 18.0, new List<WorldObject>())).Candidates.Count, "No field here.");
+
+            var bare = new List<WorldObject> { FieldObject(new FieldState(FieldStage.Fallow, 1.0)) };
+            Assert.AreEqual(Plough, engine.Evaluate(Ctx(20, 0.30, 15.0, bare)).Candidates.Single().Name);
+            Assert.AreEqual(0, engine.Evaluate(Ctx(20, 0.80, -3.0, bare)).Candidates.Count, "Frozen ground.");
         }
 
         [TestMethod]

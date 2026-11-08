@@ -80,7 +80,7 @@ namespace GameEngineTools.World.Objects.Crops
 
         /// <summary>A stock of dry grain or flour kept in a settlement: not a production fixture, not shop stock, not held by anyone.</summary>
         public static bool IsStore(WorldObject o)
-            => o.Category == WorldObjectCategory.Ambient
+            => o.IsStock
                && o.ItemKind is PickupItemKind.Grain or PickupItemKind.Flour
                && o.Price is null
                && !o.Affordances.Any(a => a.Type == AffordanceType.Production);
