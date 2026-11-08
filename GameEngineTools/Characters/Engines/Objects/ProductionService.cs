@@ -35,24 +35,23 @@ namespace GameEngineTools.Characters.Engines.Objects
 
         /// <summary>
         /// Raw-material production (no recipe inputs — e.g. harvesting grain, milking): consumes only
-        /// labor time and creates one fresh output object in the character's hands.
+        /// labor time and creates <paramref name="yield"/> fresh output objects in the character's hands (the first is returned).
         /// </summary>
-        public WorldObject Produce(IHumanContext ctx, string locationId, PickupItemKind outputKind, WDateTime now)
+        public WorldObject Produce(IHumanContext ctx, string locationId, PickupItemKind outputKind, WDateTime now, int yield = 1)
         {
             ArgumentNullException.ThrowIfNull(ctx);
             ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
 
-            var obj = FoodItemCatalog.Create(outputKind, locationId, now, heldBy: ctx.Id);
-            _objectProvider.AddObject(obj);
-            return obj;
+            return CreateOutputs(ctx, locationId, outputKind, now, yield);
         }
 
         /// <summary>
         /// Recipe-based processing (e.g. milling, baking): verifies and consumes the recipe inputs
         /// (all-or-nothing), then creates the fresh output object in the character's hands. Returns
-        /// <c>null</c> with no side effects when the recipe is unknown or inputs are insufficient.
+        /// <c>null</c> with no side effects when the recipe is unknown or inputs are insufficient. One run of the recipe makes
+        /// <paramref name="yield"/> outputs (the first is returned).
         /// </summary>
-        public WorldObject? Process(IHumanContext ctx, string locationId, PickupItemKind outputKind, WDateTime now)
+        public WorldObject? Process(IHumanContext ctx, string locationId, PickupItemKind outputKind, WDateTime now, int yield = 1)
         {
             ArgumentNullException.ThrowIfNull(ctx);
             ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
@@ -64,14 +63,21 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (!TryConsumeInputs(ctx, locationId, recipe))
                 return null; // insufficient inputs — nothing consumed
 
-            var obj = FoodItemCatalog.Create(outputKind, locationId, now, heldBy: ctx.Id);
-            _objectProvider.AddObject(obj);
-            return obj;
+            return CreateOutputs(ctx, locationId, outputKind, now, yield);
         }
 
         #endregion Public API
 
         #region Private helpers
+
+        private WorldObject CreateOutputs(IHumanContext ctx, string locationId, PickupItemKind outputKind, WDateTime now, int yield)
+        {
+            var first = FoodItemCatalog.Create(outputKind, locationId, now, heldBy: ctx.Id);
+            _objectProvider.AddObject(first);
+            for (var i = 1; i < yield; i++)
+                _objectProvider.AddObject(FoodItemCatalog.Create(outputKind, locationId, now, heldBy: ctx.Id));
+            return first;
+        }
 
         /// <summary>A recipe input lying about must be a free, pickable item: not a production-site fixture and not priced shop stock.</summary>
         private static bool IsLooseIngredient(WorldObject o) => o.IsPickable && o.Price is null;

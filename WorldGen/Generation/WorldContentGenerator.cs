@@ -825,16 +825,16 @@ public static class WorldContentGenerator
 
     private static int AddProductionChain(SqliteWorldDatabase worldDb, List<Placed> placed)
     {
-        var anchor = placed
-            .Where(p => p.Tier is SettlementTier.Town or SettlementTier.Village)
-            .OrderByDescending(p => (int)p.Tier)
-            .FirstOrDefault();
-        if (anchor is null) return 0;
+        var created = 0;
+        foreach (var anchor in placed.Where(p => p.Tier is SettlementTier.Town or SettlementTier.Village))
+        {
+            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_field", anchor.Id, PickupItemKind.Grain, "Obilné pole", FieldYield));
+            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_mill", anchor.Id, PickupItemKind.Flour, "Mlýn", MillYield));
+            worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_bakery", anchor.Id, PickupItemKind.Bread, "Pekárna", OvenYield));
+            created += 3 + AddShop(worldDb, anchor.Id);
+        }
 
-        worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_field", anchor.Id, PickupItemKind.Grain, "Obilné pole"));
-        worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_mill", anchor.Id, PickupItemKind.Flour, "Mlýn"));
-        worldDb.AddObject(ProductionSiteFactory.Create($"{anchor.Id}_bakery", anchor.Id, PickupItemKind.Bread, "Pekárna"));
-        return 3 + AddShop(worldDb, anchor.Id);
+        return created;
     }
 
     /// <summary>The settlement's shop: a counter per traded kind and a starting shelf, priced at each kind's reference price.</summary>
@@ -863,6 +863,11 @@ public static class WorldContentGenerator
 
         return created;
     }
+
+    // Outputs per action; a loaf then costs about 1.3 labor hours instead of 3.25. Own estimate, aimed at roughly 5 hours of food work per person-day.
+    private const double FieldYield = 3.0;
+    private const double MillYield = 2.0;
+    private const double OvenYield = 2.0;
 
     private const int StarterShelfBread = 4;
     private const int StarterShelfCheese = 3;

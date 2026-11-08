@@ -629,7 +629,7 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
-    public void Generate_ProductionChainEnabled_AttachedToLargestSettlementOnly()
+    public void Generate_ProductionChainEnabled_AttachedToTownsAndVillages()
     {
         using var db = NewWorldDb();
         var tiles = new[] { FlatTile(50.0) };
@@ -664,6 +664,45 @@ public class WorldContentGeneratorTests
         Assert.AreEqual(7, stock.Count);
         Assert.IsTrue(stock.All(o => o.Category == WorldObjectCategory.Food && o.ProducedAt is null && o.Price > 0), "Stock is priced food that never spoils.");
         Assert.IsTrue(stock.Any(o => o.ItemKind == PickupItemKind.Bread) && stock.Any(o => o.ItemKind == PickupItemKind.Cheese));
+    }
+
+    [TestMethod]
+    public void Generate_ProductionChainEnabled_EveryVillageGetsItsOwnChainAndShop()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 3, MinDistanceMeters: 20.0, ForcedTier: WorldContentGenerator.SettlementTier.Village,
+            GenerateProductionChain: true);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(57), Catalog);
+
+        foreach (var (descriptor, _) in db.GetAllLocations())
+        {
+            var objects = db.GetAllObjectsAt(descriptor.Id);
+            Assert.IsTrue(objects.Any(o => o.ItemKind == PickupItemKind.Grain && o.Affordances.Any(a => a.Type == AffordanceType.Production)), $"{descriptor.Id} has a field.");
+            Assert.IsTrue(objects.Any(ShopCounterFactory.IsStock), $"{descriptor.Id} has shop stock.");
+        }
+    }
+
+    [TestMethod]
+    public void Generate_ProductionChain_SitesYieldSeveralOutputsPerAction()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Town,
+            GenerateProductionChain: true);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        double YieldOf(PickupItemKind kind) => db.GetAllObjectsAt(descriptor.Id)
+            .Single(o => o.ItemKind == kind && o.Affordances.Any(a => a.Type == AffordanceType.Production))
+            .Affordances.Single(a => a.Type == AffordanceType.Production).Satisfaction;
+        Assert.AreEqual(3.0, YieldOf(PickupItemKind.Grain));
+        Assert.AreEqual(2.0, YieldOf(PickupItemKind.Flour));
+        Assert.AreEqual(2.0, YieldOf(PickupItemKind.Bread));
     }
 
     [TestMethod]

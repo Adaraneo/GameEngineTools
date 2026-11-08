@@ -16,9 +16,10 @@ namespace GameEngineTools.World.Objects.Production
     {
         /// <summary>
         /// Creates a non-pickable, non-respawning production-site fixture at <paramref name="locationId"/>
-        /// whose <see cref="AffordanceType.Production"/> yields <paramref name="outputKind"/>.
+        /// whose <see cref="AffordanceType.Production"/> yields <paramref name="outputKind"/>; the affordance's satisfaction is the number of
+        /// outputs one action makes (<paramref name="yield"/>, rounded, at least 1).
         /// </summary>
-        public static WorldObject Create(string id, string locationId, PickupItemKind outputKind, string displayName)
+        public static WorldObject Create(string id, string locationId, PickupItemKind outputKind, string displayName, double yield = 1.0)
             => new()
             {
                 Id = id,
@@ -32,7 +33,7 @@ namespace GameEngineTools.World.Objects.Production
                 Respawns = false,
                 WeightGrams = 500_000, // effectively immovable
                 ItemKind = outputKind,
-                Affordances = ImmutableArray.Create(new WorldObjectAffordance(AffordanceType.Production, 1.0)),
+                Affordances = ImmutableArray.Create(new WorldObjectAffordance(AffordanceType.Production, yield)),
             };
     }
 }

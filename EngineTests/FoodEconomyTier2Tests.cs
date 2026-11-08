@@ -512,6 +512,34 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void ProductionSite_YieldMakesSeveralOutputsPerAction()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole", yield: 3.0));
+            var engine = MakeObjectEngine(provider);
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Produce, WTimeSpan.FromMinutes(30)), LaborContext(self, 0.0), new EventCollector());
+
+            Assert.AreEqual(3, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Grain), "A field with yield 3 gives three grain per harvest.");
+        }
+
+        [TestMethod]
+        public void ProcessingSite_YieldMultipliesOutputsButConsumesInputsOnce()
+        {
+            var provider = new MemProvider();
+            var self = new HumanId(Guid.NewGuid());
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec", yield: 2.0));
+            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            var engine = MakeObjectEngine(provider);
+
+            engine.Handle(new ActionCommitted(new WDateTime(0), self, Process, WTimeSpan.FromMinutes(90)), LaborContext(self, 0.0), new EventCollector());
+
+            Assert.AreEqual(2, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Bread));
+            Assert.AreEqual(0, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Flour), "One flour went in.");
+        }
+
+        [TestMethod]
         public void BarterMode_BakerDeliversSurplusLoafToTheShop_AndKeepsTheFirst()
         {
             var provider = new MemProvider();

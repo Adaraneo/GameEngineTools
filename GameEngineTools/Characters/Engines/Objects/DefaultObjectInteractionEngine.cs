@@ -340,7 +340,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (outputKind is null)
                 return;
 
-            var produced = _production.Produce(ctx, locationId, outputKind.Value, committed.OccurredAt);
+            var produced = _production.Produce(ctx, locationId, outputKind.Value, committed.OccurredAt, SiteYield(locationId, outputKind.Value));
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
                 _logger.ItemProduced(ctx.Id.ToString(), produced.ItemKind.ToString(), produced.Id, locationId);
         }
@@ -360,7 +360,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             WorldObject? produced = null;
             foreach (var siteOutput in ResolveProcessingOutputs(locationId))
             {
-                produced = _production.Process(ctx, locationId, siteOutput, committed.OccurredAt);
+                produced = _production.Process(ctx, locationId, siteOutput, committed.OccurredAt, SiteYield(locationId, siteOutput));
                 if (produced is not null)
                     break;
             }
@@ -374,6 +374,22 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             if (_economyConfig.BarterOnly)
                 DeliverSurplus(produced, locationId, committed.OccurredAt, ctx, outbox);
+        }
+
+        /// <summary>Outputs one action makes at the site producing <paramref name="kind"/> here: its Production affordance, rounded, at least 1.</summary>
+        private int SiteYield(string locationId, PickupItemKind kind)
+        {
+            foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
+            {
+                if (o.ItemKind != kind)
+                    continue;
+                foreach (var a in o.Affordances)
+                {
+                    if (a.Type == AffordanceType.Production)
+                        return Math.Max(1, (int)Math.Round(a.Satisfaction));
+                }
+            }
+            return 1;
         }
 
         /// <summary>
