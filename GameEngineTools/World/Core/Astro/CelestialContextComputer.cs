@@ -59,6 +59,27 @@ internal sealed class CelestialContextComputer
             BaseAmbientTempCelsius: tempC);
     }
 
+    /// <summary>The context with the physical model when the universe is given, with the simple one otherwise.</summary>
+    internal CelestialContext ComputeFor(WDateTime now, AstroConfig cfg, (StarPhysics Star, OrbitalElements Orbit, PlanetConfig Planet)? universe)
+    {
+        // The calendar has no dates before its epoch, but the climate repeats every year, so an earlier instant is read a whole number of years later.
+        var yearTicks = WWorld.Spec.Calendar.DaysInYear(1) * WWorld.Spec.TicksPerDay;
+        var ticks = now.WorldTicks;
+        while (ticks < 0)
+            ticks += yearTicks;
+        now = new WDateTime(ticks);
+
+        return universe is { } u ? Compute(now, cfg, u.Star, u.Orbit, u.Planet) : Compute(now, cfg);
+    }
+
+    /// <summary>The context with its temperature trend: the ambient temperature now against two days earlier, with the physical model when the universe is given.</summary>
+    internal CelestialContext ComputeWithTrend(WDateTime now, AstroConfig cfg, (StarPhysics Star, OrbitalElements Orbit, PlanetConfig Planet)? universe)
+    {
+        var current = ComputeFor(now, cfg, universe);
+        var earlier = ComputeFor(now - WTimeSpan.FromDays(2), cfg, universe);
+        return current with { TemperatureTrendPerDay = (current.BaseAmbientTempCelsius - earlier.BaseAmbientTempCelsius) / 2.0 };
+    }
+
     /// <summary>
     /// Phase 2 overload — SeasonFraction from Kepler's equation, temperature from the physical model,
     /// gravitace z <see cref="PlanetConfig.SurfaceGravityVsEarth"/>.

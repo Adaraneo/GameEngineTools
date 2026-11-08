@@ -22,8 +22,8 @@ namespace GameEngineTools.World.Objects.Crops
         Thresh = 3,
     }
 
-    /// <summary>The calendar and weather for working a field: season fraction since the vernal equinox, air temperature, year, seed in the bin.</summary>
-    public readonly record struct FieldSeason(double SeasonFraction, double TemperatureCelsius, int Year, int SeedInStore);
+    /// <summary>The weather and calendar for working a field: temperature trend per day, air temperature, year, seed in the bin.</summary>
+    public readonly record struct FieldSeason(double TemperatureTrendPerDay, double TemperatureCelsius, int Year, int SeedInStore);
 
     /// <summary>One session's outcome: the field after it, grain threshed for the stores, seed taken from the bin, and whether the task finished.</summary>
     public readonly record struct FieldWorkResult(FieldState Field, int ThreshedUnits, int SeedConsumed, bool Completed);
@@ -54,17 +54,15 @@ namespace GameEngineTools.World.Objects.Crops
             }
         }
 
-        /// <summary>Whether the ground may be ploughed now: workable, in the rest-free part of the year, before the sowing window closes.</summary>
+        /// <summary>Whether the ground may be ploughed now: workable and rested.</summary>
         public static bool CanPlough(FieldState field, FieldSeason now, CropConfig cfg)
             => now.TemperatureCelsius >= cfg.MinWorkTemperatureCelsius
-               && now.SeasonFraction < cfg.SowingWindowEnd
                && HasRested(field, now.Year, cfg);
 
-        /// <summary>Whether the field may be sown now: inside the window, workable ground, rested, and enough seed in the bin.</summary>
+        /// <summary>Whether the field may be sown now: sowing weather (cooling, between the limits), workable ground, rested, and enough seed in the bin.</summary>
         public static bool CanSow(FieldState field, FieldSeason now, CropConfig cfg)
             => now.TemperatureCelsius >= cfg.MinWorkTemperatureCelsius
-               && now.SeasonFraction >= cfg.SowingWindowStart
-               && now.SeasonFraction <= cfg.SowingWindowEnd
+               && CropMath.IsSowingWeather(now.TemperatureCelsius, now.TemperatureTrendPerDay, cfg)
                && HasRested(field, now.Year, cfg)
                && now.SeedInStore >= CropMath.SeedUnits(field.AreaHectares, cfg);
 

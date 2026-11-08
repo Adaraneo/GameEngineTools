@@ -14,8 +14,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using static ActionNames;
 
     /// <summary>
-    /// Offers the job a field in the character's settlement needs now: reaping a ripe crop, sowing in the autumn window, threshing in the
-    /// winter, ploughing in the warm months. Which job is possible is decided by <see cref="FieldWork"/>; this only turns it into a candidate.
+    /// Offers the job a field in the character's settlement needs now: reaping a ripe crop, sowing in cooling autumn weather, threshing, ploughing workable ground. Which job is possible is decided by <see cref="FieldWork"/>; this only turns it into a candidate.
     /// Works only where a celestial context supplies the season.
     /// </summary>
     internal sealed class FieldWorkNeedEngine : IBehaviorNeedEngine
@@ -53,7 +52,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 return BehaviorNeedOutput.Empty;
 
             var seed = context.AvailableObjects.Where(GrainStores.IsSeedBin).Sum(o => o.Quantity);
-            var season = new FieldSeason(celestial.SeasonFraction, snapshot.AmbientTemperature, context.Now.Year, seed);
+            var season = new FieldSeason(celestial.TemperatureTrendPerDay, snapshot.AmbientTemperature, context.Now.Year, seed);
 
             FieldTask? best = null;
             foreach (var field in fields)

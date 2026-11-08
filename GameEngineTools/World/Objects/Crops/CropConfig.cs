@@ -48,11 +48,11 @@ namespace GameEngineTools.World.Objects.Crops
         /// <summary>Hours of one work session on a field, the length of the action; 4, a half working day (my pick).</summary>
         public double WorkSessionHours { get; set; } = 4.0;
 
-        /// <summary>Start of the sowing window as a share of the year counted from the vernal equinox; 0.49, mid-September (my reading of autumn sowing of winter wheat).</summary>
-        public double SowingWindowStart { get; set; } = 0.49;
+        /// <summary>Coldest air temperature at which winter wheat is still sown; 9 degC, falling autumn weather (my reading of mid-September to October in central Europe).</summary>
+        public double SowingTemperatureMinCelsius { get; set; } = 9.0;
 
-        /// <summary>End of the sowing window as a share of the year counted from the vernal equinox; 0.62, end of October (my reading of autumn sowing of winter wheat).</summary>
-        public double SowingWindowEnd { get; set; } = 0.62;
+        /// <summary>Warmest air temperature at which winter wheat is sown, while the year is cooling; 16 degC (my reading, as above). Makes the window follow the planet, not the calendar.</summary>
+        public double SowingTemperatureMaxCelsius { get; set; } = 16.0;
 
         /// <summary>Air temperature below which the ground is too cold to work; 2 degC (my pick, frozen soil cannot be dug).</summary>
         public double MinWorkTemperatureCelsius { get; set; } = 2.0;

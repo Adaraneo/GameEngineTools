@@ -4,6 +4,7 @@
 namespace GameEngineTools.World.Objects.Crops
 {
     using System;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>The arithmetic and the stage transitions of the grain cycle, free of storage and time sources so they can be tested alone.</summary>
@@ -18,6 +19,57 @@ namespace GameEngineTools.World.Objects.Crops
         {
             var effective = Math.Min(temperatureC, cfg.CeilingTemperatureCelsius) - cfg.BaseTemperatureCelsius;
             return effective <= 0.0 || days <= 0.0 ? 0.0 : effective * days;
+        }
+
+        /// <summary>Weather for sowing winter wheat: the year is cooling and the air is between the configured limits.</summary>
+        public static bool IsSowingWeather(double temperatureC, double trendPerDay, CropConfig cfg)
+            => trendPerDay < 0.0 && temperatureC >= cfg.SowingTemperatureMinCelsius && temperatureC <= cfg.SowingTemperatureMaxCelsius;
+
+        /// <summary>Heat collected between two dates from a daily temperature source; steps of one world day, counted in 24-hour days because heat acts in absolute time.</summary>
+        public static double DegreeDaysBetween(WDateTime from, WDateTime to, Func<WDateTime, double> temperatureAt, CropConfig cfg)
+        {
+            var step = WTimeSpan.FromDays(1);
+            var earthDaysPerStep = WWorld.Spec.HoursPerDay / 24.0;
+            var total = 0.0;
+            for (var t = from; t < to; t += step)
+                total += DegreeDays(temperatureAt(t), earthDaysPerStep, cfg);
+            return total;
+        }
+
+        /// <summary>
+        /// The state of a field that was sown before the world began, worked out from the climate: sown in the middle of the most recent spell of
+        /// sowing weather, with the heat since then, ripe if that was enough. Fallow if there was no sowing weather in the last year.
+        /// </summary>
+        public static FieldState Found(FieldState field, WDateTime now, Func<WDateTime, double> temperatureAt, CropConfig cfg)
+        {
+            var day = WTimeSpan.FromDays(1);
+            bool Weather(WDateTime t) => IsSowingWeather(temperatureAt(t), (temperatureAt(t) - temperatureAt(t - WTimeSpan.FromDays(2))) / 2.0, cfg);
+            var daysInYear = (int)WWorld.Spec.Calendar.DaysInYear(now.Year);
+
+            WDateTime? end = null;
+            for (var i = 1; i <= daysInYear; i++)
+            {
+                if (Weather(now - day * i)) { end = now - day * i; break; }
+            }
+
+            if (end is not { } spellEnd)
+                return field with { Stage = FieldStage.Fallow, SownAt = null, DegreeDays = 0.0 };
+
+            var start = spellEnd;
+            while (Weather(start - day) && WDateTime.Difference(spellEnd, start - day).TotalDays < daysInYear / 2.0)
+                start -= day;
+
+            var sownAt = start + (spellEnd - start) / 2;
+            var heat = 0.0;
+            var earthDaysPerStep = WWorld.Spec.HoursPerDay / 24.0;
+            for (var t = sownAt; t < now; t += day)
+            {
+                heat += DegreeDays(temperatureAt(t), earthDaysPerStep, cfg);
+                if (heat >= cfg.DegreeDaysToMaturity)
+                    return field with { Stage = FieldStage.Ripe, SownAt = sownAt, RipeAt = t, DegreeDays = heat, YearFactor = 1.0 };
+            }
+
+            return field with { Stage = FieldStage.Sown, SownAt = sownAt, DegreeDays = heat };
         }
 
         /// <summary>The field after ploughing; only bare or harvested ground can be ploughed.</summary>

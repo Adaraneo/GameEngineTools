@@ -412,7 +412,7 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             var here = _objectProvider.GetAllObjectsAt(location).Where(o => o.HeldBy is null).ToList();
             var seedBin = here.FirstOrDefault(GrainStores.IsSeedBin);
-            var season = new FieldSeason(celestial.SeasonFraction, ctx.Snapshot.AmbientTemperature, committed.OccurredAt.Year, seedBin?.Quantity ?? 0);
+            var season = new FieldSeason(celestial.TemperatureTrendPerDay, ctx.Snapshot.AmbientTemperature, committed.OccurredAt.Year, seedBin?.Quantity ?? 0);
 
             var fieldObject = here.FirstOrDefault(o => o.Field is { } f && FieldWork.Available(f, season, _cropConfig) == task);
             if (fieldObject?.Field is not { } field)

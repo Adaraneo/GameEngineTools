@@ -14,10 +14,10 @@ namespace EngineTests
         private static readonly CropConfig Cfg = CropConfig.Default;
         private static readonly WDateTime T0 = new(0);
 
-        // Mid-July (about 0.33 of the year after the vernal equinox), mid-October (0.55), midwinter (0.80).
-        private static FieldSeason Summer(int year = 2025, int seed = 0) => new(0.33, 18.0, year, seed);
-        private static FieldSeason Autumn(int year = 2025, int seed = 5000) => new(0.55, 8.0, year, seed);
-        private static FieldSeason Winter(int year = 2025) => new(0.80, -3.0, year, 0);
+        // Summer: warm and still warming; autumn: 12 degC and cooling; winter: frozen.
+        private static FieldSeason Summer(int year = 2025, int seed = 0) => new(0.1, 18.0, year, seed);
+        private static FieldSeason Autumn(int year = 2025, int seed = 5000) => new(-0.2, 12.0, year, seed);
+        private static FieldSeason Winter(int year = 2025) => new(0.0, -3.0, year, 0);
 
         // ── Which job, when ──────────────────────────────────────────────────────────
 
@@ -32,22 +32,23 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void PloughingNeedsWorkableGround_AndHappensBeforeTheSowingWindowCloses()
+        public void PloughingNeedsWorkableGround()
         {
             var bare = new FieldState(FieldStage.Fallow, 1.0);
 
             Assert.AreEqual(FieldTask.Plough, FieldWork.Available(bare, Summer(), Cfg));
             Assert.IsNull(FieldWork.Available(bare, Winter(), Cfg), "Frozen ground cannot be worked.");
-            Assert.IsNull(FieldWork.Available(bare, new FieldSeason(0.70, 6.0, 2025, 0), Cfg), "Too late in the year to plough for this autumn's sowing.");
         }
 
         [TestMethod]
-        public void SowingNeedsTheWindow_ASeedBin_AndRestedGround()
+        public void SowingNeedsCoolingWeatherInTheBand_ASeedBin_AndRestedGround()
         {
             var ploughed = new FieldState(FieldStage.Ploughed, 1.0);
 
             Assert.AreEqual(FieldTask.Sow, FieldWork.Available(ploughed, Autumn(), Cfg));
-            Assert.IsNull(FieldWork.Available(ploughed, Summer(seed: 5000), Cfg), "Not in July.");
+            Assert.IsNull(FieldWork.Available(ploughed, Summer(seed: 5000), Cfg), "Warm and warming: not sowing weather.");
+            Assert.IsNull(FieldWork.Available(ploughed, new FieldSeason(0.2, 12.0, 2025, 5000), Cfg), "Same temperature but the year is warming: spring, not autumn.");
+            Assert.IsNull(FieldWork.Available(ploughed, new FieldSeason(-0.2, 5.0, 2025, 5000), Cfg), "Cooling but already too cold for the band.");
             Assert.IsNull(FieldWork.Available(ploughed, Autumn(seed: 999), Cfg), "A hectare needs 1000 units of seed and the bin holds 999.");
         }
 

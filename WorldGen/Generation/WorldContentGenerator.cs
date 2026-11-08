@@ -838,8 +838,9 @@ public static class WorldContentGenerator
             var area = Math.Round(people * CroppedHectaresPerPerson, 2);
             var seed = CropMath.SeedUnits(area, crops);
 
-            // Two fields in rotation: one carries last autumn's crop, the other rests until it is ploughed and sown this autumn.
-            worldDb.AddObject(Field($"{settlement.Id}_field_1", settlement.Id, new FieldState(FieldStage.Sown, area, DegreeDays: DegreeDaysAtSpringStart, SeedUnits: seed)));
+            // Two fields in rotation: one was sown before the world began (its sowing date and heat are worked out from the climate at the first tick),
+            // the other rests until it is ploughed and sown in the next sowing weather.
+            worldDb.AddObject(Field($"{settlement.Id}_field_1", settlement.Id, new FieldState(FieldStage.Sown, area, SeedUnits: seed)));
             worldDb.AddObject(Field($"{settlement.Id}_field_2", settlement.Id, new FieldState(FieldStage.Fallow, area)));
 
             // Seed for the autumn sowing, and food to live on until the first harvest.
@@ -867,11 +868,8 @@ public static class WorldContentGenerator
     // Cropped area per person a year; my calculation: 2200 kcal a day from grain alone at 3.4 kcal/g is 236 kg a year, at 600 kg/ha net about 0.4 ha.
     private const double CroppedHectaresPerPerson = 0.4;
 
-    // Degree-days a winter crop sown the previous autumn has by early spring; my estimate, the rest of the 2800 comes with the warm months.
-    private const double DegreeDaysAtSpringStart = 700.0;
-
-    // Meals of grain per person in the starting store: about 135 days at 4.5 meals, until the first harvest.
-    private const int StartingMealsPerPerson = 610;
+    // Meals of grain per person in the founding granary: about 320 days at 4 meals, enough to reach the harvest of a crop sown at the worst moment; my estimate.
+    private const int StartingMealsPerPerson = 1300;
 
     /// <summary>Adds up to <see cref="Options.ForcedTier"/>-driven object depth per need (1 for
     /// Camp, 2 for Village, 3 for Town — see <see cref="ObjectDepthForTier"/>) so a settlement

@@ -4,11 +4,13 @@
 namespace EngineTests
 {
     using GameEngineTools.Characters.Core;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Location;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Crops;
     using GameEngineTools.World.Utils.Time;
+    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Options;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
@@ -126,6 +128,139 @@ namespace EngineTests
             Assert.AreEqual(950, CropMath.AfterStorage(1000, 360.0, 360.0, Cfg), "5% over a year.");
             Assert.AreEqual(1000, CropMath.AfterStorage(1000, 0.0, 360.0, Cfg));
             Assert.AreEqual(3, CropMath.AfterStorage(3, 30.0, 360.0, Cfg), "A tiny stock does not shrink by rounding.");
+        }
+
+        // ── Independent of the planet's calendar and hemisphere ─────────────────────
+
+        private static readonly WDateTime Epoch = new(0);
+
+        // A temperate year on the world's own calendar: coldest at day 0, mean 11 degC, +-9; the southern twin is half a year later.
+        private static double North(WDateTime t)
+        {
+            var year = WWorld.Spec.Calendar.DaysInYear(2025);
+            var day = t.WorldTicks / (double)WWorld.Spec.TicksPerDay;
+            return 11.0 - 9.0 * Math.Cos(2.0 * Math.PI * day / year);
+        }
+
+        private static double South(WDateTime t) => North(t + WTimeSpan.FromDays(WWorld.Spec.Calendar.DaysInYear(2025) / 2.0));
+
+        [TestMethod]
+        public void SowingWeather_IsCoolingAirInTheBand_AnywhereOnTheYear()
+        {
+            Assert.IsTrue(CropMath.IsSowingWeather(12.0, -0.2, Cfg));
+            Assert.IsFalse(CropMath.IsSowingWeather(12.0, 0.2, Cfg), "Spring: the same air, but warming.");
+            Assert.IsFalse(CropMath.IsSowingWeather(20.0, -0.2, Cfg), "Cooling, but still too warm.");
+            Assert.IsFalse(CropMath.IsSowingWeather(6.0, -0.2, Cfg), "Cooling, but already too cold.");
+        }
+
+        [TestMethod]
+        public void Heat_ActsInAbsoluteTime_SoALongerDayBringsMoreOfIt()
+        {
+            var longDay = (double)WWorld.Spec.HoursPerDay;
+            var oneWorldDay = CropMath.DegreeDaysBetween(Epoch, Epoch + WTimeSpan.FromDays(1), _ => 10.0, Cfg);
+
+            Assert.AreEqual(10.0 * longDay / 24.0, oneWorldDay, 1e-9, "A day of 26 hours at 10 degC is 10 x 26/24 degree-days, not 10.");
+        }
+
+        [TestMethod]
+        public void FoundedField_IsSownInTheLastSowingWeather_OnEitherHemisphere()
+        {
+            var year = (int)WWorld.Spec.Calendar.DaysInYear(2025);
+            var seed = new FieldState(FieldStage.Sown, 2.0, SeedUnits: 2000);
+
+            foreach (var climate in new Func<WDateTime, double>[] { North, South })
+            {
+                // Check a start at every season of the year: the crop is sown before the start and is not older than a year.
+                for (var startDay = 10; startDay < year; startDay += 36)
+                {
+                    var now = Epoch + WTimeSpan.FromDays(startDay + year);
+                    var found = CropMath.Found(seed, now, climate, Cfg);
+
+                    Assert.IsTrue(found.Stage is FieldStage.Sown or FieldStage.Ripe, $"Start day {startDay}: {found.Stage}");
+                    var sown = found.SownAt!.Value;
+                    var age = WDateTime.Difference(now, sown).TotalDays;
+                    Assert.IsTrue(age > 0 && age <= year, $"Start day {startDay}: sown {age:F0} days ago.");
+                    var weatherAtSowing = CropMath.IsSowingWeather(climate(sown), (climate(sown) - climate(sown - WTimeSpan.FromDays(2))) / 2.0, Cfg);
+                    Assert.IsTrue(weatherAtSowing, $"Start day {startDay}: it was sown in sowing weather.");
+                }
+            }
+        }
+
+        [TestMethod]
+        public void FoundedField_RipensWhenTheHeatSinceSowingIsEnough_AndWaitsOtherwise()
+        {
+            var year = (int)WWorld.Spec.Calendar.DaysInYear(2025);
+            var seed = new FieldState(FieldStage.Sown, 2.0, SeedUnits: 2000);
+
+            var justAfterSowing = CropMath.Found(seed, Epoch + WTimeSpan.FromDays(year * 0.80 + year), North, Cfg);
+            Assert.AreEqual(FieldStage.Sown, justAfterSowing.Stage, "Sown only weeks ago in autumn: still growing.");
+            Assert.IsTrue(justAfterSowing.DegreeDays > 0 && justAfterSowing.DegreeDays < Cfg.DegreeDaysToMaturity);
+
+            var lateSummer = CropMath.Found(seed, Epoch + WTimeSpan.FromDays(year * 0.45 + year), North, Cfg);
+            Assert.IsTrue(lateSummer.Stage == FieldStage.Ripe || lateSummer.DegreeDays > 0.5 * Cfg.DegreeDaysToMaturity, "A year-old crop is ripe or close to it.");
+        }
+
+        [TestMethod]
+        public void FoundedField_OnAPlanetWithoutSowingWeather_StartsFallow()
+        {
+            var seed = new FieldState(FieldStage.Sown, 2.0, SeedUnits: 2000);
+
+            var found = CropMath.Found(seed, Epoch + WTimeSpan.FromDays(400), _ => 30.0, Cfg);
+
+            Assert.AreEqual(FieldStage.Fallow, found.Stage, "A constantly hot planet has no cooling autumn to sow in.");
+        }
+
+        [TestMethod]
+        public void Service_WorksOutFoundedFieldsAtTheFirstTick()
+        {
+            var provider = new MemoryProvider();
+            provider.AddObject(Field(new FieldState(FieldStage.Sown, 1.0, SeedUnits: 1000)));
+            var service = new CropGrowthService(provider, Options.Create(Cfg));
+
+            service.Tick(Epoch + WTimeSpan.FromDays(400), 12.0, North);
+
+            var field = provider.FindObject("field_1")!.Field!;
+            Assert.IsNotNull(field.SownAt, "The service gave it a sowing date from the climate.");
+            Assert.IsTrue(field.Stage is FieldStage.Sown or FieldStage.Ripe);
+        }
+
+        [TestMethod]
+        public void ClimateBeforeTheEpoch_IsTheClimateOfTheSameDayInALaterYear()
+        {
+            var config = new ConfigurationBuilder()
+                .AddJsonFile(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.World.json"), optional: false).Build();
+            var astro = config.GetSection("World:Astro").Get<GameEngineTools.World.Core.Astro.AstroConfig>()!;
+            var universe = config.GetSection("World:Universe").Get<GameEngineTools.World.Core.Astro.UniverseConfig>()!;
+            var computer = new GameEngineTools.World.Core.Astro.CelestialContextComputer(new GameEngineTools.World.Core.Astro.SunModel());
+            var objects = (universe.ToStarPhysics(), universe.ToOrbitalElements(), universe.ToPlanetConfig());
+            var year = WWorld.Spec.Calendar.DaysInYear(1);
+
+            var before = computer.ComputeFor(Epoch - WTimeSpan.FromDays(40), astro, objects);
+            var later = computer.ComputeFor(Epoch + WTimeSpan.FromDays(year - 40), astro, objects);
+
+            Assert.AreEqual(later.SeasonFraction, before.SeasonFraction, 1e-6);
+            Assert.AreEqual(later.BaseAmbientTempCelsius, before.BaseAmbientTempCelsius, 0.5, "The orbit is slightly eccentric, so a year later differs by a fraction of a degree.");
+            Assert.IsNotNull(computer.ComputeWithTrend(Epoch, astro, objects), "The trend at the very first instant needs the day before it.");
+        }
+
+        [TestMethod]
+        public void TemperatureTrend_FollowsTheSeasons_OnTheWorldsOwnPlanet()
+        {
+            var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+                .AddJsonFile(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.World.json"), optional: false).Build();
+            var astro = config.GetSection("World:Astro").Get<GameEngineTools.World.Core.Astro.AstroConfig>()!;
+            var universe = config.GetSection("World:Universe").Get<GameEngineTools.World.Core.Astro.UniverseConfig>()!;
+            var computer = new GameEngineTools.World.Core.Astro.CelestialContextComputer(new GameEngineTools.World.Core.Astro.SunModel());
+            var objects = (universe.ToStarPhysics(), universe.ToOrbitalElements(), universe.ToPlanetConfig());
+            var year = (int)WWorld.Spec.Calendar.DaysInYear(2025);
+
+            double TrendAt(double seasonShare, double latitude)
+                => computer.ComputeWithTrend(Epoch + WTimeSpan.FromDays(seasonShare * year), astro with { LatitudeDeg = latitude }, objects).TemperatureTrendPerDay;
+
+            Assert.IsTrue(TrendAt(0.1, 50.0) > 0, "North, spring: warming.");
+            Assert.IsTrue(TrendAt(0.6, 50.0) < 0, "North, autumn: cooling.");
+            Assert.IsTrue(TrendAt(0.1, -50.0) < 0, "South, the same dates: cooling.");
+            Assert.IsTrue(TrendAt(0.6, -50.0) > 0, "South: warming.");
         }
 
         // ── The clock over the world ─────────────────────────────────────────────────

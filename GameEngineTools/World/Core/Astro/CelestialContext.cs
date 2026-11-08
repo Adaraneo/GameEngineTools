@@ -46,4 +46,6 @@ public sealed record CelestialContext(
     /// 0 = new moon (moon between planet and star), 0.5 = full moon.
     /// <c>null</c> if the planet has no moon or the astronomical logic is not configured.
     /// </summary>
-    double? TidalPhase = null);
+    double? TidalPhase = null,
+    /// <summary>Change of the ambient temperature per day (positive while the year warms, negative while it cools); phase-locked to the seasons, so it is right on either hemisphere.</summary>
+    double TemperatureTrendPerDay = 0.0);

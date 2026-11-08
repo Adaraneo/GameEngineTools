@@ -35,12 +35,15 @@ namespace GameEngineTools.World.Objects.Crops
         /// </summary>
         /// <param name="now">Current simulation time.</param>
         /// <param name="temperatureC">The air temperature the fields feel now (the celestial context's ambient temperature).</param>
-        public void Tick(WDateTime now, double temperatureC)
+        /// <param name="temperatureAt">The temperature on any date, used once at the first tick to work out fields that were sown before the world began.</param>
+        public void Tick(WDateTime now, double temperatureC, Func<WDateTime, double>? temperatureAt = null)
         {
             if (_lastGrowth is not { } last)
             {
                 _lastGrowth = now;
                 _lastStorageLoss = now;
+                if (temperatureAt is not null)
+                    FoundFields(now, temperatureAt);
                 return;
             }
 
@@ -48,8 +51,8 @@ namespace GameEngineTools.World.Objects.Crops
             if (elapsed.TotalHours < 1.0)
                 return;
 
-            var days = elapsed.TotalDays;
-            var heat = CropMath.DegreeDays(temperatureC, days, _config);
+            // Heat acts in absolute time, so a long world day brings proportionally more of it.
+            var heat = CropMath.DegreeDays(temperatureC, elapsed.TotalHours / 24.0, _config);
             var sinceLoss = WDateTime.Difference(now, _lastStorageLoss!.Value).TotalDays;
             var lossDue = sinceLoss >= _config.StorageLossIntervalDays;
             var daysInYear = WWorld.Spec.HoursInYear(now.Year) / (double)WWorld.Spec.HoursPerDay;
@@ -76,6 +79,15 @@ namespace GameEngineTools.World.Objects.Crops
             _lastGrowth = now;
             if (lossDue)
                 _lastStorageLoss = now;
+        }
+
+        private void FoundFields(WDateTime now, Func<WDateTime, double> temperatureAt)
+        {
+            foreach (var locationId in _provider.GetKnownLocationIds().ToList())
+            {
+                foreach (var obj in _provider.GetAllObjectsAt(locationId).Where(o => o.HeldBy is null && o.Field is { Stage: FieldStage.Sown, SownAt: null }).ToList())
+                    Replace(obj with { Field = CropMath.Found(obj.Field!, now, temperatureAt, _config) });
+            }
         }
 
         /// <summary>A stock of dry grain or flour kept in a settlement: not a production fixture, not shop stock, not held by anyone.</summary>

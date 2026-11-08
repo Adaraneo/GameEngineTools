@@ -264,14 +264,13 @@ namespace GameEngineTools.World.Simulation
             // before its tick — so the engines see the current irradiance, temperature and season.
             if (_celestialComputer is not null)
             {
-                var celestial = _universeObjects is { } u
-                    ? _celestialComputer.Compute(now, _astroConfig!, u.Star, u.Orbit, u.Planet)
-                    : _celestialComputer.Compute(now, _astroConfig!);
+                var celestial = _celestialComputer.ComputeWithTrend(now, _astroConfig!, _universeObjects);
 
                 foreach (var character in chars)
                     character.SetAmbientContext(celestial.BaseAmbientTempCelsius, celestial);
 
-                _options.CropGrowth?.Tick(now, celestial.BaseAmbientTempCelsius);
+                _options.CropGrowth?.Tick(now, celestial.BaseAmbientTempCelsius,
+                    at => _celestialComputer.ComputeFor(at, _astroConfig!, _universeObjects).BaseAmbientTempCelsius);
             }
 
             _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);

@@ -647,13 +647,14 @@ public class WorldContentGeneratorTests
 
         Assert.AreEqual(2, fields.Count);
         Assert.AreEqual(7.2, fields[0].Field!.AreaHectares, 1e-9, "A village of 18 farms 0.4 ha a person.");
-        Assert.AreEqual(FieldStage.Sown, fields[0].Field!.Stage, "One field carries last autumn's crop...");
+        Assert.AreEqual(FieldStage.Sown, fields[0].Field!.Stage, "One field was sown before the world began (the service works out when)...");
+        Assert.IsNull(fields[0].Field!.SownAt);
         Assert.AreEqual(FieldStage.Fallow, fields[1].Field!.Stage, "...the other rests until it is ploughed and sown.");
 
         var seedBin = objects.Single(GrainStores.IsSeedBin);
         var food = objects.Single(GrainStores.IsFoodStore);
         Assert.AreEqual(CropMath.SeedUnits(7.2, crops), seedBin.Quantity, "Seed for the autumn sowing.");
-        Assert.AreEqual(18 * 610, food.Quantity, "Food until the first harvest.");
+        Assert.AreEqual(18 * 1300, food.Quantity, "A founding granary: grain until a crop sown just now is in.");
     }
 
     [TestMethod]
