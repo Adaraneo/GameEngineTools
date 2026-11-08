@@ -256,6 +256,44 @@ namespace EngineTests
         }
 
         // ══════════════════════════════════════════════════════════════════════
+        // Provider fallback must not route to food that is already consumed
+        // ══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// The nearest location holds only consumed food (awaiting respawn); another location has a ready meal.
+        /// The character must go to the one with food actually there.
+        /// </summary>
+        [TestMethod]
+        public void RouteMoveTo_ProviderFoodAlreadyConsumed_SkipsThatLocation()
+        {
+            var worldMap = BuildMap(new[] { (HomeId, TavernId, 50.0), (HomeId, MarketId, 100.0) });
+            var character = BuildForagingHuman(HomeId, MoveToFood, Array.Empty<ObjectLocationFact>());
+            var provider = new ConsumingWorldObjectProvider(
+                new[] { MakeFoodObject("tavern_bread", TavernId), MakeFoodObject("market_bread", MarketId) },
+                consumedIds: new[] { "tavern_bread" });
+
+            BuildOrchestrator(worldMap, provider).OnTick(Now, new[] { character });
+
+            Assert.AreEqual(MarketId, _locationService.GetLocation(character.Id),
+                "A location whose food is consumed must not be chosen while another one has ready food.");
+        }
+
+        /// <summary>All food in the world is consumed: there is nowhere to go, so the character stays put.</summary>
+        [TestMethod]
+        public void RouteMoveTo_AllProviderFoodConsumed_CharacterStaysInPlace()
+        {
+            var worldMap = BuildMap(new[] { (HomeId, TavernId, 50.0) });
+            var character = BuildForagingHuman(HomeId, MoveToFood, Array.Empty<ObjectLocationFact>());
+            var provider = new ConsumingWorldObjectProvider(
+                new[] { MakeFoodObject("tavern_bread", TavernId) }, consumedIds: new[] { "tavern_bread" });
+
+            BuildOrchestrator(worldMap, provider).OnTick(Now, new[] { character });
+
+            Assert.AreEqual(HomeId, _locationService.GetLocation(character.Id),
+                "With every food object consumed the character must not walk to an empty location.");
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
         // Test 6 — Drink routing uses memory
         // ══════════════════════════════════════════════════════════════════════
 
@@ -371,7 +409,8 @@ namespace EngineTests
                 rng: new Random(42),
                 log: NullLogger<DefaultSceneOrchestrator>.Instance,
                 objectProvider: provider,
-                options: options ?? new SceneOrchestratorOptions());
+                options: options ?? new SceneOrchestratorOptions(),
+                mutableObjects: provider as IMutableWorldObjectProvider);
 
         private ForagingHuman BuildForagingHuman(
             string currentLocation,
@@ -581,6 +620,38 @@ namespace EngineTests
 
             public WorldObject? FindObject(string objectId)
                 => _objects.FirstOrDefault(o => o.Id == objectId);
+        }
+
+        /// <summary>Mirrors the SQLite provider: <c>GetAllObjects</c> lists consumed objects without marking them, runtime state is in <c>GetAllObjectsAt</c>.</summary>
+        private sealed class ConsumingWorldObjectProvider(IEnumerable<WorldObject> objects, IEnumerable<string> consumedIds) : IMutableWorldObjectProvider
+        {
+            private readonly List<WorldObject> _objects = objects.ToList();
+            private readonly HashSet<string> _consumed = consumedIds.ToHashSet();
+
+            public IEnumerable<WorldObject> GetObjectsAt(string locationId)
+                => _objects.Where(o => o.LocationId == locationId && !_consumed.Contains(o.Id));
+
+            public IEnumerable<WorldObject> GetAllObjects() => _objects;
+
+            public IEnumerable<WorldObject> GetAllObjectsAt(string locationId)
+                => _objects.Where(o => o.LocationId == locationId)
+                           .Select(o => _consumed.Contains(o.Id) ? o with { ConsumedAt = Now } : o);
+
+            public void AddObject(WorldObject obj) => _objects.Add(obj);
+
+            public WorldObject? FindObject(string objectId) => _objects.FirstOrDefault(o => o.Id == objectId);
+
+            public bool ConsumeObject(string locationId, string objectId, WDateTime now) => _consumed.Add(objectId);
+
+            public bool RestoreObject(string locationId, string objectId) => _consumed.Remove(objectId);
+
+            public bool RemoveObject(string locationId, string objectId) => _objects.RemoveAll(o => o.Id == objectId) > 0;
+
+            public bool SetHeldBy(string locationId, string objectId, HumanId? holder) => true;
+
+            public IEnumerable<WorldObject> GetHeldBy(HumanId holder) => Array.Empty<WorldObject>();
+
+            public IEnumerable<string> GetKnownLocationIds() => _objects.Select(o => o.LocationId).Distinct();
         }
 
         #endregion Stubs

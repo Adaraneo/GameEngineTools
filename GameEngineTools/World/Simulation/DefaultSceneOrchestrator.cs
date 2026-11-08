@@ -1371,7 +1371,7 @@ namespace GameEngineTools.World.Simulation
             if (currentLocationId is null)
                 return null;
 
-            // Build the set of locations that have the required category, excluding the current one.
+            // GetAllObjects neither filters nor reports consumed objects, so a location counts only if something is ready there now.
             var candidateLocations = _objectProvider
                 .GetAllObjects()
                 .Where(o => o.Category == category && o.IsAvailable && o.LocationId != currentLocationId)
@@ -1381,11 +1381,16 @@ namespace GameEngineTools.World.Simulation
             if (candidateLocations.Count == 0)
                 return null;
 
+            // The snapshot cache is empty for unoccupied locations, so consumption is read from the mutable provider.
+            bool HasReadyObject(string locationId)
+                => _mutableObjects is null
+                   || _mutableObjects.GetAllObjectsAt(locationId).Any(o => o.Category == category && o.IsAvailable && o.ConsumedAt is null && o.HeldBy is null);
+
             // Prefer the nearest adjacent location that has the required objects.
             // Speed is per-candidate because terrain (resolved per destination) affects duration.
             var adjacentMatch = _worldMap
                 .GetConnections(currentLocationId)
-                .Where(conn => candidateLocations.Contains(conn.TargetLocationId))
+                .Where(conn => candidateLocations.Contains(conn.TargetLocationId) && HasReadyObject(conn.TargetLocationId))
                 .Select(conn => (conn, speed: _speedProvider.GetSpeedMetersPerMinute(
                     character.Snapshot,
                     _locationService.GetDescriptor(conn.TargetLocationId)?.Terrain ?? TerrainType.Indoor)))
@@ -1396,9 +1401,10 @@ namespace GameEngineTools.World.Simulation
             if (adjacentMatch is not null)
                 return adjacentMatch;
 
-            // Fallback: pick arbitrarily from all known locations with the required object.
+            // Fallback: pick arbitrarily from all known locations with ready objects.
             // No graph edge, so assume the configured cross-locale distance.
-            return new MoveTarget(candidateLocations.First(), _options.FallbackTravelDistanceMeters);
+            var anywhere = candidateLocations.FirstOrDefault(HasReadyObject);
+            return anywhere is null ? null : new MoveTarget(anywhere, _options.FallbackTravelDistanceMeters);
         }
 
         /// <summary>
