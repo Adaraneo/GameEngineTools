@@ -348,6 +348,10 @@ barter (GameSandbox ships with it on): no coin changes hands, working or deliver
 hours per unit of value, a 2-unit loaf is 3 h), and the `Barter` action takes shop food for that credit or for a held item worth at least its price
 (reference price times `ShopBuyBackFraction`). WorldGen gives every village and town a production chain (field 3, mill 2, oven 2 outputs per action) and a shop (counters and a starting shelf of bread and cheese). A hungry but not desperate character in a settlement lacking a link of the chain can `Build` it (a standard site, 3 hours), so camps grow their own food production.
 
+`World:Crops` sets the grain cycle (thermal time to maturity, sowing rate, yield ratio, `GramsPerUnit` = grams of grain in one storage unit, shatter and storage loss);
+each default is annotated with its source or marked as an estimate in `CropConfig`. A field object carries a `FieldState` (fallow, ploughed, sown, ripe, reaped)
+and `WorldObject.Quantity` lets one object stand for a stack; `CropGrowthService` adds the heat of each world hour to sown fields and wears down stored grain.
+
 `World:*` sections: `Perception`, `Astro` (sun model, latitude, seasonal amplitude & thermal lag),
 `Universe` (full star/planet/moon/ring definition), and `Calendar` (cultural overlay: month count,
 target year length, time subdivisions, leap rule, and `BodyClockFollowsDay` — whether the

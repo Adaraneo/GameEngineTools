@@ -150,6 +150,7 @@ namespace WorldObserver.Simulation
                 ObjectSnapshotCache = ctx.ObjectCache,
                 WriteBuffer = ctx.WriteBuffer,
                 RespawnScheduler = ctx.Respawn,
+                CropGrowth = runtime.Services.GetService<GameEngineTools.World.Objects.Crops.CropGrowthService>(),
                 NarrativeFormatter = new WorldObserver.Narrative.WorldObserverNarrativeFormatter(),
                 ResolveCharacter = id => names.TryGetValue(id, out var info)
                     ? info

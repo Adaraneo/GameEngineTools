@@ -57,6 +57,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
         ObjectSnapshotCache = world.ObjectCache,
         WriteBuffer = world.WriteBuffer,
         RespawnScheduler = world.Respawn,
+        CropGrowth = runtime.Services.GetService<GameEngineTools.World.Objects.Crops.CropGrowthService>(),
         OnTick = (now, characters) =>
         {
             world.Orchestrator.OnTick(now, characters);

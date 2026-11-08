@@ -111,6 +111,19 @@ namespace GameEngineTools.World.Objects
 
         #endregion Pickup properties
 
+        #region Quantity and crop state
+
+        /// <summary>
+        /// How many units this one object stands for (a sack, a granary stock, a day's harvest). Always at least 1; ordinary objects are 1.
+        /// The size of a unit is a setting of the food chain, not of the object.
+        /// </summary>
+        public int Quantity { get; init; } = 1;
+
+        /// <summary>The crop state when this object is a field being farmed; <c>null</c> for everything else.</summary>
+        public GameEngineTools.World.Objects.Crops.FieldState? Field { get; init; } = null;
+
+        #endregion Quantity and crop state
+
         #region Runtime ownership state
 
         /// <summary>

@@ -254,6 +254,10 @@ namespace GameEngineTools
 
             services.AddSingleton<ObjectRespawnScheduler>();
 
+            services.AddOptions<GameEngineTools.World.Objects.Crops.CropConfig>()
+                    .BindConfiguration("World:Crops");
+            services.AddSingleton<GameEngineTools.World.Objects.Crops.CropGrowthService>();
+
             services.AddObjectInteractionEngine();
 
             services.AddOptions<MovementConfig>()

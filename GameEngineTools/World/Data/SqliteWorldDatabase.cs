@@ -226,6 +226,7 @@ namespace GameEngineTools.World.Data
                 DeleteAffordances(obj.Id);
                 InsertAffordances(obj.Id, obj.Affordances);
                 UpsertNutritionalProfile(obj.Id, obj.NutritionalProfile);
+                UpsertObjectState(obj);
                 tx.Commit();
             }
         }
@@ -1107,6 +1108,16 @@ namespace GameEngineTools.World.Data
             }
         }
 
+        /// <summary>Creates the tables holding object stack sizes and field crop states in a database written before they existed.</summary>
+        internal void MigrateObjectStateTables()
+        {
+            lock (_sync)
+            {
+                Execute("CREATE TABLE IF NOT EXISTS ObjectQuantities (ObjectId TEXT PRIMARY KEY REFERENCES WorldObjects(Id) ON DELETE CASCADE, Quantity INTEGER NOT NULL);");
+                Execute("CREATE TABLE IF NOT EXISTS FieldStates (ObjectId TEXT PRIMARY KEY REFERENCES WorldObjects(Id) ON DELETE CASCADE, Stage TEXT NOT NULL, AreaHectares REAL NOT NULL, SownAt INTEGER DEFAULT NULL, RipeAt INTEGER DEFAULT NULL, DegreeDays REAL NOT NULL DEFAULT 0.0, SeedUnits INTEGER NOT NULL DEFAULT 0, YearFactor REAL NOT NULL DEFAULT 1.0);");
+            }
+        }
+
         /// <summary>Adds a column to an existing table when it is missing; a table that does not exist yet is left alone.</summary>
         internal void AddColumnIfMissing(string table, string column, string definition)
         {
@@ -1327,12 +1338,41 @@ namespace GameEngineTools.World.Data
                 }
             }
 
+            // ── Load stack sizes and crop states ─────────────────────────────
+            var quantityMap = new Dictionary<string, int>(StringComparer.Ordinal);
+            using (var cmd = CreateCommand($"SELECT ObjectId, Quantity FROM ObjectQuantities WHERE ObjectId IN ({inClause})", inParams))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                    quantityMap[reader.GetString(0)] = reader.GetInt32(1);
+            }
+
+            var fieldMap = new Dictionary<string, GameEngineTools.World.Objects.Crops.FieldState>(StringComparer.Ordinal);
+            using (var cmd = CreateCommand(
+                $"SELECT ObjectId, Stage, AreaHectares, SownAt, RipeAt, DegreeDays, SeedUnits, YearFactor FROM FieldStates WHERE ObjectId IN ({inClause})", inParams))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    fieldMap[reader.GetString(0)] = new GameEngineTools.World.Objects.Crops.FieldState(
+                        Enum.Parse<GameEngineTools.World.Objects.Crops.FieldStage>(reader.GetString(1), ignoreCase: true),
+                        reader.GetDouble(2),
+                        reader.IsDBNull(3) ? null : new WDateTime(reader.GetInt64(3)),
+                        reader.IsDBNull(4) ? null : new WDateTime(reader.GetInt64(4)),
+                        reader.GetDouble(5),
+                        reader.GetInt32(6),
+                        reader.GetDouble(7));
+                }
+            }
+
             // ── Merge results into enriched records ───────────────────────────
             return objects
                 .Select(o => o with
                 {
                     Affordances = affordanceMap[o.Id].ToImmutable(),
-                    NutritionalProfile = profileMap.GetValueOrDefault(o.Id)
+                    NutritionalProfile = profileMap.GetValueOrDefault(o.Id),
+                    Quantity = quantityMap.GetValueOrDefault(o.Id, 1),
+                    Field = fieldMap.GetValueOrDefault(o.Id),
                 })
                 .ToList();
         }
@@ -1395,6 +1435,29 @@ namespace GameEngineTools.World.Data
                     ("@id", objectId),
                     ("@type", a.Type.ToString()),
                     ("@sat", a.Satisfaction));
+        }
+
+        private void UpsertObjectState(WorldObject obj)
+        {
+            ExecuteNonQuery("DELETE FROM ObjectQuantities WHERE ObjectId = @id", ("@id", obj.Id));
+            ExecuteNonQuery("DELETE FROM FieldStates WHERE ObjectId = @id", ("@id", obj.Id));
+
+            if (obj.Quantity != 1)
+                ExecuteNonQuery("INSERT INTO ObjectQuantities (ObjectId, Quantity) VALUES (@id, @q)", ("@id", obj.Id), ("@q", obj.Quantity));
+
+            if (obj.Field is { } f)
+            {
+                ExecuteNonQuery(
+                    "INSERT INTO FieldStates (ObjectId, Stage, AreaHectares, SownAt, RipeAt, DegreeDays, SeedUnits, YearFactor) VALUES (@id, @stage, @area, @sown, @ripe, @dd, @seed, @year)",
+                    ("@id", obj.Id),
+                    ("@stage", f.Stage.ToString()),
+                    ("@area", f.AreaHectares),
+                    ("@sown", f.SownAt is { } s ? s.WorldTicks : DBNull.Value),
+                    ("@ripe", f.RipeAt is { } r ? r.WorldTicks : DBNull.Value),
+                    ("@dd", f.DegreeDays),
+                    ("@seed", f.SeedUnits),
+                    ("@year", f.YearFactor));
+            }
         }
 
         private void UpsertNutritionalProfile(string objectId, NutritionalProfile? profile)

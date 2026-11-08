@@ -270,6 +270,8 @@ namespace GameEngineTools.World.Simulation
 
                 foreach (var character in chars)
                     character.SetAmbientContext(celestial.BaseAmbientTempCelsius, celestial);
+
+                _options.CropGrowth?.Tick(now, celestial.BaseAmbientTempCelsius);
             }
 
             _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);

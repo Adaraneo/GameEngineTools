@@ -28,8 +28,7 @@ namespace GameEngineTools.World.Objects.Production
                 [PickupItemKind.Bread]  = 1.0 / 72,   // ~3 days
                 [PickupItemKind.Food]   = 1.0 / 48,   // ~2 days (generic perishable)
                 [PickupItemKind.Cheese] = 1.0 / 336,  // ~14 days
-                [PickupItemKind.Grain]  = 1.0 / 720,  // ~30 days (dry)
-                [PickupItemKind.Flour]  = 1.0 / 720,  // ~30 days (dry)
+                // Dry grain and flour do not spoil per item; stocks wear down in CropGrowthService (CropConfig.StorageLossPerYear).
             };
 
         /// <summary>The default rate table.</summary>

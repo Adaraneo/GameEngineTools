@@ -306,5 +306,11 @@ namespace GameEngineTools.World.Simulation
         /// whose respawn timer has elapsed and emitting EventId 1501 log entries.
         /// </summary>
         public ObjectRespawnScheduler? RespawnScheduler { get; init; }
+
+        /// <summary>
+        /// Optional grain-cycle clock. When set together with <see cref="AstroConfig"/>, the scene hands it the current ambient
+        /// temperature once per substep so sown fields collect heat and stored grain wears down.
+        /// </summary>
+        public GameEngineTools.World.Objects.Crops.CropGrowthService? CropGrowth { get; init; }
     }
 }
