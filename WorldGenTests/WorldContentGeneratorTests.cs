@@ -646,14 +646,14 @@ public class WorldContentGeneratorTests
         var crops = new CropConfig();
 
         Assert.AreEqual(2, fields.Count);
-        Assert.AreEqual(7.2, fields[0].Field!.AreaHectares, 1e-9, "A village of 18 farms 0.4 ha a person.");
+        Assert.AreEqual(8.1, fields[0].Field!.AreaHectares, 1e-9, "A village of 18 farms 0.45 ha a person.");
         Assert.AreEqual(FieldStage.Sown, fields[0].Field!.Stage, "One field was sown before the world began (the service works out when)...");
         Assert.IsNull(fields[0].Field!.SownAt);
         Assert.AreEqual(FieldStage.Fallow, fields[1].Field!.Stage, "...the other rests until it is ploughed and sown.");
 
         var seedBin = objects.Single(GrainStores.IsSeedBin);
         var food = objects.Single(GrainStores.IsFoodStore);
-        Assert.AreEqual(CropMath.SeedUnits(7.2, crops), seedBin.Quantity, "Seed for the autumn sowing.");
+        Assert.AreEqual((int)Math.Ceiling(CropMath.SeedUnits(8.1, crops) * 1.1), seedBin.Quantity, "Seed for the autumn sowing, with the reserve margin.");
         Assert.AreEqual(18 * 1300, food.Quantity, "A founding granary: grain until a crop sown just now is in.");
     }
 
@@ -670,8 +670,8 @@ public class WorldContentGeneratorTests
 
         var (descriptor, _) = db.GetAllLocations().Single();
         var objects = db.GetAllObjectsAt(descriptor.Id);
-        Assert.AreEqual(4.0, objects.First(o => o.Field is not null).Field!.AreaHectares, 1e-9, "10 people, 0.4 ha each.");
-        Assert.AreEqual(2000, objects.Single(GrainStores.IsSeedBin).Quantity, "600 kg of seed in 300 g units.");
+        Assert.AreEqual(4.5, objects.First(o => o.Field is not null).Field!.AreaHectares, 1e-9, "10 people, 0.45 ha each.");
+        Assert.AreEqual(2475, objects.Single(GrainStores.IsSeedBin).Quantity, "675 kg of seed in 300 g units, plus the 10% margin.");
     }
 
     [TestMethod]

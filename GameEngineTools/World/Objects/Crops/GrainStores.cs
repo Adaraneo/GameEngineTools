@@ -69,7 +69,7 @@ namespace GameEngineTools.World.Objects.Crops
             var seedBin = here.FirstOrDefault(IsSeedBin);
             var fields = here.Where(o => o.Field is not null).ToList();
             var croppedPerYear = Math.Max(1, (int)Math.Round(fields.Count / (1.0 + cfg.FallowYears)));
-            var seedWanted = fields.OrderByDescending(o => o.Field!.AreaHectares).Take(croppedPerYear).Sum(o => CropMath.SeedUnits(o.Field!.AreaHectares, cfg));
+            var seedWanted = (int)Math.Ceiling(fields.OrderByDescending(o => o.Field!.AreaHectares).Take(croppedPerYear).Sum(o => CropMath.SeedUnits(o.Field!.AreaHectares, cfg)) * (1.0 + cfg.SeedReserveMargin));
             var toSeed = Math.Clamp(seedWanted - (seedBin?.Quantity ?? 0), 0, units);
             var toFood = units - toSeed;
 

@@ -538,7 +538,7 @@ namespace EngineTests
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
             var t0 = new WDateTime(0);
-            provider.AddObject(FieldObject(new FieldState(FieldStage.Ripe, 1.0, t0, t0, 2800.0, SeedUnits: 1000, WorkDoneHours: 158.0)));
+            provider.AddObject(FieldObject(new FieldState(FieldStage.Ripe, 1.0, t0, t0, 2800.0, SeedUnits: 1000, WorkDoneHours: 158.0, PendingUnits: 4938)));
             var engine = MakeObjectEngine(provider);
             var outbox = new EventCollector();
 
@@ -546,7 +546,7 @@ namespace EngineTests
 
             var field = provider.FindObject("field_1")!.Field!;
             Assert.AreEqual(FieldStage.Reaped, field.Stage);
-            Assert.AreEqual(5000, field.PendingUnits);
+            Assert.AreEqual(5000, field.PendingUnits, 1, "The last two hours cut the last 1/80 of the crop: 62.5 of 5000.");
             var changed = outbox.Drain().OfType<FieldStageChanged>().Single();
             Assert.AreEqual(FieldStage.Ripe, changed.From);
             Assert.AreEqual(FieldStage.Reaped, changed.To);
@@ -566,8 +566,8 @@ namespace EngineTests
             Assert.AreEqual(FieldStage.Fallow, provider.FindObject("field_1")!.Field!.Stage, "All the grain is out of the sheaves.");
             var seedBin = provider.FindObject(GrainStores.SeedBinId(Loc))!;
             var food = provider.FindObject(GrainStores.FoodStoreId(Loc))!;
-            Assert.AreEqual(1000, seedBin.Quantity, "The seed for next year's sowing is kept back first.");
-            Assert.AreEqual(4000, food.Quantity, "The rest is food.");
+            Assert.AreEqual(1100, seedBin.Quantity, "The seed for next year's sowing, with its 10% margin, is kept back first.");
+            Assert.AreEqual(3900, food.Quantity, "The rest is food.");
             Assert.IsTrue(food.IsStock && food.Category == WorldObjectCategory.Food);
         }
 

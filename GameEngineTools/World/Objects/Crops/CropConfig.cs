@@ -60,6 +60,12 @@ namespace GameEngineTools.World.Objects.Crops
         /// <summary>Years a field rests after a harvest before it is sown again; 1, the two-field system (my pick; three-field rotation rests a third).</summary>
         public double FallowYears { get; set; } = 1.0;
 
+        /// <summary>Extra seed kept back beyond one sowing, against storage loss; 0.1, enough for a year at the 5% loss (my pick).</summary>
+        public double SeedReserveMargin { get; set; } = 0.1;
+
+        /// <summary>Thinnest sowing accepted as a share of the full rate, when the bin falls short; 0.85, and the yield falls in proportion (my pick).</summary>
+        public double MinSowingShare { get; set; } = 0.85;
+
         /// <summary>World days between two applications of the storage loss (rounded to whole units each time).</summary>
         public double StorageLossIntervalDays { get; set; } = 30.0;
 

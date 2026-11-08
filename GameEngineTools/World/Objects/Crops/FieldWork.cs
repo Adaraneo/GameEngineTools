@@ -64,7 +64,7 @@ namespace GameEngineTools.World.Objects.Crops
             => now.TemperatureCelsius >= cfg.MinWorkTemperatureCelsius
                && CropMath.IsSowingWeather(now.TemperatureCelsius, now.TemperatureTrendPerDay, cfg)
                && HasRested(field, now.Year, cfg)
-               && now.SeedInStore >= CropMath.SeedUnits(field.AreaHectares, cfg);
+               && now.SeedInStore >= CropMath.SeedUnits(field.AreaHectares, cfg) * cfg.MinSowingShare;
 
         private static bool HasRested(FieldState field, int year, CropConfig cfg)
             => field.ReapedYear is not { } reaped || year >= reaped + (int)Math.Round(cfg.FallowYears);
@@ -79,11 +79,14 @@ namespace GameEngineTools.World.Objects.Crops
         };
 
         /// <summary>One session of <paramref name="hours"/> of labor; the task moves the field to its next stage once its labor is spent.</summary>
-        public static FieldWorkResult Apply(FieldTask task, FieldState field, double hours, WDateTime now, int year, CropConfig cfg, double yearFactor = 1.0)
+        public static FieldWorkResult Apply(FieldTask task, FieldState field, double hours, WDateTime now, int year, CropConfig cfg, double yearFactor = 1.0, int seedInStore = int.MaxValue)
         {
             hours = Math.Max(0.0, hours);
             if (task == FieldTask.Thresh)
                 return Thresh(field, hours);
+
+            if (task == FieldTask.Reap)
+                return Reap(field, hours, now, year, cfg);
 
             var done = field.WorkDoneHours + hours;
             if (done < RequiredHours(task, field, cfg))
@@ -96,21 +99,37 @@ namespace GameEngineTools.World.Objects.Crops
                     return new FieldWorkResult(ploughed, 0, 0, true);
 
                 case FieldTask.Sow when CropMath.Sow(finished, now, cfg, yearFactor) is { } sown:
-                    return new FieldWorkResult(sown, 0, sown.SeedUnits, true);
-
-                case FieldTask.Reap when finished.Stage == FieldStage.Ripe:
-                    var harvest = CropMath.HarvestUnits(finished, now, cfg);
-                    var reaped = CropMath.Reap(finished)! with
-                    {
-                        PendingUnits = harvest,
-                        ThreshHoursRemaining = cfg.ThreshHoursPerHectare * field.AreaHectares,
-                        ReapedYear = year,
-                    };
-                    return new FieldWorkResult(reaped, 0, 0, true);
+                    // A bin that falls a little short gives a thinner sowing, and the crop is smaller in proportion.
+                    var sownSeed = Math.Min(sown.SeedUnits, seedInStore);
+                    return new FieldWorkResult(sown with { SeedUnits = sownSeed }, 0, sownSeed, true);
 
                 default:
                     return new FieldWorkResult(field, 0, 0, false);
             }
+        }
+
+        // Each session cuts its share of the field and the grain still standing has lost what shattered by now, so the loss follows the days it stood.
+        private static FieldWorkResult Reap(FieldState field, double hours, WDateTime now, int year, CropConfig cfg)
+        {
+            if (field.Stage != FieldStage.Ripe)
+                return new FieldWorkResult(field, 0, 0, false);
+
+            var required = RequiredHours(FieldTask.Reap, field, cfg);
+            var spent = Math.Min(hours, required - field.WorkDoneHours);
+            var cut = (int)Math.Round(CropMath.HarvestUnits(field, now, cfg) * (spent / required));
+            var done = field.WorkDoneHours + spent;
+
+            if (done < required - 1e-9)
+                return new FieldWorkResult(field with { WorkDoneHours = done, PendingUnits = field.PendingUnits + cut }, 0, 0, false);
+
+            var reaped = CropMath.Reap(field)! with
+            {
+                WorkDoneHours = 0.0,
+                PendingUnits = field.PendingUnits + cut,
+                ThreshHoursRemaining = cfg.ThreshHoursPerHectare * field.AreaHectares,
+                ReapedYear = year,
+            };
+            return new FieldWorkResult(reaped, 0, 0, true);
         }
 
         private static FieldWorkResult Thresh(FieldState field, double hours)

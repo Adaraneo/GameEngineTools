@@ -844,7 +844,7 @@ public static class WorldContentGenerator
             worldDb.AddObject(Field($"{settlement.Id}_field_2", settlement.Id, new FieldState(FieldStage.Fallow, area)));
 
             // Seed for the autumn sowing, and food to live on until the first harvest.
-            worldDb.AddObject(GrainStores.CreateSeedBin(settlement.Id, seed));
+            worldDb.AddObject(GrainStores.CreateSeedBin(settlement.Id, (int)Math.Ceiling(seed * (1.0 + crops.SeedReserveMargin))));
             worldDb.AddObject(GrainStores.CreateFoodStore(settlement.Id, people * StartingMealsPerPerson));
             created += 4;
         }
@@ -865,8 +865,9 @@ public static class WorldContentGenerator
             Field = state,
         };
 
-    // Cropped area per person a year; my calculation: 2200 kcal a day from grain alone at 3.4 kcal/g is 236 kg a year, at 600 kg/ha net about 0.4 ha.
-    private const double CroppedHectaresPerPerson = 0.4;
+    // Cropped area per person a year; my calculation: 2200 kcal a day from grain alone at 3.4 kcal/g is 236 kg a year; a hectare gives 750 kg, of which a
+    // tenth over one sowing is kept as seed and about 5% a year is lost in store, so about 556 kg are eaten: 0.42 ha, rounded up for the shatter in the field.
+    private const double CroppedHectaresPerPerson = 0.45;
 
     // Meals of grain per person in the founding granary: about 320 days at 4 meals, enough to reach the harvest of a crop sown at the worst moment; my estimate.
     private const int StartingMealsPerPerson = 1300;

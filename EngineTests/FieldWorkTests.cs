@@ -49,7 +49,8 @@ namespace EngineTests
             Assert.IsNull(FieldWork.Available(ploughed, Summer(seed: 5000), Cfg), "Warm and warming: not sowing weather.");
             Assert.IsNull(FieldWork.Available(ploughed, new FieldSeason(0.2, 12.0, 2025, 5000), Cfg), "Same temperature but the year is warming: spring, not autumn.");
             Assert.IsNull(FieldWork.Available(ploughed, new FieldSeason(-0.2, 5.0, 2025, 5000), Cfg), "Cooling but already too cold for the band.");
-            Assert.IsNull(FieldWork.Available(ploughed, Autumn(seed: 999), Cfg), "A hectare needs 1000 units of seed and the bin holds 999.");
+            Assert.AreEqual(FieldTask.Sow, FieldWork.Available(ploughed, Autumn(seed: 850), Cfg), "850 of 1000 units is the thinnest sowing accepted.");
+            Assert.IsNull(FieldWork.Available(ploughed, Autumn(seed: 849), Cfg), "Less than that is not worth sowing.");
         }
 
         [TestMethod]
@@ -75,8 +76,8 @@ namespace EngineTests
 
             GrainStores.Deposit(provider, "farm", 5000, Cfg);
 
-            Assert.AreEqual(2000, provider.FindObject(GrainStores.SeedBinId("farm"))!.Quantity, "Two fields in a two-year rotation: seed for one (2 ha x 1000 units).");
-            Assert.AreEqual(3000, provider.FindObject(GrainStores.FoodStoreId("farm"))!.Quantity);
+            Assert.AreEqual(2200, provider.FindObject(GrainStores.SeedBinId("farm"))!.Quantity, "Two fields in a two-year rotation: seed for one (2 ha x 1000 units) plus the 10% margin.");
+            Assert.AreEqual(2800, provider.FindObject(GrainStores.FoodStoreId("farm"))!.Quantity);
         }
 
         // ── Labor moves the field on ─────────────────────────────────────────────────
@@ -99,6 +100,17 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Sowing_WithAShortBin_SowsThinnerAndTheCropIsSmaller()
+        {
+            var field = new FieldState(FieldStage.Ploughed, 1.0, WorkDoneHours: 28.0);
+
+            var result = FieldWork.Apply(FieldTask.Sow, field, 4.0, T0, 2025, Cfg, seedInStore: 900);
+
+            Assert.AreEqual(900, result.SeedConsumed);
+            Assert.AreEqual(900, result.Field.SeedUnits, "The crop is counted from the seed that went in.");
+        }
+
+        [TestMethod]
         public void Sowing_ConsumesTheSeedWhenFinished()
         {
             var field = new FieldState(FieldStage.Ploughed, 1.0, WorkDoneHours: 28.0);
@@ -111,19 +123,44 @@ namespace EngineTests
             Assert.AreEqual(1000, result.Field.SeedUnits);
         }
 
-        [TestMethod]
-        public void Reaping_FixesTheHarvest_AndLeavesSheavesToThresh()
+        private static (FieldState Field, int Sessions) ReapAll(FieldState ripe, Func<int, WDateTime> timeOfSession)
         {
-            var t0 = T0;
-            var ripe = new FieldState(FieldStage.Ripe, 1.0, t0, t0, 2800.0, SeedUnits: 1000, WorkDoneHours: 158.0);
+            var field = ripe;
+            var sessions = 0;
+            while (field.Stage == FieldStage.Ripe && sessions < 100)
+            {
+                field = FieldWork.Apply(FieldTask.Reap, field, 4.0, timeOfSession(sessions), 2026, Cfg).Field;
+                sessions++;
+            }
 
-            var result = FieldWork.Apply(FieldTask.Reap, ripe, 4.0, t0, 2026, Cfg);
+            return (field, sessions);
+        }
 
-            Assert.IsTrue(result.Completed);
-            Assert.AreEqual(FieldStage.Reaped, result.Field.Stage);
-            Assert.AreEqual(5000, result.Field.PendingUnits, "Seed 1000 x ratio 5, reaped the day it ripened.");
-            Assert.AreEqual(160.0, result.Field.ThreshHoursRemaining, 1e-9);
-            Assert.AreEqual(2026, result.Field.ReapedYear);
+        [TestMethod]
+        public void Reaping_CutsTheFieldSessionBySession_AndLeavesSheavesToThresh()
+        {
+            var ripe = new FieldState(FieldStage.Ripe, 1.0, T0, T0, 2800.0, SeedUnits: 1000);
+
+            var (field, sessions) = ReapAll(ripe, _ => T0);
+
+            Assert.AreEqual(40, sessions, "160 h in sessions of 4 h.");
+            Assert.AreEqual(FieldStage.Reaped, field.Stage);
+            Assert.AreEqual(5000, field.PendingUnits, 40, "Seed 1000 x ratio 5, all reaped the day it ripened (rounding per session).");
+            Assert.AreEqual(160.0, field.ThreshHoursRemaining, 1e-9);
+            Assert.AreEqual(2026, field.ReapedYear);
+        }
+
+        [TestMethod]
+        public void Reaping_LosesWhatShatteredByTheDayOfEachSession_NotByTheLastDay()
+        {
+            var ripe = new FieldState(FieldStage.Ripe, 1.0, T0, T0, 2800.0, SeedUnits: 1000);
+
+            // Sessions spread over 40 days: the early ones lose almost nothing, the late ones 0.5% a day.
+            var spread = ReapAll(ripe, session => T0 + WTimeSpan.FromDays(session)).Field.PendingUnits;
+            var allLate = ReapAll(ripe, _ => T0 + WTimeSpan.FromDays(40)).Field.PendingUnits;
+
+            Assert.IsTrue(spread > allLate + 400, $"Spread over 40 days {spread} against everything at day 40 {allLate}.");
+            Assert.AreEqual(5000 * (1.0 - 0.005 * 19.5), spread, 60, "On average the grain stood about 20 days.");
         }
 
         [TestMethod]
