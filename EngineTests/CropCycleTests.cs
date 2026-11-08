@@ -114,15 +114,16 @@ namespace EngineTests
             Assert.AreEqual(2500, CropMath.HarvestUnits(ripe with { YearFactor = 0.5 }, t0, Cfg), "A bad year.");
 
             var tenDaysLater = t0 + WTimeSpan.FromDays(10);
-            Assert.AreEqual(4000, CropMath.HarvestUnits(ripe, tenDaysLater, Cfg), "Ten days standing at 2% a day.");
-            Assert.AreEqual(0, CropMath.HarvestUnits(ripe, t0 + WTimeSpan.FromDays(60), Cfg), "Left standing too long, nothing is left.");
+            Assert.AreEqual(4750, CropMath.HarvestUnits(ripe, tenDaysLater, Cfg), "Ten days standing at 0.5% a day.");
+            Assert.AreEqual(3500, CropMath.HarvestUnits(ripe, t0 + WTimeSpan.FromDays(60), Cfg), "Two months standing costs a third.");
+            Assert.AreEqual(0, CropMath.HarvestUnits(ripe, t0 + WTimeSpan.FromDays(250), Cfg), "Left standing for most of a year, nothing is left.");
             Assert.AreEqual(0, CropMath.HarvestUnits(ripe with { Stage = FieldStage.Sown }, t0, Cfg), "Not ripe, nothing to reap.");
         }
 
         [TestMethod]
         public void StorageLoss_IsAFewPercentAYear_AndNeverCreatesGrain()
         {
-            Assert.AreEqual(970, CropMath.AfterStorage(1000, 360.0, 360.0, Cfg), "3% over a year.");
+            Assert.AreEqual(950, CropMath.AfterStorage(1000, 360.0, 360.0, Cfg), "5% over a year.");
             Assert.AreEqual(1000, CropMath.AfterStorage(1000, 0.0, 360.0, Cfg));
             Assert.AreEqual(3, CropMath.AfterStorage(3, 30.0, 360.0, Cfg), "A tiny stock does not shrink by rounding.");
         }
@@ -177,7 +178,7 @@ namespace EngineTests
             service.Tick(start + WTimeSpan.FromDays(31), 10.0);
 
             Assert.IsTrue(provider.FindObject("store_1")!.Quantity < 10_000, "A month in the store costs a little grain.");
-            Assert.IsTrue(provider.FindObject("store_1")!.Quantity > 9_900, "A little, not a lot: 3% a year.");
+            Assert.IsTrue(provider.FindObject("store_1")!.Quantity > 9_900, "A little, not a lot: 5% a year.");
             Assert.AreEqual(10_000, provider.FindObject("mill_1")!.Quantity, "A production fixture is not a store.");
         }
 
