@@ -34,7 +34,7 @@ namespace WorldMonitor
 
             sb.AppendLine();
             sb.AppendLine("## Food and water per world day (readings at every tick; meals and drinks are committed Eat/EatStored and Drink actions)");
-            sb.AppendLine("| day | hunger mean | hunger 80+ % | thirst mean | thirst 80+ % | meals per character | drinks per character |");
+            sb.AppendLine($"| day | hunger mean | hunger {c.HungerLevel:F0}+ % | thirst mean | thirst {c.HungerLevel:F0}+ % | meals per character | drinks per character |");
             sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|");
             foreach (var (day, counters) in c.Days)
             {
@@ -49,17 +49,17 @@ namespace WorldMonitor
             if (c.FarmSamples.Count > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine("## Farms by 30-day period (grain in units; fields per stage F fallow, P ploughed, S sown, R ripe, H reaped; jobs are committed actions)");
-                sb.AppendLine("| days | food store (end) | seed bin (end) | sheaves (end) | fields F/P/S/R/H (end) | plough | sow | reap | thresh | hunger 80+ % | meals per character |");
+                sb.AppendLine($"## Farms by {c.FarmPeriodDays}-day period (grain in units; fields per stage F fallow, P ploughed, S sown, R ripe, H reaped; jobs are committed actions)");
+                sb.AppendLine($"| days | food store (end) | seed bin (end) | sheaves (end) | fields F/P/S/R/H (end) | plough | sow | reap | thresh | hunger {c.HungerLevel:F0}+ % | meals per character |");
                 sb.AppendLine("|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|");
-                foreach (var period in c.FarmSamples.GroupBy(f => f.Day / 30).OrderBy(g => g.Key))
+                foreach (var period in c.FarmSamples.GroupBy(f => f.Day / c.FarmPeriodDays).OrderBy(g => g.Key))
                 {
                     var last = period.Last();
                     int Stage(GameEngineTools.World.Objects.Crops.FieldStage s) => last.Stages.GetValueOrDefault(s);
-                    var days = c.Days.Where(d => d.Key / 30 == period.Key).Select(d => d.Value).ToList();
+                    var days = c.Days.Where(d => d.Key / c.FarmPeriodDays == period.Key).Select(d => d.Value).ToList();
                     var readings = Math.Max(1, days.Sum(d => d.Total));
                     var people = Math.Max(1, c.CharactersSeen);
-                    sb.AppendLine($"| {period.Key * 30}-{period.Key * 30 + 29} | {last.FoodUnits} | {last.SeedUnits} | {last.SheafUnits} | {Stage(GameEngineTools.World.Objects.Crops.FieldStage.Fallow)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Ploughed)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Sown)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Ripe)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Reaped)} | {days.Sum(d => d.Ploughed)} | {days.Sum(d => d.Sowed)} | {days.Sum(d => d.Reaped)} | {days.Sum(d => d.Threshed)} | {100.0 * days.Sum(d => d.HungryReadings) / readings:F1} | {(double)days.Sum(d => d.Meals) / people / Math.Max(1, days.Count):F1} |");
+                    sb.AppendLine($"| {period.Key * c.FarmPeriodDays}-{period.Key * c.FarmPeriodDays + c.FarmPeriodDays - 1} | {last.FoodUnits} | {last.SeedUnits} | {last.SheafUnits} | {Stage(GameEngineTools.World.Objects.Crops.FieldStage.Fallow)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Ploughed)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Sown)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Ripe)}/{Stage(GameEngineTools.World.Objects.Crops.FieldStage.Reaped)} | {days.Sum(d => d.Ploughed)} | {days.Sum(d => d.Sowed)} | {days.Sum(d => d.Reaped)} | {days.Sum(d => d.Threshed)} | {100.0 * days.Sum(d => d.HungryReadings) / readings:F1} | {(double)days.Sum(d => d.Meals) / people / Math.Max(1, days.Count):F1} |");
                 }
             }
 

@@ -73,11 +73,14 @@ namespace WorldMonitor
         private readonly HashSet<(long, HumanId, Type)> _seenOther = new();
 
         private readonly int _totalDays;
-        private const double HungerLevel = 80;
+        private readonly double _hungerLevel;
+        private readonly int _farmPeriodDays;
 
-        public Collector(double sampleEveryHours, int totalDays = 0)
+        public Collector(double sampleEveryHours, int totalDays = 0, double hungerLevel = 80, int farmPeriodDays = 30)
         {
             _sampleEveryHours = sampleEveryHours;
+            _hungerLevel = hungerLevel;
+            _farmPeriodDays = farmPeriodDays;
             _totalDays = totalDays;
         }
 
@@ -116,6 +119,12 @@ namespace WorldMonitor
 
         /// <summary>Returns every world object (set by the host when farms are wanted in the report).</summary>
         public Func<IEnumerable<GameEngineTools.World.Objects.WorldObject>>? FarmSampler { get; set; }
+
+        /// <summary>Hunger and thirst level counted as "high" in the food tables.</summary>
+        public double HungerLevel => _hungerLevel;
+
+        /// <summary>Length in world days of one row of the farms table.</summary>
+        public int FarmPeriodDays => _farmPeriodDays;
 
         public List<FarmSample> FarmSamples { get; } = new();
 
@@ -187,8 +196,8 @@ namespace WorldMonitor
                 counters.Total++;
                 counters.HungerSum += ph.Hunger;
                 counters.ThirstSum += ph.Thirst;
-                if (ph.Hunger >= HungerLevel) counters.HungryReadings++;
-                if (ph.Thirst >= HungerLevel) counters.ThirstyReadings++;
+                if (ph.Hunger >= _hungerLevel) counters.HungryReadings++;
+                if (ph.Thirst >= _hungerLevel) counters.ThirstyReadings++;
                 if (surface.HasPrivacy) counters.Private++;
                 if (atHome) counters.AtHome++;
                 if (asleep) { counters.Asleep++; if (surface.HasPrivacy) counters.AsleepPrivate++; }

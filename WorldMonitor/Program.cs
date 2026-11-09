@@ -33,7 +33,7 @@ var outputDir = Path.GetFullPath(options.OutputDir, AppContext.BaseDirectory);
 var runDir = RunDirectory.Create(options.WorldDb, options.Barter);
 Directory.SetCurrentDirectory(runDir);
 
-var collector = new Collector(options.SampleEveryHours, options.Run.Days);
+var collector = new Collector(options.SampleEveryHours, options.Run.Days, options.Thresholds.HungerLevel, options.FarmPeriodDays);
 var stopwatch = Stopwatch.StartNew();
 var progress = new Progress(options.Run.Days, stopwatch);
 
@@ -62,7 +62,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
         SimulationDays = options.Run.Days,
         TickStep = WTimeSpan.FromMinutes(Math.Max(1, options.Run.TickStepMinutes)),
         InternalSubstep = WTimeSpan.FromMinutes(Math.Max(1, options.Run.SubstepMinutes)),
-        DefaultCharacterLod = GameEngineTools.Characters.Hosting.CognitiveResolutionLevel.Nearby,
+        DefaultCharacterLod = options.Lod,
         ObjectSnapshotCache = world.ObjectCache,
         WriteBuffer = world.WriteBuffer,
         RespawnScheduler = world.Respawn,
