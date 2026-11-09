@@ -21,6 +21,26 @@ namespace GameEngineTools.World.Objects.Crops
             return effective <= 0.0 || days <= 0.0 ? 0.0 : effective * days;
         }
 
+        /// <summary>The weather of a crop year as a yield multiplier, the same for one place and year on every run; lognormal with mean 1 and the configured spread, kept between 0.3 and 1.8.</summary>
+        public static double YearFactor(string placeKey, int year, CropConfig cfg)
+        {
+            var sigmaSquared = Math.Log(1.0 + cfg.YieldVariation * cfg.YieldVariation);
+            if (sigmaSquared <= 0.0)
+                return 1.0;
+
+            // FNV-1a over the place and year gives two uniform numbers, which Box-Muller turns into one normal deviate.
+            ulong hash = 14695981039346656037UL;
+            foreach (var c in placeKey + "|" + year)
+                hash = (hash ^ c) * 1099511628211UL;
+            var u1 = ((hash >> 11) + 1) / 9007199254740994.0;
+            hash = (hash ^ (hash >> 29)) * 0xBF58476D1CE4E5B9UL;
+            var u2 = (hash >> 11) / 9007199254740992.0;
+            var z = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
+
+            var factor = Math.Exp(Math.Sqrt(sigmaSquared) * z - sigmaSquared / 2.0);
+            return Math.Clamp(factor, 0.3, 1.8);
+        }
+
         /// <summary>Weather for sowing winter wheat: the year is cooling and the air is between the configured limits.</summary>
         public static bool IsSowingWeather(double temperatureC, double trendPerDay, CropConfig cfg)
             => trendPerDay < 0.0 && temperatureC >= cfg.SowingTemperatureMinCelsius && temperatureC <= cfg.SowingTemperatureMaxCelsius;

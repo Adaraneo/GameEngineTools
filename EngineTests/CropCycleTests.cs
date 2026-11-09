@@ -145,6 +145,28 @@ namespace EngineTests
         private static double South(WDateTime t) => North(t + WTimeSpan.FromDays(WWorld.Spec.Calendar.DaysInYear(2025) / 2.0));
 
         [TestMethod]
+        public void YearFactor_HasMeanOneAndTheConfiguredSpread_AndIsTheSameEveryRun()
+        {
+            var factors = Enumerable.Range(0, 4000).Select(i => CropMath.YearFactor("village_" + i % 40, 1000 + i / 40, Cfg)).ToList();
+            var mean = factors.Average();
+            var spread = Math.Sqrt(factors.Sum(f => (f - mean) * (f - mean)) / factors.Count) / mean;
+
+            Assert.AreEqual(1.0, mean, 0.03);
+            Assert.AreEqual(Cfg.YieldVariation, spread, 0.04);
+            Assert.IsTrue(factors.All(f => f is >= 0.3 and <= 1.8));
+            Assert.AreEqual(CropMath.YearFactor("village_3", 1005, Cfg), CropMath.YearFactor("village_3", 1005, Cfg));
+            Assert.AreNotEqual(CropMath.YearFactor("village_3", 1005, Cfg), CropMath.YearFactor("village_3", 1006, Cfg), "Another year, another weather.");
+        }
+
+        [TestMethod]
+        public void YearFactor_WithNoVariation_IsAlwaysOne()
+        {
+            var cfg = new CropConfig { YieldVariation = 0.0 };
+
+            Assert.AreEqual(1.0, CropMath.YearFactor("v", 2026, cfg));
+        }
+
+        [TestMethod]
         public void SowingWeather_IsCoolingAirInTheBand_AnywhereOnTheYear()
         {
             Assert.IsTrue(CropMath.IsSowingWeather(12.0, -0.2, Cfg));

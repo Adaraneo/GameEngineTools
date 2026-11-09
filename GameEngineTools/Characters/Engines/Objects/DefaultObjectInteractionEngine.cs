@@ -418,7 +418,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (fieldObject?.Field is not { } field)
                 return;
 
-            var result = FieldWork.Apply(task, field, committed.Duration.TotalHours, committed.OccurredAt, season.Year, _cropConfig, seedInStore: seedBin?.Quantity ?? 0);
+            var result = FieldWork.Apply(task, field, committed.Duration.TotalHours, committed.OccurredAt, season.Year, _cropConfig, CropMath.YearFactor(fieldObject.LocationId.ToString(), season.Year, _cropConfig), seedBin?.Quantity ?? 0);
 
             _objectProvider.RemoveObject(fieldObject.LocationId, fieldObject.Id);
             _objectProvider.AddObject(fieldObject with { Field = result.Field });

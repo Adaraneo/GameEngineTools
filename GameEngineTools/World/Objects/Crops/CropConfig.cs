@@ -24,6 +24,9 @@ namespace GameEngineTools.World.Objects.Crops
         /// <summary>Harvest as a multiple of the seed; 5, my pick in the documented 3-10, giving about 600 kg/ha net (Campbell, Norfolk: about 270-1075).</summary>
         public double YieldRatio { get; set; } = 5.0;
 
+        /// <summary>Spread of the yield from year to year as a coefficient of variation; 0.25, my reading of 20-30% for medieval English wheat; 0 gives every year the same crop.</summary>
+        public double YieldVariation { get; set; } = 0.25;
+
         /// <summary>Grams of grain in one storage unit; 150, about a meal of energy; a grain-eating adult uses 1100-1300 units a year (Campbell, Dyer; 3.4 kcal/g assumed).</summary>
         public double GramsPerUnit { get; set; } = 150.0;
 
