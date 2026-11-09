@@ -175,11 +175,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             // Energy: depletes while awake, slower during self-care, untouched during sleep
             // (sleep recovery is a one-time effect in Handle(SleepEnded), NOT here).
+            // Field labour burns more of each: the awake rates are multiplied by the task's exertion.
+            var exertion = action switch
+            {
+                Plough => config.PloughExertion,
+                Sow => config.SowExertion,
+                Reap => config.ReapExertion,
+                Thresh => config.ThreshExertion,
+                _ => 1.0
+            };
+
             var energy = action switch
             {
                 SelfCare => config.EnergyDriftSelfCarePerHour * h,
                 Sleep => 0.0,
-                _ => config.EnergyDriftAwakePerHour * h
+                _ => config.EnergyDriftAwakePerHour * h * exertion
             };
 
             // Hunger: rises while awake, slower during sleep, drops while eating.
@@ -188,7 +198,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 Eat or EatStored => config.HungerEatingGainPerHour * h,
                 Sleep => config.HungerDriftSleepPerHour * h,
-                _ => config.HungerDriftAwakePerHour * h
+                _ => config.HungerDriftAwakePerHour * h * exertion
             };
 
             // Thirst: same pattern. Drink uses the object's hydration value when supplied.
@@ -196,7 +206,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 Drink => -(hydrationGain ?? config.ThirstDrinkingGainPerHour) * h,
                 Sleep => config.ThirstDriftSleepPerHour * h,
-                _ => config.ThirstDriftAwakePerHour * h
+                _ => config.ThirstDriftAwakePerHour * h * exertion
             };
 
             // Pain: passive recovery always; sleep adds its bonus; self-care is strongest.

@@ -420,7 +420,15 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Process S level above which <c>SleepDebtHours</c> accrues. <c>null</c> (default) derives it from the world's day length as the steady-state evening level of a normal waking/sleeping cycle (see <see cref="SleepRegulationCalculator.DebtFreeLevel"/>), so a normal day carries no debt on any planet; chronic restriction is tracked by the cognitive deficit.</summary>
         double? ProcessSDebtFreeLevel = null,
         /// <summary>Mean of the circadian spontaneous-waking threshold L(t) = this + a·C(t); sleep ends when Process S decays to it. Default 0.17. Source: Daan, Beersma &amp; Borbély 1984 (H0− ≈ 0.17); reproduces the ≈ 8 h normal sleep and the only ≈ +1 h of sleep after 40 h awake (Åkerstedt &amp; Gillberg 1986).</summary>
-        double ProcessCWakeThresholdMean = 0.17)
+        double ProcessCWakeThresholdMean = 0.17,
+        /// <summary>Energy, hunger and thirst drift of ploughing by hand as a multiple of ordinary waking; about 3: spading is 5-8 MET against about 2 for a mixed waking day (Compendium of Physical Activities, my reading).</summary>
+        double PloughExertion = 3.0,
+        /// <summary>Same for sowing by hand; about 1.5, walking with a seed bag (my estimate).</summary>
+        double SowExertion = 1.5,
+        /// <summary>Same for reaping with a sickle; about 2.5, 4-6 MET (my estimate from the Compendium).</summary>
+        double ReapExertion = 2.5,
+        /// <summary>Same for threshing with a flail; about 2.5 (my estimate).</summary>
+        double ThreshExertion = 2.5)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(

@@ -47,6 +47,23 @@ namespace EngineTests
             Assert.AreEqual(awake, work, "Any non-special action must use the default awake rates.");
         }
 
+        [TestMethod]
+        public void ComputeDrift_FieldLabour_BurnsEnergyHungerAndThirstByTheTasksExertion()
+        {
+            var awake = DefaultPhysiologyEngine.ComputeDrift(null, 1.0, Cfg, null, 1.0);
+
+            foreach (var (action, factor) in new[] { (Plough, Cfg.PloughExertion), (Sow, Cfg.SowExertion), (Reap, Cfg.ReapExertion), (Thresh, Cfg.ThreshExertion) })
+            {
+                var d = DefaultPhysiologyEngine.ComputeDrift(action, 1.0, Cfg, null, 1.0);
+
+                Assert.IsTrue(factor > 1.0, action);
+                Assert.AreEqual(awake.Energy * factor, d.Energy, Tol, action);
+                Assert.AreEqual(awake.Hunger * factor, d.Hunger, Tol, action);
+                Assert.AreEqual(awake.Thirst * factor, d.Thirst, Tol, action);
+                Assert.AreEqual(awake.Pain, d.Pain, Tol, action);
+            }
+        }
+
         // ── Eat / Drink (BUG-1: no double-counting) ──────────────────────────────
 
         [TestMethod]
