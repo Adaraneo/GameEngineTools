@@ -18,7 +18,7 @@ namespace WorldMonitor
             var sb = new StringBuilder();
             sb.AppendLine("# World monitor report");
             sb.AppendLine();
-            sb.AppendLine($"Profile **{options.ProfileName}**: {options.Run.Characters} characters, {options.Run.Days} world days, tick {options.Run.TickStepMinutes} min, substep {options.Run.SubstepMinutes} min; {c.Ticks} ticks in {elapsed.TotalMinutes:F1} min of real time.");
+            sb.AppendLine($"Profile **{options.ProfileName}**: {options.Run.Characters} characters, {options.Run.Days} world days, tick {options.Run.TickStepMinutes} min, substep {options.Run.SubstepMinutes} min, {(options.Seed is { } seed ? $"seed {seed}" : "unseeded")}; {c.Ticks} ticks in {elapsed.TotalMinutes:F1} min of real time.");
             sb.AppendLine();
 
             sb.AppendLine("## Per world day");

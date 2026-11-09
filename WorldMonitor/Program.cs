@@ -25,7 +25,7 @@ catch (Exception ex)
     return 1;
 }
 
-Console.WriteLine($"WorldMonitor: profile {options.ProfileName} — {options.Run.Characters} characters, {options.Run.Days} days, tick {options.Run.TickStepMinutes} min.");
+Console.WriteLine($"WorldMonitor: profile {options.ProfileName} — {options.Run.Characters} characters, {options.Run.Days} days, tick {options.Run.TickStepMinutes} min{(options.Seed is { } seed ? $", seed {seed}" : ", unseeded")}.");
 
 // The engine reads its config and SourceFiles (and keeps world.db) under the working directory. Each run gets its own copy,
 // so several monitors can run at the same time without touching each other's world.
@@ -45,7 +45,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     writeTextLogs: false,
     configureServices: static s => s.AddLexicalAcquisition()))
 {
-    var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples);
+    var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples, options.Seed);
     var objects = runtime.Services.GetRequiredService<GameEngineTools.World.Objects.IWorldObjectProvider>();
     collector.FarmSampler = () => objects.GetAllObjects();
 

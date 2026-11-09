@@ -236,7 +236,8 @@ namespace GameEngineTools.Characters.Generation
         {
             request ??= new HumanBlueprintRequest();
 
-            var id = new HumanId(Guid.NewGuid());
+            // A seeded request also gets a reproducible id, so two runs with one seed build the same people.
+            var id = new HumanId(request.Seed is { } given ? IdFromSeed(given) : Guid.NewGuid());
             var runtimeSeed = request.Seed ?? DeriveSeedFromId(id);
 
             var seed = request.Seed ?? Environment.TickCount;
@@ -388,6 +389,13 @@ namespace GameEngineTools.Characters.Generation
         /// <summary>
         /// Deterministic seed from the Guid — stable but reasonably dispersed.
         /// </summary>
+        private static Guid IdFromSeed(int seed)
+        {
+            var bytes = new byte[16];
+            new Random(seed ^ 0x5EED_1D00).NextBytes(bytes);
+            return new Guid(bytes);
+        }
+
         private static int DeriveSeedFromId(HumanId id)
         {
             var bytes = id.Value.ToByteArray();

@@ -47,8 +47,19 @@ namespace WorldObserver.Simulation
             { "programmer", "barista", "doctor", "trainer", "shopkeeper", "chef", "librarian", "clerk", "barkeeper",
               "baker", "farmhand", "food_worker", "orchardist" };
 
+        // Neighbouring seeds give correlated draws from System.Random, so a person's seed is a hash of the run seed and its number.
+        private static int Mix(int seed, int n)
+        {
+            unchecked
+            {
+                var x = (uint)seed * 0x9E3779B1u + (uint)n * 0x85EBCA6Bu;
+                x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+                return (int)x;
+            }
+        }
+
         /// <summary>Loads the world and returns the pieces the host wires into a scene.</summary>
-        public static WorldContext Build(GameEngineToolsRuntimeHandle runtime, int characterCount, int coupleCount = 0)
+        public static WorldContext Build(GameEngineToolsRuntimeHandle runtime, int characterCount, int coupleCount = 0, int? seed = null)
         {
             var services = runtime.Services;
             var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
@@ -87,6 +98,10 @@ namespace WorldObserver.Simulation
             if (homes.Count == 0)
                 homes = allLocations;
 
+            // With a seed every person and the orchestrator draw from it, so one seed gives one run; without it they are random as before.
+            var personNo = 0;
+            int? NextPersonSeed() => seed is { } s ? Mix(s, personNo++) : null;
+
             var people = new List<IHuman>(characterCount);
             var couples = Math.Clamp(coupleCount, 0, characterCount / 2);
             var homeIndex = 0;
@@ -103,8 +118,8 @@ namespace WorldObserver.Simulation
             // Partners start as an established couple: a seeded partner bond and one shared flat.
             for (var c = 0; c < couples; c++)
             {
-                var woman = manager.RandomizePerson(maxAge: 40, sexBiology: SexBiology.Female, minAge: 22);
-                var man = manager.RandomizePerson(maxAge: 40, sexBiology: SexBiology.Male, minAge: 22);
+                var woman = manager.RandomizePerson(maxAge: 40, sexBiology: SexBiology.Female, minAge: 22, seed: NextPersonSeed());
+                var man = manager.RandomizePerson(maxAge: 40, sexBiology: SexBiology.Male, minAge: 22, seed: NextPersonSeed());
                 manager.Characters.Add(new NPC(100, woman));
                 manager.Characters.Add(new NPC(100, man));
                 FamilyBuilder.Wire(familyGraph, woman, man, Array.Empty<IHuman>(), clock.Now);
@@ -118,7 +133,7 @@ namespace WorldObserver.Simulation
 
             while (people.Count < characterCount)
             {
-                var person = manager.RandomizePerson(maxAge: 40, sexBiology: null, minAge: 18);
+                var person = manager.RandomizePerson(maxAge: 40, sexBiology: null, minAge: 18, seed: NextPersonSeed());
                 manager.Characters.Add(new NPC(100, person));
                 familyGraph.Register(person);
                 people.Add(person);
@@ -150,7 +165,7 @@ namespace WorldObserver.Simulation
                 lod,
                 worldMap,
                 services.GetRequiredService<IMovementSpeedProvider>(),
-                new Random(),
+                seed is { } given ? new Random(Mix(given, -1)) : new Random(),
                 services.GetRequiredService<ILoggerFactory>().CreateLogger<DefaultSceneOrchestrator>(),
                 services.GetRequiredService<IWorldObjectProvider>(),
                 // Realistic movement: MoveTo:* takes travel time (character is held in transit

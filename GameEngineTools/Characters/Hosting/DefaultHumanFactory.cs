@@ -172,12 +172,12 @@ namespace GameEngineTools.Characters.Hosting
             // Generate values profile from BigFive (Parks-Leduc et al. 2015 meta-analysis coefficients).
             // Use the blueprint's pre-generated profile if provided (deterministic replays / saves).
             // The generated profile is the immutable Baseline; Current starts identical and drifts (R4 drift).
-            var rngForValues = new System.Random(DeriveSeed(b.Id) ^ 0x56A1_CCFF);
+            var rngForValues = new System.Random((b.Seed ?? DeriveSeed(b.Id)) ^ 0x56A1_CCFF);
             var valuesBaseline = b.ValuesProfile ?? ValuesProfileGenerator.Generate(b.Personality.BigFive, rngForValues);
             var valuesState = ValuesState.FromBaseline(valuesBaseline);
 
             // Generate RIASEC interest baseline (BigFive + sex + occupational exposure; Larson 2002, Su 2009).
-            var rngForInterests = new System.Random(DeriveSeed(b.Id) ^ 0x1A7E_5E57);
+            var rngForInterests = new System.Random((b.Seed ?? DeriveSeed(b.Id)) ^ 0x1A7E_5E57);
             var interestBaseline = InterestProfileGenerator.Generate(
                 b.Personality.BigFive, b.Biology, b.Occupation, rngForInterests);
             var interestState = InterestState.FromBaseline(interestBaseline);

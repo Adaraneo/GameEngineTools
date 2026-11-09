@@ -122,17 +122,18 @@ namespace GameEngineTools
         /// <param name="maxAge">Maximum age in years.</param>
         /// <param name="sexBiology">Sex; if null, it is chosen randomly.</param>
         /// <param name="minAge">Minimum age in years (default 0).</param>
+        /// <param name="seed">Makes the whole person reproducible; null draws a fresh one.</param>
         /// <returns>A newly randomly generated character.</returns>
         /// <remarks>
         /// The birth date is chosen randomly within a window derived from the current
         /// game time and the given age range.
         /// </remarks>
-        public IHuman RandomizePerson(int maxAge, SexBiology? sexBiology, int minAge = 0)
+        public IHuman RandomizePerson(int maxAge, SexBiology? sexBiology, int minAge = 0, int? seed = null)
         {
             var now = _clock.Now;
             var year = now.Year;
 
-            var rng = _rngFactory.Create(Environment.TickCount);
+            var rng = _rngFactory.Create(seed ?? Environment.TickCount);
 
             // Pick a random, calendar-valid birth date for the given year. The month is chosen first,
             // then the day is bounded by THAT month's length in the active (appsettings-configured)
@@ -156,7 +157,8 @@ namespace GameEngineTools
                 new HumanBlueprintRequest(
                     MinBirthDate: minBirth,
                     MaxBirthDate: maxBirth,
-                    Sex: sexBiology));
+                    Sex: sexBiology,
+                    Seed: seed));
 
             return factory.Create(hpb);
         }
