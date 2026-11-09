@@ -30,7 +30,17 @@ Console.WriteLine($"WorldMonitor: profile {options.ProfileName} — {options.Run
 // The engine reads its config and SourceFiles (and keeps world.db) under the working directory. Each run gets its own copy,
 // so several monitors can run at the same time without touching each other's world.
 var outputDir = Path.GetFullPath(options.OutputDir, AppContext.BaseDirectory);
-var runDir = RunDirectory.Create(options.WorldDb, options.Barter);
+string runDir;
+try
+{
+    runDir = RunDirectory.Create(options.WorldDb, options.Barter, options.Planet);
+}
+catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException)
+{
+    Console.Error.WriteLine(ex.Message);
+    return 1;
+}
+
 Directory.SetCurrentDirectory(runDir);
 
 var collector = new Collector(options.SampleEveryHours, options.Run.Days, options.Thresholds.HungerLevel, options.FarmPeriodDays);
@@ -50,7 +60,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     collector.FarmSampler = () => objects.GetAllObjects();
 
     var worldConfig = options.Run.Seasons
-        ? new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddJsonFile(Path.Combine(runDir, "appsettings.World.json"), optional: false).Build()
+        ? GameEngineTools.Config.WorldSettings.Load(Path.Combine(runDir, "appsettings.World.json"))
         : null;
 
     var sceneOptions = new SimulationSceneOptions

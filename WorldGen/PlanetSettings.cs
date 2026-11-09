@@ -42,7 +42,7 @@ public static class PlanetSettings
         }
         else
         {
-            var config = new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build();
+            var config = GameEngineTools.Config.WorldSettings.Load(settingsPath);
             planet = config.GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
             // PeriapsisPhase lives in the SEPARATE World:Astro:Sun section (Characters' own seasonal
             // model, GameEngineTools.World.Core.Astro.SunParamsConfig) — reused here rather than
@@ -75,7 +75,7 @@ public static class PlanetSettings
         if (settingsPath is null)
             return new GameEngineTools.World.Objects.Crops.CropConfig();
 
-        var config = new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build();
+        var config = GameEngineTools.Config.WorldSettings.Load(settingsPath);
         return config.GetSection("World:Crops").Get<GameEngineTools.World.Objects.Crops.CropConfig>()
             ?? new GameEngineTools.World.Objects.Crops.CropConfig();
     }

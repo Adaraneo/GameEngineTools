@@ -68,7 +68,7 @@ namespace EngineTests
                     if (!File.Exists(path))
                         continue;
 
-                    var config = new ConfigurationBuilder().AddJsonFile(path, optional: false).Build();
+                    var config = group.Key == "World" ? GameEngineTools.Config.WorldSettings.Load(path) : new ConfigurationBuilder().AddJsonFile(path, optional: false).Build();
                     foreach (var (_, section, typeName) in group)
                     {
                         var keys = config.GetSection(section).GetChildren().Select(c => c.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);

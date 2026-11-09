@@ -7,15 +7,15 @@ namespace WorldMonitor
     using Microsoft.Extensions.Configuration;
 
     /// <summary>One named speed/size preset of a run.</summary>
-    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0, bool Seasons = false, int? Seed = null, string? WorldDb = null, bool Barter = false, string? CharacterLod = null);
+    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0, bool Seasons = false, int? Seed = null, string? WorldDb = null, bool Barter = false, string? CharacterLod = null, string? Planet = null);
 
     /// <summary>Pass/fail limits; a missing value means the check is not made.</summary>
     public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80, double HungerLevel = 80);
 
     /// <summary>The <c>WorldMonitor</c> section of appsettings.json, with command-line overrides applied.</summary>
-    public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null, bool Barter = false, int? Seed = null, int FarmPeriodDays = 30, CognitiveResolutionLevel Lod = CognitiveResolutionLevel.Nearby)
+    public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null, bool Barter = false, int? Seed = null, int FarmPeriodDays = 30, CognitiveResolutionLevel Lod = CognitiveResolutionLevel.Nearby, string? Planet = null)
     {
-        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c>, <c>--seasons true</c>, <c>--seed N</c>, <c>--lod Player|Nearby|Background</c> override it; each is also a profile key (or a WorldMonitor key for WorldDb, Barter, Seed, CharacterLod, FarmPeriodDays).</summary>
+        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c>, <c>--seasons true</c>, <c>--seed N</c>, <c>--lod Player|Nearby|Background</c>, <c>--planet Name</c> override it; each is also a profile key (or a WorldMonitor key for WorldDb, Barter, Seed, CharacterLod, FarmPeriodDays, Planet).</summary>
         public static MonitorOptions Load(string[] args)
         {
             var overrides = ParseArgs(args);
@@ -48,6 +48,7 @@ namespace WorldMonitor
             var lodText = overrides.GetValueOrDefault("lod") ?? profile.CharacterLod ?? section["CharacterLod"] ?? nameof(CognitiveResolutionLevel.Nearby);
             if (!Enum.TryParse<CognitiveResolutionLevel>(lodText, ignoreCase: true, out var lod))
                 throw new InvalidOperationException($"CharacterLod '{lodText}' is not one of {string.Join(", ", Enum.GetNames<CognitiveResolutionLevel>())}.");
+            var planet = overrides.GetValueOrDefault("planet") ?? profile.Planet ?? section["Planet"];
             var farmPeriodDays = section.GetValue("FarmPeriodDays", 30);
             if (farmPeriodDays < 1)
                 throw new InvalidOperationException("FarmPeriodDays must be positive.");
@@ -66,7 +67,8 @@ namespace WorldMonitor
                 barter,
                 seed,
                 farmPeriodDays,
-                lod);
+                lod,
+                string.IsNullOrWhiteSpace(planet) ? null : planet);
         }
 
         private static int IntOverride(Dictionary<string, string> overrides, string key, int fallback)

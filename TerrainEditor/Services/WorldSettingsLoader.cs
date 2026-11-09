@@ -1,4 +1,5 @@
 using System.IO;
+using GameEngineTools.Config;
 using GameEngineTools.World.Core.Astro;
 using Microsoft.Extensions.Configuration;
 
@@ -48,7 +49,7 @@ public static class WorldSettingsLoader
         if (settingsPath is null) return null;
 
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile(settingsPath, optional: false)
+            .AddWorldFile(settingsPath)
             .Build();
 
         var section = configuration.GetSection("World:Astro");
@@ -67,7 +68,7 @@ public static class WorldSettingsLoader
         if (settingsPath is null) return null;
 
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile(settingsPath, optional: false)
+            .AddWorldFile(settingsPath)
             .Build();
 
         var section = configuration.GetSection("World:Universe");

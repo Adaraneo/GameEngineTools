@@ -11,11 +11,12 @@ namespace GameEngineTools.Config
     {
         private static readonly Lazy<IConfiguration> lazyConfig = new(() =>
         {
+            var dir = Directory.GetCurrentDirectory();
             var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
+                .SetBasePath(dir)
                 .AddJsonFile("appsettings.json")
                 .AddJsonFile("appsettings.Characters.json")
-                .AddJsonFile("appsettings.World.json")
+                .AddWorldFile(Path.Combine(dir, WorldSettings.BaseFileName))
                 .AddJsonFile("appsettings.Economy.json");
             return builder.Build();
         });

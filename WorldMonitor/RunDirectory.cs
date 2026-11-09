@@ -12,7 +12,7 @@ namespace WorldMonitor
     public static class RunDirectory
     {
         /// <summary>Creates a fresh folder holding copies of the config files and SourceFiles (without any world.db unless <paramref name="worldDb"/> supplies a ready one).</summary>
-        public static string Create(string? worldDb = null, bool barter = false)
+        public static string Create(string? worldDb = null, bool barter = false, string? planet = null)
         {
             var path = Path.Combine(Path.GetTempPath(), "WorldMonitor", $"{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}");
             Directory.CreateDirectory(path);
@@ -23,11 +23,34 @@ namespace WorldMonitor
 
             CopyTree(Path.Combine(AppContext.BaseDirectory, "SourceFiles"), Path.Combine(path, "SourceFiles"));
             Directory.CreateDirectory(Path.Combine(path, "SourceFiles", "World"));
+            if (planet is not null)
+            {
+                try
+                {
+                    SelectPlanet(Path.Combine(path, "appsettings.World.json"), planet);
+                }
+                catch
+                {
+                    TryDelete(path);
+                    throw;
+                }
+            }
+
             if (barter)
                 EnableBarter(Path.Combine(path, "appsettings.Economy.json"));
             if (worldDb is not null)
                 File.Copy(worldDb, Path.Combine(path, "SourceFiles", "World", "world.db"), overwrite: true);
             return path;
+        }
+
+        private static void SelectPlanet(string file, string planet)
+        {
+            var root = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file))!.AsObject();
+            var world = root["World"]?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
+            world[GameEngineTools.Config.WorldSettings.PlanetKey.Split(':')[1]] = planet;
+            root["World"] = world;
+            File.WriteAllText(file, root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+            GameEngineTools.Config.WorldSettings.Validate(file);
         }
 
         private static void EnableBarter(string file)

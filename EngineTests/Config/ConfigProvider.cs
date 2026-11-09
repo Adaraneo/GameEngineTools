@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using GameEngineTools.Config;
+using Microsoft.Extensions.Configuration;
 
 namespace EngineTests.Config
 {
@@ -6,11 +7,12 @@ namespace EngineTests.Config
     {
         private static readonly Lazy<IConfiguration> lazyConfig = new(() =>
         {
+            var dir = Directory.GetCurrentDirectory();
             var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
+                .SetBasePath(dir)
                 .AddJsonFile("appsettings.Test.json")
                 .AddJsonFile("appsettings.Characters.json")
-                .AddJsonFile("appsettings.World.json")
+                .AddWorldFile(Path.Combine(dir, WorldSettings.BaseFileName))
                 .AddJsonFile("appsettings.Economy.json");
             return builder.Build();
         });

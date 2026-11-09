@@ -31,6 +31,7 @@ MONITOR_OPTIONS = {
     "world-db": "WorldDb",
     "barter": "Barter",
     "lod": "CharacterLod",
+    "planet": "Planet",
     "out": "OutputDir",
 }
 

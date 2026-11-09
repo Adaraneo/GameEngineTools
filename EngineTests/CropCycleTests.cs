@@ -249,8 +249,7 @@ namespace EngineTests
         [TestMethod]
         public void ClimateBeforeTheEpoch_IsTheClimateOfTheSameDayInALaterYear()
         {
-            var config = new ConfigurationBuilder()
-                .AddJsonFile(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.World.json"), optional: false).Build();
+            var config = GameEngineTools.Config.WorldSettings.Load(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.World.json"));
             var astro = config.GetSection("World:Astro").Get<GameEngineTools.World.Core.Astro.AstroConfig>()!;
             var universe = config.GetSection("World:Universe").Get<GameEngineTools.World.Core.Astro.UniverseConfig>()!;
             var computer = new GameEngineTools.World.Core.Astro.CelestialContextComputer(new GameEngineTools.World.Core.Astro.SunModel());
@@ -268,8 +267,7 @@ namespace EngineTests
         [TestMethod]
         public void TemperatureTrend_FollowsTheSeasons_OnTheWorldsOwnPlanet()
         {
-            var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
-                .AddJsonFile(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.World.json"), optional: false).Build();
+            var config = GameEngineTools.Config.WorldSettings.Load(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.World.json"));
             var astro = config.GetSection("World:Astro").Get<GameEngineTools.World.Core.Astro.AstroConfig>()!;
             var universe = config.GetSection("World:Universe").Get<GameEngineTools.World.Core.Astro.UniverseConfig>()!;
             var computer = new GameEngineTools.World.Core.Astro.CelestialContextComputer(new GameEngineTools.World.Core.Astro.SunModel());

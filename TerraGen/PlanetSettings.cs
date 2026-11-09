@@ -41,7 +41,7 @@ public static class PlanetSettings
         }
         else
         {
-            var config = new ConfigurationBuilder().AddJsonFile(settingsPath, optional: false).Build();
+            var config = GameEngineTools.Config.WorldSettings.Load(settingsPath);
             planet = config.GetSection("World:Universe").Get<UniverseConfig>() ?? new UniverseConfig();
             periapsisPhase = config.GetSection("World:Astro:Sun").Get<SunParamsConfig>()?.PeriapsisPhase
                 ?? new SunParamsConfig().PeriapsisPhase;
