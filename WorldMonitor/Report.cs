@@ -100,6 +100,7 @@ namespace WorldMonitor
             }
 
             AppendCharacters(sb, options, c);
+            PersonalityReport.Append(sb, options, c);
             AppendIntimacy(sb, c);
             AppendSituations(sb, c);
             AppendFriendship(sb, c);

@@ -95,6 +95,7 @@ var stamp = $"{DateTime.Now:yyyyMMdd-HHmmss}-p{Environment.ProcessId}";
 var reportPath = Path.Combine(outputDir, $"report-{options.ProfileName}-{stamp}.md");
 File.WriteAllText(reportPath, markdown);
 File.WriteAllText(Path.Combine(outputDir, $"samples-{options.ProfileName}-{stamp}.csv"), Report.BuildCsv(collector));
+File.WriteAllText(Path.Combine(outputDir, $"personality-{options.ProfileName}-{stamp}.csv"), PersonalityReport.BuildCsv(collector));
 
 Console.WriteLine();
 Console.WriteLine(markdown);

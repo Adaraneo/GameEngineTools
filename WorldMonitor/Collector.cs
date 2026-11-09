@@ -9,6 +9,8 @@ namespace WorldMonitor
     using GameEngineTools.Characters.Engines.Bereavement;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Physiology;
+    using GameEngineTools.Characters.Engines.SelfConcept;
+    using GameEngineTools.Characters.Traits;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
 
@@ -33,6 +35,10 @@ namespace WorldMonitor
         public Dictionary<HumanId, double> Closeness { get; } = new();
         public double MaxNeedIntimacy, MaxSexualInterest, MaxIntimateAffinity, MaxCloseness, MaxTrust, MaxComfort;
         public double SociosexualityAttitude;
+        public Personality? Personality;
+        public ValuesProfile? ValuesStart, ValuesNow;
+        public InterestProfile? InterestsStart, InterestsNow;
+        public SelfConcept? SelfStart, SelfNow;
         public int Invites;
         public double LastHunger, LastThirst, MaxHunger, MaxThirst;
         public string LastLocation = "?";
@@ -339,6 +345,10 @@ namespace WorldMonitor
             Extraversion = c.Personality.BigFive.Extraversion,
             AttachmentAnxiety = c.Personality.Attachment.Anxiety,
             SociosexualityAttitude = c.Personality.Sociosexuality.Attitude,
+            Personality = c.Personality,
+            ValuesStart = c.Snapshot.Values?.Current,
+            InterestsStart = c.Snapshot.Interests?.Current,
+            SelfStart = c.Snapshot.SelfConcept,
         };
 
         private void UpdatePeople(int day, IReadOnlyList<IHuman> characters)
@@ -351,6 +361,9 @@ namespace WorldMonitor
                 person.Occupation = c.Snapshot.Schedule?.Occupation is { Length: > 0 } occupation ? occupation : "-";
                 person.Home = c.Identity.HomeLocationId ?? "-";
                 person.Edges = c.Snapshot.Relationships.Edges.Count;
+                person.ValuesNow = c.Snapshot.Values?.Current;
+                person.InterestsNow = c.Snapshot.Interests?.Current;
+                person.SelfNow = c.Snapshot.SelfConcept;
                 foreach (var edge in c.Snapshot.Relationships.Edges.Values)
                     person.Closeness[edge.B] = edge.Closeness;
                 person.Stress.Add((day, c.Snapshot.Psychology.Stress));
