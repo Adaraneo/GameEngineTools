@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#6d5ef8" />
+  <title>GET Log Reader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="d-flex vh-100 overflow-hidden">
+
+  <!-- Run-changed banner (logs regenerated while page was open) -->
+  <div id="runChangedBanner" class="alert alert-warning d-none position-fixed top-0 start-50 translate-middle-x mt-2 shadow py-2 px-3" style="z-index:2000">
+    ⚠️ Logy byly mezitím smazány a znovu vygenerovány — zobrazená data patří k předchozímu běhu.
+    <button id="btnReloadData" class="btn btn-sm btn-warning ms-2">🔄 Znovu načíst</button>
+  </div>
+
+  <!-- Left sidebar -->
+  <div id="sidebar" class="border-end bg-light d-flex flex-column">
+    <div class="p-3 border-bottom">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="mb-0 fw-bold text-primary">GET Log Reader</h6>
+        <button id="btnResetData" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Vyčistit cache serveru a znovu načíst všechny logy (po novém běhu simulace)">🔄</button>
+      </div>
+      <input id="searchInput" type="search" class="form-control form-control-sm" placeholder="Search characters..." />
+    </div>
+    <div class="sidebar-loading-hint">⏳ Načítání — čekejte prosím…</div>
+    <ul id="characterList" class="list-group list-group-flush flex-grow-1"></ul>
+  </div>
+
+  <!-- Right main -->
+  <div class="d-flex flex-column flex-grow-1 overflow-hidden">
+
+    <!-- Profile card -->
+    <div id="profileCard" class="d-none border-bottom bg-white p-2 px-3">
+      <div class="row align-items-center g-2">
+        <div class="col-auto">
+          <div class="d-flex align-items-center gap-2">
+            <h5 id="profileName" class="mb-0">—</h5>
+            <span id="headerEmotionBadge" class="badge rounded-pill d-none" style="font-size:.85rem"></span>
+          </div>
+          <small id="profileMeta" class="text-muted"></small>
+          <div id="headerStatePills" class="d-flex flex-wrap gap-1 mt-1"></div>
+        </div>
+        <div class="col">
+          <div id="personalityBars"></div>
+        </div>
+        <div class="col-auto d-none d-md-block" id="headerSnapshotGauges"></div>
+      </div>
+    </div>
+
+    <!-- Tab nav -->
+    <nav id="mainTabs" class="nav nav-tabs px-3 pt-2 border-bottom bg-white d-flex align-items-end">
+      <a href="#" class="nav-link active" data-tab="profile">Profile <span class="tab-dot" id="dot-profile"></span></a>
+      <a href="#" class="nav-link" data-tab="story">📖 Story <span class="tab-dot" id="dot-story"></span></a>
+      <a href="#" class="nav-link" data-tab="ticks">🎞️ Ticks <span class="tab-dot" id="dot-ticks"></span></a>
+      <a href="#" class="nav-link" data-tab="physio">Physiology <span class="tab-dot" id="dot-physio"></span></a>
+      <a href="#" class="nav-link" data-tab="psych">Psychology <span class="tab-dot" id="dot-psych"></span></a>
+      <a href="#" class="nav-link" data-tab="behavior">Behavior <span class="tab-dot" id="dot-behavior"></span></a>
+      <a href="#" class="nav-link" data-tab="interactions">Interactions <span class="tab-dot" id="dot-interactions"></span></a>
+      <a href="#" class="nav-link" data-tab="locations">Locations <span class="tab-dot" id="dot-locations"></span></a>
+      <a href="#" class="nav-link" data-tab="map">🗺️ Map <span class="tab-dot" id="dot-map"></span></a>
+      <a href="#" class="nav-link" data-tab="goals">Goals <span class="tab-dot" id="dot-goals"></span></a>
+      <a href="#" class="nav-link" data-tab="relations">Relationships <span class="tab-dot" id="dot-relations"></span></a>
+      <a href="#" class="nav-link" data-tab="memory">Memory <span class="tab-dot" id="dot-memory"></span></a>
+      <button class="btn btn-link btn-sm ms-auto mb-1 text-muted" data-bs-toggle="modal" data-bs-target="#legendModal" title="Legenda barev a ikon">❓ Legenda</button>
+      <button id="darkModeToggle" class="btn btn-link btn-sm mb-1 text-muted" title="Přepnout dark/light mode">🌙</button>
+    </nav>
+
+    <!-- ── Legend modal ──────────────────────────────────────────────────────── -->
+    <div class="modal fade" id="legendModal" tabindex="-1" aria-labelledby="legendModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <h6 class="modal-title fw-bold" id="legendModalLabel">❓ Legenda — barvy, ikony a indikátory</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body small">
+
+            <!-- Sidebar -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Sidebar — stav načtení postav</h6>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dee2e6;margin-right:5px"></span>Šedá — ještě nenačteno</span>
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#0d6efd;margin-right:5px"></span>Modrá — načítá se</span>
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#198754;margin-right:5px"></span>Zelená — v cache, okamžité</span>
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc3545;margin-right:5px"></span>Červená — chyba načtení</span>
+            </div>
+
+            <!-- Profile insights -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Profile — Insight karty (WHY)</h6>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <span class="badge text-bg-danger">🔴 Danger</span><span class="text-muted">kritický stav, okamžitý dopad</span>
+              <span class="ms-3 badge text-bg-warning">🟡 Warning</span><span class="text-muted">zvýšené riziko / mírný dopad</span>
+              <span class="ms-3 badge text-bg-info">🔵 Info</span><span class="text-muted">informativní, vysvětlující</span>
+              <span class="ms-3 badge text-bg-success">🟢 Success</span><span class="text-muted">pozitivní rys</span>
+            </div>
+
+            <!-- Physiology -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Physiology — bary</h6>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <div class="d-flex align-items-center gap-2"><div style="width:14px;height:8px;border-radius:2px;background:#198754"></div><span>Zelená = dobrá hodnota, čím vyšší tím lépe (Energy, Immune)</span></div>
+              </div>
+              <div class="col-6">
+                <div class="d-flex align-items-center gap-2"><div style="width:14px;height:8px;border-radius:2px;background:#dc3545"></div><span>Červená = špatná hodnota, čím vyšší tím hůře (Hunger, Pain, Stress…)</span></div>
+              </div>
+              <div class="col-6">
+                <div class="d-flex align-items-center gap-2"><div style="width:14px;height:8px;border-radius:2px;background:#ffc107"></div><span>Žlutá = střední (přijatelná) hodnota</span></div>
+              </div>
+              <div class="col-12 mt-1">
+                <strong>Sleep quality:</strong>
+                <span class="badge text-bg-success ms-1">&gt;70</span> dobrý spánek
+                <span class="badge text-bg-warning ms-1">40–70</span> průměrný
+                <span class="badge text-bg-danger ms-1">&lt;40</span> špatný
+              </div>
+            </div>
+
+            <!-- Psychology -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Psychology</h6>
+            <div class="mb-3">
+              <div class="mb-1"><strong>VAD prostor:</strong> Valence (zelená) kladná = dobrá nálada, záporná = špatná. Arousal = aktivovanost 0–1. Dominance = pocit kontroly 0–1.</div>
+              <div class="mb-1"><strong>Přerušovaná červená čára</strong> v Stress grafu = práh 70 — nad ní stres blokuje sociální interakce.</div>
+              <div class="d-flex flex-wrap gap-2">
+                <span>😐 Neutral</span><span>😄 Joy</span><span>😢 Sadness</span><span>😠 Anger</span>
+                <span>😨 Fear</span><span>🤢 Disgust</span><span>😲 Surprise</span><span>🥰 Tenderness</span>
+                <span>😤 Pride</span><span>😳 Shame</span>
+              </div>
+            </div>
+
+            <!-- Behavior -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Behavior — Action Log</h6>
+            <div class="mb-3">
+              <div class="d-flex flex-wrap gap-3 mb-2">
+                <span><span style="border-left:3px solid #198754;padding-left:5px">Zelená</span> = fyziologické akce (Eat, Drink, SelfCare)</span>
+                <span><span style="border-left:3px solid #0d6efd;padding-left:5px">Modrá</span> = sociální (ReachOut, InviteIntimacy)</span>
+                <span><span style="border-left:3px solid #6f42c1;padding-left:5px">Fialová</span> = odpočinek (Sleep, MoveToRest)</span>
+                <span><span style="border-left:3px solid #6c757d;padding-left:5px">Šedá</span> = ostatní (Idle, Work, Create)</span>
+              </div>
+              <div><strong>Driving Need pill:</strong>
+                <span class="behav-need-pill behav-need-high ms-1">Rest 89%</span> červená = urgentní potřeba (pravděpodobně způsobila akci)
+                <span class="behav-need-pill behav-need-medium ms-1">Food 54%</span> žlutá = střední
+                <span class="behav-need-pill behav-need-low ms-1">Thirst 12%</span> zelená = nízká (akce jinak motivovaná)
+              </div>
+            </div>
+
+            <!-- Goals -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Goals — kategorie</h6>
+            <div class="d-flex flex-wrap gap-3 mb-2">
+              <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#6f42c1;margin-right:4px"></span>Fialová = Existential (FindMeaning, OvercomeTrauma, BuildIdentity)</span>
+              <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#dc3545;margin-right:4px"></span>Červená = Survival (ProtectFamily, EscapeDanger)</span>
+              <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#fd7e14;margin-right:4px"></span>Oranžová = Career (MasterCraft, BuildReputation)</span>
+              <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#e83e8c;margin-right:4px"></span>Růžová = Relational (FindPartner, RepairRelationship, SeekRevenge)</span>
+            </div>
+            <div class="mb-3">
+              <strong>Resolution:</strong>
+              <span class="ms-1">✅ Completed</span> — dosaženo
+              <span class="ms-2">🚫 Abandoned</span> — vzdáno (frustration)
+              <span class="ms-2">🌫️ Faded</span> — vyprchalo (salience klesla na 0)
+              <span class="ms-2">🔀 Displaced</span> — nahrazeno jiným cílem
+            </div>
+
+            <!-- Interactions -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Interactions — výsledky</h6>
+            <div class="mb-3">
+              <div class="mb-1"><strong>P%</strong> = pravděpodobnost přijetí interakce vypočtená enginem (z Closeness, Comfort, Stress, Noise…)</div>
+              <div><span class="badge text-bg-success">✅ accepted</span> — interakce přijata, vztah se mění pozitivně</div>
+              <div><span class="badge text-bg-danger mt-1">❌ rejected</span> — interakce odmítnuta, potenciálně negativní dopad</div>
+              <div class="mt-1"><strong>Driving Need</strong> = nejvyšší potřeba v momentě akce (kauzální kontext)</div>
+            </div>
+
+            <!-- Relationships -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Relationships — dimenze</h6>
+            <div class="mb-3">
+              <div class="mb-1">Bary 0–100. Barva v matici: <span style="color:#198754">zelená &gt;80</span>, <span style="color:#0d6efd">modrá 50–80</span>, <span style="color:#6c757d">šedá 20–50</span>, <span style="color:#dc3545">červená &lt;20</span>.</div>
+              <div>
+                <span class="rel-belief-pill positive">Warm / Reliable / Emo. Safe</span> = pozitivní přesvědčení (evidencí podložená)
+                <span class="rel-belief-pill negative ms-1">Critical / Rejecting</span> = negativní přesvědčení
+              </div>
+              <div class="mt-1"><strong>Přerušované čáry</strong> v grafu = IntimateAffinity, SexualInterest, Familiarity, Attraction (loguje se méně často než core 5 dimenzí).</div>
+            </div>
+
+            <!-- Memory -->
+            <h6 class="fw-bold border-bottom pb-1 mb-2">Memory — epizodické vzpomínky</h6>
+            <div class="mb-1">
+              <strong>Salience bar</strong> 0–1 = důležitost vzpomínky (ovlivňuje decay a vliv na chování).
+              Barva badge = emocionální tón vzpomínky (zelená=Joy/Positive, červená=Anger/Negative, modrá=Sadness…).
+            </div>
+
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Zavřít</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thin loading bar shown while tab data is rendering -->
+    <div id="tabLoadingBar" class="d-none" style="height:3px;flex-shrink:0;overflow:hidden;">
+      <div style="height:100%;width:100%;background:linear-gradient(90deg,#0d6efd 0%,#6ea8fe 40%,#0d6efd 80%);background-size:200% 100%;animation:tabload 1.2s ease-in-out infinite;"></div>
+    </div>
+
+    <!-- Tab panels -->
+    <div id="tabContent" class="flex-grow-1 p-3">
+
+      <!-- Progress panel — shown while streaming log files -->
+      <div id="progressPanel" class="d-none">
+        <div class="card border-primary">
+          <div class="card-body py-3">
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <div class="spinner-border spinner-border-sm text-primary flex-shrink-0" id="progressSpinner"></div>
+              <span id="progressTitle" class="fw-semibold">Načítám logy…</span>
+              <span id="progressCount" class="ms-auto text-muted small"></span>
+            </div>
+            <div class="progress mb-2" style="height:6px">
+              <div id="progressBar"
+                   class="progress-bar progress-bar-striped progress-bar-animated"
+                   style="width:0%;transition:width .3s ease"></div>
+            </div>
+            <div id="progressFile" class="text-muted small text-truncate"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Story panel -->
+      <div data-panel="story" class="d-none">
+        <div class="d-flex align-items-center gap-2 mb-3" id="storyHeader">
+          <h6 class="mb-0 fw-bold">📖 Story</h6>
+          <span class="text-muted small" id="storySubtitle"></span>
+          <div class="ms-auto d-flex gap-2 align-items-center">
+            <label class="form-label small mb-0 text-muted">Filter:</label>
+            <select id="storyFilter" class="form-select form-select-sm" style="width:auto">
+              <option value="">All events</option>
+              <option value="sleep">😴 Sleep</option>
+              <option value="physio-action">🍽️ Physical</option>
+              <option value="behavior-action">⚒️ Behavior</option>
+              <option value="relationship">❤️ Relationships</option>
+              <option value="goal">🎯 Goals</option>
+              <option value="memory">🧠 Memory</option>
+            </select>
+          </div>
+        </div>
+        <div id="storyList" style="max-height:calc(100vh - 200px);overflow-y:auto"></div>
+      </div>
+
+      <!-- Tick scrubber panel -->
+      <div data-panel="ticks" class="d-none">
+        <div class="card mb-3">
+          <div class="card-body py-2">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <button id="tickPrev" class="btn btn-outline-secondary btn-sm">◀</button>
+              <input id="tickSlider" type="range" class="form-range flex-grow-1" min="0" max="0" value="0" />
+              <button id="tickNext" class="btn btn-outline-secondary btn-sm">▶</button>
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+              <span id="tickWorldTime" class="fw-bold">—</span>
+              <span id="tickPosition" class="text-muted small">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-lg-5">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Character state @ tick</div>
+              <div class="card-body" id="tickState"></div>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">What happened this tick <span class="text-muted fw-normal">— click an event for ❓ Why</span></div>
+              <div class="card-body p-0"><div id="tickEvents" style="max-height:calc(100vh - 280px);overflow-y:auto"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Why panel modal (causal inference) ──────────────────────────────── -->
+      <div class="modal fade" id="whyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header py-2">
+              <h6 class="modal-title fw-bold" id="whyTitle">❓ Why?</h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <div class="fw-bold small text-success mb-1">↑ Caused by</div>
+                <div id="whyCauses"></div>
+              </div>
+              <div>
+                <div class="fw-bold small text-primary mb-1">↓ Led to</div>
+                <div id="whyEffects"></div>
+              </div>
+              <p class="text-muted small fst-italic mt-3 mb-0">
+                Causal links are inferred from same-tick state, the pipeline order, and next-tick deltas — not stored ground truth.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile panel -->
+      <div data-panel="profile" class="d-none">
+        <!-- Key moments (populated async) -->
+        <div class="card mb-3" id="keyMomentsCard" style="display:none">
+          <div class="card-header fw-semibold small">⭐ Key Moments</div>
+          <div class="card-body py-2" id="keyMomentsBody"></div>
+        </div>
+        <div id="profileTabContent">
+          <div class="text-muted text-center py-5">Select a character to view profile.</div>
+        </div>
+      </div>
+
+      <!-- Physiology panel -->
+      <div data-panel="physio" class="d-none">
+        <!-- Summary stats -->
+        <div class="row g-2 mb-3" id="physioStatsRow"></div>
+
+        <!-- Chart 1: Energy & Needs -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Energy &amp; Needs — Energy / Hunger / Thirst / Sleep Debt</span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="physioNeedsChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="physioNeedsChart"></canvas></div>
+        </div>
+
+        <!-- Chart 2: Health indicators -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Health — Pain / Immune Load / Body Temperature (°C)</span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="physioHealthChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="physioHealthChart"></canvas></div>
+        </div>
+
+        <!-- Chart 3: Sex hormones & menstrual cycle (sex-adaptive) -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Sex Hormones &amp; Cycle <span class="text-muted fw-normal small">— Testosterone · Libido · Cramps/Bloat</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="hormoneCycleChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body">
+            <div class="small text-muted mb-1 d-flex flex-wrap gap-3 align-items-center">
+              <span class="fw-semibold">Cycle phase:</span>
+              <span><span style="display:inline-block;width:11px;height:11px;background:hsla(0,70%,55%,.5);border-radius:2px;vertical-align:middle"></span> Menses</span>
+              <span><span style="display:inline-block;width:11px;height:11px;background:hsla(45,50%,55%,.4);border-radius:2px;vertical-align:middle"></span> Follicular</span>
+              <span><span style="display:inline-block;width:11px;height:11px;background:hsla(140,60%,45%,.5);border-radius:2px;vertical-align:middle"></span> Ovulation</span>
+              <span><span style="display:inline-block;width:11px;height:11px;background:hsla(38,85%,55%,.5);border-radius:2px;vertical-align:middle"></span> Luteal</span>
+            </div>
+            <canvas id="hormoneCycleChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 3b: Estradiol / Progesterone levels (EventId 5600) -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Hormone Levels <span class="text-muted fw-normal small">— Estradiol · Progesterone</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="hormoneLevelsChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="hormoneLevelsChart"></canvas></div>
+        </div>
+
+        <!-- Chart 4: Nutrition over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Nutrition <span class="text-muted fw-normal small">— Calories · Vitamin D · Iron · Protein · Blood Glucose</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="nutritionChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="nutritionChart"></canvas></div>
+        </div>
+
+        <!-- Chart 5: Physical aging over time (long-run) -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Physical Aging <span class="text-muted fw-normal small">— grey · wrinkles · hair · muscle · bone (long runs)</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="agingChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="agingChart"></canvas></div>
+        </div>
+
+        <!-- Sleep sessions + Actions -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-8">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Sleep Sessions</div>
+              <!-- Sleep quality chart (small bar chart per session) -->
+              <div class="card-body pb-0 pt-2" id="sleepQualityChartWrap" style="display:none">
+                <canvas id="sleepQualityChart" style="max-height:110px"></canvas>
+              </div>
+              <div class="card-body p-0">
+                <div id="sleepSessionsList" style="max-height:300px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Physical Actions <span class="text-muted fw-normal small">— s kontextem potřeby</span></div>
+              <div class="card-body p-0">
+                <div id="physioActionsList" style="max-height:340px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nutrition (hidden until data) -->
+        <div class="card d-none mb-3" id="nutritionCard">
+          <div class="card-header fw-semibold small">Nutrition (current snapshot)</div>
+          <div class="card-body p-0">
+            <div id="nutritionList" class="px-3 py-2"></div>
+          </div>
+        </div>
+
+        <!-- Cycle (hidden until data) -->
+        <div class="card d-none mb-3" id="cycleCard">
+          <div class="card-header fw-semibold small">Menstrual Cycle</div>
+          <div class="card-body p-0">
+            <div id="cycleList" style="max-height:200px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Reproduction (hidden until data) -->
+        <div class="card d-none" id="reproCard">
+          <div class="card-header fw-semibold small">Reproduction</div>
+          <div class="card-body p-0">
+            <div id="reproList" style="max-height:200px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Object interactions: used (hidden until data) -->
+        <div class="card d-none mb-3" id="objectUsedCard">
+          <div class="card-header fw-semibold small">📦 Object Usage <span class="text-muted fw-normal">— co postava konzumovala / použila</span></div>
+          <div class="card-body p-0">
+            <div id="objectUsedList" style="max-height:300px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Death record (hidden until data) -->
+        <div class="card d-none" id="deathCard">
+          <div class="card-header fw-semibold small">💀 Death Record</div>
+          <div class="card-body">
+            <div id="deathRecord"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Psychology panel -->
+      <div data-panel="psych" class="d-none">
+
+        <!-- Stats row -->
+        <div class="row g-2 mb-3" id="psychStatsRow"></div>
+
+        <!-- Chart 1: VAD — Valence / Arousal / Dominance -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Emotional Space — Valence / Arousal / Dominance</span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="psychVADChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="psychVADChart"></canvas></div>
+        </div>
+
+        <!-- Chart 2: Stress & CogLoad -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Stress &amp; Cognitive Load</span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="psychStressChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="psychStressChart"></canvas></div>
+        </div>
+
+        <!-- Chart 3: HPA axis & mood over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>HPA Axis &amp; Mood <span class="text-muted fw-normal small">— Stress · Cortisol · Allostatic Load · MoodBaseline</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="psychStressMoodChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="psychStressMoodChart"></canvas></div>
+        </div>
+
+        <!-- Chart 4: Motivations (drives) over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Motivations <span class="text-muted fw-normal small">— Social · Intimacy · Achievement · Care · Safety</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="psychMotivationsChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="psychMotivationsChart"></canvas></div>
+        </div>
+
+        <!-- Chart 5: Self-concept / identity over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Self-concept <span class="text-muted fw-normal small">— self-esteem · ideal/perceived discrepancy · identity</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="selfConceptChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="selfConceptChart"></canvas></div>
+        </div>
+
+        <!-- Chart 6: RIASEC interests over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Interests (RIASEC) <span class="text-muted fw-normal small">— current (solid) vs baseline (dashed)</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="interestsChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="interestsChart"></canvas></div>
+        </div>
+
+        <!-- Chart 6b: Schwartz values drift over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Values (Schwartz) <span class="text-muted fw-normal small">— current (solid) vs baseline (dashed)</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="valuesDriftChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="valuesDriftChart"></canvas></div>
+        </div>
+
+        <!-- Chart 7: Dark Core (D-factor) over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Dark Core (D-factor) <span class="text-muted fw-normal small">— DarkCore vs JustifyingBeliefs over time</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="darkCoreChart" title="Reset zoom">&#8635; Reset</button>
+          </div>
+          <div class="card-body"><canvas id="darkCoreChart"></canvas></div>
+        </div>
+
+        <!-- Chart 8: Needs (SDT) — basic-need appraisal over time -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Needs (SDT) <span class="text-muted fw-normal small">— Competence · Relatedness · Autonomy balance + global balance</span></span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="needAppraisalChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="needAppraisalChart"></canvas></div>
+        </div>
+
+        <!-- Emotion distribution + Events -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Emotion Distribution</div>
+              <div class="card-body p-0">
+                <div id="psychEmotionDist" style="max-height:300px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-8">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Psychological Events <span class="text-muted fw-normal">— Nightmare / Sleep Quality</span></div>
+              <div class="card-body p-0">
+                <div id="psychEventsList" style="max-height:300px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Social Comparison log -->
+        <div class="card mb-3" id="socialComparisonCard">
+          <div class="card-header fw-semibold small">Social Comparisons <span class="text-muted fw-normal">— self-esteem &amp; mood deltas (EventId 2016)</span></div>
+          <div class="card-body p-0">
+            <div id="socialComparisonList" style="max-height:260px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Emotion timeline chart -->
+        <div class="card">
+          <div class="card-header fw-semibold small">Emotion Timeline</div>
+          <div class="card-body" style="padding-bottom:6px">
+            <canvas id="psychEmotionChart" style="max-height:90px"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Behavior panel -->
+      <div data-panel="behavior" class="d-none">
+
+        <!-- Stats summary -->
+        <div class="row g-2 mb-3" id="behavStatsRow"></div>
+
+        <!-- Driving forces chart (POTŘEBY → WHY) -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <div>
+              <span class="fw-semibold">Driving Forces</span>
+              <span class="text-muted small ms-2">Rest / Food / Water / Belonging / Competence / Intimacy</span>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="behavChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="behavChart"></canvas></div>
+        </div>
+
+        <!-- Action log + Intent history -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-8">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small d-flex align-items-center justify-content-between">
+                <span>Action Log <span class="text-muted fw-normal">— co postava dělala a proč</span></span>
+                <span id="behavActionDistribution" class="d-flex flex-wrap gap-1"></span>
+              </div>
+              <div class="card-body p-0">
+                <div id="behavActionLog" style="max-height:380px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Intent Changes <span class="text-muted fw-normal">— kdy se záměr změnil</span></div>
+              <div class="card-body p-0">
+                <div id="behavIntentLog" style="max-height:380px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Habit analysis -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold small">Habit Patterns <span class="text-muted fw-normal">— naučené vzory chování</span></div>
+          <div class="card-body p-0">
+            <div id="behavHabitLog" style="max-height:280px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Daily schedule -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold small">Daily Schedule <span class="text-muted fw-normal">— EventId 1400-1404</span></div>
+          <div class="card-body p-0">
+            <div id="behavScheduleLog" style="max-height:240px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Behavioral profile from snapshot + cooldowns -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-8">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Behavioral Profile <span class="text-muted fw-normal">— habit traces ze snapshotu</span></div>
+              <div class="card-body p-0">
+                <div id="behavHabitTraces" style="max-height:260px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Cooldowns <span class="text-muted fw-normal">— aktuálně blokováno</span></div>
+              <div class="card-body" id="behavCooldowns"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Values & Guilt (hidden until data) -->
+        <div class="card d-none" id="valuesCard">
+          <div class="card-header fw-semibold small">&#x1F9ED; Values &amp; Guilt <span class="text-muted fw-normal">— hodnotový konflikt a vina</span></div>
+          <div class="card-body p-0">
+            <div id="valuesEventLog" style="max-height:280px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Dark Core modifier events (hidden until data) -->
+        <div class="card d-none mt-3" id="darkCoreCard">
+          <div class="card-header fw-semibold small">Dark Core Modifier Events <span class="text-muted fw-normal">— antagonism bonuses and prosocial penalties (EventId 1017)</span></div>
+          <div class="card-body p-0">
+            <div id="darkCoreEventLog" style="max-height:280px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Travel / transit events (hidden until data) -->
+        <div class="card d-none mt-3" id="travelCard">
+          <div class="card-header fw-semibold small">Travel / Transit <span class="text-muted fw-normal">— departures and arrivals (EventId 1700/1701)</span></div>
+          <div class="card-body p-0">
+            <div id="travelEventLog" style="max-height:280px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactions panel -->
+      <div data-panel="interactions" class="d-none">
+        <!-- Stats row -->
+        <div class="row g-3 mb-3" id="intStatsRow">
+          <!-- populated by JS -->
+        </div>
+        <!-- Filter bar -->
+        <div class="card mb-3">
+          <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-3">
+                <label class="form-label small mb-1">Partner</label>
+                <select id="intPartnerFilter" class="form-select form-select-sm">
+                  <option value="">(all partners)</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small mb-1">Speech Act</label>
+                <select id="intActFilter" class="form-select form-select-sm">
+                  <option value="">(all types)</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small mb-1">Outcome</label>
+                <select id="intOutcomeFilter" class="form-select form-select-sm">
+                  <option value="">All</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+              <div class="col-auto align-self-end">
+                <button id="intFilterBtn" class="btn btn-primary btn-sm">Filter</button>
+                <button id="intClearBtn" class="btn btn-outline-secondary btn-sm ms-1">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Interaction list -->
+        <div class="card">
+          <div class="card-body p-0">
+            <div id="intList" style="max-height:520px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- Dialogue: uttered SpeechActs (1220) — rough Czech gloss, preview only -->
+        <div class="card mt-3">
+          <div class="card-header fw-semibold small">
+            Dialogue — Utterances <span class="text-muted fw-normal">(1220, TEMPORARY gloss preview)</span>
+          </div>
+          <div class="card-body p-0">
+            <div id="dialogueList" style="max-height:360px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Locations panel -->
+      <div data-panel="locations" class="d-none">
+        <!-- Stats row -->
+        <div class="row g-2 mb-3" id="locStatsRow"></div>
+        <!-- Sessions log + Object interactions -->
+        <div class="row g-3">
+          <div class="col-md-8">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">
+                Location History <span class="text-muted fw-normal">— kde postava byla a co tam dělala</span>
+              </div>
+              <div class="card-body p-0">
+                <div id="locSessionsList" style="max-height:480px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Object Interactions <span class="text-muted fw-normal">(1205)</span></div>
+              <div class="card-body p-0">
+                <div id="locObjectList" style="max-height:240px;overflow-y:auto"></div>
+              </div>
+              <div class="card-header fw-semibold small border-top mt-2">Move Actions <span class="text-muted fw-normal">(1206)</span></div>
+              <div class="card-body p-0">
+                <div id="locMoveList" style="max-height:200px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- World: object respawn log (hidden until data) -->
+        <div class="card d-none mt-3" id="worldRespawnCard">
+          <div class="card-header fw-semibold small">♻️ World — Object Respawns <span class="text-muted fw-normal">— globální obnova konzumovaných objektů (1501)</span></div>
+          <div class="card-body p-0">
+            <div id="worldRespawnList" style="max-height:260px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map panel -->
+      <div data-panel="map" class="d-none">
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>World Map <span class="text-muted fw-normal small">— lokace a trasa postavy (drag = posun, kolečko = zoom)</span></span>
+            <button class="btn btn-outline-secondary btn-sm" id="mapResetView" title="Reset view">⟳ Reset</button>
+          </div>
+          <div class="card-body p-0">
+            <div id="mapContainer" style="height: calc(100vh - 260px); min-height: 400px; overflow: hidden;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Goals panel -->
+      <div data-panel="goals" class="d-none">
+        <!-- Active goals row -->
+        <div class="row g-3 mb-3" id="goalsActiveRow">
+          <!-- populated by JS -->
+        </div>
+        <!-- Salience/Progress chart -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>Goal Salience &amp; Progress over time</span>
+            <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="goalsChart" title="Reset zoom">⟳ Reset</button>
+          </div>
+          <div class="card-body"><canvas id="goalsChart"></canvas></div>
+        </div>
+        <!-- Event log + resolved history -->
+        <div class="row g-3">
+          <div class="col-md-7">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Goal Event Log</div>
+              <div class="card-body p-0">
+                <div id="goalsEventLog" style="max-height:340px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-5">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Resolved Goals</div>
+              <div class="card-body p-0">
+                <div id="goalsResolved" style="max-height:340px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Relationships panel -->
+      <div data-panel="relations" class="d-none">
+        <div class="row g-3 mb-3">
+          <!-- Partner list -->
+          <div class="col-3">
+            <div class="card h-100">
+              <div class="card-header small fw-semibold">Partners</div>
+              <div class="card-body p-0">
+                <ul id="partnerList" class="list-group list-group-flush"></ul>
+              </div>
+            </div>
+          </div>
+          <!-- Right column: summary + chart -->
+          <div class="col-9 d-flex flex-column gap-3">
+            <!-- Current state + stats summary card (hidden until partner selected) -->
+            <div class="card d-none" id="relSummaryCard">
+              <div class="card-body py-2">
+                <div class="row g-2 align-items-center">
+                  <!-- Stat pills -->
+                  <div class="col-auto d-flex flex-wrap gap-2" id="relStatPills"></div>
+                  <!-- Current dimension bars -->
+                  <div class="col" id="relCurrentDims"></div>
+                </div>
+              </div>
+            </div>
+            <!-- Timeline chart -->
+            <div class="card">
+              <div class="card-header d-flex align-items-center justify-content-between">
+                <span id="relChartTitle">Relationship timeline</span>
+                <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="relChart" title="Reset zoom">⟳ Reset</button>
+              </div>
+              <div class="card-body"><div id="relChart"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Per-pair tracking + breakup-risk prediction -->
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <span>Vývoj vztahu (dvojice)</span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <label class="small text-muted mb-0" for="pairSubjectSelect">Subjekt</label>
+              <select id="pairSubjectSelect" class="form-select form-select-sm" style="width:auto"></select>
+              <label class="small text-muted mb-0" for="pairTargetSelect">Cíl</label>
+              <select id="pairTargetSelect" class="form-select form-select-sm" style="width:auto"></select>
+              <button class="btn btn-outline-secondary btn-sm" data-reset-zoom="relPairChart" title="Reset zoom">⟳ Reset</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-auto">
+                <span class="small text-muted">Riziko rozchodu:</span>
+                <span id="breakupRiskValue" class="fw-bold ms-1">—</span>
+              </div>
+              <div class="col">
+                <div class="progress" style="height:8px">
+                  <div id="breakupRiskBar" class="progress-bar" style="width:0%"></div>
+                </div>
+              </div>
+            </div>
+            <div id="breakupRiskDetail" class="small text-muted mb-2"></div>
+            <canvas id="relPairChart"></canvas>
+          </div>
+        </div>
+        <!-- Bidirectional view + Semantic memory -->
+        <div class="row g-3 mb-3 d-none" id="relBidirRow">
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small" id="relBidirHeader">Oboustranný pohled</div>
+              <div class="card-body p-0">
+                <div id="relBidirContent"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Semantic Memory / Přesvědčení</div>
+              <div class="card-body p-0">
+                <div id="relSemanticMemory"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interaction history -->
+        <div class="card">
+          <div class="card-header fw-semibold small" id="relEventLogHeader">Interaction History</div>
+          <div class="card-body p-0">
+            <div id="relEventLog" style="max-height:360px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Memory panel -->
+      <div data-panel="memory" class="d-none">
+        <div class="row g-3 mb-3">
+          <div class="col-md-8">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Encoded Episodes (3000)</div>
+              <div class="card-body p-0">
+                <div id="memEncodedList" style="max-height:320px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Consolidation (3001)</div>
+              <div class="card-body p-0">
+                <div id="memConsolidatedList" style="max-height:320px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Reconsolidation Drifts (3002) <span class="text-muted fw-normal">— memory changes during recall</span></div>
+              <div class="card-body p-0">
+                <div id="memReconsolidatedList" style="max-height:260px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header fw-semibold small">Belief Updates (3003) <span class="text-muted fw-normal">— přesvědčení o osobách</span></div>
+              <div class="card-body p-0">
+                <div id="memBeliefList" style="max-height:260px;overflow-y:auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tabContent -->
+  </div><!-- /main -->
+
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/vendor/chartjs/chart.umd.min.js"></script>
+  <script src="/vendor/hammerjs/hammer.min.js"></script>
+  <script src="/vendor/chartjs-plugin-zoom/chartjs-plugin-zoom.min.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

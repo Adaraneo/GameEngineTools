@@ -1,0 +1,3557 @@
+[
+  {
+    "id": 1000,
+    "kind": "BehaviorCandidate",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Utility",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1001,
+    "kind": "BehaviorDecision",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Utility",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1002,
+    "kind": "BehaviorActionRunning",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Remaining",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1003,
+    "kind": "BehaviorActionChosen",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Utility",
+        "type": "number"
+      },
+      {
+        "name": "Duration",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1004,
+    "kind": "BehaviorCooldownSet",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Hours",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1005,
+    "kind": "BehaviorIntentSelected",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "IntentKind",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Score",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1006,
+    "kind": "BehaviorIntentRetained",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "IntentKind",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Score",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1007,
+    "kind": "BehaviorIntentSwitched",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "IntentKind",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Score",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1008,
+    "kind": "BehaviorIntentExpired",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "IntentKind",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1009,
+    "kind": "BehaviorIntentEmergencyOverride",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "IntentKind",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Score",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1010,
+    "kind": "BehaviorIntentBiasApplied",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Bias",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1011,
+    "kind": "BehaviorHabitLearned",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Cue",
+        "type": "string"
+      },
+      {
+        "name": "Surface",
+        "type": "string"
+      },
+      {
+        "name": "TimeBand",
+        "type": "string"
+      },
+      {
+        "name": "BeforeStrength",
+        "type": "number"
+      },
+      {
+        "name": "AfterStrength",
+        "type": "number"
+      },
+      {
+        "name": "Learning",
+        "type": "number"
+      },
+      {
+        "name": "CueFit",
+        "type": "number"
+      },
+      {
+        "name": "ReliefFit",
+        "type": "number"
+      },
+      {
+        "name": "CopingFit",
+        "type": "number"
+      },
+      {
+        "name": "ConstraintPenalty",
+        "type": "number"
+      },
+      {
+        "name": "Tendency",
+        "type": "string"
+      },
+      {
+        "name": "RepetitionCount",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 1012,
+    "kind": "BehaviorHabitDecayed",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Days",
+        "type": "number"
+      },
+      {
+        "name": "Retention",
+        "type": "number"
+      },
+      {
+        "name": "BeforeCount",
+        "type": "int"
+      },
+      {
+        "name": "AfterCount",
+        "type": "int"
+      },
+      {
+        "name": "RemovedCount",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 1013,
+    "kind": "BehaviorHabitPruned",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "BeforeCount",
+        "type": "int"
+      },
+      {
+        "name": "AfterCount",
+        "type": "int"
+      },
+      {
+        "name": "MaxTraces",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 1014,
+    "kind": "BehaviorHabitBiasApplied",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "BeforeUtility",
+        "type": "number"
+      },
+      {
+        "name": "AfterUtility",
+        "type": "number"
+      },
+      {
+        "name": "Applicability",
+        "type": "number"
+      },
+      {
+        "name": "Multiplier",
+        "type": "number"
+      },
+      {
+        "name": "FlatBias",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1015,
+    "kind": "HabitDominatedDecision",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "HabitBias",
+        "type": "number"
+      },
+      {
+        "name": "TotalUtility",
+        "type": "number"
+      },
+      {
+        "name": "Ratio",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1016,
+    "kind": "NeedThresholdCrossed",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Need",
+        "type": "string"
+      },
+      {
+        "name": "Threshold",
+        "type": "number"
+      },
+      {
+        "name": "OldValue",
+        "type": "number"
+      },
+      {
+        "name": "NewValue",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1017,
+    "kind": "DarkCoreModifierApplied",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "DarkCore",
+        "type": "number"
+      },
+      {
+        "name": "Delta",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1100,
+    "kind": "SleepPromptSent",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "NeedRest",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1101,
+    "kind": "SleepStarted",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Hours",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1102,
+    "kind": "SharedSleepStarted",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Type",
+        "type": "string"
+      },
+      {
+        "name": "Companion",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1103,
+    "kind": "SleepDeclinedByPlayer",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Warning",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Count",
+        "type": "int"
+      },
+      {
+        "name": "Grace",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1104,
+    "kind": "SleepSessionEnded",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Cooldown",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1105,
+    "kind": "SleepWokeUp",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Hours",
+        "type": "number"
+      },
+      {
+        "name": "Quality",
+        "type": "number"
+      },
+      {
+        "name": "WasInterrupted",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "id": 1106,
+    "kind": "SleepInterrupted",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Warning",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Cause",
+        "type": "string"
+      },
+      {
+        "name": "Phase",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1107,
+    "kind": "SleepPhaseEntered",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Phase",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1108,
+    "kind": "SleepNightmare",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "StressAtSleep",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1109,
+    "kind": "SleepDream",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Seed",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 1110,
+    "kind": "SleepAmbush",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Warning",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Phase",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1111,
+    "kind": "SleepGracePenalty",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Penalty",
+        "type": "number"
+      },
+      {
+        "name": "DeclineCount",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 1112,
+    "kind": "SleepEmergencyBypass",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Warning",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "NeedRest",
+        "type": "number"
+      },
+      {
+        "name": "Energy",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1113,
+    "kind": "SleepBlockedByBiology",
+    "engine": "Sleep",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Hunger",
+        "type": "number"
+      },
+      {
+        "name": "Thirst",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1200,
+    "kind": "InteractionContextChanged",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Location",
+        "type": "string"
+      },
+      {
+        "name": "Noise",
+        "type": "number"
+      },
+      {
+        "name": "Crowding",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1201,
+    "kind": "InteractionOutcomeDecided",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "P",
+        "type": "number"
+      },
+      {
+        "name": "Result",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1202,
+    "kind": "TouchOutcomeDecided",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "Level",
+        "type": "string"
+      },
+      {
+        "name": "P",
+        "type": "number"
+      },
+      {
+        "name": "Result",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1203,
+    "kind": "SexualEncounterProposed",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "Intent",
+        "type": "string"
+      },
+      {
+        "name": "ReprPotential",
+        "type": "string"
+      },
+      {
+        "name": "Contraception",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1204,
+    "kind": "MisattributionPenaltyApplied",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "Stress",
+        "type": "number"
+      },
+      {
+        "name": "Noise",
+        "type": "number"
+      },
+      {
+        "name": "Penalty",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1205,
+    "kind": "ObjectInteractionCommitted",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "LocationId",
+        "type": "string"
+      },
+      {
+        "name": "Utility",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1206,
+    "kind": "MoveActionCommitted",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "Utility",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1207,
+    "kind": "NormViolationDetected",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "NormKind",
+        "type": "string"
+      },
+      {
+        "name": "Score",
+        "type": "number"
+      },
+      {
+        "name": "Penalty",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1208,
+    "kind": "NormViolationShameSpiked",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "NormKind",
+        "type": "string"
+      },
+      {
+        "name": "Score",
+        "type": "number"
+      },
+      {
+        "name": "HasAudience",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "id": 1209,
+    "kind": "ObserverNormReactionRouted",
+    "engine": "Interactions",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ObserverId",
+        "type": "string"
+      },
+      {
+        "name": "Reaction",
+        "type": "string"
+      },
+      {
+        "name": "Score",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1210,
+    "kind": "ValuesProfileGenerated",
+    "engine": "Values",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Benevolence",
+        "type": "number"
+      },
+      {
+        "name": "Universalism",
+        "type": "number"
+      },
+      {
+        "name": "Achievement",
+        "type": "number"
+      },
+      {
+        "name": "Power",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1211,
+    "kind": "ValueCongruenceViolationDetected",
+    "engine": "Values",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ActionName",
+        "type": "string"
+      },
+      {
+        "name": "Congruence",
+        "type": "number"
+      },
+      {
+        "name": "UtilityDelta",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1212,
+    "kind": "GuiltSpikeApplied",
+    "engine": "Values",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ActionName",
+        "type": "string"
+      },
+      {
+        "name": "ViolatedValue",
+        "type": "string"
+      },
+      {
+        "name": "Congruence",
+        "type": "number"
+      },
+      {
+        "name": "DeltaValence",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1213,
+    "kind": "ValueDrifted",
+    "engine": "Values",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ErodedValue",
+        "type": "string"
+      },
+      {
+        "name": "StrengthenedValue",
+        "type": "string"
+      },
+      {
+        "name": "Delta",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1220,
+    "kind": "SpeechActUttered",
+    "engine": "Dialogue",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "SpeakerId",
+        "type": "string"
+      },
+      {
+        "name": "SpeakerName",
+        "type": "string"
+      },
+      {
+        "name": "AddresseeId",
+        "type": "string"
+      },
+      {
+        "name": "AddresseeName",
+        "type": "string"
+      },
+      {
+        "name": "RelationalKind",
+        "type": "string"
+      },
+      {
+        "name": "PredicateLemma",
+        "type": "string"
+      },
+      {
+        "name": "Register",
+        "type": "string"
+      },
+      {
+        "name": "Directness",
+        "type": "string"
+      },
+      {
+        "name": "Utterance",
+        "type": "string"
+      },
+      {
+        "name": "IsResponse",
+        "type": "bool"
+      },
+      {
+        "name": "RespondingToKind",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1300,
+    "kind": "GoalActivated",
+    "engine": "Goals",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "Origin",
+        "type": "string"
+      },
+      {
+        "name": "Salience",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1301,
+    "kind": "GoalProgressed",
+    "engine": "Goals",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "OldSalience",
+        "type": "number"
+      },
+      {
+        "name": "NewSalience",
+        "type": "number"
+      },
+      {
+        "name": "OldProgress",
+        "type": "number"
+      },
+      {
+        "name": "NewProgress",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1302,
+    "kind": "GoalResolved",
+    "engine": "Goals",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "Resolution",
+        "type": "string"
+      },
+      {
+        "name": "Progress",
+        "type": "number"
+      },
+      {
+        "name": "Frustration",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1303,
+    "kind": "GoalBiasApplied",
+    "engine": "Goals",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Bias",
+        "type": "number"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "Salience",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1304,
+    "kind": "GoalSeededFromPersonality",
+    "engine": "Goals",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "Salience",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1400,
+    "kind": "ScheduleDayRegistered",
+    "engine": "Schedule",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "SlotCount",
+        "type": "int"
+      },
+      {
+        "name": "DayIndex",
+        "type": "long"
+      }
+    ]
+  },
+  {
+    "id": 1401,
+    "kind": "ScheduleSlotTriggered",
+    "engine": "Schedule",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "SlotId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Location",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1402,
+    "kind": "ScheduleSlotBiasApplied",
+    "engine": "Schedule",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Bias",
+        "type": "number"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "SlotId",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1403,
+    "kind": "ScheduleSlotSkipped",
+    "engine": "Schedule",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "SlotId",
+        "type": "string"
+      },
+      {
+        "name": "Stress",
+        "type": "number"
+      },
+      {
+        "name": "Energy",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1404,
+    "kind": "ScheduleSeeded",
+    "engine": "Schedule",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Occupation",
+        "type": "string"
+      },
+      {
+        "name": "SlotCount",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 1500,
+    "kind": "ObjectUsed",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "type": "string"
+      },
+      {
+        "name": "LocationId",
+        "type": "string"
+      },
+      {
+        "name": "Affordances",
+        "type": "string"
+      },
+      {
+        "name": "Satisfaction",
+        "type": "number"
+      },
+      {
+        "name": "WasConsumed",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "id": 1501,
+    "kind": "ObjectRespawned",
+    "engine": "World",
+    "scope": "world",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "DisplayName",
+        "type": "string"
+      },
+      {
+        "name": "LocationId",
+        "type": "string"
+      },
+      {
+        "name": "ElapsedMinutes",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1502,
+    "kind": "ItemProduced",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ItemKind",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "LocationId",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1503,
+    "kind": "ItemProcessed",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "RecipeId",
+        "type": "string"
+      },
+      {
+        "name": "ItemKind",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "LocationId",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1504,
+    "kind": "ItemSpoiled",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ItemKind",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "Freshness",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1505,
+    "kind": "PantryConsumed",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ItemKind",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "Freshness",
+        "type": "number"
+      },
+      {
+        "name": "Nutrition",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1506,
+    "kind": "WageEarned",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Occupation",
+        "type": "string"
+      },
+      {
+        "name": "WagePerHour",
+        "type": "number"
+      },
+      {
+        "name": "HoursWorked",
+        "type": "number"
+      },
+      {
+        "name": "NewWealth",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1507,
+    "kind": "Purchased",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "ItemKind",
+        "type": "string"
+      },
+      {
+        "name": "ShopId",
+        "type": "string"
+      },
+      {
+        "name": "Price",
+        "type": "number"
+      },
+      {
+        "name": "NewWealth",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1508,
+    "kind": "Sold",
+    "engine": "World",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "ObjectId",
+        "type": "string"
+      },
+      {
+        "name": "ItemKind",
+        "type": "string"
+      },
+      {
+        "name": "ShopId",
+        "type": "string"
+      },
+      {
+        "name": "Price",
+        "type": "number"
+      },
+      {
+        "name": "NewWealth",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 1509,
+    "kind": "PriceChanged",
+    "engine": "World",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "ShopId",
+        "type": "string"
+      },
+      {
+        "name": "ItemKind",
+        "type": "string"
+      },
+      {
+        "name": "OldPrice",
+        "type": "number"
+      },
+      {
+        "name": "NewPrice",
+        "type": "number"
+      },
+      {
+        "name": "NewStockCount",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 1600,
+    "kind": "LifeStageTransition",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1601,
+    "kind": "LifeEvaluationEpisode",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1610,
+    "kind": "MutualKnowledgeFormedLog",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Subject",
+        "type": "string"
+      },
+      {
+        "name": "SharedWith",
+        "type": "string"
+      },
+      {
+        "name": "ActionKind",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1700,
+    "kind": "TravelDeparted",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Destination",
+        "type": "string"
+      },
+      {
+        "name": "Minutes",
+        "type": "number"
+      },
+      {
+        "name": "ArriveAt",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 1701,
+    "kind": "TravelArrived",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Destination",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 2001,
+    "kind": "RelEventReceived",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "EventType",
+        "type": "string"
+      },
+      {
+        "name": "Self",
+        "type": "string"
+      },
+      {
+        "name": "Other",
+        "type": "string"
+      },
+      {
+        "name": "Outcome",
+        "type": "string"
+      },
+      {
+        "name": "Detail",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 2002,
+    "kind": "RelEventApplied",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "EventType",
+        "type": "string"
+      },
+      {
+        "name": "Self",
+        "type": "string"
+      },
+      {
+        "name": "Other",
+        "type": "string"
+      },
+      {
+        "name": "Outcome",
+        "type": "string"
+      },
+      {
+        "name": "Changes",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 2004,
+    "kind": "RelEdgeCreated",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 2005,
+    "kind": "RelEdgeUpdated",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "Like",
+        "type": "number"
+      },
+      {
+        "name": "Trust",
+        "type": "number"
+      },
+      {
+        "name": "Closeness",
+        "type": "number"
+      },
+      {
+        "name": "Comfort",
+        "type": "number"
+      },
+      {
+        "name": "Respect",
+        "type": "number"
+      },
+      {
+        "name": "Familiarity",
+        "type": "number"
+      },
+      {
+        "name": "IntimateAffinity",
+        "type": "number"
+      },
+      {
+        "name": "Sexual",
+        "type": "number"
+      },
+      {
+        "name": "Aesthetic",
+        "type": "number"
+      },
+      {
+        "name": "Physical",
+        "type": "number"
+      },
+      {
+        "name": "Communal",
+        "type": "number"
+      },
+      {
+        "name": "Exchange",
+        "type": "number"
+      },
+      {
+        "name": "Residue",
+        "type": "number"
+      },
+      {
+        "name": "Responsive",
+        "type": "number"
+      },
+      {
+        "name": "Dominance",
+        "type": "number"
+      },
+      {
+        "name": "Prestige",
+        "type": "number"
+      },
+      {
+        "name": "Contempt",
+        "type": "bool"
+      },
+      {
+        "name": "Commitment",
+        "type": "number"
+      },
+      {
+        "name": "InvestmentSize",
+        "type": "number"
+      },
+      {
+        "name": "AlternativeQuality",
+        "type": "number"
+      },
+      {
+        "name": "DissolutionConsidered",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "id": 2006,
+    "kind": "RelDecayApplied",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "EdgesCount",
+        "type": "int"
+      },
+      {
+        "name": "Days",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2007,
+    "kind": "RelFirstImpression",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "A",
+        "type": "string"
+      },
+      {
+        "name": "B",
+        "type": "string"
+      },
+      {
+        "name": "Like",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2008,
+    "kind": "SexualEncounterOutcome",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "Outcome",
+        "type": "string"
+      },
+      {
+        "name": "IntimateAffinity",
+        "type": "number"
+      },
+      {
+        "name": "SexualInterest",
+        "type": "number"
+      },
+      {
+        "name": "Closeness",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2009,
+    "kind": "RelDecayDimensionDetail",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "Changes",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 2010,
+    "kind": "RelationshipMilestoneReached",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "From",
+        "type": "string"
+      },
+      {
+        "name": "To",
+        "type": "string"
+      },
+      {
+        "name": "Dimension",
+        "type": "string"
+      },
+      {
+        "name": "Threshold",
+        "type": "number"
+      },
+      {
+        "name": "OldValue",
+        "type": "number"
+      },
+      {
+        "name": "NewValue",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2011,
+    "kind": "ThirdPartyReputationChanged",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "Observer",
+        "type": "string"
+      },
+      {
+        "name": "Actor",
+        "type": "string"
+      },
+      {
+        "name": "Target",
+        "type": "string"
+      },
+      {
+        "name": "Dimension",
+        "type": "string"
+      },
+      {
+        "name": "OldValue",
+        "type": "number"
+      },
+      {
+        "name": "NewValue",
+        "type": "number"
+      },
+      {
+        "name": "Weight",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2012,
+    "kind": "JealousyDistressApplied",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "JealousyType",
+        "type": "string"
+      },
+      {
+        "name": "IntimateActor",
+        "type": "string"
+      },
+      {
+        "name": "IntimateTarget",
+        "type": "string"
+      },
+      {
+        "name": "OldResidue",
+        "type": "number"
+      },
+      {
+        "name": "NewResidue",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2013,
+    "kind": "RelOneWayObservation",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Observer",
+        "type": "string"
+      },
+      {
+        "name": "Target",
+        "type": "string"
+      },
+      {
+        "name": "Like",
+        "type": "number"
+      },
+      {
+        "name": "Attraction",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2014,
+    "kind": "RelInvestmentModel",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "A",
+        "type": "string"
+      },
+      {
+        "name": "B",
+        "type": "string"
+      },
+      {
+        "name": "Commitment",
+        "type": "number"
+      },
+      {
+        "name": "Target",
+        "type": "number"
+      },
+      {
+        "name": "Investment",
+        "type": "number"
+      },
+      {
+        "name": "Alternative",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2015,
+    "kind": "RelDissolutionConsidered",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "A",
+        "type": "string"
+      },
+      {
+        "name": "B",
+        "type": "string"
+      },
+      {
+        "name": "Commitment",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2016,
+    "kind": "SocialComparisonOccurredLog",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Target",
+        "type": "string"
+      },
+      {
+        "name": "Direction",
+        "type": "string"
+      },
+      {
+        "name": "Reaction",
+        "type": "string"
+      },
+      {
+        "name": "Envy",
+        "type": "string"
+      },
+      {
+        "name": "SelfEsteemDelta",
+        "type": "number"
+      },
+      {
+        "name": "MoodValenceDelta",
+        "type": "number"
+      },
+      {
+        "name": "MoodBaselineDelta",
+        "type": "number"
+      },
+      {
+        "name": "AchievementMotivationDelta",
+        "type": "number"
+      },
+      {
+        "name": "TargetHostilityDelta",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2017,
+    "kind": "ReputationPriorApplied",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Observer",
+        "type": "string"
+      },
+      {
+        "name": "Subject",
+        "type": "string"
+      },
+      {
+        "name": "ReputationPrior",
+        "type": "number"
+      },
+      {
+        "name": "TrustShift",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 2018,
+    "kind": "JealousyRivalHostilityApplied",
+    "engine": "Relationships",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Rival",
+        "type": "string"
+      },
+      {
+        "name": "ViaActor",
+        "type": "string"
+      },
+      {
+        "name": "Hostility",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 3000,
+    "kind": "MemoryEncoded",
+    "engine": "Memory",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Tag",
+        "type": "string"
+      },
+      {
+        "name": "Salience",
+        "type": "number"
+      },
+      {
+        "name": "Emotion",
+        "type": "string"
+      },
+      {
+        "name": "Perceived",
+        "type": "string"
+      },
+      {
+        "name": "Distortion",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 3001,
+    "kind": "MemoryConsolidated",
+    "engine": "Memory",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Count",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 3002,
+    "kind": "MemoryReconsolidated",
+    "engine": "Memory",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Tag",
+        "type": "string"
+      },
+      {
+        "name": "OldEmotion",
+        "type": "string"
+      },
+      {
+        "name": "NewEmotion",
+        "type": "string"
+      },
+      {
+        "name": "DriftFraction",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 3003,
+    "kind": "BeliefUpdated",
+    "engine": "Memory",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Other",
+        "type": "string"
+      },
+      {
+        "name": "Kind",
+        "type": "string"
+      },
+      {
+        "name": "OldStrength",
+        "type": "number"
+      },
+      {
+        "name": "NewStrength",
+        "type": "number"
+      },
+      {
+        "name": "EvidenceCount",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 4100,
+    "kind": "SchedulerStarted",
+    "engine": "Scheduler",
+    "scope": "world",
+    "level": "Information",
+    "payload": []
+  },
+  {
+    "id": 4101,
+    "kind": "SchedulerRun",
+    "engine": "Scheduler",
+    "scope": "world",
+    "level": "Information",
+    "payload": []
+  },
+  {
+    "id": 4102,
+    "kind": "SchedulerIdle",
+    "engine": "Scheduler",
+    "scope": "world",
+    "level": "Debug",
+    "payload": []
+  },
+  {
+    "id": 4103,
+    "kind": "SchedulerFailed",
+    "engine": "Scheduler",
+    "scope": "world",
+    "level": "Error",
+    "payload": [
+      {
+        "name": "ex",
+        "type": "Exception"
+      }
+    ]
+  },
+  {
+    "id": 5000,
+    "kind": "PhysiologySnapshot",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Energy",
+        "type": "number"
+      },
+      {
+        "name": "Hunger",
+        "type": "number"
+      },
+      {
+        "name": "Thirst",
+        "type": "number"
+      },
+      {
+        "name": "Pain",
+        "type": "number"
+      },
+      {
+        "name": "SleepDebt",
+        "type": "number"
+      },
+      {
+        "name": "TempDelta",
+        "type": "number"
+      },
+      {
+        "name": "Immune",
+        "type": "number"
+      },
+      {
+        "name": "Allostatic",
+        "type": "number"
+      },
+      {
+        "name": "Cortisol",
+        "type": "number"
+      },
+      {
+        "name": "Testosterone",
+        "type": "number"
+      },
+      {
+        "name": "Calories",
+        "type": "number"
+      },
+      {
+        "name": "VitaminD",
+        "type": "number"
+      },
+      {
+        "name": "Iron",
+        "type": "number"
+      },
+      {
+        "name": "Protein",
+        "type": "number"
+      },
+      {
+        "name": "Glucose",
+        "type": "number"
+      },
+      {
+        "name": "Grey",
+        "type": "number"
+      },
+      {
+        "name": "Wrinkle",
+        "type": "number"
+      },
+      {
+        "name": "HairDensity",
+        "type": "number"
+      },
+      {
+        "name": "Muscle",
+        "type": "number"
+      },
+      {
+        "name": "Bone",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5001,
+    "kind": "PhysiologyCycle",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Phase",
+        "type": "string"
+      },
+      {
+        "name": "DayInCycle",
+        "type": "int"
+      },
+      {
+        "name": "Libido",
+        "type": "number"
+      },
+      {
+        "name": "Ovulation",
+        "type": "bool"
+      },
+      {
+        "name": "Pain",
+        "type": "number"
+      },
+      {
+        "name": "Bloat",
+        "type": "number"
+      },
+      {
+        "name": "Tender",
+        "type": "number"
+      },
+      {
+        "name": "Pmdd",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "id": 5002,
+    "kind": "PhysiologySleepEnded",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Hours",
+        "type": "number"
+      },
+      {
+        "name": "Quality",
+        "type": "number"
+      },
+      {
+        "name": "Debt",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5003,
+    "kind": "PhysiologyConceptionEvaluated",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "OtherParent",
+        "type": "string"
+      },
+      {
+        "name": "Chance",
+        "type": "number"
+      },
+      {
+        "name": "OvulationWindow",
+        "type": "bool"
+      },
+      {
+        "name": "Intent",
+        "type": "string"
+      },
+      {
+        "name": "Contraception",
+        "type": "string"
+      },
+      {
+        "name": "Result",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 5004,
+    "kind": "PhysiologyPregnancyStarted",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "OtherParent",
+        "type": "string"
+      },
+      {
+        "name": "EstimatedDueDate",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 5005,
+    "kind": "PhysiologyPregnancyDiscovered",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "OtherParent",
+        "type": "string"
+      },
+      {
+        "name": "DaysPregnant",
+        "type": "long"
+      }
+    ]
+  },
+  {
+    "id": 5006,
+    "kind": "PhysiologyChildBorn",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "OtherParent",
+        "type": "string"
+      },
+      {
+        "name": "ConceivedOn",
+        "type": "string"
+      },
+      {
+        "name": "EstimatedDueDate",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 5007,
+    "kind": "NaturalDeathOccurred",
+    "engine": "Physiology",
+    "scope": "character",
+    "level": "Warning",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Cause",
+        "type": "string"
+      },
+      {
+        "name": "Age",
+        "type": "int"
+      },
+      {
+        "name": "Risk",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5100,
+    "kind": "PsychologySnapshot",
+    "engine": "Psychology",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Emotion",
+        "type": "string"
+      },
+      {
+        "name": "Valence",
+        "type": "number"
+      },
+      {
+        "name": "Arousal",
+        "type": "number"
+      },
+      {
+        "name": "Dominance",
+        "type": "number"
+      },
+      {
+        "name": "Stress",
+        "type": "number"
+      },
+      {
+        "name": "CogLoad",
+        "type": "number"
+      },
+      {
+        "name": "MoodBaseline",
+        "type": "number"
+      },
+      {
+        "name": "NeedSocial",
+        "type": "number"
+      },
+      {
+        "name": "NeedIntimacy",
+        "type": "number"
+      },
+      {
+        "name": "NeedAchievement",
+        "type": "number"
+      },
+      {
+        "name": "NeedCare",
+        "type": "number"
+      },
+      {
+        "name": "NeedSafety",
+        "type": "number"
+      },
+      {
+        "name": "SicknessWithdraw",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "id": 5101,
+    "kind": "PsychNightmareEffect",
+    "engine": "Psychology",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "StressSpike",
+        "type": "number"
+      },
+      {
+        "name": "ValencePenalty",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5102,
+    "kind": "PsychSleepInterrupted",
+    "engine": "Psychology",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "Quality",
+        "type": "number"
+      },
+      {
+        "name": "StressDelta",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5103,
+    "kind": "EmotionTransition",
+    "engine": "Psychology",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "OldEmotion",
+        "type": "string"
+      },
+      {
+        "name": "NewEmotion",
+        "type": "string"
+      },
+      {
+        "name": "Valence",
+        "type": "number"
+      },
+      {
+        "name": "Arousal",
+        "type": "number"
+      },
+      {
+        "name": "Stress",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5104,
+    "kind": "MoodBaselineShifted",
+    "engine": "Psychology",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "OldBaseline",
+        "type": "number"
+      },
+      {
+        "name": "NewBaseline",
+        "type": "number"
+      },
+      {
+        "name": "Delta",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5105,
+    "kind": "AllostaticLoadMilestone",
+    "engine": "Psychology",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Threshold",
+        "type": "number"
+      },
+      {
+        "name": "OldLoad",
+        "type": "number"
+      },
+      {
+        "name": "NewLoad",
+        "type": "number"
+      },
+      {
+        "name": "Cortisol",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5200,
+    "kind": "BehaviorSnapshot",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Plan",
+        "type": "string"
+      },
+      {
+        "name": "Rest",
+        "type": "number"
+      },
+      {
+        "name": "Food",
+        "type": "number"
+      },
+      {
+        "name": "Water",
+        "type": "number"
+      },
+      {
+        "name": "Belonging",
+        "type": "number"
+      },
+      {
+        "name": "Competence",
+        "type": "number"
+      },
+      {
+        "name": "Intimacy",
+        "type": "number"
+      },
+      {
+        "name": "IntentKind",
+        "type": "string"
+      },
+      {
+        "name": "IntentStrength",
+        "type": "number"
+      },
+      {
+        "name": "IntentCommitment",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "id": 5201,
+    "kind": "BehaviorPlan",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Action",
+        "type": "string"
+      },
+      {
+        "name": "Start",
+        "type": "string"
+      },
+      {
+        "name": "Duration",
+        "type": "string"
+      },
+      {
+        "name": "Utility",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5210,
+    "kind": "NeedAppraisalSnapshot",
+    "engine": "Behavior",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "personId",
+        "type": "string"
+      },
+      {
+        "name": "competenceSatisfaction",
+        "type": "number"
+      },
+      {
+        "name": "competenceFrustration",
+        "type": "number"
+      },
+      {
+        "name": "relatednessSatisfaction",
+        "type": "number"
+      },
+      {
+        "name": "relatednessFrustration",
+        "type": "number"
+      },
+      {
+        "name": "autonomySatisfaction",
+        "type": "number"
+      },
+      {
+        "name": "autonomyFrustration",
+        "type": "number"
+      },
+      {
+        "name": "globalBalance",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5300,
+    "kind": "SelfConceptSnapshot",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Esteem",
+        "type": "number"
+      },
+      {
+        "name": "Discrepancy",
+        "type": "number"
+      },
+      {
+        "name": "PercOpen",
+        "type": "number"
+      },
+      {
+        "name": "PercCons",
+        "type": "number"
+      },
+      {
+        "name": "PercExtra",
+        "type": "number"
+      },
+      {
+        "name": "PercAgree",
+        "type": "number"
+      },
+      {
+        "name": "PercNeuro",
+        "type": "number"
+      },
+      {
+        "name": "IdealExtra",
+        "type": "number"
+      },
+      {
+        "name": "IdealAgree",
+        "type": "number"
+      },
+      {
+        "name": "IdealCons",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5400,
+    "kind": "InterestsSnapshot",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Realistic",
+        "type": "number"
+      },
+      {
+        "name": "Investigative",
+        "type": "number"
+      },
+      {
+        "name": "Artistic",
+        "type": "number"
+      },
+      {
+        "name": "Social",
+        "type": "number"
+      },
+      {
+        "name": "Enterprising",
+        "type": "number"
+      },
+      {
+        "name": "Conventional",
+        "type": "number"
+      },
+      {
+        "name": "BaseRealistic",
+        "type": "number"
+      },
+      {
+        "name": "BaseInvestigative",
+        "type": "number"
+      },
+      {
+        "name": "BaseArtistic",
+        "type": "number"
+      },
+      {
+        "name": "BaseSocial",
+        "type": "number"
+      },
+      {
+        "name": "BaseEnterprising",
+        "type": "number"
+      },
+      {
+        "name": "BaseConventional",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5500,
+    "kind": "DarkCoreSnapshot",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "DarkCore",
+        "type": "number"
+      },
+      {
+        "name": "JustifyingBeliefs",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5600,
+    "kind": "HormoneSnapshot",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Estradiol",
+        "type": "number"
+      },
+      {
+        "name": "Progesterone",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 5700,
+    "kind": "ValuesSnapshot",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "HumanId",
+        "type": "string"
+      },
+      {
+        "name": "Benevolence",
+        "type": "number"
+      },
+      {
+        "name": "Universalism",
+        "type": "number"
+      },
+      {
+        "name": "SelfDirection",
+        "type": "number"
+      },
+      {
+        "name": "Stimulation",
+        "type": "number"
+      },
+      {
+        "name": "Hedonism",
+        "type": "number"
+      },
+      {
+        "name": "Achievement",
+        "type": "number"
+      },
+      {
+        "name": "Power",
+        "type": "number"
+      },
+      {
+        "name": "Security",
+        "type": "number"
+      },
+      {
+        "name": "Conformity",
+        "type": "number"
+      },
+      {
+        "name": "Tradition",
+        "type": "number"
+      },
+      {
+        "name": "BaseBenevolence",
+        "type": "number"
+      },
+      {
+        "name": "BaseUniversalism",
+        "type": "number"
+      },
+      {
+        "name": "BaseSelfDirection",
+        "type": "number"
+      },
+      {
+        "name": "BaseStimulation",
+        "type": "number"
+      },
+      {
+        "name": "BaseHedonism",
+        "type": "number"
+      },
+      {
+        "name": "BaseAchievement",
+        "type": "number"
+      },
+      {
+        "name": "BasePower",
+        "type": "number"
+      },
+      {
+        "name": "BaseSecurity",
+        "type": "number"
+      },
+      {
+        "name": "BaseConformity",
+        "type": "number"
+      },
+      {
+        "name": "BaseTradition",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "id": 10001,
+    "kind": "SceneMoveToFailed",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "CharId",
+        "type": "string"
+      },
+      {
+        "name": "Category",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 10002,
+    "kind": "SceneMoveToRequested",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Debug",
+    "payload": [
+      {
+        "name": "CharId",
+        "type": "string"
+      },
+      {
+        "name": "Type",
+        "type": "string"
+      },
+      {
+        "name": "CurrentLocation",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "id": 10003,
+    "kind": "SceneReachOutRouted",
+    "engine": "Unknown",
+    "scope": "character",
+    "level": "Information",
+    "payload": [
+      {
+        "name": "CharId",
+        "type": "string"
+      },
+      {
+        "name": "TargetId",
+        "type": "string"
+      },
+      {
+        "name": "Act",
+        "type": "string"
+      },
+      {
+        "name": "Familiarity",
+        "type": "number"
+      },
+      {
+        "name": "Trust",
+        "type": "number"
+      },
+      {
+        "name": "Comfort",
+        "type": "number"
+      },
+      {
+        "name": "Closeness",
+        "type": "number"
+      },
+      {
+        "name": "Romantic",
+        "type": "number"
+      },
+      {
+        "name": "HasPrivacy",
+        "type": "bool"
+      }
+    ]
+  }
+]

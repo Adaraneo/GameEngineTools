@@ -370,7 +370,10 @@ FodyWeavers.xsd
 /PHASE3_IMPLEMENTATION_REPORT.md
 /PHASE4_IMPLEMENTATION_REPORT.md
 /CLAUDE.md
-/LogReader
+/LogReader/bin/
+/LogReader/obj/
+/LogReader/.cache/
+/LogReader/appsettings.json
 /PLAN_PersistentGoalEngine.md
 /regenerateEventLogs.ps1
 /WorldObserver/Properties/launchSettings.json

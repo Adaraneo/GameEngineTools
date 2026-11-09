@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "LogReader": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" },
+      "applicationUrl": "http://localhost:3000"
+    }
+  }
+}
