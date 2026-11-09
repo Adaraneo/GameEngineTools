@@ -258,6 +258,9 @@ namespace GameEngineTools
                     .BindConfiguration("World:Crops");
             services.AddSingleton<GameEngineTools.World.Objects.Crops.CropGrowthService>();
 
+            services.AddOptions<GameEngineTools.World.Weather.WeatherConfig>()
+                    .BindConfiguration("World:Weather");
+
             services.AddObjectInteractionEngine();
 
             services.AddOptions<MovementConfig>()

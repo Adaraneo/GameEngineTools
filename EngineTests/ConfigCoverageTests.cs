@@ -42,6 +42,7 @@ namespace EngineTests
             ("Characters", "Characters:Fidelity", "CharacterFidelityConfig"),
             ("Economy", "Economy", "EconomyConfig"),
             ("World", "World:Crops", "CropConfig"),
+            ("World", "World:Weather", "WeatherConfig"),
             ("World", "World:Movement", "MovementConfig"),
             ("World", "World:Astro", "AstroConfig"),
             ("World", "World:Universe", "UniverseConfig"),
