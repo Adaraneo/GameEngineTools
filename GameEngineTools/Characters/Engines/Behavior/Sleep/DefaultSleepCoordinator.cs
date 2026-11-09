@@ -108,8 +108,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             var bodyEmergency = BehaviorMath.BodyNeedRest(ph, ctx.Snapshot.Psychology) >= _sleepCfg.EmergencyNeedRestThreshold || ph.Energy <= _sleepCfg.EmergencyEnergyThreshold;
             var isEmergency = state.NeedRest >= _sleepCfg.EmergencyNeedRestThreshold || ph.Energy <= _sleepCfg.EmergencyEnergyThreshold;
 
-            // Moderate sleepiness still yields to critical hunger or thirst unless the character is collapsing.
-            if (!isEmergency && (ph.Thirst >= _sleepCfg.ThirstSleepBlockThreshold || ph.Hunger >= _sleepCfg.HungerSleepBlockThreshold))
+            // Bedtime still yields to critical hunger or thirst; only a depleted body sleeps regardless.
+            if (!bodyEmergency && (ph.Thirst >= _sleepCfg.ThirstSleepBlockThreshold || ph.Hunger >= _sleepCfg.HungerSleepBlockThreshold))
             {
                 _log.SleepBlockedByBiology(ctx.Id.Value.ToString(), ph.Hunger, ph.Thirst);
                 return new SleepDecisionResult(false, state);
