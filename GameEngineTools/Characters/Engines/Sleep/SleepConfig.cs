@@ -109,7 +109,10 @@ namespace GameEngineTools.Characters.Engines.Sleep
     /// Maximum fractional reduction in sleep duration at Hunger = 100.
     /// 0.5 means sleep is halved at maximum hunger. Default: 0.5.
     /// </summary>
-    double HungerSleepShorteningMax = 0.5
+    double HungerSleepShorteningMax = 0.5,
+
+    /// <summary>Thirst above the sleep block level at which a sleeper wakes; 20, my pick, so a sleeper starting just under the block (+2 per hour asleep) wakes with time to drink before the limit.</summary>
+    double ThirstSleepWakeMargin = 20.0
     )
     {
         /// <summary>
@@ -130,8 +133,8 @@ namespace GameEngineTools.Characters.Engines.Sleep
             NightmareChanceNormal: 0.05,
             EmergencyNeedRestThreshold: 90.0,
             EmergencyEnergyThreshold: 5.0,
-            ThirstSleepBlockThreshold: 80.0,
-            HungerSleepBlockThreshold: 80.0,
+            ThirstSleepBlockThreshold: 65.0,
+            HungerSleepBlockThreshold: 65.0,
             NightmareStressThreshold: 70.0
         )
         { }

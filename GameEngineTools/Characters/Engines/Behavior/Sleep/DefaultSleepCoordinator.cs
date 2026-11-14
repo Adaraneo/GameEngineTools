@@ -70,7 +70,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Sleep
             if (_activeSession is { IsActive: true })
             {
                 var sleeperBody = ctx.Snapshot.Physiology;
-                if (sleeperBody.Thirst >= _sleepCfg.ThirstSleepBlockThreshold + 10.0)
+                if (sleeperBody.Thirst >= _sleepCfg.ThirstSleepBlockThreshold + _sleepCfg.ThirstSleepWakeMargin)
                 {
                     _activeSession.Interrupt(context.Now, InterruptCause.Deprivation, ctx, context.Outbox);
                     _activeSession = null;

@@ -188,6 +188,40 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Tick_ASleeperJustBelowTheWakeLevel_KeepsSleeping_AndJustAboveWakes()
+        {
+            var cfg = new SleepConfig();
+            var wakeLevel = cfg.ThirstSleepBlockThreshold + cfg.ThirstSleepWakeMargin;
+            var engine = new DefaultSleepCoordinator(cfg, new BehaviorConfig(), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+            var calm = BehaviorComponentTestFactory.Context(thirst: 20);
+            var started = engine.Handle(new SleepConfirmed(calm.Now, calm.HumanContext.Id, default), calm.HumanContext, calm.Outbox, calm.State);
+
+            var below = BehaviorComponentTestFactory.Context(thirst: wakeLevel - 1, state: started, selfId: calm.HumanContext.Id);
+            var stillAsleep = engine.Tick(below);
+            Assert.IsFalse(below.Outbox.Drain().OfType<SleepInterrupted>().Any(), "Just below the wake level the sleeper stays asleep.");
+            Assert.IsNotNull(stillAsleep.NewState.ActiveSleep);
+
+            var above = BehaviorComponentTestFactory.Context(thirst: wakeLevel + 1, state: stillAsleep.NewState, selfId: calm.HumanContext.Id);
+            engine.Tick(above);
+            Assert.IsTrue(above.Outbox.Drain().OfType<SleepInterrupted>().Any(x => x.Cause == InterruptCause.Deprivation), "Just above it the sleeper wakes thirsty.");
+        }
+
+        [TestMethod]
+        public void Tick_WithThirstAboveTheBlockLevel_DoesNotGoToBed_ButWithLessThirstDoes()
+        {
+            var cfg = new SleepConfig() with { SleepPromptThreshold = 20 };
+            var engine = new DefaultSleepCoordinator(cfg, new BehaviorConfig(), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+
+            var thirsty = BehaviorComponentTestFactory.Context(thirst: cfg.ThirstSleepBlockThreshold + 5, state: new BehaviorState(90, 5, 5, 20, 50, 30, null), surfaceKind: SurfaceKind.Private);
+            engine.Tick(thirsty);
+            Assert.IsFalse(thirsty.Outbox.Drain().OfType<SleepPromptRequested>().Any(), "A thirsty character drinks before bed.");
+
+            var fine = BehaviorComponentTestFactory.Context(thirst: cfg.ThirstSleepBlockThreshold - 15, state: new BehaviorState(90, 5, 5, 20, 50, 30, null), surfaceKind: SurfaceKind.Private);
+            engine.Tick(fine);
+            Assert.IsTrue(fine.Outbox.Drain().OfType<SleepPromptRequested>().Any());
+        }
+
+        [TestMethod]
         public void Tick_HighRestNeed_RequestsSleepPrompt()
         {
             var cfg = new SleepConfig() with { SleepPromptThreshold = 20 }; var engine = new DefaultSleepCoordinator(cfg, new BehaviorConfig(), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))); var context = BehaviorComponentTestFactory.Context(state: new BehaviorState(90, 5, 5, 20, 50, 30, null), surfaceKind: SurfaceKind.Private); var result = engine.Tick(context); Assert.IsTrue(result.ConsumedTick); Assert.IsTrue(context.Outbox.Drain().OfType<SleepPromptRequested>().Any());
