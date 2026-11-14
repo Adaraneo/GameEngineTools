@@ -155,6 +155,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             Sow => config.SowExertion,
             Reap => config.ReapExertion,
             Thresh => config.ThreshExertion,
+            Sleep => config.SleepActivityFactor,
             _ => 1.0
         };
 

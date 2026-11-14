@@ -11,9 +11,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
     /// </summary>
     internal static class HeatMath
     {
-        /// <summary>Heat production in load units: the activity factor (1 = rest) raised by the air temperature above the comfort point.</summary>
+        /// <summary>Heat to shed in load units (1 = resting awake): the activity factor plus the dry heat loss the warm air takes away; the two add, the air term does not depend on the activity.</summary>
         internal static double HeatProduction(double activity, double airC, PhysiologyConfig cfg)
-            => activity * (1.0 + cfg.HeatLoadPerDegreeAboveComfort * Math.Max(0.0, airC - cfg.HeatComfortCelsius));
+            => activity + cfg.HeatLoadPerDegreeAboveComfort * Math.Max(0.0, airC - cfg.HeatComfortCelsius);
 
         /// <summary>Sweat (litres per hour) the body would make for that heat production, capped at the physiological maximum.</summary>
         internal static double PotentialSweat(double production, PhysiologyConfig cfg)

@@ -431,8 +431,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double ThreshExertion = 2.5,
         /// <summary>Air temperature (°C) above which work and rest produce extra heat to shed. Estimate (thermoneutral zone of a clothed person, about 25).</summary>
         double HeatComfortCelsius = 25.0,
-        /// <summary>Relative rise of heat production per °C above the comfort point. Estimate.</summary>
-        double HeatLoadPerDegreeAboveComfort = 0.08,
+        /// <summary>Heat to shed (in units of resting production) added per °C above the comfort point: dry loss falls to zero at skin temperature, so 1 / (35 - 25) = 0.1. Derived from the heat balance with a skin temperature of 35 °C (my assumption).</summary>
+        double HeatLoadPerDegreeAboveComfort = 0.1,
         /// <summary>Sweat in litres per hour per unit of heat production above rest; 0.175 keeps ploughing at 20 °C at the old thirst rate (5 points/h = 0.175 L/h). Estimate.</summary>
         double SweatLitresPerHourPerLoadUnit = 0.175,
         /// <summary>Highest sweat rate, litres per hour; the literature gives above 1 and up to 1.5-2 L/h (PHS/ISO 7933 review). Source range, value a pick.</summary>
@@ -454,7 +454,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Heatstroke death risk per hour at full excess; exceeds the general mortality cap of 0.01. Estimate.</summary>
         double HeatstrokeMaxRiskPerHour = 0.05,
         /// <summary>Relative rise of the heatstroke risk per year of age over 50. Estimate.</summary>
-        double HeatstrokeAgeRiskPerYearOver50 = 0.03)
+        double HeatstrokeAgeRiskPerYearOver50 = 0.03,
+        /// <summary>Heat production of a sleeper relative to resting awake; 0.7 met against 1.0 (ASHRAE 55 table, third-party copy; low-medium confidence). With the air term it starts sweating at about 28 °C, near the 29.5 °C top of the sleeper's thermoneutral zone (Togo 2007).</summary>
+        double SleepActivityFactor = 0.7)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(

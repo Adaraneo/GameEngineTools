@@ -42,15 +42,31 @@ namespace EngineTests
         [TestMethod]
         public void Heat_MakesWorkAndEvenRestThirstier()
         {
-            Assert.IsTrue(ThirstRate(Plough, 35.0) > 1.5 * ThirstRate(Plough, 20.0), "Ploughing in 35 degC takes far more water.");
+            Assert.IsTrue(ThirstRate(Plough, 35.0) > 1.25 * ThirstRate(Plough, 20.0), "Ploughing in 35 degC takes more water.");
             Assert.IsTrue(ThirstRate(null, 35.0) > ThirstRate(null, 20.0), "Even rest sweats a little in the heat.");
             Assert.IsTrue(ThirstRate(Drink, 35.0) < 0.0, "Drinking still quenches.");
         }
 
         [TestMethod]
+        public void AirHeatAddsTheSameAmountWhateverTheActivity()
+        {
+            foreach (var activity in new[] { 0.7, 1.0, 3.0 })
+                Assert.AreEqual(Cfg.HeatLoadPerDegreeAboveComfort * 10.0, HeatMath.HeatProduction(activity, 35.0, Cfg) - HeatMath.HeatProduction(activity, 25.0, Cfg), 1e-12);
+        }
+
+        [TestMethod]
+        public void Sleeper_StartsSweatingLaterThanSomeoneAwake_AndSweatsLess()
+        {
+            Assert.AreEqual(0.0, HeatMath.PotentialSweat(HeatMath.HeatProduction(Cfg.SleepActivityFactor, 27.5, Cfg), Cfg), 1e-12, "27.5 degC is still the sleeper's thermoneutral zone.");
+            Assert.IsTrue(HeatMath.PotentialSweat(HeatMath.HeatProduction(Cfg.SleepActivityFactor, 31.0, Cfg), Cfg) > 0.0);
+            Assert.IsTrue(HeatMath.PotentialSweat(HeatMath.HeatProduction(1.0, 31.0, Cfg), Cfg) > HeatMath.PotentialSweat(HeatMath.HeatProduction(Cfg.SleepActivityFactor, 31.0, Cfg), Cfg));
+            Assert.IsTrue(ThirstRate(Sleep, 32.0) < ThirstRate(null, 32.0) - (Cfg.ThirstDriftAwakePerHour - Cfg.ThirstDriftSleepPerHour));
+        }
+
+        [TestMethod]
         public void SweatIsCapped()
         {
-            var production = HeatMath.HeatProduction(3.0, 80.0, Cfg);
+            var production = HeatMath.HeatProduction(3.0, 120.0, Cfg);
 
             Assert.AreEqual(Cfg.SweatMaxLitresPerHour, HeatMath.PotentialSweat(production, Cfg), 1e-12);
         }
@@ -61,7 +77,7 @@ namespace EngineTests
             var production = HeatMath.HeatProduction(3.0, 38.0, Cfg);
 
             Assert.AreEqual(0.0, HeatMath.HeatLoadTarget(production, 10.0, Cfg), 1e-9);
-            Assert.IsTrue(HeatMath.HeatLoadTarget(production, 100.0, Cfg) > 4.0);
+            Assert.IsTrue(HeatMath.HeatLoadTarget(production, 100.0, Cfg) > 3.0);
             Assert.IsTrue(HeatMath.HeatLoadTarget(production, 80.0, Cfg) > HeatMath.HeatLoadTarget(production, 65.0, Cfg));
         }
 
