@@ -88,6 +88,8 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     };
 
     Console.WriteLine(sceneOptions.Weather is { Enabled: true } && sceneOptions.AstroConfig is not null ? "Weather: on" : "Weather: off");
+    if (sceneOptions.AstroConfig is { } astro)
+        Console.WriteLine(sceneOptions.UniverseConfig is { } uni ? $"Climate: planet physics, greenhouse warming {uni.PlanetGreenhouseWarmingK:F1} K." : $"Climate: base {astro.BaseTemperatureCelsius:F1} C, seasonal amplitude {astro.SeasonalAmplitudeCelsius:F1} C.");
     new SimulationScene(world.Clock, sceneOptions, world.Lod).RunAsync().GetAwaiter().GetResult();
 }
 }
