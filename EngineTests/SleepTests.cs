@@ -152,8 +152,8 @@ namespace EngineTests
         [TestMethod]
         public void Tick_WhenEmergencyAndHungry_SleepOverridesBiology()
         {
-            // Arrange — emergency energie + kritický hlad i žízeň
-            _ctx = BuildFakeContext(sleepDebtHours: 5, stress: 0, energy: 3, thirst: 100, hunger: 100);
+            // Arrange — emergency energie + kritický hlad a žízeň pod úrovní, při které by spáč hned vstal (jinak by usínal a vstával donekonečna)
+            _ctx = BuildFakeContext(sleepDebtHours: 5, stress: 0, energy: 3, thirst: 70, hunger: 100);
             var engine = BuildBehaviorEngine();
 
             // Act

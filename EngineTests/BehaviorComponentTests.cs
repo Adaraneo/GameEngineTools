@@ -222,6 +222,22 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Tick_ADepletedBody_StillDoesNotSleep_WhenSoThirstyThatTheSleepWouldEndAtOnce()
+        {
+            var cfg = new SleepConfig() with { SleepPromptThreshold = 20 };
+            var engine = new DefaultSleepCoordinator(cfg, new BehaviorConfig(), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)));
+            var wakeLevel = cfg.ThirstSleepBlockThreshold + cfg.ThirstSleepWakeMargin;
+
+            var exhaustedAndParched = BehaviorComponentTestFactory.Context(thirst: wakeLevel + 3, energy: 2, state: new BehaviorState(95, 5, 5, 20, 50, 30, null), surfaceKind: SurfaceKind.Private);
+            engine.Tick(exhaustedAndParched);
+            Assert.IsFalse(exhaustedAndParched.Outbox.Drain().OfType<SleepPromptRequested>().Any(), "It would wake at once and fall asleep again, never reaching the water.");
+
+            var exhausted = BehaviorComponentTestFactory.Context(thirst: cfg.ThirstSleepBlockThreshold + 5, energy: 2, state: new BehaviorState(95, 5, 5, 20, 50, 30, null), surfaceKind: SurfaceKind.Private);
+            engine.Tick(exhausted);
+            Assert.IsTrue(exhausted.Outbox.Drain().OfType<SleepPromptRequested>().Any(), "A depleted body still sleeps when the thirst is below the wake level.");
+        }
+
+        [TestMethod]
         public void Tick_HighRestNeed_RequestsSleepPrompt()
         {
             var cfg = new SleepConfig() with { SleepPromptThreshold = 20 }; var engine = new DefaultSleepCoordinator(cfg, new BehaviorConfig(), LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning))); var context = BehaviorComponentTestFactory.Context(state: new BehaviorState(90, 5, 5, 20, 50, 30, null), surfaceKind: SurfaceKind.Private); var result = engine.Tick(context); Assert.IsTrue(result.ConsumedTick); Assert.IsTrue(context.Outbox.Drain().OfType<SleepPromptRequested>().Any());

@@ -134,7 +134,7 @@ namespace GameEngineTools.Characters.Engines.Sleep
             EmergencyNeedRestThreshold: 90.0,
             EmergencyEnergyThreshold: 5.0,
             ThirstSleepBlockThreshold: 65.0,
-            HungerSleepBlockThreshold: 65.0,
+            HungerSleepBlockThreshold: 80.0,
             NightmareStressThreshold: 70.0
         )
         { }
