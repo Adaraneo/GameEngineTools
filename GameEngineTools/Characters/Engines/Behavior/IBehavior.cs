@@ -26,6 +26,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
         double IntentCommitmentBiasStep = 1,
         double IntentTimeoutHours = 2,
         double EmergencyIntentOverrideThreshold = 75,
+        /// <summary>Need level at which the body starts to die of hunger or thirst; 95, the same as the Physiology mortality thresholds (a test keeps them equal).</summary>
+        double LethalNeedLevel = 95.0,
+        /// <summary>Hunger rise per awake hour used to rank two critical needs; 6, the Physiology awake drift (a test keeps them equal).</summary>
+        double HungerRisePerHour = 6.0,
+        /// <summary>Thirst rise per awake hour used to rank two critical needs; 5, the Physiology awake drift (a test keeps them equal).</summary>
+        double ThirstRisePerHour = 5.0,
         double HabitLearningRate = 0.08,
         double HabitDecayPerDay = 0.015,
         double HabitMaxUtilityMultiplier = 0.18,

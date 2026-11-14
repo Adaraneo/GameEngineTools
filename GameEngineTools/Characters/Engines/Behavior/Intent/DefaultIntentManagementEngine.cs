@@ -40,7 +40,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Intent
         {
             var current = context.State.ActiveIntent;
             var scoredGroups = ScoreGroups(candidates);
-            var emergency = candidates.Where(c => c.Domain == BehaviorDomain.Physiological && c.Utility >= context.Config.EmergencyIntentOverrideThreshold).OrderByDescending(c => c.Utility).FirstOrDefault();
+            var urgent = EmergencyNeeds.MostUrgent(context);
+            var emergency = candidates
+                .Where(c => c.Domain == BehaviorDomain.Physiological && c.Utility >= context.Config.EmergencyIntentOverrideThreshold)
+                .Where(c => urgent == EmergencyNeeds.Need.None || !EmergencyNeeds.Answers(EmergencyNeeds.Other(urgent), c.Name))
+                .OrderByDescending(c => c.Utility)
+                .FirstOrDefault();
 
             // Emergency physiological pressure is allowed to override the current direction immediately.
             if (emergency is not null)

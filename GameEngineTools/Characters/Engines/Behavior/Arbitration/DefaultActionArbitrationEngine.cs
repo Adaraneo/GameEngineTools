@@ -55,6 +55,15 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
                 return new ActionArbitrationResult(false, null, null, context.State with { Cooldowns = context.Cooldowns });
 
             candidates.Sort((a, b) => b.Utility.CompareTo(a.Utility));
+
+            // Two critical needs: answer the one nearer to death, whatever the ordinary utilities say.
+            var urgent = EmergencyNeeds.MostUrgent(context);
+            if (urgent != EmergencyNeeds.Need.None && candidates.FirstOrDefault(c => c.Utility > 0 && EmergencyNeeds.Answers(urgent, c.Name)) is { } urgentCandidate)
+            {
+                var urgentPlan = new PlannedAction(urgentCandidate.Name, context.Now, urgentCandidate.Duration, urgentCandidate.Utility, urgentCandidate.SocialTargeting?.TargetHuman, urgentCandidate.ObjectInteraction);
+                return new ActionArbitrationResult(false, urgentPlan, urgentCandidate, context.State with { CurrentPlan = urgentPlan, Cooldowns = context.Cooldowns }, urgentCandidate, $"urgent:{urgent}");
+            }
+
             var intended = candidates[0];
             var chosen = ChooseWithConflict(context, candidates, intended, out var reason);
             var plan = new PlannedAction(chosen.Name, context.Now, chosen.Duration, chosen.Utility, chosen.SocialTargeting?.TargetHuman, chosen.ObjectInteraction);
@@ -74,6 +83,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Arbitration
             var answersHunger = context.State.NeedFood >= threshold;
             var answersThirst = context.State.NeedWater >= threshold;
             if (!answersHunger && !answersThirst) return null;
+
+            // With both critical only the more urgent one counts.
+            var urgent = EmergencyNeeds.MostUrgent(context);
+            if (urgent != EmergencyNeeds.Need.None)
+            {
+                answersHunger = urgent == EmergencyNeeds.Need.Hunger;
+                answersThirst = urgent == EmergencyNeeds.Need.Thirst;
+            }
 
             bool Answers(string action)
                 => (answersHunger && action is Eat or EatStored or MoveToFood) || (answersThirst && action is Drink or MoveToDrink);
