@@ -33,7 +33,7 @@ var outputDir = Path.GetFullPath(options.OutputDir, AppContext.BaseDirectory);
 string runDir;
 try
 {
-    runDir = RunDirectory.Create(options.WorldDb, options.Barter, options.Planet);
+    runDir = RunDirectory.Create(options.WorldDb, options.Barter, options.Planet, options.ConfigOverrides);
 }
 catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationException)
 {

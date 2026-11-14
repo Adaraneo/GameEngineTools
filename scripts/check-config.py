@@ -32,6 +32,7 @@ MONITOR_OPTIONS = {
     "barter": "Barter",
     "lod": "CharacterLod",
     "planet": "Planet",
+    "set": "ConfigOverrides",
     "out": "OutputDir",
 }
 
@@ -59,6 +60,7 @@ def check_monitor():
 
     cli = set(re.findall(r'overrides\.(?:GetValueOrDefault|TryGetValue)\("([a-z-]+)"', options))
     cli |= set(re.findall(r'IntOverride\(overrides, "([a-z-]+)"', options))
+    cli |= set(re.findall(r'"--([a-z-]+)"', options))
 
     for option in sorted(cli):
         key = MONITOR_OPTIONS.get(option)
