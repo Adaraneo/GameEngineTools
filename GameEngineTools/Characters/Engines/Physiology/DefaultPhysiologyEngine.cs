@@ -177,6 +177,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <param name="hydrationGain">Per-object hydration gain for <c>Drink</c>, or null for the config default.</param>
         /// <param name="immuneDecayFactor">Multiplier on immune recovery (e.g. 0.7 post-menopause); pass 1.0 for default.</param>
         /// <param name="airCelsius">Air temperature around the character; above the comfort point it adds sweat, hence thirst.</param>
+        /// <param name="waterDeficitL">Body water deficit in litres; the kidneys conserve as it grows, so the water lost without sweat falls toward the obligatory rate.</param>
         /// <returns>The additive deltas to apply to the physiological state this tick.</returns>
         internal static PhysiologyDrift ComputeDrift(
             string? action,
@@ -184,7 +185,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             PhysiologyConfig config,
             double? hydrationGain,
             double immuneDecayFactor,
-            double airCelsius = 20.0)
+            double airCelsius = 20.0,
+            double waterDeficitL = 0.0)
         {
             // Energy: depletes while awake, slower during self-care, untouched during sleep
             // (sleep recovery is a one-time effect in Handle(SleepEnded), NOT here).
@@ -213,8 +215,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var thirst = action switch
             {
                 Drink => -(hydrationGain ?? config.ThirstDrinkingGainPerHour) * h,
-                Sleep => (config.ThirstDriftSleepPerHour + sweatThirst) * h,
-                _ => (config.ThirstDriftAwakePerHour + sweatThirst) * h
+                Sleep => (WaterMath.LossPointsPerHour(true, waterDeficitL, config) + sweatThirst) * h,
+                _ => (WaterMath.LossPointsPerHour(false, waterDeficitL, config) + sweatThirst) * h
             };
 
             // Pain: passive recovery always; sleep adds its bonus; self-care is strongest.
@@ -289,7 +291,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             // Single source of truth for action-driven drift (energy, hunger, thirst, pain, immune).
             var airC = ctx.Snapshot.AmbientTemperature;
-            var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor, airC);
+            var waterDeficit = WaterMath.Deficit(s, Config);
+            var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor, airC, waterDeficit);
+            var newDeficit = Math.Clamp(waterDeficit + drift.Thirst * Config.LitresPerThirstPoint, 0.0, 0.2 * Config.BodyMassKg);
 
             // Stored heat follows what the sweat cannot carry away (thirst before this tick's drift, so a dry throat already weakens it).
             var production = HeatMath.HeatProduction(ActivityOf(action, Config), airC, Config);
@@ -311,7 +315,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 Energy = Clamp01p(s.Energy + drift.Energy),
                 Hunger = Clamp01p(s.Hunger + drift.Hunger),
-                Thirst = Clamp01p(s.Thirst + drift.Thirst),
+                Thirst = WaterMath.ViewThirst(newDeficit, Config),
+                WaterDeficitL = newDeficit,
                 Pain = Clamp01p(s.Pain + drift.Pain),
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + drift.Immune),
                 BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, targetBodyTemp, 0.1 * h), -1.0, 3.5),
@@ -766,7 +771,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         private bool HasCriticalState(PhysiologyState s) =>
             s.Hunger >= Config.NaturalMortalityStarvationThreshold
-            || s.Thirst >= Config.NaturalMortalityDehydrationThreshold
+            || WaterMath.IsLethal(s, Config)
             || (s.Energy <= Config.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= Config.NaturalMortalityExhaustionSleepDebtMin)
             || s.AllostaticLoad >= Config.NaturalMortalityAlloThreshold
             || s.ImmuneLoad >= Config.NaturalMortalityImmuneThreshold
@@ -1556,6 +1561,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                 AffordanceType.Thirst => s with
                 {
+                    WaterDeficitL = Math.Max(0.0, WaterMath.Deficit(s, Config) - oaa.Satisfaction * Config.AffordanceThirstMaxDelta * Config.LitresPerThirstPoint),
                     Thirst = Clamp01p(s.Thirst - oaa.Satisfaction * Config.AffordanceThirstMaxDelta)
                 },
 

@@ -351,7 +351,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double NaturalMortalityStarvationThreshold = 95.0,
         /// <summary>Hourly risk from terminal hunger. 0.0013/h → median death ~3 weeks.</summary>
         double NaturalMortalityStarvationRisk = 0.0013,
-        /// <summary>Thirst level at or above which dehydration mortality applies.</summary>
+        /// <summary>Thirst score treated as lethal by the behaviour layer (EmergencyNeeds, kept equal to <c>Behavior:LethalNeedLevel</c> by a test); the death hazard itself starts at <see cref="DehydrationLethalBodyMassPercent"/> of body mass.</summary>
         double NaturalMortalityDehydrationThreshold = 95.0,
         /// <summary>Hourly risk from terminal thirst. 0.008/h → median death ~3.5 days.</summary>
         double NaturalMortalityDehydrationRisk = 0.008,
@@ -456,7 +456,19 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Relative rise of the heatstroke risk per year of age over 50. Estimate.</summary>
         double HeatstrokeAgeRiskPerYearOver50 = 0.03,
         /// <summary>Heat production of a sleeper relative to resting awake; 0.7 met against 1.0 (ASHRAE 55 table, third-party copy; low-medium confidence). With the air term it starts sweating at about 28 °C, near the 29.5 °C top of the sleeper's thermoneutral zone (Togo 2007).</summary>
-        double SleepActivityFactor = 0.7)
+        double SleepActivityFactor = 0.7,
+        /// <summary>Water lost per hour awake by a body that cannot drink and conserves: urine at its minimum plus insensible loss minus metabolic water, about 1.1 L/day (physiology texts, secondary sources).</summary>
+        double WaterObligatoryLossLitresPerHour = 0.046,
+        /// <summary>The same asleep. Pick.</summary>
+        double WaterObligatoryLossSleepLitresPerHour = 0.04,
+        /// <summary>Water deficit (L) from which the kidneys begin to conserve; 1.75 L is thirst 50, the usual moment to drink, so an ordinary day is unchanged. Pick.</summary>
+        double WaterConservationStartLitres = 1.75,
+        /// <summary>Water deficit (L) at which conservation is complete (loss = obligatory only); 3.3 L is thirst 95. Pick.</summary>
+        double WaterConservationFullLitres = 3.3,
+        /// <summary>Body mass in kg used for the share-of-body-mass thresholds; 70 until a per-character mass reaches Physiology. Pick.</summary>
+        double BodyMassKg = 70.0,
+        /// <summary>Water deficit as percent of body mass at which death becomes possible; about 10 percent is life threatening (Adolph 1947, from a secondary quotation), 5 percent is the work limit for 95 percent of workers. Replaces the thirst-95 hazard onset.</summary>
+        double DehydrationLethalBodyMassPercent = 10.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
@@ -768,7 +780,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Hours toward the next postpartum day. <c>null</c> in older saves.</summary>
         double? PostpartumAccumulatorHours = null,
         /// <summary>Heat stored by work and warm air, °C above the body's own temperature (see <see cref="HeatMath"/>). <c>null</c> in older saves, read as 0.</summary>
-        double? HeatLoad = null);
+        double? HeatLoad = null,
+        /// <summary>Body water deficit in litres; Thirst is its view (deficit / litres per point, capped at 100). <c>null</c> in older saves, read as Thirst x litres per point.</summary>
+        double? WaterDeficitL = null);
 
     /// <summary>
     /// The physiology engine — first stage of the per-character tick pipeline. Advances

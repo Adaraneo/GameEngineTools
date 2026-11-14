@@ -60,7 +60,7 @@ namespace EngineTests
         public void ComputeHourlyRisk_StarvationStateYoungCharacter_RiskAboveZero()
         {
             // Hunger=100, Thirst=100 → starvation contribution should make risk > 0
-            var state = NominalState() with { Hunger = 100, Thirst = 100 };
+            var state = NominalState() with { Hunger = 100, Thirst = 100, WaterDeficitL = 8.0 };
             var risk = NaturalMortalityCalculator.ComputeHourlyRisk(state, ageYears: 25, cfg: DefaultCfg);
 
             Assert.IsTrue(risk > 0,
@@ -96,7 +96,7 @@ namespace EngineTests
                 AllostaticLoad = 100,
                 ImmuneLoad = 100,
                 Hunger = 100,
-                Thirst = 100,
+                Thirst = 100, WaterDeficitL = 8.0,
                 Energy = 0,
                 SleepDebtHours = 72,
                 Aging = new PhysicalAgingState(BoneDensity: 0.1, MuscleMassFraction: 0.2)
@@ -124,7 +124,7 @@ namespace EngineTests
         [TestMethod]
         public void ResolveCause_DehydrationOutweighsStarvation_WhenBothTerminal()
         {
-            var state = NominalState() with { Hunger = 100, Thirst = 100 };
+            var state = NominalState() with { Hunger = 100, Thirst = 100, WaterDeficitL = 8.0 };
             var cause = NaturalMortalityCalculator.ResolveCause(state, ageYears: 30, DefaultCfg);
 
             Assert.AreEqual(DeathCause.Dehydration, cause,
@@ -276,7 +276,7 @@ namespace EngineTests
         public void Calibration_TerminalDehydration_KillsWithinDays()
         {
             var hourly = NaturalMortalityCalculator.ComputeHourlyRisk(
-                NominalState() with { Thirst = 100 }, ageYears: 30, cfg: DefaultCfg);
+                NominalState() with { Thirst = 100, WaterDeficitL = 8.0 }, ageYears: 30, cfg: DefaultCfg);
             var survive5Days = Math.Pow(1.0 - hourly, 5 * HoursPerGameDay);
 
             Assert.IsTrue(survive5Days < 0.5,
@@ -289,7 +289,7 @@ namespace EngineTests
             var hunger = NaturalMortalityCalculator.ComputeHourlyRisk(
                 NominalState() with { Hunger = 100 }, 30, DefaultCfg);
             var thirst = NaturalMortalityCalculator.ComputeHourlyRisk(
-                NominalState() with { Thirst = 100 }, 30, DefaultCfg);
+                NominalState() with { Thirst = 100, WaterDeficitL = 8.0 }, 30, DefaultCfg);
 
             Assert.IsTrue(hunger > 0, "Terminal hunger must contribute mortality.");
             Assert.IsTrue(hunger < thirst,
@@ -305,12 +305,12 @@ namespace EngineTests
         {
             // Regression: the old model required Hunger>=95 AND Thirst>=95, so pure thirst never killed.
             var pureThirst = NaturalMortalityCalculator.ComputeHourlyRisk(
-                NominalState() with { Thirst = 100, Hunger = 20 }, ageYears: 25, cfg: DefaultCfg);
+                NominalState() with { Thirst = 100, WaterDeficitL = 8.0, Hunger = 20 }, ageYears: 25, cfg: DefaultCfg);
             Assert.IsTrue(pureThirst > 0,
                 $"Pure dehydration (thirst high, hunger low) must be lethal on its own. Got {pureThirst:E2}");
 
             var cause = NaturalMortalityCalculator.ResolveCause(
-                NominalState() with { Thirst = 100, Hunger = 20 }, ageYears: 25, DefaultCfg);
+                NominalState() with { Thirst = 100, WaterDeficitL = 8.0, Hunger = 20 }, ageYears: 25, DefaultCfg);
             Assert.AreEqual(DeathCause.Dehydration, cause, "Pure thirst death must resolve to Dehydration.");
         }
 

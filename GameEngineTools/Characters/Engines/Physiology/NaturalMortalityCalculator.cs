@@ -49,7 +49,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             }
 
             // Dehydration: terminal thirst kills within days, independent of hunger.
-            if (s.Thirst >= cfg.NaturalMortalityDehydrationThreshold)
+            if (WaterMath.IsLethal(s, cfg))
                 risk += cfg.NaturalMortalityDehydrationRisk;
 
             // Starvation: terminal hunger kills within weeks.
@@ -93,7 +93,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             Consider(DeathCause.SystemicFailure, SystemicRisk(s, cfg));
             Consider(DeathCause.Heatstroke, HeatRisk(s, ageYears, cfg));
             Consider(DeathCause.Starvation, s.Hunger >= cfg.NaturalMortalityStarvationThreshold ? cfg.NaturalMortalityStarvationRisk : 0.0);
-            Consider(DeathCause.Dehydration, s.Thirst >= cfg.NaturalMortalityDehydrationThreshold ? cfg.NaturalMortalityDehydrationRisk : 0.0);
+            Consider(DeathCause.Dehydration, WaterMath.IsLethal(s, cfg) ? cfg.NaturalMortalityDehydrationRisk : 0.0);
             Consider(DeathCause.Exhaustion,
                 s.Energy <= cfg.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= cfg.NaturalMortalityExhaustionSleepDebtMin
                     ? cfg.NaturalMortalityExhaustionRisk : 0.0);
