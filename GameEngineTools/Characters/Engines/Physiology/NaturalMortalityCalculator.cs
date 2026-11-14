@@ -69,7 +69,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             if (s.Aging is { } a && a.MuscleMassFraction < cfg.SarcopeniaMuscleMin * 1.2)
                 risk += cfg.NaturalMortalitySarcopeniaWeight * (cfg.SarcopeniaMuscleMin * 1.2 - a.MuscleMassFraction);
 
-            return Math.Clamp(risk, 0, cfg.NaturalMortalityMaxRiskPerHour);
+            // Heatstroke has its own cap (above the general one): a body this hot dies in hours, not days.
+            return Math.Clamp(risk, 0, cfg.NaturalMortalityMaxRiskPerHour) + HeatRisk(s, ageYears, cfg);
         }
 
         /// <summary>
@@ -90,6 +91,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             }
 
             Consider(DeathCause.SystemicFailure, SystemicRisk(s, cfg));
+            Consider(DeathCause.Heatstroke, HeatRisk(s, ageYears, cfg));
             Consider(DeathCause.Starvation, s.Hunger >= cfg.NaturalMortalityStarvationThreshold ? cfg.NaturalMortalityStarvationRisk : 0.0);
             Consider(DeathCause.Dehydration, s.Thirst >= cfg.NaturalMortalityDehydrationThreshold ? cfg.NaturalMortalityDehydrationRisk : 0.0);
             Consider(DeathCause.Exhaustion,
@@ -97,6 +99,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
                     ? cfg.NaturalMortalityExhaustionRisk : 0.0);
             return cause;
         }
+
+        internal static double HeatRisk(PhysiologyState s, int ageYears, PhysiologyConfig cfg)
+            => HeatMath.HeatstrokeRisk(s.BodyTempDelta + (s.HeatLoad ?? 0.0), ageYears, cfg);
 
         private static double AgeFrailtyRisk(PhysiologyState s, int ageYears, PhysiologyConfig cfg)
         {

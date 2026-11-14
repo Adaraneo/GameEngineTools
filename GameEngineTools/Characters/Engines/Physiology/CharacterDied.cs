@@ -25,7 +25,10 @@ namespace GameEngineTools.Characters.Engines.Physiology
         SystemicFailure,
 
         /// <summary>Natural end-of-lifespan (Gompertz curve).</summary>
-        OldAge
+        OldAge,
+
+        /// <summary>Core temperature too high for too long (heat stroke).</summary>
+        Heatstroke
     }
 
     /// <summary>

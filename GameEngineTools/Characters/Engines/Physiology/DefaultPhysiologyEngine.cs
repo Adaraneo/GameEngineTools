@@ -148,6 +148,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         #region Drift computation
 
+        /// <summary>Activity factor of an action: 1 at rest, the task's exertion for field labour.</summary>
+        internal static double ActivityOf(string? action, PhysiologyConfig config) => action switch
+        {
+            Plough => config.PloughExertion,
+            Sow => config.SowExertion,
+            Reap => config.ReapExertion,
+            Thresh => config.ThreshExertion,
+            _ => 1.0
+        };
+
         /// <summary>
         /// Computes the continuous physiological drift for a single tick as a pure
         /// function of the current action, elapsed hours, and configuration.
@@ -165,25 +175,20 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <param name="config">Drift rate configuration.</param>
         /// <param name="hydrationGain">Per-object hydration gain for <c>Drink</c>, or null for the config default.</param>
         /// <param name="immuneDecayFactor">Multiplier on immune recovery (e.g. 0.7 post-menopause); pass 1.0 for default.</param>
+        /// <param name="airCelsius">Air temperature around the character; above the comfort point it adds sweat, hence thirst.</param>
         /// <returns>The additive deltas to apply to the physiological state this tick.</returns>
         internal static PhysiologyDrift ComputeDrift(
             string? action,
             double h,
             PhysiologyConfig config,
             double? hydrationGain,
-            double immuneDecayFactor)
+            double immuneDecayFactor,
+            double airCelsius = 20.0)
         {
             // Energy: depletes while awake, slower during self-care, untouched during sleep
             // (sleep recovery is a one-time effect in Handle(SleepEnded), NOT here).
             // Field labour burns more of each: the awake rates are multiplied by the task's exertion.
-            var exertion = action switch
-            {
-                Plough => config.PloughExertion,
-                Sow => config.SowExertion,
-                Reap => config.ReapExertion,
-                Thresh => config.ThreshExertion,
-                _ => 1.0
-            };
+            var exertion = ActivityOf(action, config);
 
             var energy = action switch
             {
@@ -202,11 +207,13 @@ namespace GameEngineTools.Characters.Engines.Physiology
             };
 
             // Thirst: same pattern. Drink uses the object's hydration value when supplied.
+            // Work and heat do not multiply the base rate: the sweat they make is added on top (litres converted to thirst points).
+            var sweatThirst = HeatMath.SweatThirstPerHour(HeatMath.PotentialSweat(HeatMath.HeatProduction(exertion, airCelsius, config), config), config);
             var thirst = action switch
             {
                 Drink => -(hydrationGain ?? config.ThirstDrinkingGainPerHour) * h,
-                Sleep => config.ThirstDriftSleepPerHour * h,
-                _ => config.ThirstDriftAwakePerHour * h * exertion
+                Sleep => (config.ThirstDriftSleepPerHour + sweatThirst) * h,
+                _ => (config.ThirstDriftAwakePerHour + sweatThirst) * h
             };
 
             // Pain: passive recovery always; sleep adds its bonus; self-care is strongest.
@@ -280,7 +287,12 @@ namespace GameEngineTools.Characters.Engines.Physiology
             // fluctuation).
 
             // Single source of truth for action-driven drift (energy, hunger, thirst, pain, immune).
-            var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor);
+            var airC = ctx.Snapshot.AmbientTemperature;
+            var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor, airC);
+
+            // Stored heat follows what the sweat cannot carry away (thirst before this tick's drift, so a dry throat already weakens it).
+            var production = HeatMath.HeatProduction(ActivityOf(action, Config), airC, Config);
+            var heatLoad = HeatMath.AdvanceHeatLoad(s.HeatLoad ?? 0.0, HeatMath.HeatLoadTarget(production, s.Thirst, Config), h, Config);
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
             // Circadian body temperature: a sinusoidal wave ±CircadianTempAmplitude (Waterhouse 2005)
@@ -301,7 +313,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 Thirst = Clamp01p(s.Thirst + drift.Thirst),
                 Pain = Clamp01p(s.Pain + drift.Pain),
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + drift.Immune),
-                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, targetBodyTemp, 0.1 * h), -1.0, 3.5)
+                BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, targetBodyTemp, 0.1 * h), -1.0, 3.5),
+                HeatLoad = heatLoad
             };
 
             // Nutrition drift — Calories/Protein decline and are replenished by eating;
@@ -755,7 +768,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
             || s.Thirst >= Config.NaturalMortalityDehydrationThreshold
             || (s.Energy <= Config.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= Config.NaturalMortalityExhaustionSleepDebtMin)
             || s.AllostaticLoad >= Config.NaturalMortalityAlloThreshold
-            || s.ImmuneLoad >= Config.NaturalMortalityImmuneThreshold;
+            || s.ImmuneLoad >= Config.NaturalMortalityImmuneThreshold
+            || s.BodyTempDelta + (s.HeatLoad ?? 0.0) > Config.HeatstrokeOnsetC;
 
         /// <summary>
         /// Reacts to discrete domain events by applying instantaneous state mutations.

@@ -687,6 +687,7 @@ namespace GameEngineTools.Narrative
                 DeathCause.Exhaustion => "vyčerpáním",
                 DeathCause.SystemicFailure => "selháním organismu",
                 DeathCause.OldAge => "stářím",
+                DeathCause.Heatstroke => "úpalem",
                 _ => "z neznámé příčiny",
             };
 

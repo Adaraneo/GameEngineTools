@@ -428,7 +428,33 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Same for reaping with a sickle; about 2.5, 4-6 MET (my estimate from the Compendium).</summary>
         double ReapExertion = 2.5,
         /// <summary>Same for threshing with a flail; about 2.5 (my estimate).</summary>
-        double ThreshExertion = 2.5)
+        double ThreshExertion = 2.5,
+        /// <summary>Air temperature (°C) above which work and rest produce extra heat to shed. Estimate (thermoneutral zone of a clothed person, about 25).</summary>
+        double HeatComfortCelsius = 25.0,
+        /// <summary>Relative rise of heat production per °C above the comfort point. Estimate.</summary>
+        double HeatLoadPerDegreeAboveComfort = 0.08,
+        /// <summary>Sweat in litres per hour per unit of heat production above rest; 0.175 keeps ploughing at 20 °C at the old thirst rate (5 points/h = 0.175 L/h). Estimate.</summary>
+        double SweatLitresPerHourPerLoadUnit = 0.175,
+        /// <summary>Highest sweat rate, litres per hour; the literature gives above 1 and up to 1.5-2 L/h (PHS/ISO 7933 review). Source range, value a pick.</summary>
+        double SweatMaxLitresPerHour = 1.5,
+        /// <summary>Litres of water one thirst point stands for; 80 points a day is about 2.5-3 L. Pick.</summary>
+        double LitresPerThirstPoint = 0.035,
+        /// <summary>Thirst from which dehydration begins to weaken the cooling of sweat. Estimate.</summary>
+        double SweatFailThirstStart = 60.0,
+        /// <summary>Thirst at which sweat no longer cools. Estimate.</summary>
+        double SweatFailThirstEnd = 100.0,
+        /// <summary>Time constant in hours with which stored heat follows its target. Estimate.</summary>
+        double HeatLoadTimeConstantHours = 1.0,
+        /// <summary>Highest stored heat in °C. Design cap.</summary>
+        double HeatLoadMax = 8.0,
+        /// <summary>Core temperature excess (°C over baseline, body temperature delta plus stored heat) from which heatstroke can kill; heatstroke is defined at about 40-40.5 °C core (about 3 over 37). Source, value a pick.</summary>
+        double HeatstrokeOnsetC = 3.0,
+        /// <summary>Core temperature excess at which the heatstroke risk is at its maximum. Estimate.</summary>
+        double HeatstrokeFullC = 4.5,
+        /// <summary>Heatstroke death risk per hour at full excess; exceeds the general mortality cap of 0.01. Estimate.</summary>
+        double HeatstrokeMaxRiskPerHour = 0.05,
+        /// <summary>Relative rise of the heatstroke risk per year of age over 50. Estimate.</summary>
+        double HeatstrokeAgeRiskPerYearOver50 = 0.03)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
@@ -738,7 +764,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Hours toward the next injury-healing day. <c>null</c> in older saves.</summary>
         double? InjuryAccumulatorHours = null,
         /// <summary>Hours toward the next postpartum day. <c>null</c> in older saves.</summary>
-        double? PostpartumAccumulatorHours = null);
+        double? PostpartumAccumulatorHours = null,
+        /// <summary>Heat stored by work and warm air, °C above the body's own temperature (see <see cref="HeatMath"/>). <c>null</c> in older saves, read as 0.</summary>
+        double? HeatLoad = null);
 
     /// <summary>
     /// The physiology engine — first stage of the per-character tick pipeline. Advances

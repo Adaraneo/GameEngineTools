@@ -39,6 +39,9 @@ namespace GameEngineTools.World.Weather
         /// <summary>Hours after solar noon at which the day is warmest, on a 24-hour clock; 2, my pick (the afternoon maximum falls at 14-15 h).</summary>
         public double DiurnalPeakAfterNoonHours { get; set; } = 2.0;
 
+        /// <summary>Share of the day's outdoor swing that reaches the air inside a building (0 = constant at the daily mean, 1 = same as outdoors); 0.5, my pick for a masonry or timber house.</summary>
+        public double IndoorSwingFraction { get; set; } = 0.5;
+
         /// <summary>Chance that a dry day is followed by a wet one; 0.25, my pick (no Central European value found).</summary>
         public double ProbWetAfterDry { get; set; } = 0.25;
 

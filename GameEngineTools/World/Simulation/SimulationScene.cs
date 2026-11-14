@@ -287,7 +287,7 @@ namespace GameEngineTools.World.Simulation
                 }
 
                 foreach (var character in chars)
-                    character.SetAmbientContext(airNow, celestial);
+                    character.SetAmbientContext(AirAround(character, airNow, celestial.BaseAmbientTempCelsius), celestial);
 
                 _options.CropGrowth?.Tick(now, celestial.BaseAmbientTempCelsius,
                     at => _celestialComputer.ComputeFor(at, _astroConfig!, _universeObjects).BaseAmbientTempCelsius
@@ -545,6 +545,15 @@ namespace GameEngineTools.World.Simulation
                 var lod = _options.ResolveCharacterLod?.Invoke(c) ?? _options.DefaultCharacterLod;
                 _lodRuntime.Set(c.Id, lod);
             }
+        }
+
+        /// <summary>Air around a character: the outdoor hour's temperature, or with generated weather on, the damped one inside a building (terrain Indoor).</summary>
+        private double AirAround(IHuman character, double outdoorNow, double dailyMean)
+        {
+            if (_weather is null || _options.LocationService is not { } locations) return outdoorNow;
+            var id = locations.GetLocation(character.Id);
+            if (id is null || locations.GetDescriptor(id)?.Terrain != GameEngineTools.World.Location.TerrainType.Indoor) return outdoorNow;
+            return GameEngineTools.World.Weather.AmbientTemperatureModel.Indoor(dailyMean, outdoorNow, _weather.Config.IndoorSwingFraction);
         }
 
         /// <summary>

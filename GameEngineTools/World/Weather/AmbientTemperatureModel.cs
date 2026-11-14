@@ -23,5 +23,9 @@ namespace GameEngineTools.World.Weather
             var peak = noon + peakAfterNoonHours;
             return dailyMeanC + 0.5 * rangeC * Math.Cos(2.0 * Math.PI * (hourOfDay - peak) / hoursPerDay);
         }
+
+        /// <summary>Air inside a building: the daily mean plus <paramref name="swingFraction"/> of how far the outdoor air is from it.</summary>
+        public static double Indoor(double dailyMeanC, double outdoorNowC, double swingFraction)
+            => dailyMeanC + swingFraction * (outdoorNowC - dailyMeanC);
     }
 }
