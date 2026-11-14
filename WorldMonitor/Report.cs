@@ -281,6 +281,12 @@ namespace WorldMonitor
 
             if (limits.MaxDeaths is { } maxDeaths)
                 checks.Add(new Check("deaths", c.Deaths <= maxDeaths, $"{c.Deaths} (limit {maxDeaths})"));
+            // Deaths in the first days of a run point at a bug or a start-up artefact; later ones are results to read against demographics, not failures.
+            if (limits.MaxEarlyDeaths is { } maxEarly)
+            {
+                var early = c.DeathLog.Count(d => d.Day < limits.EarlyDeathDays);
+                checks.Add(new Check($"deaths in the first {limits.EarlyDeathDays:F0} days", early <= maxEarly, $"{early} (limit {maxEarly}); {c.Deaths} deaths in all"));
+            }
 
             return checks;
         }

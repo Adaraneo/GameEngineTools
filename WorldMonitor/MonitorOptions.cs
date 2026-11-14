@@ -10,7 +10,7 @@ namespace WorldMonitor
     public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0, bool Seasons = false, int? Seed = null, string? WorldDb = null, bool Barter = false, string? CharacterLod = null, string? Planet = null);
 
     /// <summary>Pass/fail limits; a missing value means the check is not made.</summary>
-    public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80, double HungerLevel = 80);
+    public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, int? MaxEarlyDeaths = null, double EarlyDeathDays = 10, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80, double HungerLevel = 80);
 
     /// <summary>The <c>WorldMonitor</c> section of appsettings.json, with command-line overrides applied.</summary>
     public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null, bool Barter = false, int? Seed = null, int FarmPeriodDays = 30, CognitiveResolutionLevel Lod = CognitiveResolutionLevel.Nearby, string? Planet = null, IReadOnlyList<string>? ConfigOverrides = null)
