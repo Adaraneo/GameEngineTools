@@ -312,5 +312,11 @@ namespace GameEngineTools.World.Simulation
         /// temperature once per substep so sown fields collect heat and stored grain wears down.
         /// </summary>
         public GameEngineTools.World.Objects.Crops.CropGrowthService? CropGrowth { get; init; }
+
+        /// <summary>Settings of the generated weather; used when <see cref="GameEngineTools.World.Weather.WeatherConfig.Enabled"/> and <see cref="AstroConfig"/> are both set. Null or disabled keeps the plain seasonal temperature.</summary>
+        public GameEngineTools.World.Weather.WeatherConfig? Weather { get; init; }
+
+        /// <summary>Seed of the weather when <see cref="GameEngineTools.World.Weather.WeatherConfig.Seed"/> is null.</summary>
+        public int WeatherSeed { get; init; }
     }
 }

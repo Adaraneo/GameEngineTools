@@ -36,6 +36,9 @@ namespace GameEngineTools.World.Weather
         /// <summary>Daily temperature range on a wet day (degC); 6, my pick.</summary>
         public double DiurnalRangeWetC { get; set; } = 6.0;
 
+        /// <summary>Hours after solar noon at which the day is warmest, on a 24-hour clock; 2, my pick (the afternoon maximum falls at 14-15 h).</summary>
+        public double DiurnalPeakAfterNoonHours { get; set; } = 2.0;
+
         /// <summary>Chance that a dry day is followed by a wet one; 0.25, my pick (no Central European value found).</summary>
         public double ProbWetAfterDry { get; set; } = 0.25;
 

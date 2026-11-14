@@ -15,6 +15,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Narrative;
     using GameEngineTools.Universe;
     using GameEngineTools.World.Core.Astro;
+    using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>
@@ -66,6 +67,9 @@ namespace GameEngineTools.World.Simulation
 
         /// <summary>Astronomy config — non-null exactly when <see cref="_celestialComputer"/> is non-null.</summary>
         private readonly AstroConfig? _astroConfig;
+
+        /// <summary>Generated weather; null when disabled, so the temperature stays the plain seasonal curve.</summary>
+        private readonly GameEngineTools.World.Weather.WeatherGenerator? _weather;
 
         /// <summary>Phase 2 planetary objects — null if <c>UniverseConfig</c> is not set.</summary>
         private readonly (StarPhysics Star, OrbitalElements Orbit, PlanetConfig Planet)? _universeObjects;
@@ -140,6 +144,9 @@ namespace GameEngineTools.World.Simulation
             {
                 _astroConfig = astroCfg;
                 _celestialComputer = new CelestialContextComputer(new SunModel());
+
+                if (options.Weather is { Enabled: true } weatherCfg)
+                    _weather = GameEngineTools.World.Weather.WeatherGenerator.ForWorld(weatherCfg, weatherCfg.Seed ?? options.WeatherSeed, astroCfg.VernalPhase);
             }
 
             if (options.UniverseConfig is { } uc)
@@ -266,11 +273,25 @@ namespace GameEngineTools.World.Simulation
             {
                 var celestial = _celestialComputer.ComputeWithTrend(now, _astroConfig!, _universeObjects);
 
+                // With weather on, the day's mean is the seasonal curve plus the day's anomaly and the characters feel the hour's temperature; crops keep the daily mean.
+                var airNow = celestial.BaseAmbientTempCelsius;
+                if (_weather is not null)
+                {
+                    var spec = WWorld.Spec;
+                    var weather = _weather.Get(string.Empty, now.WorldTicks / spec.TicksPerDay);
+                    var mean = celestial.BaseAmbientTempCelsius + weather.TemperatureAnomalyC;
+                    var hour = now.WorldTicks % spec.TicksPerDay / (double)spec.TicksPerHour;
+                    airNow = GameEngineTools.World.Weather.AmbientTemperatureModel.Outdoor(
+                        mean, weather.DiurnalRangeC, hour, celestial.SolarNoonHour, spec.HoursPerDay, spec.FromClock24(_weather.Config.DiurnalPeakAfterNoonHours));
+                    celestial = celestial with { BaseAmbientTempCelsius = mean };
+                }
+
                 foreach (var character in chars)
-                    character.SetAmbientContext(celestial.BaseAmbientTempCelsius, celestial);
+                    character.SetAmbientContext(airNow, celestial);
 
                 _options.CropGrowth?.Tick(now, celestial.BaseAmbientTempCelsius,
-                    at => _celestialComputer.ComputeFor(at, _astroConfig!, _universeObjects).BaseAmbientTempCelsius);
+                    at => _celestialComputer.ComputeFor(at, _astroConfig!, _universeObjects).BaseAmbientTempCelsius
+                        + (_weather?.Get(string.Empty, at.WorldTicks / WWorld.Spec.TicksPerDay).TemperatureAnomalyC ?? 0.0));
             }
 
             _options.LocationService?.DispatchContextEvents(now, chars, forceAll: now == startTime);

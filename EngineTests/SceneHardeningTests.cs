@@ -13,6 +13,7 @@ namespace EngineTests
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -31,6 +32,36 @@ namespace EngineTests
                 TickStep = tickStep,
             };
             return new SimulationScene(clock, options, ServiceProvider.GetRequiredService<ICognitiveResolutionLevelRuntime>());
+        }
+
+        private List<double> AirThroughOneDay(GameEngineTools.World.Weather.WeatherConfig? weather)
+        {
+            var clock = new SystemClock(ServiceProvider.GetRequiredService<IWorldClock>(), ServiceProvider.GetRequiredService<WorldTimeSpec>());
+            clock.SetNow(WDateTime.New(WDateOnly.New(100, 4, 1)));
+            var person = CharacterManager.RandomizePerson(maxAge: 35, sexBiology: null, minAge: 18);
+            var air = new List<double>();
+            var options = new SimulationSceneOptions
+            {
+                Characters = new List<IHuman> { person },
+                AstroConfig = new GameEngineTools.World.Core.Astro.AstroConfig(Sun: new GameEngineTools.World.Core.Astro.SunParamsConfig(), LatitudeDeg: 50.0, LongitudeDeg: 0.0, BaseTemperatureCelsius: 11.0, SeasonalAmplitudeCelsius: 9.0, VernalPhase: 0.0),
+                Weather = weather,
+                WeatherSeed = 3,
+                SimulationDays = 1,
+                TickStep = WTimeSpan.FromHours(1),
+                OnTick = (_, chars) => air.Add(chars[0].Snapshot.AmbientTemperature),
+            };
+            new SimulationScene(clock, options, ServiceProvider.GetRequiredService<ICognitiveResolutionLevelRuntime>()).RunAsync().GetAwaiter().GetResult();
+            return air;
+        }
+
+        [TestMethod]
+        public void GeneratedWeather_GivesADayAndNightSwing_AndOffKeepsThePlainSeasonalCurve()
+        {
+            var off = AirThroughOneDay(null);
+            var on = AirThroughOneDay(new GameEngineTools.World.Weather.WeatherConfig { Enabled = true });
+
+            Assert.IsTrue(off.Max() - off.Min() < 0.5, "Without weather the air only follows the season.");
+            Assert.IsTrue(on.Max() - on.Min() > 4.0, "With weather the day is warmer than the night (the wet-day range is 6 degC, the dry 10).");
         }
 
         [TestMethod]

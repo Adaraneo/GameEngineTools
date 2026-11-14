@@ -39,6 +39,30 @@ namespace GameEngineTools.World.Weather
         {
         }
 
+        /// <summary>The settings this generator was built with.</summary>
+        public WeatherConfig Config => _cfg;
+
+        /// <summary>Creates the generator for the configured world calendar; days before the calendar's epoch are read a whole number of years later, as the astronomical context does.</summary>
+        public static WeatherGenerator ForWorld(WeatherConfig cfg, int seed, double vernalPhase)
+        {
+            var calendar = global::GameEngineTools.World.Core.Time.WWorld.Spec.Calendar;
+            var yearOne = (int)calendar.DaysInYear(1);
+            return new WeatherGenerator(cfg, seed, day =>
+            {
+                var shiftYears = 0L;
+                var shifted = day;
+                while (shifted < 0)
+                {
+                    shifted += yearOne;
+                    shiftYears++;
+                }
+
+                var (year, _, _) = calendar.DateFromDays(shifted);
+                var start = calendar.DaysFromDate(year, 1, 1);
+                return new YearPosition(year - shiftYears, (int)(shifted - start), (int)calendar.DaysInYear(year));
+            }, vernalPhase);
+        }
+
         /// <summary>Where a world day falls in its year: the year number, the day of that year and the days that year has.</summary>
         public readonly record struct YearPosition(long Year, int DayOfYear, int DaysInYear);
 

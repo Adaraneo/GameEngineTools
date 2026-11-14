@@ -371,6 +371,7 @@ var mainCharactersSceneOpts = new SimulationSceneOptions
     WriteBuffer = writeBuffer,
     RespawnScheduler = objectRespawner,
     CropGrowth = runtime.Services.GetService<GameEngineTools.World.Objects.Crops.CropGrowthService>(),
+    Weather = runtime.Services.GetService<Microsoft.Extensions.Options.IOptions<GameEngineTools.World.Weather.WeatherConfig>>()?.Value,
     DefaultCharacterLod = CognitiveResolutionLevel.Nearby,
     ResolveCharacterLod = character => SceneCharacterLodResolver.Resolve(character, playerPerson.Id, locationService, new HashSet<HumanId>
     {

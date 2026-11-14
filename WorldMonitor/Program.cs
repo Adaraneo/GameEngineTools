@@ -77,6 +77,8 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
         WriteBuffer = world.WriteBuffer,
         RespawnScheduler = world.Respawn,
         CropGrowth = runtime.Services.GetService<GameEngineTools.World.Objects.Crops.CropGrowthService>(),
+        Weather = runtime.Services.GetService<Microsoft.Extensions.Options.IOptions<GameEngineTools.World.Weather.WeatherConfig>>()?.Value,
+        WeatherSeed = options.Seed ?? 0,
         OnTick = (now, characters) =>
         {
             world.Orchestrator.OnTick(now, characters);
@@ -85,6 +87,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
         },
     };
 
+    Console.WriteLine(sceneOptions.Weather is { Enabled: true } && sceneOptions.AstroConfig is not null ? "Weather: on" : "Weather: off");
     new SimulationScene(world.Clock, sceneOptions, world.Lod).RunAsync().GetAwaiter().GetResult();
 }
 }

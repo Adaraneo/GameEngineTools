@@ -151,6 +151,7 @@ namespace WorldObserver.Simulation
                 WriteBuffer = ctx.WriteBuffer,
                 RespawnScheduler = ctx.Respawn,
                 CropGrowth = runtime.Services.GetService<GameEngineTools.World.Objects.Crops.CropGrowthService>(),
+                Weather = runtime.Services.GetService<Microsoft.Extensions.Options.IOptions<GameEngineTools.World.Weather.WeatherConfig>>()?.Value,
                 NarrativeFormatter = new WorldObserver.Narrative.WorldObserverNarrativeFormatter(),
                 ResolveCharacter = id => names.TryGetValue(id, out var info)
                     ? info
