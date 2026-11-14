@@ -29,6 +29,6 @@ Newborns are counted but not added to the scene, as WorldObserver's own birth ha
 
 The food and water table gives per world day the mean hunger and thirst, the share of readings at 80 or more, and the meals and drinks (committed Eat, EatStored and Drink actions) per character.
 
-The `Year` profile runs 360 days with seasons on and adds a farms table by 30-day period: grain in the food stores and seed bins, unthreshed sheaves, how many
+The `Year` profile runs 322 days (one Vigilia year) with seasons on and adds a farms table by 30-day period: grain in the food stores and seed bins, unthreshed sheaves, how many
 fields are in each stage (fallow, ploughed, sown, ripe, reaped), the jobs done (plough, sow, reap, thresh) and the hunger and meals of that period.
 Use it with a world made by `worldgen --farm-people N` for the number of characters you run.
