@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Crops;
+    using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using GameEngineTools.World.Work;
     using static ActionNames;
@@ -31,11 +32,15 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         private const double FarmerOnShiftBonus = 10.0;
         private const double HelperFactor = 0.9;
 
+        // Making the tool for a waiting job ranks a little under the job itself (a design pick).
+        private const double SupplyFactor = 0.85;
+
         // Too hungry to work; eating comes first.
         private const double MaxNeedFoodToWork = 70.0;
 
         private readonly CropConfig _config;
         private readonly WorkCatalog _catalog;
+        private readonly SupplyChain _chain;
 
         /// <param name="config">Crop settings.</param>
         /// <param name="catalog">The work catalog: ploughing, reaping and threshing need a tool of the class it names at the place or in hand.</param>
@@ -43,6 +48,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         {
             _config = config ?? CropConfig.Default;
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            _chain = new SupplyChain(catalog, new RecipeRegistry(catalog));
         }
 
         /// <inheritdoc/>
@@ -63,11 +69,24 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             var season = new FieldSeason(celestial.TemperatureTrendPerDay, snapshot.AmbientTemperature, context.Now.Year, seed);
 
             FieldTask? best = null;
+            FieldTask? lackingTool = null;
             foreach (var field in fields)
             {
-                if (FieldWork.Available(field.Field!, season, _config, _catalog) is { } task && HasToolFor(task, context) && (best is null || Utility(task) > Utility(best.Value)))
-                    best = task;
+                if (FieldWork.Available(field.Field!, season, _config, _catalog) is not { } task)
+                    continue;
+                if (HasToolFor(task, context))
+                {
+                    if (best is null || Utility(task) > Utility(best.Value))
+                        best = task;
+                }
+                else if (lackingTool is null || Utility(task) > Utility(lackingTool.Value))
+                {
+                    lackingTool = task;
+                }
             }
+
+            if (best is null && lackingTool is { } needsTool)
+                return SupplyTool(needsTool, context, snapshot.Schedule);
 
             if (best is not { } chosen)
                 return BehaviorNeedOutput.Empty;
@@ -80,6 +99,17 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 BehaviorDomain.Competence,
                 Tags: new[] { "FieldWork" });
 
+            return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
+        }
+
+        /// <summary>A job is waiting but its tool is missing: when a craft step here gets closer to such a tool (the tool itself, or what it is made from), offer that step, a little under the job.</summary>
+        private BehaviorNeedOutput SupplyTool(FieldTask task, BehaviorContext context, DailyScheduleState? schedule)
+        {
+            if (ToolClassOf(task) is not { } toolClass || _chain.NextStepForTool(toolClass, context.AvailableObjects!, context.HeldObjects) is not { } step)
+                return BehaviorNeedOutput.Empty;
+
+            var utility = Utility(task) * SupplyFactor + (IsOnShiftFor(task, schedule) ? FarmerOnShiftBonus : 0.0);
+            var candidate = new BehaviorCandidate(Process, utility, WTimeSpan.FromMinutes(step.DurationMinutes), BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" });
             return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
         }
 

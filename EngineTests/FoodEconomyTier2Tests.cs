@@ -22,6 +22,7 @@ namespace EngineTests
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
@@ -510,6 +511,59 @@ namespace EngineTests
             var shelf = provider.GetObjectsAt(Loc).Single(o => o.ShopId == "bakery");
             Assert.AreEqual("cheese", shelf.TypeId, "The cheese was relisted as shop stock.");
             Assert.IsNotNull(shelf.Price);
+        }
+
+        // ── Supply chain: a missing tool is made from what is here ──────────────────
+
+        private static GameEngineTools.World.Work.WorkCatalog SmithCatalog()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "GameEngineTools", "World", "Data", "Work")))
+                dir = dir.Parent;
+            var data = Path.Combine(dir!.FullName, "GameEngineTools", "World", "Data", "Work");
+            var types = File.ReadAllText(Path.Combine(data, "objecttypes.json")).Replace("\"types\": [", """
+                "types": [
+                  { "id": "smithy",   "category": "Ambient", "pickable": false, "weightGrams": 500000, "affordances": { "Production": 1.0 } },
+                  { "id": "furnace",  "category": "Ambient", "pickable": false, "weightGrams": 500000, "affordances": { "Production": 1.0 } },
+                  { "id": "iron_bar", "category": "Tool", "pickable": true, "parts": [ { "material": "iron", "volumeCm3": 300 } ] },
+                  { "id": "ore_lump", "category": "Tool", "pickable": true, "parts": [ { "material": "iron", "volumeCm3": 400 } ] },
+                """);
+            var tasks = File.ReadAllText(Path.Combine(data, "tasks.json")).Replace("\"tasks\": [", """
+                "tasks": [
+                  { "id": "forge_spade", "kind": "Craft", "inputs": [ { "item": "iron_bar", "qty": 1 } ], "output": { "item": "spade", "qty": 1 }, "durationMinutes": 60, "station": "smithy" },
+                  { "id": "smelt_bar", "kind": "Craft", "inputs": [ { "item": "ore_lump", "qty": 2 } ], "output": { "item": "iron_bar", "qty": 1 }, "durationMinutes": 120, "station": "furnace" },
+                """);
+            return GameEngineTools.World.Work.WorkCatalogLoader.Parse(File.ReadAllText(Path.Combine(data, "materials.json")), types, tasks);
+        }
+
+        [TestMethod]
+        public void FieldNeed_WithoutATool_OffersTheCraftStepHereThatGetsCloserToIt_UpToTwoLevelsDown()
+        {
+            var catalog = SmithCatalog();
+            var engine = new FieldWorkNeedEngine(catalog: catalog);
+            var self = new HumanId(Guid.NewGuid());
+            WorldObject Spawn(string typeId, string id, bool loose = false) => GameEngineTools.World.Work.WorkObjects.Spawn(catalog, typeId, id, Loc) with { IsPickable = loose };
+            var field = FieldObject(new FieldState(FieldStage.Fallow, 1.0));
+
+            BehaviorContext Ctx(params WorldObject[] objects)
+                => BehaviorComponentTestFactory.Context(selfId: self, hunger: 20, thirst: 5, now: new WDateTime(0)) with
+                {
+                    AvailableObjects = objects.Append(field).ToList(),
+                    HeldObjects = new List<WorldObject>(),
+                    HumanContext = FarmerContext(self, 0.1, 15.0),
+                };
+
+            var forge = engine.Evaluate(Ctx(Spawn("smithy", "smithy_1"), Spawn("iron_bar", "bar_1", loose: true))).Candidates.Single();
+            Assert.AreEqual(Process, forge.Name, "No spade, but a smithy and a bar are here: make the spade.");
+            Assert.AreEqual(WTimeSpan.FromMinutes(60), forge.Duration);
+            Assert.IsTrue(forge.Utility < 74.0, "Making the tool ranks under the ploughing itself.");
+
+            var smelt = engine.Evaluate(Ctx(Spawn("smithy", "smithy_1"), Spawn("furnace", "furnace_1"), Spawn("ore_lump", "ore_1", loose: true), Spawn("ore_lump", "ore_2", loose: true))).Candidates.Single();
+            Assert.AreEqual(WTimeSpan.FromMinutes(120), smelt.Duration, "No bar yet, but ore and a furnace: the step below the spade is smelting the bar.");
+
+            Assert.AreEqual(0, engine.Evaluate(Ctx(Spawn("smithy", "smithy_1"))).Candidates.Count, "Nothing to forge from: no candidate, as before.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(Spawn("furnace", "furnace_1"), Spawn("ore_lump", "ore_1", loose: true), Spawn("ore_lump", "ore_2", loose: true))).Candidates.Count, "The smithy that would use the bar is not here.");
+            Assert.AreEqual(Plough, engine.Evaluate(Ctx(Spawn("spade", "spade_1"), Spawn("smithy", "smithy_1"), Spawn("iron_bar", "bar_1", loose: true))).Candidates.Single().Name, "With a spade at hand the job itself is offered.");
         }
 
         // ── Field work ───────────────────────────────────────────────────────────────

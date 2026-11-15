@@ -143,6 +143,25 @@ namespace EngineTests
                 """{ "tasks": [ { "id": "make_pot", "kind": "Craft", "inputs": [ { "item": "clay_lump", "qty": 2 } ], "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120 } ] }"""));
         }
 
+        [TestMethod]
+        public void ABaker_WithoutFlour_MillsGrainFirstWhenTheMillIsHere_AndOtherwiseDoesNothing()
+        {
+            var dir = FindDataDir();
+            var catalog = WorkCatalogLoader.Parse(
+                File.ReadAllText(Path.Combine(dir, "materials.json")), File.ReadAllText(Path.Combine(dir, "objecttypes.json")), File.ReadAllText(Path.Combine(dir, "tasks.json")),
+                """{ "occupations": [ { "id": "baker", "tasks": [ "recipe_bread_from_flour" ] } ] }""");
+            var engine = new ContingencySearchEngine(catalog);
+            var oven = WorkObjects.Spawn(catalog, "oven", "oven_1", Loc);
+            var mill = WorkObjects.Spawn(catalog, "mill", "mill_1", Loc);
+            var grain = new List<WorldObject> { WorkObjects.CreateItem(catalog, "grain", Loc, new WDateTime(0), null), WorkObjects.CreateItem(catalog, "grain", Loc, new WDateTime(0), null) };
+
+            var withMill = engine.Evaluate(ShiftContext("baker", new List<WorldObject> { oven, mill }, grain));
+            var withoutMill = engine.Evaluate(ShiftContext("baker", new List<WorldObject> { oven }, grain));
+
+            Assert.IsTrue(withMill.Candidates.Any(c => c.Name == Process && c.Duration == WTimeSpan.FromMinutes(45)), "No flour, but grain and a mill here: the step below the loaf is milling.");
+            Assert.IsFalse(withoutMill.Candidates.Any(c => c.Name == Process), "No mill here and nothing sends the baker elsewhere.");
+        }
+
         private static string FindDataDir()
         {
             var dir = new DirectoryInfo(AppContext.BaseDirectory);

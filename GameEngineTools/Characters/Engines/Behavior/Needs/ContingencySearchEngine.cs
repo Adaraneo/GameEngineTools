@@ -95,6 +95,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
         private readonly WorkCatalog _catalog;
         private readonly RecipeRegistry _recipes;
+        private readonly SupplyChain _chain;
         private readonly EconomyConfig _economy;
 
         /// <summary>Creates the bridge over the work catalog (spoilage times, prices); the economy config defaults to its <c>Default</c> instance.</summary>
@@ -102,6 +103,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         {
             _catalog = catalog;
             _recipes = new RecipeRegistry(catalog);
+            _chain = new SupplyChain(catalog, _recipes);
             _economy = economy ?? EconomyConfig.Default;
         }
 
@@ -272,6 +274,23 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                    && _catalog.OccupationDoesKind(schedule.Occupation, TaskKind.Craft);
         }
 
+        /// <summary>On shift with no recipe of the occupation doable: a step that makes what one of its recipes lacks (depth of <see cref="SupplyChain.MaxDepth"/>), if the workstation for it is here.</summary>
+        private bool TryFindSupplyStep(BehaviorContext context, out Recipe? step)
+        {
+            var occupation = context.HumanContext.Snapshot.Schedule?.Occupation;
+            foreach (var goal in _recipes.All.Where(r => _catalog.OccupationDoes(occupation, r.Id)))
+            {
+                if (_chain.NextStepForInputs(goal, context.AvailableObjects!, context.HeldObjects) is { } found)
+                {
+                    step = found;
+                    return true;
+                }
+            }
+
+            step = null;
+            return false;
+        }
+
         private void AddShiftProduction(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
             if (TryFindSatisfiableRecipe(context.AvailableObjects!, context.HeldObjects, out var recipe, context.HumanContext.Snapshot.Schedule?.Occupation))
@@ -279,6 +298,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 candidates.Add(new BehaviorCandidate(
                     Process, ShiftProductionUtility, WTimeSpan.FromMinutes(recipe!.DurationMinutes),
                     BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy" }));
+            }
+
+            else if (TryFindSupplyStep(context, out var supply))
+            {
+                candidates.Add(new BehaviorCandidate(
+                    Process, ShiftProductionUtility - 1.0, WTimeSpan.FromMinutes(supply!.DurationMinutes),
+                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy", "Supply" }));
             }
 
             else if (HasRawProductionSite(context.AvailableObjects!))
@@ -426,7 +452,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 {
                     if (onlyForOccupation is not null && !_catalog.OccupationDoes(onlyForOccupation, candidate.Id))
                         continue; // not a task of this occupation
-                    if (CanSatisfy(candidate, availableObjects, heldObjects))
+                    if (SupplyChain.CanSatisfy(candidate, availableObjects, heldObjects))
                     {
                         recipe = candidate;
                         return true;
@@ -435,30 +461,6 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             }
             recipe = null;
             return false;
-        }
-
-        /// <summary>
-        /// All-or-nothing check that held + co-located items cover every <see cref="RecipeInput"/>,
-        /// counting each item toward at most one input line (mirrors <c>ProductionService</c>).
-        /// </summary>
-        private static bool CanSatisfy(
-            Recipe recipe,
-            IReadOnlyList<WorldObject> availableObjects,
-            IReadOnlyList<WorldObject>? heldObjects)
-        {
-            var pool = (heldObjects ?? Array.Empty<WorldObject>()).Concat(availableObjects.Where(o => o.IsPickable && o.Price is null));
-            var usedIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var input in recipe.Inputs)
-            {
-                var matched = pool
-                    .Where(o => string.Equals(o.TypeId, input.ItemId, StringComparison.Ordinal) && !usedIds.Contains(o.Id))
-                    .Take(input.Quantity)
-                    .ToList();
-                if (matched.Count < input.Quantity)
-                    return false;
-                foreach (var o in matched) usedIds.Add(o.Id);
-            }
-            return true;
         }
 
         #endregion Helpers
