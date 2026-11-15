@@ -1,9 +1,14 @@
 using System.Globalization;
+using System.Reflection;
 using GameEngineTools.World.Data;
 using WorldGen;
 using WorldGen.Generation;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+// Printed unconditionally, before arg parsing/errors too, as in TerraGen: a pasted bug report always names the build that produced it.
+var toolVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+Console.WriteLine($"WorldGen {toolVersion ?? "(neznámá verze)"}");
 // Keep console number formatting consistent with TerraGen's own fix — an ambient comma-decimal
 // locale (e.g. Czech) would otherwise print values that don't round-trip through the
 // InvariantCulture parsers this tool's own CLI args use.
