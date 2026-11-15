@@ -44,6 +44,24 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void WorldFromBeforeTheVitaminCColumns_GetsThemOnMigration_AndKeepsItsProfiles()
+        {
+            using var db = new SqliteWorldDatabase(":memory:");
+            db.ExecuteScript("""
+                CREATE TABLE WorldObjects (Id TEXT PRIMARY KEY, DisplayName TEXT NOT NULL);
+                CREATE TABLE NutritionalProfiles (ObjectId TEXT PRIMARY KEY REFERENCES WorldObjects(Id), CalorieGain REAL, ProteinGain REAL, IronGain REAL, VitaminDGain REAL, HydrationGain REAL);
+                INSERT INTO WorldObjects VALUES ('o1', 'Bread');
+                INSERT INTO NutritionalProfiles VALUES ('o1', 100, 5, 1, 0, 0);
+                """);
+            db.UserVersion = 6;
+
+            SchemaMigrator.Apply(db, SchemaMigrator.World);
+
+            Assert.IsTrue(db.HasColumn("NutritionalProfiles", "HemeIronFraction") && db.HasColumn("NutritionalProfiles", "VitaminCMilligrams"));
+            db.ExecuteScript("INSERT OR REPLACE INTO NutritionalProfiles (ObjectId, CalorieGain, HemeIronFraction, VitaminCMilligrams) VALUES ('o1', 100, 0.4, 12);");
+        }
+
+        [TestMethod]
         public void AtomicScript_WithAFailingStatement_AppliesNothing()
         {
             using var db = new SqliteWorldDatabase(":memory:");

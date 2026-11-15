@@ -37,6 +37,11 @@ namespace GameEngineTools.World.Data
                 db.AddColumnIfMissing("FieldStates", "ThreshHoursRemaining", "REAL NOT NULL DEFAULT 0.0");
                 db.AddColumnIfMissing("FieldStates", "ReapedYear", "INTEGER DEFAULT NULL");
             }),
+            new SchemaMigration(7, "NutritionalProfiles heme-iron fraction and vitamin C (added to the schema without a migration)", db =>
+            {
+                db.AddColumnIfMissing("NutritionalProfiles", "HemeIronFraction", "REAL DEFAULT NULL");
+                db.AddColumnIfMissing("NutritionalProfiles", "VitaminCMilligrams", "REAL DEFAULT NULL");
+            }),
         };
 
         /// <summary>Migrations of the terrain database (<c>terrain.db</c>).</summary>
