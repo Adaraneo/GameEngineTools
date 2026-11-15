@@ -148,6 +148,23 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
         #region Drift computation
 
+        /// <summary>
+        /// Hours of this tick during which a short consuming action (<c>Eat</c>, <c>EatStored</c>, <c>Drink</c>) is really going on. The plan reaches Physiology one step
+        /// after it is chosen (Physiology runs before Behavior), lasts its expected duration, and the decision that replaces it comes only at the next decision step, so
+        /// counting the whole step would make a ten minute drink worth a whole thirty minute step.
+        /// </summary>
+        internal static double ActionHours(GameEngineTools.Characters.Engines.Behavior.PlannedAction plan, WDateTime now, WTimeSpan dt, double h)
+        {
+            // The lag is however long Physiology took to see the plan, at most one step (a plan seen at its own start has none).
+            var lag = WTimeSpan.Min(dt, now > plan.Start ? now - plan.Start : WTimeSpan.Zero);
+            var from = plan.Start + lag;
+            var to = from + plan.ExpectedDuration;
+            var end = now + dt;
+            var lo = now > from ? now : from;
+            var hi = end < to ? end : to;
+            return Math.Clamp(WDateTime.Difference(hi, lo).TotalHours, 0.0, h);
+        }
+
         /// <summary>Activity factor of an action: 1 at rest, the task's exertion for field labour.</summary>
         internal static double ActivityOf(string? action, PhysiologyConfig config) => action switch
         {
@@ -293,6 +310,14 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var airC = ctx.Snapshot.AmbientTemperature;
             var waterDeficit = WaterMath.Deficit(s, Config);
             var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor, airC, waterDeficit);
+            if (action is Eat or EatStored or Drink && ctx.Snapshot.Behavior.CurrentPlan is { } consuming)
+            {
+                // Only the part of the step the action really lasts counts as eating or drinking; the rest of the step is an ordinary one.
+                var actionH = ActionHours(consuming, now, dt, h);
+                var rest = ComputeDrift(null, h - actionH, Config, null, immuneDecayFactor, airC, waterDeficit);
+                var part = ComputeDrift(action, actionH, Config, nutProfile?.HydrationGain, immuneDecayFactor, airC, waterDeficit);
+                drift = new PhysiologyDrift(part.Energy + rest.Energy, part.Hunger + rest.Hunger, part.Thirst + rest.Thirst, part.Pain + rest.Pain, part.Immune + rest.Immune);
+            }
             var newDeficit = Math.Clamp(waterDeficit + drift.Thirst * Config.LitresPerThirstPoint, 0.0, 0.2 * Config.BodyMassKg);
 
             // Stored heat follows what the sweat cannot carry away (thirst before this tick's drift, so a dry throat already weakens it).
