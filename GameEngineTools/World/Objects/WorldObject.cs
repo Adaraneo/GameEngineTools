@@ -179,6 +179,12 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public string? TypeId { get; init; } = null;
 
+        /// <summary>
+        /// What kind of item this is, as one string: the catalog type id when it has one, else the name of its legacy <see cref="PickupItemKind"/> (so existing food and grain keep working), else <c>null</c>.
+        /// Recipes and tasks name items by this id.
+        /// </summary>
+        public string? ItemId => TypeId ?? (ItemKind == PickupItemKind.None ? null : ItemKind.ToString());
+
         /// <summary>The character who owns this object, or <c>null</c> when it belongs to nobody (a shared tool, a fixture).</summary>
         public HumanId? OwnerId { get; init; } = null;
 

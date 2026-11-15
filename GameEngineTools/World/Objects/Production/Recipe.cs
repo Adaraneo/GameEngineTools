@@ -21,11 +21,15 @@ namespace GameEngineTools.World.Objects.Production
         string Id,
         string DisplayName,
         ImmutableArray<RecipeInput> Inputs,
-        PickupItemKind OutputKind,
+        string OutputItemId,
         string OutputDisplayName,
         int DurationMinutes,
-        string RequiredLocationType);
+        string RequiredLocationType)
+    {
+        /// <summary>The legacy item kind of the product, or <see cref="PickupItemKind.None"/> when the product is a catalog object type.</summary>
+        public PickupItemKind OutputKind => System.Enum.TryParse<PickupItemKind>(OutputItemId, ignoreCase: false, out var kind) ? kind : PickupItemKind.None;
+    }
 
-    /// <summary>One required input line of a <see cref="Recipe"/> (an item kind and a quantity).</summary>
-    public sealed record RecipeInput(PickupItemKind Kind, int Quantity);
+    /// <summary>One required input line of a <see cref="Recipe"/>: an item id (a legacy <see cref="PickupItemKind"/> name or a catalog object type id; see <see cref="WorldObject.ItemId"/>) and a quantity.</summary>
+    public sealed record RecipeInput(string ItemId, int Quantity);
 }

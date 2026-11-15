@@ -454,7 +454,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             foreach (var input in recipe.Inputs)
             {
                 var matched = pool
-                    .Where(o => o.ItemKind == input.Kind && !usedIds.Contains(o.Id))
+                    .Where(o => string.Equals(o.ItemId, input.ItemId, StringComparison.Ordinal) && !usedIds.Contains(o.Id))
                     .Take(input.Quantity)
                     .ToList();
                 if (matched.Count < input.Quantity)

@@ -45,6 +45,54 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void Process_ACatalogItemMadeFromCatalogItems_WorksLikeAFoodRecipe_WithWeightFromItsMaterials()
+        {
+            var catalog = GameEngineTools.World.Work.WorkCatalogLoader.Parse(
+                """{ "materials": [ { "id": "fired_clay", "class": "Clay", "densityKgM3": 1900 } ] }""",
+                """
+                { "types": [
+                  { "id": "clay_lump", "category": "Ambient", "pickable": true, "parts": [ { "material": "fired_clay", "volumeCm3": 500 } ] },
+                  { "id": "pot", "name": "Hrnec", "category": "Tool", "pickable": true, "parts": [ { "material": "fired_clay", "volumeCm3": 800 } ] } ] }
+                """,
+                """
+                { "tasks": [ { "id": "make_pot", "name": "Vypálit hrnec", "kind": "Craft", "inputs": [ { "item": "clay_lump", "qty": 2 } ],
+                               "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120, "location": "kiln" } ] }
+                """);
+            var provider = new MemProvider();
+            var svc = new ProductionService(provider, catalog);
+            var ctx = Ctx(out var self);
+            WorldObject Lump(string id) => GameEngineTools.World.Work.WorkObjects.Spawn(catalog, "clay_lump", id, Loc) with { IsPickable = true, HeldBy = self };
+            provider.AddObject(Lump("lump_1"));
+
+            Assert.IsNull(svc.Process(ctx, Loc, "pot", new WDateTime(0)), "One lump is not enough: nothing is made and nothing consumed.");
+            Assert.IsNotNull(provider.FindObject("lump_1"));
+
+            provider.AddObject(Lump("lump_2"));
+            var pot = svc.Process(ctx, Loc, "pot", new WDateTime(0));
+
+            Assert.IsNotNull(pot);
+            Assert.AreEqual("pot", pot!.TypeId);
+            Assert.AreEqual("pot", pot.ItemId);
+            Assert.AreEqual("Hrnec", pot.DisplayName);
+            Assert.AreEqual(self, pot.HeldBy);
+            Assert.IsTrue(pot.IsPickable);
+            Assert.AreEqual(1520, pot.WeightGrams, "800 cm3 of fired clay at 1.9 g/cm3.");
+            Assert.IsNull(provider.FindObject("lump_1"), "The inputs are consumed.");
+            Assert.IsNull(provider.FindObject("lump_2"));
+            Assert.ThrowsExactly<InvalidOperationException>(() => new ProductionService(provider).Produce(ctx, Loc, PickupItemKind.None, new WDateTime(0)), "An unknown product is refused instead of invented.");
+        }
+
+        [TestMethod]
+        public void TheItemId_IsTheTypeWhenThereIsOne_ElseTheLegacyKind()
+        {
+            WorldObject Obj(PickupItemKind kind, string? type = null) => new() { Id = "o", DisplayName = "o", Category = WorldObjectCategory.Food, LocationId = Loc, ItemKind = kind, TypeId = type };
+
+            Assert.AreEqual("Grain", Obj(PickupItemKind.Grain).ItemId);
+            Assert.AreEqual("spade", Obj(PickupItemKind.Tool, "spade").ItemId);
+            Assert.IsNull(Obj(PickupItemKind.None).ItemId);
+        }
+
+        [TestMethod]
         public void Process_WithEnoughInputs_ConsumesInputsAndYieldsOutput()
         {
             var provider = new MemProvider();

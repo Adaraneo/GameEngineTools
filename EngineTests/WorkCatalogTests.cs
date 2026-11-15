@@ -108,15 +108,15 @@ namespace EngineTests
             Assert.AreEqual("Mouka", flour.OutputDisplayName);
             Assert.AreEqual(45, flour.DurationMinutes);
             Assert.AreEqual("mill", flour.RequiredLocationType);
-            Assert.AreEqual(new RecipeInput(PickupItemKind.Grain, 2), flour.Inputs.Single());
+            Assert.AreEqual(new RecipeInput("Grain", 2), flour.Inputs.Single());
 
             var bread = RecipeRegistry.FindByOutput(PickupItemKind.Bread)!;
             Assert.AreEqual((90, "bakery", "Čerstvý chléb"), (bread.DurationMinutes, bread.RequiredLocationType, bread.OutputDisplayName));
-            Assert.AreEqual(new RecipeInput(PickupItemKind.Flour, 1), bread.Inputs.Single());
+            Assert.AreEqual(new RecipeInput("Flour", 1), bread.Inputs.Single());
 
             var cheese = RecipeRegistry.FindByOutput(PickupItemKind.Cheese)!;
             Assert.AreEqual((180, "dairy", "Čerstvý sýr"), (cheese.DurationMinutes, cheese.RequiredLocationType, cheese.OutputDisplayName));
-            Assert.AreEqual(new RecipeInput(PickupItemKind.Milk, 2), cheese.Inputs.Single());
+            Assert.AreEqual(new RecipeInput("Milk", 2), cheese.Inputs.Single());
             Assert.AreEqual(3, RecipeRegistry.All.Count());
         }
 
