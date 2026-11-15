@@ -252,6 +252,15 @@ namespace GameEngineTools.World.Objects
         /// <summary>Flushes any buffered mutations so shutting the host down does not lose the last substep.</summary>
         public void Dispose() => Flush();
 
+        /// <summary>Drops every buffered write without applying it (the database is about to be replaced).</summary>
+        public void Discard()
+        {
+            lock (_lock)
+            {
+                _pending.Clear();
+            }
+        }
+
         #endregion Flush
     }
 }

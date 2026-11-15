@@ -2,6 +2,7 @@
 // Copyright (c) 50PSoftware
 
 using GameEngineTools.World.Utils.Time;
+using System;
 
 namespace GameEngineTools.World.Core.Time
 {
@@ -16,5 +17,8 @@ namespace GameEngineTools.World.Core.Time
 
         /// <summary>Stops the clock.</summary>
         void Stop();
+
+        /// <summary>Sets the current world time (a reset to the start of the world). Clocks that cannot be set refuse.</summary>
+        void SetNow(WDateTime now) => throw new NotSupportedException("This clock cannot be set.");
     }
 }

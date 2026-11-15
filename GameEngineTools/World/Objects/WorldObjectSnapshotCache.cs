@@ -87,6 +87,13 @@ namespace GameEngineTools.World.Objects
 
         #region Cache management
 
+        /// <summary>Forgets everything read so far (the database content was replaced); the next <see cref="Refresh"/> reads it again.</summary>
+        public void Invalidate()
+        {
+            _snapshot = new Dictionary<string, IReadOnlyList<WorldObject>>(StringComparer.Ordinal);
+            _heldObjects = new List<WorldObject>();
+        }
+
         /// <summary>
         /// Rebuilds the snapshot for the given set of active location IDs.
         /// Call once at the start of each simulation substep, before any character ticks.

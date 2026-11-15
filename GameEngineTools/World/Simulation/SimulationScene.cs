@@ -91,7 +91,8 @@ namespace GameEngineTools.World.Simulation
 
         /// <summary>When set, the live character list is cleared at the next substep boundary (world replace).</summary>
         private bool _resetRequested;
-        private bool _initialStateRequested;
+        private WorldResetScope _resetScope;
+        private WDateTime? _sceneStart;
 
         #endregion Privátní pole
 
@@ -211,17 +212,33 @@ namespace GameEngineTools.World.Simulation
             }
         }
 
+        /// <summary>Shorthand for <c>Reset(WorldResetScope.Characters)</c>.</summary>
+        public void ResetCharactersToInitialState() => Reset(WorldResetScope.Characters);
+
         /// <summary>
-        /// Requests that every character return to the state it had after generation (<see cref="IHuman.ResetToInitialState"/>) at the next step boundary:
-        /// engines, identity, inbox, scheduled events and a running sleep; the dead are alive again and every character is moved to its home.
-        /// The world clock, the world objects and the orchestrator's own bookkeeping (call its <c>Reset()</c> from <see cref="SimulationSceneOptions.OnCharactersReset"/>) are not touched.
-        /// Thread-safe.
+        /// Requests a return to the state after generation at the next step boundary, for any combination of
+        /// <see cref="WorldResetScope.Characters"/> (engines, identity, inbox, scheduled events, sleep; the dead are alive again and every character stands at home),
+        /// <see cref="WorldResetScope.World"/> (the objects, from <see cref="SimulationSceneOptions.WorldBaseline"/>) and
+        /// <see cref="WorldResetScope.Time"/> (the world clock, back to where this scene started). Done in that order: time, world, characters.
+        /// Whatever the host keeps itself (the orchestrator Reset(), ledgers) is reset from <see cref="SimulationSceneOptions.OnCharactersReset"/>.
+        /// Thread-safe; a request made before another is applied joins it.
         /// </summary>
-        public void ResetCharactersToInitialState()
+        /// <param name="scope">What to reset.</param>
+        /// <param name="allowInconsistentTime">
+        /// Resetting only the clock leaves the timestamps that characters and objects carry (plans, contacts, sowing and spoilage times) in the future, so it is refused unless
+        /// the characters and the world are reset with it; pass true to do it anyway.
+        /// </param>
+        /// <exception cref="ArgumentException">The world baseline is missing for a world reset, or the time reset is not allowed.</exception>
+        public void Reset(WorldResetScope scope, bool allowInconsistentTime = false)
         {
+            if (scope.HasFlag(WorldResetScope.World) && _options.WorldBaseline is null)
+                throw new ArgumentException("A world reset needs SimulationSceneOptions.WorldBaseline.", nameof(scope));
+            if (scope.HasFlag(WorldResetScope.Time) && !(scope.HasFlag(WorldResetScope.Characters) && scope.HasFlag(WorldResetScope.World)) && !allowInconsistentTime)
+                throw new ArgumentException("Resetting the clock alone leaves the timestamps of characters and objects in the future; reset characters and world with it, or pass allowInconsistentTime.", nameof(scope));
+
             lock (_addLock)
             {
-                _initialStateRequested = true;
+                _resetScope |= scope;
             }
         }
 
@@ -235,6 +252,7 @@ namespace GameEngineTools.World.Simulation
         private Task SimulateAsync(System.Threading.CancellationToken cancellationToken)
         {
             var startTime = _clock.Now;
+            _sceneStart ??= startTime;
             var endTime = _clock.Now.AddDays(_options.SimulationDays);
 
             while (_clock.Now < endTime)
@@ -404,18 +422,29 @@ namespace GameEngineTools.World.Simulation
                     _resetRequested = false;
                 }
 
-                if (_initialStateRequested)
+                if (_resetScope != WorldResetScope.None)
                 {
-                    _initialStateRequested = false;
+                    var scope = _resetScope;
+                    _resetScope = WorldResetScope.None;
+
+                    if (scope.HasFlag(WorldResetScope.Time) && _sceneStart is { } begin)
+                        _clock.SetNow(begin);
+                    if (scope.HasFlag(WorldResetScope.World))
+                        _options.WorldBaseline?.Reset();
+
                     var now = _clock.Now;
-                    foreach (var character in _characters)
+                    if (scope.HasFlag(WorldResetScope.Characters))
                     {
-                        character.ResetToInitialState(now);
-                        if (_options.LocationService is { } locations && character.Identity.HomeLocationId is { } home)
-                            locations.MoveCharacter(character.Id, home);
+                        foreach (var character in _characters)
+                        {
+                            character.ResetToInitialState(now);
+                            if (_options.LocationService is { } locations && character.Identity.HomeLocationId is { } home)
+                                locations.MoveCharacter(character.Id, home);
+                        }
+
+                        _deadCharacters.Clear();
                     }
 
-                    _deadCharacters.Clear();
                     _options.OnCharactersReset?.Invoke(now, _characters);
                 }
 

@@ -94,8 +94,11 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         public WTimeSpan? InternalSubstep { get; init; }
 
+        /// <summary>The generated world a <see cref="WorldResetScope.World"/> reset returns to; null when the host has none (then a world reset is refused).</summary>
+        public GameEngineTools.World.Data.IWorldBaseline? WorldBaseline { get; init; }
+
         /// <summary>
-        /// Called after <see cref="SimulationScene.ResetCharactersToInitialState"/> has reset the characters, before the next step: the place for a host to reset what it owns
+        /// Called after <see cref="SimulationScene.Reset"/> has reset what it was asked to, before the next step: the place for a host to reset what it owns
         /// (for example <c>DefaultSceneOrchestrator.Reset()</c>).
         /// </summary>
         public Action<WDateTime, IReadOnlyList<IHuman>>? OnCharactersReset { get; init; }

@@ -87,6 +87,22 @@ namespace GameEngineTools.World.Data
             Execute("PRAGMA foreign_keys=ON;");
         }
 
+        /// <summary>
+        /// Replaces the whole content of this database with that of another file (SQLite online backup: tables, schema version and rows; the connection stays open).
+        /// </summary>
+        /// <param name="sourcePath">The database file to copy from; it is opened read-only.</param>
+        public void ResetFrom(string sourcePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+            lock (_sync)
+            {
+                using var source = new SqliteConnection($"Data Source={sourcePath};Mode=ReadOnly;Pooling=false");
+                source.Open();
+                source.BackupDatabase(_connection);
+                Execute("PRAGMA foreign_keys=ON;");
+            }
+        }
+
         #endregion Construction
 
         #region World Object queries
