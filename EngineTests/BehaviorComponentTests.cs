@@ -117,6 +117,20 @@ namespace EngineTests
     public class PhysiologicalNeedsEngineTests : TestBase
     {
         [TestMethod]
+        public void Evaluate_DrinkAndMealLastAsLongAsTheNeedTakes()
+        {
+            WTimeSpan Duration(string name, double hunger, double thirst)
+                => new PhysiologicalNeedsEngine().Evaluate(BehaviorComponentTestFactory.Context(hunger: hunger, thirst: thirst)).Candidates.First(c => c.Name == name).Duration;
+
+            var cfg = new BehaviorConfig();
+            Assert.AreEqual((70.0 - cfg.DrinkTargetThirst) / cfg.DrinkRatePerHour * 60.0, Duration(Drink, 40, 70).TotalMinutes, 1e-6, "Thirst 70 down to the target at the default rate.");
+            Assert.IsTrue(Duration(Drink, 40, 90) > Duration(Drink, 40, 50), "A thirstier person drinks longer.");
+            Assert.AreEqual(cfg.DrinkMinMinutes, Duration(Drink, 40, 26).TotalMinutes, 1e-6, "Almost no need still takes a moment.");
+            Assert.AreEqual((40.0 - cfg.EatTargetHunger) / cfg.EatRatePerHour * 60.0, Duration(Eat, 40, 30).TotalMinutes, 1e-6);
+            Assert.AreEqual(cfg.EatMaxMinutes, Duration(Eat, 95, 30).TotalMinutes, 1e-6, "A meal never runs past the ceiling.");
+        }
+
+        [TestMethod]
         public void Evaluate_HungerAndThirst_CreatesFoodAndWaterCandidates()
         {
             var output = new PhysiologicalNeedsEngine().Evaluate(BehaviorComponentTestFactory.Context(hunger: 80, thirst: 70)); Assert.IsTrue(output.Candidates.Any(c => c.Name == Eat)); Assert.IsTrue(output.Candidates.Any(c => c.Name == Drink));

@@ -232,7 +232,25 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// World days after a sexual encounter during which neither partner invites again. Own estimate (not a literature value),
     /// set so that couples land near the ≈1 act/week of Twenge 2017 together with the readiness probability.
     /// </summary>
-    double SexualRefractoryDays = 3.0)
+    double SexualRefractoryDays = 3.0,
+
+    // ── How long eating and drinking take (docs/research/drinking-eating-rates.md) ──
+    /// <summary>Thirst at which a drink ends: people stop drinking at about 25 of 100 (Capitan-Jimenez and Aragon-Vargas 2022, Nutrients 14:4188, thirst at cessation 25 +/- 18 mm).</summary>
+    double DrinkTargetThirst = 25.0,
+    /// <summary>Thirst points per hour a drink removes when the object gives no value of its own; equal to <c>PhysiologyConfig.ThirstDrinkingGainPerHour</c> (a test keeps them equal). The same study: thirst 96 to 25 in 46.7 min is about 91 points/h.</summary>
+    double DrinkRatePerHour = 50.0,
+    /// <summary>Shortest drink in minutes. Pick.</summary>
+    double DrinkMinMinutes = 2.0,
+    /// <summary>Longest drink in minutes; the same study found 46.7 +/- 5 min until drinking stopped after 3.6 percent body-mass loss, so one hour covers it.</summary>
+    double DrinkMaxMinutes = 60.0,
+    /// <summary>Hunger at which a meal ends. Pick.</summary>
+    double EatTargetHunger = 20.0,
+    /// <summary>Hunger points per hour a meal removes; equal to the magnitude of <c>PhysiologyConfig.HungerEatingGainPerHour</c> (a test keeps them equal). Pick: a meal at hunger 40 ends in about 18 min, as the 11-20 min of self-reported lunches (YouGov US 2025, n=1106); timed lunches are eaten at 35-49 g/min (Woodward et al., PMC7146333).</summary>
+    double EatRatePerHour = 65.0,
+    /// <summary>Shortest meal in minutes. Pick.</summary>
+    double EatMinMinutes = 5.0,
+    /// <summary>Longest meal in minutes; 21-30 min is the longest class of self-reported dinners (YouGov 2025).</summary>
+    double EatMaxMinutes = 30.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }

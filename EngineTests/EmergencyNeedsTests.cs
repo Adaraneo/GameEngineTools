@@ -77,6 +77,8 @@ namespace EngineTests
             Assert.AreEqual(physiology.ThirstDriftAwakePerHour, behavior.ThirstRisePerHour);
             Assert.AreEqual(physiology.NaturalMortalityStarvationThreshold, behavior.LethalNeedLevel);
             Assert.AreEqual(physiology.NaturalMortalityDehydrationThreshold, behavior.LethalNeedLevel);
+            Assert.AreEqual(physiology.ThirstDrinkingGainPerHour, behavior.DrinkRatePerHour);
+            Assert.AreEqual(-physiology.HungerEatingGainPerHour, behavior.EatRatePerHour);
         }
     }
 }

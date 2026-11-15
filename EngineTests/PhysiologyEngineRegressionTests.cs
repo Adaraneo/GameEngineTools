@@ -74,9 +74,9 @@ namespace EngineTests
             // Očekávané snížení hladu: -40/h × 1h = -40
             // Tedy Hunger = 80 - 40 = 40
             // Kdyby byl aktivní i Handle, bylo by: 80 - 40 - 40 = 0 (bug)
-            var expectedHunger = 80.0 - 40.0;
+            var expectedHunger = 80.0 + new PhysiologyConfig().HungerEatingGainPerHour;
             Assert.AreEqual(expectedHunger, engine.State.Hunger, delta: 0.01,
-                "BUG-1 REGRESSION: Hlad musí klesat pouze jednou (-40/h). " +
+                "BUG-1 REGRESSION: Hlad musí klesat pouze jednou (jednou za hodinu). " +
                 "Dvojí aplikace by dala -80 za hodinu.");
         }
 

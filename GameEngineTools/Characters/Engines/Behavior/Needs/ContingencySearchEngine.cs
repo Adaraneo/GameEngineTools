@@ -134,7 +134,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     candidates.Add(new BehaviorCandidate(
                         EatStored,
                         BehaviorMath.Util(need, EatStoredWeight),
-                        WTimeSpan.FromMinutes(30), // same meal length as Eat, since Physiology relieves hunger by duration
+                        BehaviorMath.ConsumptionDuration(context.HumanContext.Snapshot.Physiology.Hunger, context.Config.EatTargetHunger, context.Config.EatRatePerHour, context.Config.EatMinMinutes, context.Config.EatMaxMinutes), // same meal length as Eat
                         BehaviorDomain.Physiological,
                         Tags: new[] { "FoodEconomy" }));
                 }

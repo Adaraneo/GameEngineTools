@@ -388,7 +388,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double EnergyDriftSelfCarePerHour = -0.5,
         double HungerDriftAwakePerHour = 6.0,
         double HungerDriftSleepPerHour = 2.0,   // slowed metabolism during sleep
-        double HungerEatingGainPerHour = -40.0, // negative: eating reduces hunger
+        double HungerEatingGainPerHour = -65.0, // negative: eating reduces hunger
         double ThirstDriftAwakePerHour = 5.0, // 5/h: about 7-8 drinks a day at 50/h per 15-minute drink (own estimate from ~2 L/day fluid intake)
         double ThirstDriftSleepPerHour = 2.0,
         double ThirstDrinkingGainPerHour = 50.0, // magnitude; negated in ComputeDrift

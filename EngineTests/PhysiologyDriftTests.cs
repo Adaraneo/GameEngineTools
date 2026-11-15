@@ -71,7 +71,7 @@ namespace EngineTests
         {
             var d = DefaultPhysiologyEngine.ComputeDrift(Eat, 1.0, Cfg, null, 1.0);
 
-            Assert.AreEqual(-40.0, d.Hunger, Tol, "Eating must reduce hunger.");
+            Assert.AreEqual(Cfg.HungerEatingGainPerHour, d.Hunger, Tol, "Eating must reduce hunger.");
             Assert.AreEqual(Cfg.ThirstDriftAwakePerHour, d.Thirst, Tol, "BUG-1: eating must NOT also consume thirst.");
             Assert.AreEqual(-2.0, d.Energy, Tol, "Eating is an awake action — energy still depletes.");
         }

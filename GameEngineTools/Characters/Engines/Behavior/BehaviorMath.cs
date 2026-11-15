@@ -24,6 +24,13 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
         internal static double Util(double need, double weight) => need * (0.5 + weight);
 
+        /// <summary>How long it takes to bring a need from its level down to its target at a given rate (points per hour), kept between a floor and a ceiling in minutes.</summary>
+        internal static GameEngineTools.World.Utils.Time.WTimeSpan ConsumptionDuration(double level, double target, double ratePerHour, double minMinutes, double maxMinutes)
+        {
+            var minutes = ratePerHour > 0.0 ? Math.Max(0.0, level - target) / ratePerHour * 60.0 : maxMinutes;
+            return GameEngineTools.World.Utils.Time.WTimeSpan.FromMinutes(Math.Clamp(minutes, minMinutes, maxMinutes));
+        }
+
         internal static double Clamp01p(double v) => Math.Clamp(v, 0, 100);
 
         internal static Dictionary<string, double> UpdateCooldowns(IReadOnlyDictionary<string, double>? cooldowns, double hours) => (cooldowns ?? new Dictionary<string, double>()).ToDictionary(kv => kv.Key, kv => Math.Max(0, kv.Value - hours));
