@@ -24,20 +24,27 @@ namespace GameEngineTools.World.Objects.Crops
     {
         private static readonly string[] Plain = { "pending", "no_pending", "workable", "rested", "sowing_weather", "seed_enough" };
 
-        /// <summary>Whether the condition is part of the vocabulary (a <c>stage:</c> condition must name real stages).</summary>
+        /// <summary>Whether the condition is part of the vocabulary (a <c>stage:</c> condition must name at least one real stage, by name, none empty).</summary>
         public static bool IsKnown(string condition)
         {
             if (condition.StartsWith("stage:", StringComparison.Ordinal))
-                return condition["stage:".Length..].Split('|').All(s => Enum.TryParse<FieldStage>(s, ignoreCase: false, out _));
+                return Stages(condition) is { Length: > 0 } stages && stages.All(s => s is not null);
             return Plain.Contains(condition);
         }
+
+        // The stages a condition names; an entry is null when it is not the name of a declared stage (empty, numeric text such as "5", or a typo). Numbers are refused because
+        // Enum.TryParse would accept them and define stages that the file never names.
+        private static FieldStage?[] Stages(string condition)
+            => condition["stage:".Length..].Split('|')
+                .Select(s => Enum.GetNames<FieldStage>().Contains(s, StringComparer.Ordinal) ? (FieldStage?)Enum.Parse<FieldStage>(s) : null)
+                .ToArray();
 
         /// <summary>Whether the condition holds for the field in the season.</summary>
         /// <exception cref="ArgumentException">The condition is not in the vocabulary.</exception>
         public static bool Holds(string condition, FieldState field, FieldSeason now, CropConfig cfg)
         {
             if (condition.StartsWith("stage:", StringComparison.Ordinal))
-                return condition["stage:".Length..].Split('|').Any(s => Enum.TryParse<FieldStage>(s, ignoreCase: false, out var stage) && field.Stage == stage);
+                return IsKnown(condition) ? Stages(condition).Any(s => s == field.Stage) : throw new ArgumentException($"Unknown field condition '{condition}'.", nameof(condition));
 
             return condition switch
             {

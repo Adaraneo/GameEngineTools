@@ -114,7 +114,8 @@ namespace GameEngineTools.World.Work
     {
         private readonly Dictionary<string, MaterialDefinition> _materials;
         private readonly Dictionary<string, ObjectTypeDefinition> _types;
-        private readonly Dictionary<string, TaskDefinition> _tasks = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, TaskDefinition> _tasksById = new(StringComparer.Ordinal);
+        private readonly List<TaskDefinition> _tasks = new();
 
         /// <summary>Builds and checks a catalog.</summary>
         /// <exception cref="FormatException">An id is duplicated or empty, a density or volume is not positive, a part names an unknown material, or a task is incomplete.</exception>
@@ -156,26 +157,28 @@ namespace GameEngineTools.World.Work
                 }
                 else
                 {
-                    if (string.IsNullOrWhiteSpace(task.Action)) throw new FormatException($"Task '{task.Id}': a field task needs the action it is carried out as.");
+                    if (string.IsNullOrWhiteSpace(task.Action) || !Enum.GetNames<GameEngineTools.World.Objects.Crops.FieldTask>().Contains(task.Action, StringComparer.Ordinal))
+                        throw new FormatException($"Task '{task.Id}': a field task needs the action it is carried out as ({string.Join(", ", Enum.GetNames<GameEngineTools.World.Objects.Crops.FieldTask>())}), not '{task.Action}'.");
                     if (task.Requires.Count == 0) throw new FormatException($"Task '{task.Id}': a field task needs at least one condition in 'requires'.");
                     foreach (var condition in task.Requires)
                         if (!GameEngineTools.World.Objects.Crops.FieldConditions.IsKnown(condition))
                             throw new FormatException($"Task '{task.Id}': unknown condition '{condition}'.");
                 }
 
-                if (!_tasks.TryAdd(task.Id, task)) throw new FormatException($"Duplicate task '{task.Id}'.");
+                if (!_tasksById.TryAdd(task.Id, task)) throw new FormatException($"Duplicate task '{task.Id}'.");
+                _tasks.Add(task);
             }
         }
 
-        /// <summary>All tasks.</summary>
-        public IReadOnlyCollection<TaskDefinition> Tasks => _tasks.Values;
+        /// <summary>All tasks, in the order of the file; where several could apply, the first decides.</summary>
+        public IReadOnlyList<TaskDefinition> Tasks => _tasks;
 
         /// <summary>The task with this id, or null.</summary>
-        public TaskDefinition? Task(string id) => _tasks.GetValueOrDefault(id);
+        public TaskDefinition? Task(string id) => _tasksById.GetValueOrDefault(id);
 
         /// <summary>The field task carried out as the given action (Plough, Sow, Reap, Thresh), or null.</summary>
         public TaskDefinition? FieldTaskFor(string action)
-            => _tasks.Values.FirstOrDefault(t => t.Kind == TaskKind.FieldWork && string.Equals(t.Action, action, StringComparison.Ordinal));
+            => _tasks.FirstOrDefault(t => t.Kind == TaskKind.FieldWork && string.Equals(t.Action, action, StringComparison.Ordinal));
 
         /// <summary>All materials.</summary>
         public IReadOnlyCollection<MaterialDefinition> Materials => _materials.Values;

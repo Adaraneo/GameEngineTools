@@ -267,5 +267,23 @@ namespace EngineTests
             Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse("""{ "materials": [] }""", """{ "types": [] }""",
                 """{ "tasks": [ { "id": "x", "kind": "FieldWork", "action": "Plough" } ] }"""));
         }
+        [TestMethod]
+        public void TheVocabularyIsStrict_NumbersEmptyNamesAndTyposAreRefused_AndTheFirstRowInTheFileDecides()
+        {
+            foreach (var bad in new[] { "stage:", "stage:5", "stage:Fallow|", "stage:|Fallow", "stage:fallow", "stage:Fallow|Frozen" })
+                Assert.IsFalse(FieldConditions.IsKnown(bad), bad);
+            Assert.IsTrue(FieldConditions.IsKnown("stage:Fallow|Reaped"));
+            Assert.ThrowsExactly<ArgumentException>(() => FieldConditions.Holds("stage:5", new FieldState(FieldStage.Ripe, 1.0), Summer(), Cfg));
+
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse("""{ "materials": [] }""", """{ "types": [] }""",
+                """{ "tasks": [ { "id": "x", "kind": "FieldWork", "action": "Plow", "requires": [ "workable" ] } ] }"""), "An action that is no FieldTask is refused at load.");
+
+            var catalog = WorkCatalogLoader.Parse("""{ "materials": [] }""", """{ "types": [] }""", """
+                { "tasks": [ { "id": "first", "kind": "FieldWork", "action": "Reap", "requires": [ "workable" ] },
+                             { "id": "second", "kind": "FieldWork", "action": "Thresh", "requires": [ "workable" ] } ] }
+                """);
+            Assert.AreEqual("first", catalog.Tasks[0].Id);
+            Assert.AreEqual(FieldTask.Reap, FieldWork.Available(new FieldState(FieldStage.Sown, 1.0), Summer(), Cfg, catalog), "Both match; the file order decides.");
+        }
     }
 }

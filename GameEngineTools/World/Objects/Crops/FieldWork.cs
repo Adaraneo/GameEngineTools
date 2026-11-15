@@ -36,7 +36,7 @@ namespace GameEngineTools.World.Objects.Crops
         private static readonly Lazy<WorkCatalog> BuiltIn = new(() => WorkCatalogLoader.Load());
 
         /// <summary>
-        /// The job the field can take now, or <c>null</c> when it has to wait (not ripe, wrong season, frozen ground, resting year, no seed). The first field task of the catalog whose
+        /// The job the field can take now, or <c>null</c> when it has to wait (not ripe, wrong season, frozen ground, resting year, no seed). The first field task in the order of the file whose
         /// conditions (<see cref="FieldConditions"/>, the <c>requires</c> of its row in <c>tasks.json</c>) all hold; the built-in conditions are written so that at most one task fits a field.
         /// </summary>
         /// <param name="catalog">The work catalog; <c>null</c> uses the one loaded from the files.</param>
@@ -44,9 +44,8 @@ namespace GameEngineTools.World.Objects.Crops
         {
             foreach (var task in (catalog ?? BuiltIn.Value).Tasks)
             {
-                if (task.Kind == TaskKind.FieldWork && task.Requires.Count > 0 && task.Requires.All(c => FieldConditions.Holds(c, field, now, cfg))
-                    && Enum.TryParse<FieldTask>(task.Action, ignoreCase: false, out var fieldTask))
-                    return fieldTask;
+                if (task.Kind == TaskKind.FieldWork && task.Requires.Count > 0 && task.Requires.All(c => FieldConditions.Holds(c, field, now, cfg)))
+                    return Enum.Parse<FieldTask>(task.Action!);
             }
 
             return null;
