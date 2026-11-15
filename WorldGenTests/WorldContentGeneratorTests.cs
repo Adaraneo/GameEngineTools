@@ -662,6 +662,29 @@ public class WorldContentGeneratorTests
     }
 
     [TestMethod]
+    public void Generate_Farms_PlaceTheHandToolsAsTypedObjects_OneOfEachPerFourPeople()
+    {
+        using var db = NewWorldDb();
+        var tiles = new[] { FlatTile(50.0) };
+        var options = new WorldContentGenerator.Options(
+            Count: 1, MinDistanceMeters: 10.0, ForcedTier: WorldContentGenerator.SettlementTier.Village,
+            GenerateProductionChain: true, FarmedPeople: 10);
+
+        WorldContentGenerator.Generate(db, tiles, options, new Random(55), Catalog);
+
+        var (descriptor, _) = db.GetAllLocations().Single();
+        var objects = db.GetAllObjectsAt(descriptor.Id);
+        var work = GameEngineTools.World.Work.WorkCatalogLoader.Load();
+        foreach (var typeId in new[] { "spade", "sickle", "flail" })
+        {
+            var tools = objects.Where(o => o.TypeId == typeId).ToList();
+            Assert.AreEqual(3, tools.Count, $"10 people need 3 of {typeId} (one per four).");
+            Assert.IsTrue(tools.All(o => o.Category == WorldObjectCategory.Tool && !o.IsPickable && o.OwnerId is null));
+            Assert.IsTrue(tools.All(o => o.WeightGrams == work.WeightGrams(typeId) && o.WeightGrams > 0), "The weight comes from the materials.");
+        }
+    }
+
+    [TestMethod]
     public void Generate_Farms_SizeFollowsTheFarmedPeopleAndTheUnitSize()
     {
         using var db = NewWorldDb();

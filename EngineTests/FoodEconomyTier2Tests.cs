@@ -640,6 +640,34 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void FieldNeed_WithACatalog_NeedsTheToolOfTheTaskAtTheFarmOrInHand_SowingNeedsNone()
+        {
+            var catalog = GameEngineTools.World.Work.WorkCatalogLoader.Load();
+            var engine = new FieldWorkNeedEngine(catalog: catalog);
+            var self = new HumanId(Guid.NewGuid());
+
+            BehaviorContext Ctx(List<WorldObject> objects, List<WorldObject>? held = null)
+                => BehaviorComponentTestFactory.Context(selfId: self, hunger: 20, thirst: 5, now: new WDateTime(0)) with
+                {
+                    AvailableObjects = objects,
+                    HeldObjects = held,
+                    HumanContext = FarmerContext(self, 0.1, 15.0),
+                };
+
+            WorldObject Tool(string typeId) => GameEngineTools.World.Work.WorkObjects.Spawn(catalog, typeId, typeId + "_1", Loc);
+            var bare = FieldObject(new FieldState(FieldStage.Fallow, 1.0));
+            var ripe = FieldObject(new FieldState(FieldStage.Ripe, 1.0));
+
+            Assert.AreEqual(0, engine.Evaluate(Ctx(new List<WorldObject> { bare })).Candidates.Count, "No spade: no ploughing.");
+            Assert.AreEqual(Plough, engine.Evaluate(Ctx(new List<WorldObject> { bare, Tool("spade") })).Candidates.Single().Name);
+            Assert.AreEqual(Plough, engine.Evaluate(Ctx(new List<WorldObject> { bare }, new List<WorldObject> { Tool("spade") })).Candidates.Single().Name, "A spade in hand counts.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(new List<WorldObject> { bare, Tool("sickle") })).Candidates.Count, "A sickle does not dig.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(new List<WorldObject> { ripe, Tool("spade") })).Candidates.Count, "No sickle: no reaping.");
+            Assert.AreEqual(Reap, engine.Evaluate(Ctx(new List<WorldObject> { ripe, Tool("sickle") })).Candidates.Single().Name);
+            Assert.AreEqual(Plough, new FieldWorkNeedEngine().Evaluate(Ctx(new List<WorldObject> { bare })).Candidates.Single().Name, "Without a catalog no tool is asked for.");
+        }
+
+        [TestMethod]
         public void ProductionSite_YieldMakesSeveralOutputsPerAction()
         {
             var provider = new MemProvider();

@@ -6,6 +6,7 @@ namespace EngineTests
     using GameEngineTools.World.Work;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
+    using System.IO;
     using System.Linq;
 
     /// <summary>The materials and object types: loading, checking, and the weight that follows from density and volume.</summary>
@@ -74,6 +75,27 @@ namespace EngineTests
 
             Assert.AreEqual(7870, catalog.WeightGrams("bar"));
             Assert.AreEqual(1, catalog.Types.Count(t => t.Id == "bar"));
+        }
+
+        [TestMethod]
+        public void TheSourceFilesCopies_AreIdenticalToTheBuiltInFiles_SoNothingIsShadowedWithAStaleVersion()
+        {
+            var root = new DirectoryInfo(AppContext.BaseDirectory);
+            while (root is not null && !Directory.Exists(Path.Combine(root.FullName, "GameEngineTools", "World", "Data", "Work")))
+                root = root.Parent;
+            if (root is null)
+                Assert.Inconclusive("The repository folders were not found next to the test binaries.");
+
+            foreach (var file in new[] { "materials.json", "objecttypes.json" })
+            {
+                var builtIn = File.ReadAllText(Path.Combine(root.FullName, "GameEngineTools", "World", "Data", "Work", file)).Replace("\r\n", "\n");
+                foreach (var project in new[] { "GameSandbox", "WorldObserver" })
+                {
+                    var copy = Path.Combine(root.FullName, project, "SourceFiles", "World", file);
+                    Assert.IsTrue(File.Exists(copy), $"{project}/SourceFiles/World/{file} is missing; copy it from GameEngineTools/World/Data/Work.");
+                    Assert.AreEqual(builtIn, File.ReadAllText(copy).Replace("\r\n", "\n"), $"{project}/SourceFiles/World/{file} differs from the built-in file; keep them identical.");
+                }
+            }
         }
     }
 }

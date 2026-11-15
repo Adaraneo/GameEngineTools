@@ -1,0 +1,25 @@
+// Object types of the work system. A world object in world.db stores only its typeId (plus owner, condition, place); everything here is read from this file.
+// parts: material id and volume in cm3; the weight is computed from the densities in materials.json. The volumes are my estimates, chosen so the computed weights fall in the usual range of the tool.
+// toolClasses: what the object can be used as, with a quality (1 is ordinary). durabilityHours: hours of use until worn out; leave out for an object that does not wear.
+{
+  "types": [
+    {
+      "id": "spade", "name": "Rýč", "category": "Tool", "pickable": true,
+      "parts": [ { "material": "ash_wood", "volumeCm3": 900 }, { "material": "iron", "volumeCm3": 180 } ],
+      "toolClasses": { "dig": 1.0 },
+      "source": "volumes estimated: a hand spade weighs about 1.5-2.5 kg"
+    },
+    {
+      "id": "sickle", "name": "Srp", "category": "Tool", "pickable": true,
+      "parts": [ { "material": "ash_wood", "volumeCm3": 120 }, { "material": "iron", "volumeCm3": 40 } ],
+      "toolClasses": { "cut_grain": 1.0 },
+      "source": "volumes estimated: a hand sickle weighs about 0.3-0.5 kg"
+    },
+    {
+      "id": "flail", "name": "Cep", "category": "Tool", "pickable": true,
+      "parts": [ { "material": "ash_wood", "volumeCm3": 1700 }, { "material": "leather", "volumeCm3": 40 } ],
+      "toolClasses": { "thresh": 1.0 },
+      "source": "volumes estimated: a threshing flail weighs about 1-1.5 kg"
+    }
+  ]
+}

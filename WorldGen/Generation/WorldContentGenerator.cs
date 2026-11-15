@@ -142,7 +142,9 @@ public static class WorldContentGenerator
         /// for the people it feeds (about 0.3 ha of crop a person a year), so a lightly populated world should set this lower.</summary>
         int? FarmedPeople = null,
         /// <summary>The grain-cycle settings the farms are built from (seed per hectare, size of a storage unit); defaults when <c>null</c>.</summary>
-        GameEngineTools.World.Objects.Crops.CropConfig? Crops = null);
+        GameEngineTools.World.Objects.Crops.CropConfig? Crops = null,
+        /// <summary>Materials and object types for the tools placed at farms; <c>null</c> loads the catalog files (disk override, else built in).</summary>
+        GameEngineTools.World.Work.WorkCatalog? Work = null);
 
     public sealed record Result(int LocationsPlaced, int ConnectionsCreated, int ObjectsCreated, string? CemeteryLocationId = null);
 
@@ -256,7 +258,7 @@ public static class WorldContentGenerator
         }
 
         if (options.GenerateProductionChain)
-            objectsCreated += AddFarms(worldDb, placed, options.FarmedPeople, options.Crops ?? new GameEngineTools.World.Objects.Crops.CropConfig());
+            objectsCreated += AddFarms(worldDb, placed, options.FarmedPeople, options.Crops ?? new GameEngineTools.World.Objects.Crops.CropConfig(), options.Work ?? GameEngineTools.World.Work.WorkCatalogLoader.Load());
 
         if (options.GenerateWorkplaces)
             objectsCreated += AddWorkplacesAndFurniture(worldDb, placed);
@@ -854,7 +856,10 @@ public static class WorldContentGenerator
         return 1;
     }
 
-    private static int AddFarms(SqliteWorldDatabase worldDb, List<Placed> placed, int? farmedPeople, CropConfig crops)
+    /// <summary>One spade, sickle and flail for this many people who farm (at least one of each); my pick, so the village can work its fields without everyone waiting for one tool.</summary>
+    private const int FarmedPeoplePerTool = 4;
+
+    private static int AddFarms(SqliteWorldDatabase worldDb, List<Placed> placed, int? farmedPeople, CropConfig crops, GameEngineTools.World.Work.WorkCatalog work)
     {
         var created = 0;
         foreach (var settlement in placed.Where(p => p.Tier is SettlementTier.Town or SettlementTier.Village))
@@ -872,6 +877,17 @@ public static class WorldContentGenerator
             worldDb.AddObject(GrainStores.CreateSeedBin(settlement.Id, (int)Math.Ceiling(seed * (1.0 + crops.SeedReserveMargin))));
             worldDb.AddObject(GrainStores.CreateFoodStore(settlement.Id, people * StartingMealsPerPerson));
             created += 4;
+
+            // The hand tools of the farm, shared and standing at the settlement; field work needs one of each class at hand.
+            var toolCount = Math.Max(1, (int)Math.Ceiling(people / (double)FarmedPeoplePerTool));
+            foreach (var typeId in new[] { "spade", "sickle", "flail" })
+            {
+                for (var i = 1; i <= toolCount; i++)
+                {
+                    worldDb.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(work, typeId, $"{settlement.Id}_{typeId}_{i:D2}", settlement.Id));
+                    created++;
+                }
+            }
         }
 
         return created;

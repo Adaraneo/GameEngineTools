@@ -11,6 +11,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Crops;
     using GameEngineTools.World.Utils.Time;
+    using GameEngineTools.World.Work;
     using static ActionNames;
 
     /// <summary>
@@ -34,8 +35,15 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         private const double MaxNeedFoodToWork = 70.0;
 
         private readonly CropConfig _config;
+        private readonly WorkCatalog? _catalog;
 
-        public FieldWorkNeedEngine(CropConfig? config = null) => _config = config ?? CropConfig.Default;
+        /// <param name="config">Crop settings.</param>
+        /// <param name="catalog">The work catalog; when given, ploughing, reaping and threshing need a tool of their class at the place or in hand. Without it no tool is asked for.</param>
+        public FieldWorkNeedEngine(CropConfig? config = null, WorkCatalog? catalog = null)
+        {
+            _config = config ?? CropConfig.Default;
+            _catalog = catalog;
+        }
 
         /// <inheritdoc/>
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
@@ -57,7 +65,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             FieldTask? best = null;
             foreach (var field in fields)
             {
-                if (FieldWork.Available(field.Field!, season, _config) is { } task && (best is null || Utility(task) > Utility(best.Value)))
+                if (FieldWork.Available(field.Field!, season, _config) is { } task && HasToolFor(task, context) && (best is null || Utility(task) > Utility(best.Value)))
                     best = task;
             }
 
@@ -74,6 +82,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
             return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
         }
+
+        /// <summary>The tool class a task needs, or null when it needs none (sowing is done from a seed bag by hand).</summary>
+        internal static string? ToolClassOf(FieldTask task) => task switch
+        {
+            FieldTask.Plough => ToolClasses.Dig,
+            FieldTask.Reap => ToolClasses.CutGrain,
+            FieldTask.Thresh => ToolClasses.Thresh,
+            _ => null,
+        };
+
+        private bool HasToolFor(FieldTask task, BehaviorContext context)
+            => _catalog is null || ToolClassOf(task) is not { } toolClass || WorkObjects.HasTool(_catalog, toolClass, context.AvailableObjects, context.HeldObjects);
 
         internal static string NameOf(FieldTask task) => task switch
         {
