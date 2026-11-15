@@ -64,6 +64,47 @@ public class WorldDatabaseServicePersistenceTests
     }
 
     [TestMethod]
+    public void AuthoredChanges_AreMirroredIntoTheGeneratedWorldFile_WhenThereIsOne()
+    {
+        var worldPath = Path.Combine(_tempDir, "world.db");
+        var genPath = Path.Combine(_tempDir, "world.gen.db");
+
+        using (var svc = new WorldDatabaseService())
+        {
+            svc.Open(genPath);
+            svc.InsertLocation(new LocationInfo("loc", "Location", "Lowlands", 1.0, 2.0, 3.0));
+        }
+
+        GameEngineTools.World.Data.WorldBaselineFiles.Publish(genPath, worldPath);
+
+        using (var svc = new WorldDatabaseService())
+        {
+            svc.Open(worldPath);
+            Assert.IsTrue(svc.MirrorsToGeneratedWorld, "A world.gen.db next to the world is mirrored into.");
+            svc.UpdateLocationPosition("loc", 10.0, 20.0, 30.0);
+            svc.InsertLocation(new LocationInfo("added", "Added", "Coast", 5.0, 6.0, 7.0));
+        }
+
+        foreach (var path in new[] { worldPath, genPath })
+        {
+            using var check = new WorldDatabaseService();
+            check.Open(path);
+            var moved = check.GetLocations().Single(l => l.Id == "loc");
+            Assert.AreEqual(10.0, moved.X, 1e-9, path);
+            Assert.IsTrue(check.GetLocations().Any(l => l.Id == "added"), path);
+        }
+    }
+
+    [TestMethod]
+    public void WithoutAGeneratedWorldFile_NothingIsMirrored()
+    {
+        using var svc = new WorldDatabaseService();
+        svc.Open(Path.Combine(_tempDir, "world.db"));
+
+        Assert.IsFalse(svc.MirrorsToGeneratedWorld);
+    }
+
+    [TestMethod]
     public void OpenBlank_FreshPath_StartsWithNoLocations()
     {
         var dbPath = Path.Combine(_tempDir, "blank_world.db");

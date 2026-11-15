@@ -29,6 +29,9 @@ public sealed class WorldDatabaseService : IDisposable
     private const string TerrainDatabaseFileName = "terrain.db";
 
     private SqliteWorldDatabase? _db;
+
+    // The generated-world file next to world.db (world.gen.db), when there is one: every authored change is made in it too, so a world reset does not undo the editing.
+    private SqliteWorldDatabase? _genDb;
     private SqliteWorldDatabase? _terrainDb;
 
     /// <summary>Bounds how many decoded tiles <see cref="_heightmapCache"/> holds at once — without
@@ -98,6 +101,7 @@ public sealed class WorldDatabaseService : IDisposable
         Close();
         _db = new SqliteWorldDatabase(path);
         WorldDatabaseSeeder.Initialize(_db);
+        OpenGeneratedWorldIfPresent(path);
         DatabasePath = path;
         CosmologyConfig = WorldSettingsLoader.TryLoadAstroConfig(path);
         PlanetConfig = WorldSettingsLoader.TryLoadUniverseConfig(path);
@@ -189,8 +193,24 @@ public sealed class WorldDatabaseService : IDisposable
         _db.ExecuteScript("DROP TABLE IF EXISTS TerrainHeightmap;");
     }
 
+    /// <summary>Opens world.gen.db next to the world file when it exists, so edits can be mirrored into it.</summary>
+    private void OpenGeneratedWorldIfPresent(string worldPath)
+    {
+        var genPath = WorldBaselineFiles.PathFor(worldPath);
+        if (!File.Exists(genPath) || string.Equals(Path.GetFullPath(genPath), Path.GetFullPath(worldPath), StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _genDb = new SqliteWorldDatabase(genPath);
+        WorldDatabaseSeeder.Initialize(_genDb);
+    }
+
+    /// <summary>Whether authored changes are also written to world.gen.db.</summary>
+    public bool MirrorsToGeneratedWorld => _genDb is not null;
+
     public void Close()
     {
+        _genDb?.Dispose();
+        _genDb = null;
         _db?.Dispose();
         _db = null;
         _terrainDb?.Dispose();
@@ -289,17 +309,20 @@ public sealed class WorldDatabaseService : IDisposable
             Y: info.Y,
             AltitudeMeters: info.AltitudeMeters);
         _db!.InsertLocation(descriptor, info.Region);
+        _genDb?.InsertLocation(descriptor, info.Region);
     }
 
     public bool UpdateLocationPosition(string locationId, double x, double y, double altitudeMeters)
     {
         RequireWorldOpen();
+        _genDb?.UpdateLocationPosition(locationId, x, y, altitudeMeters);
         return _db!.UpdateLocationPosition(locationId, x, y, altitudeMeters);
     }
 
     public bool UpdateLocationRegion(string locationId, string region)
     {
         RequireWorldOpen();
+        _genDb?.UpdateLocationRegion(locationId, region);
         return _db!.UpdateLocationRegion(locationId, region);
     }
 
@@ -308,6 +331,8 @@ public sealed class WorldDatabaseService : IDisposable
     public bool UpdateLocationDetails(LocationInfo info)
     {
         RequireWorldOpen();
+        _genDb?.UpdateLocationDetails(info.Id, info.DisplayName, info.Type, info.Terrain,
+            info.BaseNoise, info.NoisePerPerson, info.Capacity, info.AllowsPrivacy);
         return _db!.UpdateLocationDetails(info.Id, info.DisplayName, info.Type, info.Terrain,
             info.BaseNoise, info.NoisePerPerson, info.Capacity, info.AllowsPrivacy);
     }
@@ -323,6 +348,7 @@ public sealed class WorldDatabaseService : IDisposable
     public bool UpdateConnectionDistance(string fromId, string toId, double distanceMeters)
     {
         RequireWorldOpen();
+        _genDb?.UpdateConnectionDistance(fromId, toId, distanceMeters);
         return _db!.UpdateConnectionDistance(fromId, toId, distanceMeters);
     }
 
@@ -333,6 +359,7 @@ public sealed class WorldDatabaseService : IDisposable
     {
         RequireWorldOpen();
         _db!.InsertConnection(fromId, toId, distanceMeters);
+        _genDb?.InsertConnection(fromId, toId, distanceMeters);
     }
 
     /// <summary>Regenerates a seed_data.sql-compatible script from the database's current contents.</summary>
