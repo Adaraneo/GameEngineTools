@@ -94,7 +94,7 @@ namespace GameEngineTools.World.Work
     /// <param name="Output">What a craft task makes.</param>
     /// <param name="OutputName">Display name of the product.</param>
     /// <param name="DurationMinutes">Minutes a craft task takes.</param>
-    /// <param name="Location">Location type a craft task must be done at (mill, bakery, dairy).</param>
+    /// <param name="Station">Id of the object type a craft task is done at (mill, oven, dairy): the workstation, which may serve several tasks.</param>
     /// <param name="Action">The action a field task is carried out as (Plough, Sow, Reap, Thresh).</param>
     /// <param name="ToolClass">The tool class the task needs, or null when it needs none.</param>
     /// <param name="Source">Where the numbers come from.</param>
@@ -107,7 +107,7 @@ namespace GameEngineTools.World.Work
         TaskItem? Output,
         string? OutputName,
         int DurationMinutes,
-        string? Location,
+        string? Station,
         string? Action,
         string? ToolClass,
         string? Source = null,
@@ -129,6 +129,7 @@ namespace GameEngineTools.World.Work
         private readonly Dictionary<string, ObjectTypeDefinition> _types;
         private readonly Dictionary<string, TaskDefinition> _tasksById = new(StringComparer.Ordinal);
         private readonly List<TaskDefinition> _tasks = new();
+        private readonly Dictionary<string, List<TaskDefinition>> _stationTasks = new(StringComparer.Ordinal);
         private readonly Dictionary<string, OccupationWork> _occupations = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Builds and checks a catalog.</summary>
@@ -174,7 +175,10 @@ namespace GameEngineTools.World.Work
                     if (task.Output is null || task.Output.Quantity <= 0) throw new FormatException($"Task '{task.Id}': a craft task needs an output with a positive quantity.");
                     if (task.Inputs.Count == 0 || task.Inputs.Any(i => i.Quantity <= 0)) throw new FormatException($"Task '{task.Id}': a craft task needs inputs with positive quantities.");
                     if (task.DurationMinutes <= 0) throw new FormatException($"Task '{task.Id}': a craft task needs a positive duration.");
-                    if (string.IsNullOrWhiteSpace(task.Location)) throw new FormatException($"Task '{task.Id}': a craft task needs a location type.");
+                    if (string.IsNullOrWhiteSpace(task.Station)) throw new FormatException($"Task '{task.Id}': a craft task needs the workstation it is done at ('station').");
+                    if (!_types.ContainsKey(task.Station)) throw new FormatException($"Task '{task.Id}': the workstation '{task.Station}' is not an object type of objecttypes.json.");
+                    if (!_stationTasks.TryGetValue(task.Station, out var atStation)) _stationTasks[task.Station] = atStation = new List<TaskDefinition>();
+                    atStation.Add(task);
                 }
                 else
                 {
@@ -225,6 +229,13 @@ namespace GameEngineTools.World.Work
 
         /// <summary>The task with this id, or null.</summary>
         public TaskDefinition? Task(string id) => _tasksById.GetValueOrDefault(id);
+
+        /// <summary>Whether an object type is a workstation: some craft task is done at it.</summary>
+        public bool IsStation(string? typeId) => typeId is not null && _stationTasks.ContainsKey(typeId);
+
+        /// <summary>The craft tasks done at a workstation type, in the order of the file; empty for a type that is not a workstation.</summary>
+        public IReadOnlyList<TaskDefinition> TasksAt(string? typeId)
+            => typeId is not null && _stationTasks.TryGetValue(typeId, out var list) ? list : Array.Empty<TaskDefinition>();
 
         /// <summary>The field task carried out as the given action (Plough, Sow, Reap, Thresh), or null.</summary>
         public TaskDefinition? FieldTaskFor(string action)

@@ -24,7 +24,7 @@ namespace GameEngineTools.World.Objects.Production
         string OutputItemId,
         string OutputDisplayName,
         int DurationMinutes,
-        string RequiredLocationType);
+        string StationTypeId);
 
     /// <summary>One required input line of a <see cref="Recipe"/>: the id of a catalog object type (<see cref="WorldObject.TypeId"/>) and a quantity.</summary>
     public sealed record RecipeInput(string ItemId, int Quantity);

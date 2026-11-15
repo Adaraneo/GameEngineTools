@@ -1,10 +1,10 @@
-﻿// Tasks of the work system. kind Craft: inputs and one output (items are ids of object types in objecttypes.json), minutes and the location type it is done at.
+﻿// Tasks of the work system. kind Craft: inputs and one output (items are ids of object types in objecttypes.json), minutes and the workstation (an object type of objecttypes.json) it is done at.
 // kind FieldWork: the action it is carried out as, the tool class it needs ("tool" left out: none) and "requires", the conditions that must all hold (stage:A|B, pending, no_pending, workable, rested, sowing_weather, seed_enough; see FieldConditions). Hours per hectare stay in World:Crops, MET in Characters:Physiology.
 {
   "tasks": [
-    { "id": "recipe_flour_from_grain", "name": "Mlít obilí", "kind": "Craft", "inputs": [ { "item": "grain", "qty": 2 } ], "output": { "item": "flour", "qty": 1 }, "outputName": "Mouka", "durationMinutes": 45, "location": "mill", "source": "design values of the Tier 1 food chain" },
-    { "id": "recipe_bread_from_flour", "name": "Péct chléb", "kind": "Craft", "inputs": [ { "item": "flour", "qty": 1 } ], "output": { "item": "bread", "qty": 1 }, "outputName": "Čerstvý chléb", "durationMinutes": 90, "location": "bakery", "source": "design values of the Tier 1 food chain" },
-    { "id": "recipe_cheese_from_milk", "name": "Vyrábět sýr", "kind": "Craft", "inputs": [ { "item": "milk", "qty": 2 } ], "output": { "item": "cheese", "qty": 1 }, "outputName": "Čerstvý sýr", "durationMinutes": 180, "location": "dairy", "source": "design values of the Tier 1 food chain" },
+    { "id": "recipe_flour_from_grain", "name": "Mlít obilí", "kind": "Craft", "inputs": [ { "item": "grain", "qty": 2 } ], "output": { "item": "flour", "qty": 1 }, "outputName": "Mouka", "durationMinutes": 45, "station": "mill", "source": "design values of the Tier 1 food chain" },
+    { "id": "recipe_bread_from_flour", "name": "Péct chléb", "kind": "Craft", "inputs": [ { "item": "flour", "qty": 1 } ], "output": { "item": "bread", "qty": 1 }, "outputName": "Čerstvý chléb", "durationMinutes": 90, "station": "oven", "source": "design values of the Tier 1 food chain" },
+    { "id": "recipe_cheese_from_milk", "name": "Vyrábět sýr", "kind": "Craft", "inputs": [ { "item": "milk", "qty": 2 } ], "output": { "item": "cheese", "qty": 1 }, "outputName": "Čerstvý sýr", "durationMinutes": 180, "station": "dairy", "source": "design values of the Tier 1 food chain" },
 
     { "id": "plough", "name": "Orat", "kind": "FieldWork", "action": "Plough", "tool": "dig", "requires": [ "stage:Fallow", "workable", "rested" ] },
     { "id": "plough_stubble", "name": "Orat strniště", "kind": "FieldWork", "action": "Plough", "tool": "dig", "requires": [ "stage:Reaped", "no_pending", "workable", "rested" ] },

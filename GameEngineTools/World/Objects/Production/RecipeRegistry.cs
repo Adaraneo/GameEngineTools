@@ -36,7 +36,7 @@ namespace GameEngineTools.World.Objects.Production
                     output,
                     task.OutputName ?? catalog.Type(output)?.Name ?? output,
                     task.DurationMinutes,
-                    task.Location!);
+                    task.Station!);
                 if (!_table.TryAdd(output, recipe))
                     throw new System.FormatException($"tasks.json: task '{task.Id}': a second recipe for {output}; the registry holds one recipe per product.");
             }
@@ -45,6 +45,10 @@ namespace GameEngineTools.World.Objects.Production
         /// <summary>Looks up the recipe that produces the object type with this id, or <c>null</c>.</summary>
         public Recipe? FindByOutput(string? itemId)
             => itemId is not null && _table.TryGetValue(itemId, out var recipe) ? recipe : null;
+
+        /// <summary>The recipes done at a workstation type, in the order of the file.</summary>
+        public IEnumerable<Recipe> ForStation(string? stationTypeId)
+            => _table.Values.Where(r => string.Equals(r.StationTypeId, stationTypeId, System.StringComparison.Ordinal));
 
         /// <summary>All recipes (for the provisioning bridge to consider).</summary>
         public IEnumerable<Recipe> All => _table.Values;

@@ -109,15 +109,15 @@ using System.Collections.Generic;
             Assert.AreEqual("Mlít obilí", flour.DisplayName);
             Assert.AreEqual("Mouka", flour.OutputDisplayName);
             Assert.AreEqual(45, flour.DurationMinutes);
-            Assert.AreEqual("mill", flour.RequiredLocationType);
+            Assert.AreEqual("mill", flour.StationTypeId);
             Assert.AreEqual(new RecipeInput("grain", 2), flour.Inputs.Single());
 
             var bread = recipes.FindByOutput("bread")!;
-            Assert.AreEqual((90, "bakery", "Čerstvý chléb"), (bread.DurationMinutes, bread.RequiredLocationType, bread.OutputDisplayName));
+            Assert.AreEqual((90, "oven", "Čerstvý chléb"), (bread.DurationMinutes, bread.StationTypeId, bread.OutputDisplayName));
             Assert.AreEqual(new RecipeInput("flour", 1), bread.Inputs.Single());
 
             var cheese = recipes.FindByOutput("cheese")!;
-            Assert.AreEqual((180, "dairy", "Čerstvý sýr"), (cheese.DurationMinutes, cheese.RequiredLocationType, cheese.OutputDisplayName));
+            Assert.AreEqual((180, "dairy", "Čerstvý sýr"), (cheese.DurationMinutes, cheese.StationTypeId, cheese.OutputDisplayName));
             Assert.AreEqual(new RecipeInput("milk", 2), cheese.Inputs.Single());
             Assert.AreEqual(3, recipes.All.Count());
         }
@@ -139,9 +139,9 @@ using System.Collections.Generic;
         [TestMethod]
         public void BadTasks_AreRejected_NamingTheTask()
         {
-            const string types = """{ "types": [ { "id": "bread", "category": "Food", "weightGrams": 300 }, { "id": "grain", "category": "Food", "weightGrams": 200 } ] }""";
+            const string types = """{ "types": [ { "id": "mill", "category": "Ambient", "pickable": false, "weightGrams": 500000 }, { "id": "kiln", "category": "Ambient", "pickable": false, "weightGrams": 500000 }, { "id": "bread", "category": "Food", "weightGrams": 300 }, { "id": "grain", "category": "Food", "weightGrams": 200 } ] }""";
             var noOutput = Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, types,
-                """{ "tasks": [ { "id": "t", "kind": "Craft", "inputs": [ { "item": "grain", "qty": 1 } ], "durationMinutes": 5, "location": "mill" } ] }"""));
+                """{ "tasks": [ { "id": "t", "kind": "Craft", "inputs": [ { "item": "grain", "qty": 1 } ], "durationMinutes": 5, "station": "mill" } ] }"""));
             StringAssert.Contains(noOutput.Message, "'t'");
             Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, types, """{ "tasks": [ { "id": "t", "kind": "Teleport" } ] }"""));
             Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, types, """{ "tasks": [ { "id": "f", "kind": "FieldWork" } ] }"""));
@@ -149,8 +149,8 @@ using System.Collections.Generic;
                 """{ "tasks": [ { "id": "a", "kind": "FieldWork", "action": "Plough" }, { "id": "a", "kind": "FieldWork", "action": "Sow" } ] }"""));
 
             var catalog = WorkCatalogLoader.Parse(Materials, types,
-                """{ "tasks": [ { "id": "pot", "kind": "Craft", "inputs": [ { "item": "Clay", "qty": 2 } ], "output": { "item": "bread", "qty": 1 }, "durationMinutes": 30, "location": "kiln" } ] }""");
-            Assert.AreEqual("kiln", catalog.Task("pot")!.Location);
+                """{ "tasks": [ { "id": "pot", "kind": "Craft", "inputs": [ { "item": "Clay", "qty": 2 } ], "output": { "item": "bread", "qty": 1 }, "durationMinutes": 30, "station": "kiln" } ] }""");
+            Assert.AreEqual("kiln", catalog.Task("pot")!.Station);
 
             var unknownItem = Assert.ThrowsExactly<FormatException>(() => new RecipeRegistry(catalog));
             StringAssert.Contains(unknownItem.Message, "Clay");

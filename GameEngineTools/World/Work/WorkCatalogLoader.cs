@@ -97,7 +97,7 @@ namespace GameEngineTools.World.Work
                     output,
                     OptionalText(t, "outputName"),
                     t.TryGetProperty("durationMinutes", out var minutes) && minutes.ValueKind == JsonValueKind.Number ? minutes.GetInt32() : 0,
-                    OptionalText(t, "location"),
+                    OptionalText(t, "station"),
                     OptionalText(t, "action"),
                     OptionalText(t, "tool"),
                     OptionalText(t, "source"),

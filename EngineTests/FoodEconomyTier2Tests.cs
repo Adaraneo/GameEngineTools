@@ -334,8 +334,8 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn"));
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "mill", Loc));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "oven", Loc));
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
             var engine = MakeObjectEngine(provider);
 
@@ -685,7 +685,7 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec", yield: 2.0));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "oven", Loc));
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
             var engine = MakeObjectEngine(provider);
 
@@ -704,16 +704,16 @@ namespace EngineTests
         public void SiteBuilding_NextSite_FollowsTheChainOrderUntilComplete()
         {
             var here = new List<WorldObject>();
-            Assert.AreEqual("grain", SiteBuilding.NextSite(here));
+            Assert.AreEqual("grain", SiteBuilding.NextSite(here, new RecipeRegistry(EngineTests.Utils.TestWork.Catalog)));
 
             here.Add(ProductionSiteFactory.Create("f", Loc, "grain", "Pole"));
-            Assert.AreEqual("flour", SiteBuilding.NextSite(here));
+            Assert.AreEqual("flour", SiteBuilding.NextSite(here, new RecipeRegistry(EngineTests.Utils.TestWork.Catalog)));
 
-            here.Add(ProductionSiteFactory.Create("m", Loc, "flour", "Mlyn"));
-            Assert.AreEqual("bread", SiteBuilding.NextSite(here));
+            here.Add(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "m", Loc));
+            Assert.AreEqual("bread", SiteBuilding.NextSite(here, new RecipeRegistry(EngineTests.Utils.TestWork.Catalog)));
 
-            here.Add(ProductionSiteFactory.Create("o", Loc, "bread", "Pec"));
-            Assert.IsNull(SiteBuilding.NextSite(here), "A complete chain leaves nothing to build.");
+            here.Add(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "o", Loc));
+            Assert.IsNull(SiteBuilding.NextSite(here, new RecipeRegistry(EngineTests.Utils.TestWork.Catalog)), "A complete chain leaves nothing to build.");
         }
 
         [TestMethod]
@@ -733,8 +733,8 @@ namespace EngineTests
             var complete = new List<WorldObject>
             {
                 ProductionSiteFactory.Create("f", Loc, "grain", "Pole"),
-                ProductionSiteFactory.Create("m", Loc, "flour", "Mlyn"),
-                ProductionSiteFactory.Create("o", Loc, "bread", "Pec"),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "m", Loc),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "o", Loc),
             };
 
             var inSettlement = new List<BehaviorCandidate> { Cand(Build) };
@@ -785,7 +785,7 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "oven", Loc) with { Affordances = System.Collections.Immutable.ImmutableArray.Create(new WorldObjectAffordance(AffordanceType.Production, 1.0)) });
             provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", "bread", "Pult"));
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), self));
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
@@ -805,7 +805,7 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "oven", Loc) with { Affordances = System.Collections.Immutable.ImmutableArray.Create(new WorldObjectAffordance(AffordanceType.Production, 1.0)) });
             provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", "bread", "Pult"));
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
             var engine = MakeObjectEngine(provider, economy: Barter3);

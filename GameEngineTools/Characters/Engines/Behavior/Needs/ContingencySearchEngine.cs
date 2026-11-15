@@ -197,7 +197,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 if (_economy.BuildEnabled
                     && need is >= BuildMinNeed and <= BuildMaxNeed
                     && SiteBuilding.IsSettlement(context.AvailableObjects)
-                    && SiteBuilding.NextSite(context.AvailableObjects) is not null)
+                    && SiteBuilding.NextSite(context.AvailableObjects, _recipes) is not null)
                 {
                     candidates.Add(new BehaviorCandidate(
                         Build,
@@ -406,15 +406,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
         /// <summary>True when a co-located object is a raw-production site (Production affordance, no recipe).</summary>
         private bool HasRawProductionSite(IReadOnlyList<WorldObject> availableObjects)
-        {
-            foreach (var obj in availableObjects)
-            {
-                if (obj.Affordances.Any(a => a.Type == AffordanceType.Production)
-                    && _recipes.FindByOutput(obj.ItemTypeId) is null)
-                    return true;
-            }
-            return false;
-        }
+            => availableObjects.Any(o => ProductionSites.IsRawSite(_catalog, o));
 
         /// <summary>
         /// Finds a co-located processing site (Production affordance whose output has a recipe) for
@@ -426,19 +418,19 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             out Recipe? recipe,
             string? onlyForOccupation = null)
         {
-            foreach (var site in availableObjects)
+            foreach (var station in availableObjects)
             {
-                if (!site.Affordances.Any(a => a.Type == AffordanceType.Production))
+                if (!ProductionSites.IsStation(_catalog, station))
                     continue;
-                var candidate = _recipes.FindByOutput(site.ItemTypeId);
-                if (candidate is null)
-                    continue; // raw site, not a processing site
-                if (onlyForOccupation is not null && !_catalog.OccupationDoes(onlyForOccupation, candidate.Id))
-                    continue; // not a task of this occupation
-                if (CanSatisfy(candidate, availableObjects, heldObjects))
+                foreach (var candidate in _recipes.ForStation(station.TypeId))
                 {
-                    recipe = candidate;
-                    return true;
+                    if (onlyForOccupation is not null && !_catalog.OccupationDoes(onlyForOccupation, candidate.Id))
+                        continue; // not a task of this occupation
+                    if (CanSatisfy(candidate, availableObjects, heldObjects))
+                    {
+                        recipe = candidate;
+                        return true;
+                    }
                 }
             }
             recipe = null;

@@ -157,29 +157,16 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             if (!hasHeldFood)
                 candidates.RemoveAll(c => c.Name == EatStored);
 
-            if (!HasProductionSite(availableObjects, wantRecipe: false))
+            if (!HasProductionSite(availableObjects, wantStation: false))
                 candidates.RemoveAll(c => c.Name == Produce);
 
-            if (!HasProductionSite(availableObjects, wantRecipe: true))
+            if (!HasProductionSite(availableObjects, wantStation: true))
                 candidates.RemoveAll(c => c.Name == Process);
         }
 
-        /// <summary>
-        /// True when a co-located object carries a <see cref="AffordanceType.Production"/> affordance
-        /// whose <c>ItemKind</c> either has a recipe (<paramref name="wantRecipe"/>) or has none.
-        /// </summary>
-        private bool HasProductionSite(IReadOnlyList<WorldObject> availableObjects, bool wantRecipe)
-        {
-            foreach (var obj in availableObjects)
-            {
-                if (!obj.Affordances.Any(a => a.Type == AffordanceType.Production))
-                    continue;
-                var hasRecipe = _recipes.FindByOutput(obj.ItemTypeId) is not null;
-                if (hasRecipe == wantRecipe)
-                    return true;
-            }
-            return false;
-        }
+        /// <summary>True when a co-located object is a workstation (<paramref name="wantStation"/>) or a raw production site.</summary>
+        private bool HasProductionSite(IReadOnlyList<WorldObject> availableObjects, bool wantStation)
+            => availableObjects.Any(o => wantStation ? ProductionSites.IsStation(_catalog, o) : ProductionSites.IsRawSite(_catalog, o));
 
         /// <summary>
         /// Returns <c>true</c> when at least one available object satisfies the requirement.
@@ -230,7 +217,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             if (BarterRules.FindOffer(availableObjects, heldObjects, laborHours, _economy, _ => true, _catalog) is null)
                 candidates.RemoveAll(c => c.Name == Barter);
 
-            if (!_economy.BuildEnabled || !SiteBuilding.IsSettlement(availableObjects) || SiteBuilding.NextSite(availableObjects) is null)
+            if (!_economy.BuildEnabled || !SiteBuilding.IsSettlement(availableObjects) || SiteBuilding.NextSite(availableObjects, _recipes) is null)
                 candidates.RemoveAll(c => c.Name == Build);
 
             if (!CanSellHere(availableObjects, heldObjects))

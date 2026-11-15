@@ -51,12 +51,13 @@ namespace EngineTests
                 """{ "materials": [ { "id": "fired_clay", "class": "Clay", "densityKgM3": 1900 } ] }""",
                 """
                 { "types": [
+                  { "id": "kiln", "name": "Pec", "category": "Ambient", "pickable": false, "weightGrams": 500000, "affordances": { "Production": 1.0 } },
                   { "id": "clay_lump", "category": "Ambient", "pickable": true, "parts": [ { "material": "fired_clay", "volumeCm3": 500 } ] },
                   { "id": "pot", "name": "Hrnec", "category": "Tool", "pickable": true, "parts": [ { "material": "fired_clay", "volumeCm3": 800 } ] } ] }
                 """,
                 """
                 { "tasks": [ { "id": "make_pot", "name": "Vypálit hrnec", "kind": "Craft", "inputs": [ { "item": "clay_lump", "qty": 2 } ],
-                               "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120, "location": "kiln" } ] }
+                               "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120, "station": "kiln" } ] }
                 """);
             var provider = new MemProvider();
             var svc = new ProductionService(provider, catalog);
@@ -158,7 +159,7 @@ namespace EngineTests
         public void Bridge_AtProcessingSiteWithInputs_EmitsProcess()
         {
             var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
-            var mill = ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn");
+            var mill = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "mill", Loc);
             var held = new List<WorldObject>
             {
                 GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), null),
@@ -232,7 +233,7 @@ namespace EngineTests
             var provider = new MemProvider();
             var svc = new ProductionService(provider, EngineTests.Utils.TestWork.Catalog);
             var ctx = Ctx(out _);
-            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "mill", Loc));
 
             var bread = svc.Process(ctx, Loc, "bread", new WDateTime(0));
 
@@ -279,7 +280,7 @@ namespace EngineTests
             var available = new List<WorldObject>
             {
                 ProductionSiteFactory.Create("field", Loc, "grain", "Pole"),
-                ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn"),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "mill", Loc),
             };
 
             var output = engine.Evaluate(BridgeContext(hunger: 80, available: available, held: held, now: new WDateTime(0)));

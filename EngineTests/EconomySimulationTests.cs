@@ -182,8 +182,8 @@ namespace EngineTests
 
             var now = new WDateTime(0);
             _buffer.AddObject(ProductionSiteFactory.Create("econ_field", Village, "grain", "Pole"));
-            _buffer.AddObject(ProductionSiteFactory.Create("econ_mill", Village, "flour", "Mlýn"));
-            _buffer.AddObject(ProductionSiteFactory.Create("econ_oven", Village, "bread", "Pec"));
+            _buffer.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "econ_mill", Village));
+            _buffer.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "econ_oven", Village));
             _buffer.AddObject(Fixture("econ_tool", "Dílna", WorldObjectCategory.Tool, AffordanceType.Work));
             _buffer.AddObject(Fixture("econ_well", "Studna", WorldObjectCategory.Drink, AffordanceType.Thirst));
             for (var b = 0; b < 8; b++)

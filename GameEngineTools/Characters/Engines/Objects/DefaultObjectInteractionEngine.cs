@@ -362,7 +362,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (locationId is null)
                 return;
 
-            var outputKind = ResolveProductionOutput(locationId, wantRecipe: false);
+            var outputKind = ResolveProductionOutput(locationId);
             if (outputKind is null)
                 return;
 
@@ -384,9 +384,9 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             // Several processing sites can share a location (mill and oven): run the first one whose recipe the inputs cover.
             WorldObject? produced = null;
-            foreach (var siteOutput in ResolveProcessingOutputs(locationId))
+            foreach (var (output, yield) in ResolveProcessingOutputs(locationId))
             {
-                produced = _production.Process(ctx, locationId, siteOutput, committed.OccurredAt, SiteYield(locationId, siteOutput));
+                produced = _production.Process(ctx, locationId, output, committed.OccurredAt, yield);
                 if (produced is not null)
                     break;
             }
@@ -445,10 +445,10 @@ namespace GameEngineTools.Characters.Engines.Objects
                 return;
 
             var here = _objectProvider.GetAllObjectsAt(location).ToList();
-            if (!SiteBuilding.IsSettlement(here) || SiteBuilding.NextSite(here) is not { } kind)
+            if (!SiteBuilding.IsSettlement(here) || SiteBuilding.NextSite(here, _recipes) is not { } kind)
                 return;
 
-            var site = SiteBuilding.Create(kind, location);
+            var site = SiteBuilding.Create(kind, location, _catalog, _recipes);
             _objectProvider.AddObject(site);
             outbox.Add(new SiteBuilt(committed.OccurredAt, ctx.Id, site.Id, kind, location));
         }
@@ -458,7 +458,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         {
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
             {
-                if (o.ItemTypeId != kind)
+                if (o.ItemTypeId != kind || !ProductionSites.IsRawSite(_catalog, o))
                     continue;
                 foreach (var a in o.Affordances)
                 {
@@ -676,32 +676,20 @@ namespace GameEngineTools.Characters.Engines.Objects
                 _logger.PriceChanged(shopId, kind, oldPrice, newPrice, newStock);
         }
 
-        /// <summary>
-        /// Finds the output kind of the production site at <paramref name="locationId"/>: the first
-        /// co-located object carrying a <see cref="AffordanceType.Production"/> affordance whose
-        /// <c>ItemKind</c> either has a recipe (<paramref name="wantRecipe"/> = true → processing site)
-        /// or has none (raw production site). Returns <c>null</c> when no matching site is present.
-        /// </summary>
-        private IEnumerable<string> ResolveProcessingOutputs(string locationId)
+        /// <summary>The products the workstations here can make (every recipe of every station), with the outputs one action makes at that station.</summary>
+        private IEnumerable<(string Output, int Yield)> ResolveProcessingOutputs(string locationId)
         {
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
             {
-                if (o.Affordances.Any(a => a.Type == AffordanceType.Production) && o.ItemTypeId is { } output && _recipes.FindByOutput(output) is not null)
-                    yield return output;
+                if (!ProductionSites.IsStation(_catalog, o))
+                    continue;
+                foreach (var recipe in _recipes.ForStation(o.TypeId))
+                    yield return (recipe.OutputItemId, ProductionSites.Yield(o));
             }
         }
 
-        private string? ResolveProductionOutput(string locationId, bool wantRecipe)
-        {
-            foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
-            {
-                if (!o.Affordances.Any(a => a.Type == AffordanceType.Production))
-                    continue;
-                var hasRecipe = _recipes.FindByOutput(o.ItemTypeId) is not null;
-                if (hasRecipe == wantRecipe)
-                    return o.ItemTypeId;
-            }
-            return null;
-        }
+        /// <summary>The item the raw production site here yields (a field, a pasture), or <c>null</c>.</summary>
+        private string? ResolveProductionOutput(string locationId)
+            => _objectProvider.GetAllObjectsAt(locationId).FirstOrDefault(o => ProductionSites.IsRawSite(_catalog, o))?.ItemTypeId;
     }
 }

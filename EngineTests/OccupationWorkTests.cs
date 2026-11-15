@@ -28,13 +28,14 @@ namespace EngineTests
 
         private const string Types = """
             { "types": [
+              { "id": "kiln", "name": "Pec", "category": "Ambient", "pickable": false, "weightGrams": 500000, "affordances": { "Production": 1.0 } },
               { "id": "clay_lump", "category": "Ambient", "pickable": true, "parts": [ { "material": "fired_clay", "volumeCm3": 500 } ] },
               { "id": "pot", "name": "Hrnec", "category": "Tool", "pickable": true, "parts": [ { "material": "fired_clay", "volumeCm3": 800 } ] } ] }
             """;
 
         private const string Tasks = """
             { "tasks": [ { "id": "make_pot", "name": "Vypálit hrnec", "kind": "Craft", "inputs": [ { "item": "clay_lump", "qty": 2 } ],
-                           "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120, "location": "kiln" } ] }
+                           "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120, "station": "kiln" } ] }
             """;
 
         [TestMethod]
@@ -69,7 +70,7 @@ namespace EngineTests
         {
             var catalog = WorkCatalogLoader.Parse(Materials, Types, Tasks, """{ "occupations": [ { "id": "potter", "tasks": [ "make_pot" ] } ] }""");
             var engine = new ContingencySearchEngine(catalog);
-            var kiln = ProductionSiteFactory.Create("kiln", Loc, "pot", "Pec");
+            var kiln = WorkObjects.Spawn(catalog, "kiln", "kiln_1", Loc);
             var clay = new List<WorldObject>
             {
                 WorkObjects.Spawn(catalog, "clay_lump", "lump_1", Loc) with { IsPickable = true },
@@ -92,11 +93,54 @@ namespace EngineTests
                 """{ "occupations": [ { "id": "miller", "tasks": [ "recipe_flour_from_grain" ] } ] }""");
             var engine = new ContingencySearchEngine(catalog);
             var held = new List<WorldObject> { WorkObjects.CreateItem(catalog, "flour", Loc, new WDateTime(0), null) };
-            var oven = ProductionSiteFactory.Create("oven", Loc, "bread", "Pec");
+            var oven = WorkObjects.Spawn(catalog, "oven", "oven_1", Loc);
 
             var miller = engine.Evaluate(ShiftContext("miller", new List<WorldObject> { oven }, held));
 
             Assert.IsFalse(miller.Candidates.Any(c => c.Name == Process), "A miller does not bake: the oven is not one of their tasks.");
+        }
+
+        [TestMethod]
+        public void OneWorkstation_ServesSeveralTasks_AndTheSmithDoesWhatTheBarsCover()
+        {
+            var catalog = WorkCatalogLoader.Parse(
+                """{ "materials": [ { "id": "iron", "class": "Metal", "densityKgM3": 7870 } ] }""",
+                """
+                { "types": [
+                  { "id": "forge",  "category": "Ambient", "pickable": false, "weightGrams": 500000, "affordances": { "Production": 1.0 } },
+                  { "id": "bar",    "category": "Tool", "pickable": true, "parts": [ { "material": "iron", "volumeCm3": 300 } ] },
+                  { "id": "nail",   "category": "Tool", "pickable": true, "parts": [ { "material": "iron", "volumeCm3": 2 } ] },
+                  { "id": "spade_head", "category": "Tool", "pickable": true, "parts": [ { "material": "iron", "volumeCm3": 180 } ] } ] }
+                """,
+                """
+                { "tasks": [
+                  { "id": "forge_spade_head", "kind": "Craft", "inputs": [ { "item": "bar", "qty": 3 } ], "output": { "item": "spade_head", "qty": 1 }, "durationMinutes": 90, "station": "forge" },
+                  { "id": "forge_nail", "kind": "Craft", "inputs": [ { "item": "bar", "qty": 1 } ], "output": { "item": "nail", "qty": 1 }, "durationMinutes": 20, "station": "forge" } ] }
+                """,
+                """{ "occupations": [ { "id": "smith", "tasks": [ "forge_spade_head", "forge_nail" ] } ] }""");
+            var engine = new ContingencySearchEngine(catalog);
+            var forge = WorkObjects.Spawn(catalog, "forge", "forge_1", Loc);
+            List<WorldObject> Bars(int n) => Enumerable.Range(0, n).Select(i => WorkObjects.Spawn(catalog, "bar", $"bar_{i}", Loc) with { IsPickable = true }).ToList();
+
+            Assert.IsTrue(catalog.IsStation("forge"));
+            CollectionAssert.AreEqual(new[] { "forge_spade_head", "forge_nail" }, catalog.TasksAt("forge").Select(t => t.Id).ToArray());
+            CollectionAssert.AreEqual(new[] { "spade_head", "nail" }, new RecipeRegistry(catalog).ForStation("forge").Select(r => r.OutputItemId).ToArray());
+
+            Assert.IsTrue(engine.Evaluate(ShiftContext("smith", new List<WorldObject> { forge }.Concat(Bars(3)).ToList()))
+                .Candidates.Any(c => c.Name == Process && c.Duration == WTimeSpan.FromMinutes(90)), "Three bars: a spade head.");
+            Assert.IsTrue(engine.Evaluate(ShiftContext("smith", new List<WorldObject> { forge }.Concat(Bars(1)).ToList()))
+                .Candidates.Any(c => c.Name == Process && c.Duration == WTimeSpan.FromMinutes(20)), "One bar: only a nail, from the same forge.");
+            Assert.IsFalse(engine.Evaluate(ShiftContext("smith", new List<WorldObject> { forge })).Candidates.Any(c => c.Name == Process), "No bar, nothing to forge.");
+        }
+
+        [TestMethod]
+        public void ATaskNeedsAStationThatIsAnObjectTypeOfTheCatalog()
+        {
+            var e = Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, Types,
+                """{ "tasks": [ { "id": "make_pot", "kind": "Craft", "inputs": [ { "item": "clay_lump", "qty": 2 } ], "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120, "station": "nowhere" } ] }"""));
+            StringAssert.Contains(e.Message, "nowhere");
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, Types,
+                """{ "tasks": [ { "id": "make_pot", "kind": "Craft", "inputs": [ { "item": "clay_lump", "qty": 2 } ], "output": { "item": "pot", "qty": 1 }, "durationMinutes": 120 } ] }"""));
         }
 
         private static string FindDataDir()
