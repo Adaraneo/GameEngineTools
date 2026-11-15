@@ -31,6 +31,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         private readonly IObjectInteractionPolicy _policy;
         private readonly ProductionService _production;
         private readonly WorkCatalog _catalog;
+        private readonly RecipeRegistry _recipes;
         private readonly EconomyLedger _economyLedger;
         private readonly EconomyConfig _economyConfig;
         private readonly ICognitiveResolutionLevelRuntime? _lodRuntime;
@@ -70,6 +71,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             _policy = policy;
             _production = production;
             _catalog = catalog;
+            _recipes = new RecipeRegistry(catalog);
             _economyLedger = economyLedger;
             _economyConfig = economyConfig.Value;
             _lodRuntime = lodRuntime;
@@ -392,7 +394,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (produced is null)
                 return; // insufficient inputs — nothing consumed
 
-            var recipe = RecipeRegistry.FindByOutput(produced.TypeId);
+            var recipe = _recipes.FindByOutput(produced.TypeId);
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
                 _logger.ItemProcessed(ctx.Id.ToString(), recipe?.Id ?? "?", produced.TypeId ?? "?", produced.Id, locationId);
 
@@ -684,7 +686,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         {
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
             {
-                if (o.Affordances.Any(a => a.Type == AffordanceType.Production) && o.ItemTypeId is { } output && RecipeRegistry.FindByOutput(output) is not null)
+                if (o.Affordances.Any(a => a.Type == AffordanceType.Production) && o.ItemTypeId is { } output && _recipes.FindByOutput(output) is not null)
                     yield return output;
             }
         }
@@ -695,7 +697,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             {
                 if (!o.Affordances.Any(a => a.Type == AffordanceType.Production))
                     continue;
-                var hasRecipe = RecipeRegistry.FindByOutput(o.ItemTypeId) is not null;
+                var hasRecipe = _recipes.FindByOutput(o.ItemTypeId) is not null;
                 if (hasRecipe == wantRecipe)
                     return o.ItemTypeId;
             }

@@ -117,6 +117,11 @@ namespace GameEngineTools.World.Work
         public IReadOnlyList<string> Requires { get; init; } = Requires ?? Array.Empty<string>();
     }
 
+    /// <summary>An occupation as the work system sees it: the tasks of <c>tasks.json</c> its holder does. The daily rhythm (hours, places) stays in the schedule slots of the occupation.</summary>
+    /// <param name="Id">Occupation id, as in the schedule (compared ignoring case).</param>
+    /// <param name="TaskIds">Ids of the tasks it does.</param>
+    public sealed record OccupationWork(string Id, IReadOnlyList<string> TaskIds);
+
     /// <summary>The materials and object types the work system knows; the world database stores only a type id and the state of an instance, this holds what the type is.</summary>
     public sealed class WorkCatalog
     {
@@ -124,10 +129,11 @@ namespace GameEngineTools.World.Work
         private readonly Dictionary<string, ObjectTypeDefinition> _types;
         private readonly Dictionary<string, TaskDefinition> _tasksById = new(StringComparer.Ordinal);
         private readonly List<TaskDefinition> _tasks = new();
+        private readonly Dictionary<string, OccupationWork> _occupations = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Builds and checks a catalog.</summary>
         /// <exception cref="FormatException">An id is duplicated or empty, a density or volume is not positive, a part names an unknown material, or a task is incomplete.</exception>
-        public WorkCatalog(IEnumerable<MaterialDefinition> materials, IEnumerable<ObjectTypeDefinition> types, IEnumerable<TaskDefinition>? tasks = null)
+        public WorkCatalog(IEnumerable<MaterialDefinition> materials, IEnumerable<ObjectTypeDefinition> types, IEnumerable<TaskDefinition>? tasks = null, IEnumerable<OccupationWork>? occupations = null)
         {
             _materials = new Dictionary<string, MaterialDefinition>(StringComparer.Ordinal);
             foreach (var m in materials)
@@ -183,7 +189,36 @@ namespace GameEngineTools.World.Work
                 if (!_tasksById.TryAdd(task.Id, task)) throw new FormatException($"Duplicate task '{task.Id}'.");
                 _tasks.Add(task);
             }
+
+            foreach (var occupation in occupations ?? Array.Empty<OccupationWork>())
+            {
+                if (string.IsNullOrWhiteSpace(occupation.Id)) throw new FormatException("An occupation has no id.");
+                if (occupation.TaskIds.Count == 0) throw new FormatException($"Occupation '{occupation.Id}': it lists no task.");
+                foreach (var taskId in occupation.TaskIds)
+                    if (!_tasksById.ContainsKey(taskId))
+                        throw new FormatException($"Occupation '{occupation.Id}': '{taskId}' is not a task of tasks.json.");
+                if (occupation.TaskIds.Distinct(StringComparer.Ordinal).Count() != occupation.TaskIds.Count)
+                    throw new FormatException($"Occupation '{occupation.Id}': a task is listed twice.");
+                if (!_occupations.TryAdd(occupation.Id, occupation)) throw new FormatException($"Duplicate occupation '{occupation.Id}'.");
+            }
         }
+
+        /// <summary>The work of an occupation, or null for an occupation that lists none (a scholar, a guard: only their schedule).</summary>
+        public OccupationWork? Occupation(string? id) => string.IsNullOrEmpty(id) ? null : _occupations.GetValueOrDefault(id);
+
+        /// <summary>All occupations that list tasks.</summary>
+        public IReadOnlyCollection<OccupationWork> Occupations => _occupations.Values;
+
+        /// <summary>Whether the occupation does the task with this id.</summary>
+        public bool OccupationDoes(string? occupationId, string taskId) => Occupation(occupationId)?.TaskIds.Contains(taskId) == true;
+
+        /// <summary>Whether the occupation does any task of this kind (a farmer: field work; a miller: craft).</summary>
+        public bool OccupationDoesKind(string? occupationId, TaskKind kind)
+            => Occupation(occupationId)?.TaskIds.Any(id => _tasksById[id].Kind == kind) == true;
+
+        /// <summary>Whether the occupation does a field task carried out as this action (Plough, Sow, Reap, Thresh).</summary>
+        public bool OccupationDoesAction(string? occupationId, string action)
+            => Occupation(occupationId)?.TaskIds.Any(id => _tasksById[id] is { Kind: TaskKind.FieldWork } t && string.Equals(t.Action, action, StringComparison.Ordinal)) == true;
 
         /// <summary>All tasks, in the order of the file; where several could apply, the first decides.</summary>
         public IReadOnlyList<TaskDefinition> Tasks => _tasks;

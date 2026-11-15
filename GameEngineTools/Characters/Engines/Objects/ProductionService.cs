@@ -23,7 +23,7 @@ namespace GameEngineTools.Characters.Engines.Objects
 
         private readonly IMutableWorldObjectProvider _objectProvider;
         private readonly WorkCatalog _catalog;
-        private readonly IReadOnlyDictionary<string, Recipe> _recipes;
+        private readonly RecipeRegistry _recipes;
 
         /// <summary>Creates the service over the mutable world-object provider.</summary>
         /// <param name="objectProvider">The world objects.</param>
@@ -33,7 +33,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             ArgumentNullException.ThrowIfNull(objectProvider);
             _objectProvider = objectProvider;
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
-            _recipes = RecipeRegistry.FromCatalog(catalog);
+            _recipes = new RecipeRegistry(catalog);
         }
 
         #endregion Construction
@@ -63,7 +63,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             ArgumentNullException.ThrowIfNull(ctx);
             ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
 
-            var recipe = _recipes.GetValueOrDefault(outputItemId);
+            var recipe = _recipes.FindByOutput(outputItemId);
             if (recipe is null)
                 return null;
 

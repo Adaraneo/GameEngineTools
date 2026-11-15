@@ -72,7 +72,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             if (best is not { } chosen)
                 return BehaviorNeedOutput.Empty;
 
-            var utility = Utility(chosen) * (IsFarmerOnShift(snapshot.Schedule) ? 1.0 : HelperFactor) + (IsFarmerOnShift(snapshot.Schedule) ? FarmerOnShiftBonus : 0.0);
+            var utility = Utility(chosen) * (IsOnShiftFor(chosen, snapshot.Schedule) ? 1.0 : HelperFactor) + (IsOnShiftFor(chosen, snapshot.Schedule) ? FarmerOnShiftBonus : 0.0);
             var candidate = new BehaviorCandidate(
                 NameOf(chosen),
                 utility,
@@ -105,9 +105,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             _ => PloughUtility,
         };
 
-        private static bool IsFarmerOnShift(DailyScheduleState? schedule)
+        /// <summary>On a Work shift of an occupation that does this field task (the tasks of the occupation come from occupations.json).</summary>
+        private bool IsOnShiftFor(FieldTask task, DailyScheduleState? schedule)
             => schedule?.ActiveSlot is { PreferredAction: Work }
-               && !string.IsNullOrEmpty(schedule.Occupation)
-               && OccupationIds.FoodProducerOccupations.Contains(schedule.Occupation);
+               && _catalog.OccupationDoesAction(schedule.Occupation, NameOf(task));
     }
 }

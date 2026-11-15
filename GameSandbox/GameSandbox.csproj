@@ -79,7 +79,10 @@
     <None Update="SourceFiles\World\objecttypes.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="SourceFiles\World	asks.json">
+    <None Update="SourceFiles\World\tasks.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="SourceFiles\World\occupations.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

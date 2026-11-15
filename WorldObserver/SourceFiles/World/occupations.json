@@ -1,0 +1,9 @@
+// Occupations of the work system: the tasks of tasks.json each one does. The daily rhythm (hours, places) stays in the schedule slots of the occupation (built in, or Occupations.csv).
+// An occupation not listed here only has its schedule (a scholar, a guard). The task ids must exist in tasks.json.
+// farmer and craftsperson list the whole food chain: that is how they behaved before the tasks were assigned (both worked the fields and the mill and bakery); a narrower list is a data change.
+{
+  "occupations": [
+    { "id": "farmer",       "tasks": [ "plough", "plough_stubble", "sow", "reap", "thresh", "recipe_flour_from_grain", "recipe_bread_from_flour", "recipe_cheese_from_milk" ] },
+    { "id": "craftsperson", "tasks": [ "plough", "plough_stubble", "sow", "reap", "thresh", "recipe_flour_from_grain", "recipe_bread_from_flour", "recipe_cheese_from_milk" ] }
+  ]
+}

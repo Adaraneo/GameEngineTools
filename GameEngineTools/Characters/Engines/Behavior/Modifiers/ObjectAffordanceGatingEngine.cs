@@ -38,9 +38,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
 
         /// <summary>Creates the gate; the economy config (barter mode) defaults to <see cref="EconomyConfig.Default"/>.</summary>
         private readonly WorkCatalog _catalog;
+        private readonly RecipeRegistry _recipes;
 
         public ObjectAffordanceGatingEngine(WorkCatalog catalog, EconomyConfig? economy = null)
         {
+            _recipes = new RecipeRegistry(catalog);
             _catalog = catalog;
             _economy = economy ?? EconomyConfig.Default;
         }
@@ -145,7 +147,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         ///   output has a recipe (a processing site).</item>
         /// </list>
         /// </summary>
-        private static void ApplyFoodEconomyGates(
+        private void ApplyFoodEconomyGates(
             List<BehaviorCandidate> candidates,
             IReadOnlyList<WorldObject> availableObjects,
             IReadOnlyList<WorldObject>? heldObjects)
@@ -166,13 +168,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         /// True when a co-located object carries a <see cref="AffordanceType.Production"/> affordance
         /// whose <c>ItemKind</c> either has a recipe (<paramref name="wantRecipe"/>) or has none.
         /// </summary>
-        private static bool HasProductionSite(IReadOnlyList<WorldObject> availableObjects, bool wantRecipe)
+        private bool HasProductionSite(IReadOnlyList<WorldObject> availableObjects, bool wantRecipe)
         {
             foreach (var obj in availableObjects)
             {
                 if (!obj.Affordances.Any(a => a.Type == AffordanceType.Production))
                     continue;
-                var hasRecipe = RecipeRegistry.FindByOutput(obj.ItemTypeId) is not null;
+                var hasRecipe = _recipes.FindByOutput(obj.ItemTypeId) is not null;
                 if (hasRecipe == wantRecipe)
                     return true;
             }

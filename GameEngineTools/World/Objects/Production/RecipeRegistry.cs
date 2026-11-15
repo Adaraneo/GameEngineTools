@@ -1,49 +1,31 @@
-// RecipeRegistry.cs
+﻿// RecipeRegistry.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Objects.Production
 {
     using System.Collections.Generic;
     using System.Collections.Immutable;
-    using System.Collections.ObjectModel;
     using System.Linq;
     using GameEngineTools.World.Work;
 
     /// <summary>
-    /// Immutable table of all <see cref="Recipe"/> definitions, read once from the craft tasks of the work catalog (<c>tasks.json</c>). Design data, not runtime
-    /// state, so it is not a SQLite table. Food-economy Tier 1.
+    /// The <see cref="Recipe"/> table of one <see cref="WorkCatalog"/>: its craft tasks (<c>tasks.json</c>), keyed by product. Design data, not runtime state. Food-economy Tier 1.
     /// </summary>
-    public static class RecipeRegistry
+    public sealed class RecipeRegistry
     {
-        #region Public accessors
+        private readonly Dictionary<string, Recipe> _table;
 
-        /// <summary>Looks up the recipe that produces the object type with this id, or <c>null</c>.</summary>
-        public static Recipe? FindByOutput(string? itemId)
-            => itemId is not null && Table.TryGetValue(itemId, out var recipe) ? recipe : null;
-
-        /// <summary>All registered recipes (for the provisioning bridge to consider).</summary>
-        public static IEnumerable<Recipe> All => Table.Values;
-
-        #endregion Public accessors
-
-        #region Internal table
-
-        // The recipes are the craft tasks of tasks.json (disk override, else built in): grain to flour to bread and milk to cheese for now.
-        private static readonly IReadOnlyDictionary<string, Recipe> Table =
-            new ReadOnlyDictionary<string, Recipe>(FromCatalog(WorkCatalogLoader.Load()));
-
-        /// <summary>
-        /// The recipes of a catalog: its craft tasks. An item is named by the id of an object type of the catalog.
-        /// </summary>
+        /// <summary>Reads the recipes of a catalog: its craft tasks. An item is named by the id of an object type of the catalog.</summary>
         /// <exception cref="System.FormatException">A task names an item that is not an object type, or two tasks make the same product.</exception>
-        public static Dictionary<string, Recipe> FromCatalog(WorkCatalog catalog)
+        public RecipeRegistry(WorkCatalog catalog)
         {
+            System.ArgumentNullException.ThrowIfNull(catalog);
             string Item(string taskId, string item)
                 => catalog.Type(item) is not null
                     ? item
                     : throw new System.FormatException($"tasks.json: task '{taskId}': '{item}' is not an object type of objecttypes.json.");
 
-            var table = new Dictionary<string, Recipe>(System.StringComparer.Ordinal);
+            _table = new Dictionary<string, Recipe>(System.StringComparer.Ordinal);
             foreach (var task in catalog.Tasks.Where(t => t.Kind == TaskKind.Craft))
             {
                 var output = Item(task.Id, task.Output!.Item);
@@ -55,13 +37,16 @@ namespace GameEngineTools.World.Objects.Production
                     task.OutputName ?? catalog.Type(output)?.Name ?? output,
                     task.DurationMinutes,
                     task.Location!);
-                if (!table.TryAdd(output, recipe))
+                if (!_table.TryAdd(output, recipe))
                     throw new System.FormatException($"tasks.json: task '{task.Id}': a second recipe for {output}; the registry holds one recipe per product.");
             }
-
-            return table;
         }
 
-        #endregion Internal table
+        /// <summary>Looks up the recipe that produces the object type with this id, or <c>null</c>.</summary>
+        public Recipe? FindByOutput(string? itemId)
+            => itemId is not null && _table.TryGetValue(itemId, out var recipe) ? recipe : null;
+
+        /// <summary>All recipes (for the provisioning bridge to consider).</summary>
+        public IEnumerable<Recipe> All => _table.Values;
     }
 }

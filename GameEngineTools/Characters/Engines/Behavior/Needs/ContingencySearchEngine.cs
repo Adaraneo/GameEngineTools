@@ -94,12 +94,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         #region Construction
 
         private readonly WorkCatalog _catalog;
+        private readonly RecipeRegistry _recipes;
         private readonly EconomyConfig _economy;
 
         /// <summary>Creates the bridge over the work catalog (spoilage times, prices); the economy config defaults to its <c>Default</c> instance.</summary>
         public ContingencySearchEngine(WorkCatalog catalog, EconomyConfig? economy = null)
         {
             _catalog = catalog;
+            _recipes = new RecipeRegistry(catalog);
             _economy = economy ?? EconomyConfig.Default;
         }
 
@@ -263,17 +265,16 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         private const double ShiftSellMaxNeed = 50.0;
 
         /// <summary>True when the active schedule slot is Work and the occupation is one that produces food for the shop.</summary>
-        private static bool IsOnFoodProductionShift(BehaviorContext context)
+        private bool IsOnFoodProductionShift(BehaviorContext context)
         {
             var schedule = context.HumanContext.Snapshot.Schedule;
             return schedule?.ActiveSlot is { PreferredAction: Work }
-                   && !string.IsNullOrEmpty(schedule.Occupation)
-                   && OccupationIds.FoodProducerOccupations.Contains(schedule.Occupation);
+                   && _catalog.OccupationDoesKind(schedule.Occupation, TaskKind.Craft);
         }
 
         private void AddShiftProduction(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
-            if (TryFindSatisfiableRecipe(context.AvailableObjects!, context.HeldObjects, out var recipe))
+            if (TryFindSatisfiableRecipe(context.AvailableObjects!, context.HeldObjects, out var recipe, context.HumanContext.Snapshot.Schedule?.Occupation))
             {
                 candidates.Add(new BehaviorCandidate(
                     Process, ShiftProductionUtility, WTimeSpan.FromMinutes(recipe!.DurationMinutes),
@@ -404,12 +405,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         }
 
         /// <summary>True when a co-located object is a raw-production site (Production affordance, no recipe).</summary>
-        private static bool HasRawProductionSite(IReadOnlyList<WorldObject> availableObjects)
+        private bool HasRawProductionSite(IReadOnlyList<WorldObject> availableObjects)
         {
             foreach (var obj in availableObjects)
             {
                 if (obj.Affordances.Any(a => a.Type == AffordanceType.Production)
-                    && RecipeRegistry.FindByOutput(obj.ItemTypeId) is null)
+                    && _recipes.FindByOutput(obj.ItemTypeId) is null)
                     return true;
             }
             return false;
@@ -419,18 +420,21 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         /// Finds a co-located processing site (Production affordance whose output has a recipe) for
         /// which the character's held plus co-located items satisfy every input. Returns the recipe.
         /// </summary>
-        private static bool TryFindSatisfiableRecipe(
+        private bool TryFindSatisfiableRecipe(
             IReadOnlyList<WorldObject> availableObjects,
             IReadOnlyList<WorldObject>? heldObjects,
-            out Recipe? recipe)
+            out Recipe? recipe,
+            string? onlyForOccupation = null)
         {
             foreach (var site in availableObjects)
             {
                 if (!site.Affordances.Any(a => a.Type == AffordanceType.Production))
                     continue;
-                var candidate = RecipeRegistry.FindByOutput(site.ItemTypeId);
+                var candidate = _recipes.FindByOutput(site.ItemTypeId);
                 if (candidate is null)
                     continue; // raw site, not a processing site
+                if (onlyForOccupation is not null && !_catalog.OccupationDoes(onlyForOccupation, candidate.Id))
+                    continue; // not a task of this occupation
                 if (CanSatisfy(candidate, availableObjects, heldObjects))
                 {
                     recipe = candidate;

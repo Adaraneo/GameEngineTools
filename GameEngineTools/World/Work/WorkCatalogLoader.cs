@@ -22,6 +22,7 @@ namespace GameEngineTools.World.Work
         private const string MaterialsFile = "materials.json";
         private const string ObjectTypesFile = "objecttypes.json";
         private const string TasksFile = "tasks.json";
+        private const string OccupationsFile = "occupations.json";
 
         private static readonly JsonDocumentOptions DocumentOptions = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 
@@ -29,10 +30,10 @@ namespace GameEngineTools.World.Work
         /// <param name="directory">A folder holding the files, or null for the program folder SourceFiles\World and then the built-in copy.</param>
         /// <exception cref="FormatException">A file is malformed or the catalog fails its checks; the message names the file and the entry.</exception>
         public static WorkCatalog Load(string? directory = null)
-            => Parse(ReadFile(MaterialsFile, directory), ReadFile(ObjectTypesFile, directory), ReadFile(TasksFile, directory));
+            => Parse(ReadFile(MaterialsFile, directory), ReadFile(ObjectTypesFile, directory), ReadFile(TasksFile, directory), ReadFile(OccupationsFile, directory));
 
         /// <summary>Parses the text of the two files; public so tests and tools can validate a file before shipping it.</summary>
-        public static WorkCatalog Parse(string materialsJson, string objectTypesJson, string? tasksJson = null)
+        public static WorkCatalog Parse(string materialsJson, string objectTypesJson, string? tasksJson = null, string? occupationsJson = null)
         {
             var materials = new List<MaterialDefinition>();
             foreach (var m in Entries(materialsJson, MaterialsFile, "materials"))
@@ -103,7 +104,16 @@ namespace GameEngineTools.World.Work
                     t.TryGetProperty("requires", out var requiresElement) ? requiresElement.EnumerateArray().Select(r => r.GetString() ?? string.Empty).ToList() : null));
             }
 
-            return new WorkCatalog(materials, types, tasks);
+            var occupations = new List<OccupationWork>();
+            foreach (var o in occupationsJson is null ? new List<JsonElement>() : Entries(occupationsJson, OccupationsFile, "occupations"))
+            {
+                var id = Text(o, "id", OccupationsFile);
+                if (!o.TryGetProperty("tasks", out var taskList) || taskList.ValueKind != JsonValueKind.Array)
+                    throw Bad(OccupationsFile, id, "'tasks' is missing or not an array");
+                occupations.Add(new OccupationWork(id, taskList.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.String ? x.GetString()! : throw Bad(OccupationsFile, id, "a task id is not a string")).ToList()));
+            }
+
+            return new WorkCatalog(materials, types, tasks, occupations);
         }
 
         private static List<JsonElement> Entries(string json, string file, string arrayName)
@@ -142,7 +152,8 @@ namespace GameEngineTools.World.Work
 
             var disk = file == MaterialsFile ? FileSystemConstant.SourceFilePath.WorkMaterials
                 : file == ObjectTypesFile ? FileSystemConstant.SourceFilePath.WorkObjectTypes
-                : FileSystemConstant.SourceFilePath.WorkTasks;
+                : file == TasksFile ? FileSystemConstant.SourceFilePath.WorkTasks
+                : FileSystemConstant.SourceFilePath.WorkOccupations;
             if (directory is null && File.Exists(disk))
                 return File.ReadAllText(disk, Encoding.UTF8);
 

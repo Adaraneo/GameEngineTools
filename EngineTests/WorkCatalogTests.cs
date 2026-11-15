@@ -89,7 +89,7 @@ using System.Collections.Generic;
             if (root is null)
                 Assert.Inconclusive("The repository folders were not found next to the test binaries.");
 
-            foreach (var file in new[] { "materials.json", "objecttypes.json", "tasks.json" })
+            foreach (var file in new[] { "materials.json", "objecttypes.json", "tasks.json", "occupations.json" })
             {
                 var builtIn = File.ReadAllText(Path.Combine(root.FullName, "GameEngineTools", "World", "Data", "Work", file)).Replace("\r\n", "\n");
                 foreach (var project in new[] { "GameSandbox", "WorldObserver" })
@@ -103,7 +103,8 @@ using System.Collections.Generic;
         [TestMethod]
         public void TheRecipesFromTheData_AreExactlyTheOnesThatWereInTheCode()
         {
-            var flour = RecipeRegistry.FindByOutput("flour")!;
+            var recipes = new RecipeRegistry(WorkCatalogLoader.Load());
+            var flour = recipes.FindByOutput("flour")!;
             Assert.AreEqual("recipe_flour_from_grain", flour.Id, "The ids of the old code table are kept.");
             Assert.AreEqual("Mlít obilí", flour.DisplayName);
             Assert.AreEqual("Mouka", flour.OutputDisplayName);
@@ -111,14 +112,14 @@ using System.Collections.Generic;
             Assert.AreEqual("mill", flour.RequiredLocationType);
             Assert.AreEqual(new RecipeInput("grain", 2), flour.Inputs.Single());
 
-            var bread = RecipeRegistry.FindByOutput("bread")!;
+            var bread = recipes.FindByOutput("bread")!;
             Assert.AreEqual((90, "bakery", "Čerstvý chléb"), (bread.DurationMinutes, bread.RequiredLocationType, bread.OutputDisplayName));
             Assert.AreEqual(new RecipeInput("flour", 1), bread.Inputs.Single());
 
-            var cheese = RecipeRegistry.FindByOutput("cheese")!;
+            var cheese = recipes.FindByOutput("cheese")!;
             Assert.AreEqual((180, "dairy", "Čerstvý sýr"), (cheese.DurationMinutes, cheese.RequiredLocationType, cheese.OutputDisplayName));
             Assert.AreEqual(new RecipeInput("milk", 2), cheese.Inputs.Single());
-            Assert.AreEqual(3, RecipeRegistry.All.Count());
+            Assert.AreEqual(3, recipes.All.Count());
         }
 
         [TestMethod]
@@ -151,7 +152,7 @@ using System.Collections.Generic;
                 """{ "tasks": [ { "id": "pot", "kind": "Craft", "inputs": [ { "item": "Clay", "qty": 2 } ], "output": { "item": "bread", "qty": 1 }, "durationMinutes": 30, "location": "kiln" } ] }""");
             Assert.AreEqual("kiln", catalog.Task("pot")!.Location);
 
-            var unknownItem = Assert.ThrowsExactly<FormatException>(() => RecipeRegistry.FromCatalog(catalog));
+            var unknownItem = Assert.ThrowsExactly<FormatException>(() => new RecipeRegistry(catalog));
             StringAssert.Contains(unknownItem.Message, "Clay");
         }
     }
