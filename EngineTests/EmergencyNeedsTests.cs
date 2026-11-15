@@ -79,6 +79,7 @@ namespace EngineTests
             Assert.AreEqual(physiology.NaturalMortalityDehydrationThreshold, behavior.LethalNeedLevel);
             Assert.AreEqual(physiology.ThirstDrinkingGainPerHour, behavior.DrinkRatePerHour);
             Assert.AreEqual(-physiology.HungerEatingGainPerHour, behavior.EatRatePerHour);
+            Assert.AreEqual(physiology.ThirstOnsetBodyMassPercent / 100.0 * physiology.BodyMassKg / physiology.LitresPerThirstPoint, behavior.DrinkStartThirst, 1e-9, "Drinking starts at the thirst onset of 2 percent body-mass loss.");
         }
     }
 }

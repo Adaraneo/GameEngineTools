@@ -468,7 +468,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Body mass in kg used for the share-of-body-mass thresholds; 70 until a per-character mass reaches Physiology. Pick.</summary>
         double BodyMassKg = 70.0,
         /// <summary>Water deficit as percent of body mass at which death becomes possible; about 10 percent is life threatening (Adolph 1947, from a secondary quotation), 5 percent is the work limit for 95 percent of workers. Replaces the thirst-95 hazard onset.</summary>
-        double DehydrationLethalBodyMassPercent = 10.0)
+        double DehydrationLethalBodyMassPercent = 10.0,
+        /// <summary>Body-mass loss in percent at which thirst begins and a person starts to drink: about 2 percent, the osmotic threshold of a roughly 2 percent rise in plasma osmolality (about 6 mmol/kg), from reviews (secondary). At 70 kg and 0.035 L per point it is thirst 40, which <c>BehaviorConfig.DrinkStartThirst</c> equals (a test keeps them equal).</summary>
+        double ThirstOnsetBodyMassPercent = 2.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
