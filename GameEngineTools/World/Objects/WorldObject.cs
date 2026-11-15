@@ -173,6 +173,18 @@ namespace GameEngineTools.World.Objects
         /// </summary>
         public WDateTime? ProducedAt { get; init; } = null;
 
+        /// <summary>
+        /// Id of the object type in the work catalog (<c>objecttypes.json</c>) this is an instance of, or <c>null</c> for an object not described by a type.
+        /// The type holds what the object is (materials, parts, tool classes, weight); the instance holds only where it is, who owns it and its condition.
+        /// </summary>
+        public string? TypeId { get; init; } = null;
+
+        /// <summary>The character who owns this object, or <c>null</c> when it belongs to nobody (a shared tool, a fixture).</summary>
+        public HumanId? OwnerId { get; init; } = null;
+
+        /// <summary>Condition from 1 (new) down to 0 (worn out); only meaningful for a type that wears.</summary>
+        public double Condition { get; init; } = 1.0;
+
         #endregion Spoilage (food-economy Tier 1 pantry decay)
 
         #region Shop pricing (food-economy Tier 2)

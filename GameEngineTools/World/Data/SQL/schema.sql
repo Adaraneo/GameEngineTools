@@ -87,6 +87,9 @@ CREATE TABLE IF NOT EXISTS WorldObjects (
     Price             REAL            DEFAULT NULL,
     ShopId            TEXT            DEFAULT NULL,
     ProducedAt        INTEGER         DEFAULT NULL,
+    TypeId            TEXT            DEFAULT NULL,  -- object type in the work catalog (objecttypes.json); NULL for an object without a type
+    OwnerId           TEXT            DEFAULT NULL,  -- owner (a character id); NULL when it belongs to nobody
+    Condition         REAL    NOT NULL DEFAULT 1.0,  -- 1 new .. 0 worn out
     HeldBy            TEXT            DEFAULT NULL,
     ConsumedAt        INTEGER         DEFAULT NULL
 );
