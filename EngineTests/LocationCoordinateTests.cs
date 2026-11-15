@@ -224,30 +224,6 @@ namespace EngineTests
             );
             """;
 
-        [TestMethod]
-        public void MigrateLocationCoordinateColumns_PreExistingLegacyRow_GainsZeroDefaultXY()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.ExecuteScript(LegacyLocationsSchema);
-            db.ExecuteScript("""
-                INSERT INTO Locations (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy)
-                VALUES ('old_tavern', 'Old Tavern', 'Social', 'Town', 0.4, 0.05, 20, 0);
-                """);
-
-            db.MigrateLocationCoordinateColumns();
-            db.MigrateLocationClimateColumns();
-
-            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "old_tavern");
-
-            // Pre-existing data survives the migration untouched.
-            Assert.AreEqual("Old Tavern", stored.Descriptor.DisplayName);
-            Assert.AreEqual(20, stored.Descriptor.Capacity);
-            // New columns backfill to the documented "unpositioned" default.
-            Assert.AreEqual(0.0, stored.Descriptor.X);
-            Assert.AreEqual(0.0, stored.Descriptor.Y);
-            Assert.AreEqual(0.0, stored.Descriptor.AltitudeMeters);
-        }
-
         /// <summary>
         /// Locations table shape as it existed after X/Y were added but before AltitudeMeters —
         /// verifies the migration also backfills a database that's only "half migrated".
@@ -271,119 +247,9 @@ namespace EngineTests
             );
             """;
 
-        [TestMethod]
-        public void MigrateLocationCoordinateColumns_PreAltitudeSchema_BackfillsAltitudeOnly()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.ExecuteScript(PreAltitudeLocationsSchema);
-            db.ExecuteScript("""
-                INSERT INTO Locations (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy, X, Y)
-                VALUES ('hilltop', 'Hilltop', 'Public', 'Wilds', 0.1, 0.02, 10, 0, 200.0, 400.0);
-                """);
-
-            db.MigrateLocationCoordinateColumns();
-            db.MigrateLocationClimateColumns();
-
-            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "hilltop");
-            Assert.AreEqual(200.0, stored.Descriptor.X);
-            Assert.AreEqual(400.0, stored.Descriptor.Y);
-            Assert.AreEqual(0.0, stored.Descriptor.AltitudeMeters);
-        }
-
-        [TestMethod]
-        public void MigrateLocationCoordinateColumns_NoLocationsTableYet_DoesNotThrow()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-
-            // Locations table doesn't exist yet — migration must be a safe no-op,
-            // leaving schema creation to the normal WorldDatabaseSeeder.Initialize flow.
-            db.MigrateLocationCoordinateColumns();
-        }
-
-        [TestMethod]
-        public void MigrateLocationCoordinateColumns_AlreadyCurrentSchema_IsIdempotent()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            SeedSchema(db);
-
-            db.InsertLocation(
-                new LocationDescriptor(
-                    Id: "square",
-                    DisplayName: "Square",
-                    BaseNoise: 0.2,
-                    NoisePerPerson: 0.02,
-                    Capacity: 30,
-                    AllowsPrivacy: false,
-                    LocationType.Public,
-                    X: 10.0,
-                    Y: 20.0),
-                region: string.Empty);
-
-            // Running the migration again against an already-current schema must not
-            // fail or disturb existing data.
-            db.MigrateLocationCoordinateColumns();
-            db.MigrateLocationCoordinateColumns();
-
-            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "square");
-            Assert.AreEqual(10.0, stored.Descriptor.X);
-            Assert.AreEqual(20.0, stored.Descriptor.Y);
-        }
-
         #endregion Migration from a pre-coordinate schema
 
         #region Migration from a pre-climate schema
-
-        [TestMethod]
-        public void MigrateLocationClimateColumns_PreExistingRow_GainsZeroDefaultTemperatureAndHumidity()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.ExecuteScript(PreAltitudeLocationsSchema); // any pre-climate schema shape works — climate columns are independent of X/Y/AltitudeMeters
-            db.ExecuteScript("""
-                INSERT INTO Locations (Id, DisplayName, Type, Region, BaseNoise, NoisePerPerson, Capacity, AllowsPrivacy, X, Y)
-                VALUES ('old_tavern', 'Old Tavern', 'Social', 'Town', 0.4, 0.05, 20, 0, 10.0, 20.0);
-                """);
-
-            db.MigrateLocationCoordinateColumns();
-            db.MigrateLocationClimateColumns();
-
-            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "old_tavern");
-            Assert.AreEqual(0.0, stored.Descriptor.TemperatureCelsius);
-            Assert.AreEqual(0.0, stored.Descriptor.Humidity);
-        }
-
-        [TestMethod]
-        public void MigrateLocationClimateColumns_NoLocationsTableYet_DoesNotThrow()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.MigrateLocationClimateColumns();
-        }
-
-        [TestMethod]
-        public void MigrateLocationClimateColumns_AlreadyCurrentSchema_IsIdempotent()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            SeedSchema(db);
-
-            db.InsertLocation(
-                new LocationDescriptor(
-                    Id: "oasis",
-                    DisplayName: "Oasis",
-                    BaseNoise: 0.2,
-                    NoisePerPerson: 0.02,
-                    Capacity: 30,
-                    AllowsPrivacy: false,
-                    LocationType.Public,
-                    TemperatureCelsius: 35.0,
-                    Humidity: 0.1),
-                region: string.Empty);
-
-            db.MigrateLocationClimateColumns();
-            db.MigrateLocationClimateColumns();
-
-            var stored = db.GetAllLocations().Single(l => l.Descriptor.Id == "oasis");
-            Assert.AreEqual(35.0, stored.Descriptor.TemperatureCelsius);
-            Assert.AreEqual(0.1, stored.Descriptor.Humidity);
-        }
 
         #endregion Migration from a pre-climate schema
     }

@@ -101,7 +101,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
         }
 
         internal static double HeatRisk(PhysiologyState s, int ageYears, PhysiologyConfig cfg)
-            => HeatMath.HeatstrokeRisk(s.BodyTempDelta + (s.HeatLoad ?? 0.0), ageYears, cfg);
+            => HeatMath.HeatstrokeRisk(s.BodyTempDelta + (s.HeatLoad), ageYears, cfg);
 
         private static double AgeFrailtyRisk(PhysiologyState s, int ageYears, PhysiologyConfig cfg)
         {

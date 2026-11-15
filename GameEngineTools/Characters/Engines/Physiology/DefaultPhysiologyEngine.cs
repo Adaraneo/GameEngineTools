@@ -354,7 +354,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             // Stored heat follows what the sweat cannot carry away (thirst before this tick's drift, so a dry throat already weakens it).
             var production = HeatMath.HeatProduction(ActivityOf(action, BodyConfig), airC, BodyConfig);
-            var heatLoad = HeatMath.AdvanceHeatLoad(s.HeatLoad ?? 0.0, HeatMath.HeatLoadTarget(production, WaterMath.DeficitPoints(waterDeficit, BodyConfig), BodyConfig), h, BodyConfig);
+            var heatLoad = HeatMath.AdvanceHeatLoad(s.HeatLoad, HeatMath.HeatLoadTarget(production, WaterMath.DeficitPoints(waterDeficit, BodyConfig), BodyConfig), h, BodyConfig);
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
             // Circadian body temperature: a sinusoidal wave ±CircadianTempAmplitude (Waterhouse 2005)
@@ -833,7 +833,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             || (s.Energy <= BodyConfig.NaturalMortalityExhaustionEnergyMax && s.SleepDebtHours >= BodyConfig.NaturalMortalityExhaustionSleepDebtMin)
             || s.AllostaticLoad >= BodyConfig.NaturalMortalityAlloThreshold
             || s.ImmuneLoad >= BodyConfig.NaturalMortalityImmuneThreshold
-            || s.BodyTempDelta + (s.HeatLoad ?? 0.0) > BodyConfig.HeatstrokeOnsetC;
+            || s.BodyTempDelta + (s.HeatLoad) > BodyConfig.HeatstrokeOnsetC;
 
         /// <summary>
         /// Reacts to discrete domain events by applying instantaneous state mutations.
@@ -1573,9 +1573,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Reinstates the partial-day counters and the menses flag the engine keeps outside its state record.</summary>
         private void RestoreAccumulators(PhysiologyState state)
         {
-            _accHours = state.DayAccumulatorHours ?? 0.0;
-            _injuryAccHours = state.InjuryAccumulatorHours ?? 0.0;
-            _postpartumAccHours = state.PostpartumAccumulatorHours ?? 0.0;
+            _accHours = state.DayAccumulatorHours;
+            _injuryAccHours = state.InjuryAccumulatorHours;
+            _postpartumAccHours = state.PostpartumAccumulatorHours;
             _mensesOn = state.Cycle?.Phase == CyclePhase.Menses;
         }
 

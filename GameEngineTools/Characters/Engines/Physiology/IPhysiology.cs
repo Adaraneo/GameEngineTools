@@ -804,17 +804,17 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// Source: Daan, Beersma &amp; Borbély (1984).
         /// </summary>
         double? WakeMargin = null,
-        /// <summary>Hours of the current world day already counted toward the next cycle-day advance (kept so a save/load does not lose them). <c>null</c> in older saves.</summary>
-        double? DayAccumulatorHours = null,
-        /// <summary>Hours toward the next injury-healing day. <c>null</c> in older saves.</summary>
-        double? InjuryAccumulatorHours = null,
-        /// <summary>Hours toward the next postpartum day. <c>null</c> in older saves.</summary>
-        double? PostpartumAccumulatorHours = null,
-        /// <summary>Heat stored by work and warm air, °C above the body's own temperature (see <see cref="HeatMath"/>). <c>null</c> in older saves, read as 0.</summary>
-        double? HeatLoad = null,
-        /// <summary>Body water deficit in litres; Thirst is its view (deficit / litres per point, capped at 100). <c>null</c> in older saves, read as Thirst x litres per point.</summary>
-        double? WaterDeficitL = null,
-        /// <summary>Water drunk that has not yet left the stomach, in litres. The thirst score is the deficit less this (the mouth and stomach relieve thirst at once); the deficit itself falls only as the stomach empties. 0 in older saves.</summary>
+        /// <summary>Hours of the current world day already counted toward the next cycle-day advance (kept so a save/load does not lose them). </summary>
+        double DayAccumulatorHours = 0.0,
+        /// <summary>Hours toward the next injury-healing day. </summary>
+        double InjuryAccumulatorHours = 0.0,
+        /// <summary>Hours toward the next postpartum day. </summary>
+        double PostpartumAccumulatorHours = 0.0,
+        /// <summary>Heat stored by work and warm air, °C above the body's own temperature (see <see cref="HeatMath"/>).</summary>
+        double HeatLoad = 0.0,
+        /// <summary>Body water deficit in litres; Thirst is its view (deficit / litres per point, capped at 100). When it does not match the Thirst score (someone else changed the score) the score wins.</summary>
+        double WaterDeficitL = 0.0,
+        /// <summary>Water drunk that has not yet left the stomach, in litres. The thirst score is the deficit less this (the mouth and stomach relieve thirst at once); the deficit itself falls only as the stomach empties.</summary>
         double GutWaterL = 0.0);
 
     /// <summary>

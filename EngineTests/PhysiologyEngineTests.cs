@@ -1791,7 +1791,6 @@ namespace EngineTests
             for (var i = 3; i < 6; i++)
                 resumed.Tick(start + WTimeSpan.FromHours(11 * i), step, ctx, new EventCollector());
 
-            Assert.IsNotNull(first.State.DayAccumulatorHours, "The counter is part of the state.");
             Assert.AreEqual(continuous.State.Cycle!.DayInCycle, resumed.State.Cycle!.DayInCycle,
                 "Save/load in the middle of a day must not lose the hours already counted.");
         }

@@ -103,20 +103,16 @@ namespace GameEngineTools.World.Data
             ArgumentNullException.ThrowIfNull(db);
             var schemaSql = SqlScriptLoader.Load(TerrainSchemaScript);
             db.ExecuteScript(schemaSql);
-            SchemaMigrator.Apply(db, SchemaMigrator.Terrain);
         }
 
         /// <summary>Applies the main world schema (Locations/Connections/WorldObjects/... — no
         /// longer <c>TerrainHeightmap</c>, which moved to its own dedicated database, see
-        /// <see cref="InitializeTerrainDatabase"/>) and runs migrations.</summary>
+        /// <see cref="InitializeTerrainDatabase"/>) </summary>
         private static void InitializeSchema(SqliteWorldDatabase db)
         {
             // Schema is always idempotent (IF NOT EXISTS / INSERT OR IGNORE) — safe to re-run.
             var schemaSql = SqlScriptLoader.Load(SchemaScript);
             db.ExecuteScript(schemaSql);
-
-            // CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so older files gain new columns through versioned migrations.
-            SchemaMigrator.Apply(db, SchemaMigrator.World);
         }
 
         #endregion Public API

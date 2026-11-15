@@ -156,9 +156,9 @@ namespace EngineTests
 
             var later = engine.State;
             Assert.IsTrue(later.GutWaterL < 0.01, "After three hours the stomach is empty.");
-            Assert.AreEqual(later.WaterDeficitL!.Value / cfg.LitresPerThirstPoint, later.Thirst, 1e-6, "With an empty stomach the thirst score is the deficit again.");
+            Assert.AreEqual(later.WaterDeficitL / cfg.LitresPerThirstPoint, later.Thirst, 1e-6, "With an empty stomach the thirst score is the deficit again.");
             var expected = deficitBefore - 25.0 * cfg.LitresPerThirstPoint + 3.5 * cfg.ThirstDriftAwakePerHour * cfg.LitresPerThirstPoint;
-            Assert.AreEqual(expected, later.WaterDeficitL.Value, 0.15, "The drunk litres have all reached the body, less what was lost since.");
+            Assert.AreEqual(expected, later.WaterDeficitL, 0.15, "The drunk litres have all reached the body, less what was lost since.");
         }
 
         [TestMethod]
@@ -167,8 +167,8 @@ namespace EngineTests
             var cfg = new PhysiologyConfig();
             var dying = Nominal() with { WaterDeficitL = WaterMath.LethalDeficitL(cfg) + 0.5, GutWaterL = 3.0, Thirst = 0.0 };
 
-            Assert.IsTrue(WaterMath.ViewThirst(dying.WaterDeficitL!.Value, dying.GutWaterL, cfg) >= 0.0);
-            Assert.IsTrue(WaterMath.IsLethal(dying with { Thirst = WaterMath.ViewThirst(dying.WaterDeficitL!.Value, dying.GutWaterL, cfg) }, cfg), "Water not yet absorbed does not undo the lethal deficit.");
+            Assert.IsTrue(WaterMath.ViewThirst(dying.WaterDeficitL, dying.GutWaterL, cfg) >= 0.0);
+            Assert.IsTrue(WaterMath.IsLethal(dying with { Thirst = WaterMath.ViewThirst(dying.WaterDeficitL, dying.GutWaterL, cfg) }, cfg), "Water not yet absorbed does not undo the lethal deficit.");
         }
 
         private const string Idle = ActionNames.Idle;

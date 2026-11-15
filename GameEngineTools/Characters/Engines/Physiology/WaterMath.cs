@@ -30,8 +30,8 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>The deficit in litres: the stored one while the thirst score still matches it, else the score read as litres (someone else changed the score).</summary>
         internal static double Deficit(PhysiologyState s, PhysiologyConfig cfg)
         {
-            if (s.WaterDeficitL is { } stored && Math.Abs(ViewThirst(stored, s.GutWaterL, cfg) - s.Thirst) <= 0.05)
-                return stored;
+            if (Math.Abs(ViewThirst(s.WaterDeficitL, s.GutWaterL, cfg) - s.Thirst) <= 0.05)
+                return s.WaterDeficitL;
             return s.Thirst * cfg.LitresPerThirstPoint + s.GutWaterL;
         }
 

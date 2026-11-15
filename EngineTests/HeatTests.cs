@@ -135,7 +135,7 @@ namespace EngineTests
             var watered = Hours(thirst: 10, airC: 60, hours: 6, keepWatered: true);
 
             Assert.IsTrue(dry.State.HeatLoad > 1.0, $"dry: {dry.State.HeatLoad}");
-            Assert.AreEqual(0.0, watered.State.HeatLoad ?? 0.0, 1e-6);
+            Assert.AreEqual(0.0, watered.State.HeatLoad, 1e-6);
         }
 
         [TestMethod]

@@ -107,7 +107,6 @@ public sealed class WorldDatabaseService : IDisposable
         PlanetConfig = WorldSettingsLoader.TryLoadUniverseConfig(path);
 
         OpenTerrainDatabase(path);
-        MigrateLegacyTerrainIfPresent();
     }
 
     /// <summary>
@@ -128,7 +127,6 @@ public sealed class WorldDatabaseService : IDisposable
         PlanetConfig = WorldSettingsLoader.TryLoadUniverseConfig(path);
 
         OpenTerrainDatabase(path);
-        MigrateLegacyTerrainIfPresent();
     }
 
     /// <summary>
@@ -158,39 +156,6 @@ public sealed class WorldDatabaseService : IDisposable
         _terrainDb = new SqliteWorldDatabase(terrainPath);
         WorldDatabaseSeeder.InitializeTerrainDatabase(_terrainDb);
         GeoReference = _terrainDb.LoadGeoReference();
-    }
-
-    /// <summary>
-    /// One-time migration for a world.db saved before terrain moved to its own database: if the
-    /// just-opened file still physically has a <c>TerrainHeightmap</c> table (schema.sql no
-    /// longer creates one, but an existing file on disk still has whatever it was created with),
-    /// copy its rows into the sibling terrain.db and drop the table from world.db so this only
-    /// ever runs once. Silently does nothing for a file that never had the table (the normal case
-    /// going forward) or one already migrated.
-    /// </summary>
-    private void MigrateLegacyTerrainIfPresent()
-    {
-        if (_db is null || _terrainDb is null) return;
-
-        IReadOnlyList<TerrainHeightmapSummary> legacy;
-        try
-        {
-            legacy = _db.ListHeightmaps();
-        }
-        catch
-        {
-            // No TerrainHeightmap table on this file at all — the expected case for anything
-            // created after this change, and for a brand-new file. Nothing to migrate.
-            return;
-        }
-
-        foreach (var summary in legacy)
-        {
-            var grid = _db.LoadHeightmap(summary.Id);
-            if (grid is not null) _terrainDb.SaveHeightmap(grid);
-        }
-
-        _db.ExecuteScript("DROP TABLE IF EXISTS TerrainHeightmap;");
     }
 
     /// <summary>Opens world.gen.db next to the world file when it exists, so edits can be mirrored into it.</summary>

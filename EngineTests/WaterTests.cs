@@ -99,8 +99,7 @@ namespace EngineTests
                 engine.Tick(now, WTimeSpan.FromHours(1), ctx, outbox);
 
             var s = engine.State;
-            Assert.IsNotNull(s.WaterDeficitL);
-            Assert.AreEqual(s.WaterDeficitL!.Value / Cfg.LitresPerThirstPoint, s.Thirst, 1e-6);
+            Assert.AreEqual(s.WaterDeficitL / Cfg.LitresPerThirstPoint, s.Thirst, 1e-6);
             Assert.IsTrue(s.WaterDeficitL > 0.7 + 0.5, "Six awake hours at the free rate add about 1 L.");
         }
 

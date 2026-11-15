@@ -327,28 +327,6 @@ namespace EngineTests
             );
             """;
 
-        [TestMethod]
-        public void MigrateTerrainHeightmapColumns_PreRiverRow_SurvivesAndGainsNullRiverMask()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.ExecuteScript(PreRiverHeightmapSchema);
-
-            var grid = MakeGrid();
-            db.ExecuteScript($"""
-                INSERT INTO TerrainHeightmap (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data)
-                VALUES ('default', 0.0, 0.0, 10.0, 3, 2, X'{Convert.ToHexString(grid.ToBytes())}');
-                """);
-
-            db.MigrateTerrainHeightmapColumns();
-
-            var loaded = db.LoadHeightmap("default");
-            Assert.IsNotNull(loaded);
-            CollectionAssert.AreEqual(grid.Values, loaded!.Values);
-            Assert.IsNull(loaded.RiverMask);
-            Assert.IsNull(loaded.ShreveMagnitude);
-            Assert.IsNull(loaded.OxbowMask);
-        }
-
         /// <summary>TerrainHeightmap shape as it existed after RiverMask but before ShreveMagnitude
         /// was introduced — the realistic upgrade path, since almost every existing database will
         /// already have RiverMask by the time this migration runs.</summary>
@@ -364,28 +342,6 @@ namespace EngineTests
                 RiverMask       BLOB
             );
             """;
-
-        [TestMethod]
-        public void MigrateTerrainHeightmapColumns_PreShreveRow_SurvivesAndGainsNullShreveMagnitude()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.ExecuteScript(PreShreveHeightmapSchema);
-
-            var grid = MakeGrid() with { RiverMask = [0, 1, 1, 0, 0, 1] };
-            db.ExecuteScript($"""
-                INSERT INTO TerrainHeightmap (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask)
-                VALUES ('default', 0.0, 0.0, 10.0, 3, 2, X'{Convert.ToHexString(grid.ToBytes())}', X'{Convert.ToHexString(grid.RiverMask)}');
-                """);
-
-            db.MigrateTerrainHeightmapColumns();
-
-            var loaded = db.LoadHeightmap("default");
-            Assert.IsNotNull(loaded);
-            CollectionAssert.AreEqual(grid.Values, loaded!.Values);
-            CollectionAssert.AreEqual(grid.RiverMask, loaded.RiverMask);
-            Assert.IsNull(loaded.ShreveMagnitude);
-            Assert.IsNull(loaded.OxbowMask);
-        }
 
         /// <summary>TerrainHeightmap shape as it existed after RiverMask/ShreveMagnitude but before
         /// OxbowMask (Stage 2) was introduced — the realistic upgrade path once Stage 1 has already
@@ -403,54 +359,6 @@ namespace EngineTests
                 ShreveMagnitude BLOB
             );
             """;
-
-        [TestMethod]
-        public void MigrateTerrainHeightmapColumns_PreOxbowRow_SurvivesAndGainsNullOxbowMask()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.ExecuteScript(PreOxbowHeightmapSchema);
-
-            var grid = MakeGrid() with { RiverMask = [0, 1, 1, 0, 0, 1], ShreveMagnitude = [0, 1, 1, 0, 0, 1] };
-            db.ExecuteScript($"""
-                INSERT INTO TerrainHeightmap (Id, OriginX, OriginY, CellSizeMeters, Width, Height, Data, RiverMask, ShreveMagnitude)
-                VALUES ('default', 0.0, 0.0, 10.0, 3, 2, X'{Convert.ToHexString(grid.ToBytes())}', X'{Convert.ToHexString(grid.RiverMask)}', X'{Convert.ToHexString(TerrainHeightmap.Int32ArrayToBytes(grid.ShreveMagnitude!))}');
-                """);
-
-            db.MigrateTerrainHeightmapColumns();
-
-            var loaded = db.LoadHeightmap("default");
-            Assert.IsNotNull(loaded);
-            CollectionAssert.AreEqual(grid.Values, loaded!.Values);
-            CollectionAssert.AreEqual(grid.RiverMask, loaded.RiverMask);
-            CollectionAssert.AreEqual(grid.ShreveMagnitude, loaded.ShreveMagnitude);
-            Assert.IsNull(loaded.OxbowMask);
-        }
-
-        [TestMethod]
-        public void MigrateTerrainHeightmapColumns_NoTableYet_DoesNotThrow()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-
-            db.MigrateTerrainHeightmapColumns();
-        }
-
-        [TestMethod]
-        public void MigrateTerrainHeightmapColumns_AlreadyCurrentSchema_IsIdempotent()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            SeedSchema(db);
-
-            var grid = MakeGrid() with { RiverMask = [1, 0, 0, 1, 0, 0], ShreveMagnitude = [1, 0, 0, 2, 0, 0], OxbowMask = [0, 1, 0, 0, 1, 0] };
-            db.SaveHeightmap(grid);
-
-            db.MigrateTerrainHeightmapColumns();
-            db.MigrateTerrainHeightmapColumns();
-
-            var loaded = db.LoadHeightmap("default");
-            CollectionAssert.AreEqual(grid.RiverMask, loaded!.RiverMask);
-            CollectionAssert.AreEqual(grid.ShreveMagnitude, loaded.ShreveMagnitude);
-            CollectionAssert.AreEqual(grid.OxbowMask, loaded.OxbowMask);
-        }
 
         #endregion Migration from a pre-river schema
     }

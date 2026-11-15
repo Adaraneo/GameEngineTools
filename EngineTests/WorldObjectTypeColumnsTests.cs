@@ -72,19 +72,5 @@ namespace EngineTests
             Assert.AreEqual(0.9, held.Condition, 1e-12);
         }
 
-        [TestMethod]
-        public void AWorldFromBeforeTheColumns_GetsThemOnMigration()
-        {
-            using var db = new SqliteWorldDatabase(":memory:");
-            db.ExecuteScript("""
-                CREATE TABLE WorldObjects (Id TEXT PRIMARY KEY, DisplayName TEXT NOT NULL);
-                INSERT INTO WorldObjects VALUES ('o1', 'Old');
-                """);
-            db.UserVersion = 7;
-
-            SchemaMigrator.Apply(db, SchemaMigrator.World);
-
-            Assert.IsTrue(db.HasColumn("WorldObjects", "TypeId") && db.HasColumn("WorldObjects", "OwnerId") && db.HasColumn("WorldObjects", "Condition"));
-        }
     }
 }
