@@ -803,10 +803,35 @@ public static class WorldContentGenerator
             {
                 created += AddFixture(worldDb, $"{house.Id}_bed", "Postel", WorldObjectCategory.Shelter, house.Id, AffordanceType.Rest, 0.8);
                 created += AddFixture(worldDb, $"{house.Id}_table", "Stůl a židle", WorldObjectCategory.Furniture, house.Id, AffordanceType.Rest, 0.3);
+                created += AddWaterJug(worldDb, house.Id);
             }
         }
 
         return created;
+    }
+
+    /// <summary>Minutes before a household jug is full again; the spring value, a pick (the household keeps water for about one drink per two hours).</summary>
+    private const int JugRefillMinutes = 120;
+
+    /// <summary>A jug of water in a house, same affordance and hydration as <c>spring_water</c>; the household refills it, nobody carries water.</summary>
+    private static int AddWaterJug(SqliteWorldDatabase worldDb, string houseId)
+    {
+        worldDb.AddObject(new WorldObject
+        {
+            Id = $"{houseId}_jug",
+            DisplayName = "Džbán s vodou",
+            Category = WorldObjectCategory.Drink,
+            LocationId = houseId,
+            IsAvailable = true,
+            IsPickable = false,
+            Respawns = true,
+            RespawnMinutes = JugRefillMinutes,
+            WeightGrams = 10_000,
+            ItemKind = PickupItemKind.Drink,
+            Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.85)],
+            NutritionalProfile = new NutritionalProfile(HydrationGain: 85),
+        });
+        return 1;
     }
 
     private static int AddFixture(

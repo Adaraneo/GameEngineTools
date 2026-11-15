@@ -341,6 +341,25 @@ namespace EngineTests
                 "MoveTo:Drink must use PickupItemKind.Drink memory, not Food.");
         }
 
+        /// <summary>A jug in a neighbour's house is not a place to go for water; the same jug in the character's own house is.</summary>
+        [TestMethod]
+        public void RouteMoveTo_DrinkMemory_SkipsAForeignHome_ButNotItsOwn()
+        {
+            var knownObjects = new[] { new ObjectLocationFact("jug_01", TavernId, Now, 0.80, PickupItemKind.Drink) };
+            var worldMap = BuildMap(new[] { (HomeId, TavernId, 50.0) });
+
+            var thirsty = BuildForagingHuman(HomeId, MoveToDrink, knownObjects);
+            var neighbour = BuildForagingHuman(TavernId, Idle, Array.Empty<ObjectLocationFact>());
+            neighbour.Home = TavernId;
+            BuildOrchestrator(worldMap, new EmptyWorldObjectProvider()).OnTick(Now, new IHuman[] { thirsty, neighbour });
+            Assert.AreEqual(HomeId, _locationService.GetLocation(thirsty.Id), "Someone else lives at the tavern: no walking in for a drink.");
+
+            var owner = BuildForagingHuman(HomeId, MoveToDrink, knownObjects);
+            owner.Home = TavernId;
+            BuildOrchestrator(worldMap, new EmptyWorldObjectProvider()).OnTick(Now, new IHuman[] { owner });
+            Assert.AreEqual(TavernId, _locationService.GetLocation(owner.Id), "Its own home is fine.");
+        }
+
         // ══════════════════════════════════════════════════════════════════════
         // Test 7 — Travel time: character stays in transit, arrives after the trip
         // ══════════════════════════════════════════════════════════════════════
@@ -520,10 +539,13 @@ namespace EngineTests
 
             public HumanId Id { get; }
 
+            /// <summary>The home location of this character, if any.</summary>
+            public string? Home { get; set; }
+
             public Identity Identity => new(
                 new Name { Original = "Test", Familiar = new[] { "Test" } },
                 new Surname { Male = "Forager", Female = "Forager" },
-                WDateOnly.New(80, 1, 1));
+                WDateOnly.New(80, 1, 1)) { HomeLocationId = Home };
 
             public SexBiology Biology => SexBiology.Female;
             public Personality Personality => _personality;

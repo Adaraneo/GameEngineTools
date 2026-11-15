@@ -1072,6 +1072,7 @@ namespace GameEngineTools.World.Simulation
             // recorded so the per-character loop below does not immediately re-route them on
             // a now-stale MoveTo (they have only just arrived — let them act next substep).
             var arrivedThisSubstep = ProcessArrivals(now);
+            var homesFresh = false;
 
             foreach (var character in chars)
             {
@@ -1104,6 +1105,12 @@ namespace GameEngineTools.World.Simulation
                 // These bypass LocationType routing and search by required object category.
                 if (moveTo.ActionName is MoveToFood or MoveToDrink)
                 {
+                    if (moveTo.ActionName == MoveToDrink && !homesFresh)
+                    {
+                        RefreshHomes(chars);
+                        homesFresh = true;
+                    }
+
                     var category = moveTo.ActionName == MoveToFood
                         ? WorldObjectCategory.Food
                         : WorldObjectCategory.Drink;
@@ -1156,6 +1163,23 @@ namespace GameEngineTools.World.Simulation
                 CommitMove(character, chosen.Value, now);
             }
         }
+
+        private readonly Dictionary<string, HashSet<HumanId>> _homeOwners = new(StringComparer.Ordinal);
+
+        private void RefreshHomes(IReadOnlyList<IHuman> chars)
+        {
+            _homeOwners.Clear();
+            foreach (var c in chars)
+            {
+                if (c.Identity.HomeLocationId is not { } home) continue;
+                if (!_homeOwners.TryGetValue(home, out var owners)) _homeOwners[home] = owners = new HashSet<HumanId>();
+                owners.Add(c.Id);
+            }
+        }
+
+        /// <summary>True when the location is the home of someone else; a thirsty character does not walk into a neighbour's house for water.</summary>
+        private bool IsForeignHome(IHuman character, string locationId)
+            => _homeOwners.TryGetValue(locationId, out var owners) && !owners.Contains(character.Id);
 
         /// <summary>
         /// Places every traveller whose arrival time has been reached and removes them from the
@@ -1374,7 +1398,8 @@ namespace GameEngineTools.World.Simulation
             // GetAllObjects neither filters nor reports consumed objects, so a location counts only if something is ready there now.
             var candidateLocations = _objectProvider
                 .GetAllObjects()
-                .Where(o => o.Category == category && o.IsAvailable && o.LocationId != currentLocationId)
+                .Where(o => o.Category == category && o.IsAvailable && o.LocationId != currentLocationId
+                            && !(category == WorldObjectCategory.Drink && IsForeignHome(character, o.LocationId)))
                 .Select(o => o.LocationId)
                 .ToHashSet(StringComparer.Ordinal);
 
@@ -1478,7 +1503,8 @@ namespace GameEngineTools.World.Simulation
             var rememberedLocations = knownObjects
                 .Where(f => f.ItemKind == itemKind
                          && f.Confidence >= _options.MinMemoryConfidence
-                         && f.LocationId != currentLocationId)
+                         && f.LocationId != currentLocationId
+                         && !(itemKind == PickupItemKind.Drink && IsForeignHome(character, f.LocationId)))
                 .GroupBy(f => f.LocationId)
                 .Select(g => (
                     LocationId: g.Key,

@@ -598,6 +598,10 @@ public class WorldContentGeneratorTests
             var inside = db.GetAllObjectsAt(house.Id);
             Assert.IsTrue(inside.Any(o => o.Category == WorldObjectCategory.Shelter), $"{house.Id} needs a bed to sleep at home.");
             Assert.IsTrue(inside.Any(o => o.Category == WorldObjectCategory.Furniture), $"{house.Id} needs furniture for SelfCare.");
+            var jug = inside.SingleOrDefault(o => o.Category == WorldObjectCategory.Drink);
+            Assert.IsNotNull(jug, $"{house.Id} needs a jug of water for waking up thirsty.");
+            Assert.IsTrue(jug!.Respawns && jug.Affordances.Any(a => a.Type == AffordanceType.Thirst));
+            Assert.AreEqual(85.0, jug.NutritionalProfile!.HydrationGain);
         }
     }
 
