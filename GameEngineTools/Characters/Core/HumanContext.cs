@@ -37,6 +37,9 @@ namespace GameEngineTools.Characters.Core
         public Engines.Behavior.ActionSlotMask OccupiedSlots { get; internal set; } = Engines.Behavior.ActionSlotMask.None;
 
         /// <inheritdoc/>
+        public double BodyMassKg { get; internal set; }
+
+        /// <inheritdoc/>
         public IEventBus EventBus { get; init; } = default!;
 
         /// <inheritdoc/>

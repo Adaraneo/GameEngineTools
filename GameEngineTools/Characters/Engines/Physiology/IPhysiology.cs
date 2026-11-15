@@ -476,6 +476,31 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Litres per hour the stomach passes on to the body (and so into the blood): gastric emptying of water reaches about 15-20 mL/min, about 1 L/h (Gatorade Sports Science Institute review of gastric emptying, secondary). What is drunk relieves thirst at once but lowers the deficit only as fast as this.</summary>
         double WaterGastricEmptyingLitresPerHour = 1.0)
     {
+        /// <summary>
+        /// This configuration for a body of the given mass; <see cref="BodyMassKg"/> is the reference mass the litre settings were written for. Water amounts that are a share of the body
+        /// (a thirst point, the obligatory loss, the levels where the kidneys conserve, the lethal deficit) scale with the mass, so a thirst score means the same share of the body for everyone;
+        /// sweat scales with the body surface, about the mass to the power 2/3 (geometry), which makes a light person sweat more per point of thirst. Call it on the base configuration only.
+        /// </summary>
+        public PhysiologyConfig ForBody(double bodyMassKg)
+        {
+            var scale = bodyMassKg / BodyMassKg;
+            if (!(scale > 0.0) || Math.Abs(scale - 1.0) < 1e-9)
+                return this;
+
+            var surface = Math.Pow(scale, 2.0 / 3.0);
+            return this with
+            {
+                BodyMassKg = bodyMassKg,
+                LitresPerThirstPoint = LitresPerThirstPoint * scale,
+                WaterObligatoryLossLitresPerHour = WaterObligatoryLossLitresPerHour * scale,
+                WaterObligatoryLossSleepLitresPerHour = WaterObligatoryLossSleepLitresPerHour * scale,
+                WaterConservationStartLitres = WaterConservationStartLitres * scale,
+                WaterConservationFullLitres = WaterConservationFullLitres * scale,
+                SweatLitresPerHourPerLoadUnit = SweatLitresPerHourPerLoadUnit * surface,
+                SweatMaxLitresPerHour = SweatMaxLitresPerHour * surface,
+            };
+        }
+
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
             // ── Core metabolism ───────────────────────────────────────────────────────

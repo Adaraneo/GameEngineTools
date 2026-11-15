@@ -104,6 +104,53 @@ namespace EngineTests
             Assert.IsTrue(s.WaterDeficitL > 0.7 + 0.5, "Six awake hours at the free rate add about 1 L.");
         }
 
+        [TestMethod]
+        public void ABodyOfAnotherMass_ScalesTheLitres_ButNotTheScoreOfOrdinaryWater_AndMakesALightPersonSweatMoreForTheSameWork()
+        {
+            var light = Cfg.ForBody(50.0);
+            var heavy = Cfg.ForBody(90.0);
+
+            Assert.AreEqual(5.0, WaterMath.LethalDeficitL(light), 1e-9);
+            Assert.AreEqual(9.0, WaterMath.LethalDeficitL(heavy), 1e-9);
+            Assert.AreEqual(0.05 * 50.0, light.LitresPerThirstPoint * 100.0, 1e-9, "Thirst 100 is the same share of the body (5 percent) for everyone.");
+            Assert.AreEqual(WaterMath.LossPointsPerHour(false, 0.5, light), WaterMath.LossPointsPerHour(false, 0.5 * 90.0 / 50.0, heavy), 1e-9, "At the same share of the body the ordinary loss in points is the same.");
+
+            var lightSweat = HeatMath.SweatThirstPerHour(HeatMath.PotentialSweat(6.0, light), light);
+            var heavySweat = HeatMath.SweatThirstPerHour(HeatMath.PotentialSweat(6.0, heavy), heavy);
+            Assert.IsTrue(lightSweat > heavySweat, $"The same work takes more of a light body's water: {lightSweat:F1} against {heavySweat:F1} points per hour.");
+        }
+
+        [TestMethod]
+        public void Engine_UsesTheCharactersOwnBodyMass()
+        {
+            double Lethal(double kg)
+            {
+                var engine = Engine();
+                var ctx = (HumanContext)Context();
+                ctx.BodyMassKg = kg;
+                engine.Tick(WDateOnly.New(116, 1, 1).ToDateTime(), WTimeSpan.FromHours(1), ctx, new EventCollector());
+                return WaterMath.LethalDeficitL(Cfg.ForBody(kg));
+            }
+
+            Assert.AreEqual(5.0, Lethal(50.0), 1e-9);
+            var light = Engine();
+            var heavy = Engine();
+            var lightCtx = (HumanContext)Context();
+            var heavyCtx = (HumanContext)Context();
+            lightCtx.BodyMassKg = 50.0;
+            heavyCtx.BodyMassKg = 90.0;
+            var outbox = new EventCollector();
+            var now = WDateOnly.New(116, 1, 1).ToDateTime();
+            for (var i = 0; i < 6; i++)
+            {
+                light.Tick(now, WTimeSpan.FromHours(1), lightCtx, outbox);
+                heavy.Tick(now, WTimeSpan.FromHours(1), heavyCtx, outbox);
+            }
+
+            Assert.AreEqual(heavy.State.Thirst, light.State.Thirst, 0.5, "Six ordinary hours raise the score the same for both bodies.");
+            Assert.IsTrue(heavy.State.WaterDeficitL > light.State.WaterDeficitL * 1.5, "But the heavy body has lost more litres.");
+        }
+
         private static PhysiologyState Nominal() => new(
             Energy: 70, SleepDebtHours: 2, Hunger: 25, Thirst: 20, Pain: 5, ImmuneLoad: 10, BodyTempDelta: 0, Cycle: null, Aging: new PhysicalAgingState());
 

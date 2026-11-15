@@ -623,7 +623,10 @@ namespace GameEngineTools.Characters.Core
         /// Called after both Phase B and Phase C so consumers see the final state of the tick.
         /// </summary>
         private void RefreshAppearance()
-            => _projectedAppearance = Generation.AppearanceProjector.Project(_geneticBlueprint, Age);
+        {
+            _projectedAppearance = Generation.AppearanceProjector.Project(_geneticBlueprint, Age);
+            _ctx.BodyMassKg = Traits.AppearanceProjector.Compute(_projectedAppearance, Snapshot.Physiology, Biology, Snapshot.Physiology.Aging).WeightKg;
+        }
 
         private void DetectLifeStageTransition(WDateTime now, IEventCollector outbox)
         {

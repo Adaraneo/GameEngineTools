@@ -296,6 +296,9 @@ namespace GameEngineTools.Characters.Core
         /// </summary>
         ActionSlotMask OccupiedSlots { get; }
 
+        /// <summary>Body mass in kilograms (from the projected appearance); 0 when unknown, then engines use their reference mass.</summary>
+        double BodyMassKg => 0.0;
+
         /// <summary>Event bus for publishing/subscribing to domain events.</summary>
         IEventBus EventBus { get; }
 
