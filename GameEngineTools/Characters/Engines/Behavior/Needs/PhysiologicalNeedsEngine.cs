@@ -29,6 +29,19 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             var drinkDuration = BehaviorMath.ConsumptionDuration(ph.Thirst, cfg.DrinkTargetThirst, drinkRate, cfg.DrinkMinMinutes, cfg.DrinkMaxMinutes);
             var eatDuration = BehaviorMath.ConsumptionDuration(ph.Hunger, cfg.EatTargetHunger, cfg.EatRatePerHour, cfg.EatMinMinutes, cfg.EatMaxMinutes);
 
+            var candidates = new List<BehaviorCandidate>
+            {
+                new BehaviorCandidate(SelfCare, BehaviorMath.Util(needSelfCare, 0.5), WTimeSpan.FromHours(0.5), BehaviorDomain.Physiological, new[] { "PrivateSurface" }),
+                new BehaviorCandidate(Idle, BehaviorMath.Util(10, 0.3), WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological),
+                new BehaviorCandidate(MoveToRest, context.State.NeedRest, WTimeSpan.FromMinutes(20), BehaviorDomain.Physiological, new[] { "EnvironmentMovement" })
+            };
+
+            // Eating and drinking start only from a real need; otherwise a drink ends at its target and the next decision starts another.
+            if (ph.Hunger >= cfg.EatStartHunger)
+                candidates.Insert(0, new BehaviorCandidate(Eat, BehaviorMath.Util(context.State.NeedFood, 1.2), eatDuration, BehaviorDomain.Physiological));
+            if (ph.Thirst >= cfg.DrinkStartThirst)
+                candidates.Insert(ph.Hunger >= cfg.EatStartHunger ? 1 : 0, new BehaviorCandidate(Drink, BehaviorMath.Util(context.State.NeedWater, 1.1), drinkDuration, BehaviorDomain.Physiological));
+
             return new BehaviorNeedOutput(
                 new[]
                 {
@@ -37,14 +50,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     new BehaviorDrive(nameof(context.State.NeedRest), context.State.NeedRest, BehaviorDomain.Physiological),
                     new BehaviorDrive("NeedSelfCare", needSelfCare, BehaviorDomain.Physiological)
                 },
-                new List<BehaviorCandidate>
-                {
-                    new BehaviorCandidate(Eat, BehaviorMath.Util(context.State.NeedFood, 1.2), eatDuration, BehaviorDomain.Physiological),
-                    new BehaviorCandidate(Drink, BehaviorMath.Util(context.State.NeedWater, 1.1), drinkDuration, BehaviorDomain.Physiological),
-                    new BehaviorCandidate(SelfCare, BehaviorMath.Util(needSelfCare, 0.5), WTimeSpan.FromHours(0.5), BehaviorDomain.Physiological, new[] { "PrivateSurface" }),
-                    new BehaviorCandidate(Idle, BehaviorMath.Util(10, 0.3), WTimeSpan.FromMinutes(30), BehaviorDomain.Physiological),
-                    new BehaviorCandidate(MoveToRest, context.State.NeedRest, WTimeSpan.FromMinutes(20), BehaviorDomain.Physiological, new[] { "EnvironmentMovement" })
-                });
+                candidates);
         }
 
         #endregion IBehaviorNeedEngine

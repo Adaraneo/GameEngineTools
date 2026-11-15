@@ -124,7 +124,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             if (onFoodShift && context.State.NeedFood < MinNeedToSearch)
                 AddShiftProduction(context, candidates);
 
-            if (context.State.NeedFood >= MinNeedToSearch)
+            if (context.State.NeedFood >= Math.Max(MinNeedToSearch, context.Config.EatStartHunger))
             {
                 var need = context.State.NeedFood;
 
@@ -220,7 +220,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             }
 
             // ── Drink foraging ────────────────────────────────────────────────────────
-            if (context.State.NeedWater >= MinNeedToSearch &&
+            if (context.State.NeedWater >= Math.Max(MinNeedToSearch, context.Config.DrinkStartThirst) &&
                 !HasCategory(context.AvailableObjects, WorldObjectCategory.Drink))
             {
                 candidates.Add(new BehaviorCandidate(

@@ -250,7 +250,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
     /// <summary>Shortest meal in minutes. Pick.</summary>
     double EatMinMinutes = 5.0,
     /// <summary>Longest meal in minutes; 21-30 min is the longest class of self-reported dinners (YouGov 2025).</summary>
-    double EatMaxMinutes = 30.0)
+    double EatMaxMinutes = 30.0,
+    /// <summary>Thirst from which a person starts to drink; below it there is no drink to choose, so a drink ends at its target instead of turning into a chain of sips. Pick: the thirst before exercise was 36 of 100 in Capitan-Jimenez and Aragon-Vargas 2022; about 40 gives 6-8 drinking occasions a day.</summary>
+    double DrinkStartThirst = 40.0,
+    /// <summary>Hunger from which a person starts to eat; same reasoning, about 3 meals a day with a meal ending at hunger 20. Pick.</summary>
+    double EatStartHunger = 40.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public BehaviorConfig() : this(0.25, 0.1, 2, 8, 4, 12, 16, true, 10, 8, 1, 2, 75) { }

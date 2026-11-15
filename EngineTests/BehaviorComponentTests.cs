@@ -123,11 +123,23 @@ namespace EngineTests
                 => new PhysiologicalNeedsEngine().Evaluate(BehaviorComponentTestFactory.Context(hunger: hunger, thirst: thirst)).Candidates.First(c => c.Name == name).Duration;
 
             var cfg = new BehaviorConfig();
-            Assert.AreEqual((70.0 - cfg.DrinkTargetThirst) / cfg.DrinkRatePerHour * 60.0, Duration(Drink, 40, 70).TotalMinutes, 1e-6, "Thirst 70 down to the target at the default rate.");
-            Assert.IsTrue(Duration(Drink, 40, 90) > Duration(Drink, 40, 50), "A thirstier person drinks longer.");
-            Assert.AreEqual(cfg.DrinkMinMinutes, Duration(Drink, 40, 26).TotalMinutes, 1e-6, "Almost no need still takes a moment.");
-            Assert.AreEqual((40.0 - cfg.EatTargetHunger) / cfg.EatRatePerHour * 60.0, Duration(Eat, 40, 30).TotalMinutes, 1e-6);
-            Assert.AreEqual(cfg.EatMaxMinutes, Duration(Eat, 95, 30).TotalMinutes, 1e-6, "A meal never runs past the ceiling.");
+            Assert.AreEqual((70.0 - cfg.DrinkTargetThirst) / cfg.DrinkRatePerHour * 60.0, Duration(Drink, 50, 70).TotalMinutes, 1e-6, "Thirst 70 down to the target at the default rate.");
+            Assert.IsTrue(Duration(Drink, 50, 90) > Duration(Drink, 50, 50), "A thirstier person drinks longer.");
+            Assert.AreEqual((50.0 - cfg.EatTargetHunger) / cfg.EatRatePerHour * 60.0, Duration(Eat, 50, 50).TotalMinutes, 1e-6);
+            Assert.AreEqual(cfg.EatMaxMinutes, Duration(Eat, 95, 50).TotalMinutes, 1e-6, "A meal never runs past the ceiling.");
+        }
+
+        [TestMethod]
+        public void Evaluate_NoDrinkOrMealBelowTheirStartLevel_ButFromIt()
+        {
+            var cfg = new BehaviorConfig();
+            var engine = new PhysiologicalNeedsEngine();
+
+            var low = engine.Evaluate(BehaviorComponentTestFactory.Context(hunger: cfg.EatStartHunger - 1, thirst: cfg.DrinkStartThirst - 1)).Candidates;
+            Assert.IsFalse(low.Any(c => c.Name == Eat) || low.Any(c => c.Name == Drink), "Below the start level there is nothing to choose, so a drink cannot turn into a chain of sips.");
+
+            var at = engine.Evaluate(BehaviorComponentTestFactory.Context(hunger: cfg.EatStartHunger, thirst: cfg.DrinkStartThirst)).Candidates;
+            Assert.IsTrue(at.Any(c => c.Name == Eat) && at.Any(c => c.Name == Drink));
         }
 
         [TestMethod]
