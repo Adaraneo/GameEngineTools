@@ -65,6 +65,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
                 // ── Grave visits ────────────────────────────────────────────────
                 [MoveToGrave] = ActionSlotMask.Posture,
+                [MoveToSupply] = ActionSlotMask.Posture,
                 [MournAtGrave] = ActionSlotMask.None,
             };
 

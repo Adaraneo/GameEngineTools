@@ -100,6 +100,9 @@ namespace GameEngineTools.Characters.Engines
         /// <summary>Forage-style move toward a location with a grave (reserved for behavior-driven grave visits).</summary>
         public const string MoveToGrave = "MoveTo:Grave";
 
+        /// <summary>Walk to the nearest place with an object of the type the action names (<c>TargetTypeId</c>): the workstation a craft task needs.</summary>
+        public const string MoveToSupply = "MoveTo:Supply";
+
         #endregion Bereavement / burial
 
         #region Food economy (Tier 1)

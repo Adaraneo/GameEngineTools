@@ -184,6 +184,9 @@ namespace GameEngineTools.World.Objects
         /// <summary>The character who owns this object, or <c>null</c> when it belongs to nobody (a shared tool, a fixture).</summary>
         public HumanId? OwnerId { get; init; } = null;
 
+        /// <summary>The character the owner has lent this object to; while set, that character may use it as if it were theirs. <c>null</c> when it is not lent.</summary>
+        public HumanId? LentTo { get; init; } = null;
+
         /// <summary>Condition from 1 (new) down to 0 (worn out); only meaningful for a type that wears.</summary>
         public double Condition { get; init; } = 1.0;
 

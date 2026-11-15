@@ -117,7 +117,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         private string? ToolClassOf(FieldTask task) => _catalog.FieldTaskFor(NameOf(task))?.ToolClass;
 
         private bool HasToolFor(FieldTask task, BehaviorContext context)
-            => ToolClassOf(task) is not { } toolClass || WorkObjects.HasTool(_catalog, toolClass, context.AvailableObjects, context.HeldObjects);
+            => ToolClassOf(task) is not { } toolClass || WorkObjects.HasTool(_catalog, toolClass, context.AvailableObjects, context.HeldObjects, context.HumanContext.Id);
 
         internal static string NameOf(FieldTask task) => task switch
         {

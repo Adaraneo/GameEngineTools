@@ -162,6 +162,28 @@ namespace EngineTests
             Assert.IsFalse(withoutMill.Candidates.Any(c => c.Name == Process), "No mill here and nothing sends the baker elsewhere.");
         }
 
+        [TestMethod]
+        public void AMiller_HoldingGrainButNoMillHere_WalksToAMill_AndWorksItWhenThereIsOne()
+        {
+            var dir = FindDataDir();
+            var catalog = WorkCatalogLoader.Parse(
+                File.ReadAllText(Path.Combine(dir, "materials.json")), File.ReadAllText(Path.Combine(dir, "objecttypes.json")), File.ReadAllText(Path.Combine(dir, "tasks.json")),
+                """{ "occupations": [ { "id": "miller", "tasks": [ "recipe_flour_from_grain" ] } ] }""");
+            var engine = new ContingencySearchEngine(catalog);
+            var grain = new List<WorldObject> { WorkObjects.CreateItem(catalog, "grain", Loc, new WDateTime(0), null), WorkObjects.CreateItem(catalog, "grain", Loc, new WDateTime(0), null) };
+            var mill = WorkObjects.Spawn(catalog, "mill", "mill_1", Loc);
+
+            var away = engine.Evaluate(ShiftContext("miller", new List<WorldObject>(), grain)).Candidates.Single(c => c.Tags!.Contains("Supply"));
+            var here = engine.Evaluate(ShiftContext("miller", new List<WorldObject> { mill }, grain));
+            var withOneGrain = engine.Evaluate(ShiftContext("miller", new List<WorldObject>(), grain.Take(1).ToList()));
+
+            Assert.AreEqual(MoveToSupply, away.Name);
+            Assert.AreEqual("mill", away.TargetTypeId);
+            Assert.IsTrue(here.Candidates.Any(c => c.Name == Process && c.TaskId == "recipe_flour_from_grain"), "With the mill here the miller mills, and says which task.");
+            Assert.IsFalse(here.Candidates.Any(c => c.Name == MoveToSupply));
+            Assert.IsFalse(withOneGrain.Candidates.Any(c => c.Name == MoveToSupply), "One grain does not make flour: no point walking to the mill.");
+        }
+
         private static string FindDataDir()
         {
             var dir = new DirectoryInfo(AppContext.BaseDirectory);

@@ -1101,6 +1101,24 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
+                // ── Workstation trip (MoveTo:Supply) ────────────────────────────────────────
+                // Walks to the nearest place that has an object of the named type (the workstation a craft task needs); the provider is asked, as foraging does when memory has nothing.
+                if (moveTo.ActionName == MoveToSupply)
+                {
+                    var stationDestination = moveTo.TargetTypeId is { } typeId ? FindLocationWithObjectType(currentLocation, typeId) : null;
+                    if (stationDestination is not null)
+                    {
+                        CommitMove(character, stationDestination.Value, now);
+                    }
+                    else
+                    {
+                        using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
+                            _log.SceneMoveToFailed(character.Id.Value.ToString(), moveTo.TargetTypeId ?? "?");
+                    }
+
+                    continue;
+                }
+
                 // ── Object-category foraging movement (MoveTo:Food, MoveTo:Drink) ──────────
                 // These bypass LocationType routing and search by required object category.
                 if (moveTo.ActionName is MoveToFood or MoveToDrink)
@@ -1428,6 +1446,29 @@ namespace GameEngineTools.World.Simulation
             // Not connected to any: pick one arbitrarily and assume the configured cross-locale distance.
             var anywhere = candidateLocations.FirstOrDefault(HasReadyObject);
             return anywhere is null ? null : new MoveTarget(anywhere, _options.FallbackTravelDistanceMeters);
+        }
+
+        /// <summary>The nearest location (other than the current one) with an available, unheld object of this type: an adjacent one first, else by path length, else any at the fallback distance.</summary>
+        private MoveTarget? FindLocationWithObjectType(string? currentLocationId, string typeId)
+        {
+            if (currentLocationId is null)
+                return null;
+
+            var locations = _objectProvider.GetAllObjects()
+                .Where(o => o.IsAvailable && o.HeldBy is null && o.LocationId != currentLocationId && string.Equals(o.TypeId, typeId, StringComparison.Ordinal))
+                .Select(o => o.LocationId)
+                .ToHashSet(StringComparer.Ordinal);
+            if (locations.Count == 0)
+                return null;
+
+            var adjacent = _worldMap.GetConnections(currentLocationId).Where(c => locations.Contains(c.TargetLocationId)).OrderBy(c => c.DistanceMeters).FirstOrDefault();
+            if (adjacent is not null)
+                return new MoveTarget(adjacent.TargetLocationId, adjacent.DistanceMeters);
+
+            if (NearestByPath(currentLocationId, locations.Contains) is { } nearest)
+                return nearest;
+
+            return new MoveTarget(locations.First(), _options.FallbackTravelDistanceMeters);
         }
 
         /// <summary>Dijkstra over the connection graph: the closest location (other than the start) that satisfies <paramref name="accept"/>, with its path length.</summary>

@@ -69,8 +69,12 @@ namespace GameEngineTools.World.Work
                 ? System.Collections.Immutable.ImmutableArray<WorldObjectAffordance>.Empty
                 : type.Affordances.Select(a => new WorldObjectAffordance(Enum.Parse<AffordanceType>(a.Key), a.Value)).ToImmutableArray();
 
-        /// <summary>Whether something of the given tool class is at hand: among the objects at the place or among those the character holds.</summary>
-        public static bool HasTool(WorkCatalog catalog, string toolClass, IEnumerable<WorldObject>? atPlace, IEnumerable<WorldObject>? held)
-            => (atPlace ?? Enumerable.Empty<WorldObject>()).Concat(held ?? Enumerable.Empty<WorldObject>()).Any(o => catalog.ToolQuality(o.TypeId, toolClass) > 0.0);
+        /// <summary>Whether something of the given tool class is at hand and usable by the actor: among the objects at the place or among those the character holds.</summary>
+        public static bool HasTool(WorkCatalog catalog, string toolClass, IEnumerable<WorldObject>? atPlace, IEnumerable<WorldObject>? held, HumanId? actor)
+            => (atPlace ?? Enumerable.Empty<WorldObject>()).Concat(held ?? Enumerable.Empty<WorldObject>()).Any(o => CanUse(o, actor) && catalog.ToolQuality(o.TypeId, toolClass) > 0.0);
+
+        /// <summary>May this character use the object as a tool: it belongs to nobody, to them, or its owner has lent it to them.</summary>
+        public static bool CanUse(WorldObject tool, HumanId? actor)
+            => tool.OwnerId is null || tool.OwnerId == actor || tool.LentTo == actor && actor is not null;
     }
 }

@@ -89,6 +89,39 @@ namespace EngineTests
         #endregion Setup
 
         // ══════════════════════════════════════════════════════════════════════
+        // MoveTo:Supply — walk to the workstation a craft task needs
+        // ══════════════════════════════════════════════════════════════════════
+
+        [TestMethod]
+        public void RouteMoveTo_Supply_WalksToTheNearestPlaceWithTheNamedWorkstation()
+        {
+            var worldMap = BuildMap(new[] { (HomeId, TavernId, 60.0), (HomeId, MarketId, 40.0) });
+            var character = BuildForagingHuman(HomeId, MoveToSupply, Array.Empty<ObjectLocationFact>(), targetTypeId: "mill");
+            var provider = new FixedWorldObjectProvider(new[]
+            {
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "tavern_mill", TavernId),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "market_mill", MarketId),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "home_oven", HomeId),
+            });
+
+            BuildOrchestrator(worldMap, provider).OnTick(Now, new[] { character });
+
+            Assert.AreEqual(MarketId, _locationService.GetLocation(character.Id), "The mill at the nearer place; the oven at home is not a mill.");
+        }
+
+        [TestMethod]
+        public void RouteMoveTo_Supply_WithNoSuchWorkstationAnywhere_StaysPut()
+        {
+            var worldMap = BuildMap(new[] { (HomeId, TavernId, 60.0) });
+            var character = BuildForagingHuman(HomeId, MoveToSupply, Array.Empty<ObjectLocationFact>(), targetTypeId: "mill");
+            var provider = new FixedWorldObjectProvider(new[] { GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "tavern_oven", TavernId) });
+
+            BuildOrchestrator(worldMap, provider).OnTick(Now, new[] { character });
+
+            Assert.AreEqual(HomeId, _locationService.GetLocation(character.Id));
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
         // Test 1 — Memory has food location → uses it
         // ══════════════════════════════════════════════════════════════════════
 
@@ -469,7 +502,8 @@ namespace EngineTests
         private ForagingHuman BuildForagingHuman(
             string currentLocation,
             string action,
-            IReadOnlyList<ObjectLocationFact> knownObjects)
+            IReadOnlyList<ObjectLocationFact> knownObjects,
+            string? targetTypeId = null)
         {
             var id = new HumanId(Guid.NewGuid());
 
@@ -494,7 +528,7 @@ namespace EngineTests
                 Sociosexuality.Intermediate,
                 Chronotype.Neutral);
 
-            var committed = new ActionCommitted(Now, id, action, WTimeSpan.FromMinutes(20));
+            var committed = new ActionCommitted(Now, id, action, WTimeSpan.FromMinutes(20), TargetTypeId: targetTypeId);
 
             var human = new ForagingHuman(id, personality, snapshot, committed);
             _locationService.MoveCharacter(id, currentLocation);

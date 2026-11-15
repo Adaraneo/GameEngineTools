@@ -212,7 +212,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             }
 
             outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason));
-            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason, result.SelectedCandidate.ObjectInteraction, result.SelectedCandidate.TaskId));
+            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason, result.SelectedCandidate.ObjectInteraction, result.SelectedCandidate.TaskId, result.SelectedCandidate.TargetTypeId));
             EmitInteractionProposalIfNeeded(now, ctx, outbox, result.SelectedCandidate);
             SetCooldownsForCommittedAction(ctx.Id, result.SelectedCandidate.Name);
             using (_log.BeginCharacterScope(
@@ -245,7 +245,8 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     secondary.SocialTargeting?.TargetHuman,
                     null, null,
                     secondary.ObjectInteraction,
-                    secondary.TaskId));
+                    secondary.TaskId,
+                    secondary.TargetTypeId));
 
                 using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultBehaviorEngine),
                        tickKey: now.WorldTicks.ToString()))

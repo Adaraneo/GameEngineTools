@@ -42,5 +42,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// </summary>
         ActionSlotMask SlotMask = ActionSlotMask.None,
         /// <summary>The craft task a <c>Process</c> action is meant to do (its id in tasks.json); null lets the object engine choose.</summary>
-        string? TaskId = null);
+        string? TaskId = null,
+        /// <summary>For <c>MoveTo:Supply</c>: the id of the object type to walk to.</summary>
+        string? TargetTypeId = null);
 }

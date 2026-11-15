@@ -292,6 +292,24 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             return false;
         }
 
+        /// <summary>On shift, holding what a recipe of the occupation needs, but the workstation for it is not here: the type of that workstation, to walk to.</summary>
+        private bool TryFindSupplyTrip(BehaviorContext context, out string? stationTypeId)
+        {
+            var occupation = context.HumanContext.Snapshot.Schedule?.Occupation;
+            foreach (var goal in _recipes.All.Where(r => _catalog.OccupationDoes(occupation, r.Id)))
+            {
+                var stationHere = context.AvailableObjects!.Any(o => ProductionSites.IsStation(_catalog, o) && string.Equals(o.TypeId, goal.StationTypeId, StringComparison.Ordinal));
+                if (!stationHere && SupplyChain.CanSatisfy(goal, context.AvailableObjects!, context.HeldObjects))
+                {
+                    stationTypeId = goal.StationTypeId;
+                    return true;
+                }
+            }
+
+            stationTypeId = null;
+            return false;
+        }
+
         private void AddShiftProduction(BehaviorContext context, List<BehaviorCandidate> candidates)
         {
             if (TryFindSatisfiableRecipe(context.AvailableObjects!, context.HeldObjects, out var recipe, context.HumanContext.Snapshot.Schedule?.Occupation))
@@ -306,6 +324,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 candidates.Add(new BehaviorCandidate(
                     Process, ShiftProductionUtility - 1.0, WTimeSpan.FromMinutes(supply!.DurationMinutes),
                     BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy", "Supply" }, TaskId: supply.Id));
+            }
+
+            else if (TryFindSupplyTrip(context, out var station))
+            {
+                candidates.Add(new BehaviorCandidate(
+                    MoveToSupply, ShiftProductionUtility - 3.0, WTimeSpan.FromMinutes(20),
+                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy", "Supply" }, TargetTypeId: station));
             }
 
             else if (HasRawProductionSite(context.AvailableObjects!))
