@@ -12,6 +12,7 @@ public sealed class WorldCalendar
     public string? Planet { get; private set; }
     public string? PlanetName { get; private set; }
     public WorldTimeSpec? Spec { get; private set; }
+    /// <summary>Detail stays server-side (log); the API only reports that the calendar is unavailable.</summary>
     public string? Error { get; private set; }
 
     public static WorldCalendar Load(string? path, ILogger log)
@@ -48,7 +49,7 @@ public sealed class WorldCalendar
             planet = Planet,
             daysInYear = cal?.DaysInYear(1),
             monthLengths = cal == null ? null : Enumerable.Range(1, months!.Value).Select(m => cal.DaysInMonth(1, m)).ToArray(),
-            calendarError = Error,
+            calendarError = Error != null ? "world calendar unavailable" : null,
             runStamp,
         };
     }
