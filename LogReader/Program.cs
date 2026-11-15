@@ -19,6 +19,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 });
 builder.Services.AddSingleton(options);
+var worldCalendar = WorldCalendar.Load(options.WorldSettingsPath, LoggerFactory.Create(b => b.AddConsole()).CreateLogger("WorldCalendar"));
 builder.Services.AddSingleton(new EventRegistry(Path.Combine(AppContext.BaseDirectory, "eventRegistry.json")));
 builder.Services.AddSingleton<LogStore>();
 
@@ -55,11 +56,7 @@ app.Use(async (ctx, next) =>
 
 var api = app.MapGroup("/api");
 
-api.MapGet("/config", () => new
-{
-    calMonths = options.Calendar.Months, calDays = options.Calendar.Days, calHours = options.Calendar.Hours,
-    calName = options.Calendar.Name, runStamp = store.RunStamp,
-});
+api.MapGet("/config", () => worldCalendar.ToConfig(store.RunStamp));
 
 api.MapPost("/reset", async () =>
 {

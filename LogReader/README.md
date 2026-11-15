@@ -20,7 +20,7 @@ Open http://localhost:3000 (change it with `Urls` in `appsettings.json`).
 | `WorldDbPath` | Optional engine `world.db`; powers the Map tab |
 | `CacheTtlMs` | In-memory cache TTL (snapshot-derived data lives 6 h regardless) |
 | `LoadBatchSize` | Characters per batch during load-all (RAM vs. I/O) |
-| `Calendar` | World calendar sent to the UI (Vigilia Insectianis by default) |
+| `WorldSettingsPath` | `appsettings.World.json` of the simulation; planet, hours per day and the calendar are derived from it via the engine (`World:Planet` layering) and sent to the UI |
 
 ## Layout
 

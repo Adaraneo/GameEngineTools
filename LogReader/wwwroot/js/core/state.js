@@ -5,7 +5,7 @@ export const state = {
   currentCharId: null,
   currentTab: 'profile',
   /** World calendar config (loaded from the server). */
-  worldCal: { calMonths: 10, calDays: 36, calHours: 26, calName: 'Vigilia Insectianis' },
+  worldCal: { calMonths: null, calHours: null, calName: null },
   /** Client-side cache of { id => profile }. */
   npcMapCache: new Map(),
   /** Full relationship data for the current character. */

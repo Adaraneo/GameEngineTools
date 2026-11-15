@@ -22,15 +22,8 @@ public sealed class LogReaderOptions
     /// <summary>Characters processed per batch during load-all.</summary>
     public int LoadBatchSize { get; set; } = 10;
 
-    public CalendarOptions Calendar { get; set; } = new();
-}
-
-public sealed class CalendarOptions
-{
-    public int Months { get; set; } = 10;
-    public int Days { get; set; } = 36;
-    public int Hours { get; set; } = 26;
-    public string Name { get; set; } = "Vigilia Insectianis";
+    /// <summary>appsettings.World.json of the simulation that wrote the logs; the world calendar is derived from it.</summary>
+    public string WorldSettingsPath { get; set; } = "";
 }
 
 /// <summary>Thread-safe cache with per-key TTL.</summary>
