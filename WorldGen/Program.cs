@@ -60,7 +60,16 @@ Console.WriteLine($"Katalog jídla/pití/odpočinku: {catalog.Count} vzorů ({ca
 
 // worldgen genuinely creates world.db when it doesn't exist yet — unlike TerraGen (which stays
 // terrain-only), adding locations/connections/objects to a world.db is its entire purpose.
-using var worldDb = new SqliteWorldDatabase(options.WorldDbPath);
+// The generated world lives in world.gen.db; world.db, the one hosts play in, is made from it at the end, so a reset can always return to what was generated.
+// A world.db from before this split becomes the first world.gen.db (kept as it is, so generation still adds to what was there).
+var genPath = WorldBaselineFiles.PathFor(options.WorldDbPath);
+if (!File.Exists(genPath) && File.Exists(options.WorldDbPath))
+{
+    WorldBaselineFiles.Publish(options.WorldDbPath, genPath);
+    Console.WriteLine($"Existující {options.WorldDbPath} převzat jako základ {genPath}.");
+}
+
+using var worldDb = new SqliteWorldDatabase(genPath);
 WorldDatabaseSeeder.Initialize(worldDb);
 
 var rng = options.Seed is { } seed ? new Random(seed) : new Random();
@@ -142,8 +151,10 @@ Console.WriteLine($"Generuji {options.Count} lokací v regionu '{options.Region}
 
 var result = WorldContentGenerator.Generate(worldDb, tiles, genOptions, rng, catalog);
 
+WorldBaselineFiles.Publish(genPath, options.WorldDbPath);
+
 Console.WriteLine($"Hotovo — {result.LocationsPlaced}/{options.Count} lokací, {result.ConnectionsCreated} spojení, " +
-                   $"{result.ObjectsCreated} objektů uloženo do {options.WorldDbPath}.");
+                   $"{result.ObjectsCreated} objektů uloženo do {genPath}; pracovní {options.WorldDbPath} z něj vytvořen znovu.");
 if (result.CemeteryLocationId is not null)
     Console.WriteLine($"Hřbitov: {result.CemeteryLocationId}");
 if (result.LocationsPlaced < options.Count)
