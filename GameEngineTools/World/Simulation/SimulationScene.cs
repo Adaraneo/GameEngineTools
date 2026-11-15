@@ -91,6 +91,7 @@ namespace GameEngineTools.World.Simulation
 
         /// <summary>When set, the live character list is cleared at the next substep boundary (world replace).</summary>
         private bool _resetRequested;
+        private bool _initialStateRequested;
 
         #endregion Privátní pole
 
@@ -207,6 +208,20 @@ namespace GameEngineTools.World.Simulation
             lock (_addLock)
             {
                 _resetRequested = true;
+            }
+        }
+
+        /// <summary>
+        /// Requests that every character return to the state it had after generation (<see cref="IHuman.ResetToInitialState"/>) at the next step boundary:
+        /// engines, identity, inbox, scheduled events and a running sleep; the dead are alive again and every character is moved to its home.
+        /// The world clock, the world objects and the orchestrator's own bookkeeping (call its <c>Reset()</c> from <see cref="SimulationSceneOptions.OnCharactersReset"/>) are not touched.
+        /// Thread-safe.
+        /// </summary>
+        public void ResetCharactersToInitialState()
+        {
+            lock (_addLock)
+            {
+                _initialStateRequested = true;
             }
         }
 
@@ -387,6 +402,21 @@ namespace GameEngineTools.World.Simulation
                     _characters.Clear();
                     _deadCharacters.Clear();
                     _resetRequested = false;
+                }
+
+                if (_initialStateRequested)
+                {
+                    _initialStateRequested = false;
+                    var now = _clock.Now;
+                    foreach (var character in _characters)
+                    {
+                        character.ResetToInitialState(now);
+                        if (_options.LocationService is { } locations && character.Identity.HomeLocationId is { } home)
+                            locations.MoveCharacter(character.Id, home);
+                    }
+
+                    _deadCharacters.Clear();
+                    _options.OnCharactersReset?.Invoke(now, _characters);
                 }
 
                 if (_pendingAdditions.Count == 0)

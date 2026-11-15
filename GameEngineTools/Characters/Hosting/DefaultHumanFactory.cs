@@ -238,6 +238,8 @@ namespace GameEngineTools.Characters.Hosting
                 Economy = economyState
             }, _clock.Now.Date);
 
+            human.CaptureInitialState();
+
             return human;
         }
 

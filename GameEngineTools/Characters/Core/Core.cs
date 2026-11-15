@@ -129,6 +129,20 @@ namespace GameEngineTools.Characters.Core
         void SetHomeLocation(string? locationId) { }
 
         /// <summary>
+        /// Remembers the character's present state (engines, identity) as the state a later <see cref="ResetToInitialState"/> returns to.
+        /// The factory calls it when it creates the character; a host that changes the character afterwards (wired kin, a settled home) calls it again once the world is set up.
+        /// The default does nothing, for test stubs.
+        /// </summary>
+        void CaptureInitialState() { }
+
+        /// <summary>
+        /// Returns the character to the state it was captured in: every engine, the identity (home, surname), the inbox, scheduled events, running action slots and sleep.
+        /// Where the character stands, the objects it holds and the world clock belong to the host and are not touched here.
+        /// </summary>
+        /// <param name="now">Current game time; age-dependent subsystems are revalidated against its date, and the daily schedule is registered from it.</param>
+        void ResetToInitialState(WDateTime now) { }
+
+        /// <summary>
         /// Changes the character's occupation and re-seeds the daily schedule.
         /// Existing scheduled slots for the current and future days are replaced.
         /// </summary>
@@ -356,6 +370,9 @@ namespace GameEngineTools.Characters.Core
         /// <summary>Returns the actions due at or before <paramref name="now"/> (pull model).</summary>
         /// <param name="now">Current game time.</param>
         IEnumerable<(ScheduledId id, ScheduledAction action)> Due(WDateTime now);
+
+        /// <summary>Drops every pending action (a character's scheduler is its own). The default does nothing, for test stubs.</summary>
+        void Clear() { }
     }
 
     /// <summary>Identifier for a scheduled action.</summary>

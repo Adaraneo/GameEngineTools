@@ -94,6 +94,12 @@ namespace GameEngineTools.World.Simulation
         /// </remarks>
         public WTimeSpan? InternalSubstep { get; init; }
 
+        /// <summary>
+        /// Called after <see cref="SimulationScene.ResetCharactersToInitialState"/> has reset the characters, before the next step: the place for a host to reset what it owns
+        /// (for example <c>DefaultSceneOrchestrator.Reset()</c>).
+        /// </summary>
+        public Action<WDateTime, IReadOnlyList<IHuman>>? OnCharactersReset { get; init; }
+
         /// <summary>Default LOD tier assigned to characters when no resolver is provided.</summary>
         public CognitiveResolutionLevel DefaultCharacterLod { get; init; } = CognitiveResolutionLevel.Nearby;
 

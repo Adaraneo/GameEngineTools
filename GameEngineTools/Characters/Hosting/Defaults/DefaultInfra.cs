@@ -129,6 +129,14 @@ namespace GameEngineTools.Characters.Hosting.Defaults
             return ScheduleAt(now + delay, action, tag);
         }
 
+        public void Clear()
+        {
+            lock (_lock)
+            {
+                _items.Clear();
+            }
+        }
+
         public bool Cancel(ScheduledId id)
         {
             lock (_lock)

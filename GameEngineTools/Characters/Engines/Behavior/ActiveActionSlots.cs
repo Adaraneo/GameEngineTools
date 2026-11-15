@@ -78,6 +78,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 _entries.Remove(key);
         }
 
+        /// <summary>Releases every slot.</summary>
+        public void Clear() => _entries.Clear();
+
         /// <summary>
         /// Forcibly releases the slot(s) held by <paramref name="actionName"/>.
         /// Used when an action is interrupted or cancelled.

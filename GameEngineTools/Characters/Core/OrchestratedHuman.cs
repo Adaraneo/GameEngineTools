@@ -156,6 +156,10 @@ namespace GameEngineTools.Characters.Core
 
         private WTimeSpan _behaviorAccumulated;
 
+        // The state a reset returns to; the factory captures it at creation, a host recaptures it once the world is set up.
+        private EnginesSnapshot _initialSnapshot;
+        private Identity _initialIdentity;
+
         // Last observed life stage; used to emit LifeStageTransitionOccurred on change.
         // Volatile runtime state (derivable from age) — not persisted in EnginesSnapshot.
         private StadiumType? _lastStadium;
@@ -266,6 +270,8 @@ namespace GameEngineTools.Characters.Core
             _economy = economy;
 
             Snapshot = initialSnapshot;
+            _initialSnapshot = initialSnapshot;
+            _initialIdentity = identity;
             _behaviorCadencePolicy = behaviorCadencePolicy;
             _behaviorAccumulated = WTimeSpan.Zero;
 
@@ -697,6 +703,35 @@ namespace GameEngineTools.Characters.Core
                 HierarchyStability = hierarchyStability,
             };
             _ctx.Snapshot = Snapshot;
+        }
+
+        /// <inheritdoc/>
+        public void CaptureInitialState()
+        {
+            _initialSnapshot = Snapshot;
+            _initialIdentity = Identity;
+        }
+
+        /// <inheritdoc/>
+        public void ResetToInitialState(WDateTime now)
+        {
+            Identity = _initialIdentity;
+            _ctx.Identity = Identity;
+
+            _scheduler.Clear();
+            while (_inbox.TryDequeue(out _)) { }
+            _lastOutboxAccumulator.Clear();
+            _slots.Clear();
+            _behaviorAccumulated = WTimeSpan.Zero;
+            _lastStadium = null;
+
+            RestoreSnapshot(_initialSnapshot, now.Date);
+
+            // The scheduler was emptied, so the routine is registered again from the restored occupation.
+            if (_initialSnapshot.Schedule is { } routine)
+                _schedule.SeedFromOccupation(routine.Occupation, Personality, now, _scheduler, Id);
+
+            RefreshAppearance();
         }
 
         /// <inheritdoc/>
