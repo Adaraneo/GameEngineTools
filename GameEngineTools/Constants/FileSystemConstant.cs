@@ -103,6 +103,12 @@ namespace GameEngineTools.Constants
             /// </summary>
             public const string Nutrition = SourceDirectory.World + "Nutrition" + Extension.SourceCsv;
 
+            /// <summary>Disk-override path of the materials file read by <see cref="GameEngineTools.World.Work.WorkCatalogLoader"/>; when absent the built-in copy is used.</summary>
+            public const string WorkMaterials = SourceDirectory.World + "materials.json";
+
+            /// <summary>Disk-override path of the object types file read by <see cref="GameEngineTools.World.Work.WorkCatalogLoader"/>; when absent the built-in copy is used.</summary>
+            public const string WorkObjectTypes = SourceDirectory.World + "objecttypes.json";
+
             /// <summary>
             /// Disk-override path for the default <c>SocialNorms</c> catalog consumed by
             /// <see cref="GameEngineTools.World.Data.SocialNormCatalogLoader"/>. When absent, the

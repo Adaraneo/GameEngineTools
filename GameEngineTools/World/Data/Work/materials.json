@@ -1,0 +1,17 @@
+// Materials of the work system. densityKgM3: typical air-dry or bulk values from engineering handbooks, approximate (secondary).
+// Add a material by adding an entry; object types refer to it by id.
+{
+  "materials": [
+    { "id": "iron",       "name": "Železo",         "class": "Metal",   "densityKgM3": 7870, "source": "handbook typical value" },
+    { "id": "steel",      "name": "Ocel",           "class": "Metal",   "densityKgM3": 7850, "source": "handbook typical value" },
+    { "id": "copper",     "name": "Měď",            "class": "Metal",   "densityKgM3": 8960, "source": "handbook typical value" },
+    { "id": "bronze",     "name": "Bronz",          "class": "Metal",   "densityKgM3": 8800, "source": "handbook typical value (copper-tin, varies 8700-8900)" },
+    { "id": "ash_wood",   "name": "Jasanové dřevo", "class": "Wood",    "densityKgM3": 690,  "source": "air-dry, handbook typical value" },
+    { "id": "oak_wood",   "name": "Dubové dřevo",   "class": "Wood",    "densityKgM3": 750,  "source": "air-dry, handbook typical value" },
+    { "id": "beech_wood", "name": "Bukové dřevo",   "class": "Wood",    "densityKgM3": 720,  "source": "air-dry, handbook typical value" },
+    { "id": "pine_wood",  "name": "Borové dřevo",   "class": "Wood",    "densityKgM3": 520,  "source": "air-dry, handbook typical value" },
+    { "id": "flint",      "name": "Pazourek",       "class": "Stone",   "densityKgM3": 2600, "source": "handbook typical value" },
+    { "id": "granite",    "name": "Žula",           "class": "Stone",   "densityKgM3": 2700, "source": "handbook typical value" },
+    { "id": "leather",    "name": "Kůže",           "class": "Leather", "densityKgM3": 860,  "source": "approximate; varies with tanning" }
+  ]
+}

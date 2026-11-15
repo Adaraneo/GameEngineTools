@@ -40,6 +40,7 @@
     <EmbeddedResource Include="World\Data\SocialNorms.csv" />
     <!-- Shipped planets (World:Planet); an appsettings.World.<Name>.json next to the base file overrides them. -->
     <EmbeddedResource Include="Config\Planets\*.json" LogicalName="GameEngineTools.Planets.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="World\Data\Work\*.json" LogicalName="GameEngineTools.Work.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
