@@ -414,6 +414,26 @@ namespace EngineTests
                 "After arrival the character is no longer in transit.");
         }
 
+        /// <summary>A trip that fits in one clock step happens at once; a longer one is still timed.</summary>
+        [TestMethod]
+        public void RouteMoveTo_TripShorterThanTheThreshold_ArrivesAtOnce_LongerTripStillTimed()
+        {
+            var knownObjects = new[] { new ObjectLocationFact("well_01", TavernId, Now, 0.80, PickupItemKind.Drink) };
+            var options = new SceneOrchestratorOptions { EnableTravelTime = true, InstantTravelBelowMinutes = 15.0 };
+
+            // 50 m at 80 m/min is under a minute.
+            var near = BuildForagingHuman(HomeId, MoveToDrink, knownObjects);
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), new EmptyWorldObjectProvider(), options).OnTick(Now, new[] { near });
+            Assert.AreEqual(TavernId, _locationService.GetLocation(near.Id), "A trip under the threshold must not hold the character in transit.");
+
+            // 1600 m is 20 minutes, above the threshold.
+            var far = BuildForagingHuman(HomeId, MoveToDrink, knownObjects);
+            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 1600.0) }), new EmptyWorldObjectProvider(), options);
+            orchestrator.OnTick(Now, new[] { far });
+            Assert.IsNull(_locationService.GetLocation(far.Id), "A 20 minute trip is still in transit.");
+            Assert.AreEqual(TavernId, orchestrator.GetTravelDestination(far.Id));
+        }
+
         // ══════════════════════════════════════════════════════════════════════
         // Factory helpers
         // ══════════════════════════════════════════════════════════════════════

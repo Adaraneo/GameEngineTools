@@ -59,7 +59,7 @@ namespace WorldObserver.Simulation
         }
 
         /// <summary>Loads the world and returns the pieces the host wires into a scene.</summary>
-        public static WorldContext Build(GameEngineToolsRuntimeHandle runtime, int characterCount, int coupleCount = 0, int? seed = null)
+        public static WorldContext Build(GameEngineToolsRuntimeHandle runtime, int characterCount, int coupleCount = 0, int? seed = null, double instantTravelBelowMinutes = 0.0)
         {
             var services = runtime.Services;
             var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
@@ -171,7 +171,7 @@ namespace WorldObserver.Simulation
                 // Realistic movement: MoveTo:* takes travel time (character is held in transit
                 // at its origin until the trip duration elapses) instead of teleporting.
                 // Cemetery location: dead are interred there; grievers route to visit.
-                new SceneOrchestratorOptions { EnableTravelTime = true, CemeteryLocationId = "cemetery" },
+                new SceneOrchestratorOptions { EnableTravelTime = true, CemeteryLocationId = "cemetery", InstantTravelBelowMinutes = instantTravelBelowMinutes },
                 services.GetService<CommunityReputationLedger>(),
                 services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>(),
                 services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>(),

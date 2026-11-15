@@ -1232,7 +1232,7 @@ namespace GameEngineTools.World.Simulation
 
             var minutes = TravelDurationComputer.ComputeMinutes(target.DistanceMeters, speed);
 
-            if (minutes <= 0.0)
+            if (minutes <= Math.Max(0.0, _options.InstantTravelBelowMinutes))
             {
                 Arrive(character.Id, target.LocationId);
                 return;

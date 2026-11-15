@@ -55,7 +55,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     writeTextLogs: false,
     configureServices: static s => s.AddLexicalAcquisition()))
 {
-    var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples, options.Seed);
+    var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples, options.Seed, options.Run.SubstepMinutes);
     var objects = runtime.Services.GetRequiredService<GameEngineTools.World.Objects.IWorldObjectProvider>();
     collector.FarmSampler = () => objects.GetAllObjects();
 

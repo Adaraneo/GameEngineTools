@@ -50,6 +50,13 @@ namespace GameEngineTools.World.Simulation
         public double FallbackTravelDistanceMeters { get; init; } = 1200.0;
 
         /// <summary>
+        /// A trip of at most this many minutes happens at once instead of holding the character in transit until a later step: below the
+        /// clock resolution it cannot be told apart anyway. Hosts set it to their substep. Default 0 keeps every trip timed.
+        /// Only consulted when <see cref="EnableTravelTime"/> is <c>true</c>.
+        /// </summary>
+        public double InstantTravelBelowMinutes { get; init; } = 0.0;
+
+        /// <summary>
         /// Minimum edge <c>Closeness</c> (0–100) a non-kin survivor must hold toward the deceased to be
         /// routed a <c>BereavementOnset</c> when a death occurs. Kin (any <c>KinRole</c>) always mourn
         /// regardless of this threshold. Default 35 — acquaintances below this do not grieve.
