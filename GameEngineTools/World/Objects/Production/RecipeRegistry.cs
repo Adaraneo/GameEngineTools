@@ -6,11 +6,12 @@ namespace GameEngineTools.World.Objects.Production
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Collections.ObjectModel;
+    using System.Linq;
+    using GameEngineTools.World.Work;
 
     /// <summary>
-    /// Static, immutable table of all <see cref="Recipe"/> definitions. Design data, not runtime
-    /// state (analogous to <c>ActionValueLoadings</c>), so it is a compiled dictionary, not a
-    /// SQLite table. Food-economy Tier 1.
+    /// Immutable table of all <see cref="Recipe"/> definitions, read once from the craft tasks of the work catalog (<c>tasks.json</c>). Design data, not runtime
+    /// state, so it is not a SQLite table. Food-economy Tier 1.
     /// </summary>
     public static class RecipeRegistry
     {
@@ -27,40 +28,37 @@ namespace GameEngineTools.World.Objects.Production
 
         #region Internal table
 
-        // Deliberately small Tier 1 set: grain→flour→bread and milk→cheese exercise the full
-        // production → processing → consumption chain end to end. Expand only after Tier 1 tests pass.
+        // The recipes are the craft tasks of tasks.json (disk override, else built in): grain to flour to bread and milk to cheese for now.
         private static readonly IReadOnlyDictionary<PickupItemKind, Recipe> Table =
-            new ReadOnlyDictionary<PickupItemKind, Recipe>(BuildTable());
+            new ReadOnlyDictionary<PickupItemKind, Recipe>(FromCatalog(WorkCatalogLoader.Load()));
 
-        private static Dictionary<PickupItemKind, Recipe> BuildTable() => new()
+        /// <summary>The recipes of a catalog: its craft tasks, with item names read as <see cref="PickupItemKind"/> names.</summary>
+        /// <exception cref="System.FormatException">A task names an item that is not a known item kind.</exception>
+        public static Dictionary<PickupItemKind, Recipe> FromCatalog(WorkCatalog catalog)
         {
-            [PickupItemKind.Flour] = new Recipe(
-                Id: "recipe_flour_from_grain",
-                DisplayName: "Mlít obilí",
-                Inputs: ImmutableArray.Create(new RecipeInput(PickupItemKind.Grain, 2)),
-                OutputKind: PickupItemKind.Flour,
-                OutputDisplayName: "Mouka",
-                DurationMinutes: 45,
-                RequiredLocationType: "mill"),
+            PickupItemKind Kind(string taskId, string item)
+                => System.Enum.TryParse<PickupItemKind>(item, ignoreCase: false, out var kind)
+                    ? kind
+                    : throw new System.FormatException($"tasks.json: task '{taskId}': unknown item kind '{item}'.");
 
-            [PickupItemKind.Bread] = new Recipe(
-                Id: "recipe_bread_from_flour",
-                DisplayName: "Péct chléb",
-                Inputs: ImmutableArray.Create(new RecipeInput(PickupItemKind.Flour, 1)),
-                OutputKind: PickupItemKind.Bread,
-                OutputDisplayName: "Čerstvý chléb",
-                DurationMinutes: 90,
-                RequiredLocationType: "bakery"),
+            var table = new Dictionary<PickupItemKind, Recipe>();
+            foreach (var task in catalog.Tasks.Where(t => t.Kind == TaskKind.Craft))
+            {
+                var output = Kind(task.Id, task.Output!.Item);
+                var recipe = new Recipe(
+                    task.Id,
+                    task.Name,
+                    task.Inputs.Select(i => new RecipeInput(Kind(task.Id, i.Item), i.Quantity)).ToImmutableArray(),
+                    output,
+                    task.OutputName ?? task.Output.Item,
+                    task.DurationMinutes,
+                    task.Location!);
+                if (!table.TryAdd(output, recipe))
+                    throw new System.FormatException($"tasks.json: task '{task.Id}': a second recipe for {output}; the registry holds one recipe per product.");
+            }
 
-            [PickupItemKind.Cheese] = new Recipe(
-                Id: "recipe_cheese_from_milk",
-                DisplayName: "Vyrábět sýr",
-                Inputs: ImmutableArray.Create(new RecipeInput(PickupItemKind.Milk, 2)),
-                OutputKind: PickupItemKind.Cheese,
-                OutputDisplayName: "Čerstvý sýr",
-                DurationMinutes: 180,
-                RequiredLocationType: "dairy"),
-        };
+            return table;
+        }
 
         #endregion Internal table
     }

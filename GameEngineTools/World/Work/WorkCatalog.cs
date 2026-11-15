@@ -65,15 +65,54 @@ namespace GameEngineTools.World.Work
         double? DurabilityHours = null,
         string? Source = null);
 
+    /// <summary>What kind of task it is.</summary>
+    public enum TaskKind
+    {
+        /// <summary>Turns inputs into one product at a place of a location type (a recipe).</summary>
+        Craft,
+
+        /// <summary>A job on a field; the name of the action it is carried out as, and the tool it needs.</summary>
+        FieldWork,
+    }
+
+    /// <summary>An item and a count, as a task consumes or produces it. <paramref name="Item"/> names an item kind (today the <c>PickupItemKind</c> names; later object type ids).</summary>
+    public sealed record TaskItem(string Item, int Quantity);
+
+    /// <summary>One thing that can be done. A <see cref="TaskKind.Craft"/> task has inputs, one output, a duration and a location type; a <see cref="TaskKind.FieldWork"/> task names its action and the tool class it needs.</summary>
+    /// <param name="Id">Stable id.</param>
+    /// <param name="Name">Display name.</param>
+    /// <param name="Kind">Craft or field work.</param>
+    /// <param name="Inputs">What a craft task consumes.</param>
+    /// <param name="Output">What a craft task makes.</param>
+    /// <param name="OutputName">Display name of the product.</param>
+    /// <param name="DurationMinutes">Minutes a craft task takes.</param>
+    /// <param name="Location">Location type a craft task must be done at (mill, bakery, dairy).</param>
+    /// <param name="Action">The action a field task is carried out as (Plough, Sow, Reap, Thresh).</param>
+    /// <param name="ToolClass">The tool class the task needs, or null when it needs none.</param>
+    /// <param name="Source">Where the numbers come from.</param>
+    public sealed record TaskDefinition(
+        string Id,
+        string Name,
+        TaskKind Kind,
+        IReadOnlyList<TaskItem> Inputs,
+        TaskItem? Output,
+        string? OutputName,
+        int DurationMinutes,
+        string? Location,
+        string? Action,
+        string? ToolClass,
+        string? Source = null);
+
     /// <summary>The materials and object types the work system knows; the world database stores only a type id and the state of an instance, this holds what the type is.</summary>
     public sealed class WorkCatalog
     {
         private readonly Dictionary<string, MaterialDefinition> _materials;
         private readonly Dictionary<string, ObjectTypeDefinition> _types;
+        private readonly Dictionary<string, TaskDefinition> _tasks = new(StringComparer.Ordinal);
 
         /// <summary>Builds and checks a catalog.</summary>
-        /// <exception cref="FormatException">An id is duplicated or empty, a density or volume is not positive, or a part names an unknown material.</exception>
-        public WorkCatalog(IEnumerable<MaterialDefinition> materials, IEnumerable<ObjectTypeDefinition> types)
+        /// <exception cref="FormatException">An id is duplicated or empty, a density or volume is not positive, a part names an unknown material, or a task is incomplete.</exception>
+        public WorkCatalog(IEnumerable<MaterialDefinition> materials, IEnumerable<ObjectTypeDefinition> types, IEnumerable<TaskDefinition>? tasks = null)
         {
             _materials = new Dictionary<string, MaterialDefinition>(StringComparer.Ordinal);
             foreach (var m in materials)
@@ -98,7 +137,35 @@ namespace GameEngineTools.World.Work
                 if (t.DurabilityHours is { } d && !(d > 0.0)) throw new FormatException($"Object type '{t.Id}': durability must be positive.");
                 if (!_types.TryAdd(t.Id, t)) throw new FormatException($"Duplicate object type '{t.Id}'.");
             }
+
+            foreach (var task in tasks ?? Array.Empty<TaskDefinition>())
+            {
+                if (string.IsNullOrWhiteSpace(task.Id)) throw new FormatException("A task has no id.");
+                if (task.Kind == TaskKind.Craft)
+                {
+                    if (task.Output is null || task.Output.Quantity <= 0) throw new FormatException($"Task '{task.Id}': a craft task needs an output with a positive quantity.");
+                    if (task.Inputs.Count == 0 || task.Inputs.Any(i => i.Quantity <= 0)) throw new FormatException($"Task '{task.Id}': a craft task needs inputs with positive quantities.");
+                    if (task.DurationMinutes <= 0) throw new FormatException($"Task '{task.Id}': a craft task needs a positive duration.");
+                    if (string.IsNullOrWhiteSpace(task.Location)) throw new FormatException($"Task '{task.Id}': a craft task needs a location type.");
+                }
+                else if (string.IsNullOrWhiteSpace(task.Action))
+                {
+                    throw new FormatException($"Task '{task.Id}': a field task needs the action it is carried out as.");
+                }
+
+                if (!_tasks.TryAdd(task.Id, task)) throw new FormatException($"Duplicate task '{task.Id}'.");
+            }
         }
+
+        /// <summary>All tasks.</summary>
+        public IReadOnlyCollection<TaskDefinition> Tasks => _tasks.Values;
+
+        /// <summary>The task with this id, or null.</summary>
+        public TaskDefinition? Task(string id) => _tasks.GetValueOrDefault(id);
+
+        /// <summary>The field task carried out as the given action (Plough, Sow, Reap, Thresh), or null.</summary>
+        public TaskDefinition? FieldTaskFor(string action)
+            => _tasks.Values.FirstOrDefault(t => t.Kind == TaskKind.FieldWork && string.Equals(t.Action, action, StringComparison.Ordinal));
 
         /// <summary>All materials.</summary>
         public IReadOnlyCollection<MaterialDefinition> Materials => _materials.Values;

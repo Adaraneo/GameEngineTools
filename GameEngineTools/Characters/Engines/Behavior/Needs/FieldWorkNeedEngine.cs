@@ -83,14 +83,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
         }
 
-        /// <summary>The tool class a task needs, or null when it needs none (sowing is done from a seed bag by hand).</summary>
-        internal static string? ToolClassOf(FieldTask task) => task switch
-        {
-            FieldTask.Plough => ToolClasses.Dig,
-            FieldTask.Reap => ToolClasses.CutGrain,
-            FieldTask.Thresh => ToolClasses.Thresh,
-            _ => null,
-        };
+        /// <summary>The tool class a task needs, read from its row in tasks.json; null when it needs none (sowing is done from a seed bag by hand).</summary>
+        private string? ToolClassOf(FieldTask task) => _catalog?.FieldTaskFor(NameOf(task))?.ToolClass;
 
         private bool HasToolFor(FieldTask task, BehaviorContext context)
             => _catalog is null || ToolClassOf(task) is not { } toolClass || WorkObjects.HasTool(_catalog, toolClass, context.AvailableObjects, context.HeldObjects);

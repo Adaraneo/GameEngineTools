@@ -109,6 +109,9 @@ namespace GameEngineTools.Constants
             /// <summary>Disk-override path of the object types file read by <see cref="GameEngineTools.World.Work.WorkCatalogLoader"/>; when absent the built-in copy is used.</summary>
             public const string WorkObjectTypes = SourceDirectory.World + "objecttypes.json";
 
+            /// <summary>Disk-override path of the tasks file read by <see cref="GameEngineTools.World.Work.WorkCatalogLoader"/>; when absent the built-in copy is used.</summary>
+            public const string WorkTasks = SourceDirectory.World + "tasks.json";
+
             /// <summary>
             /// Disk-override path for the default <c>SocialNorms</c> catalog consumed by
             /// <see cref="GameEngineTools.World.Data.SocialNormCatalogLoader"/>. When absent, the

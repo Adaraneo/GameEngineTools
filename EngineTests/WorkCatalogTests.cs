@@ -3,6 +3,8 @@
 
 namespace EngineTests
 {
+    using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Work;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using System;
@@ -86,7 +88,7 @@ namespace EngineTests
             if (root is null)
                 Assert.Inconclusive("The repository folders were not found next to the test binaries.");
 
-            foreach (var file in new[] { "materials.json", "objecttypes.json" })
+            foreach (var file in new[] { "materials.json", "objecttypes.json", "tasks.json" })
             {
                 var builtIn = File.ReadAllText(Path.Combine(root.FullName, "GameEngineTools", "World", "Data", "Work", file)).Replace("\r\n", "\n");
                 foreach (var project in new[] { "GameSandbox", "WorldObserver" })
@@ -96,6 +98,60 @@ namespace EngineTests
                     Assert.AreEqual(builtIn, File.ReadAllText(copy).Replace("\r\n", "\n"), $"{project}/SourceFiles/World/{file} differs from the built-in file; keep them identical.");
                 }
             }
+        }
+        [TestMethod]
+        public void TheRecipesFromTheData_AreExactlyTheOnesThatWereInTheCode()
+        {
+            var flour = RecipeRegistry.FindByOutput(PickupItemKind.Flour)!;
+            Assert.AreEqual("recipe_flour_from_grain", flour.Id, "The ids of the old code table are kept.");
+            Assert.AreEqual("Mlít obilí", flour.DisplayName);
+            Assert.AreEqual("Mouka", flour.OutputDisplayName);
+            Assert.AreEqual(45, flour.DurationMinutes);
+            Assert.AreEqual("mill", flour.RequiredLocationType);
+            Assert.AreEqual(new RecipeInput(PickupItemKind.Grain, 2), flour.Inputs.Single());
+
+            var bread = RecipeRegistry.FindByOutput(PickupItemKind.Bread)!;
+            Assert.AreEqual((90, "bakery", "Čerstvý chléb"), (bread.DurationMinutes, bread.RequiredLocationType, bread.OutputDisplayName));
+            Assert.AreEqual(new RecipeInput(PickupItemKind.Flour, 1), bread.Inputs.Single());
+
+            var cheese = RecipeRegistry.FindByOutput(PickupItemKind.Cheese)!;
+            Assert.AreEqual((180, "dairy", "Čerstvý sýr"), (cheese.DurationMinutes, cheese.RequiredLocationType, cheese.OutputDisplayName));
+            Assert.AreEqual(new RecipeInput(PickupItemKind.Milk, 2), cheese.Inputs.Single());
+            Assert.AreEqual(3, RecipeRegistry.All.Count());
+        }
+
+        [TestMethod]
+        public void TheFieldTasks_NameTheirActionAndToolClass()
+        {
+            var catalog = WorkCatalogLoader.Load();
+
+            Assert.AreEqual(ToolClasses.Dig, catalog.FieldTaskFor("Plough")!.ToolClass);
+            Assert.IsNull(catalog.FieldTaskFor("Sow")!.ToolClass, "Sowing needs no tool.");
+            Assert.AreEqual(ToolClasses.CutGrain, catalog.FieldTaskFor("Reap")!.ToolClass);
+            Assert.AreEqual(ToolClasses.Thresh, catalog.FieldTaskFor("Thresh")!.ToolClass);
+            Assert.IsNull(catalog.FieldTaskFor("Dance"));
+            foreach (var task in catalog.Tasks.Where(t => t.ToolClass is not null))
+                Assert.IsTrue(catalog.Types.Any(type => type.ToolClasses.ContainsKey(task.ToolClass!)), $"Task '{task.Id}' needs the tool class '{task.ToolClass}' but no object type serves as one.");
+        }
+
+        [TestMethod]
+        public void BadTasks_AreRejected_NamingTheTask()
+        {
+            const string types = """{ "types": [] }""";
+            var noOutput = Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, types,
+                """{ "tasks": [ { "id": "t", "kind": "Craft", "inputs": [ { "item": "Grain", "qty": 1 } ], "durationMinutes": 5, "location": "mill" } ] }"""));
+            StringAssert.Contains(noOutput.Message, "'t'");
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, types, """{ "tasks": [ { "id": "t", "kind": "Teleport" } ] }"""));
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, types, """{ "tasks": [ { "id": "f", "kind": "FieldWork" } ] }"""));
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse(Materials, types,
+                """{ "tasks": [ { "id": "a", "kind": "FieldWork", "action": "Plough" }, { "id": "a", "kind": "FieldWork", "action": "Sow" } ] }"""));
+
+            var catalog = WorkCatalogLoader.Parse(Materials, types,
+                """{ "tasks": [ { "id": "pot", "kind": "Craft", "inputs": [ { "item": "Clay", "qty": 2 } ], "output": { "item": "Bread", "qty": 1 }, "durationMinutes": 30, "location": "kiln" } ] }""");
+            Assert.AreEqual("kiln", catalog.Task("pot")!.Location);
+
+            var unknownItem = Assert.ThrowsExactly<FormatException>(() => RecipeRegistry.FromCatalog(catalog));
+            StringAssert.Contains(unknownItem.Message, "Clay");
         }
     }
 }

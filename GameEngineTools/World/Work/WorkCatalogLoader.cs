@@ -20,6 +20,7 @@ namespace GameEngineTools.World.Work
     {
         private const string MaterialsFile = "materials.json";
         private const string ObjectTypesFile = "objecttypes.json";
+        private const string TasksFile = "tasks.json";
 
         private static readonly JsonDocumentOptions DocumentOptions = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 
@@ -27,10 +28,10 @@ namespace GameEngineTools.World.Work
         /// <param name="directory">A folder holding the files, or null for the program folder SourceFiles\World and then the built-in copy.</param>
         /// <exception cref="FormatException">A file is malformed or the catalog fails its checks; the message names the file and the entry.</exception>
         public static WorkCatalog Load(string? directory = null)
-            => Parse(ReadFile(MaterialsFile, directory), ReadFile(ObjectTypesFile, directory));
+            => Parse(ReadFile(MaterialsFile, directory), ReadFile(ObjectTypesFile, directory), ReadFile(TasksFile, directory));
 
         /// <summary>Parses the text of the two files; public so tests and tools can validate a file before shipping it.</summary>
-        public static WorkCatalog Parse(string materialsJson, string objectTypesJson)
+        public static WorkCatalog Parse(string materialsJson, string objectTypesJson, string? tasksJson = null)
         {
             var materials = new List<MaterialDefinition>();
             foreach (var m in Entries(materialsJson, MaterialsFile, "materials"))
@@ -69,7 +70,34 @@ namespace GameEngineTools.World.Work
                     OptionalText(t, "source")));
             }
 
-            return new WorkCatalog(materials, types);
+            var tasks = new List<TaskDefinition>();
+            foreach (var t in tasksJson is null ? new List<JsonElement>() : Entries(tasksJson, TasksFile, "tasks"))
+            {
+                var id = Text(t, "id", TasksFile);
+                var inputs = new List<TaskItem>();
+                if (t.TryGetProperty("inputs", out var inputsElement))
+                    foreach (var i in inputsElement.EnumerateArray())
+                        inputs.Add(new TaskItem(Text(i, "item", TasksFile), (int)Number(i, "qty", TasksFile, id)));
+
+                TaskItem? output = null;
+                if (t.TryGetProperty("output", out var outputElement))
+                    output = new TaskItem(Text(outputElement, "item", TasksFile), (int)Number(outputElement, "qty", TasksFile, id));
+
+                tasks.Add(new TaskDefinition(
+                    id,
+                    OptionalText(t, "name") ?? id,
+                    Enum.TryParse<TaskKind>(Text(t, "kind", TasksFile), ignoreCase: true, out var kind) ? kind : throw Bad(TasksFile, id, "unknown kind"),
+                    inputs,
+                    output,
+                    OptionalText(t, "outputName"),
+                    t.TryGetProperty("durationMinutes", out var minutes) && minutes.ValueKind == JsonValueKind.Number ? minutes.GetInt32() : 0,
+                    OptionalText(t, "location"),
+                    OptionalText(t, "action"),
+                    OptionalText(t, "tool"),
+                    OptionalText(t, "source")));
+            }
+
+            return new WorkCatalog(materials, types, tasks);
         }
 
         private static List<JsonElement> Entries(string json, string file, string arrayName)
@@ -106,7 +134,9 @@ namespace GameEngineTools.World.Work
             if (directory is not null && File.Exists(Path.Combine(directory, file)))
                 return File.ReadAllText(Path.Combine(directory, file), Encoding.UTF8);
 
-            var disk = file == MaterialsFile ? FileSystemConstant.SourceFilePath.WorkMaterials : FileSystemConstant.SourceFilePath.WorkObjectTypes;
+            var disk = file == MaterialsFile ? FileSystemConstant.SourceFilePath.WorkMaterials
+                : file == ObjectTypesFile ? FileSystemConstant.SourceFilePath.WorkObjectTypes
+                : FileSystemConstant.SourceFilePath.WorkTasks;
             if (directory is null && File.Exists(disk))
                 return File.ReadAllText(disk, Encoding.UTF8);
 
