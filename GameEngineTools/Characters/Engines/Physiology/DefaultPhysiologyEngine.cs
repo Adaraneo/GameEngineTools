@@ -165,16 +165,21 @@ namespace GameEngineTools.Characters.Engines.Physiology
             return Math.Clamp(WDateTime.Difference(hi, lo).TotalHours, 0.0, h);
         }
 
-        /// <summary>Activity factor of an action: 1 at rest, the task's exertion for field labour.</summary>
+        /// <summary>Activity of an action in MET, 1 being quiet seated rest: what the heat model produces its heat from (the task's MET for field labour, the sleep factor asleep).</summary>
         internal static double ActivityOf(string? action, PhysiologyConfig config) => action switch
         {
-            Plough => config.PloughExertion,
-            Sow => config.SowExertion,
-            Reap => config.ReapExertion,
-            Thresh => config.ThreshExertion,
+            Plough => config.PloughMet,
+            Sow => config.SowMet,
+            Reap => config.ReapMet,
+            Thresh => config.ThreshMet,
             Sleep => config.SleepActivityFactor,
             _ => 1.0
         };
+
+        /// <summary>How much faster than an ordinary waking hour an action burns energy and raises hunger: the task's MET against the waking baseline, 1 for everything else.</summary>
+        internal static double MetabolicFactorOf(string? action, PhysiologyConfig config) => action is Plough or Sow or Reap or Thresh
+            ? Math.Max(1.0, ActivityOf(action, config) / Math.Max(1.0, config.AwakeBaselineMet))
+            : 1.0;
 
         /// <summary>
         /// Computes the continuous physiological drift for a single tick as a pure
@@ -207,8 +212,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         {
             // Energy: depletes while awake, slower during self-care, untouched during sleep
             // (sleep recovery is a one-time effect in Handle(SleepEnded), NOT here).
-            // Field labour burns more of each: the awake rates are multiplied by the task's exertion.
-            var exertion = ActivityOf(action, config);
+            // Field labour burns more of each: the awake rates are multiplied by the task's MET against the waking baseline.
+            var activity = ActivityOf(action, config);
+            var exertion = MetabolicFactorOf(action, config);
 
             var energy = action switch
             {
@@ -228,7 +234,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
             // Thirst: same pattern. Drink uses the object's hydration value when supplied.
             // Work and heat do not multiply the base rate: the sweat they make is added on top (litres converted to thirst points).
-            var sweatThirst = HeatMath.SweatThirstPerHour(HeatMath.PotentialSweat(HeatMath.HeatProduction(exertion, airCelsius, config), config), config);
+            var sweatThirst = HeatMath.SweatThirstPerHour(HeatMath.PotentialSweat(HeatMath.HeatProduction(activity, airCelsius, config), config), config);
             var thirst = action switch
             {
                 Drink => -(hydrationGain ?? config.ThirstDrinkingGainPerHour) * h,

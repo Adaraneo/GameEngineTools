@@ -52,14 +52,15 @@ namespace EngineTests
         {
             var awake = DefaultPhysiologyEngine.ComputeDrift(null, 1.0, Cfg, null, 1.0);
 
-            foreach (var (action, factor) in new[] { (Plough, Cfg.PloughExertion), (Sow, Cfg.SowExertion), (Reap, Cfg.ReapExertion), (Thresh, Cfg.ThreshExertion) })
+            foreach (var (action, met) in new[] { (Plough, Cfg.PloughMet), (Sow, Cfg.SowMet), (Reap, Cfg.ReapMet), (Thresh, Cfg.ThreshMet) })
             {
                 var d = DefaultPhysiologyEngine.ComputeDrift(action, 1.0, Cfg, null, 1.0);
 
+                var factor = met / Cfg.AwakeBaselineMet;
                 Assert.IsTrue(factor > 1.0, action);
                 Assert.AreEqual(awake.Energy * factor, d.Energy, Tol, action);
                 Assert.AreEqual(awake.Hunger * factor, d.Hunger, Tol, action);
-                Assert.AreEqual(awake.Thirst * factor, d.Thirst, Tol, action);
+                Assert.AreEqual(awake.Thirst + (met - 1.0) * Cfg.SweatLitresPerHourPerLoadUnit / Cfg.LitresPerThirstPoint, d.Thirst, Tol, action);
                 Assert.AreEqual(awake.Pain, d.Pain, Tol, action);
             }
         }

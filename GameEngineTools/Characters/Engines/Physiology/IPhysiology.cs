@@ -421,14 +421,16 @@ namespace GameEngineTools.Characters.Engines.Physiology
         double? ProcessSDebtFreeLevel = null,
         /// <summary>Mean of the circadian spontaneous-waking threshold L(t) = this + a·C(t); sleep ends when Process S decays to it. Default 0.17. Source: Daan, Beersma &amp; Borbély 1984 (H0− ≈ 0.17); reproduces the ≈ 8 h normal sleep and the only ≈ +1 h of sleep after 40 h awake (Åkerstedt &amp; Gillberg 1986).</summary>
         double ProcessCWakeThresholdMean = 0.17,
-        /// <summary>Energy, hunger and thirst drift of ploughing by hand as a multiple of ordinary waking; about 3: spading is 5-8 MET against about 2 for a mixed waking day (Compendium of Physical Activities, my reading).</summary>
-        double PloughExertion = 3.0,
-        /// <summary>Same for sowing by hand; about 1.5, walking with a seed bag (my estimate).</summary>
-        double SowExertion = 1.5,
-        /// <summary>Same for reaping with a sickle; about 2.5, 4-6 MET (my estimate from the Compendium).</summary>
-        double ReapExertion = 2.5,
-        /// <summary>Same for threshing with a flail; about 2.5 (my estimate).</summary>
-        double ThreshExertion = 2.5,
+        /// <summary>Metabolic equivalents of ploughing by hand (digging with a spade): 6; the Compendium of Physical Activities lists digging and spading at 4.8 (moderate) to 7.3 (vigorous), adults digging 6.3 +/- 1.2 in a Korean garden study (secondary). 1 MET is quiet seated rest; the heat model reads it directly, hunger and energy read it relative to <see cref="AwakeBaselineMet"/>.</summary>
+        double PloughMet = 6.0,
+        /// <summary>Sowing by hand: 4; the range found is 3.3 (planting seedlings, Compendium for older adults) to 5.0 (sowing seeds, garden study); the point is a pick.</summary>
+        double SowMet = 4.0,
+        /// <summary>Reaping with a sickle: 5; harvesting 3.5-5.4 in an adult garden study and 4.8 in another, weeding and hoeing 5.0 in the Compendium; a sickle is not listed, the point is a pick.</summary>
+        double ReapMet = 5.0,
+        /// <summary>Threshing with a flail: 6; no source found for a flail, taken as vigorous as spading (pick).</summary>
+        double ThreshMet = 6.0,
+        /// <summary>Mean MET of an ordinary waking day, to which the awake hunger and energy rates belong: 2; a moderately active lifestyle has a physical activity level of 1.70-1.99 (FAO/WHO/UNU 2004 classes), which with 8 h of sleep at about 0.95 MET gives about 2.0 for the waking hours.</summary>
+        double AwakeBaselineMet = 2.0,
         /// <summary>Air temperature (°C) above which work and rest produce extra heat to shed. Estimate (thermoneutral zone of a clothed person, about 25).</summary>
         double HeatComfortCelsius = 25.0,
         /// <summary>Heat to shed (in units of resting production) added per °C above the comfort point: dry loss falls to zero at skin temperature, so 1 / (35 - 25) = 0.1. Derived from the heat balance with a skin temperature of 35 °C (my assumption).</summary>

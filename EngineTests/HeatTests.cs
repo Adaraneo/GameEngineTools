@@ -35,14 +35,15 @@ namespace EngineTests
         [TestMethod]
         public void MildAir_KeepsTheOldWorkThirstRates()
         {
-            Assert.AreEqual(Cfg.ThirstDriftAwakePerHour * Cfg.PloughExertion, ThirstRate(Plough, 20.0), 1e-9);
+            var sweatPoints = (Cfg.PloughMet - 1.0) * Cfg.SweatLitresPerHourPerLoadUnit / Cfg.LitresPerThirstPoint;
+            Assert.AreEqual(Cfg.ThirstDriftAwakePerHour + sweatPoints, ThirstRate(Plough, 20.0), 1e-9, "Work thirst is the ordinary loss plus the sweat of the task's MET.");
             Assert.AreEqual(Cfg.ThirstDriftAwakePerHour, ThirstRate(null, 24.0), 1e-9);
         }
 
         [TestMethod]
         public void Heat_MakesWorkAndEvenRestThirstier()
         {
-            Assert.IsTrue(ThirstRate(Plough, 35.0) > 1.25 * ThirstRate(Plough, 20.0), "Ploughing in 35 degC takes more water.");
+            Assert.AreEqual(ThirstRate(Plough, 20.0) + Cfg.HeatLoadPerDegreeAboveComfort * 10.0 * Cfg.SweatLitresPerHourPerLoadUnit / Cfg.LitresPerThirstPoint, ThirstRate(Plough, 35.0), 1e-9, "Ploughing in 35 degC adds the sweat of the air heat to the sweat of the work.");
             Assert.IsTrue(ThirstRate(null, 35.0) > ThirstRate(null, 20.0), "Even rest sweats a little in the heat.");
             Assert.IsTrue(ThirstRate(Drink, 35.0) < 0.0, "Drinking still quenches.");
         }

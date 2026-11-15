@@ -64,7 +64,7 @@ namespace WorldMonitor
             GameEngineTools.Config.WorldSettings.Validate(file);
         }
 
-        /// <summary>Sets one value of the run's own copy of the config files: "Characters:Physiology:PloughExertion=1" edits appsettings.Characters.json.</summary>
+        /// <summary>Sets one value of the run's own copy of the config files: "Characters:Physiology:PloughMet=1" edits appsettings.Characters.json.</summary>
         private static void ApplyOverride(string runDir, string setting)
         {
             var equals = setting.IndexOf('=');
