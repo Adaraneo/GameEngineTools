@@ -31,7 +31,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Text;
 using NPC = GameEngineTools.Characters.GameObjects.NPC;
-using TFSC = GameEngineTools.Constants.TestFSConstatns;
+using TFSC = GameEngineTools.Constants.FileSystemConstantsForTest;
 
 // ── Game time ─────────────────────────────────────────────────────────────────
 var gameTimePath = Path.Combine(
@@ -56,8 +56,8 @@ await using var runtime = await GameEngineToolsRuntime.StartAsync(
     writeTextLogs: false,
     generatedFileOptions: new GeneratedFileOptions
     {
-        PlayerDirectory = TFSC.player,
-        NPCDirectory = TFSC.NPCs
+        PlayerDirectory = TFSC.Pc,
+        NPCDirectory = TFSC.Npc
     });
 
 var gf = (GeneratedFile)runtime.Services.GetRequiredService<IGeneratedFile>();
@@ -71,7 +71,7 @@ var perceptionPolicy = runtime.Services.GetRequiredService<IPerceptionFidelityPo
 var player = gf.ImportPC(new FileInfo(Directory.GetFiles(gf.PlayerDirectory).First()).Name);
 manager.Characters.Add(player);
 
-var generatedBlankPeopleLogFiles = new DirectoryInfo(TFSC.gfiles).GetFiles().ToImmutableList();
+var generatedBlankPeopleLogFiles = new DirectoryInfo(TFSC.Root).GetFiles().ToImmutableList();
 
 var ids = new Dictionary<string, Guid>();
 const string so = "significantOther";
