@@ -28,17 +28,17 @@ namespace EngineTests
         public void EconomyLedger_RoundTrip_KeepsPricesAndBases_SoPricingContinuesWhereItStopped()
         {
             var cfg = EconomyConfig.Default;
-            var ledger = new EconomyLedger();
-            ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, 3, cfg, observedPrice: 2.0, observedStock: 8);
-            var expected = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, 2, cfg);
+            var ledger = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
+            ledger.AdjustPriceForStockChange("bakery", "bread", 3, cfg, observedPrice: 2.0, observedStock: 8);
+            var expected = ledger.AdjustPriceForStockChange("bakery", "bread", 2, cfg);
 
-            var restored = new EconomyLedger();
+            var restored = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
             restored.Restore(ledger.Snapshot());
 
-            Assert.AreEqual(expected, restored.GetPrice("bakery", PickupItemKind.Bread), 1e-12);
+            Assert.AreEqual(expected, restored.GetPrice("bakery", "bread"), 1e-12);
             Assert.AreEqual(
-                ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, 6, cfg),
-                restored.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, 6, cfg), 1e-12,
+                ledger.AdjustPriceForStockChange("bakery", "bread", 6, cfg),
+                restored.AdjustPriceForStockChange("bakery", "bread", 6, cfg), 1e-12,
                 "The learned base must survive, otherwise the next repricing starts from the seed price.");
         }
 
@@ -78,8 +78,8 @@ namespace EngineTests
             locations.RegisterLocation(new LocationDescriptor("room", "Room", 0.05, 0.01, 50, false, LocationType.Social));
             var id = new HumanId(Guid.NewGuid());
             locations.MoveCharacter(id, "room");
-            var economy = new EconomyLedger();
-            economy.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, 4, EconomyConfig.Default);
+            var economy = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
+            economy.AdjustPriceForStockChange("bakery", "bread", 4, EconomyConfig.Default);
 
             var saved = WorldStateStore.Capture(Now, economy, new CommunityReputationLedger(), new StatusLedger(), locations, orchestrator: null);
             var path = Path.Combine(Path.GetTempPath(), $"world_{Guid.NewGuid():N}.json");
@@ -90,11 +90,11 @@ namespace EngineTests
                 var loaded = WorldStateStore.Load(path);
 
                 var locations2 = new DefaultLocationService();
-                var economy2 = new EconomyLedger();
+                var economy2 = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
                 WorldStateStore.Apply(loaded, economy2, null, null, locations2, null);
 
                 Assert.AreEqual("room", locations2.GetLocation(id));
-                Assert.AreEqual(economy.GetPrice("bakery", PickupItemKind.Bread), economy2.GetPrice("bakery", PickupItemKind.Bread), 1e-12);
+                Assert.AreEqual(economy.GetPrice("bakery", "bread"), economy2.GetPrice("bakery", "bread"), 1e-12);
                 Assert.AreEqual(Now, loaded.SavedAt);
 
                 var future = WorldStateStore.ToJson(saved with { SchemaVersion = 99 });

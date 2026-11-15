@@ -769,15 +769,13 @@ namespace GameEngineTools.Narrative
 
         #region Ekonomika a normy
 
-        private static string ItemName(PickupItemKind kind) => kind switch
+        private static string ItemName(string? typeId) => typeId switch
         {
-            PickupItemKind.Bread => "chléb",
-            PickupItemKind.Cheese => "sýr",
-            PickupItemKind.Flour => "mouku",
-            PickupItemKind.Grain => "obilí",
-            PickupItemKind.Milk => "mléko",
-            PickupItemKind.Food => "jídlo",
-            PickupItemKind.Drink => "pití",
+            "bread" => "chléb",
+            "cheese" => "sýr",
+            "flour" => "mouku",
+            "grain" => "obilí",
+            "milk" => "mléko",
             _ => "zboží",
         };
 
@@ -785,14 +783,14 @@ namespace GameEngineTools.Narrative
         {
             var who = resolve(pu.Actor);
             return new NarrativeEntry(pu.OccurredAt, pu.Actor,
-                $"{who.Name} {Conj(who, "koupil", "koupila")} {ItemName(pu.ItemKind)} za {pu.Price:0.0}.", NarrativePriority.Low);
+                $"{who.Name} {Conj(who, "koupil", "koupila")} {ItemName(pu.TypeId)} za {pu.Price:0.0}.", NarrativePriority.Low);
         }
 
         private NarrativeEntry FormatSale(Sold so, Func<HumanId, NarrativeCharacterInfo> resolve)
         {
             var who = resolve(so.Actor);
             return new NarrativeEntry(so.OccurredAt, so.Actor,
-                $"{who.Name} {Conj(who, "prodal", "prodala")} {ItemName(so.ItemKind)} za {so.Price:0.0}.", NarrativePriority.Low);
+                $"{who.Name} {Conj(who, "prodal", "prodala")} {ItemName(so.TypeId)} za {so.Price:0.0}.", NarrativePriority.Low);
         }
 
         private NarrativeEntry FormatNormViolation(NormViolationOccurred nv, Func<HumanId, NarrativeCharacterInfo> resolve)

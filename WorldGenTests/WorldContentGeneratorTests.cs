@@ -360,10 +360,10 @@ public class WorldContentGeneratorTests
     public void Generate_UsesOnlyMatchingBiomeOrAnyTemplates()
     {
         var customCatalog = NutritionCatalogLoader.Parse("""
-            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
-            plains_only;Plains Only;Plains;Hunger;0.3;Food;50;600;true;10;;;;5;;
-            mountain_only;Mountain Only;Mountain;Hunger;0.3;Food;50;600;true;10;;;;5;;
-            any_water;Any Water;Any;Thirst;0.8;Drink;500;120;false;0;;;;80;;
+            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+            plains_only;Plains Only;Plains;Hunger;0.3;50;600;true;10;;;;5;;
+            mountain_only;Mountain Only;Mountain;Hunger;0.3;50;600;true;10;;;;5;;
+            any_water;Any Water;Any;Thirst;0.8;500;120;false;0;;;;80;;
             """);
 
         using var db = NewWorldDb();
@@ -385,8 +385,8 @@ public class WorldContentGeneratorTests
     public void Generate_NoMatchingTemplateForANeed_SkipsThatObjectWithoutError()
     {
         var foodOnlyCatalog = NutritionCatalogLoader.Parse("""
-            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
-            only_food;Only Food;Any;Hunger;0.3;Food;50;600;true;10;;;;5;;
+            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+            only_food;Only Food;Any;Hunger;0.3;50;600;true;10;;;;5;;
             """);
 
         using var db = NewWorldDb();

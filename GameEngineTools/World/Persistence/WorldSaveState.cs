@@ -13,7 +13,7 @@ namespace GameEngineTools.World.Persistence
     /// <param name="Kind">The item kind.</param>
     /// <param name="Price">Current posted price.</param>
     /// <param name="Base">Price at the target stock level, or <c>null</c> if not yet learned.</param>
-    public sealed record PriceEntry(string ShopId, PickupItemKind Kind, double Price, double? Base);
+    public sealed record PriceEntry(string ShopId, string Kind, double Price, double? Base);
 
     /// <summary>One community reputation: how a subject is regarded at a location.</summary>
     public sealed record ReputationEntry(HumanId Subject, string LocationId, double Score, double Spread, WDateTime LastUpdatedAt);

@@ -23,7 +23,7 @@ namespace EngineTests
         [TestInitialize]
         public void Setup()
         {
-            _engine = new ObjectAffordanceGatingEngine();
+            _engine = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog);
         }
 
         [TestMethod]
@@ -157,7 +157,6 @@ namespace EngineTests
                 Affordances = [],
                 IsPickable = false,
                 WeightGrams = 0,
-                ItemKind = PickupItemKind.None,
                 HeldBy = null,
                 ConsumedAt = null,
                 Respawns = false,

@@ -3,11 +3,11 @@
 
 namespace GameEngineTools.World.Objects.Production
 {
-    /// <summary>Shop identity that outlives its stock: a counter keeps trading an item kind after the last unit is sold.</summary>
+    /// <summary>Shop identity that outlives its stock: a counter keeps trading an item type after the last unit is sold.</summary>
     public static class ShopCounterFactory
     {
-        /// <summary>Creates an immovable, unpriced counter at which <paramref name="shopId"/> trades <paramref name="kind"/>.</summary>
-        public static WorldObject Create(string id, string locationId, string shopId, PickupItemKind kind, string displayName)
+        /// <summary>Creates an immovable, unpriced counter at which <paramref name="shopId"/> trades <paramref name="typeId"/>.</summary>
+        public static WorldObject Create(string id, string locationId, string shopId, string typeId, string displayName)
             => new()
             {
                 Id = id,
@@ -18,7 +18,7 @@ namespace GameEngineTools.World.Objects.Production
                 IsPickable = false,
                 Respawns = false,
                 WeightGrams = 500_000,
-                ItemKind = kind,
+                ItemTypeId = typeId,
                 ShopId = shopId,
             };
 

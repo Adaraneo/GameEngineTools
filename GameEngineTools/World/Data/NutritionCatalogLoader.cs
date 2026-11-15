@@ -24,7 +24,6 @@ namespace GameEngineTools.World.Data
         string Biome,
         AffordanceType AffordanceType,
         double Satisfaction,
-        PickupItemKind ItemKind,
         int WeightGrams,
         int RespawnMinutes,
         bool Pickable,
@@ -52,7 +51,7 @@ namespace GameEngineTools.World.Data
     public static class NutritionCatalogLoader
     {
         private const string EmbeddedResourceName = "GameEngineTools.World.Data.Nutrition.csv";
-        private const int ExpectedColumnCount = 16;
+        private const int ExpectedColumnCount = 15;
 
         /// <summary>
         /// Loads the catalog using the three-tier resolution described on the type.
@@ -116,17 +115,16 @@ namespace GameEngineTools.World.Data
                     Biome: cols[2].Trim(),
                     AffordanceType: Enum.Parse<AffordanceType>(cols[3].Trim(), ignoreCase: true),
                     Satisfaction: ParseDouble(cols[4], lineNumber, "Satisfaction"),
-                    ItemKind: Enum.Parse<PickupItemKind>(cols[5].Trim(), ignoreCase: true),
-                    WeightGrams: ParseInt(cols[6], lineNumber, "WeightGrams"),
-                    RespawnMinutes: ParseInt(cols[7], lineNumber, "RespawnMinutes"),
-                    Pickable: bool.Parse(cols[8].Trim()),
-                    CalorieGain: ParseNullableDouble(cols[9]),
-                    ProteinGain: ParseNullableDouble(cols[10]),
-                    IronGain: ParseNullableDouble(cols[11]),
-                    VitaminDGain: ParseNullableDouble(cols[12]),
-                    HydrationGain: ParseNullableDouble(cols[13]),
-                    HemeIronFraction: ParseNullableDouble(cols[14]),
-                    VitaminCMilligrams: ParseNullableDouble(cols[15])));
+                    WeightGrams: ParseInt(cols[5], lineNumber, "WeightGrams"),
+                    RespawnMinutes: ParseInt(cols[6], lineNumber, "RespawnMinutes"),
+                    Pickable: bool.Parse(cols[7].Trim()),
+                    CalorieGain: ParseNullableDouble(cols[8]),
+                    ProteinGain: ParseNullableDouble(cols[9]),
+                    IronGain: ParseNullableDouble(cols[10]),
+                    VitaminDGain: ParseNullableDouble(cols[11]),
+                    HydrationGain: ParseNullableDouble(cols[12]),
+                    HemeIronFraction: ParseNullableDouble(cols[13]),
+                    VitaminCMilligrams: ParseNullableDouble(cols[14])));
             }
 
             return templates;

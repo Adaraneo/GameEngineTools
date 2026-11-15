@@ -75,7 +75,7 @@ namespace EngineTests
             var ctx = BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
 
             engine.Handle(
-                new Purchased(new WDateTime(0), self, "bread_1", PickupItemKind.Bread, "bakery", 4.0, 6.0),
+                new Purchased(new WDateTime(0), self, "bread_1", "bread", "bakery", 4.0, 6.0),
                 ctx, new EventCollector());
 
             Assert.AreEqual(6.0, engine.State.Wealth, 1e-9, "Purchased event deducts its price from wealth.");
@@ -86,11 +86,11 @@ namespace EngineTests
         [TestMethod]
         public void EconomyLedger_PriceRises_WhenStockBelowTarget()
         {
-            var ledger = new EconomyLedger();
+            var ledger = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
             var cfg = EconomyConfig.Default; // TargetStockLevel = 8
-            var before = ledger.GetPrice("bakery", PickupItemKind.Bread);
+            var before = ledger.GetPrice("bakery", "bread");
 
-            var after = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, newStockCount: 2, cfg);
+            var after = ledger.AdjustPriceForStockChange("bakery", "bread", newStockCount: 2, cfg);
 
             Assert.IsTrue(after > before, "Stock below target (scarcity) must raise the price.");
         }
@@ -98,11 +98,11 @@ namespace EngineTests
         [TestMethod]
         public void EconomyLedger_PriceFalls_WhenStockAboveTarget()
         {
-            var ledger = new EconomyLedger();
+            var ledger = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
             var cfg = EconomyConfig.Default; // TargetStockLevel = 8
-            var before = ledger.GetPrice("bakery", PickupItemKind.Bread);
+            var before = ledger.GetPrice("bakery", "bread");
 
-            var after = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, newStockCount: 16, cfg);
+            var after = ledger.AdjustPriceForStockChange("bakery", "bread", newStockCount: 16, cfg);
 
             Assert.IsTrue(after < before, "Stock above target (glut) must lower the price.");
         }
@@ -110,13 +110,13 @@ namespace EngineTests
         [TestMethod]
         public void EconomyLedger_ConstantStock_DoesNotRatchetPriceToARail()
         {
-            var ledger = new EconomyLedger();
+            var ledger = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
             var cfg = EconomyConfig.Default;
 
-            var first = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, newStockCount: 2, cfg);
+            var first = ledger.AdjustPriceForStockChange("bakery", "bread", newStockCount: 2, cfg);
             var last = first;
             for (var i = 0; i < 50; i++)
-                last = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, newStockCount: 2, cfg);
+                last = ledger.AdjustPriceForStockChange("bakery", "bread", newStockCount: 2, cfg);
 
             Assert.AreEqual(first, last, 1e-9, "The same stock must always yield the same price.");
             Assert.IsTrue(last < cfg.MaxPrice, "A moderate shortage must not drive the price to the ceiling.");
@@ -125,12 +125,12 @@ namespace EngineTests
         [TestMethod]
         public void EconomyLedger_PriceReturnsToBase_WhenStockReturnsToTarget()
         {
-            var ledger = new EconomyLedger();
+            var ledger = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
             var cfg = EconomyConfig.Default;
-            var atTarget = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, cfg.TargetStockLevel, cfg, observedPrice: 3.0, observedStock: cfg.TargetStockLevel);
+            var atTarget = ledger.AdjustPriceForStockChange("bakery", "bread", cfg.TargetStockLevel, cfg, observedPrice: 3.0, observedStock: cfg.TargetStockLevel);
 
-            ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, 1, cfg);
-            var back = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, cfg.TargetStockLevel, cfg);
+            ledger.AdjustPriceForStockChange("bakery", "bread", 1, cfg);
+            var back = ledger.AdjustPriceForStockChange("bakery", "bread", cfg.TargetStockLevel, cfg);
 
             Assert.AreEqual(3.0, atTarget, 1e-9);
             Assert.AreEqual(3.0, back, 1e-9, "Price depends on stock only, so restoring the stock restores the price.");
@@ -139,11 +139,11 @@ namespace EngineTests
         [TestMethod]
         public void EconomyLedger_ColdLedger_DerivesBaseFromObservedPriceAndStock()
         {
-            var ledger = new EconomyLedger();
+            var ledger = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
             var cfg = EconomyConfig.Default;
 
             // A persisted shop posted 6.0 at stock 4 (below target); at target stock it must therefore ask less than 6.0.
-            var atTarget = ledger.AdjustPriceForStockChange("bakery", PickupItemKind.Bread, cfg.TargetStockLevel, cfg, observedPrice: 6.0, observedStock: 4);
+            var atTarget = ledger.AdjustPriceForStockChange("bakery", "bread", cfg.TargetStockLevel, cfg, observedPrice: 6.0, observedStock: 4);
 
             Assert.AreEqual(6.0 / Math.Exp(cfg.PriceElasticityPerUnit * (cfg.TargetStockLevel - 4)), atTarget, 1e-9);
         }
@@ -191,9 +191,9 @@ namespace EngineTests
         [TestMethod]
         public void EconomyLedger_GetPrice_ColdCacheUsesPersistedFallback_NotSeedPrice()
         {
-            var ledger = new EconomyLedger();
+            var ledger = new EconomyLedger(EngineTests.Utils.TestWork.Catalog);
 
-            var price = ledger.GetPrice("bakery", PickupItemKind.Bread, persistedFallback: 7.5);
+            var price = ledger.GetPrice("bakery", "bread", persistedFallback: 7.5);
 
             Assert.AreEqual(7.5, price, 1e-9,
                 "On a cache miss, the caller's persisted price must win over the hardcoded SeedPrice constant.");
@@ -229,7 +229,7 @@ namespace EngineTests
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
 
-            var held = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self);
+            var held = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), self);
             provider.AddObject(held);
             provider.AddObject(PricedFood("bakery_bread", price: persistedPrice, shop: "bakery"));
 
@@ -252,7 +252,7 @@ namespace EngineTests
         [TestMethod]
         public void Buy_Gate_FailsWithoutSufficientWealth()
         {
-            var gate = new ObjectAffordanceGatingEngine();
+            var gate = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog);
             var priced = PricedFood("shop_bread", price: 5.0, shop: "bakery");
             var candidates = new List<BehaviorCandidate> { Cand(Buy), Cand(Idle) };
             var ctx = EconContext(available: new() { priced }, held: new(), wealth: 2.0);
@@ -266,9 +266,9 @@ namespace EngineTests
         [TestMethod]
         public void Buy_Gate_FailsForNonPricedObject()
         {
-            var gate = new ObjectAffordanceGatingEngine();
+            var gate = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog);
             // A free (unpriced) bread — nothing to buy even with plenty of coin.
-            var free = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null);
+            var free = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), null);
             var candidates = new List<BehaviorCandidate> { Cand(Buy), Cand(Idle) };
             var ctx = EconContext(available: new() { free }, held: new(), wealth: 50.0);
 
@@ -286,7 +286,7 @@ namespace EngineTests
             var self = new HumanId(Guid.NewGuid());
 
             // The seller holds a bread; a co-located bakery already stocks (and thus trades) bread.
-            var held = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self);
+            var held = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), self);
             provider.AddObject(held);
             provider.AddObject(PricedFood("bakery_bread", price: 2.0, shop: "bakery"));
 
@@ -300,7 +300,7 @@ namespace EngineTests
 
             var sold = outbox.Drain().OfType<Sold>().SingleOrDefault();
             Assert.IsNotNull(sold, "A Sold event must be emitted.");
-            Assert.AreEqual(PickupItemKind.Bread, sold!.ItemKind);
+            Assert.AreEqual("bread", sold!.TypeId);
             Assert.AreEqual(2.0 * EconomyConfig.Default.ShopBuyBackFraction, sold.Price, 1e-9,
                 "Sale credits the buy-back fraction of the shop's posted price.");
 
@@ -315,8 +315,8 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self));
-            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", PickupItemKind.Bread, "Pult"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), self));
+            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", "bread", "Pult"));
             var engine = MakeObjectEngine(provider);
             var outbox = new EventCollector();
 
@@ -334,15 +334,15 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, PickupItemKind.Flour, "Mlýn"));
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec"));
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn"));
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
             var engine = MakeObjectEngine(provider);
 
             engine.Handle(new ActionCommitted(new WDateTime(0), self, Process, WTimeSpan.FromMinutes(90)),
                 BehaviorComponentTestFactory.Context(selfId: self).HumanContext, new EventCollector());
 
-            Assert.IsTrue(provider.GetHeldBy(self).Any(o => o.ItemKind == PickupItemKind.Bread),
+            Assert.IsTrue(provider.GetHeldBy(self).Any(o => o.TypeId == "bread"),
                 "Flour in hand bakes into bread even though the mill is listed first.");
         }
 
@@ -351,9 +351,9 @@ namespace EngineTests
         [TestMethod]
         public void ContingencySearch_PrefersBuy_WhenCheaperThanProduce_AndAffordable()
         {
-            var engine = new ContingencySearchEngine();
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
             var priced = PricedFood("shop_bread", price: 3.0, shop: "bakery");
-            var field = ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole");
+            var field = ProductionSiteFactory.Create("field", Loc, "grain", "Pole");
             var ctx = EconContext(available: new() { priced, field }, held: new(), wealth: 30.0, hunger: 80);
 
             var output = engine.Evaluate(ctx);
@@ -369,8 +369,8 @@ namespace EngineTests
         [TestMethod]
         public void ContingencySearch_SkipsBuy_WhenWealthInsufficient()
         {
-            var engine = new ContingencySearchEngine();
-            var gate = new ObjectAffordanceGatingEngine();
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
+            var gate = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog);
             var priced = PricedFood("shop_bread", price: 5.0, shop: "bakery");
             var ctx = EconContext(available: new() { priced }, held: new(), wealth: 1.0, hunger: 80);
 
@@ -427,9 +427,9 @@ namespace EngineTests
         [TestMethod]
         public void BarterRules_LaborCredit_PaysTheCheapestStock()
         {
-            var stock = new List<WorldObject> { PricedFood("cheese_1", 3.0, "shop", PickupItemKind.Cheese), PricedFood("bread_1", 2.0, "shop") };
+            var stock = new List<WorldObject> { PricedFood("cheese_1", 3.0, "shop", "cheese"), PricedFood("bread_1", 2.0, "shop") };
 
-            var offer = BarterRules.FindOffer(stock, null, laborHours: 3.0, Barter3, _ => true);
+            var offer = BarterRules.FindOffer(stock, null, laborHours: 3.0, Barter3, _ => true, EngineTests.Utils.TestWork.Catalog);
 
             Assert.IsNotNull(offer);
             Assert.AreEqual("bread_1", offer.Take.Id);
@@ -442,32 +442,32 @@ namespace EngineTests
         {
             var stock = new List<WorldObject> { PricedFood("bread_1", 2.0, "shop") };
 
-            Assert.IsNull(BarterRules.FindOffer(stock, new List<WorldObject>(), laborHours: 2.9, Barter3, _ => true));
+            Assert.IsNull(BarterRules.FindOffer(stock, new List<WorldObject>(), laborHours: 2.9, Barter3, _ => true, EngineTests.Utils.TestWork.Catalog));
         }
 
         [TestMethod]
         public void BarterRules_HeldItem_PaysOnlyWhenWorthTheStock()
         {
             var self = new HumanId(Guid.NewGuid());
-            var cheese = FoodItemCatalog.Create(PickupItemKind.Cheese, Loc, new WDateTime(0), self);
+            var cheese = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "cheese", Loc, new WDateTime(0), self);
             var cheap = new List<WorldObject> { PricedFood("bread_1", 1.5, "shop") };
             var dear = new List<WorldObject> { PricedFood("bread_1", 2.0, "shop") };
 
-            Assert.AreEqual(cheese.Id, BarterRules.FindOffer(cheap, new[] { cheese }, 0.0, Barter3, _ => true)?.Give?.Id);
-            Assert.IsNull(BarterRules.FindOffer(dear, new[] { cheese }, 0.0, Barter3, _ => true), "The shop keeps its margin: 1.8 does not cover 2.0.");
+            Assert.AreEqual(cheese.Id, BarterRules.FindOffer(cheap, new[] { cheese }, 0.0, Barter3, _ => true, EngineTests.Utils.TestWork.Catalog)?.Give?.Id);
+            Assert.IsNull(BarterRules.FindOffer(dear, new[] { cheese }, 0.0, Barter3, _ => true, EngineTests.Utils.TestWork.Catalog), "The shop keeps its margin: 1.8 does not cover 2.0.");
         }
 
         [TestMethod]
         public void BarterRules_SameKindSpoiledOrAbsentItem_IsNotSwapped()
         {
             var self = new HumanId(Guid.NewGuid());
-            var bread = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self);
-            var cheese = FoodItemCatalog.Create(PickupItemKind.Cheese, Loc, new WDateTime(0), self);
+            var bread = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), self);
+            var cheese = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "cheese", Loc, new WDateTime(0), self);
             var stock = new List<WorldObject> { PricedFood("bread_1", 1.0, "shop") };
 
-            Assert.IsNull(BarterRules.FindOffer(stock, new[] { bread }, 0.0, Barter3, _ => true), "Bread for bread is pointless.");
-            Assert.IsNull(BarterRules.FindOffer(stock, new[] { cheese }, 0.0, Barter3, _ => false), "Spoiled goods are not accepted.");
-            Assert.IsNull(BarterRules.FindOffer(new List<WorldObject>(), new[] { cheese }, 0.0, Barter3, _ => true), "No stock, nothing to take.");
+            Assert.IsNull(BarterRules.FindOffer(stock, new[] { bread }, 0.0, Barter3, _ => true, EngineTests.Utils.TestWork.Catalog), "Bread for bread is pointless.");
+            Assert.IsNull(BarterRules.FindOffer(stock, new[] { cheese }, 0.0, Barter3, _ => false, EngineTests.Utils.TestWork.Catalog), "Spoiled goods are not accepted.");
+            Assert.IsNull(BarterRules.FindOffer(new List<WorldObject>(), new[] { cheese }, 0.0, Barter3, _ => true, EngineTests.Utils.TestWork.Catalog), "No stock, nothing to take.");
         }
 
         [TestMethod]
@@ -485,7 +485,7 @@ namespace EngineTests
             var events = outbox.Drain();
             var bartered = events.OfType<Bartered>().Single();
             Assert.AreEqual(3.0, bartered.LaborHoursSpent, 1e-9);
-            Assert.IsNull(bartered.GivenKind);
+            Assert.IsNull(bartered.GivenTypeId);
             Assert.IsFalse(events.OfType<Purchased>().Any(), "Barter moves no coin.");
             Assert.AreEqual(1, provider.GetHeldBy(self).Count(), "The taken loaf is in hand.");
             Assert.AreEqual(1, provider.GetObjectsAt(Loc).Count(o => o.ShopId == "bakery"), "One loaf is left on the shelf.");
@@ -497,7 +497,7 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Cheese, Loc, new WDateTime(0), self));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "cheese", Loc, new WDateTime(0), self));
             provider.AddObject(PricedFood("bread_1", 1.5, "bakery"));
             var engine = MakeObjectEngine(provider, lod: null);
             var outbox = new EventCollector();
@@ -505,17 +505,17 @@ namespace EngineTests
             engine.Handle(new ActionCommitted(new WDateTime(0), self, Barter, WTimeSpan.FromMinutes(15)), LaborContext(self, 0.0), outbox);
 
             var bartered = outbox.Drain().OfType<Bartered>().Single();
-            Assert.AreEqual(PickupItemKind.Cheese, bartered.GivenKind);
-            Assert.AreEqual(PickupItemKind.Bread, provider.GetHeldBy(self).Single().ItemKind, "The character now holds the bread.");
+            Assert.AreEqual("cheese", bartered.GivenTypeId);
+            Assert.AreEqual("bread", provider.GetHeldBy(self).Single().TypeId, "The character now holds the bread.");
             var shelf = provider.GetObjectsAt(Loc).Single(o => o.ShopId == "bakery");
-            Assert.AreEqual(PickupItemKind.Cheese, shelf.ItemKind, "The cheese was relisted as shop stock.");
+            Assert.AreEqual("cheese", shelf.TypeId, "The cheese was relisted as shop stock.");
             Assert.IsNotNull(shelf.Price);
         }
 
         // ── Field work ───────────────────────────────────────────────────────────────
 
         private static WorldObject FieldObject(FieldState state, string id = "field_1", string location = Loc)
-            => new() { Id = id, DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = location, ItemKind = PickupItemKind.Grain, Field = state };
+            => new() { Id = id, DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = location, ItemTypeId = "grain", Field = state };
 
         /// <summary>A worker whose snapshot carries the temperature trend per day and the air temperature.</summary>
         private static IHumanContext FarmerContext(HumanId self, double trend, double temperature)
@@ -619,9 +619,10 @@ namespace EngineTests
         [TestMethod]
         public void FieldNeed_OffersTheJobTheFieldNeeds_OnlyWithASeasonAndAnEmptyEnoughStomach()
         {
-            var engine = new FieldWorkNeedEngine();
+            var engine = new FieldWorkNeedEngine(EngineTests.Utils.TestWork.Catalog);
             var self = new HumanId(Guid.NewGuid());
-            var ripe = new List<WorldObject> { FieldObject(new FieldState(FieldStage.Ripe, 1.0)) };
+            WorldObject Tool(string typeId) => GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, typeId, typeId + "_1", Loc);
+            var ripe = new List<WorldObject> { FieldObject(new FieldState(FieldStage.Ripe, 1.0)), Tool("sickle") };
 
             BehaviorContext Ctx(double hunger, double trend, double temp, List<WorldObject> objects)
                 => BehaviorComponentTestFactory.Context(selfId: self, hunger: hunger, thirst: 5, now: new WDateTime(0)) with
@@ -634,7 +635,7 @@ namespace EngineTests
             Assert.AreEqual(0, engine.Evaluate(Ctx(85, 0.1, 18.0, ripe)).Candidates.Count, "Too hungry to work: eating comes first.");
             Assert.AreEqual(0, engine.Evaluate(Ctx(20, 0.1, 18.0, new List<WorldObject>())).Candidates.Count, "No field here.");
 
-            var bare = new List<WorldObject> { FieldObject(new FieldState(FieldStage.Fallow, 1.0)) };
+            var bare = new List<WorldObject> { FieldObject(new FieldState(FieldStage.Fallow, 1.0)), Tool("spade") };
             Assert.AreEqual(Plough, engine.Evaluate(Ctx(20, 0.1, 15.0, bare)).Candidates.Single().Name);
             Assert.AreEqual(0, engine.Evaluate(Ctx(20, 0.0, -3.0, bare)).Candidates.Count, "Frozen ground.");
         }
@@ -664,7 +665,6 @@ namespace EngineTests
             Assert.AreEqual(0, engine.Evaluate(Ctx(new List<WorldObject> { bare, Tool("sickle") })).Candidates.Count, "A sickle does not dig.");
             Assert.AreEqual(0, engine.Evaluate(Ctx(new List<WorldObject> { ripe, Tool("spade") })).Candidates.Count, "No sickle: no reaping.");
             Assert.AreEqual(Reap, engine.Evaluate(Ctx(new List<WorldObject> { ripe, Tool("sickle") })).Candidates.Single().Name);
-            Assert.AreEqual(Plough, new FieldWorkNeedEngine().Evaluate(Ctx(new List<WorldObject> { bare })).Candidates.Single().Name, "Without a catalog no tool is asked for.");
         }
 
         [TestMethod]
@@ -672,12 +672,12 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole", yield: 3.0));
+            provider.AddObject(ProductionSiteFactory.Create("field", Loc, "grain", "Pole", yield: 3.0));
             var engine = MakeObjectEngine(provider);
 
             engine.Handle(new ActionCommitted(new WDateTime(0), self, Produce, WTimeSpan.FromMinutes(30)), LaborContext(self, 0.0), new EventCollector());
 
-            Assert.AreEqual(3, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Grain), "A field with yield 3 gives three grain per harvest.");
+            Assert.AreEqual(3, provider.GetHeldBy(self).Count(h => h.TypeId == "grain"), "A field with yield 3 gives three grain per harvest.");
         }
 
         [TestMethod]
@@ -685,34 +685,34 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec", yield: 2.0));
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec", yield: 2.0));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
             var engine = MakeObjectEngine(provider);
 
             engine.Handle(new ActionCommitted(new WDateTime(0), self, Process, WTimeSpan.FromMinutes(90)), LaborContext(self, 0.0), new EventCollector());
 
-            Assert.AreEqual(2, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Bread));
-            Assert.AreEqual(0, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Flour), "One flour went in.");
+            Assert.AreEqual(2, provider.GetHeldBy(self).Count(h => h.TypeId == "bread"));
+            Assert.AreEqual(0, provider.GetHeldBy(self).Count(h => h.TypeId == "flour"), "One flour went in.");
         }
 
         // ── Build ────────────────────────────────────────────────────────────────────
 
         private static WorldObject FreeFood(string id)
-            => new() { Id = id, DisplayName = id, Category = WorldObjectCategory.Food, LocationId = Loc, ItemKind = PickupItemKind.Food, IsPickable = true };
+            => new() { Id = id, DisplayName = id, Category = WorldObjectCategory.Food, LocationId = Loc, IsPickable = true };
 
         [TestMethod]
         public void SiteBuilding_NextSite_FollowsTheChainOrderUntilComplete()
         {
             var here = new List<WorldObject>();
-            Assert.AreEqual(PickupItemKind.Grain, SiteBuilding.NextSite(here));
+            Assert.AreEqual("grain", SiteBuilding.NextSite(here));
 
-            here.Add(ProductionSiteFactory.Create("f", Loc, PickupItemKind.Grain, "Pole"));
-            Assert.AreEqual(PickupItemKind.Flour, SiteBuilding.NextSite(here));
+            here.Add(ProductionSiteFactory.Create("f", Loc, "grain", "Pole"));
+            Assert.AreEqual("flour", SiteBuilding.NextSite(here));
 
-            here.Add(ProductionSiteFactory.Create("m", Loc, PickupItemKind.Flour, "Mlyn"));
-            Assert.AreEqual(PickupItemKind.Bread, SiteBuilding.NextSite(here));
+            here.Add(ProductionSiteFactory.Create("m", Loc, "flour", "Mlyn"));
+            Assert.AreEqual("bread", SiteBuilding.NextSite(here));
 
-            here.Add(ProductionSiteFactory.Create("o", Loc, PickupItemKind.Bread, "Pec"));
+            here.Add(ProductionSiteFactory.Create("o", Loc, "bread", "Pec"));
             Assert.IsNull(SiteBuilding.NextSite(here), "A complete chain leaves nothing to build.");
         }
 
@@ -720,7 +720,7 @@ namespace EngineTests
         public void SiteBuilding_IsSettlement_NeedsFreeFoodOrASite()
         {
             Assert.IsTrue(SiteBuilding.IsSettlement(new[] { FreeFood("berries") }));
-            Assert.IsTrue(SiteBuilding.IsSettlement(new[] { ProductionSiteFactory.Create("f", Loc, PickupItemKind.Grain, "Pole") }));
+            Assert.IsTrue(SiteBuilding.IsSettlement(new[] { ProductionSiteFactory.Create("f", Loc, "grain", "Pole") }));
             Assert.IsFalse(SiteBuilding.IsSettlement(new[] { PricedFood("loaf", 2.0, "shop") }), "Shop stock alone is not a settlement.");
             Assert.IsFalse(SiteBuilding.IsSettlement(Array.Empty<WorldObject>()), "A bare house or road.");
         }
@@ -728,13 +728,13 @@ namespace EngineTests
         [TestMethod]
         public void Build_Gate_KeepsBuildOnlyWhereSomethingIsMissingInASettlement()
         {
-            var gate = new ObjectAffordanceGatingEngine(new EconomyConfig { BuildEnabled = true });
+            var gate = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog, new EconomyConfig { BuildEnabled = true });
             var settlement = new List<WorldObject> { FreeFood("berries") };
             var complete = new List<WorldObject>
             {
-                ProductionSiteFactory.Create("f", Loc, PickupItemKind.Grain, "Pole"),
-                ProductionSiteFactory.Create("m", Loc, PickupItemKind.Flour, "Mlyn"),
-                ProductionSiteFactory.Create("o", Loc, PickupItemKind.Bread, "Pec"),
+                ProductionSiteFactory.Create("f", Loc, "grain", "Pole"),
+                ProductionSiteFactory.Create("m", Loc, "flour", "Mlyn"),
+                ProductionSiteFactory.Create("o", Loc, "bread", "Pec"),
             };
 
             var inSettlement = new List<BehaviorCandidate> { Cand(Build) };
@@ -753,10 +753,10 @@ namespace EngineTests
         [TestMethod]
         public void Build_Candidate_OfferedToAModeratelyHungryCharacterInASettlement()
         {
-            var engine = new ContingencySearchEngine(economy: new EconomyConfig { BuildEnabled = true });
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog, economy: new EconomyConfig { BuildEnabled = true });
             var settlement = new List<WorldObject> { FreeFood("berries") };
 
-            Assert.IsFalse(new ContingencySearchEngine().Evaluate(EconContext(settlement, new(), 0.0, hunger: 40)).Candidates.Any(c => c.Name == Build), "Off by default.");
+            Assert.IsFalse(new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog).Evaluate(EconContext(settlement, new(), 0.0, hunger: 40)).Candidates.Any(c => c.Name == Build), "Off by default.");
             Assert.IsTrue(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 40)).Candidates.Any(c => c.Name == Build));
             Assert.IsFalse(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 10)).Candidates.Any(c => c.Name == Build), "Not hungry enough to care.");
             Assert.IsFalse(engine.Evaluate(EconContext(settlement, new(), 0.0, hunger: 85)).Candidates.Any(c => c.Name == Build), "Too hungry for hours of work.");
@@ -774,9 +774,9 @@ namespace EngineTests
             for (var i = 0; i < 4; i++)
                 engine.Handle(new ActionCommitted(new WDateTime(0), self, Build, WTimeSpan.FromHours(3)), LaborContext(self, 0.0), outbox);
 
-            var built = outbox.Drain().OfType<SiteBuilt>().Select(e => e.OutputKind).ToList();
-            CollectionAssert.AreEqual(new[] { PickupItemKind.Grain, PickupItemKind.Flour, PickupItemKind.Bread }, built, "Three builds, then the chain is complete.");
-            var field = provider.GetAllObjectsAt(Loc).Single(o => o.ItemKind == PickupItemKind.Grain && o.Affordances.Any(a => a.Type == AffordanceType.Production));
+            var built = outbox.Drain().OfType<SiteBuilt>().Select(e => e.OutputTypeId).ToList();
+            CollectionAssert.AreEqual(new[] { "grain", "flour", "bread" }, built, "Three builds, then the chain is complete.");
+            var field = provider.GetAllObjectsAt(Loc).Single(o => o.ItemTypeId == "grain" && o.Affordances.Any(a => a.Type == AffordanceType.Production));
             Assert.AreEqual(3.0, field.Affordances.Single(a => a.Type == AffordanceType.Production).Satisfaction, "A built field is a standard field.");
         }
 
@@ -785,10 +785,10 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec"));
-            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", PickupItemKind.Bread, "Pult"));
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), self));
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec"));
+            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", "bread", "Pult"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), self));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
             var engine = MakeObjectEngine(provider, economy: Barter3);
             var outbox = new EventCollector();
 
@@ -797,7 +797,7 @@ namespace EngineTests
             var sold = outbox.Drain().OfType<Sold>().Single();
             Assert.IsTrue(sold.Price > 0.0);
             Assert.AreEqual(1, provider.GetObjectsAt(Loc).Count(ShopCounterFactory.IsStock), "The new loaf is on the shelf.");
-            Assert.AreEqual(1, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Bread), "The first loaf stayed with the baker.");
+            Assert.AreEqual(1, provider.GetHeldBy(self).Count(h => h.TypeId == "bread"), "The first loaf stayed with the baker.");
         }
 
         [TestMethod]
@@ -805,22 +805,22 @@ namespace EngineTests
         {
             var provider = new MemProvider();
             var self = new HumanId(Guid.NewGuid());
-            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, PickupItemKind.Bread, "Pec"));
-            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", PickupItemKind.Bread, "Pult"));
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), self));
+            provider.AddObject(ProductionSiteFactory.Create("oven", Loc, "bread", "Pec"));
+            provider.AddObject(ShopCounterFactory.Create("counter", Loc, "bakery", "bread", "Pult"));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), self));
             var engine = MakeObjectEngine(provider, economy: Barter3);
             var outbox = new EventCollector();
 
             engine.Handle(new ActionCommitted(new WDateTime(0), self, Process, WTimeSpan.FromMinutes(90)), LaborContext(self, 0.0), outbox);
 
             Assert.IsFalse(outbox.Drain().OfType<Sold>().Any());
-            Assert.AreEqual(1, provider.GetHeldBy(self).Count(h => h.ItemKind == PickupItemKind.Bread), "A hungry baker eats the first loaf.");
+            Assert.AreEqual(1, provider.GetHeldBy(self).Count(h => h.TypeId == "bread"), "A hungry baker eats the first loaf.");
         }
 
         [TestMethod]
         public void Barter_Gate_NeedsAnOffer_AndBuyIsDroppedInBarterMode()
         {
-            var gate = new ObjectAffordanceGatingEngine(Barter3);
+            var gate = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog, Barter3);
             var stock = PricedFood("bread_1", 2.0, "bakery");
 
             var broke = new List<BehaviorCandidate> { Cand(Barter), Cand(Buy) };
@@ -840,11 +840,11 @@ namespace EngineTests
             var self = new HumanId(Guid.NewGuid());
             var ctx = BehaviorComponentTestFactory.Context(selfId: self).HumanContext;
 
-            engine.Handle(new Sold(new WDateTime(0), self, "bread_1", PickupItemKind.Bread, "bakery", 2.0, 0.0), ctx, new EventCollector());
+            engine.Handle(new Sold(new WDateTime(0), self, "bread_1", "bread", "bakery", 2.0, 0.0), ctx, new EventCollector());
             Assert.AreEqual(3.0, engine.State.LaborHours, 1e-9, "Delivering a 2.0 loaf earns 3 hours of credit.");
             Assert.AreEqual(0.0, engine.State.Wealth, 1e-9, "No coin changes hands in barter mode.");
 
-            engine.Handle(new Bartered(new WDateTime(0), self, "bread_2", PickupItemKind.Bread, "bakery", null, 3.0), ctx, new EventCollector());
+            engine.Handle(new Bartered(new WDateTime(0), self, "bread_2", "bread", "bakery", null, 3.0), ctx, new EventCollector());
             Assert.AreEqual(0.0, engine.State.LaborHours, 1e-9);
         }
 
@@ -875,9 +875,9 @@ namespace EngineTests
                 provider,
                 new FixedLocationService(Loc),
                 new AllowAllPolicy(),
-                new ProductionService(provider),
-                SpoilageConfig.Default,
-                new GameEngineTools.World.Economy.EconomyLedger(),
+                new ProductionService(provider, EngineTests.Utils.TestWork.Catalog),
+                EngineTests.Utils.TestWork.Catalog,
+                new GameEngineTools.World.Economy.EconomyLedger(EngineTests.Utils.TestWork.Catalog),
                 Options.Create(economy ?? EconomyConfig.Default),
                 NullLogger<DefaultObjectInteractionEngine>.Instance,
                 lod);
@@ -889,14 +889,14 @@ namespace EngineTests
             return ctx with { AvailableObjects = available, HeldObjects = held, Wealth = wealth };
         }
 
-        private static WorldObject PricedFood(string id, double price, string shop, PickupItemKind kind = PickupItemKind.Bread)
+        private static WorldObject PricedFood(string id, double price, string shop, string kind = "bread")
             => new()
             {
                 Id = id,
                 DisplayName = id,
                 Category = WorldObjectCategory.Food,
                 LocationId = Loc,
-                ItemKind = kind,
+                TypeId = kind,
                 IsPickable = true,
                 Price = price,
                 ShopId = shop,

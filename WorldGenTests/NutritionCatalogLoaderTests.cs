@@ -38,8 +38,8 @@ public class NutritionCatalogLoaderTests
     public void Parse_ValidCsv_ReturnsExpectedTemplate()
     {
         const string csv = """
-            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
-            test_food;Test Food;Forest;Hunger;0.5;Food;100;600;true;20;5;2;;10;;
+            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+            test_food;Test Food;Forest;Hunger;0.5;100;600;true;20;5;2;;10;;
             """;
 
         var templates = NutritionCatalogLoader.Parse(csv);
@@ -51,7 +51,6 @@ public class NutritionCatalogLoaderTests
         Assert.AreEqual("Forest", t.Biome);
         Assert.AreEqual(AffordanceType.Hunger, t.AffordanceType);
         Assert.AreEqual(0.5, t.Satisfaction, 1e-9);
-        Assert.AreEqual(PickupItemKind.Food, t.ItemKind);
         Assert.AreEqual(100, t.WeightGrams);
         Assert.AreEqual(600, t.RespawnMinutes);
         Assert.IsTrue(t.Pickable);
@@ -68,10 +67,10 @@ public class NutritionCatalogLoaderTests
     public void Parse_SkipsCommentAndBlankLines()
     {
         const string csv = """
-            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
             # this is a comment
 
-            a;A;Any;Rest;0.25;None;0;0;false;;;;;;;
+            a;A;Any;Rest;0.25;0;0;false;;;;;;;
             """;
 
         var templates = NutritionCatalogLoader.Parse(csv);
@@ -83,9 +82,9 @@ public class NutritionCatalogLoaderTests
     public void Parse_DuplicateTemplateId_Throws()
     {
         const string csv = """
-            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
-            dup;A;Any;Rest;0.25;None;0;0;false;;;;;;;
-            dup;B;Any;Rest;0.25;None;0;0;false;;;;;;;
+            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+            dup;A;Any;Rest;0.25;0;0;false;;;;;;;
+            dup;B;Any;Rest;0.25;0;0;false;;;;;;;
             """;
 
         Assert.Throws<FormatException>(() => NutritionCatalogLoader.Parse(csv));
@@ -95,8 +94,8 @@ public class NutritionCatalogLoaderTests
     public void Parse_WrongColumnCount_Throws()
     {
         const string csv = """
-            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
-            bad;Missing Columns;Any;Rest;0.25;None
+            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+            bad;Missing Columns;Any;Rest;0.25
             """;
 
         Assert.Throws<FormatException>(() => NutritionCatalogLoader.Parse(csv));
@@ -107,8 +106,8 @@ public class NutritionCatalogLoaderTests
     {
         var tempPath = Path.Combine(Path.GetTempPath(), $"worldgen_test_nutrition_{Guid.NewGuid():N}.csv");
         File.WriteAllText(tempPath, """
-            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;ItemKind;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
-            only_one;Only One;Any;Rest;0.25;None;0;0;false;;;;;;;
+            TemplateId;DisplayName;Biome;AffordanceType;Satisfaction;WeightGrams;RespawnMinutes;Pickable;CalorieGain;ProteinGain;IronGain;VitaminDGain;HydrationGain;HemeIronFraction;VitaminCMilligrams
+            only_one;Only One;Any;Rest;0.25;0;0;false;;;;;;;
             """);
 
         try

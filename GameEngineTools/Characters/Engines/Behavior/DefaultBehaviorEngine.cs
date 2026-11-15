@@ -74,6 +74,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             IOptions<BehaviorConfig> cfg,
             IOptions<SleepConfig> sleepCfg,
             ILoggerFactory loggerFactory,
+            World.Work.WorkCatalog workCatalog,
             ICharacterDevelopmentPolicy? developmentPolicy = null,
             IHabitApplicabilityModulator? habitApplicabilityModulator = null,
             /// <summary>
@@ -86,13 +87,12 @@ namespace GameEngineTools.Characters.Engines.Behavior
             IOptions<DailyScheduleConfig>? scheduleCfg = null,
             IOptions<Goals.GoalConfig>? goalCfg = null,
             IOptions<Economy.EconomyConfig>? economyCfg = null,
-            IOptions<World.Objects.Crops.CropConfig>? cropCfg = null,
-            World.Work.WorkCatalog? workCatalog = null)
+            IOptions<World.Objects.Crops.CropConfig>? cropCfg = null)
         {
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
-            _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine(), new ContingencySearchEngine(economy: economyCfg?.Value), new FieldWorkNeedEngine(cropCfg?.Value, workCatalog), new BereavementBehaviorBridge() };
+            _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine(), new ContingencySearchEngine(workCatalog, economyCfg?.Value), new FieldWorkNeedEngine(workCatalog, cropCfg?.Value), new BereavementBehaviorBridge() };
             _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new InvestmentModelBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(objectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>(), goalCfg?.Value.MaxFlatBiasPerGoal ?? 12.0, goalCfg?.Value.ShieldingCommitmentThreshold ?? 0.5, goalCfg?.Value.ShieldingMaxInhibition ?? 8.0, goalCfg?.Value.ShieldingStressDampening ?? 0.6), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value),
                 new Modifiers.ValuesBehaviorModifier(loggerFactory.CreateLogger<Modifiers.ValuesBehaviorModifier>()),
                 new Modifiers.InterestBehaviorModifier(),
@@ -102,7 +102,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 new Modifiers.WantingGainModifier(),         // cue-gated multiplicative κ on already-transformed utility (OFF by default)
                 new Modifiers.RegulatoryFitModifier(),       // optional, OFF by default — small eager/vigilant fit bonus
                 new Modifiers.FFFSEscapeModifier() };        // fast proximal-threat escape, OFF by default; last so it dominates when it fires
-            _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine(economyCfg?.Value);
+            _objectAffordanceGatingEngine = new ObjectAffordanceGatingEngine(workCatalog, economyCfg?.Value);
             _sleepCoordinator = new DefaultSleepCoordinator(sleepCfg.Value, Config, loggerFactory);
             _intentManagementEngine = new DefaultIntentManagementEngine(loggerFactory.CreateLogger<DefaultIntentManagementEngine>());
             _arbitrationEngine = new DefaultActionArbitrationEngine(loggerFactory.CreateLogger<DefaultActionArbitrationEngine>());

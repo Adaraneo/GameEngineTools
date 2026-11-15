@@ -35,14 +35,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         private const double MaxNeedFoodToWork = 70.0;
 
         private readonly CropConfig _config;
-        private readonly WorkCatalog? _catalog;
+        private readonly WorkCatalog _catalog;
 
         /// <param name="config">Crop settings.</param>
-        /// <param name="catalog">The work catalog; when given, ploughing, reaping and threshing need a tool of their class at the place or in hand. Without it no tool is asked for.</param>
-        public FieldWorkNeedEngine(CropConfig? config = null, WorkCatalog? catalog = null)
+        /// <param name="catalog">The work catalog: ploughing, reaping and threshing need a tool of the class it names at the place or in hand.</param>
+        public FieldWorkNeedEngine(WorkCatalog catalog, CropConfig? config = null)
         {
             _config = config ?? CropConfig.Default;
-            _catalog = catalog;
+            _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         }
 
         /// <inheritdoc/>
@@ -84,10 +84,10 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         }
 
         /// <summary>The tool class a task needs, read from its row in tasks.json; null when it needs none (sowing is done from a seed bag by hand).</summary>
-        private string? ToolClassOf(FieldTask task) => _catalog?.FieldTaskFor(NameOf(task))?.ToolClass;
+        private string? ToolClassOf(FieldTask task) => _catalog.FieldTaskFor(NameOf(task))?.ToolClass;
 
         private bool HasToolFor(FieldTask task, BehaviorContext context)
-            => _catalog is null || ToolClassOf(task) is not { } toolClass || WorkObjects.HasTool(_catalog, toolClass, context.AvailableObjects, context.HeldObjects);
+            => ToolClassOf(task) is not { } toolClass || WorkObjects.HasTool(_catalog, toolClass, context.AvailableObjects, context.HeldObjects);
 
         internal static string NameOf(FieldTask task) => task switch
         {

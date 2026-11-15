@@ -173,12 +173,12 @@ namespace GameEngineTools.World.Data
                 sb.AppendLine(
                     $"INSERT OR IGNORE INTO WorldObjects " +
                     $"(Id, DisplayName, Category, LocationId, HeatSignature, AmbientNoise, " +
-                    $"BlocksLineOfSight, IsAvailable, IsPickable, WeightGrams, ItemKind, " +
+                    $"BlocksLineOfSight, IsAvailable, IsPickable, WeightGrams, ItemTypeId, TypeId, " +
                     $"Respawns, RespawnMinutes, HeldBy) VALUES " +
                     $"({Str(obj.Id)}, {Str(obj.DisplayName)}, {Str(obj.Category.ToString())}, " +
                     $"{Str(obj.LocationId)}, {R(obj.HeatSignature)}, {R(obj.AmbientNoise)}, " +
                     $"{B(obj.BlocksLineOfSight)}, {B(obj.IsAvailable)}, {B(obj.IsPickable)}, " +
-                    $"{obj.WeightGrams}, {Str(obj.ItemKind.ToString())}, " +
+                    $"{obj.WeightGrams}, {(obj.ItemTypeId is null ? "NULL" : Str(obj.ItemTypeId))}, {(obj.TypeId is null ? "NULL" : Str(obj.TypeId))}, " +
                     $"{B(obj.Respawns)}, {obj.RespawnMinutes}, " +
                     $"{(obj.HeldBy.HasValue ? Str(obj.HeldBy.Value.Value.ToString()) : "NULL")});");
 

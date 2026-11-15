@@ -790,7 +790,7 @@ public static class WorldContentGenerator
         {
             var workstations = parent.Tier switch { SettlementTier.Town => 3, SettlementTier.Village => 2, _ => 1 };
             for (var i = 1; i <= workstations; i++)
-                created += AddFixture(worldDb, $"{parent.Id}_workstation_{i:D2}", "Pracovní stanice", WorldObjectCategory.Tool, parent.Id, AffordanceType.Work, 0.8, PickupItemKind.Tool);
+                created += AddFixture(worldDb, $"{parent.Id}_workstation_{i:D2}", "Pracovní stanice", WorldObjectCategory.Tool, parent.Id, AffordanceType.Work, 0.8);
 
             created += AddFixture(worldDb, $"{parent.Id}_bench_01", "Lavička", WorldObjectCategory.Furniture, parent.Id, AffordanceType.Rest, 0.4);
 
@@ -829,7 +829,6 @@ public static class WorldContentGenerator
             Respawns = true,
             RespawnMinutes = JugRefillMinutes,
             WeightGrams = 10_000,
-            ItemKind = PickupItemKind.Drink,
             Affordances = [new WorldObjectAffordance(AffordanceType.Thirst, 0.85)],
             NutritionalProfile = new NutritionalProfile(HydrationGain: 85),
         });
@@ -838,7 +837,7 @@ public static class WorldContentGenerator
 
     private static int AddFixture(
         SqliteWorldDatabase worldDb, string id, string name, WorldObjectCategory category, string locationId,
-        AffordanceType affordance, double satisfaction, PickupItemKind kind = PickupItemKind.None)
+        AffordanceType affordance, double satisfaction)
     {
         worldDb.AddObject(new WorldObject
         {
@@ -850,7 +849,6 @@ public static class WorldContentGenerator
             IsPickable = false,
             Respawns = false,
             WeightGrams = 500_000,
-            ItemKind = kind,
             Affordances = [new WorldObjectAffordance(affordance, satisfaction)],
         });
         return 1;
@@ -900,7 +898,7 @@ public static class WorldContentGenerator
             DisplayName = "Pole",
             Category = WorldObjectCategory.Ambient,
             LocationId = locationId,
-            ItemKind = PickupItemKind.Grain,
+            ItemTypeId = "grain",
             IsPickable = false,
             WeightGrams = 500_000,
             Field = state,
@@ -954,7 +952,7 @@ public static class WorldContentGenerator
                     LocationId = locationId,
                     IsAvailable = true,
                     IsPickable = template.Pickable,
-                    ItemKind = template.ItemKind,
+                    TypeId = template.TemplateId,
                     Respawns = template.RespawnMinutes > 0,
                     RespawnMinutes = template.RespawnMinutes,
                     WeightGrams = template.WeightGrams,

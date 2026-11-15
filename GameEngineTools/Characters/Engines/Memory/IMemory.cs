@@ -16,7 +16,7 @@ namespace GameEngineTools.Characters.Engines.Memory
         string LocationId,
         WDateTime SeenAt,
         double Confidence,
-        PickupItemKind ItemKind);
+        GameEngineTools.World.Objects.WorldObjectCategory? Category = null);
 
     /// <summary>
     /// Tuning constants for <see cref="IMemoryEngine"/>: encoding strength, Ebbinghaus

@@ -22,18 +22,18 @@ namespace GameEngineTools.Characters.Engines.Objects
         #region Construction
 
         private readonly IMutableWorldObjectProvider _objectProvider;
-        private readonly WorkCatalog? _catalog;
-        private readonly IReadOnlyDictionary<string, Recipe>? _recipes;
+        private readonly WorkCatalog _catalog;
+        private readonly IReadOnlyDictionary<string, Recipe> _recipes;
 
         /// <summary>Creates the service over the mutable world-object provider.</summary>
         /// <param name="objectProvider">The world objects.</param>
-        /// <param name="catalog">The work catalog: its craft tasks are the recipes (the built-in registry when null), and it is needed to make products that are catalog object types rather than legacy item kinds.</param>
-        public ProductionService(IMutableWorldObjectProvider objectProvider, WorkCatalog? catalog = null)
+        /// <param name="catalog">The work catalog: its craft tasks are the recipes and its object types are what is made.</param>
+        public ProductionService(IMutableWorldObjectProvider objectProvider, WorkCatalog catalog)
         {
             ArgumentNullException.ThrowIfNull(objectProvider);
             _objectProvider = objectProvider;
-            _catalog = catalog;
-            _recipes = catalog is null ? null : RecipeRegistry.FromCatalog(catalog);
+            _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            _recipes = RecipeRegistry.FromCatalog(catalog);
         }
 
         #endregion Construction
@@ -44,12 +44,12 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// Raw-material production (no recipe inputs — e.g. harvesting grain, milking): consumes only
         /// labor time and creates <paramref name="yield"/> fresh output objects in the character's hands (the first is returned).
         /// </summary>
-        public WorldObject Produce(IHumanContext ctx, string locationId, PickupItemKind outputKind, WDateTime now, int yield = 1)
+        public WorldObject Produce(IHumanContext ctx, string locationId, string outputTypeId, WDateTime now, int yield = 1)
         {
             ArgumentNullException.ThrowIfNull(ctx);
             ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
 
-            return CreateOutputs(ctx, locationId, outputKind.ToString(), now, yield);
+            return CreateOutputs(ctx, locationId, outputTypeId, now, yield);
         }
 
         /// <summary>
@@ -58,16 +58,12 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <c>null</c> with no side effects when the recipe is unknown or inputs are insufficient. One run of the recipe makes
         /// <paramref name="yield"/> outputs (the first is returned).
         /// </summary>
-        public WorldObject? Process(IHumanContext ctx, string locationId, PickupItemKind outputKind, WDateTime now, int yield = 1)
-            => Process(ctx, locationId, outputKind.ToString(), now, yield);
-
-        /// <summary>The same by item id: a legacy kind name or the id of a catalog object type.</summary>
         public WorldObject? Process(IHumanContext ctx, string locationId, string outputItemId, WDateTime now, int yield = 1)
         {
             ArgumentNullException.ThrowIfNull(ctx);
             ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
 
-            var recipe = _recipes is not null ? _recipes.GetValueOrDefault(outputItemId) : RecipeRegistry.FindByOutput(outputItemId);
+            var recipe = _recipes.GetValueOrDefault(outputItemId);
             if (recipe is null)
                 return null;
 
@@ -90,15 +86,12 @@ namespace GameEngineTools.Characters.Engines.Objects
             return first;
         }
 
-        // A legacy kind is made as before (name, nutrition, spoilage clock); anything else must be an object type of the catalog and is made from it (name, category, weight from its parts).
+        // What is made must be an object type of the catalog; it is made from it (name, category, weight, affordances, spoilage clock).
         private WorldObject CreateOne(IHumanContext ctx, string locationId, string outputItemId, WDateTime now)
         {
-            if (Enum.TryParse<PickupItemKind>(outputItemId, ignoreCase: false, out var kind) && kind != PickupItemKind.None)
-                return FoodItemCatalog.Create(kind, locationId, now, heldBy: ctx.Id);
-
-            var type = _catalog?.Type(outputItemId)
-                ?? throw new InvalidOperationException($"Cannot make '{outputItemId}': it is not an item kind and the work catalog has no such object type.");
-            return WorkObjects.Spawn(_catalog!, type.Id, $"{type.Id}_{Guid.NewGuid().ToString("N")[..8]}", locationId) with { IsPickable = type.Pickable, HeldBy = ctx.Id, ProducedAt = now };
+            if (_catalog.Type(outputItemId) is null)
+                throw new InvalidOperationException($"Cannot make '{outputItemId}': the work catalog has no such object type.");
+            return WorkObjects.CreateItem(_catalog, outputItemId, locationId, now, ctx.Id);
         }
 
         /// <summary>A recipe input lying about must be a free, pickable item: not a production-site fixture and not priced shop stock.</summary>
@@ -121,7 +114,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             foreach (var input in recipe.Inputs)
             {
                 var pool = held.Concat(atLocation)
-                    .Where(o => string.Equals(o.ItemId, input.ItemId, StringComparison.Ordinal) && !usedIds.Contains(o.Id))
+                    .Where(o => string.Equals(o.TypeId, input.ItemId, StringComparison.Ordinal) && !usedIds.Contains(o.Id))
                     .Take(input.Quantity)
                     .ToList();
 

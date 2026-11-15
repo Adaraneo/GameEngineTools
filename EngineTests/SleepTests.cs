@@ -720,7 +720,7 @@ namespace EngineTests
             var sleepOpts = Options.Create(DefaultSleepCfg);
             var logFactory = BuildLoggerFactory();
 
-            return new DefaultBehaviorEngine(behavOpts, sleepOpts, logFactory, new EngineTests.Utils.PermissiveDevelopmentPolicy());
+            return new DefaultBehaviorEngine(behavOpts, sleepOpts, logFactory,EngineTests.Utils.TestWork.Catalog,  new EngineTests.Utils.PermissiveDevelopmentPolicy());
         }
 
         /// <summary>

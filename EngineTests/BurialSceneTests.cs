@@ -154,7 +154,7 @@ namespace EngineTests
             var orchestrator = BuildOrchestrator(locations, new InMemoryMutableProvider(), new SceneOrchestratorOptions { EnableTravelTime = true }, map);
             var id = new HumanId(Guid.NewGuid());
             var walker = new BurialSpy(id, edges: new());
-            walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, PickupItemKind.Food));
+            walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, WorldObjectCategory.Food));
             walker.SetLastOutbox(new ActionCommitted(Now, id, ActionNames.MoveToFood, WTimeSpan.FromMinutes(20)));
             locations.MoveCharacter(id, "home");
             orchestrator.OnTick(Now, new IHuman[] { walker });
@@ -200,7 +200,7 @@ namespace EngineTests
             var orchestrator = BuildOrchestrator(locations, new InMemoryMutableProvider(), new SceneOrchestratorOptions { EnableTravelTime = true }, map, speedMetersPerMinute: 0.0);
             var id = new HumanId(Guid.NewGuid());
             var walker = new BurialSpy(id, edges: new());
-            walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, PickupItemKind.Food));
+            walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, WorldObjectCategory.Food));
             walker.SetLastOutbox(new ActionCommitted(Now, id, ActionNames.MoveToFood, WTimeSpan.FromMinutes(20)));
             locations.MoveCharacter(id, "home");
 
@@ -253,7 +253,7 @@ namespace EngineTests
                 var orchestrator = BuildOrchestrator(locations, objects, new SceneOrchestratorOptions { EnableTravelTime = true }, map);
                 var id = new HumanId(Guid.NewGuid());
                 var walker = new BurialSpy(id, edges: new());
-                walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, PickupItemKind.Food));
+                walker.SetKnownObjects(new ObjectLocationFact("bread", "tavern", Now, 0.9, WorldObjectCategory.Food));
                 walker.SetLastOutbox(new ActionCommitted(Now, id, ActionNames.MoveToFood, WTimeSpan.FromMinutes(20)));
                 locations.MoveCharacter(id, "home");
 

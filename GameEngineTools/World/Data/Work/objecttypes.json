@@ -3,6 +3,15 @@
 // toolClasses: what the object can be used as, with a quality (1 is ordinary). durabilityHours: hours of use until worn out; leave out for an object that does not wear.
 {
   "types": [
+    // Food and drink items. weightGrams: for a type without parts. affordances: what using it gives (Ownership is what holding it is worth). spoilageHours: until fully spoiled.
+    // referencePrice: starting price and barter value. All values are design picks of the Tier 1 and Tier 2 food economy (see docs/research/food-economy-research-findings.md).
+    { "id": "grain",  "name": "Obilí",         "category": "Food",  "pickable": true, "weightGrams": 200, "affordances": { "Ownership": 0.25 }, "referencePrice": 1.0, "source": "design pick" },
+    { "id": "flour",  "name": "Mouka",         "category": "Food",  "pickable": true, "weightGrams": 250, "affordances": { "Ownership": 0.25 }, "referencePrice": 1.5, "source": "design pick" },
+    { "id": "milk",   "name": "Mléko",         "category": "Drink", "pickable": true, "weightGrams": 400, "affordances": { "Thirst": 0.5, "Ownership": 0.3 }, "spoilageHours": 60, "referencePrice": 1.0, "source": "design pick; spoilage about 2.5 days" },
+    { "id": "bread",  "name": "Čerstvý chléb", "category": "Food",  "pickable": true, "weightGrams": 300, "affordances": { "Hunger": 0.6, "Ownership": 0.4 }, "spoilageHours": 72, "referencePrice": 2.0, "source": "design pick; spoilage about 3 days" },
+    { "id": "cheese", "name": "Čerstvý sýr",   "category": "Food",  "pickable": true, "weightGrams": 250, "affordances": { "Hunger": 0.55, "Ownership": 0.4 }, "spoilageHours": 336, "referencePrice": 3.0, "source": "design pick; spoilage about 14 days" },
+
+    // Hand tools.
     {
       "id": "spade", "name": "Rýč", "category": "Tool", "pickable": true,
       "parts": [ { "material": "ash_wood", "volumeCm3": 900 }, { "material": "iron", "volumeCm3": 180 } ],

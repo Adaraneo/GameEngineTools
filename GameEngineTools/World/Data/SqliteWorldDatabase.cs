@@ -116,7 +116,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
-                       IsAvailable, IsPickable, WeightGrams, ItemKind,
+                       IsAvailable, IsPickable, WeightGrams, ItemTypeId,
                        Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition
                 FROM WorldObjects
                 WHERE LocationId = @loc
@@ -139,7 +139,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
-                       IsAvailable, IsPickable, WeightGrams, ItemKind,
+                       IsAvailable, IsPickable, WeightGrams, ItemTypeId,
                        Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, ConsumedAt, TypeId, OwnerId, Condition
                 FROM WorldObjects
                 WHERE LocationId = @loc
@@ -159,7 +159,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
-                       IsAvailable, IsPickable, WeightGrams, ItemKind,
+                       IsAvailable, IsPickable, WeightGrams, ItemTypeId,
                        Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition
                 FROM WorldObjects
                 """;
@@ -197,7 +197,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
-                       IsAvailable, IsPickable, WeightGrams, ItemKind,
+                       IsAvailable, IsPickable, WeightGrams, ItemTypeId,
                        Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition
                 FROM WorldObjects
                 WHERE Id = @id
@@ -218,7 +218,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
-                       IsAvailable, IsPickable, WeightGrams, ItemKind,
+                       IsAvailable, IsPickable, WeightGrams, ItemTypeId,
                        Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition
                 FROM WorldObjects
                 WHERE HeldBy = @holder
@@ -1102,7 +1102,7 @@ namespace GameEngineTools.World.Data
                     IsAvailable = reader.GetInt32(7) != 0,
                     IsPickable = reader.GetInt32(8) != 0,
                     WeightGrams = reader.GetInt32(9),
-                    ItemKind = Enum.Parse<PickupItemKind>(reader.GetString(10), ignoreCase: true),
+                    ItemTypeId = reader.IsDBNull(10) ? null : reader.GetString(10),
                     Respawns = reader.GetInt32(11) != 0,
                     RespawnMinutes = reader.GetInt32(12),
                     // Column 13 = Price (nullable REAL), 14 = ShopId (nullable TEXT) — food-economy Tier 2.
@@ -1270,7 +1270,7 @@ namespace GameEngineTools.World.Data
             const string sql = """
                 INSERT OR REPLACE INTO WorldObjects
                     (Id, DisplayName, Category, LocationId, HeatSignature, AmbientNoise,
-                     BlocksLineOfSight, IsAvailable, IsPickable, WeightGrams, ItemKind,
+                     BlocksLineOfSight, IsAvailable, IsPickable, WeightGrams, ItemTypeId,
                      Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, TypeId, OwnerId, Condition)
                 VALUES
                     (@id, @name, @cat, @loc, @heat, @noise,
@@ -1289,7 +1289,7 @@ namespace GameEngineTools.World.Data
                 ("@avail", obj.IsAvailable ? 1 : 0),
                 ("@pick", obj.IsPickable ? 1 : 0),
                 ("@weight", obj.WeightGrams),
-                ("@kind", obj.ItemKind.ToString()),
+                ("@kind", (object?)obj.ItemTypeId ?? DBNull.Value),
                 ("@resp", obj.Respawns ? 1 : 0),
                 ("@respMin", obj.RespawnMinutes),
                 ("@price", (object?)obj.Price ?? DBNull.Value),

@@ -753,7 +753,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
                 // ── Object interactions — spatial memory ──────────────────────────────────
                 case ObjectTaken taken when taken.Actor == ctx.Id:
-                    UpdateObjectLocationFact(taken.ObjectId, locationId: null, taken.OccurredAt, confidence: 1.0, itemKind: PickupItemKind.None);
+                    UpdateObjectLocationFact(taken.ObjectId, locationId: null, taken.OccurredAt, confidence: 1.0);
                     break;
 
                 case ObjectUsed used when used.Actor == ctx.Id && used.WasConsumed:
@@ -761,7 +761,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                     break;
 
                 case ObjectDropped dropped when dropped.Actor == ctx.Id:
-                    UpdateObjectLocationFact(dropped.ObjectId, dropped.AtLocationId, dropped.OccurredAt, confidence: 1.0, itemKind: PickupItemKind.None);
+                    UpdateObjectLocationFact(dropped.ObjectId, dropped.AtLocationId, dropped.OccurredAt, confidence: 1.0);
                     break;
 
                 case Interactions.NormViolationOccurred nv:
@@ -886,7 +886,7 @@ namespace GameEngineTools.Characters.Engines.Memory
             string? locationId,
             WDateTime seenAt,
             double confidence,
-            PickupItemKind itemKind)
+            GameEngineTools.World.Objects.WorldObjectCategory? category = null)
         {
             var facts = State.KnownObjects.ToList();
             var idx = facts.FindIndex(f => f.ObjectId == objectId);
@@ -895,7 +895,7 @@ namespace GameEngineTools.Characters.Engines.Memory
                 locationId ?? string.Empty,
                 seenAt,
                 Math.Clamp(confidence, 0.0, 1.0),
-                itemKind);
+                category);
 
             if (idx >= 0)
                 facts[idx] = updated;

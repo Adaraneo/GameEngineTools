@@ -32,7 +32,8 @@ namespace WorldObserver.Simulation
         IReadOnlyList<string> KnownLocations,
         IReadOnlyList<(string From, string To, double Dist)> Connections,
         IReadOnlyDictionary<string, string> Regions,
-        GameEngineTools.Characters.Engines.Status.StatusLedger? StatusLedger);
+        GameEngineTools.Characters.Engines.Status.StatusLedger? StatusLedger,
+        GameEngineTools.World.Work.WorkCatalog WorkCatalog);
 
     /// <summary>
     /// Loads WorldObserver's world (a modern-day city) from the database and places the characters.
@@ -198,7 +199,8 @@ namespace WorldObserver.Simulation
                 KnownLocations: allLocations,
                 Connections: connections,
                 Regions: regions,
-                StatusLedger: services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>());
+                StatusLedger: services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>(),
+                WorkCatalog: services.GetRequiredService<GameEngineTools.World.Work.WorkCatalog>());
         }
     }
 }

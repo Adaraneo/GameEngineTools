@@ -7,7 +7,9 @@ namespace GameEngineTools.World.Work
     using GameEngineTools.World.Objects;
     using System;
     using System.Collections.Generic;
+    using System.Collections.Immutable;
     using System.Linq;
+    using GameEngineTools.World.Utils.Time;
 
     /// <summary>The tool classes the built-in tasks ask for; a type names the classes it serves as in <c>objecttypes.json</c>.</summary>
     public static class ToolClasses
@@ -44,8 +46,28 @@ namespace GameEngineTools.World.Work
                 WeightGrams = catalog.WeightGrams(typeId),
                 TypeId = typeId,
                 OwnerId = owner,
+                Affordances = Affordances(type),
             };
         }
+
+        /// <summary>
+        /// A fresh, carried item of a type, as a recipe or a harvest makes it: pickable as the type says, held by the character, its spoilage clock started at <paramref name="producedAt"/>,
+        /// with the type's affordances (food and drink satisfy hunger and thirst).
+        /// </summary>
+        public static WorldObject CreateItem(WorkCatalog catalog, string typeId, string locationId, WDateTime producedAt, HumanId? heldBy)
+        {
+            var type = catalog.Type(typeId) ?? throw new ArgumentException($"Unknown object type '{typeId}'.", nameof(typeId));
+            return Spawn(catalog, typeId, $"{typeId}_{Guid.NewGuid():N}", locationId) with { IsPickable = type.Pickable, HeldBy = heldBy, ProducedAt = producedAt };
+        }
+
+        /// <summary>True for food that can be eaten as it is; raw ingredients (grain, flour) are Food-category but only ownable.</summary>
+        public static bool IsEdible(WorldObject o)
+            => o.Category == WorldObjectCategory.Food && o.Affordances.Any(a => a.Type == AffordanceType.Hunger);
+
+        private static System.Collections.Immutable.ImmutableArray<WorldObjectAffordance> Affordances(ObjectTypeDefinition type)
+            => type.Affordances is null
+                ? System.Collections.Immutable.ImmutableArray<WorldObjectAffordance>.Empty
+                : type.Affordances.Select(a => new WorldObjectAffordance(Enum.Parse<AffordanceType>(a.Key), a.Value)).ToImmutableArray();
 
         /// <summary>Whether something of the given tool class is at hand: among the objects at the place or among those the character holds.</summary>
         public static bool HasTool(WorkCatalog catalog, string toolClass, IEnumerable<WorldObject>? atPlace, IEnumerable<WorldObject>? held)

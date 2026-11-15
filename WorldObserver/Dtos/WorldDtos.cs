@@ -136,7 +136,7 @@ namespace WorldObserver.Dtos
 
     /// <summary>One food/drink item the character is carrying, with its remaining freshness [0..1].</summary>
     public sealed record PantryDto(
-        string ItemKind,
+        string? TypeId,
         string DisplayName,
         double Freshness);
 

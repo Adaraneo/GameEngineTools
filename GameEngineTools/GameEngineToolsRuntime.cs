@@ -258,9 +258,6 @@ namespace GameEngineTools
                     .BindConfiguration("World:Crops");
             services.AddSingleton<GameEngineTools.World.Objects.Crops.CropGrowthService>();
 
-            // Materials and object types of the work system: field work needs the tools it names.
-            services.AddSingleton(_ => GameEngineTools.World.Work.WorkCatalogLoader.Load());
-
             services.AddOptions<GameEngineTools.World.Weather.WeatherConfig>()
                     .BindConfiguration("World:Weather");
 

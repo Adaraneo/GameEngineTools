@@ -896,14 +896,14 @@ static void TraceFoodMove(
         // What the memory-based router sees: remembered Food facts.
         var human = chars.First(c => c.Id == id);
         var foodMemories = human.Snapshot.Memory.KnownObjects
-            .Where(f => f.ItemKind == PickupItemKind.Food)
+            .Where(f => f.Category == WorldObjectCategory.Food)
             .Select(f => $"{f.LocationId}(conf={f.Confidence:F2})")
             .Take(5)
             .ToList();
 
         // What memory thinks is DRINK — to detect mis-tagging (Hypothesis A).
         var drinkMemories = human.Snapshot.Memory.KnownObjects
-            .Where(f => f.ItemKind == PickupItemKind.Drink)
+            .Where(f => f.Category == WorldObjectCategory.Drink)
             .Select(f => $"{f.LocationId}(conf={f.Confidence:F2})")
             .Take(5)
             .ToList();

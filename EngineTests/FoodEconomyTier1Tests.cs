@@ -33,12 +33,12 @@ namespace EngineTests
         public void Produce_RawItem_AddsFreshItemToHand()
         {
             var provider = new MemProvider();
-            var svc = new ProductionService(provider);
+            var svc = new ProductionService(provider, EngineTests.Utils.TestWork.Catalog);
             var ctx = Ctx(out var self);
 
-            var produced = svc.Produce(ctx, Loc, PickupItemKind.Grain, new WDateTime(0));
+            var produced = svc.Produce(ctx, Loc, "grain", new WDateTime(0));
 
-            Assert.AreEqual(PickupItemKind.Grain, produced.ItemKind);
+            Assert.AreEqual("grain", produced.TypeId);
             Assert.AreEqual(self, produced.HeldBy);
             Assert.IsNotNull(produced.ProducedAt, "Produced item must carry a ProducedAt for spoilage.");
             CollectionAssert.Contains(provider.GetHeldBy(self).ToList(), produced);
@@ -72,41 +72,30 @@ namespace EngineTests
 
             Assert.IsNotNull(pot);
             Assert.AreEqual("pot", pot!.TypeId);
-            Assert.AreEqual("pot", pot.ItemId);
             Assert.AreEqual("Hrnec", pot.DisplayName);
             Assert.AreEqual(self, pot.HeldBy);
             Assert.IsTrue(pot.IsPickable);
             Assert.AreEqual(1520, pot.WeightGrams, "800 cm3 of fired clay at 1.9 g/cm3.");
             Assert.IsNull(provider.FindObject("lump_1"), "The inputs are consumed.");
             Assert.IsNull(provider.FindObject("lump_2"));
-            Assert.ThrowsExactly<InvalidOperationException>(() => new ProductionService(provider).Produce(ctx, Loc, PickupItemKind.None, new WDateTime(0)), "An unknown product is refused instead of invented.");
-        }
-
-        [TestMethod]
-        public void TheItemId_IsTheTypeWhenThereIsOne_ElseTheLegacyKind()
-        {
-            WorldObject Obj(PickupItemKind kind, string? type = null) => new() { Id = "o", DisplayName = "o", Category = WorldObjectCategory.Food, LocationId = Loc, ItemKind = kind, TypeId = type };
-
-            Assert.AreEqual("Grain", Obj(PickupItemKind.Grain).ItemId);
-            Assert.AreEqual("spade", Obj(PickupItemKind.Tool, "spade").ItemId);
-            Assert.IsNull(Obj(PickupItemKind.None).ItemId);
+            Assert.ThrowsExactly<InvalidOperationException>(() => new ProductionService(provider, EngineTests.Utils.TestWork.Catalog).Produce(ctx, Loc, "none", new WDateTime(0)), "An unknown product is refused instead of invented.");
         }
 
         [TestMethod]
         public void Process_WithEnoughInputs_ConsumesInputsAndYieldsOutput()
         {
             var provider = new MemProvider();
-            var svc = new ProductionService(provider);
+            var svc = new ProductionService(provider, EngineTests.Utils.TestWork.Catalog);
             var ctx = Ctx(out var self);
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), self));
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), self));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), self));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), self));
 
-            var flour = svc.Process(ctx, Loc, PickupItemKind.Flour, new WDateTime(0));
+            var flour = svc.Process(ctx, Loc, "flour", new WDateTime(0));
 
             Assert.IsNotNull(flour);
-            Assert.AreEqual(PickupItemKind.Flour, flour!.ItemKind);
+            Assert.AreEqual("flour", flour!.TypeId);
             Assert.AreEqual(self, flour.HeldBy);
-            Assert.AreEqual(0, provider.GetHeldBy(self).Count(o => o.ItemKind == PickupItemKind.Grain),
+            Assert.AreEqual(0, provider.GetHeldBy(self).Count(o => o.TypeId == "grain"),
                 "Both grain inputs must be consumed by the recipe.");
         }
 
@@ -114,15 +103,15 @@ namespace EngineTests
         public void Process_InsufficientInputs_ReturnsNullAndConsumesNothing()
         {
             var provider = new MemProvider();
-            var svc = new ProductionService(provider);
+            var svc = new ProductionService(provider, EngineTests.Utils.TestWork.Catalog);
             var ctx = Ctx(out var self);
             // Recipe needs 2 grain; only 1 held.
-            provider.AddObject(FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), self));
+            provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), self));
 
-            var flour = svc.Process(ctx, Loc, PickupItemKind.Flour, new WDateTime(0));
+            var flour = svc.Process(ctx, Loc, "flour", new WDateTime(0));
 
             Assert.IsNull(flour, "Processing must fail when inputs are insufficient.");
-            Assert.AreEqual(1, provider.GetHeldBy(self).Count(o => o.ItemKind == PickupItemKind.Grain),
+            Assert.AreEqual(1, provider.GetHeldBy(self).Count(o => o.TypeId == "grain"),
                 "All-or-nothing: the single grain must not be consumed on a failed recipe.");
         }
 
@@ -131,8 +120,8 @@ namespace EngineTests
         [TestMethod]
         public void Spoilage_FreshItem_FreshnessOne_ThenDecays()
         {
-            var bread = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null);
-            var cfg = SpoilageConfig.Default;
+            var bread = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), null);
+            var cfg = EngineTests.Utils.TestWork.Catalog;
 
             Assert.AreEqual(1.0, Spoilage.Freshness(bread, new WDateTime(0), cfg), 1e-9);
             // Bread rate = 1/72 per hour → after 36h freshness ≈ 0.5.
@@ -143,8 +132,8 @@ namespace EngineTests
         [TestMethod]
         public void Spoilage_OldPerishable_IsSpoiled()
         {
-            var bread = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null);
-            var cfg = SpoilageConfig.Default;
+            var bread = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), null);
+            var cfg = EngineTests.Utils.TestWork.Catalog;
 
             // Bread lasts ~72h; 200h later it is fully spoiled.
             Assert.IsTrue(Spoilage.IsSpoiled(bread, new WDateTime(0).AddHours(200), cfg));
@@ -155,8 +144,8 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_HoldsFreshFood_EmitsEatStored()
         {
-            var engine = new ContingencySearchEngine();
-            var held = new List<WorldObject> { FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null) };
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
+            var held = new List<WorldObject> { GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), null) };
             var ctx = BridgeContext(hunger: 80, available: new(), held: held, now: new WDateTime(0));
 
             var output = engine.Evaluate(ctx);
@@ -168,12 +157,12 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_AtProcessingSiteWithInputs_EmitsProcess()
         {
-            var engine = new ContingencySearchEngine();
-            var mill = ProductionSiteFactory.Create("mill", Loc, PickupItemKind.Flour, "Mlýn");
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
+            var mill = ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn");
             var held = new List<WorldObject>
             {
-                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
-                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
+                GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), null),
+                GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), null),
             };
             var ctx = BridgeContext(hunger: 80, available: new() { mill }, held: held, now: new WDateTime(0));
 
@@ -186,8 +175,8 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_AtRawSite_EmitsProduce()
         {
-            var engine = new ContingencySearchEngine();
-            var field = ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole");
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
+            var field = ProductionSiteFactory.Create("field", Loc, "grain", "Pole");
             var ctx = BridgeContext(hunger: 80, available: new() { field }, held: new(), now: new WDateTime(0));
 
             var output = engine.Evaluate(ctx);
@@ -201,7 +190,7 @@ namespace EngineTests
         [TestMethod]
         public void Gate_RemovesEatStoredAndProduce_WhenNoPantryOrSite()
         {
-            var gate = new ObjectAffordanceGatingEngine();
+            var gate = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog);
             var candidates = new List<BehaviorCandidate>
             {
                 Cand(EatStored),
@@ -223,8 +212,8 @@ namespace EngineTests
         [TestMethod]
         public void Gate_KeepsProduce_WhenRawSitePresent()
         {
-            var gate = new ObjectAffordanceGatingEngine();
-            var field = ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole");
+            var gate = new ObjectAffordanceGatingEngine(EngineTests.Utils.TestWork.Catalog);
+            var field = ProductionSiteFactory.Create("field", Loc, "grain", "Pole");
             var candidates = new List<BehaviorCandidate> { Cand(Produce), Cand(Process) };
             var ctx = BridgeContext(hunger: 80, available: new() { field }, held: new(), now: new WDateTime(0));
 
@@ -241,11 +230,11 @@ namespace EngineTests
         public void Process_DoesNotConsumeAProductionSiteFixtureAsAnIngredient()
         {
             var provider = new MemProvider();
-            var svc = new ProductionService(provider);
+            var svc = new ProductionService(provider, EngineTests.Utils.TestWork.Catalog);
             var ctx = Ctx(out _);
-            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, PickupItemKind.Flour, "Mlýn"));
+            provider.AddObject(ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn"));
 
-            var bread = svc.Process(ctx, Loc, PickupItemKind.Bread, new WDateTime(0));
+            var bread = svc.Process(ctx, Loc, "bread", new WDateTime(0));
 
             Assert.IsNull(bread, "The mill itself (ItemKind Flour) is not flour to bake with.");
             Assert.IsTrue(provider.GetObjectsAt(Loc).Any(o => o.Id == "mill"), "The mill fixture must survive.");
@@ -254,11 +243,11 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_RawIngredientsAreNotEatable()
         {
-            var engine = new ContingencySearchEngine();
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
             var held = new List<WorldObject>
             {
-                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
-                FoodItemCatalog.Create(PickupItemKind.Flour, Loc, new WDateTime(0), null),
+                GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), null),
+                GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "flour", Loc, new WDateTime(0), null),
             };
 
             var output = engine.Evaluate(BridgeContext(hunger: 80, available: new(), held: held, now: new WDateTime(0)));
@@ -269,8 +258,8 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_HungryAtProductionSite_ProducesInsteadOfForagingAway()
         {
-            var engine = new ContingencySearchEngine();
-            var field = ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole");
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
+            var field = ProductionSiteFactory.Create("field", Loc, "grain", "Pole");
 
             var output = engine.Evaluate(BridgeContext(hunger: 80, available: new() { field }, held: new(), now: new WDateTime(0)));
 
@@ -281,16 +270,16 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_HungryWithGrainAtMill_ProcessesBeforeHarvestingMore()
         {
-            var engine = new ContingencySearchEngine();
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
             var held = new List<WorldObject>
             {
-                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
-                FoodItemCatalog.Create(PickupItemKind.Grain, Loc, new WDateTime(0), null),
+                GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), null),
+                GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), null),
             };
             var available = new List<WorldObject>
             {
-                ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole"),
-                ProductionSiteFactory.Create("mill", Loc, PickupItemKind.Flour, "Mlýn"),
+                ProductionSiteFactory.Create("field", Loc, "grain", "Pole"),
+                ProductionSiteFactory.Create("mill", Loc, "flour", "Mlýn"),
             };
 
             var output = engine.Evaluate(BridgeContext(hunger: 80, available: available, held: held, now: new WDateTime(0)));
@@ -302,8 +291,8 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_FarmerOnWorkShift_ProducesWithoutBeingHungry_ButAHealerDoesNot()
         {
-            var engine = new ContingencySearchEngine();
-            var field = ProductionSiteFactory.Create("field", Loc, PickupItemKind.Grain, "Pole");
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
+            var field = ProductionSiteFactory.Create("field", Loc, "grain", "Pole");
 
             Assert.IsTrue(
                 engine.Evaluate(ShiftContext(OccupationIds.Farmer, field)).Candidates.Any(c => c.Name == Produce),
@@ -316,9 +305,9 @@ namespace EngineTests
         [TestMethod]
         public void Bridge_ProducerOnShiftHoldingBread_SellsToTheCounterEvenWhenTheShelfIsEmpty()
         {
-            var engine = new ContingencySearchEngine();
-            var counter = ShopCounterFactory.Create("counter", Loc, "bakery_shop", PickupItemKind.Bread, "Pult");
-            var bread = FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null);
+            var engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
+            var counter = ShopCounterFactory.Create("counter", Loc, "bakery_shop", "bread", "Pult");
+            var bread = GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), null);
 
             var output = engine.Evaluate(ShiftContext(OccupationIds.Farmer, counter, held: new() { bread }));
 

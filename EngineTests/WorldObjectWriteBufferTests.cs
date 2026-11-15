@@ -28,7 +28,7 @@ namespace EngineTests
             return (new WorldObjectWriteBuffer(provider, db), provider, db);
         }
 
-        private static WorldObject Bread() => FoodItemCatalog.Create(PickupItemKind.Bread, Loc, new WDateTime(0), null);
+        private static WorldObject Bread() => GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Loc, new WDateTime(0), null);
 
         [TestMethod]
         public void ProducedAt_SurvivesTheDatabase_SoSpoilageIsNotResetByAReload()

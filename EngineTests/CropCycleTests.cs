@@ -286,10 +286,10 @@ namespace EngineTests
         // ── The clock over the world ─────────────────────────────────────────────────
 
         private static WorldObject Field(FieldState state)
-            => new() { Id = "field_1", DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemKind = PickupItemKind.Grain, Field = state };
+            => new() { Id = "field_1", DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = Loc, TypeId = "grain", Field = state };
 
         private static WorldObject Store(int units)
-            => new() { Id = "store_1", DisplayName = "Sypka", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemKind = PickupItemKind.Grain, Quantity = units, IsStock = true };
+            => new() { Id = "store_1", DisplayName = "Sypka", Category = WorldObjectCategory.Ambient, LocationId = Loc, TypeId = "grain", Quantity = units, IsStock = true };
 
         [TestMethod]
         public void Service_AddsHeatToSownFieldsOncePerHour_AndRipensThem()

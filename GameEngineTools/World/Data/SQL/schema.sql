@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS WorldObjects (
     IsAvailable       INTEGER NOT NULL DEFAULT 1,
     IsPickable        INTEGER NOT NULL DEFAULT 0,
     WeightGrams       INTEGER NOT NULL DEFAULT 0,
-    ItemKind          TEXT    NOT NULL DEFAULT 'None',
+    ItemTypeId        TEXT            DEFAULT NULL,  -- the item a fixture is about: what a production site makes, what a shop counter trades; NULL for an ordinary object
     Respawns          INTEGER NOT NULL DEFAULT 0,
     RespawnMinutes    INTEGER NOT NULL DEFAULT 1440,
     Price             REAL            DEFAULT NULL,

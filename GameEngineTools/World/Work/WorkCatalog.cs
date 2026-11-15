@@ -55,6 +55,10 @@ namespace GameEngineTools.World.Work
     /// <param name="ToolClasses">Tool class to quality (1 is ordinary) it can serve as.</param>
     /// <param name="DurabilityHours">Hours of use until worn out, or null when it does not wear.</param>
     /// <param name="Source">Where the parts and volumes come from.</param>
+    /// <param name="FixedWeightGrams">Weight in grams for a type without parts (food, grain); a type with parts weighs what its parts weigh.</param>
+    /// <param name="Affordances">What using an instance gives, as affordance name to satisfaction (Hunger, Thirst, Ownership ...).</param>
+    /// <param name="SpoilageHours">Hours until a fresh instance has spoiled completely; null when it does not spoil.</param>
+    /// <param name="ReferencePrice">Starting price and barter value; null means the catalog default.</param>
     public sealed record ObjectTypeDefinition(
         string Id,
         string Name,
@@ -63,7 +67,11 @@ namespace GameEngineTools.World.Work
         IReadOnlyList<ObjectPart> Parts,
         IReadOnlyDictionary<string, double> ToolClasses,
         double? DurabilityHours = null,
-        string? Source = null);
+        string? Source = null,
+        int? FixedWeightGrams = null,
+        IReadOnlyDictionary<string, double>? Affordances = null,
+        double? SpoilageHours = null,
+        double? ReferencePrice = null);
 
     /// <summary>What kind of task it is.</summary>
     public enum TaskKind
@@ -75,7 +83,7 @@ namespace GameEngineTools.World.Work
         FieldWork,
     }
 
-    /// <summary>An item and a count, as a task consumes or produces it. <paramref name="Item"/> names an item kind (today the <c>PickupItemKind</c> names; later object type ids).</summary>
+    /// <summary>An item and a count, as a task consumes or produces it. <paramref name="Item"/> is the id of an object type of the catalog.</summary>
     public sealed record TaskItem(string Item, int Quantity);
 
     /// <summary>One thing that can be done. A <see cref="TaskKind.Craft"/> task has inputs, one output, a duration and a location type; a <see cref="TaskKind.FieldWork"/> task names its action and the tool class it needs.</summary>
@@ -139,6 +147,13 @@ namespace GameEngineTools.World.Work
                     if (!(part.VolumeCm3 > 0.0)) throw new FormatException($"Object type '{t.Id}': the volume of '{part.MaterialId}' must be positive.");
                 }
 
+                if (t.Parts.Count == 0 && t.FixedWeightGrams is not > 0)
+                    throw new FormatException($"Object type '{t.Id}': it needs parts or a positive weightGrams.");
+                foreach (var affordance in t.Affordances?.Keys ?? Enumerable.Empty<string>())
+                    if (!Enum.TryParse<AffordanceType>(affordance, ignoreCase: false, out _))
+                        throw new FormatException($"Object type '{t.Id}': unknown affordance '{affordance}'.");
+                if (t.SpoilageHours is { } sh && !(sh > 0.0)) throw new FormatException($"Object type '{t.Id}': spoilageHours must be positive.");
+                if (t.ReferencePrice is { } rp && !(rp >= 0.0)) throw new FormatException($"Object type '{t.Id}': referencePrice must not be negative.");
                 foreach (var (toolClass, quality) in t.ToolClasses)
                     if (!(quality > 0.0)) throw new FormatException($"Object type '{t.Id}': tool class '{toolClass}' needs a positive quality.");
                 if (t.DurabilityHours is { } d && !(d > 0.0)) throw new FormatException($"Object type '{t.Id}': durability must be positive.");
@@ -192,13 +207,25 @@ namespace GameEngineTools.World.Work
         /// <summary>The object type with this id, or null (a world database may name a type that was removed from the file).</summary>
         public ObjectTypeDefinition? Type(string? id) => id is not null && _types.TryGetValue(id, out var t) ? t : null;
 
-        /// <summary>Weight in grams of one object of the type: the sum over its parts of density times volume; 0 for an unknown type.</summary>
+        /// <summary>Weight in grams of one object of the type: the sum over its parts of density times volume, or its fixed weight when it has no parts.</summary>
+        /// <exception cref="KeyNotFoundException">The catalog has no such type.</exception>
         public int WeightGrams(string? typeId)
         {
-            if (Type(typeId) is not { } type) return 0;
+            var type = Type(typeId) ?? throw new KeyNotFoundException($"The work catalog has no object type '{typeId}'.");
+            if (type.Parts.Count == 0)
+                return type.FixedWeightGrams!.Value;
             var kilograms = type.Parts.Sum(p => _materials[p.MaterialId].DensityKgM3 * p.VolumeCm3 * 1e-6);
             return (int)Math.Round(kilograms * 1000.0);
         }
+
+        /// <summary>Price used where nothing else is known: a type without a reference price, or an object without a type.</summary>
+        public const double DefaultReferencePrice = 1.0;
+
+        /// <summary>Starting price and barter value of an item type; <see cref="DefaultReferencePrice"/> for an untyped object or a type that names none.</summary>
+        public double ReferencePrice(string? typeId) => Type(typeId)?.ReferencePrice ?? DefaultReferencePrice;
+
+        /// <summary>Share of freshness an instance of the type loses per hour; 0 when it does not spoil.</summary>
+        public double SpoilagePerHour(string? typeId) => Type(typeId)?.SpoilageHours is { } hours ? 1.0 / hours : 0.0;
 
         /// <summary>The quality with which an object of the type serves as a tool of the class, or 0 when it does not.</summary>
         public double ToolQuality(string? typeId, string toolClass)

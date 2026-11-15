@@ -74,7 +74,6 @@ namespace EngineTests
                 BlocksLineOfSight = false,
                 IsPickable = false,
                 WeightGrams = 0,
-                ItemKind = PickupItemKind.None,
                 Respawns = false,
                 RespawnMinutes = 0
             };
@@ -121,7 +120,7 @@ namespace EngineTests
             var bread = MakeObject("shop_bread_01", "bakery") with
             {
                 Category = WorldObjectCategory.Food,
-                ItemKind = PickupItemKind.Bread,
+                TypeId = "bread",
                 Price = 2.5,
                 ShopId = "bakery_shop",
             };

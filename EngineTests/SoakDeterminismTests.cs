@@ -171,7 +171,6 @@ namespace EngineTests
                     Respawns = respawns,
                     RespawnMinutes = 30,
                     WeightGrams = pickable ? 300 : 500_000,
-                    ItemKind = category == WorldObjectCategory.Food ? PickupItemKind.Food : PickupItemKind.None,
                     Affordances = ImmutableArray.Create(new WorldObjectAffordance(affordance, 0.8)),
                 };
 

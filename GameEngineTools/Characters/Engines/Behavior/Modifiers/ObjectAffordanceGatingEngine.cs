@@ -8,6 +8,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
     using GameEngineTools.Characters.Engines.Economy;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
+    using GameEngineTools.World.Work;
     using static ActionNames;
 
     /// <summary>
@@ -36,7 +37,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         private readonly EconomyConfig _economy;
 
         /// <summary>Creates the gate; the economy config (barter mode) defaults to <see cref="EconomyConfig.Default"/>.</summary>
-        public ObjectAffordanceGatingEngine(EconomyConfig? economy = null) => _economy = economy ?? EconomyConfig.Default;
+        private readonly WorkCatalog _catalog;
+
+        public ObjectAffordanceGatingEngine(WorkCatalog catalog, EconomyConfig? economy = null)
+        {
+            _catalog = catalog;
+            _economy = economy ?? EconomyConfig.Default;
+        }
 
         #region Action requirement map
 
@@ -144,7 +151,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             IReadOnlyList<WorldObject>? heldObjects)
         {
             var hasHeldFood = heldObjects is not null
-                && heldObjects.Any(FoodItemCatalog.IsEdible);
+                && heldObjects.Any(WorkObjects.IsEdible);
             if (!hasHeldFood)
                 candidates.RemoveAll(c => c.Name == EatStored);
 
@@ -165,7 +172,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             {
                 if (!obj.Affordances.Any(a => a.Type == AffordanceType.Production))
                     continue;
-                var hasRecipe = RecipeRegistry.FindByOutput(obj.ItemKind) is not null;
+                var hasRecipe = RecipeRegistry.FindByOutput(obj.ItemTypeId) is not null;
                 if (hasRecipe == wantRecipe)
                     return true;
             }
@@ -205,7 +212,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
         ///   <item><c>Buy</c> survives only when a co-located priced object is present <b>and</b>
         ///   affordable (<c>Price ≤ Wealth</c>).</item>
         ///   <item><c>Sell</c> survives only when the character holds a food/drink item whose kind a
-        ///   co-located shop trades (has stock of the same <see cref="WorldObject.ItemKind"/>).</item>
+        ///   co-located shop trades (has stock of the same <see cref="WorldObject.TypeId"/>).</item>
         /// </list>
         /// </summary>
         private void ApplyEconomyTradeGates(
@@ -218,7 +225,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             if (_economy.BarterOnly || !CanBuyHere(availableObjects, wealth))
                 candidates.RemoveAll(c => c.Name == Buy);
 
-            if (BarterRules.FindOffer(availableObjects, heldObjects, laborHours, _economy, _ => true) is null)
+            if (BarterRules.FindOffer(availableObjects, heldObjects, laborHours, _economy, _ => true, _catalog) is null)
                 candidates.RemoveAll(c => c.Name == Barter);
 
             if (!_economy.BuildEnabled || !SiteBuilding.IsSettlement(availableObjects) || SiteBuilding.NextSite(availableObjects) is null)
@@ -251,18 +258,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             {
                 if (held.Category is not (WorldObjectCategory.Food or WorldObjectCategory.Drink))
                     continue;
-                if (ShopTrades(availableObjects, held.ItemKind))
+                if (ShopTrades(availableObjects, held.TypeId))
                     return true;
             }
             return false;
         }
 
         /// <summary>True when a co-located shop stocks (and therefore trades) the given item kind.</summary>
-        private static bool ShopTrades(IReadOnlyList<WorldObject> availableObjects, PickupItemKind kind)
+        private static bool ShopTrades(IReadOnlyList<WorldObject> availableObjects, string? kind)
         {
             foreach (var obj in availableObjects)
             {
-                if (obj.ShopId is not null && obj.ItemKind == kind)
+                if (obj.ShopId is not null && obj.TradedTypeId == kind)
                     return true;
             }
             return false;

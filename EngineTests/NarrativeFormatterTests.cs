@@ -74,8 +74,8 @@ namespace EngineTests
         [TestMethod]
         public void PurchaseSaleAndNormViolation_AreNarrated()
         {
-            StringAssert.Contains(Format(new Purchased(Now, Petr, "o1", PickupItemKind.Bread, "bakery", 2.0, 8.0))!.Text, "koupil chléb za");
-            StringAssert.Contains(Format(new Sold(Now, Anna, "o1", PickupItemKind.Cheese, "bakery", 1.2, 9.0))!.Text, "prodala sýr");
+            StringAssert.Contains(Format(new Purchased(Now, Petr, "o1", "bread", "bakery", 2.0, 8.0))!.Text, "koupil chléb za");
+            StringAssert.Contains(Format(new Sold(Now, Anna, "o1", "cheese", "bakery", 1.2, 9.0))!.Text, "prodala sýr");
             StringAssert.Contains(Format(new NormViolationOccurred(Now, Petr, GameEngineTools.Characters.Engines.Interactions.SocialNormKind.RitualContext, 0.8, HasAudience: true))!.Text, "před lidmi");
         }
 

@@ -101,7 +101,7 @@ namespace EngineTests
         {
             var knownObjects = new[]
             {
-                new ObjectLocationFact("bread_01", TavernId, Now, 0.85, PickupItemKind.Food)
+                new ObjectLocationFact("bread_01", TavernId, Now, 0.85, WorldObjectCategory.Food)
             };
 
             // Adjacent: home → tavern
@@ -135,7 +135,7 @@ namespace EngineTests
         {
             var knownObjects = new[]
             {
-                new ObjectLocationFact("old_mushroom", ForestId, Now, 0.10, PickupItemKind.Food)
+                new ObjectLocationFact("old_mushroom", ForestId, Now, 0.10, WorldObjectCategory.Food)
             };
 
             var worldMap = BuildMap(new[]
@@ -208,8 +208,8 @@ namespace EngineTests
         {
             var knownObjects = new[]
             {
-                new ObjectLocationFact("tavern_bread",   TavernId, Now, 0.80, PickupItemKind.Food),
-                new ObjectLocationFact("forest_berries", ForestId, Now, 0.95, PickupItemKind.Food)
+                new ObjectLocationFact("tavern_bread",   TavernId, Now, 0.80, WorldObjectCategory.Food),
+                new ObjectLocationFact("forest_berries", ForestId, Now, 0.95, WorldObjectCategory.Food)
             };
 
             // Only home → tavern is adjacent; home → forest is not in the adjacency graph.
@@ -321,7 +321,7 @@ namespace EngineTests
         {
             var knownObjects = new[]
             {
-                new ObjectLocationFact("well_01", TavernId, Now, 0.80, PickupItemKind.Drink)
+                new ObjectLocationFact("well_01", TavernId, Now, 0.80, WorldObjectCategory.Drink)
             };
 
             var worldMap = BuildMap(new[]
@@ -338,14 +338,14 @@ namespace EngineTests
             orchestrator.OnTick(Now, new[] { character });
 
             Assert.AreEqual(TavernId, _locationService.GetLocation(character.Id),
-                "MoveTo:Drink must use PickupItemKind.Drink memory, not Food.");
+                "MoveTo:Drink must use Drink memory, not Food.");
         }
 
         /// <summary>A jug in a neighbour's house is not a place to go for water; the same jug in the character's own house is.</summary>
         [TestMethod]
         public void RouteMoveTo_DrinkMemory_SkipsAForeignHome_ButNotItsOwn()
         {
-            var knownObjects = new[] { new ObjectLocationFact("jug_01", TavernId, Now, 0.80, PickupItemKind.Drink) };
+            var knownObjects = new[] { new ObjectLocationFact("jug_01", TavernId, Now, 0.80, WorldObjectCategory.Drink) };
             var worldMap = BuildMap(new[] { (HomeId, TavernId, 50.0) });
 
             var thirsty = BuildForagingHuman(HomeId, MoveToDrink, knownObjects);
@@ -376,7 +376,7 @@ namespace EngineTests
         {
             var knownObjects = new[]
             {
-                new ObjectLocationFact("bread_01", TavernId, Now, 0.85, PickupItemKind.Food)
+                new ObjectLocationFact("bread_01", TavernId, Now, 0.85, WorldObjectCategory.Food)
             };
 
             // home → tavern, 1600 m; at 80 m/min that is a 20-minute walk.
@@ -418,7 +418,7 @@ namespace EngineTests
         [TestMethod]
         public void RouteMoveTo_TripShorterThanTheThreshold_ArrivesAtOnce_LongerTripStillTimed()
         {
-            var knownObjects = new[] { new ObjectLocationFact("well_01", TavernId, Now, 0.80, PickupItemKind.Drink) };
+            var knownObjects = new[] { new ObjectLocationFact("well_01", TavernId, Now, 0.80, WorldObjectCategory.Drink) };
             var options = new SceneOrchestratorOptions { EnableTravelTime = true, InstantTravelBelowMinutes = 15.0 };
 
             // 50 m at 80 m/min is under a minute.
@@ -527,8 +527,7 @@ namespace EngineTests
                 Category = WorldObjectCategory.Food,
                 LocationId = locationId,
                 IsAvailable = true,
-                Affordances = System.Collections.Immutable.ImmutableArray<WorldObjectAffordance>.Empty,
-                ItemKind = PickupItemKind.Food
+                Affordances = System.Collections.Immutable.ImmutableArray<WorldObjectAffordance>.Empty
             };
 
         #endregion Factory methods

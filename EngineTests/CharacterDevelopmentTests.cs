@@ -91,7 +91,7 @@ namespace EngineTests
             var engine = new DefaultBehaviorEngine(
                 Options.Create(new BehaviorConfig()),
                 Options.Create(new SleepConfig()),
-                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),EngineTests.Utils.TestWork.Catalog, 
                 new DefaultCharacterDevelopmentPolicy());
             var ctx = BabyContext();
             var outbox = new EventCollector();

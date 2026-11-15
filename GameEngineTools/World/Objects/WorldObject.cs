@@ -103,12 +103,6 @@ namespace GameEngineTools.World.Objects
         /// Weight of this object in grams. Used to compute inventory carry weight.
         /// </summary>
         public int WeightGrams { get; init; } = 0;
-
-        /// <summary>
-        /// Semantic category used by the inventory engine when resolving pickup behaviour.
-        /// </summary>
-        public PickupItemKind ItemKind { get; init; } = PickupItemKind.None;
-
         #endregion Pickup properties
 
         #region Quantity and crop state
@@ -180,10 +174,12 @@ namespace GameEngineTools.World.Objects
         public string? TypeId { get; init; } = null;
 
         /// <summary>
-        /// What kind of item this is, as one string: the catalog type id when it has one, else the name of its legacy <see cref="PickupItemKind"/> (so existing food and grain keep working), else <c>null</c>.
-        /// Recipes and tasks name items by this id.
+        /// For a fixture, the item it is about: what a production site makes, what a shop counter trades. <c>null</c> for an ordinary object, whose own <see cref="TypeId"/> says what it is.
         /// </summary>
-        public string? ItemId => TypeId ?? (ItemKind == PickupItemKind.None ? null : ItemKind.ToString());
+        public string? ItemTypeId { get; init; } = null;
+
+        /// <summary>The item type a shop deals in through this object: that of a counter, or of a unit on its shelf.</summary>
+        public string? TradedTypeId => ItemTypeId ?? TypeId;
 
         /// <summary>The character who owns this object, or <c>null</c> when it belongs to nobody (a shared tool, a fixture).</summary>
         public HumanId? OwnerId { get; init; } = null;
@@ -205,7 +201,7 @@ namespace GameEngineTools.World.Objects
 
         /// <summary>
         /// Identifies which shop's stock this object belongs to, for <c>EconomyLedger</c>
-        /// price-adjustment bookkeeping (stock level per shop per <see cref="ItemKind"/>).
+        /// price-adjustment bookkeeping (stock level per shop per <see cref="TradedTypeId"/>).
         /// <c>null</c> when <see cref="Price"/> is also <c>null</c>, except on a shop counter (<see cref="Production.ShopCounterFactory"/>). Food-economy Tier 2.
         /// </summary>
         public string? ShopId { get; init; } = null;

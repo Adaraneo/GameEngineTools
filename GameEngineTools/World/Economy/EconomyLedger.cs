@@ -9,6 +9,7 @@ namespace GameEngineTools.World.Economy
     using System.Linq;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Persistence;
+    using GameEngineTools.World.Work;
 
     /// <summary>
     /// Scene-level singleton tracking per-shop, per-item-kind posted prices with stock feedback.
@@ -26,6 +27,11 @@ namespace GameEngineTools.World.Economy
     /// </remarks>
     public sealed class EconomyLedger
     {
+        private readonly WorkCatalog _catalog;
+
+        /// <summary>Creates a ledger whose starting prices are the reference prices of the object types of the catalog.</summary>
+        public EconomyLedger(WorkCatalog catalog) => _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+
         #region Public API
 
         /// <summary>
@@ -34,10 +40,10 @@ namespace GameEngineTools.World.Economy
         /// the caller's already-resolved persisted price for this shop/kind, if it has one — is
         /// preferred over the hardcoded <see cref="SeedPrice"/> constant.
         /// </summary>
-        public double GetPrice(string shopId, PickupItemKind kind, double? persistedFallback = null)
+        public double GetPrice(string shopId, string kind, double? persistedFallback = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(shopId);
-            return _prices.TryGetValue((shopId, kind), out var price) ? price : persistedFallback ?? SeedPrice(kind);
+            return _prices.TryGetValue((shopId, kind), out var price) ? price : persistedFallback ?? ReferencePrice(kind);
         }
 
         /// <summary>
@@ -57,7 +63,7 @@ namespace GameEngineTools.World.Economy
         /// <param name="observedPrice">The price actually posted before the transaction, if known (derives the base on a cold ledger).</param>
         /// <param name="observedStock">The stock the <paramref name="observedPrice"/> was posted at.</param>
         public double AdjustPriceForStockChange(
-            string shopId, PickupItemKind kind, int newStockCount, EconomyConfig config,
+            string shopId, string kind, int newStockCount, EconomyConfig config,
             double? observedPrice = null, int? observedStock = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(shopId);
@@ -103,25 +109,13 @@ namespace GameEngineTools.World.Economy
 
         #region Private state
 
-        private readonly Dictionary<(string ShopId, PickupItemKind Kind), double> _prices = new();
+        private readonly Dictionary<(string ShopId, string Kind), double> _prices = new();
 
         /// <summary>Price each shop/kind would post at exactly the target stock level.</summary>
-        private readonly Dictionary<(string ShopId, PickupItemKind Kind), double> _bases = new();
+        private readonly Dictionary<(string ShopId, string Kind), double> _bases = new();
 
-        private static double SeedPrice(PickupItemKind kind) => ReferencePrice(kind);
-
-        /// <summary>Fallback starting price for a shop/kind pair the ledger has not yet transacted; also the barter value of a held item.</summary>
-        public static double ReferencePrice(PickupItemKind kind) => kind switch
-        {
-            PickupItemKind.Bread => 2.0,
-            PickupItemKind.Cheese => 3.0,
-            PickupItemKind.Flour => 1.5,
-            PickupItemKind.Grain => 1.0,
-            PickupItemKind.Milk => 1.0,
-            PickupItemKind.Food => 2.0,
-            PickupItemKind.Drink => 1.0,
-            _ => 1.0,
-        };
+        /// <summary>Fallback starting price for a shop/kind pair the ledger has not yet transacted; also the barter value of a held item (the reference price of its object type).</summary>
+        public double ReferencePrice(string? typeId) => _catalog.ReferencePrice(typeId);
 
         #endregion Private state
     }

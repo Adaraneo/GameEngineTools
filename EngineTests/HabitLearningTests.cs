@@ -341,7 +341,8 @@ namespace EngineTests
             => new(
                 Options.Create(new BehaviorConfig()),
                 Options.Create(new SleepConfig()),
-                LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Warning)));
+                LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Warning)),
+                EngineTests.Utils.TestWork.Catalog);
 
         private static BehaviorContext ContextWithTrace(
             BehaviorHabitTrace trace,

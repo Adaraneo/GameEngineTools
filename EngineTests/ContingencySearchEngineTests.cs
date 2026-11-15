@@ -20,7 +20,7 @@ namespace EngineTests
         [TestInitialize]
         public void Setup()
         {
-            _engine = new ContingencySearchEngine();
+            _engine = new ContingencySearchEngine(EngineTests.Utils.TestWork.Catalog);
         }
 
         // ── No provider wired ──────────────────────────────────────────────────────

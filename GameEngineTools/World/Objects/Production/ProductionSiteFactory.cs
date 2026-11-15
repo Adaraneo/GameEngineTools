@@ -8,7 +8,7 @@ namespace GameEngineTools.World.Objects.Production
     /// <summary>
     /// Builds the immovable <see cref="WorldObject"/> fixtures that mark a location as a production
     /// or processing site (a field, a mill, a bakery). A site carries a
-    /// <see cref="AffordanceType.Production"/> affordance and an <c>ItemKind</c> naming its output;
+    /// <see cref="AffordanceType.Production"/> affordance and an <c>ItemTypeId</c> naming its output;
     /// whether that output has a <see cref="Recipe"/> distinguishes a processing site (mill/bakery)
     /// from a raw-harvest site (field/pasture). Food-economy Tier 1.
     /// </summary>
@@ -16,10 +16,10 @@ namespace GameEngineTools.World.Objects.Production
     {
         /// <summary>
         /// Creates a non-pickable, non-respawning production-site fixture at <paramref name="locationId"/>
-        /// whose <see cref="AffordanceType.Production"/> yields <paramref name="outputKind"/>; the affordance's satisfaction is the number of
+        /// whose <see cref="AffordanceType.Production"/> yields <paramref name="outputTypeId"/>; the affordance's satisfaction is the number of
         /// outputs one action makes (<paramref name="yield"/>, rounded, at least 1).
         /// </summary>
-        public static WorldObject Create(string id, string locationId, PickupItemKind outputKind, string displayName, double yield = 1.0)
+        public static WorldObject Create(string id, string locationId, string outputTypeId, string displayName, double yield = 1.0)
             => new()
             {
                 Id = id,
@@ -32,7 +32,7 @@ namespace GameEngineTools.World.Objects.Production
                 IsPickable = false,
                 Respawns = false,
                 WeightGrams = 500_000, // effectively immovable
-                ItemKind = outputKind,
+                ItemTypeId = outputTypeId,
                 Affordances = ImmutableArray.Create(new WorldObjectAffordance(AffordanceType.Production, yield)),
             };
     }

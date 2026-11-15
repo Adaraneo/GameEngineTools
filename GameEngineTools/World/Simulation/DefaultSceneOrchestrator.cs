@@ -1115,15 +1115,10 @@ namespace GameEngineTools.World.Simulation
                         ? WorldObjectCategory.Food
                         : WorldObjectCategory.Drink;
 
-                    // Map category to PickupItemKind for memory lookup.
-                    var itemKind = category == WorldObjectCategory.Food
-                        ? PickupItemKind.Food
-                        : PickupItemKind.Drink;
-
                     // Try memory-based routing first — character navigates where they remember seeing food.
                     // Falls back to omniscient provider when memory is empty or all facts are stale.
                     var destination =
-                        FindLocationWithCategoryViaMemory(character, currentLocation, itemKind)
+                        FindLocationWithCategoryViaMemory(character, currentLocation, category)
                         ?? FindLocationWithCategory(character, currentLocation, category);
 
                     if (destination is not null)
@@ -1488,7 +1483,7 @@ namespace GameEngineTools.World.Simulation
         private MoveTarget? FindLocationWithCategoryViaMemory(
             IHuman character,
             string? currentLocationId,
-            PickupItemKind itemKind)
+            WorldObjectCategory category)
         {
             if (currentLocationId is null)
                 return null;
@@ -1501,10 +1496,10 @@ namespace GameEngineTools.World.Simulation
             // Collect distinct locations where the character remembers seeing this kind of item,
             // filtered by minimum confidence threshold to exclude nearly-forgotten facts.
             var rememberedLocations = knownObjects
-                .Where(f => f.ItemKind == itemKind
+                .Where(f => f.Category == category
                          && f.Confidence >= _options.MinMemoryConfidence
                          && f.LocationId != currentLocationId
-                         && !(itemKind == PickupItemKind.Drink && IsForeignHome(character, f.LocationId)))
+                         && !(category == WorldObjectCategory.Drink && IsForeignHome(character, f.LocationId)))
                 .GroupBy(f => f.LocationId)
                 .Select(g => (
                     LocationId: g.Key,

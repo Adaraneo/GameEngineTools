@@ -500,7 +500,6 @@ namespace EngineTests
                 Affordances = ImmutableArray.Create(new WorldObjectAffordance(type, satisfaction)),
                 IsPickable = isPickable,
                 WeightGrams = 0,
-                ItemKind = PickupItemKind.None,
                 HeldBy = null,
                 ConsumedAt = null,
                 Respawns = false,

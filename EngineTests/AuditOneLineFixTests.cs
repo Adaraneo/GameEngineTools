@@ -37,7 +37,7 @@ namespace EngineTests
         {
             var now = WDateTime.New(100, 1, 10, 12);
             var self = new HumanId(Guid.NewGuid());
-            var facts = new[] { new ObjectLocationFact("bread_01", "bakery", now, 0.9, PickupItemKind.Food) };
+            var facts = new[] { new ObjectLocationFact("bread_01", "bakery", now, 0.9, WorldObjectCategory.Food) };
             var episode = Episode(now, 2, "Interaction:SmallTalk:Accepted|from=a|to=b", EmotionalTag.Positive, 0.80, new HumanId(Guid.NewGuid()), salience: 0.90);
 
             var engine = BuildMemoryEngine();

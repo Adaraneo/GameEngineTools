@@ -52,7 +52,7 @@ namespace EngineTests
 
             Assert.IsTrue(bakeryFood.Count > 0, "The bakery should stock ready food.");
             Assert.IsTrue(
-                bakeryFood.All(o => o.Price == 2.0 && o.ShopId == "bakery_shop" && o.ItemKind == PickupItemKind.Bread),
+                bakeryFood.All(o => o.Price == 2.0 && o.ShopId == "bakery_shop" && o.TypeId == "bread"),
                 "Every ready food at the bakery must be priced shop stock (Price 2.0, ShopId bakery_shop, kind Bread).");
             Assert.IsFalse(
                 bakeryFood.Any(o => o.Price is null),

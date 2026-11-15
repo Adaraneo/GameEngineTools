@@ -257,6 +257,7 @@ namespace WorldObserver.Simulation
                     var dest = ctx.Orchestrator.GetTravelDestination(id);
                     return dest is null ? null : (ctx.Locations.GetDescriptor(dest)?.DisplayName ?? dest);
                 },
+                catalog: ctx.WorkCatalog,
                 startTime: _startTime,
                 realElapsed: FormatRealElapsed(Environment.TickCount64 - _realStartTicks),
                 mapLocationIds: ctx.KnownLocations,

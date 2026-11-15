@@ -8,6 +8,7 @@ namespace GameEngineTools.World.Objects.Production
     using System.Linq;
     using GameEngineTools.Characters.Engines.Economy;
     using GameEngineTools.World.Economy;
+    using GameEngineTools.World.Work;
 
     /// <summary>One feasible barter: shop stock to take, paid with a held item, or with labor hours when <see cref="Give"/> is <c>null</c>.</summary>
     public sealed record BarterOffer(WorldObject Take, WorldObject? Give, double LaborHours);
@@ -24,7 +25,8 @@ namespace GameEngineTools.World.Objects.Production
             IEnumerable<WorldObject>? held,
             double laborHours,
             EconomyConfig config,
-            Func<WorldObject, bool> isFresh)
+            Func<WorldObject, bool> isFresh,
+            WorkCatalog catalog)
         {
             var stock = available
                 .Where(o => ShopCounterFactory.IsStock(o) && o.Category == WorldObjectCategory.Food && o.Price is not null)
@@ -45,10 +47,10 @@ namespace GameEngineTools.World.Objects.Production
 
             foreach (var give in held
                          .Where(h => h.Category is WorldObjectCategory.Food or WorldObjectCategory.Drink && isFresh(h))
-                         .OrderBy(h => EconomyLedger.ReferencePrice(h.ItemKind)))
+                         .OrderBy(h => catalog.ReferencePrice(h.TypeId)))
             {
-                var worth = EconomyLedger.ReferencePrice(give.ItemKind) * config.ShopBuyBackFraction;
-                var take = stock.FirstOrDefault(s => s.ItemKind != give.ItemKind && s.Price!.Value <= worth);
+                var worth = catalog.ReferencePrice(give.TypeId) * config.ShopBuyBackFraction;
+                var take = stock.FirstOrDefault(s => s.TradedTypeId != give.TypeId && s.Price!.Value <= worth);
                 if (take is not null)
                     return new BarterOffer(take, give, 0.0);
             }

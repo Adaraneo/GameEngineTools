@@ -14,6 +14,7 @@ namespace GameEngineTools.Characters.Engines.Objects
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Crops;
     using GameEngineTools.World.Objects.Production;
+    using GameEngineTools.World.Work;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -29,7 +30,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         private readonly ILocationService _locations;
         private readonly IObjectInteractionPolicy _policy;
         private readonly ProductionService _production;
-        private readonly SpoilageConfig _spoilage;
+        private readonly WorkCatalog _catalog;
         private readonly EconomyLedger _economyLedger;
         private readonly EconomyConfig _economyConfig;
         private readonly ICognitiveResolutionLevelRuntime? _lodRuntime;
@@ -41,7 +42,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <param name="locations">Location service.</param>
         /// <param name="policy">Object-interaction permission policy.</param>
         /// <param name="production">Food-economy production/processing service (Tier 1).</param>
-        /// <param name="spoilage">Food-spoilage rate configuration (Tier 1).</param>
+        /// <param name="catalog">The work catalog: spoilage times and prices of the item types.</param>
         /// <param name="economyLedger">Scene posted-price aggregate (Tier 2).</param>
         /// <param name="economyConfig">Economy tuning configuration (Tier 2).</param>
         /// <param name="logger">Logger.</param>
@@ -56,7 +57,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             ILocationService locations,
             IObjectInteractionPolicy policy,
             ProductionService production,
-            SpoilageConfig spoilage,
+            WorkCatalog catalog,
             EconomyLedger economyLedger,
             IOptions<EconomyConfig> economyConfig,
             ILogger<DefaultObjectInteractionEngine> logger,
@@ -68,7 +69,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             _locations = locations;
             _policy = policy;
             _production = production;
-            _spoilage = spoilage;
+            _catalog = catalog;
             _economyLedger = economyLedger;
             _economyConfig = economyConfig.Value;
             _lodRuntime = lodRuntime;
@@ -313,7 +314,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         {
             var now = committed.OccurredAt;
             var held = _objectProvider.GetHeldBy(ctx.Id)
-                                      .Where(FoodItemCatalog.IsEdible)
+                                      .Where(WorkObjects.IsEdible)
                                       .ToList();
             if (held.Count == 0)
                 return;
@@ -323,12 +324,12 @@ namespace GameEngineTools.Characters.Engines.Objects
             var bestFreshness = 0.0;
             foreach (var o in held)
             {
-                var freshness = Spoilage.Freshness(o, now, _spoilage);
+                var freshness = Spoilage.Freshness(o, now, _catalog);
                 if (freshness <= 0.0)
                 {
                     _objectProvider.RemoveObject(o.LocationId, o.Id);
                     using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                        _logger.ItemSpoiled(ctx.Id.ToString(), o.ItemKind.ToString(), o.Id, freshness);
+                        _logger.ItemSpoiled(ctx.Id.ToString(), o.TypeId ?? "?", o.Id, freshness);
                     continue;
                 }
                 if (freshness > bestFreshness)
@@ -346,7 +347,7 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             var nutrition = (freshest.NutritionalProfile?.CalorieGain ?? 1.0) * bestFreshness;
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                _logger.PantryConsumed(ctx.Id.ToString(), freshest.ItemKind.ToString(), freshest.Id, bestFreshness, nutrition);
+                _logger.PantryConsumed(ctx.Id.ToString(), freshest.TypeId ?? "?", freshest.Id, bestFreshness, nutrition);
         }
 
         /// <summary>
@@ -363,9 +364,9 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (outputKind is null)
                 return;
 
-            var produced = _production.Produce(ctx, locationId, outputKind.Value, committed.OccurredAt, SiteYield(locationId, outputKind.Value));
+            var produced = _production.Produce(ctx, locationId, outputKind, committed.OccurredAt, SiteYield(locationId, outputKind));
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                _logger.ItemProduced(ctx.Id.ToString(), produced.ItemKind.ToString(), produced.Id, locationId);
+                _logger.ItemProduced(ctx.Id.ToString(), produced.TypeId ?? "?", produced.Id, locationId);
         }
 
         /// <summary>
@@ -391,9 +392,9 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (produced is null)
                 return; // insufficient inputs — nothing consumed
 
-            var recipe = RecipeRegistry.FindByOutput(produced.ItemKind);
+            var recipe = RecipeRegistry.FindByOutput(produced.TypeId);
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                _logger.ItemProcessed(ctx.Id.ToString(), recipe?.Id ?? "?", produced.ItemKind.ToString(), produced.Id, locationId);
+                _logger.ItemProcessed(ctx.Id.ToString(), recipe?.Id ?? "?", produced.TypeId ?? "?", produced.Id, locationId);
 
             if (_economyConfig.BarterOnly)
                 DeliverSurplus(produced, locationId, committed.OccurredAt, ctx, outbox);
@@ -451,11 +452,11 @@ namespace GameEngineTools.Characters.Engines.Objects
         }
 
         /// <summary>Outputs one action makes at the site producing <paramref name="kind"/> here: its Production affordance, rounded, at least 1.</summary>
-        private int SiteYield(string locationId, PickupItemKind kind)
+        private int SiteYield(string locationId, string kind)
         {
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
             {
-                if (o.ItemKind != kind)
+                if (o.ItemTypeId != kind)
                     continue;
                 foreach (var a in o.Affordances)
                 {
@@ -472,19 +473,19 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// </summary>
         private void DeliverSurplus(WorldObject produced, string locationId, WDateTime now, IHumanContext ctx, IEventCollector outbox)
         {
-            var shop = _objectProvider.GetObjectsAt(locationId).FirstOrDefault(o => o.ShopId is not null && o.ItemKind == produced.ItemKind);
+            var shop = _objectProvider.GetObjectsAt(locationId).FirstOrDefault(o => o.ShopId is not null && o.TradedTypeId == produced.TypeId);
             if (shop?.ShopId is not { } shopId)
                 return;
-            if (!_objectProvider.GetHeldBy(ctx.Id).Any(h => h.Id != produced.Id && FoodItemCatalog.IsEdible(h)))
+            if (!_objectProvider.GetHeldBy(ctx.Id).Any(h => h.Id != produced.Id && WorkObjects.IsEdible(h)))
                 return;
 
-            var askPrice = _economyLedger.GetPrice(shopId, produced.ItemKind);
+            var askPrice = _economyLedger.GetPrice(shopId, produced.TypeId);
             _objectProvider.RemoveObject(produced.LocationId, produced.Id);
             _objectProvider.AddObject(produced with { HeldBy = null, LocationId = locationId, Price = askPrice, ShopId = shopId, ProducedAt = null });
 
-            outbox.Add(new Sold(now, ctx.Id, produced.Id, produced.ItemKind, shopId, askPrice * _economyConfig.ShopBuyBackFraction, 0.0));
+            outbox.Add(new Sold(now, ctx.Id, produced.Id, produced.TypeId, shopId, askPrice * _economyConfig.ShopBuyBackFraction, 0.0));
             if (!IsBackground(ctx.Id))
-                Reprice(locationId, shopId, produced.ItemKind, askPrice, stockChange: 1, ctx, now, outbox);
+                Reprice(locationId, shopId, produced.TypeId, askPrice, stockChange: 1, ctx, now, outbox);
         }
 
         /// <summary>
@@ -512,7 +513,7 @@ namespace GameEngineTools.Characters.Engines.Objects
                 return; // nothing affordable here (gate should have prevented Buy) — no-op
 
             var shopId = obj.ShopId ?? "shop";
-            var kind = obj.ItemKind;
+            var kind = obj.TypeId;
 
             // Transfer the object into the buyer's hand and strip its shop pricing — it is now owned.
             _objectProvider.RemoveObject(obj.LocationId, obj.Id);
@@ -528,14 +529,14 @@ namespace GameEngineTools.Characters.Engines.Objects
                 return;
 
             // Recompute the shop's posted price against the reduced stock (excludes the now-held object).
-            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o));
+            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.TypeId == kind && ShopCounterFactory.IsStock(o));
             var oldPrice = _economyLedger.GetPrice(shopId, kind, price);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig, price, newStock + 1);
             PostPrice(location, shopId, kind, newPrice);
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
+                _logger.PriceChanged(shopId, kind, oldPrice, newPrice, newStock);
         }
 
         /// <summary>
@@ -552,7 +553,7 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             var offer = BarterRules.FindOffer(
                 _objectProvider.GetObjectsAt(location), _objectProvider.GetHeldBy(ctx.Id), ctx.Snapshot.Economy?.LaborHours ?? 0.0,
-                _economyConfig, o => Spoilage.Freshness(o, now, _spoilage) > 0.0);
+                _economyConfig, o => Spoilage.Freshness(o, now, _catalog) > 0.0, _catalog);
             if (offer is null)
                 return;
 
@@ -562,42 +563,42 @@ namespace GameEngineTools.Characters.Engines.Objects
             _objectProvider.RemoveObject(take.LocationId, take.Id);
             _objectProvider.AddObject(take with { HeldBy = ctx.Id, LocationId = location, Price = null, ShopId = null });
 
-            PickupItemKind? givenKind = null;
+            string? givenKind = null;
             if (offer.Give is { } give)
             {
-                givenKind = give.ItemKind;
+                givenKind = give.TypeId;
                 _objectProvider.RemoveObject(give.LocationId, give.Id);
-                _objectProvider.AddObject(give with { HeldBy = null, LocationId = location, Price = _economyLedger.GetPrice(shopId, give.ItemKind), ShopId = shopId });
+                _objectProvider.AddObject(give with { HeldBy = null, LocationId = location, Price = _economyLedger.GetPrice(shopId, give.TypeId), ShopId = shopId });
             }
 
-            outbox.Add(new Bartered(now, ctx.Id, take.Id, take.ItemKind, shopId, givenKind, offer.LaborHours));
+            outbox.Add(new Bartered(now, ctx.Id, take.Id, take.TypeId, shopId, givenKind, offer.LaborHours));
 
             // LOD §7: background characters skip the per-shop price formation entirely.
             if (IsBackground(ctx.Id))
                 return;
 
-            Reprice(location, shopId, take.ItemKind, take.Price ?? _economyLedger.GetPrice(shopId, take.ItemKind), stockChange: -1, ctx, now, outbox);
+            Reprice(location, shopId, take.TypeId, take.Price ?? _economyLedger.GetPrice(shopId, take.TypeId), stockChange: -1, ctx, now, outbox);
             if (givenKind is { } given)
                 Reprice(location, shopId, given, _economyLedger.GetPrice(shopId, given), stockChange: 1, ctx, now, outbox);
         }
 
         /// <summary>Re-prices a shop's kind against its current stock after a swap and posts the new price on the shelf.</summary>
-        private void Reprice(string location, string shopId, PickupItemKind kind, double observedPrice, int stockChange, IHumanContext ctx, WDateTime now, IEventCollector outbox)
+        private void Reprice(string location, string shopId, string kind, double observedPrice, int stockChange, IHumanContext ctx, WDateTime now, IEventCollector outbox)
         {
-            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o));
+            var newStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.TypeId == kind && ShopCounterFactory.IsStock(o));
             var oldPrice = _economyLedger.GetPrice(shopId, kind, observedPrice);
             var newPrice = _economyLedger.AdjustPriceForStockChange(shopId, kind, newStock, _economyConfig, observedPrice, newStock - stockChange);
             PostPrice(location, shopId, kind, newPrice);
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
+                _logger.PriceChanged(shopId, kind, oldPrice, newPrice, newStock);
         }
 
         /// <summary>Writes the shop's new posted price onto every in-stock object of that kind, so the next Buy really charges it.</summary>
-        private void PostPrice(string location, string shopId, PickupItemKind kind, double price)
+        private void PostPrice(string location, string shopId, string kind, double price)
         {
-            foreach (var stocked in _objectProvider.GetObjectsAt(location).Where(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o)).ToList())
+            foreach (var stocked in _objectProvider.GetObjectsAt(location).Where(o => o.ShopId == shopId && o.TypeId == kind && ShopCounterFactory.IsStock(o)).ToList())
             {
                 if (stocked.Price is { } current && Math.Abs(current - price) < 1e-9)
                     continue;
@@ -632,9 +633,9 @@ namespace GameEngineTools.Characters.Engines.Objects
             {
                 if (held.Category is not (WorldObjectCategory.Food or WorldObjectCategory.Drink))
                     continue;
-                if (Spoilage.Freshness(held, now, _spoilage) <= 0.0)
+                if (Spoilage.Freshness(held, now, _catalog) <= 0.0)
                     continue; // no one buys spoiled food back
-                shop = shopStock.FirstOrDefault(s => s.ItemKind == held.ItemKind);
+                shop = shopStock.FirstOrDefault(s => s.TradedTypeId == held.TypeId);
                 if (shop is not null)
                 {
                     item = held;
@@ -645,10 +646,10 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (item is null || shop?.ShopId is not { } shopId)
                 return;
 
-            var kind = item.ItemKind;
+            var kind = item.TypeId;
             var askPrice = shop.Price ?? _economyLedger.GetPrice(shopId, kind);
             var salePrice = askPrice * _economyConfig.ShopBuyBackFraction;
-            var oldStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.ItemKind == kind && ShopCounterFactory.IsStock(o));
+            var oldStock = _objectProvider.GetObjectsAt(location).Count(o => o.ShopId == shopId && o.TypeId == kind && ShopCounterFactory.IsStock(o));
 
             // Move the item from the seller's hand into the shop's stock, relisted at the shop's ask.
             _objectProvider.RemoveObject(item.LocationId, item.Id);
@@ -670,7 +671,7 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             outbox.Add(new PriceChanged(now, ctx.Id, shopId, kind, oldPrice, newPrice, newStock));
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                _logger.PriceChanged(shopId, kind.ToString(), oldPrice, newPrice, newStock);
+                _logger.PriceChanged(shopId, kind, oldPrice, newPrice, newStock);
         }
 
         /// <summary>
@@ -679,24 +680,24 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <c>ItemKind</c> either has a recipe (<paramref name="wantRecipe"/> = true → processing site)
         /// or has none (raw production site). Returns <c>null</c> when no matching site is present.
         /// </summary>
-        private IEnumerable<PickupItemKind> ResolveProcessingOutputs(string locationId)
+        private IEnumerable<string> ResolveProcessingOutputs(string locationId)
         {
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
             {
-                if (o.Affordances.Any(a => a.Type == AffordanceType.Production) && RecipeRegistry.FindByOutput(o.ItemKind) is not null)
-                    yield return o.ItemKind;
+                if (o.Affordances.Any(a => a.Type == AffordanceType.Production) && o.ItemTypeId is { } output && RecipeRegistry.FindByOutput(output) is not null)
+                    yield return output;
             }
         }
 
-        private PickupItemKind? ResolveProductionOutput(string locationId, bool wantRecipe)
+        private string? ResolveProductionOutput(string locationId, bool wantRecipe)
         {
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
             {
                 if (!o.Affordances.Any(a => a.Type == AffordanceType.Production))
                     continue;
-                var hasRecipe = RecipeRegistry.FindByOutput(o.ItemKind) is not null;
+                var hasRecipe = RecipeRegistry.FindByOutput(o.ItemTypeId) is not null;
                 if (hasRecipe == wantRecipe)
-                    return o.ItemKind;
+                    return o.ItemTypeId;
             }
             return null;
         }

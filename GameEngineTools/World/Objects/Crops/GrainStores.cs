@@ -17,10 +17,10 @@ namespace GameEngineTools.World.Objects.Crops
         public static string FoodStoreId(string locationId) => $"{locationId}_grain_store";
 
         /// <summary>True for the seed bin: a finite grain stock that is not food.</summary>
-        public static bool IsSeedBin(WorldObject o) => o.IsStock && o.ItemKind == PickupItemKind.Grain && o.Category == WorldObjectCategory.Ambient;
+        public static bool IsSeedBin(WorldObject o) => o.IsStock && o.TypeId == "grain" && o.Category == WorldObjectCategory.Ambient;
 
         /// <summary>True for the food store: a finite grain stock people can eat from.</summary>
-        public static bool IsFoodStore(WorldObject o) => o.IsStock && o.ItemKind == PickupItemKind.Grain && o.Category == WorldObjectCategory.Food;
+        public static bool IsFoodStore(WorldObject o) => o.IsStock && o.TypeId == "grain" && o.Category == WorldObjectCategory.Food;
 
         /// <summary>A seed bin holding <paramref name="units"/>.</summary>
         public static WorldObject CreateSeedBin(string locationId, int units)
@@ -30,7 +30,7 @@ namespace GameEngineTools.World.Objects.Crops
                 DisplayName = "Sýpka - osivo",
                 Category = WorldObjectCategory.Ambient,
                 LocationId = locationId,
-                ItemKind = PickupItemKind.Grain,
+                TypeId = "grain",
                 IsPickable = false,
                 IsStock = true,
                 Quantity = Math.Max(1, units),
@@ -45,7 +45,7 @@ namespace GameEngineTools.World.Objects.Crops
                 DisplayName = "Sýpka - zásoba obilí",
                 Category = WorldObjectCategory.Food,
                 LocationId = locationId,
-                ItemKind = PickupItemKind.Grain,
+                TypeId = "grain",
                 IsPickable = false,
                 IsStock = true,
                 Quantity = Math.Max(1, units),

@@ -79,6 +79,7 @@ namespace WorldObserver.Simulation
             ILocationService locationService,
             SimulationControl control,
             IReadOnlyDictionary<HumanId, List<string>> trails,
+            GameEngineTools.World.Work.WorkCatalog catalog,
             System.Func<HumanId, string?>? travelDestinationOf = null,
             WDateTime startTime = default,
             string realElapsed = "",
@@ -233,15 +234,15 @@ namespace WorldObserver.Simulation
                         HierarchyStability: Math.Round(hierarchyStability, 3));
                 }
 
-                // Pantry — carried food/drink with remaining freshness (spoilage rates are static design data).
+                // Pantry — carried food/drink with remaining freshness (spoilage times are in objecttypes.json).
                 IReadOnlyList<PantryDto>? pantry = null;
                 if (heldByHolder is not null && heldByHolder.TryGetValue(c.Id, out var heldItems) && heldItems.Count > 0)
                 {
                     pantry = heldItems
                         .Select(o => new PantryDto(
-                            ItemKind: o.ItemKind.ToString(),
+                            TypeId: o.TypeId,
                             DisplayName: o.DisplayName,
-                            Freshness: Math.Round(Spoilage.Freshness(o, now, SpoilageConfig.Default), 2)))
+                            Freshness: Math.Round(Spoilage.Freshness(o, now, catalog), 2)))
                         .OrderBy(p => p.Freshness)
                         .ToList();
                 }

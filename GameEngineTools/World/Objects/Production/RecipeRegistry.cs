@@ -17,11 +17,7 @@ namespace GameEngineTools.World.Objects.Production
     {
         #region Public accessors
 
-        /// <summary>Looks up the recipe that produces <paramref name="outputKind"/>, or <c>null</c>.</summary>
-        public static Recipe? FindByOutput(PickupItemKind outputKind)
-            => outputKind == PickupItemKind.None ? null : FindByOutput(outputKind.ToString());
-
-        /// <summary>Looks up the recipe that produces the item with this id (a legacy kind name or a catalog type id), or <c>null</c>.</summary>
+        /// <summary>Looks up the recipe that produces the object type with this id, or <c>null</c>.</summary>
         public static Recipe? FindByOutput(string? itemId)
             => itemId is not null && Table.TryGetValue(itemId, out var recipe) ? recipe : null;
 
@@ -37,15 +33,15 @@ namespace GameEngineTools.World.Objects.Production
             new ReadOnlyDictionary<string, Recipe>(FromCatalog(WorkCatalogLoader.Load()));
 
         /// <summary>
-        /// The recipes of a catalog: its craft tasks. An item is named by a legacy <see cref="PickupItemKind"/> name (Grain, Flour, Bread ...) or by the id of an object type of the catalog.
+        /// The recipes of a catalog: its craft tasks. An item is named by the id of an object type of the catalog.
         /// </summary>
-        /// <exception cref="System.FormatException">A task names an item that is neither, or two tasks make the same product.</exception>
+        /// <exception cref="System.FormatException">A task names an item that is not an object type, or two tasks make the same product.</exception>
         public static Dictionary<string, Recipe> FromCatalog(WorkCatalog catalog)
         {
             string Item(string taskId, string item)
-                => (System.Enum.TryParse<PickupItemKind>(item, ignoreCase: false, out var kind) && kind != PickupItemKind.None && System.Enum.IsDefined(kind)) || catalog.Type(item) is not null
+                => catalog.Type(item) is not null
                     ? item
-                    : throw new System.FormatException($"tasks.json: task '{taskId}': '{item}' is neither an item kind nor an object type.");
+                    : throw new System.FormatException($"tasks.json: task '{taskId}': '{item}' is not an object type of objecttypes.json.");
 
             var table = new Dictionary<string, Recipe>(System.StringComparer.Ordinal);
             foreach (var task in catalog.Tasks.Where(t => t.Kind == TaskKind.Craft))

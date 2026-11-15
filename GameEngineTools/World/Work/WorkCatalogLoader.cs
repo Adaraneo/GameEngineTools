@@ -68,7 +68,11 @@ namespace GameEngineTools.World.Work
                     parts,
                     classes,
                     t.TryGetProperty("durabilityHours", out var dur) && dur.ValueKind == JsonValueKind.Number ? dur.GetDouble() : null,
-                    OptionalText(t, "source")));
+                    OptionalText(t, "source"),
+                    t.TryGetProperty("weightGrams", out var weight) && weight.ValueKind == JsonValueKind.Number ? weight.GetInt32() : null,
+                    t.TryGetProperty("affordances", out var affordancesElement) ? affordancesElement.EnumerateObject().ToDictionary(a => a.Name, a => a.Value.GetDouble(), StringComparer.Ordinal) : null,
+                    t.TryGetProperty("spoilageHours", out var spoil) && spoil.ValueKind == JsonValueKind.Number ? spoil.GetDouble() : null,
+                    t.TryGetProperty("referencePrice", out var price) && price.ValueKind == JsonValueKind.Number ? price.GetDouble() : null));
             }
 
             var tasks = new List<TaskDefinition>();

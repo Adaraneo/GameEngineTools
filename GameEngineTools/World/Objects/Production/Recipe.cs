@@ -24,12 +24,8 @@ namespace GameEngineTools.World.Objects.Production
         string OutputItemId,
         string OutputDisplayName,
         int DurationMinutes,
-        string RequiredLocationType)
-    {
-        /// <summary>The legacy item kind of the product, or <see cref="PickupItemKind.None"/> when the product is a catalog object type.</summary>
-        public PickupItemKind OutputKind => System.Enum.TryParse<PickupItemKind>(OutputItemId, ignoreCase: false, out var kind) ? kind : PickupItemKind.None;
-    }
+        string RequiredLocationType);
 
-    /// <summary>One required input line of a <see cref="Recipe"/>: an item id (a legacy <see cref="PickupItemKind"/> name or a catalog object type id; see <see cref="WorldObject.ItemId"/>) and a quantity.</summary>
+    /// <summary>One required input line of a <see cref="Recipe"/>: the id of a catalog object type (<see cref="WorldObject.TypeId"/>) and a quantity.</summary>
     public sealed record RecipeInput(string ItemId, int Quantity);
 }

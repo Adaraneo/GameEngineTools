@@ -105,7 +105,7 @@ namespace EngineTests
             report.AppendLine($"bought {bought} sold {sold} eaten {eaten} produced/processed {produced} | shop stock {stock}");
             report.AppendLine($"prices: n={prices.Count} min={(prices.Count > 0 ? prices.Min() : 0):F2} max={(prices.Count > 0 ? prices.Max() : 0):F2} last={(prices.Count > 0 ? prices[^1] : 0):F2}");
             report.AppendLine("actions: " + string.Join(", ", actions.OrderByDescending(a => a.Value).Take(14).Select(a => $"{a.Key}={a.Value}")));
-            report.AppendLine("objects by kind: " + string.Join(", ", all.GroupBy(o => o.ItemKind).Select(g => $"{g.Key}={g.Count()}")));
+            report.AppendLine("objects by kind: " + string.Join(", ", all.GroupBy(o => o.TypeId).Select(g => $"{g.Key}={g.Count()}")));
             foreach (var h in humans)
                 report.AppendLine($"  {occupations[h.Id]}: wealth {(h.Snapshot.Economy?.Wealth ?? 0):F1} hunger {h.Snapshot.Physiology.Hunger:F0}");
             Console.WriteLine(report.ToString());
@@ -181,16 +181,16 @@ namespace EngineTests
             locations.RegisterLocation(descriptor);
 
             var now = new WDateTime(0);
-            _buffer.AddObject(ProductionSiteFactory.Create("econ_field", Village, PickupItemKind.Grain, "Pole"));
-            _buffer.AddObject(ProductionSiteFactory.Create("econ_mill", Village, PickupItemKind.Flour, "Mlýn"));
-            _buffer.AddObject(ProductionSiteFactory.Create("econ_oven", Village, PickupItemKind.Bread, "Pec"));
+            _buffer.AddObject(ProductionSiteFactory.Create("econ_field", Village, "grain", "Pole"));
+            _buffer.AddObject(ProductionSiteFactory.Create("econ_mill", Village, "flour", "Mlýn"));
+            _buffer.AddObject(ProductionSiteFactory.Create("econ_oven", Village, "bread", "Pec"));
             _buffer.AddObject(Fixture("econ_tool", "Dílna", WorldObjectCategory.Tool, AffordanceType.Work));
             _buffer.AddObject(Fixture("econ_well", "Studna", WorldObjectCategory.Drink, AffordanceType.Thirst));
             for (var b = 0; b < 8; b++)
                 _buffer.AddObject(Fixture($"econ_bed_{b}", "Postel", WorldObjectCategory.Shelter, AffordanceType.Rest));
-            _buffer.AddObject(ShopCounterFactory.Create("econ_counter", Village, Shop, PickupItemKind.Bread, "Pult"));
+            _buffer.AddObject(ShopCounterFactory.Create("econ_counter", Village, Shop, "bread", "Pult"));
             for (var i = 0; i < 8; i++)
-                _buffer.AddObject(FoodItemCatalog.Create(PickupItemKind.Bread, Village, now, null) with { Price = 2.0, ShopId = Shop });
+                _buffer.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "bread", Village, now, null) with { Price = 2.0, ShopId = Shop });
 
             var generator = ServiceProvider.GetRequiredService<IHumanBlueprintGenerator>();
             var factory = ServiceProvider.GetRequiredService<IHumanFactory>();

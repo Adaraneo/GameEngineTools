@@ -10,6 +10,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Objects.Production;
+    using GameEngineTools.World.Work;
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
@@ -92,13 +93,13 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
         #region Construction
 
-        private readonly SpoilageConfig _spoilage;
+        private readonly WorkCatalog _catalog;
         private readonly EconomyConfig _economy;
 
-        /// <summary>Creates the bridge; spoilage/economy configs default to their <c>Default</c> instances.</summary>
-        public ContingencySearchEngine(SpoilageConfig? spoilage = null, EconomyConfig? economy = null)
+        /// <summary>Creates the bridge over the work catalog (spoilage times, prices); the economy config defaults to its <c>Default</c> instance.</summary>
+        public ContingencySearchEngine(WorkCatalog catalog, EconomyConfig? economy = null)
         {
-            _spoilage = spoilage ?? SpoilageConfig.Default;
+            _catalog = catalog;
             _economy = economy ?? EconomyConfig.Default;
         }
 
@@ -180,7 +181,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
                 // 4b) Barter at a co-located shop: labor credit or a held item of equal value for its stock.
                 if (BarterRules.FindOffer(context.AvailableObjects, context.HeldObjects, context.LaborHours, _economy,
-                        o => Spoilage.Freshness(o, context.Now, _spoilage) > 0.0) is not null)
+                        o => Spoilage.Freshness(o, context.Now, _catalog) > 0.0, _catalog) is not null)
                 {
                     candidates.Add(new BehaviorCandidate(
                         Barter,
@@ -360,7 +361,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         #endregion Willingness to pay (Tier 2)
 
         /// <summary>
-        /// True when the character holds a still-fresh food/drink item whose <see cref="WorldObject.ItemKind"/>
+        /// True when the character holds a still-fresh food/drink item whose <see cref="WorldObject.TypeId"/>
         /// a co-located shop trades (has stock of the same kind).
         /// </summary>
         private bool HasSellableSurplus(
@@ -372,20 +373,20 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             {
                 if (obj.Category is not (WorldObjectCategory.Food or WorldObjectCategory.Drink))
                     continue;
-                if (Spoilage.Freshness(obj, now, _spoilage) <= 0.0)
+                if (Spoilage.Freshness(obj, now, _catalog) <= 0.0)
                     continue; // no one buys spoiled food back
-                if (ShopTrades(available, obj.ItemKind))
+                if (ShopTrades(available, obj.TypeId))
                     return true;
             }
             return false;
         }
 
         /// <summary>True when a co-located shop stocks (and therefore trades) the given item kind.</summary>
-        private static bool ShopTrades(IReadOnlyList<WorldObject> available, PickupItemKind kind)
+        private static bool ShopTrades(IReadOnlyList<WorldObject> available, string? kind)
         {
             foreach (var obj in available)
             {
-                if (obj.ShopId is not null && obj.ItemKind == kind)
+                if (obj.ShopId is not null && obj.TradedTypeId == kind)
                     return true;
             }
             return false;
@@ -396,7 +397,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         {
             foreach (var obj in held)
             {
-                if (FoodItemCatalog.IsEdible(obj) && Spoilage.Freshness(obj, now, _spoilage) > 0.0)
+                if (WorkObjects.IsEdible(obj) && Spoilage.Freshness(obj, now, _catalog) > 0.0)
                     return true;
             }
             return false;
@@ -408,7 +409,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             foreach (var obj in availableObjects)
             {
                 if (obj.Affordances.Any(a => a.Type == AffordanceType.Production)
-                    && RecipeRegistry.FindByOutput(obj.ItemKind) is null)
+                    && RecipeRegistry.FindByOutput(obj.ItemTypeId) is null)
                     return true;
             }
             return false;
@@ -427,7 +428,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             {
                 if (!site.Affordances.Any(a => a.Type == AffordanceType.Production))
                     continue;
-                var candidate = RecipeRegistry.FindByOutput(site.ItemKind);
+                var candidate = RecipeRegistry.FindByOutput(site.ItemTypeId);
                 if (candidate is null)
                     continue; // raw site, not a processing site
                 if (CanSatisfy(candidate, availableObjects, heldObjects))
@@ -454,7 +455,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             foreach (var input in recipe.Inputs)
             {
                 var matched = pool
-                    .Where(o => string.Equals(o.ItemId, input.ItemId, StringComparison.Ordinal) && !usedIds.Contains(o.Id))
+                    .Where(o => string.Equals(o.TypeId, input.ItemId, StringComparison.Ordinal) && !usedIds.Contains(o.Id))
                     .Take(input.Quantity)
                     .ToList();
                 if (matched.Count < input.Quantity)

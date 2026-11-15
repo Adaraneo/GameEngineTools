@@ -96,7 +96,10 @@ namespace GameEngineTools.Characters.Hosting
             // Economy engine (food-economy Tier 2 — per-character wealth, wages, buy/sell).
             services.TryAddTransient<Engines.Economy.IEconomyEngine, Engines.Economy.DefaultEconomyEngine>();
 
-            // Scene-level posted-price aggregate (singleton — per-shop, per-item-kind stock feedback).
+            // The materials, object types and tasks of the work system (items, tools, recipes, field work); one catalog for the whole world.
+            services.TryAddSingleton(_ => World.Work.WorkCatalogLoader.Load());
+
+            // Scene-level posted-price aggregate (singleton — per-shop, per-item-type stock feedback).
             services.TryAddSingleton<World.Economy.EconomyLedger>();
 
             var valuesOb = services.AddOptions<ValuesConfig>();
@@ -441,9 +444,8 @@ namespace GameEngineTools.Characters.Hosting
         public static IServiceCollection AddObjectInteractionEngine(this IServiceCollection services)
         {
             services.TryAddSingleton<IObjectInteractionPolicy, DefaultObjectInteractionPolicy>();
-            // Food-economy Tier 1: production/processing service + spoilage rates.
+            // Food-economy Tier 1: production/processing service.
             services.TryAddSingleton<GameEngineTools.Characters.Engines.Objects.ProductionService>();
-            services.TryAddSingleton(GameEngineTools.World.Objects.Production.SpoilageConfig.Default);
             // Food-economy Tier 2: posted-price ledger the buy/sell commit path adjusts.
             services.TryAddSingleton<World.Economy.EconomyLedger>();
             services.TryAddSingleton<IObjectInteractionEngine, DefaultObjectInteractionEngine>();

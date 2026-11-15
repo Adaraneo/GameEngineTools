@@ -28,7 +28,7 @@ namespace GameEngineTools.Characters.Engines.Economy
         WDateTime OccurredAt,
         HumanId Actor,
         string ObjectId,
-        PickupItemKind ItemKind,
+        string TypeId,
         string ShopId,
         double Price,
         double NewWealth) : IDomainEvent;
@@ -41,23 +41,23 @@ namespace GameEngineTools.Characters.Engines.Economy
         WDateTime OccurredAt,
         HumanId Actor,
         string ObjectId,
-        PickupItemKind ItemKind,
+        string TypeId,
         string ShopId,
         double Price,
         double NewWealth) : IDomainEvent;
 
     /// <summary>
-    /// Fired by the object-interaction commit path when a character barters at a shop: takes <see cref="ItemKind"/> and pays with a
-    /// held item of kind <see cref="GivenKind"/>, or with <see cref="LaborHoursSpent"/> hours of labor credit when nothing was given.
+    /// Fired by the object-interaction commit path when a character barters at a shop: takes <see cref="TypeId"/> and pays with a
+    /// held item of type <see cref="GivenTypeId"/>, or with <see cref="LaborHoursSpent"/> hours of labor credit when nothing was given.
     /// <see cref="DefaultEconomyEngine"/> consumes it to spend the credit. Tier 2, barter mode.
     /// </summary>
     public sealed record Bartered(
         WDateTime OccurredAt,
         HumanId Actor,
         string ObjectId,
-        PickupItemKind ItemKind,
+        string TypeId,
         string ShopId,
-        PickupItemKind? GivenKind,
+        string? GivenTypeId,
         double LaborHoursSpent) : IDomainEvent;
 
     /// <summary>Fired by the object-interaction commit path when field work finishes a job and the field moves to its next stage.</summary>
@@ -74,7 +74,7 @@ namespace GameEngineTools.Characters.Engines.Economy
         WDateTime OccurredAt,
         HumanId Builder,
         string SiteId,
-        PickupItemKind OutputKind,
+        string OutputTypeId,
         string LocationId) : IDomainEvent;
 
     /// <summary>
@@ -86,7 +86,7 @@ namespace GameEngineTools.Characters.Engines.Economy
         WDateTime OccurredAt,
         HumanId Actor,
         string ShopId,
-        PickupItemKind ItemKind,
+        string TypeId,
         double OldPrice,
         double NewPrice,
         int NewStockCount) : IDomainEvent;

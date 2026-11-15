@@ -722,7 +722,7 @@ namespace EngineTests
                 .Select(i => new EpisodicMemory(Guid.NewGuid(), _now, $"What{i}", 0.5, EmotionalTag.Neutral, Strength: 0.2 + i * 0.05))
                 .ToList();
             var objects = Enumerable.Range(0, 6)
-                .Select(i => new ObjectLocationFact($"o{i}", "loc", _now, 0.3 + i * 0.1, PickupItemKind.Food))
+                .Select(i => new ObjectLocationFact($"o{i}", "loc", _now, 0.3 + i * 0.1, WorldObjectCategory.Food))
                 .ToList();
             engine.RestoreState(new MemoryIndex(episodes) { KnownObjects = objects });
 

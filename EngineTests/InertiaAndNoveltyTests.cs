@@ -288,7 +288,7 @@ namespace EngineTests
             => new DefaultBehaviorEngine(
                 Options.Create(cfg),
                 Options.Create(NoSleepCfg),
-                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),
+                LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Warning)),EngineTests.Utils.TestWork.Catalog, 
                 new EngineTests.Utils.PermissiveDevelopmentPolicy());
 
         /// <summary>

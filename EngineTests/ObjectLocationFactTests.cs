@@ -20,7 +20,7 @@ public class ObjectLocationFactTests : TestBase
     [TestMethod]
     public void ObjectLocationFact_ConfidenceInRange()
     {
-        var fact = new ObjectLocationFact("herb_01", "herb_garden", new WDateTime(10000), 0.85, PickupItemKind.Herb);
+        var fact = new ObjectLocationFact("herb_01", "herb_garden", new WDateTime(10000), 0.85, WorldObjectCategory.Ambient);
         Assert.IsTrue(fact.Confidence >= 0.0 && fact.Confidence <= 1.0);
     }
 
@@ -28,13 +28,13 @@ public class ObjectLocationFactTests : TestBase
     public void ObjectLocationFact_StoresAllFields()
     {
         var at = new WDateTime(99999);
-        var fact = new ObjectLocationFact("mushroom_01", "forest_clearing", at, 0.7, PickupItemKind.Food);
+        var fact = new ObjectLocationFact("mushroom_01", "forest_clearing", at, 0.7, WorldObjectCategory.Food);
 
         Assert.AreEqual("mushroom_01", fact.ObjectId);
         Assert.AreEqual("forest_clearing", fact.LocationId);
         Assert.AreEqual(at, fact.SeenAt);
         Assert.AreEqual(0.7, fact.Confidence, 0.001);
-        Assert.AreEqual(PickupItemKind.Food, fact.ItemKind);
+        Assert.AreEqual(WorldObjectCategory.Food, fact.Category);
     }
 
     [TestMethod]
@@ -42,8 +42,8 @@ public class ObjectLocationFactTests : TestBase
     {
         var facts = new[]
         {
-            new ObjectLocationFact("herb_01", "herb_garden", new WDateTime(1000), 0.9, PickupItemKind.Herb),
-            new ObjectLocationFact("mushroom_01", "forest_clearing", new WDateTime(2000), 0.6, PickupItemKind.Food)
+            new ObjectLocationFact("herb_01", "herb_garden", new WDateTime(1000), 0.9, WorldObjectCategory.Ambient),
+            new ObjectLocationFact("mushroom_01", "forest_clearing", new WDateTime(2000), 0.6, WorldObjectCategory.Food)
         };
 
         var idx = new MemoryIndex(Array.Empty<EpisodicMemory>()) { KnownObjects = facts };
