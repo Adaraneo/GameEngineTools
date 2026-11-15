@@ -50,6 +50,30 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void ToolsAreCarriable_WorkstationsAreNot()
+        {
+            Assert.IsTrue(WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm").IsPickable, "A spade can be picked up and carried to the field.");
+            Assert.IsFalse(WorkObjects.Spawn(TestWork.Catalog, "mill", "mill_1", "farm").IsPickable);
+        }
+
+        [TestMethod]
+        public void TakingATool_IsRefusedForSomeoneElsesTool_UntilItIsLent()
+        {
+            var policy = new GameEngineTools.Characters.Engines.Objects.DefaultObjectInteractionPolicy();
+            var place = new GameEngineTools.World.Location.LocationDescriptor(
+                Id: "farm", DisplayName: "farm", Type: GameEngineTools.World.Location.LocationType.Public, BaseNoise: 0.1, NoisePerPerson: 0.01, Capacity: 20, AllowsPrivacy: false);
+            var spade = WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm", Owner);
+            IHumanContext As(HumanId id) => BehaviorComponentTestFactory.Context(selfId: id).HumanContext;
+
+            Assert.IsTrue(policy.Evaluate(As(Owner), spade, ObjectInteractionKind.Take, place).IsAllowed, "The owner takes their own tool.");
+            var refused = policy.Evaluate(As(Neighbour), spade, ObjectInteractionKind.Take, place);
+            Assert.IsFalse(refused.IsAllowed, "Someone else's tool is not taken without a loan.");
+            Assert.IsTrue(refused.IsSocial);
+            Assert.IsTrue(policy.Evaluate(As(Neighbour), spade with { LentTo = Neighbour }, ObjectInteractionKind.Take, place).IsAllowed, "Lent to them: they may take it.");
+            Assert.IsTrue(policy.Evaluate(As(Stranger), WorkObjects.Spawn(TestWork.Catalog, "spade", "shared", "farm"), ObjectInteractionKind.Take, place).IsAllowed, "A tool that belongs to nobody is free to take.");
+        }
+
+        [TestMethod]
         public void OnlyTheOwnerLends_OnceAtATime_AndEitherSideEndsTheLoan_AndItSurvivesTheDatabase()
         {
             var (db, provider) = NewWorld();

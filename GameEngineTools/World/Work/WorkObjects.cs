@@ -27,10 +27,7 @@ namespace GameEngineTools.World.Work
     /// <summary>Making instances of catalog types and asking what is at hand.</summary>
     public static class WorkObjects
     {
-        /// <summary>
-        /// Makes an object of a type: name, category and weight from the catalog, the type id for the world database. Instances are not pickable yet: in this phase a tool is present
-        /// at a place and not carried (carrying is the work system's later phase), and a pickable object would be used up by the interaction engine.
-        /// </summary>
+        /// <summary>Makes an object of a type: name, category, weight and pickability from the catalog, the type id for the world database. A tool is pickable (it can be carried to the field); a workstation is not.</summary>
         /// <exception cref="ArgumentException">The catalog has no such type.</exception>
         public static WorldObject Spawn(WorkCatalog catalog, string typeId, string id, string locationId, HumanId? owner = null)
         {
@@ -42,7 +39,7 @@ namespace GameEngineTools.World.Work
                 Category = type.Category,
                 LocationId = locationId,
                 IsAvailable = true,
-                IsPickable = false,
+                IsPickable = type.Pickable,
                 WeightGrams = catalog.WeightGrams(typeId),
                 TypeId = typeId,
                 OwnerId = owner,

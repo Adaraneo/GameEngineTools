@@ -679,7 +679,7 @@ public class WorldContentGeneratorTests
         {
             var tools = objects.Where(o => o.TypeId == typeId).ToList();
             Assert.AreEqual(3, tools.Count, $"10 people need 3 of {typeId} (one per four).");
-            Assert.IsTrue(tools.All(o => o.Category == WorldObjectCategory.Tool && !o.IsPickable && o.OwnerId is null));
+            Assert.IsTrue(tools.All(o => o.Category == WorldObjectCategory.Tool && o.IsPickable && o.OwnerId is null));
             Assert.IsTrue(tools.All(o => o.WeightGrams == work.WeightGrams(typeId) && o.WeightGrams > 0), "The weight comes from the materials.");
         }
     }
