@@ -310,6 +310,7 @@ namespace GameEngineTools.Characters.Engines.Physiology
             var airC = ctx.Snapshot.AmbientTemperature;
             var waterDeficit = WaterMath.Deficit(s, Config);
             var drift = ComputeDrift(action, h, Config, nutProfile?.HydrationGain, immuneDecayFactor, airC, waterDeficit);
+            var drunkPoints = 0.0;
             if (action is Eat or EatStored or Drink && ctx.Snapshot.Behavior.CurrentPlan is { } consuming)
             {
                 // Only the part of the step the action really lasts counts as eating or drinking; the rest of the step is an ordinary one.
@@ -317,12 +318,20 @@ namespace GameEngineTools.Characters.Engines.Physiology
                 var rest = ComputeDrift(null, h - actionH, Config, null, immuneDecayFactor, airC, waterDeficit);
                 var part = ComputeDrift(action, actionH, Config, nutProfile?.HydrationGain, immuneDecayFactor, airC, waterDeficit);
                 drift = new PhysiologyDrift(part.Energy + rest.Energy, part.Hunger + rest.Hunger, part.Thirst + rest.Thirst, part.Pain + rest.Pain, part.Immune + rest.Immune);
+                if (action == Drink)
+                    drunkPoints = Math.Max(0.0, -part.Thirst);
             }
-            var newDeficit = Math.Clamp(waterDeficit + drift.Thirst * Config.LitresPerThirstPoint, 0.0, 0.2 * Config.BodyMassKg);
+
+            // What is drunk goes into the stomach and is passed on to the body at the gastric emptying rate; only that lowers the deficit.
+            var lossPoints = Math.Max(0.0, drift.Thirst + drunkPoints);
+            var gut = s.GutWaterL + drunkPoints * Config.LitresPerThirstPoint;
+            var absorbed = WaterMath.Emptied(gut, h, Config);
+            gut -= absorbed;
+            var newDeficit = Math.Clamp(waterDeficit + lossPoints * Config.LitresPerThirstPoint - absorbed, 0.0, 0.2 * Config.BodyMassKg);
 
             // Stored heat follows what the sweat cannot carry away (thirst before this tick's drift, so a dry throat already weakens it).
             var production = HeatMath.HeatProduction(ActivityOf(action, Config), airC, Config);
-            var heatLoad = HeatMath.AdvanceHeatLoad(s.HeatLoad ?? 0.0, HeatMath.HeatLoadTarget(production, s.Thirst, Config), h, Config);
+            var heatLoad = HeatMath.AdvanceHeatLoad(s.HeatLoad ?? 0.0, HeatMath.HeatLoadTarget(production, WaterMath.DeficitPoints(waterDeficit, Config), Config), h, Config);
 
             var feverDelta = s.ImmuneLoad > 30 ? (s.ImmuneLoad - 30) / 70.0 * 2.0 : 0.0;
             // Circadian body temperature: a sinusoidal wave ±CircadianTempAmplitude (Waterhouse 2005)
@@ -340,8 +349,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
             {
                 Energy = Clamp01p(s.Energy + drift.Energy),
                 Hunger = Clamp01p(s.Hunger + drift.Hunger),
-                Thirst = WaterMath.ViewThirst(newDeficit, Config),
+                Thirst = WaterMath.ViewThirst(newDeficit, gut, Config),
                 WaterDeficitL = newDeficit,
+                GutWaterL = gut,
                 Pain = Clamp01p(s.Pain + drift.Pain),
                 ImmuneLoad = Clamp01p(s.ImmuneLoad + drift.Immune),
                 BodyTempDelta = Math.Clamp(Approach(s.BodyTempDelta, targetBodyTemp, 0.1 * h), -1.0, 3.5),
@@ -1586,8 +1596,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
 
                 AffordanceType.Thirst => s with
                 {
-                    WaterDeficitL = Math.Max(0.0, WaterMath.Deficit(s, Config) - oaa.Satisfaction * Config.AffordanceThirstMaxDelta * Config.LitresPerThirstPoint),
-                    Thirst = Clamp01p(s.Thirst - oaa.Satisfaction * Config.AffordanceThirstMaxDelta)
+                    WaterDeficitL = WaterMath.Deficit(s, Config),
+                    GutWaterL = s.GutWaterL + oaa.Satisfaction * Config.AffordanceThirstMaxDelta * Config.LitresPerThirstPoint,
+                    Thirst = WaterMath.ViewThirst(WaterMath.Deficit(s, Config), s.GutWaterL + oaa.Satisfaction * Config.AffordanceThirstMaxDelta * Config.LitresPerThirstPoint, Config)
                 },
 
                 // All other affordance types are not physiology concerns.

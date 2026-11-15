@@ -125,6 +125,52 @@ namespace EngineTests
             Assert.AreEqual(HungerAfter(10), HungerAfter(30), 1.5);
         }
 
+        [TestMethod]
+        public void WhatIsDrunk_RelievesThirstAtOnce_ButTheDeficitFallsOnlyAsTheStomachEmpties()
+        {
+            var cfg = new PhysiologyConfig();
+            var engine = Engine();
+            var outbox = new EventCollector();
+            var step = WTimeSpan.FromMinutes(10);
+            var plan = new PlannedAction(ActionNames.Drink, Start, WTimeSpan.FromMinutes(30), 50.0);
+            var idle = new PlannedAction(ActionNames.Idle, Start, WTimeSpan.FromMinutes(30), 10.0);
+            var deficitBefore = engine.State.Thirst * cfg.LitresPerThirstPoint;
+
+            var now = Start + step;
+            for (var i = 0; i < 3; i++)
+            {
+                engine.Tick(now, step, Context(plan), outbox);
+                now += step;
+            }
+
+            var s = engine.State;
+            Assert.IsTrue(s.Thirst < 40.0, $"Half an hour of drinking (25 points at 50 per hour) relieves thirst at once: {s.Thirst:F1}");
+            Assert.IsTrue(s.GutWaterL > 0.3, $"Part of what was drunk is still in the stomach: {s.GutWaterL:F2} L");
+            Assert.IsTrue(s.WaterDeficitL > deficitBefore - 0.6, $"The deficit has fallen only by what the stomach passed on (about 0.5 L): {deficitBefore:F2} to {s.WaterDeficitL:F2} L");
+
+            for (var i = 0; i < 18; i++)
+            {
+                engine.Tick(now, step, Context(idle), outbox);
+                now += step;
+            }
+
+            var later = engine.State;
+            Assert.IsTrue(later.GutWaterL < 0.01, "After three hours the stomach is empty.");
+            Assert.AreEqual(later.WaterDeficitL!.Value / cfg.LitresPerThirstPoint, later.Thirst, 1e-6, "With an empty stomach the thirst score is the deficit again.");
+            var expected = deficitBefore - 25.0 * cfg.LitresPerThirstPoint + 3.5 * cfg.ThirstDriftAwakePerHour * cfg.LitresPerThirstPoint;
+            Assert.AreEqual(expected, later.WaterDeficitL.Value, 0.15, "The drunk litres have all reached the body, less what was lost since.");
+        }
+
+        [TestMethod]
+        public void LethalDeficit_IsTheTrueDeficit_NotTheThirstReliefOfWhatIsInTheStomach()
+        {
+            var cfg = new PhysiologyConfig();
+            var dying = Nominal() with { WaterDeficitL = WaterMath.LethalDeficitL(cfg) + 0.5, GutWaterL = 3.0, Thirst = 0.0 };
+
+            Assert.IsTrue(WaterMath.ViewThirst(dying.WaterDeficitL!.Value, dying.GutWaterL, cfg) >= 0.0);
+            Assert.IsTrue(WaterMath.IsLethal(dying with { Thirst = WaterMath.ViewThirst(dying.WaterDeficitL!.Value, dying.GutWaterL, cfg) }, cfg), "Water not yet absorbed does not undo the lethal deficit.");
+        }
+
         private const string Idle = ActionNames.Idle;
     }
 }

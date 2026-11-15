@@ -470,7 +470,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Water deficit as percent of body mass at which death becomes possible; about 10 percent is life threatening (Adolph 1947, from a secondary quotation), 5 percent is the work limit for 95 percent of workers. Replaces the thirst-95 hazard onset.</summary>
         double DehydrationLethalBodyMassPercent = 10.0,
         /// <summary>Body-mass loss in percent at which thirst begins and a person starts to drink: about 2 percent, the osmotic threshold of a roughly 2 percent rise in plasma osmolality (about 6 mmol/kg), from reviews (secondary). At 70 kg and 0.035 L per point it is thirst 40, which <c>BehaviorConfig.DrinkStartThirst</c> equals (a test keeps them equal).</summary>
-        double ThirstOnsetBodyMassPercent = 2.0)
+        double ThirstOnsetBodyMassPercent = 2.0,
+        /// <summary>Litres per hour the stomach passes on to the body (and so into the blood): gastric emptying of water reaches about 15-20 mL/min, about 1 L/h (Gatorade Sports Science Institute review of gastric emptying, secondary). What is drunk relieves thirst at once but lowers the deficit only as fast as this.</summary>
+        double WaterGastricEmptyingLitresPerHour = 1.0)
     {
         /// <summary>Parameterless constructor — all fields use their defaults.</summary>
         public PhysiologyConfig() : this(
@@ -784,7 +786,9 @@ namespace GameEngineTools.Characters.Engines.Physiology
         /// <summary>Heat stored by work and warm air, °C above the body's own temperature (see <see cref="HeatMath"/>). <c>null</c> in older saves, read as 0.</summary>
         double? HeatLoad = null,
         /// <summary>Body water deficit in litres; Thirst is its view (deficit / litres per point, capped at 100). <c>null</c> in older saves, read as Thirst x litres per point.</summary>
-        double? WaterDeficitL = null);
+        double? WaterDeficitL = null,
+        /// <summary>Water drunk that has not yet left the stomach, in litres. The thirst score is the deficit less this (the mouth and stomach relieve thirst at once); the deficit itself falls only as the stomach empties. 0 in older saves.</summary>
+        double GutWaterL = 0.0);
 
     /// <summary>
     /// The physiology engine — first stage of the per-character tick pipeline. Advances
