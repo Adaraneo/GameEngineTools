@@ -13,10 +13,10 @@ namespace GameEngineTools.World.Objects.Production
     /// </summary>
     public sealed class RecipeRegistry
     {
-        private readonly Dictionary<string, Recipe> _table;
+        private readonly List<Recipe> _recipes = new();
 
         /// <summary>Reads the recipes of a catalog: its craft tasks. An item is named by the id of an object type of the catalog.</summary>
-        /// <exception cref="System.FormatException">A task names an item that is not an object type, or two tasks make the same product.</exception>
+    
         public RecipeRegistry(WorkCatalog catalog)
         {
             System.ArgumentNullException.ThrowIfNull(catalog);
@@ -25,7 +25,6 @@ namespace GameEngineTools.World.Objects.Production
                     ? item
                     : throw new System.FormatException($"tasks.json: task '{taskId}': '{item}' is not an object type of objecttypes.json.");
 
-            _table = new Dictionary<string, Recipe>(System.StringComparer.Ordinal);
             foreach (var task in catalog.Tasks.Where(t => t.Kind == TaskKind.Craft))
             {
                 var output = Item(task.Id, task.Output!.Item);
@@ -37,20 +36,24 @@ namespace GameEngineTools.World.Objects.Production
                     task.OutputName ?? catalog.Type(output)?.Name ?? output,
                     task.DurationMinutes,
                     task.Station!);
-                if (!_table.TryAdd(output, recipe))
-                    throw new System.FormatException($"tasks.json: task '{task.Id}': a second recipe for {output}; the registry holds one recipe per product.");
+                _recipes.Add(recipe);
             }
         }
 
-        /// <summary>Looks up the recipe that produces the object type with this id, or <c>null</c>.</summary>
-        public Recipe? FindByOutput(string? itemId)
-            => itemId is not null && _table.TryGetValue(itemId, out var recipe) ? recipe : null;
+        /// <summary>The first recipe (in the order of the file) that produces the object type with this id, or <c>null</c>; a product may have several recipes, see <see cref="ForOutput"/>.</summary>
+        public Recipe? FindByOutput(string? itemId) => ForOutput(itemId).FirstOrDefault();
+
+        /// <summary>All recipes that produce the object type with this id, in the order of the file.</summary>
+        public IEnumerable<Recipe> ForOutput(string? itemId) => _recipes.Where(r => string.Equals(r.OutputItemId, itemId, System.StringComparison.Ordinal));
+
+        /// <summary>The recipe of the craft task with this id, or <c>null</c>.</summary>
+        public Recipe? ById(string? taskId) => _recipes.FirstOrDefault(r => string.Equals(r.Id, taskId, System.StringComparison.Ordinal));
 
         /// <summary>The recipes done at a workstation type, in the order of the file.</summary>
         public IEnumerable<Recipe> ForStation(string? stationTypeId)
-            => _table.Values.Where(r => string.Equals(r.StationTypeId, stationTypeId, System.StringComparison.Ordinal));
+            => _recipes.Where(r => string.Equals(r.StationTypeId, stationTypeId, System.StringComparison.Ordinal));
 
         /// <summary>All recipes (for the provisioning bridge to consider).</summary>
-        public IEnumerable<Recipe> All => _table.Values;
+        public IEnumerable<Recipe> All => _recipes;
     }
 }

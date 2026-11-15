@@ -109,7 +109,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 return BehaviorNeedOutput.Empty;
 
             var utility = Utility(task) * SupplyFactor + (IsOnShiftFor(task, schedule) ? FarmerOnShiftBonus : 0.0);
-            var candidate = new BehaviorCandidate(Process, utility, WTimeSpan.FromMinutes(step.DurationMinutes), BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" });
+            var candidate = new BehaviorCandidate(Process, utility, WTimeSpan.FromMinutes(step.DurationMinutes), BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" }, TaskId: step.Id);
             return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
         }
 

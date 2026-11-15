@@ -382,21 +382,24 @@ namespace GameEngineTools.Characters.Engines.Objects
             if (locationId is null)
                 return;
 
-            // Several processing sites can share a location (mill and oven): run the first one whose recipe the inputs cover.
+            // The task the character chose (Process carries its id); without one, the first doable recipe of any workstation here, the occupation's own recipes first.
             WorldObject? produced = null;
-            foreach (var (output, yield) in ResolveProcessingOutputs(locationId))
+            Recipe? done = null;
+            foreach (var (recipe, yield) in ResolveProcessingRecipes(locationId, committed.TaskId, ctx.Snapshot.Schedule?.Occupation))
             {
-                produced = _production.Process(ctx, locationId, output, committed.OccurredAt, yield);
+                produced = _production.Process(ctx, locationId, recipe, committed.OccurredAt, yield);
                 if (produced is not null)
+                {
+                    done = recipe;
                     break;
+                }
             }
 
             if (produced is null)
                 return; // insufficient inputs — nothing consumed
 
-            var recipe = _recipes.FindByOutput(produced.TypeId);
             using (_logger.BeginCharacterScope(ctx.Id.Value, nameof(DefaultObjectInteractionEngine)))
-                _logger.ItemProcessed(ctx.Id.ToString(), recipe?.Id ?? "?", produced.TypeId ?? "?", produced.Id, locationId);
+                _logger.ItemProcessed(ctx.Id.ToString(), done?.Id ?? "?", produced.TypeId ?? "?", produced.Id, locationId);
 
             if (_economyConfig.BarterOnly)
                 DeliverSurplus(produced, locationId, committed.OccurredAt, ctx, outbox);
@@ -676,16 +679,21 @@ namespace GameEngineTools.Characters.Engines.Objects
                 _logger.PriceChanged(shopId, kind, oldPrice, newPrice, newStock);
         }
 
-        /// <summary>The products the workstations here can make (every recipe of every station), with the outputs one action makes at that station.</summary>
-        private IEnumerable<(string Output, int Yield)> ResolveProcessingOutputs(string locationId)
+        /// <summary>The recipes the workstations here can run, with the outputs one action makes: only the chosen task when there is one, else the occupation's recipes before the others.</summary>
+        private IEnumerable<(Recipe Recipe, int Yield)> ResolveProcessingRecipes(string locationId, string? taskId, string? occupation)
         {
+            var offers = new List<(Recipe Recipe, int Yield)>();
             foreach (var o in _objectProvider.GetAllObjectsAt(locationId))
             {
                 if (!ProductionSites.IsStation(_catalog, o))
                     continue;
                 foreach (var recipe in _recipes.ForStation(o.TypeId))
-                    yield return (recipe.OutputItemId, ProductionSites.Yield(o));
+                    offers.Add((recipe, ProductionSites.Yield(o)));
             }
+
+            if (taskId is not null)
+                return offers.Where(x => x.Recipe.Id == taskId);
+            return offers.OrderBy(x => _catalog.OccupationDoes(occupation, x.Recipe.Id) ? 0 : 1);
         }
 
         /// <summary>The item the raw production site here yields (a field, a pasture), or <c>null</c>.</summary>

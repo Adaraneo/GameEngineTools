@@ -23,7 +23,6 @@ namespace GameEngineTools.Characters.Engines.Objects
 
         private readonly IMutableWorldObjectProvider _objectProvider;
         private readonly WorkCatalog _catalog;
-        private readonly RecipeRegistry _recipes;
 
         /// <summary>Creates the service over the mutable world-object provider.</summary>
         /// <param name="objectProvider">The world objects.</param>
@@ -33,7 +32,6 @@ namespace GameEngineTools.Characters.Engines.Objects
             ArgumentNullException.ThrowIfNull(objectProvider);
             _objectProvider = objectProvider;
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
-            _recipes = new RecipeRegistry(catalog);
         }
 
         #endregion Construction
@@ -55,17 +53,14 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <summary>
         /// Recipe-based processing (e.g. milling, baking): verifies and consumes the recipe inputs
         /// (all-or-nothing), then creates the fresh output object in the character's hands. Returns
-        /// <c>null</c> with no side effects when the recipe is unknown or inputs are insufficient. One run of the recipe makes
+        /// <c>null</c> with no side effects when inputs are insufficient. One run of the recipe makes
         /// <paramref name="yield"/> outputs (the first is returned).
         /// </summary>
-        public WorldObject? Process(IHumanContext ctx, string locationId, string outputItemId, WDateTime now, int yield = 1)
+        public WorldObject? Process(IHumanContext ctx, string locationId, Recipe recipe, WDateTime now, int yield = 1)
         {
             ArgumentNullException.ThrowIfNull(ctx);
+            ArgumentNullException.ThrowIfNull(recipe);
             ArgumentException.ThrowIfNullOrWhiteSpace(locationId);
-
-            var recipe = _recipes.FindByOutput(outputItemId);
-            if (recipe is null)
-                return null;
 
             if (!TryConsumeInputs(ctx, locationId, recipe))
                 return null; // insufficient inputs — nothing consumed

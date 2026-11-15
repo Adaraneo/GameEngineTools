@@ -513,6 +513,50 @@ namespace EngineTests
             Assert.IsNotNull(shelf.Price);
         }
 
+        [TestMethod]
+        public void Process_WithTwoRecipesForOneProduct_RunsTheTaskThatWasChosen()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "GameEngineTools", "World", "Data", "Work")))
+                dir = dir.Parent;
+            var data = Path.Combine(dir!.FullName, "GameEngineTools", "World", "Data", "Work");
+            var types = File.ReadAllText(Path.Combine(data, "objecttypes.json")).Replace("\"types\": [", """
+                "types": [
+                  { "id": "rye", "category": "Food", "pickable": true, "weightGrams": 200, "affordances": { "Ownership": 0.25 } },
+                """);
+            var tasks = File.ReadAllText(Path.Combine(data, "tasks.json")).Replace("\"tasks\": [", """
+                "tasks": [
+                  { "id": "recipe_flour_from_rye", "kind": "Craft", "inputs": [ { "item": "rye", "qty": 2 } ], "output": { "item": "flour", "qty": 1 }, "durationMinutes": 50, "station": "mill" },
+                """);
+            var catalog = GameEngineTools.World.Work.WorkCatalogLoader.Parse(File.ReadAllText(Path.Combine(data, "materials.json")), types, tasks);
+            var recipes = new RecipeRegistry(catalog);
+            Assert.AreEqual(2, recipes.ForOutput("flour").Count(), "A product may have several recipes.");
+            Assert.AreEqual("recipe_flour_from_rye", recipes.FindByOutput("flour")!.Id, "The first in the file is the default.");
+
+            int HeldCount(MemProvider provider, HumanId self, string typeId) => provider.GetHeldBy(self).Count(h => h.TypeId == typeId);
+            (MemProvider Provider, HumanId Self, DefaultObjectInteractionEngine Engine) Setup()
+            {
+                var provider = new MemProvider();
+                var self = new HumanId(Guid.NewGuid());
+                provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(catalog, "mill", "mill", Loc));
+                foreach (var type in new[] { "grain", "grain", "rye", "rye" })
+                    provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(catalog, type, Loc, new WDateTime(0), self));
+                return (provider, self, MakeObjectEngine(provider, catalog: catalog));
+            }
+
+            var (p1, s1, e1) = Setup();
+            e1.Handle(new ActionCommitted(new WDateTime(0), s1, Process, WTimeSpan.FromMinutes(45), TaskId: "recipe_flour_from_grain"), LaborContext(s1, 0.0), new EventCollector());
+            Assert.AreEqual((0, 2), (HeldCount(p1, s1, "grain"), HeldCount(p1, s1, "rye")), "The chosen task (grain) is the one that ran.");
+
+            var (p2, s2, e2) = Setup();
+            e2.Handle(new ActionCommitted(new WDateTime(0), s2, Process, WTimeSpan.FromMinutes(50), TaskId: "recipe_flour_from_rye"), LaborContext(s2, 0.0), new EventCollector());
+            Assert.AreEqual((2, 0), (HeldCount(p2, s2, "grain"), HeldCount(p2, s2, "rye")), "The chosen task (rye) is the one that ran.");
+
+            var (p3, s3, e3) = Setup();
+            e3.Handle(new ActionCommitted(new WDateTime(0), s3, Process, WTimeSpan.FromMinutes(50)), LaborContext(s3, 0.0), new EventCollector());
+            Assert.AreEqual((2, 0), (HeldCount(p3, s3, "grain"), HeldCount(p3, s3, "rye")), "Without a chosen task the first doable recipe of the file runs.");
+        }
+
         // ── Supply chain: a missing tool is made from what is here ──────────────────
 
         private static GameEngineTools.World.Work.WorkCatalog SmithCatalog()
@@ -924,14 +968,14 @@ namespace EngineTests
             => new(Options.Create(EconomyConfig.Default), NullLoggerFactory.Instance);
 
         private static DefaultObjectInteractionEngine MakeObjectEngine(
-            MemProvider provider, ICognitiveResolutionLevelRuntime? lod = null, EconomyConfig? economy = null)
+            MemProvider provider, ICognitiveResolutionLevelRuntime? lod = null, EconomyConfig? economy = null, GameEngineTools.World.Work.WorkCatalog? catalog = null)
             => new(
                 provider,
                 new FixedLocationService(Loc),
                 new AllowAllPolicy(),
-                new ProductionService(provider, EngineTests.Utils.TestWork.Catalog),
-                EngineTests.Utils.TestWork.Catalog,
-                new GameEngineTools.World.Economy.EconomyLedger(EngineTests.Utils.TestWork.Catalog),
+                new ProductionService(provider, catalog ?? EngineTests.Utils.TestWork.Catalog),
+                catalog ?? EngineTests.Utils.TestWork.Catalog,
+                new GameEngineTools.World.Economy.EconomyLedger(catalog ?? EngineTests.Utils.TestWork.Catalog),
                 Options.Create(economy ?? EconomyConfig.Default),
                 NullLogger<DefaultObjectInteractionEngine>.Instance,
                 lod);

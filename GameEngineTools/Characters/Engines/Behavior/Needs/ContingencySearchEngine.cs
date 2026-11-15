@@ -153,7 +153,8 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                         BehaviorMath.Util(need, ProcessWeight),
                         WTimeSpan.FromMinutes(recipe!.DurationMinutes),
                         BehaviorDomain.Physiological,
-                        Tags: new[] { "FoodEconomy" }));
+                        Tags: new[] { "FoodEconomy" },
+                        TaskId: recipe.Id));
                 }
 
                 // 3) Harvest raw material at a co-located raw-production site — only when there is nothing to process yet,
@@ -297,14 +298,14 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             {
                 candidates.Add(new BehaviorCandidate(
                     Process, ShiftProductionUtility, WTimeSpan.FromMinutes(recipe!.DurationMinutes),
-                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy" }));
+                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy" }, TaskId: recipe.Id));
             }
 
             else if (TryFindSupplyStep(context, out var supply))
             {
                 candidates.Add(new BehaviorCandidate(
                     Process, ShiftProductionUtility - 1.0, WTimeSpan.FromMinutes(supply!.DurationMinutes),
-                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy", "Supply" }));
+                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy", "Supply" }, TaskId: supply.Id));
             }
 
             else if (HasRawProductionSite(context.AvailableObjects!))

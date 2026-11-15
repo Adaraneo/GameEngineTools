@@ -65,11 +65,11 @@ namespace EngineTests
             WorldObject Lump(string id) => GameEngineTools.World.Work.WorkObjects.Spawn(catalog, "clay_lump", id, Loc) with { IsPickable = true, HeldBy = self };
             provider.AddObject(Lump("lump_1"));
 
-            Assert.IsNull(svc.Process(ctx, Loc, "pot", new WDateTime(0)), "One lump is not enough: nothing is made and nothing consumed.");
+            Assert.IsNull(svc.Process(ctx, Loc, new RecipeRegistry(catalog).FindByOutput("pot")!, new WDateTime(0)), "One lump is not enough: nothing is made and nothing consumed.");
             Assert.IsNotNull(provider.FindObject("lump_1"));
 
             provider.AddObject(Lump("lump_2"));
-            var pot = svc.Process(ctx, Loc, "pot", new WDateTime(0));
+            var pot = svc.Process(ctx, Loc, new RecipeRegistry(catalog).FindByOutput("pot")!, new WDateTime(0));
 
             Assert.IsNotNull(pot);
             Assert.AreEqual("pot", pot!.TypeId);
@@ -91,7 +91,7 @@ namespace EngineTests
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), self));
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), self));
 
-            var flour = svc.Process(ctx, Loc, "flour", new WDateTime(0));
+            var flour = svc.Process(ctx, Loc, new RecipeRegistry(EngineTests.Utils.TestWork.Catalog).FindByOutput("flour")!, new WDateTime(0));
 
             Assert.IsNotNull(flour);
             Assert.AreEqual("flour", flour!.TypeId);
@@ -109,7 +109,7 @@ namespace EngineTests
             // Recipe needs 2 grain; only 1 held.
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.CreateItem(EngineTests.Utils.TestWork.Catalog, "grain", Loc, new WDateTime(0), self));
 
-            var flour = svc.Process(ctx, Loc, "flour", new WDateTime(0));
+            var flour = svc.Process(ctx, Loc, new RecipeRegistry(EngineTests.Utils.TestWork.Catalog).FindByOutput("flour")!, new WDateTime(0));
 
             Assert.IsNull(flour, "Processing must fail when inputs are insufficient.");
             Assert.AreEqual(1, provider.GetHeldBy(self).Count(o => o.TypeId == "grain"),
@@ -235,7 +235,7 @@ namespace EngineTests
             var ctx = Ctx(out _);
             provider.AddObject(GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "mill", Loc));
 
-            var bread = svc.Process(ctx, Loc, "bread", new WDateTime(0));
+            var bread = svc.Process(ctx, Loc, new RecipeRegistry(EngineTests.Utils.TestWork.Catalog).FindByOutput("bread")!, new WDateTime(0));
 
             Assert.IsNull(bread, "The mill itself (ItemKind Flour) is not flour to bake with.");
             Assert.IsTrue(provider.GetObjectsAt(Loc).Any(o => o.Id == "mill"), "The mill fixture must survive.");

@@ -40,5 +40,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// Two actions can run simultaneously only when their masks share no bits.
         /// Defaults to <see cref="ActionSlotMask.None"/> — safe for movement and passive actions.
         /// </summary>
-        ActionSlotMask SlotMask = ActionSlotMask.None);
+        ActionSlotMask SlotMask = ActionSlotMask.None,
+        /// <summary>The craft task a <c>Process</c> action is meant to do (its id in tasks.json); null lets the object engine choose.</summary>
+        string? TaskId = null);
 }
