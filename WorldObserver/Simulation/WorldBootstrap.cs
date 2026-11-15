@@ -157,6 +157,10 @@ namespace WorldObserver.Simulation
 
             var planner = new GameEngineTools.Dialogue.Planning.DefaultSpeechActPlanner(null, acquisition);
 
+            // A third of the village's tools become somebody's own (round-robin over the people); the rest stay common. Lending then matters.
+            if (services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>() is { } toolProvider)
+                GameEngineTools.World.Work.ToolOwnership.AssignPersonalTools(toolProvider, people.Select(p => p.Id).ToList());
+
             // ── Scene orchestrator ───────────────────────────────────────────────────
             var orchestrator = new DefaultSceneOrchestrator(
                 services.GetRequiredService<IAttractionCalculator>(),

@@ -9,6 +9,7 @@ namespace EngineTests
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Psychology;
     using GameEngineTools.Characters.Engines.Relationships;
@@ -87,6 +88,87 @@ namespace EngineTests
         }
 
         #endregion Setup
+
+        // ══════════════════════════════════════════════════════════════════════
+        // AskToBorrow — a Request to the owner of a tool, who lends or refuses
+        // ══════════════════════════════════════════════════════════════════════
+
+        private (ForagingHuman Asker, ForagingHuman Owner, ConsumingWorldObjectProvider Provider, DefaultSceneOrchestrator Orchestrator) ToolScene(
+            double trust, double like, double closeness, bool ownerOnShift = false, bool ownerHere = true, bool noEdge = false)
+        {
+            var askerId = new HumanId(Guid.NewGuid());
+            var ownerId = new HumanId(Guid.NewGuid());
+            var asker = BuildPerson(HomeId, new ActionCommitted(Now, askerId, AskToBorrow, WTimeSpan.FromMinutes(30), TargetTypeId: "spade"));
+            var edges = noEdge ? null : new Dictionary<HumanId, RelationshipEdge> { [askerId] = Edge(ownerId, askerId, trust, like, closeness) };
+            var owner = BuildPerson(ownerHere ? HomeId : TavernId, new ActionCommitted(Now, ownerId, Idle, WTimeSpan.FromMinutes(5)), edges, ownerOnShift);
+            var spade = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "spade_1", HomeId, ownerId);
+            var provider = new ConsumingWorldObjectProvider(new[] { spade }, Array.Empty<string>());
+            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), provider);
+            return (asker, owner, provider, orchestrator);
+        }
+
+        [TestMethod]
+        public void AskToBorrow_ATrustedOwnerLends_AndBothAreTold()
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(trust: 80, like: 70, closeness: 50);
+
+            orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+
+            Assert.AreEqual(asker.Id, provider.FindObject("spade_1")!.LentTo);
+            Assert.IsTrue(asker.Received.OfType<ToolLent>().Any() && owner.Received.OfType<ToolLent>().Any());
+        }
+
+        [TestMethod]
+        public void AskToBorrow_AStrangerIsRefused()
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(0, 0, 0, noEdge: true);
+
+            orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+
+            Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
+            Assert.IsTrue(asker.Received.OfType<ToolRequestRefused>().Any());
+        }
+
+        [TestMethod]
+        public void AskToBorrow_AnOwnerWhoNeedsTheToolNowRefuses_EvenATrustedAsker()
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90, ownerOnShift: true);
+
+            orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+
+            Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
+            Assert.IsTrue(asker.Received.OfType<ToolRequestRefused>().Any(r => r.Reason.Contains("needs")));
+        }
+
+        [TestMethod]
+        public void AskToBorrow_NobodyWhoOwnsOneIsHere_IsRefused()
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90, ownerHere: false);
+
+            orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+
+            Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
+            Assert.IsTrue(asker.Received.OfType<ToolRequestRefused>().Any());
+        }
+
+        [TestMethod]
+        public void ALoanKeptPastTheGracePeriod_CostsTheBorrowerTheOwnersTrust_OnceAPeriod()
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90);
+            var idle = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)));
+            GameEngineTools.World.Work.ToolLending.Lend(provider, "spade_1", owner.Id, idle.Id, Now);
+            var chars = new IHuman[] { idle, owner };
+
+            orchestrator.OnTick(Now + WTimeSpan.FromDays(1), chars);
+            Assert.IsFalse(owner.Received.OfType<MicroNegative>().Any(), "Within the grace period nothing is held against the borrower.");
+
+            orchestrator.OnTick(Now + WTimeSpan.FromDays(4), chars);
+            var penalty = owner.Received.OfType<MicroNegative>().Single();
+            Assert.AreEqual((owner.Id, idle.Id), (penalty.A, penalty.B));
+
+            orchestrator.OnTick(Now + WTimeSpan.FromDays(5), chars);
+            Assert.AreEqual(1, owner.Received.OfType<MicroNegative>().Count(), "The loan clock restarted: not reported again the next day.");
+        }
 
         // ══════════════════════════════════════════════════════════════════════
         // MoveTo:Supply — walk to the workstation a craft task needs
@@ -535,6 +617,39 @@ namespace EngineTests
             return human;
         }
 
+        private ForagingHuman BuildPerson(
+            string location, ActionCommitted committed, Dictionary<HumanId, RelationshipEdge>? edges = null, bool onWorkShift = false, double agreeableness = 0.5)
+        {
+            var id = committed.Human;
+            var snapshot = new EnginesSnapshot(
+                new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
+                new PsychologyState(0.0, 0.5, 0.5, 10, 10, DiscreteEmotion.Neutral),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new InteractionSurface(location, false, 0.05, 0.1, SurfaceKind.Social),
+                new RelationshipState(edges ?? new Dictionary<HumanId, RelationshipEdge>()),
+                new MemoryIndex(Array.Empty<EpisodicMemory>()));
+            if (onWorkShift)
+            {
+                var slot = new GameEngineTools.Characters.Engines.Schedule.ScheduleSlot("work", 5, Work);
+                snapshot = snapshot with { Schedule = new GameEngineTools.Characters.Engines.Schedule.DailyScheduleState(new[] { slot }, slot, 0, "farmer") };
+            }
+
+            var personality = new Personality(
+                new BigFive(0.5, 0.5, 0.5, agreeableness, 0.5),
+                AttachmentProfile.Secure,
+                CommunicationStyle.Direct,
+                new MotivationWeights(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
+                Sociosexuality.Intermediate,
+                Chronotype.Neutral);
+            var human = new ForagingHuman(id, personality, snapshot, committed);
+            _locationService.MoveCharacter(id, location);
+            return human;
+        }
+
+        private static RelationshipEdge Edge(HumanId from, HumanId to, double trust, double like, double closeness)
+            => new(from, to, Like: like, Trust: trust, Familiarity: 50, AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
+                Closeness: closeness, Respect: 50, Comfort: 50, Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
+
         private static WorldMap BuildMap(IEnumerable<(string From, string To, double Meters)> connections)
         {
             var adjacency = new Dictionary<string, IReadOnlyList<WorldConnection>>();
@@ -624,8 +739,9 @@ namespace EngineTests
             public int Age => 25;
             public StadiumType Stadium => StadiumType.Adult;
 
-            public void ReceiveEvent(IDomainEvent @event)
-            { }
+            public List<IDomainEvent> Received { get; } = new();
+
+            public void ReceiveEvent(IDomainEvent @event) => Received.Add(@event);
 
             public void Tick(WDateTime now, WTimeSpan dt)
             { }

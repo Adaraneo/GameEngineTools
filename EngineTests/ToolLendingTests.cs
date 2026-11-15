@@ -9,12 +9,15 @@ namespace EngineTests
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Needs;
+    using GameEngineTools.Characters.Engines.Objects;
+    using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.World.Data;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using GameEngineTools.World.Work;
     using EngineTests.Utils;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using GameEngineTools.Characters.Engines.Behavior.Modifiers;
     using static GameEngineTools.Characters.Engines.ActionNames;
 
     /// <summary>A tool that belongs to someone else can be used only after its owner has lent it.</summary>
@@ -74,26 +77,48 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AboutAThirdOfTheTools_BecomePersonal_RoundRobin_AndTheRestStayCommon()
+        {
+            var (db, provider) = NewWorld();
+            using (db)
+            {
+                for (var i = 2; i <= 6; i++)
+                    provider.AddObject(WorkObjects.Spawn(TestWork.Catalog, "sickle", $"sickle_{i}", "farm"));
+                provider.RemoveObject("farm", "spade_1");
+                provider.AddObject(WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm"));
+
+                var assigned = ToolOwnership.AssignPersonalTools(provider, new[] { Owner, Neighbour });
+
+                var tools = provider.GetAllObjects().Where(o => o.Category == WorldObjectCategory.Tool).ToList();
+                Assert.AreEqual(6, tools.Count);
+                Assert.AreEqual(2, assigned, "A third of six.");
+                Assert.AreEqual(2, tools.Count(o => o.OwnerId is not null));
+                CollectionAssert.AreEquivalent(new[] { Owner, Neighbour }, tools.Where(o => o.OwnerId is not null).Select(o => o.OwnerId!.Value).ToArray(), "Round-robin over the owners.");
+                Assert.AreEqual(0, ToolOwnership.AssignPersonalTools(provider, Array.Empty<HumanId>()), "Nobody to give them to.");
+            }
+        }
+
+        [TestMethod]
         public void OnlyTheOwnerLends_OnceAtATime_AndEitherSideEndsTheLoan_AndItSurvivesTheDatabase()
         {
             var (db, provider) = NewWorld();
             using (db)
             {
-                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Neighbour, Stranger), "Only the owner can lend.");
-                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Owner), "Lending to oneself is no loan.");
-                Assert.IsFalse(ToolLending.Lend(provider, "missing", Owner, Neighbour));
+                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Neighbour, Stranger, Now), "Only the owner can lend.");
+                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Owner, Now), "Lending to oneself is no loan.");
+                Assert.IsFalse(ToolLending.Lend(provider, "missing", Owner, Neighbour, Now));
 
-                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour));
+                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, Now));
                 Assert.AreEqual(Neighbour, provider.FindObject("spade_1")!.LentTo, "The loan is kept in the world database.");
                 Assert.AreEqual(Owner, provider.FindObject("spade_1")!.OwnerId, "Lending does not change the owner.");
-                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Stranger), "A lent tool is not lent twice.");
+                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Stranger, Now), "A lent tool is not lent twice.");
 
                 Assert.IsFalse(ToolLending.Return(provider, "spade_1", Stranger), "Neither owner nor borrower: no say.");
                 Assert.IsTrue(ToolLending.Return(provider, "spade_1", Neighbour));
                 Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
                 Assert.IsFalse(ToolLending.Return(provider, "spade_1", Owner), "Nothing to take back.");
 
-                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Stranger));
+                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Stranger, Now));
                 Assert.IsTrue(ToolLending.Return(provider, "spade_1", Owner), "The owner can ask for it back.");
             }
         }
@@ -118,11 +143,109 @@ namespace EngineTests
                 return ctx with { AvailableObjects = new List<WorldObject> { field, tool }, HeldObjects = new List<WorldObject>() };
             }
 
-            Assert.AreEqual(0, engine.Evaluate(Ctx(spade)).Candidates.Count, "The spade belongs to someone else: no ploughing.");
+            Assert.AreEqual(AskToBorrow, engine.Evaluate(Ctx(spade)).Candidates.Single().Name, "The spade belongs to someone else: no ploughing, only asking.");
             Assert.AreEqual(Plough, engine.Evaluate(Ctx(spade with { LentTo = self })).Candidates.Single().Name, "Lent to this character: they plough.");
             Assert.AreEqual(0, engine.Evaluate(Ctx(spade with { LentTo = Stranger })).Candidates.Count, "Lent to somebody else.");
         }
 
+        [TestMethod]
+        public void WithoutAToolHere_TheFarmerTakesOneHeMayUse_ElseAsksTheOwner_ButNeverTakesOrAsksForNothing()
+        {
+            var engine = new FieldWorkNeedEngine(catalog: TestWork.Catalog);
+            var self = Neighbour;
+            var field = new WorldObject { Id = "field_1", DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemTypeId = "grain", Field = new GameEngineTools.World.Objects.Crops.FieldState(GameEngineTools.World.Objects.Crops.FieldStage.Fallow, 1.0) };
+
+            BehaviorContext Ctx(params WorldObject[] objects)
+            {
+                var ctx = BehaviorComponentTestFactory.Context(selfId: self, hunger: 20, thirst: 5, now: new WDateTime(0));
+                var human = (HumanContext)ctx.HumanContext;
+                human.Snapshot = human.Snapshot with
+                {
+                    AmbientTemperature = 15.0,
+                    Celestial = new GameEngineTools.World.Core.Astro.CelestialContext(0.5, 12.0, 6.0, 18.0, 12.0, 0.5, 0.0, true, 15.0, TemperatureTrendPerDay: 0.1),
+                };
+                return ctx with { AvailableObjects = objects.Append(field).ToList(), HeldObjects = new List<WorldObject>() };
+            }
+
+            var shared = WorkObjects.Spawn(TestWork.Catalog, "spade", "shared", Loc);
+            var take = engine.Evaluate(Ctx(shared)).Candidates;
+            Assert.AreEqual(Plough, take.Single().Name, "A usable spade lying here is already at hand: the job itself.");
+
+            var theirs = WorkObjects.Spawn(TestWork.Catalog, "spade", "theirs", Loc, Owner);
+            var ask = engine.Evaluate(Ctx(theirs)).Candidates.Single();
+            Assert.AreEqual(AskToBorrow, ask.Name, "Someone else's spade, not lent: ask.");
+            Assert.AreEqual("spade", ask.TargetTypeId);
+            Assert.IsTrue(ask.Duration >= WTimeSpan.FromMinutes(30), "Asking takes a while, so a refusal is not repeated at once.");
+
+            Assert.AreEqual(Plough, engine.Evaluate(Ctx(theirs with { LentTo = self })).Candidates.Single().Name, "Lent to them: it is at hand.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(theirs with { LentTo = Stranger })).Candidates.Count, "Lent to somebody else: nothing to ask for.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx()).Candidates.Count, "No spade anywhere here: nothing.");
+        }
+
+        [TestMethod]
+        public void ACarriedTool_IsNotPutDownInTheMiddleOfAShift_AndDroppingALentOneEndsTheLoan()
+        {
+            var spade = WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", Loc, Owner) with { LentTo = Neighbour, HeldBy = Neighbour };
+
+            BehaviorContext Ctx(bool onShift)
+            {
+                var ctx = BehaviorComponentTestFactory.Context(selfId: Neighbour, hunger: 10, thirst: 5, now: new WDateTime(0));
+                if (onShift)
+                {
+                    var slot = new GameEngineTools.Characters.Engines.Schedule.ScheduleSlot("work", 5, Work);
+                    ((HumanContext)ctx.HumanContext).Snapshot = ctx.HumanContext.Snapshot with
+                    {
+                        Schedule = new GameEngineTools.Characters.Engines.Schedule.DailyScheduleState(new[] { slot }, slot, 0, "farmer"),
+                    };
+                }
+
+                return ctx with { AvailableObjects = new List<WorldObject>(), HeldObjects = new List<WorldObject> { spade } };
+            }
+
+            var provider = new SingleObjectProvider(spade);
+            var modifier = new ObjectInteractionBehaviorModifier(provider);
+            var off = new List<BehaviorCandidate>();
+            var on = new List<BehaviorCandidate>();
+            modifier.Modify(Ctx(onShift: false), off);
+            modifier.Modify(Ctx(onShift: true), on);
+
+            Assert.IsTrue(off.Any(c => c.ObjectInteraction?.Kind == ObjectInteractionKind.Drop), "Off shift a carried tool may be put down.");
+            Assert.IsFalse(on.Any(c => c.ObjectInteraction?.Kind == ObjectInteractionKind.Drop), "On shift it is kept.");
+        }
+
+        private sealed class SingleObjectProvider(WorldObject held) : IMutableWorldObjectProvider
+        {
+            public IEnumerable<WorldObject> GetObjectsAt(string locationId) => Enumerable.Empty<WorldObject>();
+            public IEnumerable<WorldObject> GetAllObjects() => new[] { held };
+            public IEnumerable<WorldObject> GetAllObjectsAt(string locationId) => Enumerable.Empty<WorldObject>();
+            public IEnumerable<WorldObject> GetHeldBy(HumanId holder) => holder == held.HeldBy ? new[] { held } : Enumerable.Empty<WorldObject>();
+            public WorldObject? FindObject(string objectId) => objectId == held.Id ? held : null;
+            public void AddObject(WorldObject obj) { }
+            public bool RemoveObject(string locationId, string objectId) => true;
+            public bool SetHeldBy(string locationId, string objectId, HumanId? holder) => true;
+            public bool ConsumeObject(string locationId, string objectId, WDateTime at) => true;
+            public bool RestoreObject(string locationId, string objectId) => true;
+            public IEnumerable<string> GetKnownLocationIds() => Enumerable.Empty<string>();
+        }
+
         private const string Loc = "test"; // BehaviorComponentTestFactory surface location
+
+        private static readonly WDateTime Now = new(0);
+
+        [TestMethod]
+        public void TheOwnersDecision_NeedsTrustAndLikeAndFreeHands_AndAgreeableOwnersAskLess()
+        {
+            RelationshipEdge Edge(double trust, double like, double closeness)
+                => new(Owner, Neighbour, Like: like, Trust: trust, Familiarity: 50, AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: closeness, Respect: 50, Comfort: 50, Breakdown: new GameEngineTools.Characters.Engines.Relationships.DomainBreakdown(50, 50, 50, 50, 50));
+            var friend = Edge(80, 70, 50);
+
+            Assert.IsTrue(ToolLendingPolicy.Accepts(friend, 0.5, ownerOnWorkShift: false));
+            Assert.IsFalse(ToolLendingPolicy.Accepts(friend, 0.5, ownerOnWorkShift: true), "The owner needs it now.");
+            Assert.IsFalse(ToolLendingPolicy.Accepts(null, 0.5, ownerOnWorkShift: false), "A stranger is refused.");
+            Assert.IsFalse(ToolLendingPolicy.Accepts(Edge(40, 40, 30), 0.5, false), "Lukewarm is not enough.");
+            Assert.IsTrue(ToolLendingPolicy.Accepts(Edge(50, 50, 45), 1.0, false) && !ToolLendingPolicy.Accepts(Edge(50, 50, 45), 0.0, false), "The same edge: an agreeable owner lends, a disagreeable one does not.");
+            Assert.IsFalse(ToolLendingPolicy.Accepts(friend with { IsContemptuouslyDestroyed = true }, 0.5, false));
+        }
     }
 }

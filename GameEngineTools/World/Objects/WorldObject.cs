@@ -187,6 +187,9 @@ namespace GameEngineTools.World.Objects
         /// <summary>The character the owner has lent this object to; while set, that character may use it as if it were theirs. <c>null</c> when it is not lent.</summary>
         public HumanId? LentTo { get; init; } = null;
 
+        /// <summary>When it was lent (or when the overdue clock was last restarted); <c>null</c> when it is not lent.</summary>
+        public GameEngineTools.World.Utils.Time.WDateTime? LentAt { get; init; } = null;
+
         /// <summary>Condition from 1 (new) down to 0 (worn out); only meaningful for a type that wears.</summary>
         public double Condition { get; init; } = 1.0;
 

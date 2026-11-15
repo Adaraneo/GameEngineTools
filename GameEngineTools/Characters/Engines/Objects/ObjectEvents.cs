@@ -55,4 +55,13 @@ namespace GameEngineTools.Characters.Engines.Objects
         string ObjectId,
         AffordanceType AffordanceType,
         double Satisfaction) : IDomainEvent;
+
+    /// <summary>An owner lent a tool to someone (after a request).</summary>
+    public sealed record ToolLent(WDateTime OccurredAt, HumanId Owner, HumanId Borrower, string ToolId) : IDomainEvent;
+
+    /// <summary>A borrower gave a lent tool back (it was put down; the loan ended).</summary>
+    public sealed record ToolReturned(WDateTime OccurredAt, HumanId Owner, HumanId Borrower, string ToolId) : IDomainEvent;
+
+    /// <summary>An owner declined to lend a tool.</summary>
+    public sealed record ToolRequestRefused(WDateTime OccurredAt, HumanId Requester, HumanId Owner, string ToolTypeId, string Reason) : IDomainEvent;
 }

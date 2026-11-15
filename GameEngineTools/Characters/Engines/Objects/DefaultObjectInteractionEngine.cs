@@ -234,6 +234,8 @@ namespace GameEngineTools.Characters.Engines.Objects
                             _objectProvider.SetHeldBy(data.LocationId, data.ObjectId, null);
                         }
                         outbox.Add(new ObjectDropped(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId));
+                        if (obj.LentTo == ctx.Id && obj.OwnerId is { } lender && ToolLending.Return(_objectProvider, obj.Id, ctx.Id))
+                            outbox.Add(new ToolReturned(committed.OccurredAt, lender, ctx.Id, obj.Id));
                         break;
                     }
             }

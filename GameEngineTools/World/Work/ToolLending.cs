@@ -11,14 +11,14 @@ namespace GameEngineTools.World.Work
     public static class ToolLending
     {
         /// <summary>Lends the tool to the borrower; false (nothing changes) when it is unknown, not owned by <paramref name="owner"/>, already lent, or the borrower is the owner.</summary>
-        public static bool Lend(IMutableWorldObjectProvider provider, string toolId, HumanId owner, HumanId borrower)
+        public static bool Lend(IMutableWorldObjectProvider provider, string toolId, HumanId owner, HumanId borrower, GameEngineTools.World.Utils.Time.WDateTime now)
         {
             ArgumentNullException.ThrowIfNull(provider);
             if (provider.FindObject(toolId) is not { } tool || tool.OwnerId != owner || tool.LentTo is not null || borrower == owner)
                 return false;
 
             provider.RemoveObject(tool.LocationId, tool.Id);
-            provider.AddObject(tool with { LentTo = borrower });
+            provider.AddObject(tool with { LentTo = borrower, LentAt = now });
             return true;
         }
 
@@ -30,7 +30,7 @@ namespace GameEngineTools.World.Work
                 return false;
 
             provider.RemoveObject(tool.LocationId, tool.Id);
-            provider.AddObject(tool with { LentTo = null });
+            provider.AddObject(tool with { LentTo = null, LentAt = null });
             return true;
         }
     }

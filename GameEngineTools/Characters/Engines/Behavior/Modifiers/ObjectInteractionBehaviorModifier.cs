@@ -103,8 +103,11 @@ namespace GameEngineTools.Characters.Engines.Behavior.Modifiers
             if (string.IsNullOrEmpty(currentLocationId))
                 return;
 
+            var onWorkShift = context.HumanContext.Snapshot.Schedule?.ActiveSlot is { PreferredAction: ActionNames.Work };
             foreach (var heldObj in _objectProvider.GetHeldBy(context.HumanContext.Id))
             {
+                if (onWorkShift && heldObj.Category == WorldObjectCategory.Tool)
+                    continue; // a tool carried to work is not put down in the middle of the shift
                 candidates.Add(new BehaviorCandidate(
                     Name: ActionNames.InteractWithObject,
                     Utility: DropBaseUtility,

@@ -35,6 +35,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         // Making the tool for a waiting job ranks a little under the job itself (a design pick).
         private const double SupplyFactor = 0.85;
 
+        // How long asking an owner takes (a design pick); a refused request is not repeated within it.
+        private static readonly WTimeSpan AskDuration = WTimeSpan.FromMinutes(30);
+
         // Too hungry to work; eating comes first.
         private const double MaxNeedFoodToWork = 70.0;
 
@@ -102,15 +105,43 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
         }
 
-        /// <summary>A job is waiting but its tool is missing: when a craft step here gets closer to such a tool (the tool itself, or what it is made from), offer that step, a little under the job.</summary>
+        /// <summary>
+        /// A job is waiting but no tool of its class is usable: take one that lies here and may be used, else make one from what is here (a craft step), else ask the owner of one that lies here.
+        /// Each ranks a little under the job itself.
+        /// </summary>
         private BehaviorNeedOutput SupplyTool(FieldTask task, BehaviorContext context, DailyScheduleState? schedule)
         {
-            if (ToolClassOf(task) is not { } toolClass || _chain.NextStepForTool(toolClass, context.AvailableObjects!, context.HeldObjects) is not { } step)
+            if (ToolClassOf(task) is not { } toolClass)
                 return BehaviorNeedOutput.Empty;
 
             var utility = Utility(task) * SupplyFactor + (IsOnShiftFor(task, schedule) ? FarmerOnShiftBonus : 0.0);
-            var candidate = new BehaviorCandidate(Process, utility, WTimeSpan.FromMinutes(step.DurationMinutes), BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" }, TaskId: step.Id);
-            return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
+            var self = context.HumanContext.Id;
+            var here = context.AvailableObjects!;
+
+            bool IsTool(WorldObject o) => o.IsPickable && o.IsAvailable && o.HeldBy is null && _catalog.ToolQuality(o.TypeId, toolClass) > 0.0;
+
+            if (here.FirstOrDefault(o => IsTool(o) && WorkObjects.CanUse(o, self)) is { } lying)
+            {
+                var take = new BehaviorCandidate(
+                    InteractWithObject, utility, WTimeSpan.FromMinutes(1), BehaviorDomain.Competence,
+                    ObjectInteraction: new ObjectInteractionData(lying.Id, lying.LocationId, ObjectInteractionKind.Take), Tags: new[] { "FieldWork", "Supply" });
+                return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { take });
+            }
+
+            if (_chain.NextStepForTool(toolClass, here, context.HeldObjects) is { } step)
+            {
+                var make = new BehaviorCandidate(Process, utility, WTimeSpan.FromMinutes(step.DurationMinutes), BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" }, TaskId: step.Id);
+                return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { make });
+            }
+
+            // Someone else's tool lies here, not lent: ask. The asking takes AskDuration, so a refusal is not repeated at once.
+            if (here.FirstOrDefault(o => IsTool(o) && o.OwnerId is not null && o.LentTo is null) is { } owned)
+            {
+                var ask = new BehaviorCandidate(AskToBorrow, utility, AskDuration, BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" }, TargetTypeId: owned.TypeId);
+                return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { ask });
+            }
+
+            return BehaviorNeedOutput.Empty;
         }
 
         /// <summary>The tool class a task needs, read from its row in tasks.json; null when it needs none (sowing is done from a seed bag by hand).</summary>

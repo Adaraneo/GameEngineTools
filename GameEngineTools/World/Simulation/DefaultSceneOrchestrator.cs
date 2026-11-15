@@ -12,6 +12,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.Characters.Engines.Bereavement;
     using GameEngineTools.Characters.Engines.Interactions;
     using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Physiology;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.Reputation;
@@ -24,6 +25,7 @@ namespace GameEngineTools.World.Simulation
     using GameEngineTools.World.Movement;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
+    using GameEngineTools.World.Work;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using static GameEngineTools.Characters.Engines.ActionNames;
@@ -366,6 +368,8 @@ namespace GameEngineTools.World.Simulation
             // ── Social functions ──────────────────────────────────────────────────
             FireFirstImpressions(now, living);
             RouteMoveTo(now, living);
+            RouteToolRequests(now, living);
+            ReportOverdueLoans(now, living);
 
             if (_socialCharsBuffer.Count > 0)
             {
@@ -1049,6 +1053,79 @@ namespace GameEngineTools.World.Simulation
         }
 
         #endregion FireFirstImpressions
+
+        #region ToolLoans
+
+        // Days a lent tool may stay out before the owner holds it against the borrower (a design pick).
+        private const double ToolLoanGraceDays = 3.0;
+
+        private WDateTime _nextLoanCheck;
+
+        /// <summary>
+        /// An <c>AskToBorrow</c> that was committed this tick: the asker says a Request to an owner who is here and has an unlent tool of that type lying here;
+        /// the owner lends or refuses by <see cref="ToolLendingPolicy"/>. Both sides are told with an event.
+        /// </summary>
+        private void RouteToolRequests(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            if (_mutableObjects is null)
+                return;
+
+            foreach (var asker in chars)
+            {
+                var ask = asker.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == AskToBorrow);
+                if (ask?.TargetTypeId is not { } typeId || _locationService.GetLocation(asker.Id) is not { } location)
+                    continue;
+
+                var lying = _objectProvider.GetAllObjects()
+                    .Where(o => o.LocationId == location && o.HeldBy is null && o.IsAvailable && o.LentTo is null && o.OwnerId is not null && string.Equals(o.TypeId, typeId, StringComparison.Ordinal))
+                    .ToList();
+                var owner = chars.FirstOrDefault(c => c.Id != asker.Id && _locationService.GetLocation(c.Id) == location && lying.Any(o => o.OwnerId == c.Id));
+                var tool = owner is null ? null : lying.First(o => o.OwnerId == owner.Id);
+                if (owner is null || tool is null)
+                {
+                    asker.ReceiveEvent(new ToolRequestRefused(now, asker.Id, asker.Id, typeId, "The owner is not here."));
+                    continue;
+                }
+
+                var edge = owner.Snapshot.Relationships.Edges.GetValueOrDefault(asker.Id);
+                UtterSpeechAct(now, asker, owner, location, RelationalActKind.Request, urgency: 0.0, closeness: edge?.Closeness ?? 0.0, familiarity: edge?.Familiarity ?? 0.0, respondingTo: null);
+
+                var onShift = owner.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work };
+                if (ToolLendingPolicy.Accepts(edge, owner.Personality.BigFive.Agreeableness, onShift)
+                    && ToolLending.Lend(_mutableObjects, tool.Id, owner.Id, asker.Id, now))
+                {
+                    var lent = new ToolLent(now, owner.Id, asker.Id, tool.Id);
+                    asker.ReceiveEvent(lent);
+                    owner.ReceiveEvent(lent);
+                }
+                else
+                {
+                    var refused = new ToolRequestRefused(now, asker.Id, owner.Id, typeId, onShift ? "The owner needs it." : "The owner does not trust the asker enough.");
+                    asker.ReceiveEvent(refused);
+                    owner.ReceiveEvent(refused);
+                }
+            }
+        }
+
+        /// <summary>Once a world day: a tool lent for longer than the grace period costs the borrower the owner's trust (a MicroNegative, with its residue); the loan clock restarts so it is not reported every day.</summary>
+        private void ReportOverdueLoans(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            if (_mutableObjects is null || now < _nextLoanCheck)
+                return;
+
+            _nextLoanCheck = now + WTimeSpan.FromDays(1);
+            foreach (var tool in _objectProvider.GetAllObjects().Where(o => o.LentTo is not null && o.LentAt is not null).ToList())
+            {
+                if ((now - tool.LentAt!.Value).TotalDays < ToolLoanGraceDays)
+                    continue;
+
+                _mutableObjects.RemoveObject(tool.LocationId, tool.Id);
+                _mutableObjects.AddObject(tool with { LentAt = now });
+                chars.FirstOrDefault(c => c.Id == tool.OwnerId)?.ReceiveEvent(new MicroNegative(now, tool.OwnerId!.Value, tool.LentTo!.Value, "ToolNotReturned"));
+            }
+        }
+
+        #endregion ToolLoans
 
         #region RouteMoveTo
 
