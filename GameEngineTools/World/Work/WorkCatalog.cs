@@ -90,6 +90,7 @@ namespace GameEngineTools.World.Work
     /// <param name="Action">The action a field task is carried out as (Plough, Sow, Reap, Thresh).</param>
     /// <param name="ToolClass">The tool class the task needs, or null when it needs none.</param>
     /// <param name="Source">Where the numbers come from.</param>
+    /// <param name="Requires">The conditions of a field task, all of which must hold (<see cref="GameEngineTools.World.Objects.Crops.FieldConditions"/>).</param>
     public sealed record TaskDefinition(
         string Id,
         string Name,
@@ -101,7 +102,12 @@ namespace GameEngineTools.World.Work
         string? Location,
         string? Action,
         string? ToolClass,
-        string? Source = null);
+        string? Source = null,
+        IReadOnlyList<string>? Requires = null)
+    {
+        /// <summary>The conditions of a field task, never null.</summary>
+        public IReadOnlyList<string> Requires { get; init; } = Requires ?? Array.Empty<string>();
+    }
 
     /// <summary>The materials and object types the work system knows; the world database stores only a type id and the state of an instance, this holds what the type is.</summary>
     public sealed class WorkCatalog
@@ -148,9 +154,13 @@ namespace GameEngineTools.World.Work
                     if (task.DurationMinutes <= 0) throw new FormatException($"Task '{task.Id}': a craft task needs a positive duration.");
                     if (string.IsNullOrWhiteSpace(task.Location)) throw new FormatException($"Task '{task.Id}': a craft task needs a location type.");
                 }
-                else if (string.IsNullOrWhiteSpace(task.Action))
+                else
                 {
-                    throw new FormatException($"Task '{task.Id}': a field task needs the action it is carried out as.");
+                    if (string.IsNullOrWhiteSpace(task.Action)) throw new FormatException($"Task '{task.Id}': a field task needs the action it is carried out as.");
+                    if (task.Requires.Count == 0) throw new FormatException($"Task '{task.Id}': a field task needs at least one condition in 'requires'.");
+                    foreach (var condition in task.Requires)
+                        if (!GameEngineTools.World.Objects.Crops.FieldConditions.IsKnown(condition))
+                            throw new FormatException($"Task '{task.Id}': unknown condition '{condition}'.");
                 }
 
                 if (!_tasks.TryAdd(task.Id, task)) throw new FormatException($"Duplicate task '{task.Id}'.");

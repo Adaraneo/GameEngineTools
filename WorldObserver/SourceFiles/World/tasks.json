@@ -1,14 +1,15 @@
 ﻿// Tasks of the work system. kind Craft: inputs and one output (item kinds are the PickupItemKind names today), minutes and the location type it is done at.
-// kind FieldWork: the action it is carried out as and the tool class it needs ("tool" left out: none). Hours per hectare stay in World:Crops, MET in Characters:Physiology.
+// kind FieldWork: the action it is carried out as, the tool class it needs ("tool" left out: none) and "requires", the conditions that must all hold (stage:A|B, pending, no_pending, workable, rested, sowing_weather, seed_enough; see FieldConditions). Hours per hectare stay in World:Crops, MET in Characters:Physiology.
 {
   "tasks": [
     { "id": "recipe_flour_from_grain", "name": "Mlít obilí", "kind": "Craft", "inputs": [ { "item": "Grain", "qty": 2 } ], "output": { "item": "Flour", "qty": 1 }, "outputName": "Mouka", "durationMinutes": 45, "location": "mill", "source": "design values of the Tier 1 food chain" },
     { "id": "recipe_bread_from_flour", "name": "Péct chléb", "kind": "Craft", "inputs": [ { "item": "Flour", "qty": 1 } ], "output": { "item": "Bread", "qty": 1 }, "outputName": "Čerstvý chléb", "durationMinutes": 90, "location": "bakery", "source": "design values of the Tier 1 food chain" },
     { "id": "recipe_cheese_from_milk", "name": "Vyrábět sýr", "kind": "Craft", "inputs": [ { "item": "Milk", "qty": 2 } ], "output": { "item": "Cheese", "qty": 1 }, "outputName": "Čerstvý sýr", "durationMinutes": 180, "location": "dairy", "source": "design values of the Tier 1 food chain" },
 
-    { "id": "plough", "name": "Orat", "kind": "FieldWork", "action": "Plough", "tool": "dig" },
-    { "id": "sow", "name": "Sít", "kind": "FieldWork", "action": "Sow" },
-    { "id": "reap", "name": "Žnout", "kind": "FieldWork", "action": "Reap", "tool": "cut_grain" },
-    { "id": "thresh", "name": "Mlátit", "kind": "FieldWork", "action": "Thresh", "tool": "thresh" }
+    { "id": "plough", "name": "Orat", "kind": "FieldWork", "action": "Plough", "tool": "dig", "requires": [ "stage:Fallow", "workable", "rested" ] },
+    { "id": "plough_stubble", "name": "Orat strniště", "kind": "FieldWork", "action": "Plough", "tool": "dig", "requires": [ "stage:Reaped", "no_pending", "workable", "rested" ] },
+    { "id": "sow", "name": "Sít", "kind": "FieldWork", "action": "Sow", "requires": [ "stage:Ploughed", "workable", "sowing_weather", "rested", "seed_enough" ] },
+    { "id": "reap", "name": "Žnout", "kind": "FieldWork", "action": "Reap", "tool": "cut_grain", "requires": [ "stage:Ripe" ] },
+    { "id": "thresh", "name": "Mlátit", "kind": "FieldWork", "action": "Thresh", "tool": "thresh", "requires": [ "stage:Reaped", "pending" ] }
   ]
 }

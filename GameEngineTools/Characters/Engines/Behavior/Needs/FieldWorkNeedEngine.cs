@@ -65,7 +65,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             FieldTask? best = null;
             foreach (var field in fields)
             {
-                if (FieldWork.Available(field.Field!, season, _config) is { } task && HasToolFor(task, context) && (best is null || Utility(task) > Utility(best.Value)))
+                if (FieldWork.Available(field.Field!, season, _config, _catalog) is { } task && HasToolFor(task, context) && (best is null || Utility(task) > Utility(best.Value)))
                     best = task;
             }
 

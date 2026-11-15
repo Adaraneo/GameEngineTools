@@ -4,6 +4,9 @@
 namespace EngineTests
 {
     using GameEngineTools.World.Objects.Crops;
+    using GameEngineTools.World.Work;
+    using System;
+    using System.Collections.Generic;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -195,6 +198,74 @@ namespace EngineTests
 
             Assert.AreEqual(576.0, hours, 1e-9);
             Assert.IsTrue(hours * 0.4 is > 150 and < 250, "About 0.4 ha feeds a person on grain alone, so 150-250 h of grain work a person-year, as estimated from the sources.");
+        }
+        // The rules as they were written in code before they became the conditions of tasks.json, kept here as the reference the data must reproduce.
+        private static FieldTask? LegacyAvailable(FieldState field, FieldSeason now, CropConfig cfg)
+        {
+            bool Rested() => field.ReapedYear is not { } reaped || now.Year >= reaped + (int)Math.Round(cfg.FallowYears);
+            bool Workable() => now.TemperatureCelsius >= cfg.MinWorkTemperatureCelsius;
+
+            switch (field.Stage)
+            {
+                case FieldStage.Ripe:
+                    return FieldTask.Reap;
+                case FieldStage.Reaped when field.PendingUnits > 0:
+                    return FieldTask.Thresh;
+                case FieldStage.Fallow:
+                case FieldStage.Reaped:
+                    return Workable() && Rested() ? FieldTask.Plough : null;
+                case FieldStage.Ploughed:
+                    return Workable() && CropMath.IsSowingWeather(now.TemperatureCelsius, now.TemperatureTrendPerDay, cfg) && Rested()
+                        && now.SeedInStore >= CropMath.SeedUnits(field.AreaHectares, cfg) * cfg.MinSowingShare
+                        ? FieldTask.Sow : null;
+                default:
+                    return null;
+            }
+        }
+
+        [TestMethod]
+        public void TheConditionsInTheData_GiveTheSameJobAsTheOldRules_OverAGridOfFieldsAndSeasons()
+        {
+            var catalog = WorkCatalogLoader.Load();
+            var configs = new[] { Cfg, new CropConfig { FallowYears = 0.0, MinWorkTemperatureCelsius = 5.0, MinSowingShare = 0.5 }, new CropConfig { FallowYears = 2.0 } };
+            var checkedCases = 0;
+
+            foreach (var cfg in configs)
+            foreach (var stage in Enum.GetValues<FieldStage>())
+            foreach (var pending in new[] { 0, 7 })
+            foreach (var reapedYear in new int?[] { null, 2024, 2025 })
+            foreach (var year in new[] { 2024, 2025, 2026, 2027 })
+            foreach (var temperature in new[] { -5.0, 1.9, 2.0, 4.0, 5.0, 9.0, 12.0, 16.0, 17.0, 25.0 })
+            foreach (var trend in new[] { -0.3, -0.05, 0.0, 0.1 })
+            foreach (var seed in new[] { 0, 400, 850, 900, 5000 })
+            {
+                var field = new FieldState(stage, 1.0) { PendingUnits = pending, ReapedYear = reapedYear };
+                var season = new FieldSeason(trend, temperature, year, seed);
+
+                Assert.AreEqual(LegacyAvailable(field, season, cfg), FieldWork.Available(field, season, cfg, catalog),
+                    $"{stage}, pending {pending}, reaped {reapedYear}, year {year}, {temperature} degC, trend {trend}, seed {seed}");
+                checkedCases++;
+            }
+
+            Assert.IsTrue(checkedCases > 50_000, $"{checkedCases} cases");
+        }
+
+        [TestMethod]
+        public void AnotherJobCanBeAddedByData_WithoutTouchingTheCode()
+        {
+            var catalog = WorkCatalogLoader.Parse("""{ "materials": [] }""", """{ "types": [] }""", """
+                { "tasks": [ { "id": "weed", "kind": "FieldWork", "action": "Thresh", "requires": [ "stage:Sown", "workable" ] } ] }
+                """);
+            var sown = new FieldState(FieldStage.Sown, 1.0);
+
+            Assert.AreEqual(FieldTask.Thresh, FieldWork.Available(sown, Summer(), Cfg, catalog), "A row with its own conditions decides.");
+            Assert.IsNull(FieldWork.Available(sown, Winter(), Cfg, catalog), "The condition 'workable' fails in a frozen season.");
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse("""{ "materials": [] }""", """{ "types": [] }""",
+                """{ "tasks": [ { "id": "x", "kind": "FieldWork", "action": "Plough", "requires": [ "moon_is_full" ] } ] }"""));
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse("""{ "materials": [] }""", """{ "types": [] }""",
+                """{ "tasks": [ { "id": "x", "kind": "FieldWork", "action": "Plough", "requires": [ "stage:Frozen" ] } ] }"""));
+            Assert.ThrowsExactly<FormatException>(() => WorkCatalogLoader.Parse("""{ "materials": [] }""", """{ "types": [] }""",
+                """{ "tasks": [ { "id": "x", "kind": "FieldWork", "action": "Plough" } ] }"""));
         }
     }
 }

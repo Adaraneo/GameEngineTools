@@ -10,6 +10,7 @@ namespace GameEngineTools.World.Work
     using System.IO;
     using System.Reflection;
     using System.Text;
+    using System.Linq;
     using System.Text.Json;
 
     /// <summary>
@@ -94,7 +95,8 @@ namespace GameEngineTools.World.Work
                     OptionalText(t, "location"),
                     OptionalText(t, "action"),
                     OptionalText(t, "tool"),
-                    OptionalText(t, "source")));
+                    OptionalText(t, "source"),
+                    t.TryGetProperty("requires", out var requiresElement) ? requiresElement.EnumerateArray().Select(r => r.GetString() ?? string.Empty).ToList() : null));
             }
 
             return new WorkCatalog(materials, types, tasks);

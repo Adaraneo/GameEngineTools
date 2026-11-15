@@ -4,7 +4,9 @@
 namespace GameEngineTools.World.Objects.Crops
 {
     using System;
+    using System.Linq;
     using GameEngineTools.World.Utils.Time;
+    using GameEngineTools.World.Work;
 
     /// <summary>A job on a field, done in sessions of hours until its labor is spent.</summary>
     public enum FieldTask
@@ -31,43 +33,24 @@ namespace GameEngineTools.World.Objects.Crops
     /// <summary>Which job a field needs now and how a session of labor moves it on. Pure, so the whole year can be tested without characters.</summary>
     public static class FieldWork
     {
-        /// <summary>The job the field can take now, or <c>null</c> when it has to wait (not ripe, wrong season, frozen ground, resting year, no seed).</summary>
-        public static FieldTask? Available(FieldState field, FieldSeason now, CropConfig cfg)
+        private static readonly Lazy<WorkCatalog> BuiltIn = new(() => WorkCatalogLoader.Load());
+
+        /// <summary>
+        /// The job the field can take now, or <c>null</c> when it has to wait (not ripe, wrong season, frozen ground, resting year, no seed). The first field task of the catalog whose
+        /// conditions (<see cref="FieldConditions"/>, the <c>requires</c> of its row in <c>tasks.json</c>) all hold; the built-in conditions are written so that at most one task fits a field.
+        /// </summary>
+        /// <param name="catalog">The work catalog; <c>null</c> uses the one loaded from the files.</param>
+        public static FieldTask? Available(FieldState field, FieldSeason now, CropConfig cfg, WorkCatalog? catalog = null)
         {
-            switch (field.Stage)
+            foreach (var task in (catalog ?? BuiltIn.Value).Tasks)
             {
-                case FieldStage.Ripe:
-                    return FieldTask.Reap;
-
-                case FieldStage.Reaped when field.PendingUnits > 0:
-                    return FieldTask.Thresh;
-
-                case FieldStage.Fallow:
-                case FieldStage.Reaped:
-                    return CanPlough(field, now, cfg) ? FieldTask.Plough : null;
-
-                case FieldStage.Ploughed:
-                    return CanSow(field, now, cfg) ? FieldTask.Sow : null;
-
-                default:
-                    return null;
+                if (task.Kind == TaskKind.FieldWork && task.Requires.Count > 0 && task.Requires.All(c => FieldConditions.Holds(c, field, now, cfg))
+                    && Enum.TryParse<FieldTask>(task.Action, ignoreCase: false, out var fieldTask))
+                    return fieldTask;
             }
+
+            return null;
         }
-
-        /// <summary>Whether the ground may be ploughed now: workable and rested.</summary>
-        public static bool CanPlough(FieldState field, FieldSeason now, CropConfig cfg)
-            => now.TemperatureCelsius >= cfg.MinWorkTemperatureCelsius
-               && HasRested(field, now.Year, cfg);
-
-        /// <summary>Whether the field may be sown now: sowing weather (cooling, between the limits), workable ground, rested, and enough seed in the bin.</summary>
-        public static bool CanSow(FieldState field, FieldSeason now, CropConfig cfg)
-            => now.TemperatureCelsius >= cfg.MinWorkTemperatureCelsius
-               && CropMath.IsSowingWeather(now.TemperatureCelsius, now.TemperatureTrendPerDay, cfg)
-               && HasRested(field, now.Year, cfg)
-               && now.SeedInStore >= CropMath.SeedUnits(field.AreaHectares, cfg) * cfg.MinSowingShare;
-
-        private static bool HasRested(FieldState field, int year, CropConfig cfg)
-            => field.ReapedYear is not { } reaped || year >= reaped + (int)Math.Round(cfg.FallowYears);
 
         /// <summary>Labor the whole job needs on this field, in hours.</summary>
         public static double RequiredHours(FieldTask task, FieldState field, CropConfig cfg) => field.AreaHectares * task switch
