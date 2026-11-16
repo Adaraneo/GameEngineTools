@@ -152,6 +152,20 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void APutBackTool_TellsTheOwner_AndTheOwnerThinksBetterOfTheBorrower()
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(80, 70, 50);
+            var borrower = BuildPerson(HomeId, new ActionCommitted(Now, new HumanId(Guid.NewGuid()), Idle, WTimeSpan.FromMinutes(5)));
+            borrower.Extra.Add(new ToolReturned(Now, owner.Id, borrower.Id, "spade_1"));
+
+            orchestrator.OnTick(Now, new IHuman[] { borrower, owner });
+
+            Assert.IsTrue(owner.Received.OfType<ToolReturned>().Any());
+            var thanks = owner.Received.OfType<MicroPositive>().Single();
+            Assert.AreEqual((owner.Id, borrower.Id), (thanks.A, thanks.B));
+        }
+
+        [TestMethod]
         public void ALoanKeptPastTheGracePeriod_CostsTheBorrowerTheOwnersTrust_OnceAPeriod()
         {
             var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90);
@@ -735,7 +749,10 @@ namespace EngineTests
 
             public AttractionProfile? AttractionProfile => null;
             public EnginesSnapshot Snapshot => _snapshot;
-            public IReadOnlyList<IDomainEvent> LastOutbox => new[] { _committed };
+            /// <summary>Further events this character is taken to have emitted last tick, next to the committed action.</summary>
+            public List<IDomainEvent> Extra { get; } = new();
+
+            public IReadOnlyList<IDomainEvent> LastOutbox => new IDomainEvent[] { _committed }.Concat(Extra).ToList();
             public int Age => 25;
             public StadiumType Stadium => StadiumType.Adult;
 

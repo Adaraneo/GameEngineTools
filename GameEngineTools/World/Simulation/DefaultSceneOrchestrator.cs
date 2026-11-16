@@ -369,6 +369,7 @@ namespace GameEngineTools.World.Simulation
             FireFirstImpressions(now, living);
             RouteMoveTo(now, living);
             RouteToolRequests(now, living);
+            RouteToolReturns(now, living);
             ReportOverdueLoans(now, living);
 
             if (_socialCharsBuffer.Count > 0)
@@ -1103,6 +1104,22 @@ namespace GameEngineTools.World.Simulation
                     var refused = new ToolRequestRefused(now, asker.Id, owner.Id, typeId, onShift ? "The owner needs it." : "The owner does not trust the asker enough.");
                     asker.ReceiveEvent(refused);
                     owner.ReceiveEvent(refused);
+                }
+            }
+        }
+
+        /// <summary>A borrower put a lent tool back (the object engine ended the loan and said <see cref="ToolReturned"/>): the owner is told, and thinks a little better of the borrower (a MicroPositive, as an overdue loan costs a MicroNegative).</summary>
+        private void RouteToolReturns(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            foreach (var borrower in chars)
+            {
+                foreach (var returned in borrower.LastOutbox.OfType<ToolReturned>())
+                {
+                    if (chars.FirstOrDefault(c => c.Id == returned.Owner) is not { } owner)
+                        continue;
+
+                    owner.ReceiveEvent(returned);
+                    owner.ReceiveEvent(new MicroPositive(now, owner.Id, borrower.Id, "ToolReturned"));
                 }
             }
         }
