@@ -43,18 +43,19 @@ namespace GameEngineTools.World.Work
                 WeightGrams = catalog.WeightGrams(typeId),
                 TypeId = typeId,
                 OwnerId = owner,
+                StoredAt = type.Category == WorldObjectCategory.Tool && type.Pickable ? locationId : null,
                 Affordances = Affordances(type),
             };
         }
 
         /// <summary>
-        /// A fresh, carried item of a type, as a recipe or a harvest makes it: pickable as the type says, held by the character, its spoilage clock started at <paramref name="producedAt"/>,
+        /// A fresh, carried item of a type, as a recipe or a harvest makes it (it has no shed yet): pickable as the type says, held by the character, its spoilage clock started at <paramref name="producedAt"/>,
         /// with the type's affordances (food and drink satisfy hunger and thirst).
         /// </summary>
         public static WorldObject CreateItem(WorkCatalog catalog, string typeId, string locationId, WDateTime producedAt, HumanId? heldBy)
         {
             var type = catalog.Type(typeId) ?? throw new ArgumentException($"Unknown object type '{typeId}'.", nameof(typeId));
-            return Spawn(catalog, typeId, $"{typeId}_{Guid.NewGuid():N}", locationId) with { IsPickable = type.Pickable, HeldBy = heldBy, ProducedAt = producedAt };
+            return Spawn(catalog, typeId, $"{typeId}_{Guid.NewGuid():N}", locationId) with { IsPickable = type.Pickable, HeldBy = heldBy, ProducedAt = producedAt, StoredAt = null };
         }
 
         /// <summary>True for food that can be eaten as it is; raw ingredients (grain, flour) are Food-category but only ownable.</summary>

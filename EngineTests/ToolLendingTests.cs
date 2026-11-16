@@ -57,6 +57,9 @@ namespace EngineTests
         {
             Assert.IsTrue(WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm").IsPickable, "A spade can be picked up and carried to the field.");
             Assert.IsFalse(WorkObjects.Spawn(TestWork.Catalog, "mill", "mill_1", "farm").IsPickable);
+            Assert.AreEqual("farm", WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm").StoredAt, "A tool belongs where it is first put.");
+            Assert.IsNull(WorkObjects.Spawn(TestWork.Catalog, "mill", "mill_1", "farm").StoredAt, "A workstation is not carried back.");
+            Assert.IsNull(WorkObjects.CreateItem(TestWork.Catalog, "spade", "smithy", new WDateTime(0), Owner).StoredAt, "A freshly made tool has no shed yet.");
         }
 
         [TestMethod]
@@ -110,6 +113,7 @@ namespace EngineTests
 
                 Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, Now));
                 Assert.AreEqual(Neighbour, provider.FindObject("spade_1")!.LentTo, "The loan is kept in the world database.");
+                Assert.AreEqual("farm", provider.FindObject("spade_1")!.StoredAt, "The shed is kept in the world database.");
                 Assert.AreEqual(Owner, provider.FindObject("spade_1")!.OwnerId, "Lending does not change the owner.");
                 Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Stranger, Now), "A lent tool is not lent twice.");
 

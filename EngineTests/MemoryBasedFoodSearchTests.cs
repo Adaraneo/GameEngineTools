@@ -221,6 +221,19 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void MoveToStorage_ACarriedToolIsWalkedBackToItsShed()
+        {
+            var seekerId = new HumanId(Guid.NewGuid());
+            var seeker = BuildPerson(HomeId, new ActionCommitted(Now, seekerId, MoveToStorage, WTimeSpan.FromMinutes(20)));
+            var spade = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "spade_1", HomeId) with { HeldBy = seekerId, StoredAt = TavernId };
+            var provider = new ConsumingWorldObjectProvider(new[] { spade }, Array.Empty<string>());
+
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), provider).OnTick(Now, new IHuman[] { seeker });
+
+            Assert.AreEqual(TavernId, _locationService.GetLocation(seeker.Id), "The spade is kept at the tavern's shed: carry it back.");
+        }
+
+        [TestMethod]
         public void MoveToTool_NoSuchToolAnywhere_TheSeekerStaysPut()
         {
             var seeker = BuildPerson(HomeId, new ActionCommitted(Now, new HumanId(Guid.NewGuid()), MoveToTool, WTimeSpan.FromMinutes(20), TargetTypeIds: new[] { "spade" }));
@@ -951,7 +964,7 @@ namespace EngineTests
 
             public bool SetHeldBy(string locationId, string objectId, HumanId? holder) => true;
 
-            public IEnumerable<WorldObject> GetHeldBy(HumanId holder) => Array.Empty<WorldObject>();
+            public IEnumerable<WorldObject> GetHeldBy(HumanId holder) => _objects.Where(o => o.HeldBy == holder);
 
             public IEnumerable<string> GetKnownLocationIds() => _objects.Select(o => o.LocationId).Distinct();
         }

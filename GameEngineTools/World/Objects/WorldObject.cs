@@ -190,6 +190,9 @@ namespace GameEngineTools.World.Objects
         /// <summary>When it was lent (or when the overdue clock was last restarted); <c>null</c> when it is not lent.</summary>
         public GameEngineTools.World.Utils.Time.WDateTime? LentAt { get; init; } = null;
 
+        /// <summary>The place a tool belongs when it is not in use (its shed); a carried tool is brought back there. <c>null</c> for an object with no such place.</summary>
+        public string? StoredAt { get; init; } = null;
+
         /// <summary>Condition from 1 (new) down to 0 (worn out); only meaningful for a type that wears.</summary>
         public double Condition { get; init; } = 1.0;
 

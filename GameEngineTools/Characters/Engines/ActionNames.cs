@@ -109,6 +109,9 @@ namespace GameEngineTools.Characters.Engines
         /// <summary>Walk to a tool of one of the types <c>TargetTypeIds</c> the character may use, or to an owner who could lend one.</summary>
         public const string MoveToTool = "MoveTo:Tool";
 
+        /// <summary>Walk to the place a carried tool is kept, to put it back.</summary>
+        public const string MoveToStorage = "MoveTo:Storage";
+
         #endregion Bereavement / burial
 
         #region Food economy (Tier 1)

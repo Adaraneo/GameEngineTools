@@ -1290,6 +1290,18 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
+                // ── Bringing a carried tool back to its shed (MoveTo:Storage) ──────────────────
+                if (moveTo.ActionName == MoveToStorage)
+                {
+                    var shed = _mutableObjects?.GetHeldBy(character.Id).FirstOrDefault(o => o.StoredAt is not null && o.StoredAt != currentLocation)?.StoredAt;
+                    if (shed is not null && currentLocation is not null)
+                    {
+                        CommitMove(character, NearestOf(currentLocation, new HashSet<string>(StringComparer.Ordinal) { shed })!.Value, now);
+                    }
+
+                    continue;
+                }
+
                 // ── Looking for a tool (MoveTo:Tool): the same search as asking for one ───────
                 if (moveTo.ActionName == MoveToTool)
                 {

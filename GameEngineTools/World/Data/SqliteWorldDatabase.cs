@@ -117,7 +117,7 @@ namespace GameEngineTools.World.Data
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
                        IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt
+                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
                 FROM WorldObjects
                 WHERE LocationId = @loc
                   AND HeldBy IS NULL
@@ -140,7 +140,7 @@ namespace GameEngineTools.World.Data
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
                        IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, ConsumedAt, TypeId, OwnerId, Condition, LentTo, LentAt
+                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, ConsumedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
                 FROM WorldObjects
                 WHERE LocationId = @loc
                 """;
@@ -160,7 +160,7 @@ namespace GameEngineTools.World.Data
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
                        IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt
+                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
                 FROM WorldObjects
                 """;
 
@@ -198,7 +198,7 @@ namespace GameEngineTools.World.Data
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
                        IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt
+                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
                 FROM WorldObjects
                 WHERE Id = @id
                 """;
@@ -219,7 +219,7 @@ namespace GameEngineTools.World.Data
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
                        IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt
+                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
                 FROM WorldObjects
                 WHERE HeldBy = @holder
                 """;
@@ -1112,7 +1112,7 @@ namespace GameEngineTools.World.Data
                     ProducedAt = reader.IsDBNull(15) ? null : new WDateTime(reader.GetInt64(15)),
                 };
 
-                // TypeId, OwnerId, Condition, LentTo, LentAt follow ProducedAt, or follow HeldBy and ConsumedAt when those are selected.
+                // TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt follow ProducedAt, or follow HeldBy and ConsumedAt when those are selected.
                 var typeAt = includeRuntimeState ? 18 : 16;
                 obj = obj with
                 {
@@ -1121,6 +1121,7 @@ namespace GameEngineTools.World.Data
                     Condition = reader.IsDBNull(typeAt + 2) ? 1.0 : reader.GetDouble(typeAt + 2),
                     LentTo = reader.IsDBNull(typeAt + 3) ? null : new HumanId(Guid.Parse(reader.GetString(typeAt + 3))),
                     LentAt = reader.IsDBNull(typeAt + 4) ? null : new WDateTime(reader.GetInt64(typeAt + 4)),
+                    StoredAt = reader.IsDBNull(typeAt + 5) ? null : reader.GetString(typeAt + 5),
                 };
 
                 if (includeRuntimeState)
@@ -1273,11 +1274,11 @@ namespace GameEngineTools.World.Data
                 INSERT OR REPLACE INTO WorldObjects
                     (Id, DisplayName, Category, LocationId, HeatSignature, AmbientNoise,
                      BlocksLineOfSight, IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                     Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, TypeId, OwnerId, Condition, LentTo, LentAt)
+                     Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt)
                 VALUES
                     (@id, @name, @cat, @loc, @heat, @noise,
                      @blos, @avail, @pick, @weight, @kind,
-                     @resp, @respMin, @price, @shopId, @producedAt, @heldBy, @typeId, @ownerId, @condition, @lentTo, @lentAt)
+                     @resp, @respMin, @price, @shopId, @producedAt, @heldBy, @typeId, @ownerId, @condition, @lentTo, @lentAt, @storedAt)
                 """;
 
             ExecuteNonQuery(sql,
@@ -1302,7 +1303,8 @@ namespace GameEngineTools.World.Data
                 ("@ownerId", (object?)obj.OwnerId?.Value.ToString() ?? DBNull.Value),
                 ("@condition", obj.Condition),
                 ("@lentTo", (object?)obj.LentTo?.Value.ToString() ?? DBNull.Value),
-                ("@lentAt", obj.LentAt is { } lent ? lent.WorldTicks : DBNull.Value));
+                ("@lentAt", obj.LentAt is { } lent ? lent.WorldTicks : DBNull.Value),
+                ("@storedAt", (object?)obj.StoredAt ?? DBNull.Value));
         }
 
         private void DeleteAffordances(string objectId)

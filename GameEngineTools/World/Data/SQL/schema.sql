@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS WorldObjects (
     Condition         REAL    NOT NULL DEFAULT 1.0,  -- 1 new .. 0 worn out
     LentTo            TEXT            DEFAULT NULL,  -- the character the owner has lent it to; NULL when not lent
     LentAt            INTEGER         DEFAULT NULL,  -- WorldTicks of the loan (restarted when an overdue loan is reported)
+    StoredAt          TEXT            DEFAULT NULL,  -- where a tool is kept when not in use; NULL for an object with no such place
     HeldBy            TEXT            DEFAULT NULL,
     ConsumedAt        INTEGER         DEFAULT NULL
 );
