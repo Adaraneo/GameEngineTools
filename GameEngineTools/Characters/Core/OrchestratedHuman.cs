@@ -42,66 +42,6 @@ namespace GameEngineTools.Characters.Core
     /// </remarks>
     public sealed class OrchestratedHuman : IHuman
     {
-        #region Public properties — identity
-
-        /// <inheritdoc/>
-        public HumanId Id { get; }
-
-        /// <inheritdoc/>
-        public Identity Identity { get; private set; }
-
-        /// <inheritdoc/>
-        public SexBiology Biology { get; }
-
-        /// <inheritdoc/>
-        public Personality Personality { get; }
-
-        /// <inheritdoc/>
-        public PsychologicalProfile PsychologyProfile { get; }
-
-        /// <inheritdoc/>
-        public PhysicalAppearance PhysicalAppearance => _projectedAppearance;
-
-        /// <inheritdoc/>
-        public GeneticBlueprint GeneticBlueprint => _geneticBlueprint;
-
-        /// <inheritdoc/>
-        public AttractionProfile? AttractionProfile { get; }
-
-        #endregion Public properties — identity
-
-        #region Public properties — runtime state
-
-        /// <inheritdoc/>
-        public EnginesSnapshot Snapshot { get; private set; }
-
-        /// <inheritdoc/>
-        public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutboxAccumulator;
-
-        /// <inheritdoc/>
-        public int Age
-        {
-            get
-            {
-                var today = WDateTime.Now.Date;
-                var birth = Identity.BirthDate;
-                var age = today.Year - birth.Year;
-
-                if (today.Month < birth.Month ||
-                   (today.Month == birth.Month && today.Day < birth.Day))
-                {
-                    age--;
-                }
-
-                return age;
-            }
-        }
-
-        /// <inheritdoc/>
-        public StadiumType Stadium => StadiumResolver.Resolve(Math.Max(0, Age));
-
-        #endregion Public properties — runtime state
-
         #region Private fields
 
         private readonly List<IDomainEvent> _lastOutboxAccumulator = new();
@@ -295,6 +235,66 @@ namespace GameEngineTools.Characters.Core
 
         #endregion Constructor
 
+        #region Public properties — identity
+
+        /// <inheritdoc/>
+        public HumanId Id { get; }
+
+        /// <inheritdoc/>
+        public Identity Identity { get; private set; }
+
+        /// <inheritdoc/>
+        public SexBiology Biology { get; }
+
+        /// <inheritdoc/>
+        public Personality Personality { get; }
+
+        /// <inheritdoc/>
+        public PsychologicalProfile PsychologyProfile { get; }
+
+        /// <inheritdoc/>
+        public PhysicalAppearance PhysicalAppearance => _projectedAppearance;
+
+        /// <inheritdoc/>
+        public GeneticBlueprint GeneticBlueprint => _geneticBlueprint;
+
+        /// <inheritdoc/>
+        public AttractionProfile? AttractionProfile { get; }
+
+        #endregion Public properties — identity
+
+        #region Public properties — runtime state
+
+        /// <inheritdoc/>
+        public EnginesSnapshot Snapshot { get; private set; }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<IDomainEvent> LastOutbox => _lastOutboxAccumulator;
+
+        /// <inheritdoc/>
+        public int Age
+        {
+            get
+            {
+                var today = WDateTime.Now.Date;
+                var birth = Identity.BirthDate;
+                var age = today.Year - birth.Year;
+
+                if (today.Month < birth.Month ||
+                   (today.Month == birth.Month && today.Day < birth.Day))
+                {
+                    age--;
+                }
+
+                return age;
+            }
+        }
+
+        /// <inheritdoc/>
+        public StadiumType Stadium => StadiumResolver.Resolve(Math.Max(0, Age));
+
+        #endregion Public properties — runtime state
+
         #region Cadence helpers
 
         private WTimeSpan ConsumeBehaviorDelta(WTimeSpan dt)
@@ -336,7 +336,9 @@ namespace GameEngineTools.Characters.Core
         public void Tick(WDateTime now, WTimeSpan dt)
         {
             if (now.Date < _ctx.Identity.BirthDate)
+            {
                 return;
+            }
 
             _lastOutboxAccumulator.Clear();
 
@@ -344,7 +346,9 @@ namespace GameEngineTools.Characters.Core
             // A dead character runs no engines and produces no events — it is effectively
             // removed from the simulation while remaining in the roster for lookups.
             if (Snapshot.Physiology.Status == StatusType.Dead)
+            {
                 return;
+            }
 
             // Release slots whose committed action duration has elapsed before processing new actions.
             _slots.ExpireAll(now);
@@ -421,9 +425,13 @@ namespace GameEngineTools.Characters.Core
             _ctx.Snapshot = snapshot;
 
             if (today != default)
+            {
                 _physio.RestoreState(snapshot.Physiology, today);
+            }
             else
+            {
                 _physio.RestoreState(snapshot.Physiology);
+            }
 
             _psych.RestoreState(snapshot.Psychology);
             _behavior.RestoreState(snapshot.Behavior);
@@ -434,23 +442,38 @@ namespace GameEngineTools.Characters.Core
             _goal.RestoreState(snapshot.Goals ?? GoalState.Empty);
             _schedule.RestoreState(snapshot.Schedule ?? DailyScheduleState.Empty);
             if (snapshot.Values is not null)
+            {
                 _values.RestoreState(snapshot.Values);
+            }
             if (snapshot.SelfConcept is not null)
+            {
                 _selfConcept.RestoreState(snapshot.SelfConcept);
+            }
             if (snapshot.Interests is not null)
+            {
                 _interests.RestoreState(snapshot.Interests);
+            }
             if (snapshot.SocialComparison is not null)
+            {
                 _socialComparison?.RestoreState(snapshot.SocialComparison);
+            }
             if (snapshot.Bereavement is not null)
+            {
                 _bereavement?.RestoreState(snapshot.Bereavement);
+            }
             if (snapshot.Economy is not null)
+            {
                 _economy?.RestoreState(snapshot.Economy);
+            }
         }
 
         /// <inheritdoc/>
         public void FlushInbox()
         {
-            if (_inbox.IsEmpty) return;
+            if (_inbox.IsEmpty)
+            {
+                return;
+            }
 
             var outbox = new EventCollector();
             while (_inbox.TryDequeue(out var ev))
@@ -652,7 +675,9 @@ namespace GameEngineTools.Characters.Core
             var birth = Identity.BirthDate;
             var age = today.Year - birth.Year;
             if (today.Month < birth.Month || (today.Month == birth.Month && today.Day < birth.Day))
+            {
                 age--;
+            }
             return age;
         }
 
@@ -732,7 +757,9 @@ namespace GameEngineTools.Characters.Core
 
             // The scheduler was emptied, so the routine is registered again from the restored occupation.
             if (_initialSnapshot.Schedule is { } routine)
+            {
                 _schedule.SeedFromOccupation(routine.Occupation, Personality, now, _scheduler, Id);
+            }
 
             RefreshAppearance();
         }
@@ -761,9 +788,15 @@ namespace GameEngineTools.Characters.Core
             if (_ctx.Snapshot.Relationships.Edges is not null)
             {
                 _ctx.Snapshot.Relationships.Deconstruct(out var edges);
-                if (edges.Count == 0) return;
+                if (edges.Count == 0)
+                {
+                    return;
+                }
                 var partnerId = edges.First(edge => edge.Value.KinRole == KinRole.Partner && edge.Key == partner.Id);
-                if (partnerId.Key != partner.Id) return;
+                if (partnerId.Key != partner.Id)
+                {
+                    return;
+                }
                 Identity = Identity with { LastName = partner.Identity.LastName };
                 _ctx.Identity = Identity;
             }
@@ -924,7 +957,10 @@ namespace GameEngineTools.Characters.Core
         /// <returns></returns>
         public int CompareTo(IHuman? other)
         {
-            if (other is null) return 0;
+            if (other is null)
+            {
+                return 0;
+            }
 
             return this.Age.CompareTo(other.Age);
         }
