@@ -1126,6 +1126,14 @@ namespace GameEngineTools.World.Simulation
                 return;
             }
 
+            // What the seeker remembers seeing comes first; only then do they ask around (the provider).
+            var remembered = RememberedPlaces(seeker, typeIds, location, o => o.IsAvailable && o.HeldBy is null && WorkObjects.CanUse(o, seeker.Id));
+            if (remembered.Count > 0 && NearestOf(location, remembered) is { } toRemembered)
+            {
+                CommitMove(seeker, toRemembered, now);
+                return;
+            }
+
             var usableElsewhere = tools.Where(o => WorkObjects.CanUse(o, seeker.Id)).Select(o => o.LocationId).ToHashSet(StringComparer.Ordinal);
             if (usableElsewhere.Count > 0 && NearestOf(location, usableElsewhere) is { } toTool)
             {
@@ -1142,7 +1150,7 @@ namespace GameEngineTools.World.Simulation
                 return;
             }
 
-            var ownerPlaces = owners.Select(c => _locationService.GetLocation(c.Id)).OfType<string>().ToHashSet(StringComparer.Ordinal);
+            var ownerPlaces = owners.Select(c => PlaceToFind(seeker, c)).OfType<string>().Where(place => place != location).ToHashSet(StringComparer.Ordinal);
             if (ownerPlaces.Count > 0 && NearestOf(location, ownerPlaces) is { } toOwner)
             {
                 CommitMove(seeker, toOwner, now);
@@ -1153,6 +1161,33 @@ namespace GameEngineTools.World.Simulation
             {
                 _log.SceneMoveToFailed(seeker.Id.Value.ToString(), string.Join(",", typeIds));
             }
+        }
+
+        /// <summary>Where the seeker remembers seeing an object of one of these types that the filter still accepts (the remembered place, not necessarily the true one); only recent enough memories count.</summary>
+        private HashSet<string> RememberedPlaces(IHuman seeker, IReadOnlyList<string> typeIds, string currentLocation, Func<WorldObject, bool> accept)
+        {
+            var places = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var fact in seeker.Snapshot.Memory.KnownObjects)
+            {
+                if (fact.TypeId is null || fact.LocationId.Length == 0 || fact.LocationId == currentLocation || fact.Confidence < _options.MinMemoryConfidence || !typeIds.Contains(fact.TypeId))
+                {
+                    continue;
+                }
+
+                if (_objectProvider.FindObject(fact.ObjectId) is { } current && accept(current))
+                {
+                    places.Add(fact.LocationId);
+                }
+            }
+
+            return places;
+        }
+
+        /// <summary>Where the seeker looks for a person: where they live if the seeker knows them, else where they are now (the seeker asks around).</summary>
+        private string? PlaceToFind(IHuman seeker, IHuman person)
+        {
+            var knowsThem = seeker.Snapshot.Relationships.Edges.ContainsKey(person.Id);
+            return knowsThem && person.Identity.HomeLocationId is { Length: > 0 } home ? home : _locationService.GetLocation(person.Id);
         }
 
         private bool AskedTooRecently(HumanId asker, HumanId owner, WDateTime now)
@@ -1313,7 +1348,7 @@ namespace GameEngineTools.World.Simulation
                 // Walks to the nearest place that has an object of the named type (the workstation a craft task needs); the provider is asked, as foraging does when memory has nothing.
                 if (moveTo.ActionName == MoveToSupply)
                 {
-                    var stationDestination = moveTo.TargetTypeIds?.Count > 0 ? FindLocationWithObjectType(currentLocation, moveTo.TargetTypeIds[0]) : null;
+                    var stationDestination = moveTo.TargetTypeIds?.Count > 0 ? FindWorkstation(character, currentLocation, moveTo.TargetTypeIds) : null;
                     if (stationDestination is not null)
                     {
                         CommitMove(character, stationDestination.Value, now);
@@ -1654,6 +1689,23 @@ namespace GameEngineTools.World.Simulation
             // Not connected to any: pick one arbitrarily and assume the configured cross-locale distance.
             var anywhere = candidateLocations.FirstOrDefault(HasReadyObject);
             return anywhere is null ? null : new MoveTarget(anywhere, _options.FallbackTravelDistanceMeters);
+        }
+
+        /// <summary>The place to walk to for a workstation of one of these types: one the seeker remembers, else the nearest that has one.</summary>
+        private MoveTarget? FindWorkstation(IHuman seeker, string? currentLocationId, IReadOnlyList<string> typeIds)
+        {
+            if (currentLocationId is null)
+            {
+                return null;
+            }
+
+            var remembered = RememberedPlaces(seeker, typeIds, currentLocationId, o => o.IsAvailable);
+            if (remembered.Count > 0 && NearestOf(currentLocationId, remembered) is { } known)
+            {
+                return known;
+            }
+
+            return FindLocationWithObjectType(currentLocationId, typeIds[0]);
         }
 
         /// <summary>The nearest location (other than the current one) with an available, unheld object of this type.</summary>

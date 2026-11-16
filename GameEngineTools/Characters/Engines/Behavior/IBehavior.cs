@@ -278,7 +278,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
         ActiveIntent? ActiveIntent = null,
         IReadOnlyDictionary<string, BehaviorHabitTrace>? HabitTraces = null,
         /// <summary>State of the running sleep session, kept so that a save/load mid-sleep resumes it; <c>null</c> while awake.</summary>
-        GameEngineTools.Characters.Engines.Sleep.SleepSessionState? ActiveSleep = null);
+        GameEngineTools.Characters.Engines.Sleep.SleepSessionState? ActiveSleep = null,
+        string? PerceivedAt = null,
+        WDateTime? PerceivedAtTime = null);
 
     #endregion Configuration and state
 

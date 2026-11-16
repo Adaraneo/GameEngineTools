@@ -180,7 +180,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             {
                 case ObjectInteractionKind.Take:
                     _objectProvider.SetHeldBy(data.LocationId, data.ObjectId, ctx.Id);
-                    outbox.Add(new ObjectTaken(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId));
+                    outbox.Add(new ObjectTaken(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId, obj.TypeId));
                     break;
 
                 case ObjectInteractionKind.UseInPlace:
@@ -233,7 +233,7 @@ namespace GameEngineTools.Characters.Engines.Objects
                             // Same location — just clear the holder.
                             _objectProvider.SetHeldBy(data.LocationId, data.ObjectId, null);
                         }
-                        outbox.Add(new ObjectDropped(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId));
+                        outbox.Add(new ObjectDropped(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId, obj.TypeId));
                         if (obj.LentTo == ctx.Id && obj.OwnerId is { } lender && ToolLending.Return(_objectProvider, obj.Id, ctx.Id))
                             outbox.Add(new ToolReturned(committed.OccurredAt, lender, ctx.Id, obj.Id));
                         break;

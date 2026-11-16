@@ -753,7 +753,7 @@ namespace GameEngineTools.Characters.Engines.Memory
 
                 // ── Object interactions — spatial memory ──────────────────────────────────
                 case ObjectTaken taken when taken.Actor == ctx.Id:
-                    UpdateObjectLocationFact(taken.ObjectId, locationId: null, taken.OccurredAt, confidence: 1.0);
+                    UpdateObjectLocationFact(taken.ObjectId, locationId: null, taken.OccurredAt, confidence: 1.0, typeId: taken.TypeId);
                     break;
 
                 case ObjectUsed used when used.Actor == ctx.Id && used.WasConsumed:
@@ -761,7 +761,11 @@ namespace GameEngineTools.Characters.Engines.Memory
                     break;
 
                 case ObjectDropped dropped when dropped.Actor == ctx.Id:
-                    UpdateObjectLocationFact(dropped.ObjectId, dropped.AtLocationId, dropped.OccurredAt, confidence: 1.0);
+                    UpdateObjectLocationFact(dropped.ObjectId, dropped.AtLocationId, dropped.OccurredAt, confidence: 1.0, typeId: dropped.TypeId);
+                    break;
+
+                case ObjectsPerceived seen when seen.Observer == ctx.Id:
+                    RememberPerceivedObjects(seen);
                     break;
 
                 case Interactions.NormViolationOccurred nv:
@@ -886,7 +890,8 @@ namespace GameEngineTools.Characters.Engines.Memory
             string? locationId,
             WDateTime seenAt,
             double confidence,
-            GameEngineTools.World.Objects.WorldObjectCategory? category = null)
+            GameEngineTools.World.Objects.WorldObjectCategory? category = null,
+            string? typeId = null)
         {
             var facts = State.KnownObjects.ToList();
             var idx = facts.FindIndex(f => f.ObjectId == objectId);
@@ -895,14 +900,38 @@ namespace GameEngineTools.Characters.Engines.Memory
                 locationId ?? string.Empty,
                 seenAt,
                 Math.Clamp(confidence, 0.0, 1.0),
-                category);
+                category ?? (idx >= 0 ? facts[idx].Category : null),
+                typeId ?? (idx >= 0 ? facts[idx].TypeId : null));
 
             if (idx >= 0)
+            {
                 facts[idx] = updated;
+            }
             else
+            {
                 facts.Add(updated);
+            }
 
             State = State with { KnownObjects = facts };
+        }
+
+        /// <summary>
+        /// Looking around a place: every tool and workstation seen is remembered there, and what had been remembered there (a typed fact) but is not in sight any more is forgotten, as it was taken away.
+        /// </summary>
+        private void RememberPerceivedObjects(ObjectsPerceived seen)
+        {
+            var inSight = seen.Objects.Select(o => o.ObjectId).ToHashSet(StringComparer.Ordinal);
+            State = State with
+            {
+                KnownObjects = State.KnownObjects
+                    .Where(f => f.LocationId != seen.LocationId || f.TypeId is null || inSight.Contains(f.ObjectId))
+                    .ToList(),
+            };
+
+            foreach (var o in seen.Objects)
+            {
+                UpdateObjectLocationFact(o.ObjectId, seen.LocationId, seen.OccurredAt, Config.DirectWitnessConfidence, o.Category, o.TypeId);
+            }
         }
 
         /// <summary>

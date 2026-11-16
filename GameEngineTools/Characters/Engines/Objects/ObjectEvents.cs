@@ -14,7 +14,8 @@ namespace GameEngineTools.Characters.Engines.Objects
         WDateTime OccurredAt,
         HumanId Actor,
         string ObjectId,
-        string FromLocationId) : IDomainEvent;
+        string FromLocationId,
+        string? TypeId = null) : IDomainEvent;
 
     /// <summary>
     /// Fired when a character uses an object in place (UseInPlace) or drops a held object.
@@ -33,7 +34,8 @@ namespace GameEngineTools.Characters.Engines.Objects
         WDateTime OccurredAt,
         HumanId Actor,
         string ObjectId,
-        string AtLocationId) : IDomainEvent;
+        string AtLocationId,
+        string? TypeId = null) : IDomainEvent;
 
     /// <summary>
     /// Fired when the interaction policy refused an object interaction.

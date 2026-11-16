@@ -234,6 +234,55 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void MoveToTool_ARememberedToolIsWalkedToBeforeAskingAround()
+        {
+            var facts = new[] { new ObjectLocationFact("far_spade", MarketId, Now, 0.85, WorldObjectCategory.Tool, "spade") };
+            var seeker = BuildForagingHuman(HomeId, MoveToTool, facts, new[] { "spade" });
+            var provider = new FixedWorldObjectProvider(new[]
+            {
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "far_spade", MarketId),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "near_spade", TavernId),
+            });
+
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 20.0), (HomeId, MarketId, 90.0) }), provider).OnTick(Now, new IHuman[] { seeker });
+
+            Assert.AreEqual(MarketId, _locationService.GetLocation(seeker.Id), "The seeker remembers the market spade and goes there, although another spade lies nearer at the tavern.");
+        }
+
+        [TestMethod]
+        public void MoveToTool_AMemoryOfAToolThatIsNotTheirsToUse_IsNotFollowed()
+        {
+            var ownerId = new HumanId(Guid.NewGuid());
+            var facts = new[] { new ObjectLocationFact("theirs", MarketId, Now, 0.85, WorldObjectCategory.Tool, "spade") };
+            var seeker = BuildForagingHuman(HomeId, MoveToTool, facts, new[] { "spade" });
+            var provider = new FixedWorldObjectProvider(new[]
+            {
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "theirs", MarketId, ownerId),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "shared", TavernId),
+            });
+
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 20.0), (HomeId, MarketId, 90.0) }), provider).OnTick(Now, new IHuman[] { seeker });
+
+            Assert.AreEqual(TavernId, _locationService.GetLocation(seeker.Id), "The remembered spade is someone's own: the seeker asks around and finds the common one.");
+        }
+
+        [TestMethod]
+        public void MoveToSupply_ARememberedWorkstationIsWalkedTo()
+        {
+            var facts = new[] { new ObjectLocationFact("far_mill", MarketId, Now, 0.85, WorldObjectCategory.Ambient, "mill") };
+            var seeker = BuildForagingHuman(HomeId, MoveToSupply, facts, new[] { "mill" });
+            var provider = new FixedWorldObjectProvider(new[]
+            {
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "far_mill", MarketId),
+                GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "near_mill", TavernId),
+            });
+
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 20.0), (HomeId, MarketId, 90.0) }), provider).OnTick(Now, new IHuman[] { seeker });
+
+            Assert.AreEqual(MarketId, _locationService.GetLocation(seeker.Id));
+        }
+
+        [TestMethod]
         public void MoveToTool_NoSuchToolAnywhere_TheSeekerStaysPut()
         {
             var seeker = BuildPerson(HomeId, new ActionCommitted(Now, new HumanId(Guid.NewGuid()), MoveToTool, WTimeSpan.FromMinutes(20), TargetTypeIds: new[] { "spade" }));

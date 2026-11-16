@@ -18,6 +18,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
     using GameEngineTools.Logging;
     using GameEngineTools.World.Core.Time;
     using GameEngineTools.World.Objects;
+    using GameEngineTools.World.Objects.Production;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -35,6 +36,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// Prevents trivially low-priority candidates (Idle ≈ 5) from being emitted.
         /// </summary>
         private const double MinSecondaryUtility = 10.0;
+
+        // World hours after which a character looks around the same place again (a design pick).
+        private const double PerceptionRefreshHours = 6.0;
 
         private readonly ILogger _log;
         private readonly IReadOnlyList<IBehaviorNeedEngine> _needEngines;
@@ -167,6 +171,19 @@ namespace GameEngineTools.Characters.Engines.Behavior
 
                 // Pantry/inventory for food-economy Tier 1 (eat-from-hand, recipe inputs).
                 heldObjects = _objectProvider.GetHeldBy(ctx.Id).ToList();
+            }
+
+            // Looking around: on arriving somewhere, and again after a while, the tools and workstations in sight are noted for the memory.
+            if (availableObjects is not null && ctx.Snapshot.InteractionSurface.Location is { Length: > 0 } place
+                && (place != stateWithNeeds.PerceivedAt || stateWithNeeds.PerceivedAtTime is not { } lookedAt || (now - lookedAt).TotalHours >= PerceptionRefreshHours))
+            {
+                var seen = availableObjects
+                    .Where(o => o.Category == WorldObjectCategory.Tool || ProductionSites.HasProduction(o))
+                    .Select(o => new Characters.Engines.Memory.PerceivedObject(o.Id, o.TypeId, o.Category))
+                    .ToList();
+                outbox.Add(new Characters.Engines.Memory.ObjectsPerceived(now, ctx.Id, place, seen));
+                stateWithNeeds = stateWithNeeds with { PerceivedAt = place, PerceivedAtTime = now };
+                State = stateWithNeeds;
             }
 
             var context = new BehaviorContext(now, dt, ctx, outbox, stateWithNeeds, Config, updatedCooldowns, new Dictionary<string, Characters.Engines.Memory.DecisionWorkingSet>(), _habitApplicabilityModulator, availableObjects, heldObjects, ctx.Snapshot.Economy?.Wealth ?? 0.0, ctx.Snapshot.Economy?.LaborHours ?? 0.0);
