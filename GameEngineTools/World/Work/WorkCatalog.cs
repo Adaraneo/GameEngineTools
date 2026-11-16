@@ -59,6 +59,7 @@ namespace GameEngineTools.World.Work
     /// <param name="Affordances">What using an instance gives, as affordance name to satisfaction (Hunger, Thirst, Ownership ...).</param>
     /// <param name="SpoilageHours">Hours until a fresh instance has spoiled completely; null when it does not spoil.</param>
     /// <param name="ReferencePrice">Starting price and barter value; null means the catalog default.</param>
+    /// <param name="Czech">How the type is named in Czech for dialogue, or null when it is never spoken about.</param>
     public sealed record ObjectTypeDefinition(
         string Id,
         string Name,
@@ -71,7 +72,8 @@ namespace GameEngineTools.World.Work
         int? FixedWeightGrams = null,
         IReadOnlyDictionary<string, double>? Affordances = null,
         double? SpoilageHours = null,
-        double? ReferencePrice = null);
+        double? ReferencePrice = null,
+        CzechNoun? Czech = null);
 
     /// <summary>What kind of task it is.</summary>
     public enum TaskKind
@@ -164,6 +166,11 @@ namespace GameEngineTools.World.Work
                 foreach (var (toolClass, quality) in t.ToolClasses)
                     if (!(quality > 0.0)) throw new FormatException($"Object type '{t.Id}': tool class '{toolClass}' needs a positive quality.");
                 if (t.DurabilityHours is { } d && !(d > 0.0)) throw new FormatException($"Object type '{t.Id}': durability must be positive.");
+                if (t.Czech is { } czech && (string.IsNullOrWhiteSpace(czech.Lemma) || string.IsNullOrWhiteSpace(czech.Pattern) || !CzechNoun.Genders.Contains(czech.Gender)))
+                {
+                    throw new FormatException($"Object type '{t.Id}': czech needs a lemma, a pattern and a gender ({string.Join(", ", CzechNoun.Genders)}).");
+                }
+
                 if (!_types.TryAdd(t.Id, t)) throw new FormatException($"Duplicate object type '{t.Id}'.");
             }
 

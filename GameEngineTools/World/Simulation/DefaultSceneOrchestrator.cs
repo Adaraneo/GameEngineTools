@@ -182,6 +182,9 @@ namespace GameEngineTools.World.Simulation
         /// </summary>
         private readonly Dialogue.Conversation.ConversationCoordinator _conversation;
 
+        // Only names things in the words of a request (player-facing text); null leaves a request unnamed.
+        private readonly WorkCatalog? _workCatalog;
+
         /// <summary>Unmet need (0–100: care / hunger / thirst) at/above which a reach-out becomes a request (first heuristic).</summary>
         private const double RequestNeedThreshold = 55.0;
 
@@ -263,7 +266,8 @@ namespace GameEngineTools.World.Simulation
             Objects.IMutableWorldObjectProvider? mutableObjects = null,
             RelationshipsConfig? relationshipsConfig = null,
             Dialogue.Planning.ISpeechActPlanner? speechActPlanner = null,
-            Dialogue.Conversation.ConversationCoordinator? conversation = null)
+            Dialogue.Conversation.ConversationCoordinator? conversation = null,
+            WorkCatalog? workCatalog = null)
         {
             _attractionCalculator = attractionCalculator;
             _locationService = locationService;
@@ -282,6 +286,7 @@ namespace GameEngineTools.World.Simulation
             _relationshipsConfig = relationshipsConfig;
             _speechActPlanner = speechActPlanner ?? new Dialogue.Planning.DefaultSpeechActPlanner();
             _conversation = conversation ?? new Dialogue.Conversation.ConversationCoordinator();
+            _workCatalog = workCatalog;
         }
 
         #endregion Constructor
@@ -1062,48 +1067,86 @@ namespace GameEngineTools.World.Simulation
 
         private WDateTime _nextLoanCheck;
 
+        // The Request each (asker, owner) pair last spoke, so the owner's reply can answer it; not persisted, like the other scene runtime sets.
+        private readonly Dictionary<(HumanId Asker, HumanId Owner), SpeechAct> _toolRequestActs = new();
+
         /// <summary>
-        /// An <c>AskToBorrow</c> that was committed this tick: the asker says a Request to an owner who is here and has an unlent tool of that type lying here;
-        /// the owner lends or refuses by <see cref="ToolLendingPolicy"/>. Both sides are told with an event.
+        /// Tool requests, in two halves. An <c>AskToBorrow</c> committed this tick becomes a Request speech act (about the tool) to an owner who is here.
+        /// The owner's own interaction engine answers it, so what settles the loan is its <see cref="InteractionOutcome"/> a tick later: lent or refused, both sides are told, and the owner replies aloud.
         /// </summary>
         private void RouteToolRequests(WDateTime now, IReadOnlyList<IHuman> chars)
         {
             if (_mutableObjects is null)
+            {
                 return;
+            }
 
             foreach (var asker in chars)
             {
-                var ask = asker.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == AskToBorrow);
-                if (ask?.TargetTypeId is not { } typeId || _locationService.GetLocation(asker.Id) is not { } location)
-                    continue;
+                AskForTool(now, asker, chars);
+            }
 
-                var lying = _objectProvider.GetAllObjects()
-                    .Where(o => o.LocationId == location && o.HeldBy is null && o.IsAvailable && o.LentTo is null && o.OwnerId is not null && string.Equals(o.TypeId, typeId, StringComparison.Ordinal))
-                    .ToList();
-                var owner = chars.FirstOrDefault(c => c.Id != asker.Id && _locationService.GetLocation(c.Id) == location && lying.Any(o => o.OwnerId == c.Id));
-                var tool = owner is null ? null : lying.First(o => o.OwnerId == owner.Id);
-                if (owner is null || tool is null)
+            foreach (var owner in chars)
+            {
+                SettleToolRequests(now, owner, chars);
+            }
+        }
+
+        private void AskForTool(WDateTime now, IHuman asker, IReadOnlyList<IHuman> chars)
+        {
+            var ask = asker.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == AskToBorrow);
+            if (ask?.TargetTypeId is not { } typeId || _locationService.GetLocation(asker.Id) is not { } location)
+            {
+                return;
+            }
+
+            var lendable = _objectProvider.GetAllObjects()
+                .Where(o => o.HeldBy is null && o.IsAvailable && o.LentTo is null && o.OwnerId is not null && string.Equals(o.TypeId, typeId, StringComparison.Ordinal))
+                .ToList();
+            var owner = chars.FirstOrDefault(c => c.Id != asker.Id && _locationService.GetLocation(c.Id) == location && lendable.Any(o => o.OwnerId == c.Id));
+            if (owner is null)
+            {
+                asker.ReceiveEvent(new ToolRequestRefused(now, asker.Id, asker.Id, typeId, "The owner is not here."));
+                return;
+            }
+
+            var tool = lendable.First(o => o.OwnerId == owner.Id);
+            var edge = asker.Snapshot.Relationships.Edges.GetValueOrDefault(owner.Id);
+            var act = UtterSpeechAct(
+                now, asker, owner, location, RelationalActKind.Request, urgency: 0.0, closeness: edge?.Closeness ?? 0.0, familiarity: edge?.Familiarity ?? 0.0, respondingTo: null, subject: tool);
+            _toolRequestActs[(asker.Id, owner.Id)] = act;
+        }
+
+        private void SettleToolRequests(WDateTime now, IHuman owner, IReadOnlyList<IHuman> chars)
+        {
+            foreach (var answer in owner.LastOutbox.OfType<InteractionOutcome>().Where(o => o.Act == RelationalActKind.Request && o.SubjectObjectId is not null && o.To == owner.Id))
+            {
+                if (chars.FirstOrDefault(c => c.Id == answer.From) is not { } asker || _objectProvider.FindObject(answer.SubjectObjectId!) is not { } tool)
                 {
-                    asker.ReceiveEvent(new ToolRequestRefused(now, asker.Id, asker.Id, typeId, "The owner is not here."));
                     continue;
                 }
 
-                var edge = owner.Snapshot.Relationships.Edges.GetValueOrDefault(asker.Id);
-                UtterSpeechAct(now, asker, owner, location, RelationalActKind.Request, urgency: 0.0, closeness: edge?.Closeness ?? 0.0, familiarity: edge?.Familiarity ?? 0.0, respondingTo: null);
-
-                var onShift = owner.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work };
-                if (ToolLendingPolicy.Accepts(edge, owner.Personality.BigFive.Agreeableness, onShift)
-                    && ToolLending.Lend(_mutableObjects, tool.Id, owner.Id, asker.Id, now))
+                var lent = answer.Accepted && ToolLending.Lend(_mutableObjects!, tool.Id, owner.Id, asker.Id, now);
+                if (lent)
                 {
-                    var lent = new ToolLent(now, owner.Id, asker.Id, tool.Id);
-                    asker.ReceiveEvent(lent);
-                    owner.ReceiveEvent(lent);
+                    var loan = new ToolLent(now, owner.Id, asker.Id, tool.Id);
+                    asker.ReceiveEvent(loan);
+                    owner.ReceiveEvent(loan);
                 }
                 else
                 {
-                    var refused = new ToolRequestRefused(now, asker.Id, owner.Id, typeId, onShift ? "The owner needs it." : "The owner does not trust the asker enough.");
-                    asker.ReceiveEvent(refused);
-                    owner.ReceiveEvent(refused);
+                    var onShift = owner.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work };
+                    var refusal = new ToolRequestRefused(now, asker.Id, owner.Id, tool.TypeId ?? string.Empty, onShift ? "The owner needs it." : "The owner declined.");
+                    asker.ReceiveEvent(refusal);
+                    owner.ReceiveEvent(refusal);
+                }
+
+                if (_locationService.GetLocation(owner.Id) is { } place)
+                {
+                    _toolRequestActs.Remove((asker.Id, owner.Id), out var requestAct);
+                    var edge = owner.Snapshot.Relationships.Edges.GetValueOrDefault(asker.Id);
+                    UtterSpeechAct(
+                        now, owner, asker, place, lent ? RelationalActKind.Validation : RelationalActKind.Boundary, urgency: 0.0, closeness: edge?.Closeness ?? 0.0, familiarity: edge?.Familiarity ?? 0.0, respondingTo: requestAct);
                 }
             }
         }
@@ -1896,7 +1939,7 @@ namespace GameEngineTools.World.Simulation
         /// <paramref name="addressee"/>. Shared by the reach-out path and the obligated-reply pass so
         /// both produce acts through identical machinery.
         /// </summary>
-        private void UtterSpeechAct(
+        private SpeechAct UtterSpeechAct(
             WDateTime now,
             IHuman speaker,
             IHuman addressee,
@@ -1905,7 +1948,8 @@ namespace GameEngineTools.World.Simulation
             double urgency,
             double closeness,
             double familiarity,
-            SpeechAct? respondingTo)
+            SpeechAct? respondingTo,
+            WorldObject? subject = null)
         {
             // Plan a fully-specified SpeechAct (register/directness/speaker/addressee) so the act can
             // later be realised as a direct-address utterance, not only a third-person gloss.
@@ -1920,7 +1964,8 @@ namespace GameEngineTools.World.Simulation
                 Style: speaker.Personality.Communication,
                 Power: speaker.Snapshot.Psychology.Dominance,
                 Urgency: urgency,
-                RespondingTo: respondingTo);
+                RespondingTo: respondingTo,
+                Subject: subject is null ? null : EntityRef.ForObject(subject, _workCatalog?.Type(subject.TypeId)?.Czech?.Lemma ?? string.Empty));
             var act = _speechActPlanner.Plan(request);
             _conversation.Observe(act, speaker.Id, addressee.Id, now);
 
@@ -1931,7 +1976,8 @@ namespace GameEngineTools.World.Simulation
                 new Dialogue.Realization.Participant(
                     speaker.Identity.FirstName.Original, speaker.Biology == SexBiology.Female),
                 new Dialogue.Realization.Participant(
-                    addressee.Identity.FirstName.Original, addressee.Biology == SexBiology.Female));
+                    addressee.Identity.FirstName.Original, addressee.Biology == SexBiology.Female),
+                NounPhraseOf(subject));
 
             using (_log.BeginCharacterScope(
                 speaker.Id.Value, "SceneOrchestrator",
@@ -1955,6 +2001,18 @@ namespace GameEngineTools.World.Simulation
             var content = new InteractionContent(act);
             addressee.ReceiveEvent(new InteractionProposed(
                 now, speaker.Id, addressee.Id, content, speaker.Biology));
+            return act;
+        }
+
+        /// <summary>The Czech name of the object a request asks for, or null when it has none in the catalog.</summary>
+        private Dialogue.Realization.NounPhrase? NounPhraseOf(WorldObject? subject)
+        {
+            if (subject is null || _workCatalog?.Type(subject.TypeId)?.Czech is not { } noun)
+            {
+                return null;
+            }
+
+            return new Dialogue.Realization.NounPhrase(noun.Lemma, noun.Pattern, Enum.Parse<Grammar.Core.Enums.Gender>(noun.Gender));
         }
 
         /// <summary>

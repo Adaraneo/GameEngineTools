@@ -233,19 +233,24 @@ namespace EngineTests
         private static readonly WDateTime Now = new(0);
 
         [TestMethod]
-        public void TheOwnersDecision_NeedsTrustAndLikeAndFreeHands_AndAgreeableOwnersAskLess()
+        public void TheOwnersChance_RisesWithTrustLikeAndCloseness_FallsWhenHeNeedsTheToolNow_AndAgreeableOwnersLendMoreOften()
         {
             RelationshipEdge Edge(double trust, double like, double closeness)
-                => new(Owner, Neighbour, Like: like, Trust: trust, Familiarity: 50, AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
+            {
+                return new(Owner, Neighbour, Like: like, Trust: trust, Familiarity: 50, AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
                     Closeness: closeness, Respect: 50, Comfort: 50, Breakdown: new GameEngineTools.Characters.Engines.Relationships.DomainBreakdown(50, 50, 50, 50, 50));
+            }
+
             var friend = Edge(80, 70, 50);
 
-            Assert.IsTrue(ToolLendingPolicy.Accepts(friend, 0.5, ownerOnWorkShift: false));
-            Assert.IsFalse(ToolLendingPolicy.Accepts(friend, 0.5, ownerOnWorkShift: true), "The owner needs it now.");
-            Assert.IsFalse(ToolLendingPolicy.Accepts(null, 0.5, ownerOnWorkShift: false), "A stranger is refused.");
-            Assert.IsFalse(ToolLendingPolicy.Accepts(Edge(40, 40, 30), 0.5, false), "Lukewarm is not enough.");
-            Assert.IsTrue(ToolLendingPolicy.Accepts(Edge(50, 50, 45), 1.0, false) && !ToolLendingPolicy.Accepts(Edge(50, 50, 45), 0.0, false), "The same edge: an agreeable owner lends, a disagreeable one does not.");
-            Assert.IsFalse(ToolLendingPolicy.Accepts(friend with { IsContemptuouslyDestroyed = true }, 0.5, false));
+            Assert.IsTrue(ToolLendingPolicy.Probability(friend, 0.5, ownerOnWorkShift: false) > 0.8);
+            Assert.IsTrue(ToolLendingPolicy.Probability(friend, 0.5, ownerOnWorkShift: true) < 0.1, "The owner needs it now.");
+            Assert.AreEqual(0.0, ToolLendingPolicy.Probability(null, 0.5, ownerOnWorkShift: false), "A stranger has no standing.");
+            Assert.IsTrue(ToolLendingPolicy.Probability(Edge(40, 40, 30), 0.5, false) < 0.15, "Lukewarm is not enough.");
+            Assert.IsTrue(ToolLendingPolicy.Probability(Edge(50, 50, 45), 1.0, false) > ToolLendingPolicy.Probability(Edge(50, 50, 45), 0.0, false), "The same edge: an agreeable owner lends more readily.");
+            Assert.IsTrue(ToolLendingPolicy.Probability(Edge(60, 60, 60), 0.5, false) > ToolLendingPolicy.Probability(Edge(50, 50, 50), 0.5, false), "More trust, like and closeness: more likely.");
+            Assert.AreEqual(0.0, ToolLendingPolicy.Probability(friend with { IsContemptuouslyDestroyed = true }, 0.5, false));
         }
+
     }
 }

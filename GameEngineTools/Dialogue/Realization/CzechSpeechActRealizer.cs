@@ -47,7 +47,8 @@ namespace GameEngineTools.Dialogue.Realization
             ReflexiveType Reflexive,
             FgdFunctor? AddresseeFunctor,
             Case? AddresseeCase,
-            string? Preposition);
+            string? Preposition,
+            string? ThingPreposition = "o");
 
         // Verb classes verified against the composer rather than guessed — GM documents GuessVerbClass
         // as unreliable, so they are pinned here and locked down by tests.
@@ -81,7 +82,7 @@ namespace GameEngineTools.Dialogue.Realization
             ["zvát"] = new("pozvat", "trida5", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.PAT, Case.Accusative, null),
             ["navrhovat"] = new("navrhnout", "trida2", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Dative, null),
             ["požádat"] = new("požádat", "trida5", VerbAspect.Perfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Accusative, null),
-            ["vyžadovat"] = new("vyžadovat", "trida3", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Genitive, "od"),
+            ["vyžadovat"] = new("vyžadovat", "trida3", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Genitive, "od", ThingPreposition: null),
             ["žebrat o"] = new("žebrat", "trida5", VerbAspect.Imperfective, ReflexiveType.None, FgdFunctor.ADDR, Case.Genitive, "u"),
         };
 
@@ -233,7 +234,7 @@ namespace GameEngineTools.Dialogue.Realization
         }
 
         /// <inheritdoc/>
-        public string Narrate(SpeechAct act, Participant speaker, Participant addressee)
+        public string Narrate(SpeechAct act, Participant speaker, Participant addressee, NounPhrase? thing = null)
         {
             ArgumentNullException.ThrowIfNull(act);
 
@@ -260,6 +261,13 @@ namespace GameEngineTools.Dialogue.Realization
                     elements.Add(spec.Preposition is null
                         ? ClauseElement.Of(word, functor)
                         : ClauseElement.Of(spec.Preposition, word, functor));
+                }
+
+                if (thing is { } asked && act.RelationalKind == RelationalActKind.Request)
+                {
+                    elements.Add(spec.ThingPreposition is null
+                        ? ClauseElement.Of(ThingRequest(asked), FgdFunctor.EFF)
+                        : ClauseElement.Of(spec.ThingPreposition, ThingRequest(asked), FgdFunctor.EFF));
                 }
 
                 return _builder.Build(new CzechClause
@@ -289,7 +297,7 @@ namespace GameEngineTools.Dialogue.Realization
         }
 
         /// <inheritdoc/>
-        public string Utter(SpeechAct act, Participant speaker, Participant addressee)
+        public string Utter(SpeechAct act, Participant speaker, Participant addressee, NounPhrase? thing = null)
         {
             ArgumentNullException.ThrowIfNull(act);
 
@@ -300,7 +308,7 @@ namespace GameEngineTools.Dialogue.Realization
 
             try
             {
-                return BuildUtterance(spec, act.Register == Register.Formal, speaker, addressee);
+                return BuildUtterance(spec, act.Register == Register.Formal, speaker, addressee, act.RelationalKind == RelationalActKind.Request ? thing : null);
             }
             catch
             {
@@ -316,7 +324,7 @@ namespace GameEngineTools.Dialogue.Realization
         /// address has to land inside the sentence ("Bavíš se, Jano?"), which is not something the
         /// builder can know about.
         /// </remarks>
-        private string BuildUtterance(UtteranceSpec spec, bool formal, Participant speaker, Participant addressee)
+        private string BuildUtterance(UtteranceSpec spec, bool formal, Participant speaker, Participant addressee, NounPhrase? thing)
         {
             // Vykání is second person PLURAL — that is the whole of the distinction, and it carries
             // through to the pronoun (ty ⇒ vy) as well as the verb.
@@ -363,6 +371,11 @@ namespace GameEngineTools.Dialogue.Realization
                     : ClauseElement.Of(spec.ComplementPreposition, complement, spec.ComplementFunctor));
             }
 
+            if (thing is { } asked)
+            {
+                elements.Add(ClauseElement.Of("o", ThingRequest(asked), FgdFunctor.EFF));
+            }
+
             var clause = _builder.Build(new CzechClause
             {
                 Predicate = predicate,
@@ -402,6 +415,18 @@ namespace GameEngineTools.Dialogue.Realization
             },
 
             _ => null,
+        };
+
+        /// <summary>The accusative of the thing asked for, after "o" ("požádat tě o rýč").</summary>
+        private static CzechWordRequest ThingRequest(NounPhrase thing) => new()
+        {
+            Lemma = thing.Lemma,
+            WordCategory = WordCategory.Noun,
+            Pattern = thing.Pattern,
+            Gender = thing.Gender,
+            Number = Number.Singular,
+            Case = Case.Accusative,
+            IsAnimate = false,
         };
 
         private static CzechWordRequest Pronoun(

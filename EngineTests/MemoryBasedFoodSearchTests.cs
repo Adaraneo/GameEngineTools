@@ -108,36 +108,62 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void AskToBorrow_ATrustedOwnerLends_AndBothAreTold()
+        public void AskToBorrow_BecomesARequestAboutTheTool_ToAnOwnerHere_AndNothingIsLentYet()
         {
             var (asker, owner, provider, orchestrator) = ToolScene(trust: 80, like: 70, closeness: 50);
 
             orchestrator.OnTick(Now, new IHuman[] { asker, owner });
 
+            var request = owner.Received.OfType<InteractionProposed>().Single();
+            Assert.AreEqual(RelationalActKind.Request, request.Content.SpeechAct.RelationalKind);
+            Assert.AreEqual("spade_1", request.Content.SpeechAct.Roles[Grammar.Core.Enums.FgdFunctor.EFF].Id.Value, "The act is about the tool.");
+            Assert.IsNull(provider.FindObject("spade_1")!.LentTo, "The owner has not answered yet.");
+        }
+
+        [TestMethod]
+        public void TheOwnersAcceptedAnswer_LendsTheTool_BothAreTold_AndTheOwnerSaysSo()
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(trust: 80, like: 70, closeness: 50);
+            orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+
+            owner.Extra.Add(new InteractionOutcome(Now, asker.Id, owner.Id, Accepted: true, Reason: "accepted", Act: RelationalActKind.Request, SubjectObjectId: "spade_1"));
+            var waiting = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)));
+            orchestrator.OnTick(Now + WTimeSpan.FromMinutes(1), new IHuman[] { waiting, owner });
+
             Assert.AreEqual(asker.Id, provider.FindObject("spade_1")!.LentTo);
-            Assert.IsTrue(asker.Received.OfType<ToolLent>().Any() && owner.Received.OfType<ToolLent>().Any());
+            Assert.IsTrue(waiting.Received.OfType<ToolLent>().Any() && owner.Received.OfType<ToolLent>().Any());
+            var reply = waiting.Received.OfType<InteractionProposed>().Single();
+            Assert.AreEqual(RelationalActKind.Validation, reply.Content.SpeechAct.RelationalKind, "The owner answers aloud, as a reply to the request.");
         }
 
         [TestMethod]
-        public void AskToBorrow_AStrangerIsRefused()
+        public void TheOwnersDecline_LendsNothing_ToldToBothSides_AndTheOwnerRefusesAloud()
         {
-            var (asker, owner, provider, orchestrator) = ToolScene(0, 0, 0, noEdge: true);
-
+            var (asker, owner, provider, orchestrator) = ToolScene(trust: 10, like: 10, closeness: 10);
             orchestrator.OnTick(Now, new IHuman[] { asker, owner });
 
+            owner.Extra.Add(new InteractionOutcome(Now, asker.Id, owner.Id, Accepted: false, Reason: "declined", Act: RelationalActKind.Request, SubjectObjectId: "spade_1"));
+            var waiting = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)));
+            orchestrator.OnTick(Now + WTimeSpan.FromMinutes(1), new IHuman[] { waiting, owner });
+
             Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
-            Assert.IsTrue(asker.Received.OfType<ToolRequestRefused>().Any());
+            Assert.IsTrue(waiting.Received.OfType<ToolRequestRefused>().Any() && owner.Received.OfType<ToolRequestRefused>().Any());
+            Assert.AreEqual(RelationalActKind.Boundary, waiting.Received.OfType<InteractionProposed>().Single().Content.SpeechAct.RelationalKind);
         }
 
         [TestMethod]
-        public void AskToBorrow_AnOwnerWhoNeedsTheToolNowRefuses_EvenATrustedAsker()
+        public void AnAnswerThatCannotBeKept_LendsNothing_WhenTheToolIsAlreadyLent()
         {
-            var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90, ownerOnShift: true);
-
+            var (asker, owner, provider, orchestrator) = ToolScene(trust: 80, like: 70, closeness: 50);
             orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+            GameEngineTools.World.Work.ToolLending.Lend(provider, "spade_1", owner.Id, new HumanId(Guid.NewGuid()), Now);
 
-            Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
-            Assert.IsTrue(asker.Received.OfType<ToolRequestRefused>().Any(r => r.Reason.Contains("needs")));
+            owner.Extra.Add(new InteractionOutcome(Now, asker.Id, owner.Id, Accepted: true, Reason: "accepted", Act: RelationalActKind.Request, SubjectObjectId: "spade_1"));
+            var waiting = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)));
+            orchestrator.OnTick(Now + WTimeSpan.FromMinutes(1), new IHuman[] { waiting, owner });
+
+            Assert.AreNotEqual(asker.Id, provider.FindObject("spade_1")!.LentTo);
+            Assert.IsTrue(waiting.Received.OfType<ToolRequestRefused>().Any());
         }
 
         [TestMethod]
@@ -149,6 +175,7 @@ namespace EngineTests
 
             Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
             Assert.IsTrue(asker.Received.OfType<ToolRequestRefused>().Any());
+            Assert.IsFalse(owner.Received.OfType<InteractionProposed>().Any(), "Nobody was asked.");
         }
 
         [TestMethod]

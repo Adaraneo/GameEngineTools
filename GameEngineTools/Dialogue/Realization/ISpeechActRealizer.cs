@@ -24,8 +24,9 @@ namespace GameEngineTools.Dialogue.Realization
         /// <param name="act">The act to describe.</param>
         /// <param name="speaker">Who spoke.</param>
         /// <param name="addressee">Who was addressed.</param>
+        /// <param name="thing">What a request asks for, or <c>null</c>.</param>
         /// <returns>A finished Czech sentence.</returns>
-        string Narrate(SpeechAct act, Participant speaker, Participant addressee);
+        string Narrate(SpeechAct act, Participant speaker, Participant addressee, NounPhrase? thing = null);
 
         /// <summary>
         /// The utterance itself — first person to second, with address and register:
@@ -34,8 +35,9 @@ namespace GameEngineTools.Dialogue.Realization
         /// <param name="act">The act being spoken.</param>
         /// <param name="speaker">Who is speaking.</param>
         /// <param name="addressee">Who is being spoken to.</param>
+        /// <param name="thing">What a request asks for, or <c>null</c>.</param>
         /// <returns>A finished Czech utterance.</returns>
-        string Utter(SpeechAct act, Participant speaker, Participant addressee);
+        string Utter(SpeechAct act, Participant speaker, Participant addressee, NounPhrase? thing = null);
     }
 
     /// <summary>

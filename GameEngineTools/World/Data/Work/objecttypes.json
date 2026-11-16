@@ -21,18 +21,21 @@
       "id": "spade", "name": "Rýč", "category": "Tool", "pickable": true,
       "parts": [ { "material": "ash_wood", "volumeCm3": 900 }, { "material": "iron", "volumeCm3": 180 } ],
       "toolClasses": { "dig": 1.0 },
+      "czech": { "lemma": "rýč", "pattern": "stroj", "gender": "Masculine" },
       "source": "volumes estimated: a hand spade weighs about 1.5-2.5 kg"
     },
     {
       "id": "sickle", "name": "Srp", "category": "Tool", "pickable": true,
       "parts": [ { "material": "ash_wood", "volumeCm3": 120 }, { "material": "iron", "volumeCm3": 40 } ],
       "toolClasses": { "cut_grain": 1.0 },
+      "czech": { "lemma": "srp", "pattern": "hrad", "gender": "Masculine" },
       "source": "volumes estimated: a hand sickle weighs about 0.3-0.5 kg"
     },
     {
       "id": "flail", "name": "Cep", "category": "Tool", "pickable": true,
       "parts": [ { "material": "ash_wood", "volumeCm3": 1700 }, { "material": "leather", "volumeCm3": 40 } ],
       "toolClasses": { "thresh": 1.0 },
+      "czech": { "lemma": "cep", "pattern": "hrad", "gender": "Masculine" },
       "source": "volumes estimated: a threshing flail weighs about 1-1.5 kg"
     }
   ]

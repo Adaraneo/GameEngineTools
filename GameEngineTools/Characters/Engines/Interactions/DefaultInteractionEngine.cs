@@ -6,6 +6,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
     using System;
     using Characters.Core;
     using GameEngineTools.Characters.Engines.Language;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Relationships;
     using GameEngineTools.Characters.Engines.SemanticMemory;
     using GameEngineTools.Characters.Traits;
@@ -13,6 +14,7 @@ namespace GameEngineTools.Characters.Engines.Interactions
     using GameEngineTools.Logging;
     using GameEngineTools.World.Utils.Time;
     using Microsoft.Extensions.Logging;
+    using Grammar.Core.Enums;
     using Microsoft.Extensions.Options;
 
     /// <summary>
@@ -233,6 +235,16 @@ namespace GameEngineTools.Characters.Engines.Interactions
             _ => 0.30
         };
 
+        /// <summary>The id of the world object a Request asks for (its EFF role), or null when the act is not a request for an object.</summary>
+        private static string? ToolRequestSubject(SpeechAct act)
+        {
+            return act.RelationalKind == RelationalActKind.Request
+                   && act.Roles.TryGetValue(FgdFunctor.EFF, out var subject)
+                   && subject.Id.Kind == EntityKind.Object
+                ? subject.Id.Value
+                : null;
+        }
+
         private void HandleInteractionProposed(InteractionProposed p, IHumanContext ctx, IEventCollector outbox)
         {
             var rels = ctx.Snapshot.Relationships.Edges;
@@ -261,6 +273,13 @@ namespace GameEngineTools.Characters.Engines.Interactions
                         - 0.0015 * psych.Stress
                         + (expectedAcceptance - 0.5) * 0.25
                         + agreeablenessBias;
+
+            // A request for a tool is answered by the owner's feeling for the asker and by whether the owner needs it now.
+            var subjectObjectId = ToolRequestSubject(p.Content.SpeechAct);
+            if (subjectObjectId is not null)
+            {
+                baseP = ToolLendingPolicy.Probability(edge, ctx.Personality.BigFive.Agreeableness, ctx.Snapshot.Schedule?.ActiveSlot is { PreferredAction: ActionNames.Work });
+            }
 
             if (p.Content.SpeechAct.RelationalKind == RelationalActKind.Invite)
             {
@@ -371,7 +390,8 @@ namespace GameEngineTools.Characters.Engines.Interactions
                 ToBiology: ctx.Biology,
                 PeakValence: peakVal,
                 EndValence: endVal,
-                PerceivedPower: perceivedPower);
+                PerceivedPower: perceivedPower,
+                SubjectObjectId: subjectObjectId);
 
             outbox.Add(outcome);
 

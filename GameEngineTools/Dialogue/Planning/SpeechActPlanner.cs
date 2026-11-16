@@ -26,6 +26,7 @@ namespace GameEngineTools.Dialogue.Planning
     /// <param name="Power">Speaker's felt power/dominance over the addressee [0..1].</param>
     /// <param name="Urgency">How pressing the act is [0..1]; raises face-threat tolerance.</param>
     /// <param name="Ironic">When <c>true</c>, attach a <see cref="ForceShift"/> (opposite surface polarity).</param>
+    /// <param name="Subject">What a request asks for (an object), or <c>null</c>; it fills the EFF role.</param>
     /// <param name="RespondingTo">
     /// When set, the planner produces the adjacency-pair <i>response</i> to this prior act (e.g. an
     /// answer to a question, validation of a disclosure) instead of a fresh <paramref name="Intent"/> —
@@ -43,7 +44,8 @@ namespace GameEngineTools.Dialogue.Planning
         double Power,
         double Urgency = 0.0,
         bool Ironic = false,
-        SpeechAct? RespondingTo = null);
+        SpeechAct? RespondingTo = null,
+        EntityRef? Subject = null);
 
     /// <summary>
     /// Deterministic, pure speaker-side service that turns a <see cref="SpeechActRequest"/> into a fully
@@ -130,6 +132,11 @@ namespace GameEngineTools.Dialogue.Planning
             if (predicate.AddresseeRole is { } addresseeRole)
             {
                 roles = roles.Add(addresseeRole, request.Addressee);
+            }
+
+            if (request.Subject is { } subject && intent == RelationalActKind.Request)
+            {
+                roles = roles.Add(FgdFunctor.EFF, subject);
             }
 
             var register = ComputeRegister(request.Closeness, request.Familiarity);

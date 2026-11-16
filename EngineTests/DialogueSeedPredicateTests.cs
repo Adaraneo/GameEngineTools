@@ -106,6 +106,23 @@ namespace EngineTests
         }
 
         [TestMethod]
+        [DataRow("požádat", "Požádám tě o rýč, Jano.", "Petr požádal Janu o rýč.")]
+        [DataRow("vyžadovat", "Žádám tě o rýč, Jano.", "Petr vyžadoval od Jany rýč.")]
+        [DataRow("žebrat o", "Moc tě prosím o rýč, Jano…", "Petr žebral u Jany o rýč.")]
+        public void Realizer_Request_NamesTheThingAskedFor(string lemma, string expectedSpeech, string expectedNarration)
+        {
+            var realizer = BuildRealizer();
+            var act = ActWithLemma(lemma, RelationalActKind.Request) with { Register = Register.Informal };
+            var spade = new NounPhrase("rýč", "stroj", Grammar.Core.Enums.Gender.Masculine);
+
+            var spoken = realizer.Utter(act, new Participant("Petr", false), new Participant("Jana", true), spade);
+            var told = realizer.Narrate(act, new Participant("Petr", false), new Participant("Jana", true), spade);
+
+            Assert.AreEqual(expectedSpeech, spoken);
+            Assert.AreEqual(expectedNarration, told);
+        }
+
+        [TestMethod]
         public void Realizer_DirectSpeech_UnknownLemma_FallsBackToMarker()
         {
             var realizer = BuildRealizer();

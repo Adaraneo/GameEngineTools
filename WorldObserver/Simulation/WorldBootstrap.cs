@@ -180,7 +180,8 @@ namespace WorldObserver.Simulation
                 services.GetService<CommunityReputationLedger>(),
                 services.GetService<GameEngineTools.Characters.Engines.Status.StatusLedger>(),
                 services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>(),
-                speechActPlanner: planner);
+                speechActPlanner: planner,
+                workCatalog: services.GetRequiredService<GameEngineTools.World.Work.WorkCatalog>());
 
             // Undirected connection list (the seed stores both directions) for the realistic map layout.
             var connections = db.GetAllConnections()
