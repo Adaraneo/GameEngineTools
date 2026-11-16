@@ -1,4 +1,4 @@
-// ToolLendingTests.cs
+﻿// ToolLendingTests.cs
 // Copyright (c) 50PSoftware
 
 namespace EngineTests
@@ -79,25 +79,69 @@ namespace EngineTests
             Assert.IsTrue(policy.Evaluate(As(Stranger), WorkObjects.Spawn(TestWork.Catalog, "spade", "shared", "farm"), ObjectInteractionKind.Take, place).IsAllowed, "A tool that belongs to nobody is free to take.");
         }
 
+        private static GameEngineTools.World.Objects.WorldMap Roads(params (string From, string To, double Meters)[] roads)
+        {
+            var adjacency = new Dictionary<string, IReadOnlyList<GameEngineTools.World.Objects.WorldConnection>>();
+            foreach (var (from, to, meters) in roads)
+            {
+                foreach (var (a, b) in new[] { (from, to), (to, from) })
+                {
+                    if (!adjacency.ContainsKey(a))
+                    {
+                        adjacency[a] = new List<GameEngineTools.World.Objects.WorldConnection>();
+                    }
+
+                    ((List<GameEngineTools.World.Objects.WorldConnection>)adjacency[a]).Add(new GameEngineTools.World.Objects.WorldConnection(b, meters));
+                }
+            }
+
+            return new GameEngineTools.World.Objects.WorldMap(
+                new Dictionary<string, GameEngineTools.World.Location.LocationDescriptor>(), adjacency, new Dictionary<string, IReadOnlyList<string>>());
+        }
+
+        private static void AddSickles(IMutableWorldObjectProvider provider)
+        {
+            for (var i = 2; i <= 6; i++)
+            {
+                provider.AddObject(WorkObjects.Spawn(TestWork.Catalog, "sickle", $"sickle_{i}", "farm"));
+            }
+
+            provider.RemoveObject("farm", "spade_1");
+            provider.AddObject(WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm"));
+        }
+
         [TestMethod]
-        public void AboutAThirdOfTheTools_BecomePersonal_RoundRobin_AndTheRestStayCommon()
+        public void AboutAThirdOfTheTools_BecomePersonal_TheNearestResidentsOwnThem_AndTheRestStayCommon()
         {
             var (db, provider) = NewWorld();
             using (db)
             {
-                for (var i = 2; i <= 6; i++)
-                    provider.AddObject(WorkObjects.Spawn(TestWork.Catalog, "sickle", $"sickle_{i}", "farm"));
-                provider.RemoveObject("farm", "spade_1");
-                provider.AddObject(WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm"));
+                AddSickles(provider);
+                var roads = Roads(("farm", "near", 100.0), ("farm", "far", 900.0));
 
-                var assigned = ToolOwnership.AssignPersonalTools(provider, new[] { Owner, Neighbour });
+                var assigned = ToolOwnership.AssignPersonalTools(provider, roads, new[] { (Owner, "near"), (Neighbour, "far") });
 
                 var tools = provider.GetAllObjects().Where(o => o.Category == WorldObjectCategory.Tool).ToList();
                 Assert.AreEqual(6, tools.Count);
                 Assert.AreEqual(2, assigned, "A third of six.");
                 Assert.AreEqual(2, tools.Count(o => o.OwnerId is not null));
-                CollectionAssert.AreEquivalent(new[] { Owner, Neighbour }, tools.Where(o => o.OwnerId is not null).Select(o => o.OwnerId!.Value).ToArray(), "Round-robin over the owners.");
-                Assert.AreEqual(0, ToolOwnership.AssignPersonalTools(provider, Array.Empty<HumanId>()), "Nobody to give them to.");
+                Assert.IsTrue(tools.Where(o => o.OwnerId is not null).All(o => o.OwnerId == Owner), "Whoever lives nearest to the farm owns its tools, whatever their job.");
+                Assert.AreEqual(0, ToolOwnership.AssignPersonalTools(provider, roads, Array.Empty<(HumanId, string)>()), "Nobody to give them to.");
+            }
+        }
+
+        [TestMethod]
+        public void PeopleSharingTheNearestHome_SplitTheToolsBetweenThem()
+        {
+            var (db, provider) = NewWorld();
+            using (db)
+            {
+                AddSickles(provider);
+
+                ToolOwnership.AssignPersonalTools(provider, Roads(("farm", "flat", 100.0)), new[] { (Owner, "flat"), (Neighbour, "flat") });
+
+                var owners = provider.GetAllObjects().Where(o => o.OwnerId is not null).Select(o => o.OwnerId!.Value).ToArray();
+                CollectionAssert.AreEquivalent(new[] { Owner, Neighbour }, owners);
             }
         }
 
