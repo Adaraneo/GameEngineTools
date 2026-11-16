@@ -129,7 +129,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             }
 
             // Asking and fetching are for the one whose job it is, not for a passing helper.
-            if (!IsOnShiftFor(task, schedule))
+            if (!IsOnShiftFor(task, schedule) || (context.State.ToolSearchRetryAt is { } retryAt && context.Now < retryAt))
             {
                 return BehaviorNeedOutput.Empty;
             }

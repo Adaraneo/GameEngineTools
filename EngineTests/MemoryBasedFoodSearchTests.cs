@@ -290,6 +290,8 @@ namespace EngineTests
             BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), new FixedWorldObjectProvider(Array.Empty<WorldObject>())).OnTick(Now, new IHuman[] { seeker });
 
             Assert.AreEqual(HomeId, _locationService.GetLocation(seeker.Id));
+            var failed = seeker.Received.OfType<ToolSearchFailed>().Single();
+            Assert.IsTrue(failed.RetryAt > Now, "The seeker is told to wait before searching again.");
         }
 
         [TestMethod]

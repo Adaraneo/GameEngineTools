@@ -280,7 +280,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
         /// <summary>State of the running sleep session, kept so that a save/load mid-sleep resumes it; <c>null</c> while awake.</summary>
         GameEngineTools.Characters.Engines.Sleep.SleepSessionState? ActiveSleep = null,
         string? PerceivedAt = null,
-        WDateTime? PerceivedAtTime = null);
+        WDateTime? PerceivedAtTime = null,
+        /// <summary>A search for a tool that found none: no new search before this time.</summary>
+        WDateTime? ToolSearchRetryAt = null);
 
     #endregion Configuration and state
 

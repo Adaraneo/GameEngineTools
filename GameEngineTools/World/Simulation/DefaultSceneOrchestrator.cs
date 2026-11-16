@@ -1068,6 +1068,9 @@ namespace GameEngineTools.World.Simulation
         // Hours before a character asks the same owner again, whatever the answer was (a design pick).
         private const double ToolAskCooldownHours = 6.0;
 
+        // Hours a character who found no tool anywhere waits before searching again (a design pick).
+        private const double ToolSearchRetryHours = 6.0;
+
         private WDateTime _nextLoanCheck;
 
         // When each (asker, owner) pair may be asked again; not persisted, like the other scene runtime sets.
@@ -1161,6 +1164,8 @@ namespace GameEngineTools.World.Simulation
             {
                 _log.SceneMoveToFailed(seeker.Id.Value.ToString(), string.Join(",", typeIds));
             }
+
+            seeker.ReceiveEvent(new ToolSearchFailed(now, seeker.Id, string.Join(",", typeIds), now + WTimeSpan.FromHours(ToolSearchRetryHours)));
         }
 
         /// <summary>Where the seeker remembers seeing an object of one of these types that the filter still accepts (the remembered place, not necessarily the true one); only recent enough memories count.</summary>

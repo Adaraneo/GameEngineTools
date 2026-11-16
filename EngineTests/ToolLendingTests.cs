@@ -153,6 +153,34 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AfterAFailedSearch_TheFarmerDoesNotGoLookingOrAskingAgainUntilTheRetryTime()
+        {
+            var engine = new FieldWorkNeedEngine(catalog: TestWork.Catalog);
+            var field = new WorldObject { Id = "field_1", DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemTypeId = "grain", Field = new GameEngineTools.World.Objects.Crops.FieldState(GameEngineTools.World.Objects.Crops.FieldStage.Fallow, 1.0) };
+            var theirs = WorkObjects.Spawn(TestWork.Catalog, "spade", "theirs", Loc, Owner);
+
+            BehaviorContext Ctx(WDateTime now, WDateTime? retryAt)
+            {
+                var ctx = BehaviorComponentTestFactory.Context(selfId: Neighbour, hunger: 20, thirst: 5, now: now);
+                var human = (HumanContext)ctx.HumanContext;
+                var slot = new GameEngineTools.Characters.Engines.Schedule.ScheduleSlot("work", 5, Work);
+                human.Snapshot = human.Snapshot with
+                {
+                    AmbientTemperature = 15.0,
+                    Celestial = new GameEngineTools.World.Core.Astro.CelestialContext(0.5, 12.0, 6.0, 18.0, 12.0, 0.5, 0.0, true, 15.0, TemperatureTrendPerDay: 0.1),
+                    Schedule = new GameEngineTools.Characters.Engines.Schedule.DailyScheduleState(new[] { slot }, slot, 0, "farmer"),
+                };
+                return ctx with { State = ctx.State with { ToolSearchRetryAt = retryAt }, AvailableObjects = new List<WorldObject> { field, theirs with { LentTo = Stranger } }, HeldObjects = new List<WorldObject>() };
+            }
+
+            var start = new WDateTime(0);
+            var retry = start + WTimeSpan.FromHours(6);
+            Assert.AreEqual(MoveToTool, engine.Evaluate(Ctx(start, null)).Candidates.Single().Name, "Before any failure: go looking.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(start + WTimeSpan.FromHours(1), retry)).Candidates.Count, "The search found nothing a little while ago: not again yet.");
+            Assert.AreEqual(MoveToTool, engine.Evaluate(Ctx(retry, retry)).Candidates.Single().Name, "At the retry time the search may be repeated.");
+        }
+
+        [TestMethod]
         public void WithoutAToolHere_AFarmerOnShiftAsksTheOwnerOfOneLyingHere_ElseGoesLooking_AHelperDoesNeither()
         {
             var engine = new FieldWorkNeedEngine(catalog: TestWork.Catalog);

@@ -294,6 +294,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 State = State with { Cooldowns = dict };
             }
 
+            if (@event is GameEngineTools.Characters.Engines.Objects.ToolSearchFailed failed && failed.Seeker == ctx.Id)
+            {
+                State = State with { ToolSearchRetryAt = failed.RetryAt };
+            }
+
             State = _sleepCoordinator.Handle(@event, ctx, outbox, State);
         }
 
