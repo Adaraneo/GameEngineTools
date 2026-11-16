@@ -209,15 +209,16 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void AskToBorrow_TheOwnerIsElsewhere_TheAskerWalksToTheOwner_AndNobodyWasAskedYet()
+        public void AskToBorrow_TheOwnerIsElsewhere_TheAskerWalksToTheOwner_AndAsksOnArriving()
         {
             var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90, ownerHere: false);
 
             orchestrator.OnTick(Now, new IHuman[] { asker, owner });
 
-            Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
+            Assert.IsNull(provider.FindObject("spade_1")!.LentTo, "The owner has not answered yet.");
             Assert.AreEqual(TavernId, _locationService.GetLocation(asker.Id), "The owner is at the tavern: go there to ask.");
-            Assert.IsFalse(owner.Received.OfType<InteractionProposed>().Any(), "Nobody was asked on the way.");
+            Assert.AreEqual(RelationalActKind.Request, owner.Received.OfType<InteractionProposed>().Single().Content.SpeechAct.RelationalKind, "Having arrived, the asker asks without a further decision.");
+            Assert.AreEqual(1, orchestrator.ToolLoans.Asked);
         }
 
         [TestMethod]

@@ -1115,9 +1115,41 @@ namespace GameEngineTools.World.Simulation
                 AskForTool(now, asker, chars);
             }
 
+            AskOnArrival(now, chars);
+
             foreach (var owner in chars)
             {
                 SettleToolRequests(now, owner, chars);
+            }
+        }
+
+        // Seekers walking to an owner, with the tool types they want; not persisted, like the other scene runtime sets.
+        private readonly Dictionary<HumanId, IReadOnlyList<string>> _ownerWalks = new();
+
+        /// <summary>A seeker who walked to an owner asks as soon as they arrive, if the owner is there; the engine offers no candidate away from the field, so the walk would otherwise end in nothing.</summary>
+        private void AskOnArrival(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            foreach (var (seekerId, typeIds) in _ownerWalks.ToList())
+            {
+                if (_inTransit.ContainsKey(seekerId))
+                {
+                    continue;
+                }
+
+                _ownerWalks.Remove(seekerId);
+                var seeker = chars.FirstOrDefault(c => c.Id == seekerId);
+                if (seeker is null || _locationService.GetLocation(seekerId) is not { } location)
+                {
+                    continue;
+                }
+
+                var tool = _objectProvider.GetAllObjects().FirstOrDefault(o => o.IsAvailable && o.HeldBy is null && o.LentTo is null && typeIds.Contains(o.TypeId ?? string.Empty)
+                    && o.OwnerId is { } ownerId && ownerId != seekerId && !AskedTooRecently(seekerId, ownerId, now)
+                    && chars.Any(c => c.Id == ownerId && _locationService.GetLocation(c.Id) == location));
+                if (tool is not null && chars.FirstOrDefault(c => c.Id == tool.OwnerId) is { } owner)
+                {
+                    AskOwner(now, seeker, owner, tool, location);
+                }
             }
         }
 
@@ -1180,6 +1212,7 @@ namespace GameEngineTools.World.Simulation
             {
                 ToolLoans.Walks++;
                 CommitMove(seeker, toOwner, now);
+                _ownerWalks[seeker.Id] = typeIds;
                 return;
             }
 
