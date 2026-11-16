@@ -35,9 +35,13 @@ namespace GameEngineTools.World.Objects.Production
             {
                 var matched = pool.Where(o => string.Equals(o.TypeId, input.ItemId, StringComparison.Ordinal) && !used.Contains(o.Id)).Take(input.Quantity).ToList();
                 if (matched.Count < input.Quantity)
+                {
                     return false;
+                }
                 foreach (var o in matched)
+                {
                     used.Add(o.Id);
+                }
             }
 
             return true;
@@ -53,7 +57,9 @@ namespace GameEngineTools.World.Objects.Production
             foreach (var input in goal.Inputs)
             {
                 if (NextStep(item => string.Equals(item, input.ItemId, StringComparison.Ordinal), available, held, MaxDepth) is { } step)
+                {
                     return step;
+                }
             }
 
             return null;
@@ -64,17 +70,25 @@ namespace GameEngineTools.World.Objects.Production
             foreach (var recipe in _recipes.All.Where(r => wanted(r.OutputItemId)))
             {
                 if (!available.Any(o => ProductionSites.IsStation(_catalog, o) && string.Equals(o.TypeId, recipe.StationTypeId, StringComparison.Ordinal)))
+                {
                     continue; // the workstation is not here
+                }
 
                 if (CanSatisfy(recipe, available, held))
+                {
                     return recipe;
+                }
 
                 if (depth <= 1)
+                {
                     continue;
+                }
                 foreach (var input in recipe.Inputs)
                 {
                     if (NextStep(item => string.Equals(item, input.ItemId, StringComparison.Ordinal), available, held, depth - 1) is { } deeper)
+                    {
                         return deeper;
+                    }
                 }
             }
 

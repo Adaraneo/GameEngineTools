@@ -15,7 +15,9 @@ namespace GameEngineTools.World.Work
         {
             ArgumentNullException.ThrowIfNull(provider);
             if (provider.FindObject(toolId) is not { } tool || tool.OwnerId != owner || tool.LentTo is not null || borrower == owner)
+            {
                 return false;
+            }
 
             provider.RemoveObject(tool.LocationId, tool.Id);
             provider.AddObject(tool with { LentTo = borrower, LentAt = now });
@@ -27,7 +29,9 @@ namespace GameEngineTools.World.Work
         {
             ArgumentNullException.ThrowIfNull(provider);
             if (provider.FindObject(toolId) is not { LentTo: { } borrower } tool || (by != tool.OwnerId && by != borrower))
+            {
                 return false;
+            }
 
             provider.RemoveObject(tool.LocationId, tool.Id);
             provider.AddObject(tool with { LentTo = null, LentAt = null });

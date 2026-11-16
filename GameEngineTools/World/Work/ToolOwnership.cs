@@ -12,7 +12,7 @@ namespace GameEngineTools.World.Work
     /// <summary>Gives a share of the tools of a new world to characters; the rest stay common property (owned by nobody).</summary>
     public static class ToolOwnership
     {
-        // Share of the tools that become personal, a design pick: most of a village's tools are common, a few are someone's own.
+        /// <summary>Default share of the tools that become personal (a design pick); the rest stay common.</summary>
         public const double DefaultPersonalShare = 1.0 / 3.0;
 
         /// <summary>Makes every n-th unowned, unheld tool the property of one of the owners (round-robin), so about <paramref name="share"/> of them are personal; returns how many were assigned.</summary>
@@ -20,7 +20,9 @@ namespace GameEngineTools.World.Work
         {
             ArgumentNullException.ThrowIfNull(provider);
             if (owners.Count == 0 || share <= 0.0)
+            {
                 return 0;
+            }
 
             var tools = provider.GetAllObjects()
                 .Where(o => o.Category == WorldObjectCategory.Tool && o.OwnerId is null && o.HeldBy is null)
@@ -28,7 +30,9 @@ namespace GameEngineTools.World.Work
                 .ToList();
             var personal = (int)Math.Floor(tools.Count * Math.Min(share, 1.0));
             if (personal == 0)
+            {
                 return 0;
+            }
 
             var step = (double)tools.Count / personal;
             for (var i = 0; i < personal; i++)
