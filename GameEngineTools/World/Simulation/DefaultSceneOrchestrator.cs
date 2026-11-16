@@ -1,4 +1,4 @@
-// DefaultSceneOrchestrator.cs
+﻿// DefaultSceneOrchestrator.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Simulation
@@ -1085,8 +1085,8 @@ namespace GameEngineTools.World.Simulation
         // Hours before a character asks the same owner again, whatever the answer was (a design pick).
         private const double ToolAskCooldownHours = 6.0;
 
-        // Hours a character who found no tool anywhere waits before searching again (a design pick).
-        private const double ToolSearchRetryHours = 6.0;
+        // How many searches in a row each character has failed; a search that finds or borrows a tool starts the count again. Not persisted, like the other scene runtime sets.
+        private readonly Dictionary<HumanId, int> _toolSearchFailures = new();
 
         private WDateTime _nextLoanCheck;
 
@@ -1178,12 +1178,13 @@ namespace GameEngineTools.World.Simulation
                 .ToList();
             if (tools.Any(o => o.LocationId == location && WorkObjects.CanUse(o, seeker.Id)))
             {
+                _toolSearchFailures.Remove(seeker.Id);
                 return;
             }
 
             // What the seeker remembers seeing comes first; only then do they ask around (the provider).
             var remembered = RememberedPlaces(seeker, typeIds, location, o => o.IsAvailable && o.HeldBy is null && WorkObjects.CanUse(o, seeker.Id));
-            if (remembered.Count > 0 && NearestOf(location, remembered) is { } toRemembered)
+            if (remembered.Count > 0 && NearestOf(location, remembered) is { } toRemembered && Reachable(seeker, toRemembered))
             {
                 ToolLoans.Walks++;
                 CommitMove(seeker, toRemembered, now);
@@ -1191,7 +1192,7 @@ namespace GameEngineTools.World.Simulation
             }
 
             var usableElsewhere = tools.Where(o => WorkObjects.CanUse(o, seeker.Id)).Select(o => o.LocationId).ToHashSet(StringComparer.Ordinal);
-            if (usableElsewhere.Count > 0 && NearestOf(location, usableElsewhere) is { } toTool)
+            if (usableElsewhere.Count > 0 && NearestOf(location, usableElsewhere) is { } toTool && Reachable(seeker, toTool))
             {
                 ToolLoans.Walks++;
                 CommitMove(seeker, toTool, now);
@@ -1208,7 +1209,7 @@ namespace GameEngineTools.World.Simulation
             }
 
             var ownerPlaces = owners.Select(c => PlaceToFind(seeker, c)).OfType<string>().Where(place => place != location).ToHashSet(StringComparer.Ordinal);
-            if (ownerPlaces.Count > 0 && NearestOf(location, ownerPlaces) is { } toOwner)
+            if (ownerPlaces.Count > 0 && NearestOf(location, ownerPlaces) is { } toOwner && Reachable(seeker, toOwner))
             {
                 ToolLoans.Walks++;
                 CommitMove(seeker, toOwner, now);
@@ -1222,7 +1223,24 @@ namespace GameEngineTools.World.Simulation
             }
 
             ToolLoans.SearchesFailed++;
-            seeker.ReceiveEvent(new ToolSearchFailed(now, seeker.Id, string.Join(",", typeIds), now + WTimeSpan.FromHours(ToolSearchRetryHours)));
+            var failures = _toolSearchFailures.GetValueOrDefault(seeker.Id) + 1;
+            _toolSearchFailures[seeker.Id] = failures;
+            seeker.ReceiveEvent(new ToolSearchFailed(now, seeker.Id, string.Join(",", typeIds), now + WTimeSpan.FromHours(ToolTrip.RetryHours(failures))));
+        }
+
+        /// <summary>Whether the seeker would walk this far for a tool now (<see cref="ToolTrip"/>); with instant travel there is no cost, so always.</summary>
+        private bool Reachable(IHuman seeker, MoveTarget target)
+        {
+            if (!_options.EnableTravelTime)
+            {
+                return true;
+            }
+
+            var terrain = _locationService.GetDescriptor(target.LocationId)?.Terrain ?? TerrainType.Indoor;
+            var speed = _speedProvider.GetSpeedMetersPerMinute(seeker.Snapshot, terrain);
+            var hours = TravelDurationComputer.ComputeMinutes(target.DistanceMeters, speed) / 60.0;
+            var body = seeker.Snapshot.Physiology;
+            return hours <= ToolTrip.MaxOneWayHours(seeker.Personality, seeker.Snapshot.Psychology.Stress, body.Hunger, body.Thirst);
         }
 
         /// <summary>Where the seeker remembers seeing an object of one of these types that the filter still accepts (the remembered place, not necessarily the true one); only recent enough memories count.</summary>
@@ -1280,6 +1298,7 @@ namespace GameEngineTools.World.Simulation
                 if (lent)
                 {
                     ToolLoans.Lent++;
+                    _toolSearchFailures.Remove(asker.Id);
                     WitnessToolAct(owner.Id, asker.Id, ThirdPartyObservationType.PositiveAct, now, chars);
                     var loan = new ToolLent(now, owner.Id, asker.Id, tool.Id);
                     asker.ReceiveEvent(loan);
