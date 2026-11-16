@@ -58,6 +58,7 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples, options.Seed, options.Run.SubstepMinutes);
     var objects = runtime.Services.GetRequiredService<GameEngineTools.World.Objects.IWorldObjectProvider>();
     collector.FarmSampler = () => objects.GetAllObjects();
+    collector.ToolStats = () => world.Orchestrator.ToolLoans;
 
     var worldConfig = options.Run.Seasons
         ? GameEngineTools.Config.WorldSettings.Load(Path.Combine(runDir, "appsettings.World.json"))

@@ -1073,6 +1073,9 @@ namespace GameEngineTools.World.Simulation
 
         private WDateTime _nextLoanCheck;
 
+        /// <summary>The loans of this scene so far (lent, refused, returned, overdue, failed searches).</summary>
+        public ToolLoanStats ToolLoans { get; } = new();
+
         // When each (asker, owner) pair may be asked again; not persisted, like the other scene runtime sets.
         private readonly Dictionary<(HumanId Asker, HumanId Owner), WDateTime> _toolAskedUntil = new();
 
@@ -1165,6 +1168,7 @@ namespace GameEngineTools.World.Simulation
                 _log.SceneMoveToFailed(seeker.Id.Value.ToString(), string.Join(",", typeIds));
             }
 
+            ToolLoans.SearchesFailed++;
             seeker.ReceiveEvent(new ToolSearchFailed(now, seeker.Id, string.Join(",", typeIds), now + WTimeSpan.FromHours(ToolSearchRetryHours)));
         }
 
@@ -1221,12 +1225,14 @@ namespace GameEngineTools.World.Simulation
                 var lent = answer.Accepted && ToolLending.Lend(_mutableObjects!, tool.Id, owner.Id, asker.Id, now);
                 if (lent)
                 {
+                    ToolLoans.Lent++;
                     var loan = new ToolLent(now, owner.Id, asker.Id, tool.Id);
                     asker.ReceiveEvent(loan);
                     owner.ReceiveEvent(loan);
                 }
                 else
                 {
+                    ToolLoans.Refused++;
                     var onShift = owner.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work };
                     var refusal = new ToolRequestRefused(now, asker.Id, owner.Id, tool.TypeId ?? string.Empty, onShift ? "The owner needs it." : "The owner declined.");
                     asker.ReceiveEvent(refusal);
@@ -1253,6 +1259,7 @@ namespace GameEngineTools.World.Simulation
                     if (chars.FirstOrDefault(c => c.Id == returned.Owner) is not { } owner)
                         continue;
 
+                    ToolLoans.Returned++;
                     owner.ReceiveEvent(returned);
                     owner.ReceiveEvent(new MicroPositive(now, owner.Id, borrower.Id, "ToolReturned"));
                 }
@@ -1271,6 +1278,7 @@ namespace GameEngineTools.World.Simulation
                 if ((now - tool.LentAt!.Value).TotalDays < ToolLoanGraceDays)
                     continue;
 
+                ToolLoans.Overdue++;
                 _mutableObjects.RemoveObject(tool.LocationId, tool.Id);
                 _mutableObjects.AddObject(tool with { LentAt = now });
                 chars.FirstOrDefault(c => c.Id == tool.OwnerId)?.ReceiveEvent(new MicroNegative(now, tool.OwnerId!.Value, tool.LentTo!.Value, "ToolNotReturned"));

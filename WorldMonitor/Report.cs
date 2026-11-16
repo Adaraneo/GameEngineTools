@@ -63,6 +63,22 @@ namespace WorldMonitor
                 }
             }
 
+            if (c.FarmSamples.Count > 0 && c.FarmSamples.Any(f => f.Tools > 0))
+            {
+                sb.AppendLine();
+                sb.AppendLine($"## Tools by {c.FarmPeriodDays}-day period (tool objects at the end of the period; the rest are counted within the period, from committed actions and the scene's loan counters)");
+                sb.AppendLine("| days | tools | held | lent out | away from shed | asked to borrow | walked to a tool | walked to a shed | walked for supply | loans granted | refused | returned | overdue | searches that found nothing |");
+                sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+                FarmSample? before = null;
+                foreach (var period in c.FarmSamples.GroupBy(f => f.Day / c.FarmPeriodDays).OrderBy(g => g.Key))
+                {
+                    var last = period.Last();
+                    var days = c.Days.Where(d => d.Key / c.FarmPeriodDays == period.Key).Select(d => d.Value).ToList();
+                    sb.AppendLine($"| {period.Key * c.FarmPeriodDays}-{period.Key * c.FarmPeriodDays + c.FarmPeriodDays - 1} | {last.Tools} | {last.ToolsHeld} | {last.ToolsLent} | {last.ToolsAwayFromShed} | {days.Sum(d => d.Asked)} | {days.Sum(d => d.WalkedToTool)} | {days.Sum(d => d.WalkedToStorage)} | {days.Sum(d => d.WalkedToSupply)} | {last.LoansLent - (before?.LoansLent ?? 0)} | {last.LoansRefused - (before?.LoansRefused ?? 0)} | {last.LoansReturned - (before?.LoansReturned ?? 0)} | {last.LoansOverdue - (before?.LoansOverdue ?? 0)} | {last.SearchesFailed - (before?.SearchesFailed ?? 0)} |");
+                    before = last;
+                }
+            }
+
             sb.AppendLine();
             sb.AppendLine("## Stress by time of day (24-hour clock)");
             sb.AppendLine("| hours | samples | mean | median | p90 |");

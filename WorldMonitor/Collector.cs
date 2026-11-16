@@ -15,7 +15,7 @@ namespace WorldMonitor
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>The farms at one moment: grain in the food stores and seed bins, unthreshed grain in sheaves, and how many fields are in each stage.</summary>
-    public sealed record FarmSample(int Day, long FoodUnits, long SeedUnits, long SheafUnits, IReadOnlyDictionary<GameEngineTools.World.Objects.Crops.FieldStage, int> Stages);
+    public sealed record FarmSample(int Day, long FoodUnits, long SeedUnits, long SheafUnits, IReadOnlyDictionary<GameEngineTools.World.Objects.Crops.FieldStage, int> Stages, int Tools = 0, int ToolsHeld = 0, int ToolsLent = 0, int ToolsAwayFromShed = 0, int LoansLent = 0, int LoansRefused = 0, int LoansReturned = 0, int LoansOverdue = 0, int SearchesFailed = 0);
 
     /// <summary>The stress of everyone at one moment of the run.</summary>
     public sealed record Sample(int Day, double ClockHour24, IReadOnlyList<double> Stress, int Private, int AtHome, int Asleep, double NeedSocial, double Energy, double InterestDrift);
@@ -63,7 +63,7 @@ namespace WorldMonitor
     /// <summary>Per-world-day counters taken at every tick.</summary>
     public sealed class DayCounters
     {
-        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany, HungryReadings, ThirstyReadings, Meals, Drinks, Ploughed, Sowed, Reaped, Threshed;
+        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany, HungryReadings, ThirstyReadings, Meals, Drinks, Ploughed, Sowed, Reaped, Threshed, Asked, WalkedToTool, WalkedToStorage, WalkedToSupply;
         public double HungerSum, ThirstSum;
     }
 
@@ -138,13 +138,26 @@ namespace WorldMonitor
         {
             var objects = FarmSampler!().ToList();
             var stages = objects.Where(o => o.Field is not null).GroupBy(o => o.Field!.Stage).ToDictionary(g => g.Key, g => g.Count());
+            var tools = objects.Where(o => o.IsPickable && o.Category == GameEngineTools.World.Objects.WorldObjectCategory.Tool).ToList();
             return new FarmSample(
                 day,
                 objects.Where(GameEngineTools.World.Objects.Crops.GrainStores.IsFoodStore).Sum(o => (long)o.Quantity),
                 objects.Where(GameEngineTools.World.Objects.Crops.GrainStores.IsSeedBin).Sum(o => (long)o.Quantity),
                 objects.Where(o => o.Field is not null).Sum(o => (long)o.Field!.PendingUnits),
-                stages);
+                stages,
+                tools.Count,
+                tools.Count(o => o.HeldBy is not null),
+                tools.Count(o => o.LentTo is not null),
+                tools.Count(o => o.HeldBy is null && o.StoredAt is not null && o.LocationId != o.StoredAt),
+                ToolStats?.Invoke().Lent ?? 0,
+                ToolStats?.Invoke().Refused ?? 0,
+                ToolStats?.Invoke().Returned ?? 0,
+                ToolStats?.Invoke().Overdue ?? 0,
+                ToolStats?.Invoke().SearchesFailed ?? 0);
         }
+
+        /// <summary>How the tool loans have gone (set by the host that has the scene orchestrator).</summary>
+        public Func<GameEngineTools.World.Simulation.ToolLoanStats>? ToolStats { get; set; }
 
         public void Record(WDateTime now, IReadOnlyList<IHuman> characters)
         {
@@ -296,6 +309,10 @@ namespace WorldMonitor
                             else if (ac.ActionName == ActionNames.Sow) today.Sowed++;
                             else if (ac.ActionName == ActionNames.Reap) today.Reaped++;
                             else if (ac.ActionName == ActionNames.Thresh) today.Threshed++;
+                            else if (ac.ActionName == ActionNames.AskToBorrow) today.Asked++;
+                            else if (ac.ActionName == ActionNames.MoveToTool) today.WalkedToTool++;
+                            else if (ac.ActionName == ActionNames.MoveToStorage) today.WalkedToStorage++;
+                            else if (ac.ActionName == ActionNames.MoveToSupply) today.WalkedToSupply++;
                         }
                         if (People.TryGetValue(ac.Human, out var actor)) { actor.LastAction = ac.ActionName; if (ac.ActionName == ActionNames.InviteIntimacy) actor.Invites++; }
                         break;
