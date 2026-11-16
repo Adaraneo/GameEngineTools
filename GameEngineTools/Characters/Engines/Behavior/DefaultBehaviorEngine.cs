@@ -92,7 +92,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             Config = cfg.Value;
             _log = loggerFactory.CreateLogger<DefaultBehaviorEngine>();
             State = new BehaviorState(40, 30, 25, 50, 50, 35, null, new Dictionary<string, double>());
-            _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine(), new ContingencySearchEngine(workCatalog, economyCfg?.Value), new FieldWorkNeedEngine(workCatalog, cropCfg?.Value), new BereavementBehaviorBridge() };
+            _needEngines = new IBehaviorNeedEngine[] { new PhysiologicalNeedsEngine(), new SocialNeedsEngine(), new CompetenceNeedsEngine(), new AutonomyExplorationNeedsEngine(), new ContingencySearchEngine(workCatalog, economyCfg?.Value), new FieldWorkNeedEngine(workCatalog, cropCfg?.Value), new ToolCarryNeedEngine(workCatalog), new BereavementBehaviorBridge() };
             _modifierEngines = new IBehaviorModifierEngine[] { new TraitBiasEngine(), new PsychologicalConflictBiasEngine(), new InvestmentModelBiasEngine(), new AffectiveStateEngine(), new CircadianArousalEngine(), new HabitRoutineEngine(), new LearnedHabitEngine(loggerFactory.CreateLogger<LearnedHabitEngine>()), new MemoryInfluenceEngine(), new EnvironmentalAffordanceEngine(), new WorldObjectAffordanceEngine(), new ObjectInteractionBehaviorModifier(objectProvider), new GoalBehaviorModifier(loggerFactory.CreateLogger<GoalBehaviorModifier>(), goalCfg?.Value.MaxFlatBiasPerGoal ?? 12.0, goalCfg?.Value.ShieldingCommitmentThreshold ?? 0.5, goalCfg?.Value.ShieldingMaxInhibition ?? 8.0, goalCfg?.Value.ShieldingStressDampening ?? 0.6), new DailyScheduleBehaviorModifier(loggerFactory.CreateLogger<DailyScheduleBehaviorModifier>(), scheduleCfg?.Value),
                 new Modifiers.ValuesBehaviorModifier(loggerFactory.CreateLogger<Modifiers.ValuesBehaviorModifier>()),
                 new Modifiers.InterestBehaviorModifier(),
@@ -212,7 +212,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
             }
 
             outbox.Add(new ActionProposed(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Utility, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason));
-            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason, result.SelectedCandidate.ObjectInteraction, result.SelectedCandidate.TaskId, result.SelectedCandidate.TargetTypeId));
+            outbox.Add(new ActionCommitted(now, ctx.Id, result.SelectedCandidate.Name, result.SelectedCandidate.Duration, result.SelectedCandidate.SocialTargeting?.TargetHuman, result.IntendedCandidate?.Name, result.ConflictReason, result.SelectedCandidate.ObjectInteraction, result.SelectedCandidate.TaskId, result.SelectedCandidate.TargetTypeIds));
             EmitInteractionProposalIfNeeded(now, ctx, outbox, result.SelectedCandidate);
             SetCooldownsForCommittedAction(ctx.Id, result.SelectedCandidate.Name);
             using (_log.BeginCharacterScope(
@@ -246,7 +246,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                     null, null,
                     secondary.ObjectInteraction,
                     secondary.TaskId,
-                    secondary.TargetTypeId));
+                    secondary.TargetTypeIds));
 
                 using (_log.BeginCharacterScope(ctx.Id.Value, nameof(DefaultBehaviorEngine),
                        tickKey: now.WorldTicks.ToString()))

@@ -178,7 +178,7 @@ namespace EngineTests
             var withOneGrain = engine.Evaluate(ShiftContext("miller", new List<WorldObject>(), grain.Take(1).ToList()));
 
             Assert.AreEqual(MoveToSupply, away.Name);
-            Assert.AreEqual("mill", away.TargetTypeId);
+            CollectionAssert.AreEqual(new[] { "mill" }, away.TargetTypeIds!.ToArray());
             Assert.IsTrue(here.Candidates.Any(c => c.Name == Process && c.TaskId == "recipe_flour_from_grain"), "With the mill here the miller mills, and says which task.");
             Assert.IsFalse(here.Candidates.Any(c => c.Name == MoveToSupply));
             Assert.IsFalse(withOneGrain.Candidates.Any(c => c.Name == MoveToSupply), "One grain does not make flour: no point walking to the mill.");

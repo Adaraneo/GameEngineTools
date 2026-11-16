@@ -143,19 +143,19 @@ namespace EngineTests
                 return ctx with { AvailableObjects = new List<WorldObject> { field, tool }, HeldObjects = new List<WorldObject>() };
             }
 
-            Assert.AreEqual(AskToBorrow, engine.Evaluate(Ctx(spade)).Candidates.Single().Name, "The spade belongs to someone else: no ploughing, only asking.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(spade)).Candidates.Count, "The spade belongs to someone else: no ploughing, and a helper off shift does not go asking.");
             Assert.AreEqual(Plough, engine.Evaluate(Ctx(spade with { LentTo = self })).Candidates.Single().Name, "Lent to this character: they plough.");
             Assert.AreEqual(0, engine.Evaluate(Ctx(spade with { LentTo = Stranger })).Candidates.Count, "Lent to somebody else.");
         }
 
         [TestMethod]
-        public void WithoutAToolHere_TheFarmerTakesOneHeMayUse_ElseAsksTheOwner_ButNeverTakesOrAsksForNothing()
+        public void WithoutAToolHere_AFarmerOnShiftAsksTheOwnerOfOneLyingHere_ElseGoesLooking_AHelperDoesNeither()
         {
             var engine = new FieldWorkNeedEngine(catalog: TestWork.Catalog);
             var self = Neighbour;
             var field = new WorldObject { Id = "field_1", DisplayName = "Pole", Category = WorldObjectCategory.Ambient, LocationId = Loc, ItemTypeId = "grain", Field = new GameEngineTools.World.Objects.Crops.FieldState(GameEngineTools.World.Objects.Crops.FieldStage.Fallow, 1.0) };
 
-            BehaviorContext Ctx(params WorldObject[] objects)
+            BehaviorContext Ctx(bool onShift, params WorldObject[] objects)
             {
                 var ctx = BehaviorComponentTestFactory.Context(selfId: self, hunger: 20, thirst: 5, now: new WDateTime(0));
                 var human = (HumanContext)ctx.HumanContext;
@@ -164,22 +164,32 @@ namespace EngineTests
                     AmbientTemperature = 15.0,
                     Celestial = new GameEngineTools.World.Core.Astro.CelestialContext(0.5, 12.0, 6.0, 18.0, 12.0, 0.5, 0.0, true, 15.0, TemperatureTrendPerDay: 0.1),
                 };
+                if (onShift)
+                {
+                    var slot = new GameEngineTools.Characters.Engines.Schedule.ScheduleSlot("work", 5, Work);
+                    human.Snapshot = human.Snapshot with { Schedule = new GameEngineTools.Characters.Engines.Schedule.DailyScheduleState(new[] { slot }, slot, 0, "farmer") };
+                }
+
                 return ctx with { AvailableObjects = objects.Append(field).ToList(), HeldObjects = new List<WorldObject>() };
             }
 
             var shared = WorkObjects.Spawn(TestWork.Catalog, "spade", "shared", Loc);
-            var take = engine.Evaluate(Ctx(shared)).Candidates;
-            Assert.AreEqual(Plough, take.Single().Name, "A usable spade lying here is already at hand: the job itself.");
+            Assert.AreEqual(Plough, engine.Evaluate(Ctx(true, shared)).Candidates.Single().Name, "A usable spade lying here is already at hand: the job itself.");
 
             var theirs = WorkObjects.Spawn(TestWork.Catalog, "spade", "theirs", Loc, Owner);
-            var ask = engine.Evaluate(Ctx(theirs)).Candidates.Single();
-            Assert.AreEqual(AskToBorrow, ask.Name, "Someone else's spade, not lent: ask.");
-            Assert.AreEqual("spade", ask.TargetTypeId);
+            var ask = engine.Evaluate(Ctx(true, theirs)).Candidates.Single();
+            Assert.AreEqual(AskToBorrow, ask.Name, "Someone else's spade lies here, not lent: ask.");
+            CollectionAssert.AreEqual(new[] { "spade" }, ask.TargetTypeIds!.ToArray());
             Assert.IsTrue(ask.Duration >= WTimeSpan.FromMinutes(30), "Asking takes a while, so a refusal is not repeated at once.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(false, theirs)).Candidates.Count, "A helper who is not on shift does not go asking.");
 
-            Assert.AreEqual(Plough, engine.Evaluate(Ctx(theirs with { LentTo = self })).Candidates.Single().Name, "Lent to them: it is at hand.");
-            Assert.AreEqual(0, engine.Evaluate(Ctx(theirs with { LentTo = Stranger })).Candidates.Count, "Lent to somebody else: nothing to ask for.");
-            Assert.AreEqual(0, engine.Evaluate(Ctx()).Candidates.Count, "No spade anywhere here: nothing.");
+            Assert.AreEqual(Plough, engine.Evaluate(Ctx(true, theirs with { LentTo = self })).Candidates.Single().Name, "Lent to them: it is at hand.");
+
+            var elsewhere = engine.Evaluate(Ctx(true, theirs with { LentTo = Stranger })).Candidates.Single();
+            Assert.AreEqual(MoveToTool, elsewhere.Name, "Nothing here to ask for or use: go looking.");
+            CollectionAssert.AreEqual(new[] { "spade" }, elsewhere.TargetTypeIds!.ToArray(), "Every type that serves as the tool is looked for.");
+            Assert.AreEqual(MoveToTool, engine.Evaluate(Ctx(true)).Candidates.Single().Name, "No spade here at all: go looking.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(false)).Candidates.Count, "A helper does not go looking.");
         }
 
         [TestMethod]

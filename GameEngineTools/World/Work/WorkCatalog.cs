@@ -220,6 +220,17 @@ namespace GameEngineTools.World.Work
         /// <summary>All occupations that list tasks.</summary>
         public IReadOnlyCollection<OccupationWork> Occupations => _occupations.Values;
 
+        /// <summary>The tool classes the field tasks of the occupation need (distinct), empty for an occupation that lists none.</summary>
+        public IReadOnlyList<string> ToolClassesOfOccupation(string? occupationId)
+        {
+            return Occupation(occupationId)?.TaskIds
+                .Select(id => _tasksById[id])
+                .Where(task => task is { Kind: TaskKind.FieldWork, ToolClass: not null })
+                .Select(task => task.ToolClass!)
+                .Distinct(StringComparer.Ordinal)
+                .ToList() ?? (IReadOnlyList<string>)Array.Empty<string>();
+        }
+
         /// <summary>Whether the occupation does the task with this id.</summary>
         public bool OccupationDoes(string? occupationId, string taskId) => Occupation(occupationId)?.TaskIds.Contains(taskId) == true;
 

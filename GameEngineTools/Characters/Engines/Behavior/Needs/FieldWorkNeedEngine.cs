@@ -38,6 +38,9 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         // How long asking an owner takes (a design pick); a refused request is not repeated within it.
         private static readonly WTimeSpan AskDuration = WTimeSpan.FromMinutes(30);
 
+        // How long a walk to look for a tool is planned for (a design pick); the walk itself takes the travel time.
+        private static readonly WTimeSpan FetchDuration = WTimeSpan.FromMinutes(20);
+
         // Too hungry to work; eating comes first.
         private const double MaxNeedFoodToWork = 70.0;
 
@@ -106,27 +109,18 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         }
 
         /// <summary>
-        /// A job is waiting but no tool of its class is usable: take one that lies here and may be used, else make one from what is here (a craft step), else ask the owner of one that lies here.
+        /// A job is waiting but no tool of its class is usable here: make one from what is here (a craft step); else, for the one whose job it is, ask the owner of one that lies here, else go and look for one.
         /// Each ranks a little under the job itself.
         /// </summary>
         private BehaviorNeedOutput SupplyTool(FieldTask task, BehaviorContext context, DailyScheduleState? schedule)
         {
             if (ToolClassOf(task) is not { } toolClass)
+            {
                 return BehaviorNeedOutput.Empty;
+            }
 
             var utility = Utility(task) * SupplyFactor + (IsOnShiftFor(task, schedule) ? FarmerOnShiftBonus : 0.0);
-            var self = context.HumanContext.Id;
             var here = context.AvailableObjects!;
-
-            bool IsTool(WorldObject o) => o.IsPickable && o.IsAvailable && o.HeldBy is null && _catalog.ToolQuality(o.TypeId, toolClass) > 0.0;
-
-            if (here.FirstOrDefault(o => IsTool(o) && WorkObjects.CanUse(o, self)) is { } lying)
-            {
-                var take = new BehaviorCandidate(
-                    InteractWithObject, utility, WTimeSpan.FromMinutes(1), BehaviorDomain.Competence,
-                    ObjectInteraction: new ObjectInteractionData(lying.Id, lying.LocationId, ObjectInteractionKind.Take), Tags: new[] { "FieldWork", "Supply" });
-                return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { take });
-            }
 
             if (_chain.NextStepForTool(toolClass, here, context.HeldObjects) is { } step)
             {
@@ -134,14 +128,23 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { make });
             }
 
-            // Someone else's tool lies here, not lent: ask. The asking takes AskDuration, so a refusal is not repeated at once.
-            if (here.FirstOrDefault(o => IsTool(o) && o.OwnerId is not null && o.LentTo is null) is { } owned)
+            // Asking and fetching are for the one whose job it is, not for a passing helper.
+            if (!IsOnShiftFor(task, schedule))
             {
-                var ask = new BehaviorCandidate(AskToBorrow, utility, AskDuration, BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" }, TargetTypeId: owned.TypeId);
-                return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { ask });
+                return BehaviorNeedOutput.Empty;
             }
 
-            return BehaviorNeedOutput.Empty;
+            var types = _catalog.Types.Where(t => _catalog.ToolQuality(t.Id, toolClass) > 0.0).Select(t => t.Id).ToList();
+            if (types.Count == 0)
+            {
+                return BehaviorNeedOutput.Empty;
+            }
+
+            var owned = here.FirstOrDefault(o => o.IsPickable && o.IsAvailable && o.HeldBy is null && o.OwnerId is not null && o.LentTo is null && types.Contains(o.TypeId ?? string.Empty));
+            var candidate = owned is not null
+                ? new BehaviorCandidate(AskToBorrow, utility, AskDuration, BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" }, TargetTypeIds: new[] { owned.TypeId! })
+                : new BehaviorCandidate(MoveToTool, utility, FetchDuration, BehaviorDomain.Competence, Tags: new[] { "FieldWork", "Supply" }, TargetTypeIds: types);
+            return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
         }
 
         /// <summary>The tool class a task needs, read from its row in tasks.json; null when it needs none (sowing is done from a seed bag by hand).</summary>

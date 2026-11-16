@@ -330,7 +330,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
             {
                 candidates.Add(new BehaviorCandidate(
                     MoveToSupply, ShiftProductionUtility - 3.0, WTimeSpan.FromMinutes(20),
-                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy", "Supply" }, TargetTypeId: station));
+                    BehaviorDomain.Physiological, Tags: new[] { "FoodEconomy", "Supply" }, TargetTypeIds: new[] { station! }));
             }
 
             else if (HasRawProductionSite(context.AvailableObjects!))

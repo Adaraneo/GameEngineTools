@@ -98,7 +98,7 @@ namespace EngineTests
         {
             var askerId = new HumanId(Guid.NewGuid());
             var ownerId = new HumanId(Guid.NewGuid());
-            var asker = BuildPerson(HomeId, new ActionCommitted(Now, askerId, AskToBorrow, WTimeSpan.FromMinutes(30), TargetTypeId: "spade"));
+            var asker = BuildPerson(HomeId, new ActionCommitted(Now, askerId, AskToBorrow, WTimeSpan.FromMinutes(30), TargetTypeIds: new[] { "spade" }));
             var edges = noEdge ? null : new Dictionary<HumanId, RelationshipEdge> { [askerId] = Edge(ownerId, askerId, trust, like, closeness) };
             var owner = BuildPerson(ownerHere ? HomeId : TavernId, new ActionCommitted(Now, ownerId, Idle, WTimeSpan.FromMinutes(5)), edges, ownerOnShift);
             var spade = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "spade_1", HomeId, ownerId);
@@ -167,15 +167,67 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void AskToBorrow_NobodyWhoOwnsOneIsHere_IsRefused()
+        public void AskToBorrow_TheOwnerIsElsewhere_TheAskerWalksToTheOwner_AndNobodyWasAskedYet()
         {
             var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90, ownerHere: false);
 
             orchestrator.OnTick(Now, new IHuman[] { asker, owner });
 
             Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
-            Assert.IsTrue(asker.Received.OfType<ToolRequestRefused>().Any());
-            Assert.IsFalse(owner.Received.OfType<InteractionProposed>().Any(), "Nobody was asked.");
+            Assert.AreEqual(TavernId, _locationService.GetLocation(asker.Id), "The owner is at the tavern: go there to ask.");
+            Assert.IsFalse(owner.Received.OfType<InteractionProposed>().Any(), "Nobody was asked on the way.");
+        }
+
+        [TestMethod]
+        public void MoveToTool_AToolTheSeekerMayUseLiesElsewhere_TheSeekerWalksThere()
+        {
+            var seeker = BuildPerson(HomeId, new ActionCommitted(Now, new HumanId(Guid.NewGuid()), MoveToTool, WTimeSpan.FromMinutes(20), TargetTypeIds: new[] { "spade" }));
+            var shed = new FixedWorldObjectProvider(new[] { GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "shed_spade", TavernId) });
+
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), shed).OnTick(Now, new IHuman[] { seeker });
+
+            Assert.AreEqual(TavernId, _locationService.GetLocation(seeker.Id));
+        }
+
+        [TestMethod]
+        public void MoveToTool_OnlySomeoneElsesToolExists_TheSeekerWalksToItsOwner_NotToTheTool()
+        {
+            var ownerId = new HumanId(Guid.NewGuid());
+            var seeker = BuildPerson(HomeId, new ActionCommitted(Now, new HumanId(Guid.NewGuid()), MoveToTool, WTimeSpan.FromMinutes(20), TargetTypeIds: new[] { "spade" }));
+            var owner = BuildPerson(TavernId, new ActionCommitted(Now, ownerId, Idle, WTimeSpan.FromMinutes(5)));
+            var tool = new FixedWorldObjectProvider(new[] { GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "shed_spade", MarketId, ownerId) });
+
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0), (HomeId, MarketId, 40.0) }), tool).OnTick(Now, new IHuman[] { seeker, owner });
+
+            Assert.AreEqual(TavernId, _locationService.GetLocation(seeker.Id), "The tool is not the seeker's to use: ask the owner, who is at the tavern, although the tool is nearer.");
+        }
+
+        [TestMethod]
+        public void MoveToTool_TheOwnerIsHere_TheSeekerAsksOnce_AndNotAgainWithinTheCooldown()
+        {
+            var seekerId = new HumanId(Guid.NewGuid());
+            var ownerId = new HumanId(Guid.NewGuid());
+            var seeker = BuildPerson(HomeId, new ActionCommitted(Now, seekerId, MoveToTool, WTimeSpan.FromMinutes(20), TargetTypeIds: new[] { "spade" }));
+            var owner = BuildPerson(HomeId, new ActionCommitted(Now, ownerId, Idle, WTimeSpan.FromMinutes(5)));
+            var provider = new ConsumingWorldObjectProvider(new[] { GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "spade_1", MarketId, ownerId) }, Array.Empty<string>());
+            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, MarketId, 40.0) }), provider);
+
+            orchestrator.OnTick(Now, new IHuman[] { seeker, owner });
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(2), new IHuman[] { seeker, owner });
+            Assert.AreEqual(1, owner.Received.OfType<InteractionProposed>().Count(), "Asked once; two hours later the answer is not asked for again.");
+
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(7), new IHuman[] { seeker, owner });
+            Assert.AreEqual(2, owner.Received.OfType<InteractionProposed>().Count(), "After the cooldown the seeker may ask again.");
+        }
+
+        [TestMethod]
+        public void MoveToTool_NoSuchToolAnywhere_TheSeekerStaysPut()
+        {
+            var seeker = BuildPerson(HomeId, new ActionCommitted(Now, new HumanId(Guid.NewGuid()), MoveToTool, WTimeSpan.FromMinutes(20), TargetTypeIds: new[] { "spade" }));
+
+            BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), new FixedWorldObjectProvider(Array.Empty<WorldObject>())).OnTick(Now, new IHuman[] { seeker });
+
+            Assert.AreEqual(HomeId, _locationService.GetLocation(seeker.Id));
         }
 
         [TestMethod]
@@ -219,7 +271,7 @@ namespace EngineTests
         public void RouteMoveTo_Supply_WalksToTheNearestPlaceWithTheNamedWorkstation()
         {
             var worldMap = BuildMap(new[] { (HomeId, TavernId, 60.0), (HomeId, MarketId, 40.0) });
-            var character = BuildForagingHuman(HomeId, MoveToSupply, Array.Empty<ObjectLocationFact>(), targetTypeId: "mill");
+            var character = BuildForagingHuman(HomeId, MoveToSupply, Array.Empty<ObjectLocationFact>(), targetTypeIds: new[] { "mill" });
             var provider = new FixedWorldObjectProvider(new[]
             {
                 GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "mill", "tavern_mill", TavernId),
@@ -236,7 +288,7 @@ namespace EngineTests
         public void RouteMoveTo_Supply_WithNoSuchWorkstationAnywhere_StaysPut()
         {
             var worldMap = BuildMap(new[] { (HomeId, TavernId, 60.0) });
-            var character = BuildForagingHuman(HomeId, MoveToSupply, Array.Empty<ObjectLocationFact>(), targetTypeId: "mill");
+            var character = BuildForagingHuman(HomeId, MoveToSupply, Array.Empty<ObjectLocationFact>(), targetTypeIds: new[] { "mill" });
             var provider = new FixedWorldObjectProvider(new[] { GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "oven", "tavern_oven", TavernId) });
 
             BuildOrchestrator(worldMap, provider).OnTick(Now, new[] { character });
@@ -626,7 +678,7 @@ namespace EngineTests
             string currentLocation,
             string action,
             IReadOnlyList<ObjectLocationFact> knownObjects,
-            string? targetTypeId = null)
+            IReadOnlyList<string>? targetTypeIds = null)
         {
             var id = new HumanId(Guid.NewGuid());
 
@@ -651,7 +703,7 @@ namespace EngineTests
                 Sociosexuality.Intermediate,
                 Chronotype.Neutral);
 
-            var committed = new ActionCommitted(Now, id, action, WTimeSpan.FromMinutes(20), TargetTypeId: targetTypeId);
+            var committed = new ActionCommitted(Now, id, action, WTimeSpan.FromMinutes(20), TargetTypeIds: targetTypeIds);
 
             var human = new ForagingHuman(id, personality, snapshot, committed);
             _locationService.MoveCharacter(id, currentLocation);

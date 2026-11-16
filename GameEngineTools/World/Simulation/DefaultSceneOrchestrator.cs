@@ -1065,7 +1065,13 @@ namespace GameEngineTools.World.Simulation
         // Days a lent tool may stay out before the owner holds it against the borrower (a design pick).
         private const double ToolLoanGraceDays = 3.0;
 
+        // Hours before a character asks the same owner again, whatever the answer was (a design pick).
+        private const double ToolAskCooldownHours = 6.0;
+
         private WDateTime _nextLoanCheck;
+
+        // When each (asker, owner) pair may be asked again; not persisted, like the other scene runtime sets.
+        private readonly Dictionary<(HumanId Asker, HumanId Owner), WDateTime> _toolAskedUntil = new();
 
         // The Request each (asker, owner) pair last spoke, so the owner's reply can answer it; not persisted, like the other scene runtime sets.
         private readonly Dictionary<(HumanId Asker, HumanId Owner), SpeechAct> _toolRequestActs = new();
@@ -1095,26 +1101,72 @@ namespace GameEngineTools.World.Simulation
         private void AskForTool(WDateTime now, IHuman asker, IReadOnlyList<IHuman> chars)
         {
             var ask = asker.LastOutbox.OfType<ActionCommitted>().FirstOrDefault(a => a.ActionName == AskToBorrow);
-            if (ask?.TargetTypeId is not { } typeId || _locationService.GetLocation(asker.Id) is not { } location)
+            if (ask is not null)
+            {
+                PursueTool(now, asker, ask.TargetTypeIds, chars);
+            }
+        }
+
+        /// <summary>
+        /// The search for a tool, shared by <c>AskToBorrow</c> and <c>MoveTo:Tool</c>. A tool the character may use that lies elsewhere: walk there. Else an owner of an unlent tool of the wanted types:
+        /// here, ask (unless asked too recently); elsewhere, walk to the owner. Nothing to be had anywhere: the character stays and the failure is logged.
+        /// </summary>
+        private void PursueTool(WDateTime now, IHuman seeker, IReadOnlyList<string>? typeIds, IReadOnlyList<IHuman> chars)
+        {
+            if (typeIds is null || typeIds.Count == 0 || _locationService.GetLocation(seeker.Id) is not { } location)
             {
                 return;
             }
 
-            var lendable = _objectProvider.GetAllObjects()
-                .Where(o => o.HeldBy is null && o.IsAvailable && o.LentTo is null && o.OwnerId is not null && string.Equals(o.TypeId, typeId, StringComparison.Ordinal))
+            var tools = _objectProvider.GetAllObjects()
+                .Where(o => o.IsAvailable && o.HeldBy is null && typeIds.Contains(o.TypeId ?? string.Empty))
                 .ToList();
-            var owner = chars.FirstOrDefault(c => c.Id != asker.Id && _locationService.GetLocation(c.Id) == location && lendable.Any(o => o.OwnerId == c.Id));
-            if (owner is null)
+            if (tools.Any(o => o.LocationId == location && WorkObjects.CanUse(o, seeker.Id)))
             {
-                asker.ReceiveEvent(new ToolRequestRefused(now, asker.Id, asker.Id, typeId, "The owner is not here."));
                 return;
             }
 
-            var tool = lendable.First(o => o.OwnerId == owner.Id);
+            var usableElsewhere = tools.Where(o => WorkObjects.CanUse(o, seeker.Id)).Select(o => o.LocationId).ToHashSet(StringComparer.Ordinal);
+            if (usableElsewhere.Count > 0 && NearestOf(location, usableElsewhere) is { } toTool)
+            {
+                CommitMove(seeker, toTool, now);
+                return;
+            }
+
+            var lendable = tools.Where(o => o.OwnerId is { } owner && owner != seeker.Id && o.LentTo is null && !AskedTooRecently(seeker.Id, owner, now)).ToList();
+            var owners = chars.Where(c => c.Id != seeker.Id && lendable.Any(o => o.OwnerId == c.Id)).ToList();
+            var ownerHere = owners.FirstOrDefault(c => _locationService.GetLocation(c.Id) == location);
+            if (ownerHere is not null)
+            {
+                AskOwner(now, seeker, ownerHere, lendable.First(o => o.OwnerId == ownerHere.Id), location);
+                return;
+            }
+
+            var ownerPlaces = owners.Select(c => _locationService.GetLocation(c.Id)).OfType<string>().ToHashSet(StringComparer.Ordinal);
+            if (ownerPlaces.Count > 0 && NearestOf(location, ownerPlaces) is { } toOwner)
+            {
+                CommitMove(seeker, toOwner, now);
+                return;
+            }
+
+            using (_log.BeginCharacterScope(seeker.Id.Value, "SceneOrchestrator"))
+            {
+                _log.SceneMoveToFailed(seeker.Id.Value.ToString(), string.Join(",", typeIds));
+            }
+        }
+
+        private bool AskedTooRecently(HumanId asker, HumanId owner, WDateTime now)
+        {
+            return _toolAskedUntil.TryGetValue((asker, owner), out var until) && now < until;
+        }
+
+        private void AskOwner(WDateTime now, IHuman asker, IHuman owner, WorldObject tool, string location)
+        {
             var edge = asker.Snapshot.Relationships.Edges.GetValueOrDefault(owner.Id);
             var act = UtterSpeechAct(
                 now, asker, owner, location, RelationalActKind.Request, urgency: 0.0, closeness: edge?.Closeness ?? 0.0, familiarity: edge?.Familiarity ?? 0.0, respondingTo: null, subject: tool);
             _toolRequestActs[(asker.Id, owner.Id)] = act;
+            _toolAskedUntil[(asker.Id, owner.Id)] = now + WTimeSpan.FromHours(ToolAskCooldownHours);
         }
 
         private void SettleToolRequests(WDateTime now, IHuman owner, IReadOnlyList<IHuman> chars)
@@ -1238,11 +1290,18 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
+                // ── Looking for a tool (MoveTo:Tool): the same search as asking for one ───────
+                if (moveTo.ActionName == MoveToTool)
+                {
+                    PursueTool(now, character, moveTo.TargetTypeIds, chars);
+                    continue;
+                }
+
                 // ── Workstation trip (MoveTo:Supply) ────────────────────────────────────────
                 // Walks to the nearest place that has an object of the named type (the workstation a craft task needs); the provider is asked, as foraging does when memory has nothing.
                 if (moveTo.ActionName == MoveToSupply)
                 {
-                    var stationDestination = moveTo.TargetTypeId is { } typeId ? FindLocationWithObjectType(currentLocation, typeId) : null;
+                    var stationDestination = moveTo.TargetTypeIds?.Count > 0 ? FindLocationWithObjectType(currentLocation, moveTo.TargetTypeIds[0]) : null;
                     if (stationDestination is not null)
                     {
                         CommitMove(character, stationDestination.Value, now);
@@ -1250,7 +1309,7 @@ namespace GameEngineTools.World.Simulation
                     else
                     {
                         using (_log.BeginCharacterScope(character.Id.Value, "SceneOrchestrator"))
-                            _log.SceneMoveToFailed(character.Id.Value.ToString(), moveTo.TargetTypeId ?? "?");
+                            _log.SceneMoveToFailed(character.Id.Value.ToString(), string.Join(",", moveTo.TargetTypeIds ?? Array.Empty<string>()));
                     }
 
                     continue;
@@ -1585,27 +1644,36 @@ namespace GameEngineTools.World.Simulation
             return anywhere is null ? null : new MoveTarget(anywhere, _options.FallbackTravelDistanceMeters);
         }
 
-        /// <summary>The nearest location (other than the current one) with an available, unheld object of this type: an adjacent one first, else by path length, else any at the fallback distance.</summary>
+        /// <summary>The nearest location (other than the current one) with an available, unheld object of this type.</summary>
         private MoveTarget? FindLocationWithObjectType(string? currentLocationId, string typeId)
         {
             if (currentLocationId is null)
+            {
                 return null;
+            }
 
             var locations = _objectProvider.GetAllObjects()
                 .Where(o => o.IsAvailable && o.HeldBy is null && o.LocationId != currentLocationId && string.Equals(o.TypeId, typeId, StringComparison.Ordinal))
                 .Select(o => o.LocationId)
                 .ToHashSet(StringComparer.Ordinal);
-            if (locations.Count == 0)
-                return null;
+            return locations.Count == 0 ? null : NearestOf(currentLocationId, locations);
+        }
 
-            var adjacent = _worldMap.GetConnections(currentLocationId).Where(c => locations.Contains(c.TargetLocationId)).OrderBy(c => c.DistanceMeters).FirstOrDefault();
+        /// <summary>The closest of some places: an adjacent one first (by distance), else the nearest along the connection graph, else any at the fallback distance.</summary>
+        private MoveTarget? NearestOf(string currentLocationId, HashSet<string> places)
+        {
+            var adjacent = _worldMap.GetConnections(currentLocationId).Where(c => places.Contains(c.TargetLocationId)).OrderBy(c => c.DistanceMeters).FirstOrDefault();
             if (adjacent is not null)
+            {
                 return new MoveTarget(adjacent.TargetLocationId, adjacent.DistanceMeters);
+            }
 
-            if (NearestByPath(currentLocationId, locations.Contains) is { } nearest)
+            if (NearestByPath(currentLocationId, places.Contains) is { } nearest)
+            {
                 return nearest;
+            }
 
-            return new MoveTarget(locations.First(), _options.FallbackTravelDistanceMeters);
+            return new MoveTarget(places.First(), _options.FallbackTravelDistanceMeters);
         }
 
         /// <summary>Dijkstra over the connection graph: the closest location (other than the start) that satisfies <paramref name="accept"/>, with its path length.</summary>

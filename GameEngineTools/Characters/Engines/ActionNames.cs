@@ -100,11 +100,14 @@ namespace GameEngineTools.Characters.Engines
         /// <summary>Forage-style move toward a location with a grave (reserved for behavior-driven grave visits).</summary>
         public const string MoveToGrave = "MoveTo:Grave";
 
-        /// <summary>Walk to the nearest place with an object of the type the action names (<c>TargetTypeId</c>): the workstation a craft task needs.</summary>
+        /// <summary>Walk to the nearest place with an object of the type the action names (<c>TargetTypeIds</c>): the workstation a craft task needs.</summary>
         public const string MoveToSupply = "MoveTo:Supply";
 
-        /// <summary>Ask someone who is here and owns a tool of the type <c>TargetTypeId</c> to lend it (a Request speech act; the owner decides).</summary>
+        /// <summary>Ask someone who is here and owns a tool of one of the types <c>TargetTypeIds</c> to lend it (a Request speech act; the owner decides).</summary>
         public const string AskToBorrow = "AskToBorrow";
+
+        /// <summary>Walk to a tool of one of the types <c>TargetTypeIds</c> the character may use, or to an owner who could lend one.</summary>
+        public const string MoveToTool = "MoveTo:Tool";
 
         #endregion Bereavement / burial
 
