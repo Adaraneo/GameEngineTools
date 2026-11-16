@@ -476,6 +476,23 @@ namespace GameEngineTools.World.Simulation
             }
         }
 
+        /// <summary>Everyone else at the place of a tool loan act saw it: the subject's reputation there is folded once per witness, as for any witnessed act.</summary>
+        private void WitnessToolAct(HumanId subject, HumanId other, ThirdPartyObservationType type, WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            if (_reputationLedger is null || _locationService.GetLocation(subject) is not { } place)
+            {
+                return;
+            }
+
+            foreach (var witness in chars)
+            {
+                if (witness.Id != subject && witness.Id != other && _locationService.GetLocation(witness.Id) == place)
+                {
+                    _reputationLedger.Observe(subject, place, type, now);
+                }
+            }
+        }
+
         #endregion Community reputation
 
         #region Social status
@@ -1226,6 +1243,7 @@ namespace GameEngineTools.World.Simulation
                 if (lent)
                 {
                     ToolLoans.Lent++;
+                    WitnessToolAct(owner.Id, asker.Id, ThirdPartyObservationType.PositiveAct, now, chars);
                     var loan = new ToolLent(now, owner.Id, asker.Id, tool.Id);
                     asker.ReceiveEvent(loan);
                     owner.ReceiveEvent(loan);
@@ -1234,6 +1252,11 @@ namespace GameEngineTools.World.Simulation
                 {
                     ToolLoans.Refused++;
                     var onShift = owner.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work };
+                    if (!onShift)
+                    {
+                        WitnessToolAct(owner.Id, asker.Id, ThirdPartyObservationType.NegativeAct, now, chars);
+                    }
+
                     var refusal = new ToolRequestRefused(now, asker.Id, owner.Id, tool.TypeId ?? string.Empty, onShift ? "The owner needs it." : "The owner declined.");
                     asker.ReceiveEvent(refusal);
                     owner.ReceiveEvent(refusal);
@@ -1260,6 +1283,7 @@ namespace GameEngineTools.World.Simulation
                         continue;
 
                     ToolLoans.Returned++;
+                    WitnessToolAct(borrower.Id, owner.Id, ThirdPartyObservationType.PositiveAct, now, chars);
                     owner.ReceiveEvent(returned);
                     owner.ReceiveEvent(new MicroPositive(now, owner.Id, borrower.Id, "ToolReturned"));
                 }

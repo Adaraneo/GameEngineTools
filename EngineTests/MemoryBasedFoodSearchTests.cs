@@ -94,7 +94,7 @@ namespace EngineTests
         // ══════════════════════════════════════════════════════════════════════
 
         private (ForagingHuman Asker, ForagingHuman Owner, ConsumingWorldObjectProvider Provider, DefaultSceneOrchestrator Orchestrator) ToolScene(
-            double trust, double like, double closeness, bool ownerOnShift = false, bool ownerHere = true, bool noEdge = false)
+            double trust, double like, double closeness, bool ownerOnShift = false, bool ownerHere = true, bool noEdge = false, GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger? reputation = null)
         {
             var askerId = new HumanId(Guid.NewGuid());
             var ownerId = new HumanId(Guid.NewGuid());
@@ -103,7 +103,7 @@ namespace EngineTests
             var owner = BuildPerson(ownerHere ? HomeId : TavernId, new ActionCommitted(Now, ownerId, Idle, WTimeSpan.FromMinutes(5)), edges, ownerOnShift);
             var spade = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "spade_1", HomeId, ownerId);
             var provider = new ConsumingWorldObjectProvider(new[] { spade }, Array.Empty<string>());
-            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), provider);
+            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), provider, reputation: reputation);
             return (asker, owner, provider, orchestrator);
         }
 
@@ -149,6 +149,48 @@ namespace EngineTests
             Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
             Assert.IsTrue(waiting.Received.OfType<ToolRequestRefused>().Any() && owner.Received.OfType<ToolRequestRefused>().Any());
             Assert.AreEqual(RelationalActKind.Boundary, waiting.Received.OfType<InteractionProposed>().Single().Content.SpeechAct.RelationalKind);
+        }
+
+        private void AnswerRequest(DefaultSceneOrchestrator orchestrator, ForagingHuman asker, ForagingHuman owner, bool accepted, bool withWitness)
+        {
+            orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+            owner.Extra.Add(new InteractionOutcome(Now, asker.Id, owner.Id, Accepted: accepted, Reason: accepted ? "accepted" : "declined", Act: RelationalActKind.Request, SubjectObjectId: "spade_1"));
+            var waiting = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)));
+            var present = new List<IHuman> { waiting, owner };
+            if (withWitness)
+            {
+                present.Add(BuildPerson(HomeId, new ActionCommitted(Now, new HumanId(Guid.NewGuid()), Idle, WTimeSpan.FromMinutes(5))));
+            }
+
+            orchestrator.OnTick(Now + WTimeSpan.FromMinutes(1), present);
+        }
+
+        [TestMethod]
+        public void ALoan_IsWitnessed_TheOwnersGoodNameGrowsAtThatPlace_AndNoWitnessMeansNoReputation()
+        {
+            var seen = new GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger();
+            var (asker, owner, _, orchestrator) = ToolScene(80, 70, 50, reputation: seen);
+            AnswerRequest(orchestrator, asker, owner, accepted: true, withWitness: true);
+            Assert.IsTrue(seen.Get(owner.Id, HomeId)!.Score > 0.0, "A bystander saw the owner lend.");
+
+            var unseen = new GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger();
+            var (asker2, owner2, _, orchestrator2) = ToolScene(80, 70, 50, reputation: unseen);
+            AnswerRequest(orchestrator2, asker2, owner2, accepted: true, withWitness: false);
+            Assert.IsNull(unseen.Get(owner2.Id, HomeId), "Nobody else was there.");
+        }
+
+        [TestMethod]
+        public void ADecline_CostsTheOwnerTheirGoodName_UnlessTheOwnerNeededTheTool()
+        {
+            var plain = new GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger();
+            var (asker, owner, _, orchestrator) = ToolScene(10, 10, 10, reputation: plain);
+            AnswerRequest(orchestrator, asker, owner, accepted: false, withWitness: true);
+            Assert.IsTrue(plain.Get(owner.Id, HomeId)!.Score < 0.0, "A flat refusal is held against the owner.");
+
+            var busy = new GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger();
+            var (asker2, owner2, _, orchestrator2) = ToolScene(10, 10, 10, ownerOnShift: true, reputation: busy);
+            AnswerRequest(orchestrator2, asker2, owner2, accepted: false, withWitness: true);
+            Assert.IsNull(busy.Get(owner2.Id, HomeId), "Refusing a tool the owner needs for work is reasonable, not a bad name.");
         }
 
         [TestMethod]
@@ -715,8 +757,10 @@ namespace EngineTests
         private DefaultSceneOrchestrator BuildOrchestrator(
             WorldMap worldMap,
             IWorldObjectProvider provider,
-            SceneOrchestratorOptions? options = null)
+            SceneOrchestratorOptions? options = null,
+            GameEngineTools.Characters.Engines.Reputation.CommunityReputationLedger? reputation = null)
             => new DefaultSceneOrchestrator(
+                reputationLedger: reputation,
                 attractionCalculator: new NeutralAttractionCalculator(),
                 locationService: _locationService,
                 perceptionPolicy: new AllFullPerceptionPolicy(),
