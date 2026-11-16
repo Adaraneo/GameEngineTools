@@ -32,6 +32,8 @@ MONITOR_OPTIONS = {
     "barter": "Barter",
     "lod": "CharacterLod",
     "planet": "Planet",
+    "occupations": "Occupations",
+    "tool-share": "ToolShare",
     "set": "ConfigOverrides",
     "out": "OutputDir",
 }

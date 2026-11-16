@@ -1153,6 +1153,7 @@ namespace GameEngineTools.World.Simulation
             var remembered = RememberedPlaces(seeker, typeIds, location, o => o.IsAvailable && o.HeldBy is null && WorkObjects.CanUse(o, seeker.Id));
             if (remembered.Count > 0 && NearestOf(location, remembered) is { } toRemembered)
             {
+                ToolLoans.Walks++;
                 CommitMove(seeker, toRemembered, now);
                 return;
             }
@@ -1160,6 +1161,7 @@ namespace GameEngineTools.World.Simulation
             var usableElsewhere = tools.Where(o => WorkObjects.CanUse(o, seeker.Id)).Select(o => o.LocationId).ToHashSet(StringComparer.Ordinal);
             if (usableElsewhere.Count > 0 && NearestOf(location, usableElsewhere) is { } toTool)
             {
+                ToolLoans.Walks++;
                 CommitMove(seeker, toTool, now);
                 return;
             }
@@ -1176,6 +1178,7 @@ namespace GameEngineTools.World.Simulation
             var ownerPlaces = owners.Select(c => PlaceToFind(seeker, c)).OfType<string>().Where(place => place != location).ToHashSet(StringComparer.Ordinal);
             if (ownerPlaces.Count > 0 && NearestOf(location, ownerPlaces) is { } toOwner)
             {
+                ToolLoans.Walks++;
                 CommitMove(seeker, toOwner, now);
                 return;
             }
@@ -1223,6 +1226,7 @@ namespace GameEngineTools.World.Simulation
 
         private void AskOwner(WDateTime now, IHuman asker, IHuman owner, WorldObject tool, string location)
         {
+            ToolLoans.Asked++;
             var edge = asker.Snapshot.Relationships.Edges.GetValueOrDefault(owner.Id);
             var act = UtterSpeechAct(
                 now, asker, owner, location, RelationalActKind.Request, urgency: 0.0, closeness: edge?.Closeness ?? 0.0, familiarity: edge?.Familiarity ?? 0.0, respondingTo: null, subject: tool);

@@ -7,7 +7,7 @@ namespace WorldMonitor
     using Microsoft.Extensions.Configuration;
 
     /// <summary>One named speed/size preset of a run.</summary>
-    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0, bool Seasons = false, int? Seed = null, string? WorldDb = null, bool Barter = false, string? CharacterLod = null, string? Planet = null);
+    public sealed record RunProfile(int Characters = 6, int Days = 5, int TickStepMinutes = 64, int SubstepMinutes = 15, int Couples = 0, bool Seasons = false, int? Seed = null, string? WorldDb = null, bool Barter = false, string? CharacterLod = null, string? Planet = null, string? Occupations = null, double? ToolShare = null);
 
     /// <summary>Pass/fail limits; a missing value means the check is not made.</summary>
     public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, int? MaxEarlyDeaths = null, double EarlyDeathDays = 10, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80, double HungerLevel = 80);
@@ -15,7 +15,7 @@ namespace WorldMonitor
     /// <summary>The <c>WorldMonitor</c> section of appsettings.json, with command-line overrides applied.</summary>
     public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null, bool Barter = false, int? Seed = null, int FarmPeriodDays = 30, CognitiveResolutionLevel Lod = CognitiveResolutionLevel.Nearby, string? Planet = null, IReadOnlyList<string>? ConfigOverrides = null)
     {
-        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c>, <c>--seasons true</c>, <c>--seed N</c>, <c>--lod Player|Nearby|Background</c>, <c>--planet Name</c>, <c>--set Section:Key=value</c> (repeatable) override it; each is also a profile key (or a WorldMonitor key for WorldDb, Barter, Seed, CharacterLod, FarmPeriodDays, Planet, ConfigOverrides).</summary>
+        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c>, <c>--seasons true</c>, <c>--seed N</c>, <c>--lod Player|Nearby|Background</c>, <c>--planet Name</c>, <c>--occupations a,b,c</c> (the jobs given round-robin; default the city list), <c>--tool-share X</c> (share of the tools that become personal, 0 to 1; default a third), <c>--set Section:Key=value</c> (repeatable) override it; each is also a profile key (or a WorldMonitor key for WorldDb, Barter, Seed, CharacterLod, FarmPeriodDays, Planet, ConfigOverrides).</summary>
         public static MonitorOptions Load(string[] args)
         {
             var overrides = ParseArgs(args);
@@ -39,6 +39,8 @@ namespace WorldMonitor
                 SubstepMinutes = IntOverride(overrides, "substep", profile.SubstepMinutes),
                 Couples = IntOverride(overrides, "couples", profile.Couples),
                 Seasons = overrides.TryGetValue("seasons", out var seasonsText) ? seasonsText is "true" or "1" : profile.Seasons,
+                Occupations = overrides.GetValueOrDefault("occupations") ?? profile.Occupations,
+                ToolShare = overrides.TryGetValue("tool-share", out var shareText) && double.TryParse(shareText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var shareValue) ? shareValue : profile.ToolShare,
             };
 
             // A command-line value wins over the profile, the profile over the WorldMonitor section.

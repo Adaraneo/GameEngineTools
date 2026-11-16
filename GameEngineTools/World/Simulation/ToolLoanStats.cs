@@ -1,4 +1,4 @@
-// ToolLoanStats.cs
+﻿// ToolLoanStats.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Simulation
@@ -20,5 +20,11 @@ namespace GameEngineTools.World.Simulation
 
         /// <summary>Searches that found no tool to take or borrow anywhere.</summary>
         public int SearchesFailed { get; internal set; }
+
+        /// <summary>Requests spoken to an owner who was present.</summary>
+        public int Asked { get; internal set; }
+
+        /// <summary>Walks begun toward a remembered tool, a tool lying elsewhere or an owner.</summary>
+        public int Walks { get; internal set; }
     }
 }

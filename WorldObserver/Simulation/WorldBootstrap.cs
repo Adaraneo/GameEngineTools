@@ -60,8 +60,16 @@ namespace WorldObserver.Simulation
         }
 
         /// <summary>Loads the world and returns the pieces the host wires into a scene.</summary>
-        public static WorldContext Build(GameEngineToolsRuntimeHandle runtime, int characterCount, int coupleCount = 0, int? seed = null, double instantTravelBelowMinutes = 0.0)
+        public static WorldContext Build(
+            GameEngineToolsRuntimeHandle runtime,
+            int characterCount,
+            int coupleCount = 0,
+            int? seed = null,
+            double instantTravelBelowMinutes = 0.0,
+            IReadOnlyList<string>? occupations = null,
+            double toolPersonalShare = GameEngineTools.World.Work.ToolOwnership.DefaultPersonalShare)
         {
+            var jobs = occupations is { Count: > 0 } ? occupations : ModernOccupations;
             var services = runtime.Services;
             var manager = (GameEngineToolsManager)runtime.GameEngineToolsManager;
             var clock = (SystemClock)runtime.Clock;
@@ -113,7 +121,7 @@ namespace WorldObserver.Simulation
                 locations.MoveCharacter(person.Id, home); // start the day at home
 
                 // Modern occupation (re-seeds the daily schedule with city work hours/locations).
-                person.ChangeOccupation(ModernOccupations[index % ModernOccupations.Length]);
+                person.ChangeOccupation(jobs[index % jobs.Count]);
             }
 
             // Partners start as an established couple: a seeded partner bond and one shared flat.
@@ -159,7 +167,7 @@ namespace WorldObserver.Simulation
 
             // A third of the village's tools become somebody's own (round-robin over the people); the rest stay common. Lending then matters.
             if (services.GetService<GameEngineTools.World.Objects.IMutableWorldObjectProvider>() is { } toolProvider)
-                GameEngineTools.World.Work.ToolOwnership.AssignPersonalTools(toolProvider, people.Select(p => p.Id).ToList());
+                GameEngineTools.World.Work.ToolOwnership.AssignPersonalTools(toolProvider, people.Select(p => p.Id).ToList(), toolPersonalShare);
 
             // ── Scene orchestrator ───────────────────────────────────────────────────
             var orchestrator = new DefaultSceneOrchestrator(

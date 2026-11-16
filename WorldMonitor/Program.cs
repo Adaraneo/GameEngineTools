@@ -55,7 +55,10 @@ await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     writeTextLogs: false,
     configureServices: static s => s.AddLexicalAcquisition()))
 {
-    var world = WorldBootstrap.Build(runtime, Math.Max(1, options.Run.Characters), options.Run.Couples, options.Seed, options.Run.SubstepMinutes);
+    var jobs = options.Run.Occupations?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var world = WorldBootstrap.Build(
+        runtime, Math.Max(1, options.Run.Characters), options.Run.Couples, options.Seed, options.Run.SubstepMinutes,
+        jobs, options.Run.ToolShare ?? GameEngineTools.World.Work.ToolOwnership.DefaultPersonalShare);
     var objects = runtime.Services.GetRequiredService<GameEngineTools.World.Objects.IWorldObjectProvider>();
     collector.FarmSampler = () => objects.GetAllObjects();
     collector.ToolStats = () => world.Orchestrator.ToolLoans;
