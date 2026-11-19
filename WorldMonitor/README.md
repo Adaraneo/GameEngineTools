@@ -21,6 +21,8 @@ The report also lists every character (personality, relationships, accepted/reje
 
 Several monitors can run at the same time (each uses about 80-90 MB and one core): every run copies the config and SourceFiles into its own temporary folder, because the engine keeps its world database at a fixed path under the working directory and runs sharing a folder would rewrite each other's world. Report files carry the process id so parallel runs never collide.
 
+`--logs true` (or `WorldMonitor:WriteLogs`) writes the engine's JSONL logs of the run to `logs-<profile>-<time>/Characters` in the output folder, for LogReader or a grep; it is off by default because a long run writes a lot (debug level).
+
 Runs are not reproducible: the world and the orchestrator use unseeded random sources, so two runs of one profile differ (a stress mean of 3 or 23 on the last day is within what was seen).
 
 The intimacy part lists outcomes by speech act (invitations split by privacy) and the characters' desire, closeness and invitations tried; a further table lists the closest pairs with the hours they were awake together and how many of those were in a place with privacy. The death log also carries each character's recent plan and place changes, so the cause of a death can be read off the report.

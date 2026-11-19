@@ -13,9 +13,9 @@ namespace WorldMonitor
     public sealed record Thresholds(double? MaxMedianStress = null, double? MinSleepWithPrivacyPercent = null, int? MaxDeaths = null, int? MaxEarlyDeaths = null, double EarlyDeathDays = 10, double? MaxChronicStressPercent = null, double ChronicStressLevel = 80, double HungerLevel = 80);
 
     /// <summary>The <c>WorldMonitor</c> section of appsettings.json, with command-line overrides applied.</summary>
-    public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null, bool Barter = false, int? Seed = null, int FarmPeriodDays = 30, CognitiveResolutionLevel Lod = CognitiveResolutionLevel.Nearby, string? Planet = null, IReadOnlyList<string>? ConfigOverrides = null)
+    public sealed record MonitorOptions(string ProfileName, RunProfile Run, double SampleEveryHours, string OutputDir, Thresholds Thresholds, string? WorldDb = null, bool Barter = false, int? Seed = null, int FarmPeriodDays = 30, CognitiveResolutionLevel Lod = CognitiveResolutionLevel.Nearby, string? Planet = null, IReadOnlyList<string>? ConfigOverrides = null, bool WriteLogs = false)
     {
-        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c>, <c>--seasons true</c>, <c>--seed N</c>, <c>--lod Player|Nearby|Background</c>, <c>--planet Name</c>, <c>--occupations a,b,c</c> (the jobs given round-robin; default the city list), <c>--tool-share X</c> (share of the tools that become personal, 0 to 1; default a third), <c>--set Section:Key=value</c> (repeatable) override it; each is also a profile key (or a WorldMonitor key for WorldDb, Barter, Seed, CharacterLod, FarmPeriodDays, Planet, ConfigOverrides).</summary>
+        /// <summary>Reads appsettings.json; <c>--profile X</c>, <c>--days N</c>, <c>--characters N</c>, <c>--tick N</c>, <c>--substep N</c>, <c>--out DIR</c>, <c>--world-db FILE</c>, <c>--barter true</c>, <c>--seasons true</c>, <c>--seed N</c>, <c>--lod Player|Nearby|Background</c>, <c>--planet Name</c>, <c>--occupations a,b,c</c> (the jobs given round-robin; default the city list), <c>--tool-share X</c> (share of the tools that become personal, 0 to 1; default a third), <c>--logs true</c> (write the engine's JSONL logs into the output folder for LogReader; default off), <c>--set Section:Key=value</c> (repeatable) override it; each is also a profile key (or a WorldMonitor key for WorldDb, Barter, Seed, CharacterLod, FarmPeriodDays, Planet, ConfigOverrides, WriteLogs).</summary>
         public static MonitorOptions Load(string[] args)
         {
             var overrides = ParseArgs(args);
@@ -52,6 +52,7 @@ namespace WorldMonitor
                 throw new InvalidOperationException($"CharacterLod '{lodText}' is not one of {string.Join(", ", Enum.GetNames<CognitiveResolutionLevel>())}.");
             var planet = overrides.GetValueOrDefault("planet") ?? profile.Planet ?? section["Planet"];
             var configOverrides = (section.GetSection("ConfigOverrides").Get<string[]>() ?? Array.Empty<string>()).Concat(SetArgs(args)).ToList();
+            var writeLogs = overrides.TryGetValue("logs", out var logsText) ? logsText is "true" or "1" : section.GetValue("WriteLogs", false);
             var farmPeriodDays = section.GetValue("FarmPeriodDays", 30);
             if (farmPeriodDays < 1)
                 throw new InvalidOperationException("FarmPeriodDays must be positive.");
@@ -72,7 +73,8 @@ namespace WorldMonitor
                 farmPeriodDays,
                 lod,
                 string.IsNullOrWhiteSpace(planet) ? null : planet,
-                configOverrides);
+                configOverrides,
+                writeLogs);
         }
 
         private static int IntOverride(Dictionary<string, string> overrides, string key, int fallback)

@@ -36,6 +36,7 @@ MONITOR_OPTIONS = {
     "tool-share": "ToolShare",
     "set": "ConfigOverrides",
     "out": "OutputDir",
+    "logs": "WriteLogs",
 }
 
 # Numeric constants in WorldMonitor that are not tunables, with the reason.

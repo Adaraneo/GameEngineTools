@@ -41,6 +41,8 @@ catch (Exception ex) when (ex is FileNotFoundException or InvalidOperationExcept
     return 1;
 }
 
+// Logs go next to the report, outside the run directory (which is deleted).
+var logsRoot = options.WriteLogs ? Path.Combine(outputDir, $"logs-{options.ProfileName}-{DateTime.Now:yyyyMMdd-HHmmss}-p{Environment.ProcessId}") : null;
 Directory.SetCurrentDirectory(runDir);
 
 var collector = new Collector(options.SampleEveryHours, options.Run.Days, options.Thresholds.HungerLevel, options.FarmPeriodDays);
@@ -51,7 +53,8 @@ try
 {
 await using (var runtime = await GameEngineToolsRuntime.StartAsync(
     consoleLogs: false,
-    writeJsonLines: false,
+    logsRoot: logsRoot,
+    writeJsonLines: logsRoot is not null,
     writeTextLogs: false,
     configureServices: static s => s.AddLexicalAcquisition()))
 {
