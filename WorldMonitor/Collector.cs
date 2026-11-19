@@ -63,7 +63,7 @@ namespace WorldMonitor
     /// <summary>Per-world-day counters taken at every tick.</summary>
     public sealed class DayCounters
     {
-        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany, HungryReadings, ThirstyReadings, Meals, Drinks, Ploughed, Sowed, Reaped, Threshed, Asked, WalkedToTool, WalkedToStorage, WalkedToSupply;
+        public long Total, Private, AtHome, Asleep, AsleepPrivate, Awake, AwakeWithCompany, HungryReadings, ThirstyReadings, Meals, Drinks, Ploughed, Sowed, Reaped, Threshed, Asked, WalkedToTool, WalkedToStorage, WalkedToOwner, WalkedToSupply;
         public double HungerSum, ThirstSum;
     }
 
@@ -319,6 +319,7 @@ namespace WorldMonitor
                             else if (ac.ActionName == ActionNames.AskToBorrow) today.Asked++;
                             else if (ac.ActionName == ActionNames.MoveToTool) today.WalkedToTool++;
                             else if (ac.ActionName == ActionNames.MoveToStorage) today.WalkedToStorage++;
+                            else if (ac.ActionName == ActionNames.MoveToOwner) today.WalkedToOwner++;
                             else if (ac.ActionName == ActionNames.MoveToSupply) today.WalkedToSupply++;
                         }
                         if (People.TryGetValue(ac.Human, out var actor)) { actor.LastAction = ac.ActionName; if (ac.ActionName == ActionNames.InviteIntimacy) actor.Invites++; }

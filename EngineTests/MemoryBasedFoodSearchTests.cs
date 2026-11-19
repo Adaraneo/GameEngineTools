@@ -165,6 +165,50 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void MoveToOwner_TheBorrowerWalksToWhereTheOwnerIs_AndHandsTheToolOverOnArrival()
+        {
+            var (borrower, owner, provider, orchestrator) = LendingScene();
+            var away = BuildPerson(TavernId, new ActionCommitted(Now, owner.Id, Idle, WTimeSpan.FromMinutes(5)));
+            var walking = BuildPerson(HomeId, new ActionCommitted(Now, borrower.Id, MoveToOwner, WTimeSpan.FromMinutes(20)));
+
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { walking, away });
+
+            Assert.AreEqual(TavernId, _locationService.GetLocation(borrower.Id), "The owner is at the tavern, not at the shed: the borrower goes there.");
+            Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
+            Assert.AreEqual(owner.Id, provider.FindObject("spade_1")!.HeldBy);
+            Assert.AreEqual(1, orchestrator.ToolLoans.HandedBack);
+        }
+
+        [TestMethod]
+        public void MoveToOwner_AnOwnerTooFarToAfford_IsNotWalkedTo_AndTheBorrowerIsToldToWaitBeforeTryingAgain()
+        {
+            var (borrower, owner, provider, _) = LendingScene();
+            var away = BuildPerson(TavernId, new ActionCommitted(Now, owner.Id, Idle, WTimeSpan.FromMinutes(5)));
+            var walking = BuildPerson(HomeId, new ActionCommitted(Now, borrower.Id, MoveToOwner, WTimeSpan.FromMinutes(20)));
+
+            // 100 km at 80 m/min is about 21 hours, far more than a body affords.
+            var far = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 100000.0) }), provider, new SceneOrchestratorOptions { EnableTravelTime = true });
+            far.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { walking, away });
+
+            Assert.AreEqual(HomeId, _locationService.GetLocation(borrower.Id));
+            Assert.IsTrue(walking.Received.OfType<ToolReturnDeferred>().Single().RetryAt > Now + WTimeSpan.FromHours(5));
+            Assert.AreEqual(1, far.ToolLoans.ReturnsDeferred);
+            Assert.AreEqual(borrower.Id, provider.FindObject("spade_1")!.LentTo, "The tool stays with the borrower.");
+        }
+
+        [TestMethod]
+        public void MoveToOwner_TheOwnerIsAlreadyHere_NothingIsWaitedOut_TheHandoverIsMadeAtOnce()
+        {
+            var (borrower, owner, provider, orchestrator) = LendingScene();
+            var walking = BuildPerson(HomeId, new ActionCommitted(Now, borrower.Id, MoveToOwner, WTimeSpan.FromMinutes(20)));
+
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { walking, owner });
+
+            Assert.AreEqual(0, walking.Received.OfType<ToolReturnDeferred>().Count());
+            Assert.AreEqual(owner.Id, provider.FindObject("spade_1")!.HeldBy);
+        }
+
+        [TestMethod]
         public void TheHandover_WaitsForTheMinimumHold_ForAnOwnerWhoIsAway_AndForABorrowerOnShift()
         {
             var (borrower, owner, provider, orchestrator) = LendingScene();

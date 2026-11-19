@@ -112,6 +112,9 @@ namespace GameEngineTools.Characters.Engines
         /// <summary>Walk to the place a carried tool is kept, to put it back.</summary>
         public const string MoveToStorage = "MoveTo:Storage";
 
+        /// <summary>Walk to the owner of a borrowed tool, to hand it back.</summary>
+        public const string MoveToOwner = "MoveTo:Owner";
+
         #endregion Bereavement / burial
 
         #region Food economy (Tier 1)

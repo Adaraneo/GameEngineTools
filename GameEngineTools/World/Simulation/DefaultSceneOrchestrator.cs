@@ -1232,6 +1232,40 @@ namespace GameEngineTools.World.Simulation
             seeker.ReceiveEvent(new ToolSearchFailed(now, seeker.Id, string.Join(",", typeIds), now + WTimeSpan.FromHours(ToolTrip.RetryHours(failures))));
         }
 
+        /// <summary>The borrower gives up a walk back for now (too far, or nowhere to find the owner) and is told to wait before trying again; the wait grows with each failure in a row.</summary>
+        private void DeferToolReturn(WDateTime now, IHuman borrower, string toolId)
+        {
+            ToolLoans.ReturnsDeferred++;
+            var failures = _toolReturnFailures.GetValueOrDefault(borrower.Id) + 1;
+            _toolReturnFailures[borrower.Id] = failures;
+            borrower.ReceiveEvent(new ToolReturnDeferred(now, borrower.Id, toolId, now + WTimeSpan.FromHours(ToolTrip.RetryHours(failures))));
+        }
+
+        /// <summary>A borrower walks to where they would find the owner of the tool they hold (<see cref="PlaceToFind"/>); the handover is made on arrival. An owner who is already here needs no walk, and one who cannot be reached or found is waited out.</summary>
+        private void WalkToOwner(WDateTime now, IHuman borrower, string? currentLocation, IReadOnlyList<IHuman> chars)
+        {
+            var lent = _mutableObjects?.GetHeldBy(borrower.Id).FirstOrDefault(o => o.LentTo == borrower.Id);
+            if (lent?.OwnerId is not { } ownerId || currentLocation is null || chars.FirstOrDefault(c => c.Id == ownerId) is not { } owner)
+            {
+                return;
+            }
+
+            if (_locationService.GetLocation(ownerId) == currentLocation)
+            {
+                return;
+            }
+
+            var place = PlaceToFind(borrower, owner);
+            if (place is not null && place != currentLocation && NearestOf(currentLocation, new HashSet<string>(StringComparer.Ordinal) { place }) is { } toOwner && Reachable(borrower, toOwner))
+            {
+                _toolReturnFailures.Remove(borrower.Id);
+                CommitMove(borrower, toOwner, now);
+                return;
+            }
+
+            DeferToolReturn(now, borrower, lent.Id);
+        }
+
         /// <summary>Whether the seeker would walk this far for a tool now (<see cref="ToolTrip"/>); with instant travel there is no cost, so always.</summary>
         private bool Reachable(IHuman seeker, MoveTarget target)
         {
@@ -1507,7 +1541,7 @@ namespace GameEngineTools.World.Simulation
                 // ── Bringing a carried tool back to its shed (MoveTo:Storage) ──────────────────
                 if (moveTo.ActionName == MoveToStorage)
                 {
-                    var carried = _mutableObjects?.GetHeldBy(character.Id).FirstOrDefault(o => o.StoredAt is not null && o.StoredAt != currentLocation);
+                    var carried = _mutableObjects?.GetHeldBy(character.Id).FirstOrDefault(o => o.LentTo is null && o.StoredAt is not null && o.StoredAt != currentLocation);
                     if (carried?.StoredAt is { } shed && currentLocation is not null && NearestOf(currentLocation, new HashSet<string>(StringComparer.Ordinal) { shed }) is { } toShed)
                     {
                         if (Reachable(character, toShed))
@@ -1517,13 +1551,17 @@ namespace GameEngineTools.World.Simulation
                         }
                         else
                         {
-                            ToolLoans.ReturnsDeferred++;
-                            var failures = _toolReturnFailures.GetValueOrDefault(character.Id) + 1;
-                            _toolReturnFailures[character.Id] = failures;
-                            character.ReceiveEvent(new ToolReturnDeferred(now, character.Id, carried.Id, now + WTimeSpan.FromHours(ToolTrip.RetryHours(failures))));
+                            DeferToolReturn(now, character, carried.Id);
                         }
                     }
 
+                    continue;
+                }
+
+                // ── Bringing a borrowed tool back to its owner (MoveTo:Owner) ───────────────────
+                if (moveTo.ActionName == MoveToOwner)
+                {
+                    WalkToOwner(now, character, currentLocation, chars);
                     continue;
                 }
 

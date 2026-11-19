@@ -68,6 +68,7 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 [MoveToSupply] = ActionSlotMask.Posture,
                 [MoveToTool] = ActionSlotMask.Posture,
                 [MoveToStorage] = ActionSlotMask.Posture,
+                [MoveToOwner] = ActionSlotMask.Posture,
                 [AskToBorrow] = ActionSlotMask.Mouth,
                 [MournAtGrave] = ActionSlotMask.None,
             };

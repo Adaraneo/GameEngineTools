@@ -101,6 +101,38 @@ namespace EngineTests
             Assert.AreEqual(InteractWithObject, engine.Evaluate(atShed).Candidates.Single().Name, "Already at the shed: put it down regardless.");
         }
 
+        private static WorldObject Borrowed(string? storedAt, WDateTime lentAt)
+        {
+            return Spade(storedAt) with { OwnerId = new HumanId(Guid.NewGuid()), LentTo = Self, LentAt = lentAt };
+        }
+
+        [TestMethod]
+        public void ABorrowedTool_IsWalkedToItsOwner_NotToTheShed_AndNotPutDownEvenAtTheShed()
+        {
+            var engine = new ToolReturnNeedEngine();
+            var later = new WDateTime(0) + WTimeSpan.FromHours(5);
+
+            var elsewhere = engine.Evaluate(Ctx(false, Borrowed("farm", new WDateTime(0))) with { Now = later }).Candidates.Single();
+            var atTheShed = engine.Evaluate(Ctx(false, Borrowed(Loc, new WDateTime(0))) with { Now = later }).Candidates.Single();
+
+            Assert.AreEqual(MoveToOwner, elsewhere.Name);
+            Assert.AreEqual(MoveToOwner, atTheShed.Name, "A borrowed tool is not put down at the shed: it goes back to who lent it.");
+        }
+
+        [TestMethod]
+        public void ABorrowedTool_IsKeptAWhile_AndFollowsTheSameShiftAndRetryRulesAsAWalkToTheShed()
+        {
+            var engine = new ToolReturnNeedEngine();
+            var later = new WDateTime(0) + WTimeSpan.FromHours(5);
+
+            Assert.AreEqual(0, engine.Evaluate(Ctx(false, Borrowed("farm", new WDateTime(0)))).Candidates.Count, "Just lent: kept for a while.");
+            Assert.AreEqual(0, engine.Evaluate(Ctx(true, Borrowed("farm", new WDateTime(0))) with { Now = later }).Candidates.Count, "On shift with no strong memory: kept.");
+
+            var waiting = Ctx(false, Borrowed("farm", new WDateTime(0))) with { Now = later };
+            waiting = waiting with { State = waiting.State with { ToolReturnRetryAt = later + WTimeSpan.FromHours(6) } };
+            Assert.AreEqual(0, engine.Evaluate(waiting).Candidates.Count, "A walk given up is not offered before the retry time.");
+        }
+
         [TestMethod]
         public void TheWalkBack_IsMoreUrgentTheStrongerTheMemoryThatTheToolIsOwed()
         {
