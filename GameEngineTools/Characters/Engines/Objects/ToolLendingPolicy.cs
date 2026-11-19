@@ -30,8 +30,14 @@ namespace GameEngineTools.Characters.Engines.Objects
             return edge is null ? 0.0 : TrustWeight * edge.Trust + LikeWeight * edge.Like + ClosenessWeight * edge.Closeness;
         }
 
-        /// <summary>Gets the chance (0-1) that the owner lends: logistic in the score above the owner's threshold, a tenth of that while the owner works.</summary>
-        public static double Probability(RelationshipEdge? edge, double ownerAgreeableness, bool ownerOnWorkShift)
+        /// <summary>Gets whether the owner needs the tool now: on a work shift while the tool lies where the owner stands; a tool at another place is not missed.</summary>
+        public static bool OwnerNeedsItNow(bool ownerOnWorkShift, string? ownerPlace, string toolLocation)
+        {
+            return ownerOnWorkShift && ownerPlace is not null && string.Equals(ownerPlace, toolLocation, StringComparison.Ordinal);
+        }
+
+        /// <summary>Gets the chance (0-1) that the owner lends: logistic in the score above the owner's threshold, a tenth of that while the owner needs the tool now.</summary>
+        public static double Probability(RelationshipEdge? edge, double ownerAgreeableness, bool ownerNeedsItNow)
         {
             if (edge is null || edge.IsContemptuouslyDestroyed)
             {
@@ -40,7 +46,7 @@ namespace GameEngineTools.Characters.Engines.Objects
 
             var margin = Score(edge) - (BaseThreshold - AgreeableThresholdShift * (ownerAgreeableness - 0.5));
             var chance = 1.0 / (1.0 + Math.Exp(-margin / ChanceSpread));
-            return ownerOnWorkShift ? chance * NeededNowFactor : chance;
+            return ownerNeedsItNow ? chance * NeededNowFactor : chance;
         }
     }
 }

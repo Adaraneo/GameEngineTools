@@ -1307,7 +1307,7 @@ namespace GameEngineTools.World.Simulation
                 else
                 {
                     ToolLoans.Refused++;
-                    var onShift = owner.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work };
+                    var onShift = ToolLendingPolicy.OwnerNeedsItNow(owner.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work }, _locationService.GetLocation(owner.Id), tool.LocationId);
                     if (!onShift)
                     {
                         WitnessToolAct(owner.Id, asker.Id, ThirdPartyObservationType.NegativeAct, now, chars);

@@ -333,14 +333,22 @@ namespace EngineTests
 
             var friend = Edge(80, 70, 50);
 
-            Assert.IsTrue(ToolLendingPolicy.Probability(friend, 0.5, ownerOnWorkShift: false) > 0.8);
-            Assert.IsTrue(ToolLendingPolicy.Probability(friend, 0.5, ownerOnWorkShift: true) < 0.1, "The owner needs it now.");
-            Assert.AreEqual(0.0, ToolLendingPolicy.Probability(null, 0.5, ownerOnWorkShift: false), "A stranger has no standing.");
+            Assert.IsTrue(ToolLendingPolicy.Probability(friend, 0.5, ownerNeedsItNow: false) > 0.8);
+            Assert.IsTrue(ToolLendingPolicy.Probability(friend, 0.5, ownerNeedsItNow: true) < 0.1, "The owner needs it now.");
+            Assert.AreEqual(0.0, ToolLendingPolicy.Probability(null, 0.5, ownerNeedsItNow: false), "A stranger has no standing.");
             Assert.IsTrue(ToolLendingPolicy.Probability(Edge(40, 40, 30), 0.5, false) < 0.15, "Lukewarm is not enough.");
             Assert.IsTrue(ToolLendingPolicy.Probability(Edge(50, 50, 45), 1.0, false) > ToolLendingPolicy.Probability(Edge(50, 50, 45), 0.0, false), "The same edge: an agreeable owner lends more readily.");
             Assert.IsTrue(ToolLendingPolicy.Probability(Edge(60, 60, 60), 0.5, false) > ToolLendingPolicy.Probability(Edge(50, 50, 50), 0.5, false), "More trust, like and closeness: more likely.");
             Assert.AreEqual(0.0, ToolLendingPolicy.Probability(friend with { IsContemptuouslyDestroyed = true }, 0.5, false));
         }
 
+        [TestMethod]
+        public void TheOwnerNeedsATool_OnlyOnAShiftAndWhereTheToolLies()
+        {
+            Assert.IsTrue(ToolLendingPolicy.OwnerNeedsItNow(true, "farm_a", "farm_a"));
+            Assert.IsFalse(ToolLendingPolicy.OwnerNeedsItNow(true, "farm_a", "farm_b"), "A tool at another place is not missed.");
+            Assert.IsFalse(ToolLendingPolicy.OwnerNeedsItNow(false, "farm_a", "farm_a"), "Off shift nothing is needed.");
+            Assert.IsFalse(ToolLendingPolicy.OwnerNeedsItNow(true, null, "farm_a"), "An owner with no known place does not guard it.");
+        }
     }
 }

@@ -278,7 +278,10 @@ namespace GameEngineTools.Characters.Engines.Interactions
             var subjectObjectId = ToolRequestSubject(p.Content.SpeechAct);
             if (subjectObjectId is not null)
             {
-                baseP = ToolLendingPolicy.Probability(edge, ctx.Personality.BigFive.Agreeableness, ctx.Snapshot.Schedule?.ActiveSlot is { PreferredAction: ActionNames.Work });
+                var toolPlace = ctx.Snapshot.Memory.KnownObjects.FirstOrDefault(f => f.ObjectId == subjectObjectId)?.LocationId;
+                var needsItNow = toolPlace is not null
+                    && ToolLendingPolicy.OwnerNeedsItNow(ctx.Snapshot.Schedule?.ActiveSlot is { PreferredAction: ActionNames.Work }, ctx.Snapshot.Behavior.PerceivedAt, toolPlace);
+                baseP = ToolLendingPolicy.Probability(edge, ctx.Personality.BigFive.Agreeableness, needsItNow);
             }
 
             if (p.Content.SpeechAct.RelationalKind == RelationalActKind.Invite)
