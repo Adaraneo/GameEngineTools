@@ -58,7 +58,7 @@ namespace EngineTests
                 Closeness: closeness, Respect: 50, Comfort: 50, Breakdown: new DomainBreakdown(50, 50, 50, 50, 50));
         }
 
-        private static (double Chance, InteractionOutcome Outcome) Answer(RelationshipEdge? edge, bool ownerAtWork, bool forATool)
+        private static (double Chance, InteractionOutcome Outcome) Answer(RelationshipEdge? edge, bool ownerAtWork, bool forATool, string toolPlace = "farm")
         {
             var random = new RecordingRandom();
             var engine = new DefaultInteractionEngine(
@@ -74,10 +74,10 @@ namespace EngineTests
             var snapshot = new EnginesSnapshot(
                 new PhysiologyState(80, 0, 10, 10, 0, 0, 0, null),
                 new PsychologyState(0.1, 0.4, 0.5, 20, 10, DiscreteEmotion.Neutral),
-                new BehaviorState(10, 5, 5, 20, 50, 30, null),
+                new BehaviorState(10, 5, 5, 20, 50, 30, null, PerceivedAt: "farm"),
                 new InteractionSurface("farm", false, 0.1, 0.1, SurfaceKind.Social),
                 new RelationshipState(edges),
-                new MemoryIndex(new List<EpisodicMemory>()));
+                new MemoryIndex(new List<EpisodicMemory>()) { KnownObjects = new[] { new ObjectLocationFact("spade_1", toolPlace, new WDateTime(0), 1.0) } });
             if (ownerAtWork)
             {
                 var slot = new ScheduleSlot("work", 5, Work);
@@ -119,11 +119,19 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void AnOwnerAtWork_RarelyLends_EvenToAFriend()
+        public void AnOwnerAtWork_RarelyLends_EvenToAFriend_WhenTheToolIsWhereHeStands()
         {
             var atWork = Answer(Edge(80, 70, 50), ownerAtWork: true, forATool: true);
 
             Assert.IsTrue(atWork.Chance < 0.15, $"The owner needs the tool: {atWork.Chance:F2}");
+        }
+
+        [TestMethod]
+        public void AnOwnerAtWork_LendsAToolThatLiesElsewhere_AsReadilyAsOffShift()
+        {
+            var elsewhere = Answer(Edge(80, 70, 50), ownerAtWork: true, forATool: true, toolPlace: "other_farm");
+
+            Assert.IsTrue(elsewhere.Chance > 0.75, $"The owner does not miss it: {elsewhere.Chance:F2}");
         }
 
         [TestMethod]
