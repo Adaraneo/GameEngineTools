@@ -36,6 +36,22 @@ namespace GameEngineTools.Characters.Engines.Objects
             return ownerOnWorkShift && ownerPlace is not null && string.Equals(ownerPlace, toolLocation, StringComparison.Ordinal);
         }
 
+        /// <summary>Gets the cause of a refusal that already happened, from the same inputs the chance was drawn from.</summary>
+        public static ToolRefusalReason ClassifyRefusal(RelationshipEdge? edge, double ownerAgreeableness, bool ownerNeedsItNow)
+        {
+            if (ownerNeedsItNow)
+            {
+                return ToolRefusalReason.NeededNow;
+            }
+
+            if (edge is null || edge.IsContemptuouslyDestroyed)
+            {
+                return ToolRefusalReason.NoStanding;
+            }
+
+            return Probability(edge, ownerAgreeableness, false) < 0.5 ? ToolRefusalReason.BelowThreshold : ToolRefusalReason.Unlucky;
+        }
+
         /// <summary>Gets the chance (0-1) that the owner lends: logistic in the score above the owner's threshold, a tenth of that while the owner needs the tool now.</summary>
         public static double Probability(RelationshipEdge? edge, double ownerAgreeableness, bool ownerNeedsItNow)
         {

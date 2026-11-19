@@ -343,6 +343,22 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void ARefusal_IsSortedByItsCause()
+        {
+            RelationshipEdge Edge(double trust, double like, double closeness)
+            {
+                return new(Owner, Neighbour, Like: like, Trust: trust, Familiarity: 50, AestheticAttraction: 0, PhysicalAttraction: 0, IntimateAffinity: 0, SexualInterest: 0,
+                    Closeness: closeness, Respect: 50, Comfort: 50, Breakdown: new GameEngineTools.Characters.Engines.Relationships.DomainBreakdown(50, 50, 50, 50, 50));
+            }
+
+            Assert.AreEqual(ToolRefusalReason.NeededNow, ToolLendingPolicy.ClassifyRefusal(Edge(80, 70, 50), 0.5, true));
+            Assert.AreEqual(ToolRefusalReason.NoStanding, ToolLendingPolicy.ClassifyRefusal(null, 0.5, false));
+            Assert.AreEqual(ToolRefusalReason.NoStanding, ToolLendingPolicy.ClassifyRefusal(Edge(80, 70, 50) with { IsContemptuouslyDestroyed = true }, 0.5, false));
+            Assert.AreEqual(ToolRefusalReason.BelowThreshold, ToolLendingPolicy.ClassifyRefusal(Edge(40, 40, 30), 0.5, false));
+            Assert.AreEqual(ToolRefusalReason.Unlucky, ToolLendingPolicy.ClassifyRefusal(Edge(80, 70, 50), 0.5, false));
+        }
+
+        [TestMethod]
         public void TheOwnerNeedsATool_OnlyOnAShiftAndWhereTheToolLies()
         {
             Assert.IsTrue(ToolLendingPolicy.OwnerNeedsItNow(true, "farm_a", "farm_a"));

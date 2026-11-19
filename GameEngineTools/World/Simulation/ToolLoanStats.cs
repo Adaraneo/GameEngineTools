@@ -12,6 +12,18 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Requests an owner refused.</summary>
         public int Refused { get; internal set; }
 
+        /// <summary>Refusals because the owner needed the tool where the owner stood.</summary>
+        public int RefusedNeededNow { get; internal set; }
+
+        /// <summary>Refusals because the owner had no standing view of the asker.</summary>
+        public int RefusedNoStanding { get; internal set; }
+
+        /// <summary>Refusals because the owner's feeling for the asker was below the owner's threshold.</summary>
+        public int RefusedBelowThreshold { get; internal set; }
+
+        /// <summary>Refusals with a chance of one half or more where the draw went against the asker.</summary>
+        public int RefusedUnlucky { get; internal set; }
+
         /// <summary>Lent tools put back by the borrower.</summary>
         public int Returned { get; internal set; }
 

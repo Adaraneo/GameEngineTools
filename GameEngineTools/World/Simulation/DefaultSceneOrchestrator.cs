@@ -1313,6 +1313,23 @@ namespace GameEngineTools.World.Simulation
                         WitnessToolAct(owner.Id, asker.Id, ThirdPartyObservationType.NegativeAct, now, chars);
                     }
 
+                    // The cause is read from the world's truth; the owner's engine judged by memory, so the two can differ when the owner does not remember where the tool lies.
+                    switch (ToolLendingPolicy.ClassifyRefusal(owner.Snapshot.Relationships.Edges.GetValueOrDefault(asker.Id), owner.Personality.BigFive.Agreeableness, onShift))
+                    {
+                        case ToolRefusalReason.NeededNow:
+                            ToolLoans.RefusedNeededNow++;
+                            break;
+                        case ToolRefusalReason.NoStanding:
+                            ToolLoans.RefusedNoStanding++;
+                            break;
+                        case ToolRefusalReason.BelowThreshold:
+                            ToolLoans.RefusedBelowThreshold++;
+                            break;
+                        default:
+                            ToolLoans.RefusedUnlucky++;
+                            break;
+                    }
+
                     var refusal = new ToolRequestRefused(now, asker.Id, owner.Id, tool.TypeId ?? string.Empty, onShift ? "The owner needs it." : "The owner declined.");
                     asker.ReceiveEvent(refusal);
                     owner.ReceiveEvent(refusal);

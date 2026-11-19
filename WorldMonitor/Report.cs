@@ -77,6 +77,18 @@ namespace WorldMonitor
                     sb.AppendLine($"| {period.Key * c.FarmPeriodDays}-{period.Key * c.FarmPeriodDays + c.FarmPeriodDays - 1} | {last.Tools} | {last.ToolsHeld} | {last.ToolsLent} | {last.ToolsAwayFromShed} | {days.Sum(d => d.Asked)} | {days.Sum(d => d.WalkedToTool)} | {days.Sum(d => d.WalkedToStorage)} | {days.Sum(d => d.WalkedToSupply)} | {last.LoansLent - (before?.LoansLent ?? 0)} | {last.LoansRefused - (before?.LoansRefused ?? 0)} | {last.LoansReturned - (before?.LoansReturned ?? 0)} | {last.LoansOverdue - (before?.LoansOverdue ?? 0)} | {last.SearchesFailed - (before?.SearchesFailed ?? 0)} | {last.Asked - (before?.Asked ?? 0)} | {last.Walks - (before?.Walks ?? 0)} |");
                     before = last;
                 }
+
+                sb.AppendLine();
+                sb.AppendLine("Why owners refused (per period):");
+                sb.AppendLine("| days | owner needs it | no standing | below threshold | unlucky draw |");
+                sb.AppendLine("|---|---:|---:|---:|---:|");
+                before = null;
+                foreach (var period in c.FarmSamples.GroupBy(f => f.Day / c.FarmPeriodDays).OrderBy(g => g.Key))
+                {
+                    var last = period.Last();
+                    sb.AppendLine($"| {period.Key * c.FarmPeriodDays}-{period.Key * c.FarmPeriodDays + c.FarmPeriodDays - 1} | {last.RefusedNeededNow - (before?.RefusedNeededNow ?? 0)} | {last.RefusedNoStanding - (before?.RefusedNoStanding ?? 0)} | {last.RefusedBelowThreshold - (before?.RefusedBelowThreshold ?? 0)} | {last.RefusedUnlucky - (before?.RefusedUnlucky ?? 0)} |");
+                    before = last;
+                }
             }
 
             sb.AppendLine();
