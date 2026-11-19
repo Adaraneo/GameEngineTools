@@ -127,5 +127,14 @@ namespace EngineTests
             Assert.IsFalse(ToolObligation.FeltOnShift(0.5));
             Assert.IsTrue(ToolObligation.FeltOnShift(0.8));
         }
+
+        [TestMethod]
+        public void TheToolIsBroughtBackNow_OffShiftAlways_AndOnShiftOnlyWhenStronglyFelt()
+        {
+            Assert.IsTrue(ToolObligation.ReturnsNow(false, null));
+            Assert.IsFalse(ToolObligation.ReturnsNow(true, null));
+            Assert.IsFalse(ToolObligation.ReturnsNow(true, 0.4));
+            Assert.IsTrue(ToolObligation.ReturnsNow(true, 0.8));
+        }
     }
 }

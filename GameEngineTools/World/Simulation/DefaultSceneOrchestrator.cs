@@ -375,6 +375,7 @@ namespace GameEngineTools.World.Simulation
             RouteMoveTo(now, living);
             RouteToolRequests(now, living);
             RouteToolReturns(now, living);
+            HandBackToOwners(now, living);
             ReportOverdueLoans(now, living);
 
             if (_socialCharsBuffer.Count > 0)
@@ -1301,6 +1302,7 @@ namespace GameEngineTools.World.Simulation
                 if (lent)
                 {
                     ToolLoans.Lent++;
+                    _loanBorrowers.Add(asker.Id);
                     _toolSearchFailures.Remove(asker.Id);
                     WitnessToolAct(owner.Id, asker.Id, ThirdPartyObservationType.PositiveAct, now, chars);
                     var loan = new ToolLent(now, owner.Id, asker.Id, tool.Id);
@@ -1359,9 +1361,71 @@ namespace GameEngineTools.World.Simulation
                         continue;
 
                     ToolLoans.Returned++;
-                    WitnessToolAct(borrower.Id, owner.Id, ThirdPartyObservationType.PositiveAct, now, chars);
-                    owner.ReceiveEvent(returned);
-                    owner.ReceiveEvent(new MicroPositive(now, owner.Id, borrower.Id, "ToolReturned"));
+                    AnnounceReturn(now, borrower, owner, returned, chars);
+                }
+            }
+        }
+
+        /// <summary>The owner is told the tool is back, others who saw it think well of the borrower, and the owner thinks a little better of them.</summary>
+        private void AnnounceReturn(WDateTime now, IHuman borrower, IHuman owner, ToolReturned returned, IReadOnlyList<IHuman> chars)
+        {
+            WitnessToolAct(borrower.Id, owner.Id, ThirdPartyObservationType.PositiveAct, now, chars);
+            owner.ReceiveEvent(returned);
+            owner.ReceiveEvent(new MicroPositive(now, owner.Id, borrower.Id, "ToolReturned"));
+        }
+
+        // Borrowers who may hold a lent tool: fed by each loan and by the daily overdue scan (so a world loaded with open loans is covered once a loan is overdue); not persisted, like the other scene runtime sets.
+        private readonly HashSet<HumanId> _loanBorrowers = new();
+
+        /// <summary>A borrower who stands where the owner stands and would bring the tool back now (<see cref="ToolObligation.ReturnsNow"/>, after keeping it a while) hands it to the owner, who carries it to its shed.</summary>
+        private void HandBackToOwners(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            if (_mutableObjects is null)
+            {
+                return;
+            }
+
+            foreach (var borrowerId in _loanBorrowers.ToList())
+            {
+                if (chars.FirstOrDefault(c => c.Id == borrowerId) is not { } borrower)
+                {
+                    _loanBorrowers.Remove(borrowerId);
+                    continue;
+                }
+
+                // In transit: nowhere to meet anyone yet.
+                if (_locationService.GetLocation(borrowerId) is not { } place)
+                {
+                    continue;
+                }
+
+                var lent = _mutableObjects.GetHeldBy(borrowerId).Where(o => o.LentTo == borrowerId).ToList();
+                if (lent.Count == 0)
+                {
+                    _loanBorrowers.Remove(borrowerId);
+                    continue;
+                }
+
+                var onShift = borrower.Snapshot.Schedule?.ActiveSlot is { PreferredAction: Work };
+                foreach (var tool in lent)
+                {
+                    if (tool.OwnerId is not { } ownerId || chars.FirstOrDefault(c => c.Id == ownerId) is not { } owner || _locationService.GetLocation(ownerId) != place)
+                    {
+                        continue;
+                    }
+
+                    if (tool.LentAt is { } lentAt && (now - lentAt).TotalHours < ToolObligation.MinHoldHours)
+                    {
+                        continue;
+                    }
+
+                    if (!ToolObligation.ReturnsNow(onShift, ToolObligation.StrengthFor(borrower.Snapshot.Memory.Episodes, tool.Id)) || !ToolLending.HandBack(_mutableObjects, tool.Id, borrowerId, place))
+                    {
+                        continue;
+                    }
+
+                    ToolLoans.HandedBack++;
+                    AnnounceReturn(now, borrower, owner, new ToolReturned(now, ownerId, borrowerId, tool.Id), chars);
                 }
             }
         }
@@ -1379,6 +1443,7 @@ namespace GameEngineTools.World.Simulation
                     continue;
 
                 ToolLoans.Overdue++;
+                _loanBorrowers.Add(tool.LentTo!.Value);
                 _mutableObjects.RemoveObject(tool.LocationId, tool.Id);
                 _mutableObjects.AddObject(tool with { LentAt = now });
                 chars.FirstOrDefault(c => c.Id == tool.OwnerId)?.ReceiveEvent(new MicroNegative(now, tool.OwnerId!.Value, tool.LentTo!.Value, "ToolNotReturned"));

@@ -136,6 +136,51 @@ namespace EngineTests
             Assert.AreEqual(RelationalActKind.Validation, reply.Content.SpeechAct.RelationalKind, "The owner answers aloud, as a reply to the request.");
         }
 
+        private (ForagingHuman Borrower, ForagingHuman Owner, ConsumingWorldObjectProvider Provider, DefaultSceneOrchestrator Orchestrator) LendingScene(bool borrowerOnShift = false)
+        {
+            var (asker, owner, provider, orchestrator) = ToolScene(trust: 80, like: 70, closeness: 50);
+            orchestrator.OnTick(Now, new IHuman[] { asker, owner });
+            owner.Extra.Add(new InteractionOutcome(Now, asker.Id, owner.Id, Accepted: true, Reason: "accepted", Act: RelationalActKind.Request, SubjectObjectId: "spade_1"));
+            var borrower = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)), onWorkShift: borrowerOnShift);
+            orchestrator.OnTick(Now + WTimeSpan.FromMinutes(1), new IHuman[] { borrower, owner });
+            owner.Extra.Clear();
+            Assert.AreEqual(borrower.Id, provider.FindObject("spade_1")!.LentTo, "The scene starts with the tool lent.");
+            return (borrower, owner, provider, orchestrator);
+        }
+
+        [TestMethod]
+        public void ABorrowerOffShift_WhoStandsWhereTheOwnerStands_HandsTheToolOver_AndTheOwnerHoldsIt()
+        {
+            var (borrower, owner, provider, orchestrator) = LendingScene();
+
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { borrower, owner });
+
+            var spade = provider.FindObject("spade_1")!;
+            Assert.IsNull(spade.LentTo);
+            Assert.AreEqual(owner.Id, spade.HeldBy, "The owner holds it and carries it to the shed.");
+            Assert.AreEqual(HomeId, spade.LocationId);
+            Assert.AreEqual(1, orchestrator.ToolLoans.HandedBack);
+            Assert.AreEqual(0, orchestrator.ToolLoans.Returned, "A handover is counted apart from a return to the shed.");
+            Assert.IsTrue(owner.Received.OfType<ToolReturned>().Any() && owner.Received.OfType<MicroPositive>().Any());
+        }
+
+        [TestMethod]
+        public void TheHandover_WaitsForTheMinimumHold_ForAnOwnerWhoIsAway_AndForABorrowerOnShift()
+        {
+            var (borrower, owner, provider, orchestrator) = LendingScene();
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(2), new IHuman[] { borrower, owner });
+            Assert.AreEqual(borrower.Id, provider.FindObject("spade_1")!.LentTo, "Kept for a while: a loan is for working.");
+
+            var away = BuildPerson(TavernId, new ActionCommitted(Now, owner.Id, Idle, WTimeSpan.FromMinutes(5)));
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { borrower, away });
+            Assert.AreEqual(borrower.Id, provider.FindObject("spade_1")!.LentTo, "The owner is elsewhere: nobody to hand it to.");
+
+            var (workingBorrower, workingOwner, workingProvider, workingOrchestrator) = LendingScene(borrowerOnShift: true);
+            workingOrchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { workingBorrower, workingOwner });
+            Assert.AreEqual(workingBorrower.Id, workingProvider.FindObject("spade_1")!.LentTo, "On shift with no strong memory of the debt, the tool is kept.");
+            Assert.AreEqual(0, workingOrchestrator.ToolLoans.HandedBack);
+        }
+
         [TestMethod]
         public void TheOwnersDecline_LendsNothing_ToldToBothSides_AndTheOwnerRefusesAloud()
         {

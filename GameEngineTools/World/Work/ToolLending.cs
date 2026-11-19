@@ -24,6 +24,20 @@ namespace GameEngineTools.World.Work
             return true;
         }
 
+        /// <summary>Ends the loan by the borrower handing the tool to its owner where both stand; the owner then holds it (and carries it to its shed). False when the tool is not lent to <paramref name="borrower"/> or is not in their hand.</summary>
+        public static bool HandBack(IMutableWorldObjectProvider provider, string toolId, HumanId borrower, string location)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+            if (provider.FindObject(toolId) is not { LentTo: { } lentTo, OwnerId: { } owner } tool || lentTo != borrower || tool.HeldBy != borrower)
+            {
+                return false;
+            }
+
+            provider.RemoveObject(tool.LocationId, tool.Id);
+            provider.AddObject(tool with { LentTo = null, LentAt = null, HeldBy = owner, LocationId = location });
+            return true;
+        }
+
         /// <summary>Takes the loan back: either the owner or the borrower can end it; false when the tool is not lent or <paramref name="by"/> is neither.</summary>
         public static bool Return(IMutableWorldObjectProvider provider, string toolId, HumanId by)
         {

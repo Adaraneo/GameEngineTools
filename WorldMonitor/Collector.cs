@@ -15,7 +15,7 @@ namespace WorldMonitor
     using GameEngineTools.World.Utils.Time;
 
     /// <summary>The farms at one moment: grain in the food stores and seed bins, unthreshed grain in sheaves, and how many fields are in each stage.</summary>
-    public sealed record FarmSample(int Day, long FoodUnits, long SeedUnits, long SheafUnits, IReadOnlyDictionary<GameEngineTools.World.Objects.Crops.FieldStage, int> Stages, int Tools = 0, int ToolsHeld = 0, int ToolsLent = 0, int ToolsAwayFromShed = 0, int LoansLent = 0, int LoansRefused = 0, int LoansReturned = 0, int LoansOverdue = 0, int SearchesFailed = 0, int Asked = 0, int Walks = 0, int RefusedNeededNow = 0, int RefusedNoStanding = 0, int RefusedBelowThreshold = 0, int RefusedUnlucky = 0);
+    public sealed record FarmSample(int Day, long FoodUnits, long SeedUnits, long SheafUnits, IReadOnlyDictionary<GameEngineTools.World.Objects.Crops.FieldStage, int> Stages, int Tools = 0, int ToolsHeld = 0, int ToolsLent = 0, int ToolsAwayFromShed = 0, int LoansLent = 0, int LoansRefused = 0, int LoansReturned = 0, int LoansOverdue = 0, int SearchesFailed = 0, int Asked = 0, int Walks = 0, int RefusedNeededNow = 0, int RefusedNoStanding = 0, int RefusedBelowThreshold = 0, int RefusedUnlucky = 0, int LoansHandedBack = 0);
 
     /// <summary>The stress of everyone at one moment of the run.</summary>
     public sealed record Sample(int Day, double ClockHour24, IReadOnlyList<double> Stress, int Private, int AtHome, int Asleep, double NeedSocial, double Energy, double InterestDrift);
@@ -159,7 +159,8 @@ namespace WorldMonitor
                 ToolStats?.Invoke().RefusedNeededNow ?? 0,
                 ToolStats?.Invoke().RefusedNoStanding ?? 0,
                 ToolStats?.Invoke().RefusedBelowThreshold ?? 0,
-                ToolStats?.Invoke().RefusedUnlucky ?? 0);
+                ToolStats?.Invoke().RefusedUnlucky ?? 0,
+                ToolStats?.Invoke().HandedBack ?? 0);
         }
 
         /// <summary>How the tool loans have gone (set by the host that has the scene orchestrator).</summary>

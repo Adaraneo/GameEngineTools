@@ -21,6 +21,9 @@ namespace GameEngineTools.Characters.Engines.Objects
         // Memory strength from which the obligation is felt strongly enough to leave the work shift.
         private const double OnShiftStrength = 0.7;
 
+        /// <summary>Hours a borrower keeps a freshly lent tool before handing it back to the owner at a meeting (a design pick: a loan is for working, not for returning on the spot).</summary>
+        public const double MinHoldHours = 4.0;
+
         /// <summary>Gets the canonical <c>What</c> of the episode that says the tool is owed back.</summary>
         public static string What(string toolId)
         {
@@ -58,6 +61,12 @@ namespace GameEngineTools.Characters.Engines.Objects
         public static bool FeltOnShift(double? strength)
         {
             return strength is { } value && value >= OnShiftStrength;
+        }
+
+        /// <summary>Gets whether a borrower brings the tool back now: off the work shift, or on it when the obligation is strongly felt.</summary>
+        public static bool ReturnsNow(bool onWorkShift, double? strength)
+        {
+            return !onWorkShift || FeltOnShift(strength);
         }
     }
 }

@@ -38,7 +38,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
             // The memory that the tool is owed back; on the work shift only a strongly felt one brings the tool back.
             var strength = ToolObligation.StrengthFor(snapshot.Memory.Episodes, tool.Id);
-            if (snapshot.Schedule?.ActiveSlot is { PreferredAction: Work } && !ToolObligation.FeltOnShift(strength))
+            if (!ToolObligation.ReturnsNow(snapshot.Schedule?.ActiveSlot is { PreferredAction: Work }, strength))
             {
                 return BehaviorNeedOutput.Empty;
             }

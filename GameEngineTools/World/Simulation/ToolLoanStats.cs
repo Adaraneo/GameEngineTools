@@ -27,6 +27,9 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Lent tools put back by the borrower.</summary>
         public int Returned { get; internal set; }
 
+        /// <summary>Lent tools the borrower handed to the owner where both stood.</summary>
+        public int HandedBack { get; internal set; }
+
         /// <summary>Walks back to a shed that were not begun because the shed was too far to afford.</summary>
         public int ReturnsDeferred { get; internal set; }
 

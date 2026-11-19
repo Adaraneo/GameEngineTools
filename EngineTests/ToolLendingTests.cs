@@ -176,6 +176,27 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void HandBack_PutsTheToolInTheOwnersHand_OnlyFromTheBorrowersHand()
+        {
+            var (db, provider) = NewWorld();
+            using (db)
+            {
+                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm"), "Not lent: nothing to hand back.");
+                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, "farm", Now));
+                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Stranger, "farm"), "Only the borrower hands it back.");
+
+                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm"));
+                var spade = provider.FindObject("spade_1")!;
+                Assert.IsNull(spade.LentTo);
+                Assert.AreEqual(Owner, spade.HeldBy);
+                Assert.AreEqual("farm", spade.LocationId);
+                Assert.AreEqual(0, provider.GetHeldBy(Neighbour).Count());
+                Assert.AreEqual("spade_1", provider.GetHeldBy(Owner).Single().Id);
+                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm"), "The loan is over.");
+            }
+        }
+
+        [TestMethod]
         public void FieldWork_NeedsAToolTheCharacterMayUse_AnOwnedSpadeCountsOnlyWhenLent()
         {
             var engine = new FieldWorkNeedEngine(catalog: TestWork.Catalog);
