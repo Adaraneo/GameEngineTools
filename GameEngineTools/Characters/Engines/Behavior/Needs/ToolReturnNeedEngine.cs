@@ -13,12 +13,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     /// <summary>Off the work shift, brings a carried tool back to its shed and puts it down there (which also ends a loan).</summary>
     internal sealed class ToolReturnNeedEngine : IBehaviorNeedEngine
     {
-        // Design picks: the walk back ranks under ordinary work; putting the tool down once at the shed takes a minute, so it goes first (a year-run showed a borrowed tool never put down at 58 against hunger, thirst and work).
+        // Design picks: the walk back ranks under ordinary work; putting the tool down once at the shed is an instant act, so it goes first (a year-run showed a borrowed tool never put down at 58 against hunger, thirst and work).
         private const double WalkUtility = 56.0;
         private const double PutDownUtility = 90.0;
 
         private static readonly WTimeSpan WalkDuration = WTimeSpan.FromMinutes(20);
-        private static readonly WTimeSpan PutDownDuration = WTimeSpan.FromMinutes(1);
+        private static readonly WTimeSpan PutDownDuration = WTimeSpan.FromSeconds(10);
 
         /// <inheritdoc/>
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
