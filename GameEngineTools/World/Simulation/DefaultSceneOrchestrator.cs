@@ -1294,7 +1294,7 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
-                var lent = answer.Accepted && ToolLending.Lend(_mutableObjects!, tool.Id, owner.Id, asker.Id, now);
+                var lent = answer.Accepted && _locationService.GetLocation(asker.Id) is { } askerPlace && ToolLending.Lend(_mutableObjects!, tool.Id, owner.Id, asker.Id, askerPlace, now);
                 if (lent)
                 {
                     ToolLoans.Lent++;

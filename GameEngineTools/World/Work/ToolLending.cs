@@ -1,4 +1,4 @@
-// ToolLending.cs
+﻿// ToolLending.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Work
@@ -7,20 +7,20 @@ namespace GameEngineTools.World.Work
     using GameEngineTools.Characters.Core;
     using GameEngineTools.World.Objects;
 
-    /// <summary>Lending an owned tool: only its owner can lend it, only to someone else, and only while it is not already lent; the borrower may then use it (<see cref="WorkObjects.CanUse"/>).</summary>
+    /// <summary>Lending an owned tool: only its owner can lend it, only to someone else, and only while it is not already lent; the tool is handed over into the borrower's hand, who may use it (<see cref="WorkObjects.CanUse"/>) and puts it down at its shed, which ends the loan.</summary>
     public static class ToolLending
     {
-        /// <summary>Lends the tool to the borrower; false (nothing changes) when it is unknown, not owned by <paramref name="owner"/>, already lent, or the borrower is the owner.</summary>
-        public static bool Lend(IMutableWorldObjectProvider provider, string toolId, HumanId owner, HumanId borrower, GameEngineTools.World.Utils.Time.WDateTime now)
+        /// <summary>Lends the tool to the borrower, who takes it in hand where they stand; false (nothing changes) when it is unknown, not owned by <paramref name="owner"/>, already lent, held by someone, or the borrower is the owner.</summary>
+        public static bool Lend(IMutableWorldObjectProvider provider, string toolId, HumanId owner, HumanId borrower, string borrowerLocation, GameEngineTools.World.Utils.Time.WDateTime now)
         {
             ArgumentNullException.ThrowIfNull(provider);
-            if (provider.FindObject(toolId) is not { } tool || tool.OwnerId != owner || tool.LentTo is not null || borrower == owner)
+            if (provider.FindObject(toolId) is not { } tool || tool.OwnerId != owner || tool.LentTo is not null || tool.HeldBy is not null || borrower == owner)
             {
                 return false;
             }
 
             provider.RemoveObject(tool.LocationId, tool.Id);
-            provider.AddObject(tool with { LentTo = borrower, LentAt = now });
+            provider.AddObject(tool with { LentTo = borrower, LentAt = now, HeldBy = borrower, LocationId = borrowerLocation });
             return true;
         }
 
@@ -33,8 +33,9 @@ namespace GameEngineTools.World.Work
                 return false;
             }
 
+            // An owner who takes it back from the borrower's hand puts it in its shed; a tool the borrower already put down stays where it lies.
             provider.RemoveObject(tool.LocationId, tool.Id);
-            provider.AddObject(tool with { LentTo = null, LentAt = null });
+            provider.AddObject(tool with { LentTo = null, LentAt = null, HeldBy = null, LocationId = tool.HeldBy is null ? tool.LocationId : tool.StoredAt ?? tool.LocationId });
             return true;
         }
     }

@@ -151,22 +151,26 @@ namespace EngineTests
             var (db, provider) = NewWorld();
             using (db)
             {
-                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Neighbour, Stranger, Now), "Only the owner can lend.");
-                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Owner, Now), "Lending to oneself is no loan.");
-                Assert.IsFalse(ToolLending.Lend(provider, "missing", Owner, Neighbour, Now));
+                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Neighbour, Stranger, "farm", Now), "Only the owner can lend.");
+                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Owner, "farm", Now), "Lending to oneself is no loan.");
+                Assert.IsFalse(ToolLending.Lend(provider, "missing", Owner, Neighbour, "farm", Now));
 
-                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, Now));
+                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, "farm", Now));
                 Assert.AreEqual(Neighbour, provider.FindObject("spade_1")!.LentTo, "The loan is kept in the world database.");
                 Assert.AreEqual("farm", provider.FindObject("spade_1")!.StoredAt, "The shed is kept in the world database.");
                 Assert.AreEqual(Owner, provider.FindObject("spade_1")!.OwnerId, "Lending does not change the owner.");
-                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Stranger, Now), "A lent tool is not lent twice.");
+                Assert.AreEqual("spade_1", provider.GetHeldBy(Neighbour).Single().Id, "The tool is handed over into the borrower's hand.");
+                Assert.AreEqual(Neighbour, provider.FindObject("spade_1")!.HeldBy, "A lookup by id shows who holds it, so putting it back in the world does not drop it from the hand.");
+                Assert.AreEqual(Neighbour, provider.GetAllObjects().Single(o => o.Id == "spade_1").HeldBy);
+                Assert.IsFalse(ToolLending.Lend(provider, "spade_1", Owner, Stranger, "farm", Now), "A lent tool is not lent twice.");
 
                 Assert.IsFalse(ToolLending.Return(provider, "spade_1", Stranger), "Neither owner nor borrower: no say.");
                 Assert.IsTrue(ToolLending.Return(provider, "spade_1", Neighbour));
+                Assert.AreEqual(0, provider.GetHeldBy(Neighbour).Count(), "Ending the loan frees the hand.");
                 Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
                 Assert.IsFalse(ToolLending.Return(provider, "spade_1", Owner), "Nothing to take back.");
 
-                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Stranger, Now));
+                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Stranger, "farm", Now));
                 Assert.IsTrue(ToolLending.Return(provider, "spade_1", Owner), "The owner can ask for it back.");
             }
         }

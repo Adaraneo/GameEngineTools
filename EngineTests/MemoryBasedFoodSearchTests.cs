@@ -1,4 +1,4 @@
-// MemoryBasedFoodSearchTests.cs
+﻿// MemoryBasedFoodSearchTests.cs
 // Copyright (c) 50PSoftware
 
 namespace EngineTests
@@ -198,7 +198,7 @@ namespace EngineTests
         {
             var (asker, owner, provider, orchestrator) = ToolScene(trust: 80, like: 70, closeness: 50);
             orchestrator.OnTick(Now, new IHuman[] { asker, owner });
-            GameEngineTools.World.Work.ToolLending.Lend(provider, "spade_1", owner.Id, new HumanId(Guid.NewGuid()), Now);
+            GameEngineTools.World.Work.ToolLending.Lend(provider, "spade_1", owner.Id, new HumanId(Guid.NewGuid()), HomeId, Now);
 
             owner.Extra.Add(new InteractionOutcome(Now, asker.Id, owner.Id, Accepted: true, Reason: "accepted", Act: RelationalActKind.Request, SubjectObjectId: "spade_1"));
             var waiting = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)));
@@ -356,7 +356,7 @@ namespace EngineTests
         {
             var (asker, owner, provider, orchestrator) = ToolScene(90, 90, 90);
             var idle = BuildPerson(HomeId, new ActionCommitted(Now, asker.Id, Idle, WTimeSpan.FromMinutes(5)));
-            GameEngineTools.World.Work.ToolLending.Lend(provider, "spade_1", owner.Id, idle.Id, Now);
+            GameEngineTools.World.Work.ToolLending.Lend(provider, "spade_1", owner.Id, idle.Id, HomeId, Now);
             var chars = new IHuman[] { idle, owner };
 
             orchestrator.OnTick(Now + WTimeSpan.FromDays(1), chars);

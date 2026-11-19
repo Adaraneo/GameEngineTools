@@ -1,4 +1,4 @@
-// SqliteWorldDatabase.cs
+﻿// SqliteWorldDatabase.cs
 // Copyright (c) 50PSoftware
 
 namespace GameEngineTools.World.Data
@@ -160,12 +160,12 @@ namespace GameEngineTools.World.Data
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
                        IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
+                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, ConsumedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
                 FROM WorldObjects
                 """;
 
             lock (_sync)
-                return EnrichWithAffordances(ReadObjects(sql));
+                return EnrichWithAffordances(ReadObjects(sql, Array.Empty<(string Name, object? Value)>(), includeRuntimeState: true));
         }
 
         /// <summary>
@@ -198,14 +198,14 @@ namespace GameEngineTools.World.Data
                 SELECT Id, DisplayName, Category, LocationId,
                        HeatSignature, AmbientNoise, BlocksLineOfSight,
                        IsAvailable, IsPickable, WeightGrams, ItemTypeId,
-                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
+                       Respawns, RespawnMinutes, Price, ShopId, ProducedAt, HeldBy, ConsumedAt, TypeId, OwnerId, Condition, LentTo, LentAt, StoredAt
                 FROM WorldObjects
                 WHERE Id = @id
                 """;
 
             lock (_sync)
             {
-                var objects = EnrichWithAffordances(ReadObjects(sql, ("@id", objectId)));
+                var objects = EnrichWithAffordances(ReadObjects(sql, ("@id", objectId), includeRuntimeState: true));
                 return objects.Count == 0 ? null : objects[0];
             }
         }
