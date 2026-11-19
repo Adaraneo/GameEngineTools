@@ -299,6 +299,11 @@ namespace GameEngineTools.Characters.Engines.Behavior
                 State = State with { ToolSearchRetryAt = failed.RetryAt };
             }
 
+            if (@event is GameEngineTools.Characters.Engines.Objects.ToolReturnDeferred deferred && deferred.Borrower == ctx.Id)
+            {
+                State = State with { ToolReturnRetryAt = deferred.RetryAt };
+            }
+
             State = _sleepCoordinator.Handle(@event, ctx, outbox, State);
         }
 

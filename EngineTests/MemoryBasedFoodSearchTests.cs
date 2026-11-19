@@ -277,6 +277,25 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void MoveToStorage_AShedTooFarToAfford_IsNotWalkedTo_AndTheBorrowerIsToldToWaitBeforeTryingAgain()
+        {
+            var seekerId = new HumanId(Guid.NewGuid());
+            var seeker = BuildPerson(HomeId, new ActionCommitted(Now, seekerId, MoveToStorage, WTimeSpan.FromMinutes(20)));
+            var spade = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "spade_1", HomeId) with { HeldBy = seekerId, StoredAt = TavernId };
+            var provider = new ConsumingWorldObjectProvider(new[] { spade }, Array.Empty<string>());
+
+            // 100 km at 80 m/min is about 21 hours, far more than a body affords.
+            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 100000.0) }), provider, new SceneOrchestratorOptions { EnableTravelTime = true });
+            orchestrator.OnTick(Now, new IHuman[] { seeker });
+
+            Assert.AreEqual(HomeId, _locationService.GetLocation(seeker.Id), "The shed is a day away: the tool stays with the borrower.");
+            Assert.IsNull(orchestrator.GetTravelDestination(seeker.Id));
+            var deferred = seeker.Received.OfType<ToolReturnDeferred>().Single();
+            Assert.IsTrue(deferred.RetryAt > Now);
+            Assert.AreEqual(1, orchestrator.ToolLoans.ReturnsDeferred);
+        }
+
+        [TestMethod]
         public void MoveToTool_ARememberedToolIsWalkedToBeforeAskingAround()
         {
             var facts = new[] { new ObjectLocationFact("far_spade", MarketId, Now, 0.85, WorldObjectCategory.Tool, "spade") };

@@ -89,6 +89,19 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AWalkBackThatWasGivenUp_IsNotOfferedAgainBeforeTheRetryTime_ButPuttingDownAtTheShedStillIs()
+        {
+            var engine = new ToolReturnNeedEngine();
+            var waiting = Ctx(false, Spade("farm"));
+            waiting = waiting with { State = waiting.State with { ToolReturnRetryAt = new WDateTime(0) + WTimeSpan.FromHours(6) } };
+            var atShed = Ctx(false, Spade(Loc));
+            atShed = atShed with { State = atShed.State with { ToolReturnRetryAt = new WDateTime(0) + WTimeSpan.FromHours(6) } };
+
+            Assert.AreEqual(0, engine.Evaluate(waiting).Candidates.Count, "Not before the retry time.");
+            Assert.AreEqual(InteractWithObject, engine.Evaluate(atShed).Candidates.Single().Name, "Already at the shed: put it down regardless.");
+        }
+
+        [TestMethod]
         public void TheWalkBack_IsMoreUrgentTheStrongerTheMemoryThatTheToolIsOwed()
         {
             var engine = new ToolReturnNeedEngine();

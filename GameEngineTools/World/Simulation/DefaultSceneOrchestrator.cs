@@ -1123,6 +1123,9 @@ namespace GameEngineTools.World.Simulation
             }
         }
 
+        // Walks back to a far shed that were given up, in a row, per borrower; not persisted, like the other scene runtime sets.
+        private readonly Dictionary<HumanId, int> _toolReturnFailures = new();
+
         // Seekers walking to an owner, with the tool types they want; not persisted, like the other scene runtime sets.
         private readonly Dictionary<HumanId, IReadOnlyList<string>> _ownerWalks = new();
 
@@ -1439,10 +1442,21 @@ namespace GameEngineTools.World.Simulation
                 // ── Bringing a carried tool back to its shed (MoveTo:Storage) ──────────────────
                 if (moveTo.ActionName == MoveToStorage)
                 {
-                    var shed = _mutableObjects?.GetHeldBy(character.Id).FirstOrDefault(o => o.StoredAt is not null && o.StoredAt != currentLocation)?.StoredAt;
-                    if (shed is not null && currentLocation is not null)
+                    var carried = _mutableObjects?.GetHeldBy(character.Id).FirstOrDefault(o => o.StoredAt is not null && o.StoredAt != currentLocation);
+                    if (carried?.StoredAt is { } shed && currentLocation is not null && NearestOf(currentLocation, new HashSet<string>(StringComparer.Ordinal) { shed }) is { } toShed)
                     {
-                        CommitMove(character, NearestOf(currentLocation, new HashSet<string>(StringComparer.Ordinal) { shed })!.Value, now);
+                        if (Reachable(character, toShed))
+                        {
+                            _toolReturnFailures.Remove(character.Id);
+                            CommitMove(character, toShed, now);
+                        }
+                        else
+                        {
+                            ToolLoans.ReturnsDeferred++;
+                            var failures = _toolReturnFailures.GetValueOrDefault(character.Id) + 1;
+                            _toolReturnFailures[character.Id] = failures;
+                            character.ReceiveEvent(new ToolReturnDeferred(now, character.Id, carried.Id, now + WTimeSpan.FromHours(ToolTrip.RetryHours(failures))));
+                        }
                     }
 
                     continue;

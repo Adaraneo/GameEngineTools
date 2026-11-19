@@ -282,7 +282,9 @@ namespace GameEngineTools.Characters.Engines.Behavior
         string? PerceivedAt = null,
         WDateTime? PerceivedAtTime = null,
         /// <summary>A search for a tool that found none: no new search before this time.</summary>
-        WDateTime? ToolSearchRetryAt = null);
+        WDateTime? ToolSearchRetryAt = null,
+        /// <summary>A walk back to a shed too far to afford: no new try before this time.</summary>
+        WDateTime? ToolReturnRetryAt = null);
 
     #endregion Configuration and state
 

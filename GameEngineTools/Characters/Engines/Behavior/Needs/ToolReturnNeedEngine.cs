@@ -43,16 +43,26 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 return BehaviorNeedOutput.Empty;
             }
 
-            var candidate = string.Equals(tool.StoredAt, here, StringComparison.Ordinal)
-                ? new BehaviorCandidate(
+            if (string.Equals(tool.StoredAt, here, StringComparison.Ordinal))
+            {
+                var putDown = new BehaviorCandidate(
                     InteractWithObject,
                     PutDownUtility,
                     PutDownDuration,
                     BehaviorDomain.Competence,
                     Tags: new[] { "Supply" },
-                    ObjectInteraction: new ObjectInteractionData(tool.Id, here, ObjectInteractionKind.Drop))
-                : new BehaviorCandidate(MoveToStorage, ToolObligation.WalkUtility(WalkUtility, strength), WalkDuration, BehaviorDomain.Competence, Tags: new[] { "Supply" });
-            return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
+                    ObjectInteraction: new ObjectInteractionData(tool.Id, here, ObjectInteractionKind.Drop));
+                return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { putDown });
+            }
+
+            // A walk back that was judged too far is not tried again for a while.
+            if (context.State.ToolReturnRetryAt is { } retryAt && context.Now < retryAt)
+            {
+                return BehaviorNeedOutput.Empty;
+            }
+
+            var walk = new BehaviorCandidate(MoveToStorage, ToolObligation.WalkUtility(WalkUtility, strength), WalkDuration, BehaviorDomain.Competence, Tags: new[] { "Supply" });
+            return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { walk });
         }
     }
 }
