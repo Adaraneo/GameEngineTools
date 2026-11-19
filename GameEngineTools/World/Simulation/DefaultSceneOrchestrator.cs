@@ -1379,6 +1379,7 @@ namespace GameEngineTools.World.Simulation
                 _mutableObjects.RemoveObject(tool.LocationId, tool.Id);
                 _mutableObjects.AddObject(tool with { LentAt = now });
                 chars.FirstOrDefault(c => c.Id == tool.OwnerId)?.ReceiveEvent(new MicroNegative(now, tool.OwnerId!.Value, tool.LentTo!.Value, "ToolNotReturned"));
+                chars.FirstOrDefault(c => c.Id == tool.LentTo)?.ReceiveEvent(new ToolOverdue(now, tool.OwnerId!.Value, tool.LentTo!.Value, tool.Id));
             }
         }
 

@@ -10,6 +10,8 @@ namespace EngineTests
     using GameEngineTools.Characters.Core;
     using GameEngineTools.Characters.Engines.Behavior;
     using GameEngineTools.Characters.Engines.Behavior.Needs;
+    using GameEngineTools.Characters.Engines.Memory;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.Characters.Engines.Schedule;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
@@ -27,11 +29,22 @@ namespace EngineTests
 
         private static BehaviorContext Ctx(bool onShift, params WorldObject[] held)
         {
+            return Ctx(onShift, null, held);
+        }
+
+        private static BehaviorContext Ctx(bool onShift, double? owedStrength, params WorldObject[] held)
+        {
             var ctx = BehaviorComponentTestFactory.Context(selfId: Self, hunger: 10, thirst: 5, now: new WDateTime(0));
             if (onShift)
             {
                 var slot = new ScheduleSlot("work", 5, Work);
                 ((HumanContext)ctx.HumanContext).Snapshot = ctx.HumanContext.Snapshot with { Schedule = new DailyScheduleState(new[] { slot }, slot, 0, "farmer") };
+            }
+
+            if (owedStrength is { } strength)
+            {
+                var episode = new EpisodicMemory(Guid.NewGuid(), new WDateTime(0), ToolObligation.What("spade_1"), 0.6, EmotionalTag.Negative, strength);
+                ((HumanContext)ctx.HumanContext).Snapshot = ctx.HumanContext.Snapshot with { Memory = new MemoryIndex(new List<EpisodicMemory> { episode }) };
             }
 
             return ctx with { AvailableObjects = new List<WorldObject>(), HeldObjects = held.ToList() };
@@ -64,6 +77,27 @@ namespace EngineTests
             Assert.AreEqual(0, engine.Evaluate(Ctx(true, Spade("farm"))).Candidates.Count, "On shift the tool is kept.");
             Assert.AreEqual(0, engine.Evaluate(Ctx(false, Spade(null))).Candidates.Count, "A tool with no shed has nowhere to go back to.");
             Assert.AreEqual(0, engine.Evaluate(Ctx(false)).Candidates.Count, "Nothing carried.");
+        }
+
+        [TestMethod]
+        public void OnShift_AStronglyRememberedLoan_IsBroughtBack_AWeakOneIsNot()
+        {
+            var engine = new ToolReturnNeedEngine();
+
+            Assert.AreEqual(MoveToStorage, engine.Evaluate(Ctx(true, 0.8, Spade("farm"))).Candidates.Single().Name);
+            Assert.AreEqual(0, engine.Evaluate(Ctx(true, 0.4, Spade("farm"))).Candidates.Count, "A faint memory does not pull the borrower off the shift.");
+        }
+
+        [TestMethod]
+        public void TheWalkBack_IsMoreUrgentTheStrongerTheMemoryThatTheToolIsOwed()
+        {
+            var engine = new ToolReturnNeedEngine();
+
+            var forgotten = engine.Evaluate(Ctx(false, Spade("farm"))).Candidates.Single().Utility;
+            var faint = engine.Evaluate(Ctx(false, 0.3, Spade("farm"))).Candidates.Single().Utility;
+            var vivid = engine.Evaluate(Ctx(false, 0.9, Spade("farm"))).Candidates.Single().Utility;
+
+            Assert.IsTrue(forgotten < faint && faint < vivid, $"{forgotten:F1} < {faint:F1} < {vivid:F1}");
         }
     }
 }

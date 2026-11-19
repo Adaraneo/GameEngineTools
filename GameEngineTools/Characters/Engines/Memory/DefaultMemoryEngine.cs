@@ -768,6 +768,15 @@ namespace GameEngineTools.Characters.Engines.Memory
                     RememberPerceivedObjects(seen);
                     break;
 
+                // ── A borrowed tool is owed back: the episode is made on the loan and renewed by every reminder ──
+                case ToolLent lent when lent.Borrower == ctx.Id:
+                    EncodeToolObligation(lent.OccurredAt, lent.Owner, lent.ToolId, ctx, outbox);
+                    break;
+
+                case ToolOverdue late when late.Borrower == ctx.Id:
+                    EncodeToolObligation(late.OccurredAt, late.Owner, late.ToolId, ctx, outbox);
+                    break;
+
                 case Interactions.NormViolationOccurred nv:
                     HandleNormViolation(nv, ctx, outbox);
                     break;
@@ -1149,6 +1158,21 @@ namespace GameEngineTools.Characters.Engines.Memory
 
         // The initial Strength depends on the emotional intensity of the episode.
         // Negative memories are encoded more strongly (negativity bias — Baumeister et al. 2001).
+        private void EncodeToolObligation(WDateTime when, HumanId owner, string toolId, IHumanContext ctx, IEventCollector outbox)
+        {
+            var regard = ToolLendingPolicy.Score(ctx.Snapshot.Relationships.Edges.GetValueOrDefault(owner)) / 100.0;
+            var salience = ToolObligation.Salience(ctx.Personality.BigFive.Conscientiousness, regard);
+            Encode(new EpisodicMemory(
+                _ids.Next(when, ctx.Id),
+                when,
+                ToolObligation.What(toolId),
+                salience,
+                EmotionalTag.Negative,
+                ComputeInitialStrength(salience, EmotionalTag.Negative),
+                OtherPerson: owner),
+                ctx, outbox);
+        }
+
         private static double ComputeInitialStrength(double salience, EmotionalTag emotion)
         {
             var intensity = emotion switch

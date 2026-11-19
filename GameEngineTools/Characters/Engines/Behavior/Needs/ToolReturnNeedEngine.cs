@@ -6,11 +6,12 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
     using static ActionNames;
 
-    /// <summary>Off the work shift, brings a carried tool back to its shed and puts it down there (which also ends a loan).</summary>
+    /// <summary>Brings a carried tool back to its shed and puts it down there (which also ends a loan): off the work shift, or on it when the memory that the tool is owed back is strong.</summary>
     internal sealed class ToolReturnNeedEngine : IBehaviorNeedEngine
     {
         // Design picks: the walk back ranks under ordinary work; putting the tool down once at the shed is an instant act, so it goes first (a year-run showed a borrowed tool never put down at 58 against hunger, thirst and work).
@@ -24,13 +25,20 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
         public BehaviorNeedOutput Evaluate(BehaviorContext context)
         {
             var snapshot = context.HumanContext.Snapshot;
-            if (snapshot.Schedule?.ActiveSlot is { PreferredAction: Work } || context.HeldObjects is not { Count: > 0 } held)
+            if (context.HeldObjects is not { Count: > 0 } held)
             {
                 return BehaviorNeedOutput.Empty;
             }
 
             var tool = held.FirstOrDefault(o => o.Category == WorldObjectCategory.Tool && o.StoredAt is not null);
             if (tool is null || snapshot.InteractionSurface?.Location is not { } here)
+            {
+                return BehaviorNeedOutput.Empty;
+            }
+
+            // The memory that the tool is owed back; on the work shift only a strongly felt one brings the tool back.
+            var strength = ToolObligation.StrengthFor(snapshot.Memory.Episodes, tool.Id);
+            if (snapshot.Schedule?.ActiveSlot is { PreferredAction: Work } && !ToolObligation.FeltOnShift(strength))
             {
                 return BehaviorNeedOutput.Empty;
             }
@@ -43,7 +51,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                     BehaviorDomain.Competence,
                     Tags: new[] { "Supply" },
                     ObjectInteraction: new ObjectInteractionData(tool.Id, here, ObjectInteractionKind.Drop))
-                : new BehaviorCandidate(MoveToStorage, WalkUtility, WalkDuration, BehaviorDomain.Competence, Tags: new[] { "Supply" });
+                : new BehaviorCandidate(MoveToStorage, ToolObligation.WalkUtility(WalkUtility, strength), WalkDuration, BehaviorDomain.Competence, Tags: new[] { "Supply" });
             return new BehaviorNeedOutput(Array.Empty<BehaviorDrive>(), new List<BehaviorCandidate> { candidate });
         }
     }
