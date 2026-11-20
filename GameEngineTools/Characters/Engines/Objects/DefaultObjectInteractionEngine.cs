@@ -180,6 +180,7 @@ namespace GameEngineTools.Characters.Engines.Objects
             {
                 case ObjectInteractionKind.Take:
                     _objectProvider.SetHeldBy(data.LocationId, data.ObjectId, ctx.Id);
+                    ToolLending.MarkCarried(_objectProvider, data.ObjectId, ctx.Id, committed.OccurredAt);
                     outbox.Add(new ObjectTaken(committed.OccurredAt, ctx.Id, data.ObjectId, data.LocationId, obj.TypeId));
                     break;
 

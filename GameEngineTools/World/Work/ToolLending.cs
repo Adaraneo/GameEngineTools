@@ -41,6 +41,21 @@ namespace GameEngineTools.World.Work
             return true;
         }
 
+        /// <summary>Notes that the owner took his own tool from somewhere other than its shed: <c>LentAt</c> keeps the hour, so it is carried back like a handed-back one. False when it is not his, is lent, is not in his hand or lies in its shed.</summary>
+        public static bool MarkCarried(IMutableWorldObjectProvider provider, string toolId, HumanId holder, GameEngineTools.World.Utils.Time.WDateTime now)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+            if (provider.FindObject(toolId) is not { OwnerId: { } owner, LentTo: null, HeldBy: { } heldBy, StoredAt: { } shed } tool
+                || owner != holder || heldBy != holder || string.Equals(shed, tool.LocationId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            provider.RemoveObject(tool.LocationId, tool.Id);
+            provider.AddObject(tool with { LentAt = now });
+            return true;
+        }
+
         /// <summary>Whether the tool, held by <paramref name="holder"/>, is in its owner's hand after a hand-back (not lent, <c>LentAt</c> still set): it is carried to its shed, not kept.</summary>
         public static bool IsHandedBack(WorldObject tool, HumanId holder)
         {

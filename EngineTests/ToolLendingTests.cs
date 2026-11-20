@@ -229,6 +229,23 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AnOwnerWhoTakesHisToolFromAwayFromItsShed_IsMarkedAsCarryingIt_ButNotFromTheShedOrSomeoneElses()
+        {
+            var (db, provider) = NewWorld();
+            using (db)
+            {
+                Assert.IsTrue(provider.SetHeldBy("farm", "spade_1", Owner));
+                Assert.IsFalse(ToolLending.MarkCarried(provider, "spade_1", Owner, Now), "Taken from its own shed: nothing to carry back.");
+
+                Assert.IsTrue(ToolLending.SetDown(provider, "spade_1", Owner, "home"));
+                Assert.IsTrue(provider.SetHeldBy("home", "spade_1", Owner));
+                Assert.IsFalse(ToolLending.MarkCarried(provider, "spade_1", Stranger, Now), "Only the owner who holds it.");
+                Assert.IsTrue(ToolLending.MarkCarried(provider, "spade_1", Owner, Now));
+                Assert.IsTrue(ToolLending.IsHandedBack(provider.FindObject("spade_1")!, Owner), "Carried back like a handed-back tool.");
+            }
+        }
+
+        [TestMethod]
         public void TheOwnerCanLendATool_HeHoldsHimself_ButNotOneSomeoneElseHolds()
         {
             var (db, provider) = NewWorld();

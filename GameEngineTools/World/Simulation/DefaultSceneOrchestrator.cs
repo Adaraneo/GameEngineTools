@@ -1483,6 +1483,15 @@ namespace GameEngineTools.World.Simulation
                 return;
             }
 
+            // An owner who took his own tool back from where it lay carries it like a handed-back one.
+            foreach (var character in chars)
+            {
+                if (character.LastOutbox.OfType<ObjectTaken>().Any())
+                {
+                    _toolCarriers.Add(character.Id);
+                }
+            }
+
             foreach (var carrierId in _toolCarriers.ToList())
             {
                 if (!chars.Any(c => c.Id == carrierId))
