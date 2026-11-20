@@ -31,8 +31,17 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
                 return BehaviorNeedOutput.Empty;
             }
 
-            var tool = held.FirstOrDefault(o => o.Category == WorldObjectCategory.Tool && o.StoredAt is not null);
-            if (tool is null || snapshot.InteractionSurface?.Location is not { } here)
+            if (snapshot.InteractionSurface?.Location is not { } here)
+            {
+                return BehaviorNeedOutput.Empty;
+            }
+
+            // Which tool to deal with first: one whose shed is right here (an instant put-down), then a handed-back one, then a borrowed one, then any other; a carried tool in front must not hide the rest.
+            var self = context.HumanContext.Id;
+            var tool = held.Where(o => o.Category == WorldObjectCategory.Tool && o.StoredAt is not null)
+                .OrderBy(o => o.LentTo != self && string.Equals(o.StoredAt, here, StringComparison.Ordinal) ? 0 : ToolLending.IsHandedBack(o, self) ? 1 : o.LentTo == self ? 2 : 3)
+                .FirstOrDefault();
+            if (tool is null)
             {
                 return BehaviorNeedOutput.Empty;
             }

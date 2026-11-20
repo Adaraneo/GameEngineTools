@@ -1547,7 +1547,8 @@ namespace GameEngineTools.World.Simulation
                 // ── Bringing a carried tool back to its shed (MoveTo:Storage) ──────────────────
                 if (moveTo.ActionName == MoveToStorage)
                 {
-                    var carried = _mutableObjects?.GetHeldBy(character.Id).FirstOrDefault(o => o.LentTo is null && o.StoredAt is not null && o.StoredAt != currentLocation);
+                    var carried = _mutableObjects?.GetHeldBy(character.Id).Where(o => o.LentTo is null && o.StoredAt is not null && o.StoredAt != currentLocation)
+                        .OrderBy(o => ToolLending.IsHandedBack(o, character.Id) ? 0 : 1).FirstOrDefault();
                     if (carried?.StoredAt is { } shed && currentLocation is not null && NearestOf(currentLocation, new HashSet<string>(StringComparer.Ordinal) { shed }) is { } toShed)
                     {
                         if (Reachable(character, toShed))

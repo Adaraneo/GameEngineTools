@@ -147,6 +147,19 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void ACarriedToolInFront_DoesNotHideAHandedBackOneBehindIt_AndAToolWhoseShedIsHereGoesFirst()
+        {
+            var engine = new ToolReturnNeedEngine();
+            var later = new WDateTime(0) + WTimeSpan.FromHours(5);
+            var carried = Spade("farm");
+            var handedBack = WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_2", Loc) with { StoredAt = "far", OwnerId = Self, LentAt = new WDateTime(0), HeldBy = null };
+            var shedHere = WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_3", Loc) with { StoredAt = Loc, OwnerId = Self, HeldBy = null };
+
+            Assert.AreEqual(MoveToStorage, engine.Evaluate(Ctx(true, carried, handedBack) with { Now = later }).Candidates.Single().Name, "On shift the carried tool is kept, but the handed-back one is still carried on.");
+            Assert.AreEqual("spade_3", engine.Evaluate(Ctx(false, carried, handedBack, shedHere) with { Now = later }).Candidates.Single().ObjectInteraction!.ObjectId, "A tool whose shed is here is put down first.");
+        }
+
+        [TestMethod]
         public void TheWalkBack_IsMoreUrgentTheStrongerTheMemoryThatTheToolIsOwed()
         {
             var engine = new ToolReturnNeedEngine();
