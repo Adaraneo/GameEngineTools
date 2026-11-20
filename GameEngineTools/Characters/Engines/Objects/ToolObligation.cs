@@ -24,6 +24,9 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <summary>Hours a borrower keeps a freshly lent tool before handing it back to the owner at a meeting (a design pick: a loan is for working, not for returning on the spot).</summary>
         public const double MinHoldHours = 4.0;
 
+        /// <summary>World days an owner carries a handed-back tool before putting it down where he stands (a design pick).</summary>
+        public const double MaxCarryDays = 1.0;
+
         /// <summary>Gets the canonical <c>What</c> of the episode that says the tool is owed back.</summary>
         public static string What(string toolId)
         {

@@ -376,6 +376,7 @@ namespace GameEngineTools.World.Simulation
             RouteToolRequests(now, living);
             RouteToolReturns(now, living);
             HandBackToOwners(now, living);
+            PutAwayCarriedTools(now, living);
             ReportOverdueLoans(now, living);
 
             if (_socialCharsBuffer.Count > 0)
@@ -1465,7 +1466,58 @@ namespace GameEngineTools.World.Simulation
                     }
 
                     ToolLoans.HandedBack++;
+                    _toolCarriers.Add(ownerId);
                     AnnounceReturn(now, borrower, owner, new ToolReturned(now, ownerId, borrowerId, tool.Id), chars);
+                }
+            }
+        }
+
+        // Owners who may hold a handed-back tool, fed by each hand-over; not persisted, like the other scene runtime sets.
+        private readonly HashSet<HumanId> _toolCarriers = new();
+
+        /// <summary>An owner who holds a handed-back tool puts it away without a separate action: on arriving at its shed it goes back there, and one carried past <see cref="ToolObligation.MaxCarryDays"/> is put down where the owner stands.</summary>
+        private void PutAwayCarriedTools(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            if (_mutableObjects is null)
+            {
+                return;
+            }
+
+            foreach (var carrierId in _toolCarriers.ToList())
+            {
+                if (!chars.Any(c => c.Id == carrierId))
+                {
+                    _toolCarriers.Remove(carrierId);
+                    continue;
+                }
+
+                if (_locationService.GetLocation(carrierId) is not { } place)
+                {
+                    continue;
+                }
+
+                var carried = _mutableObjects.GetHeldBy(carrierId).Where(o => ToolLending.IsHandedBack(o, carrierId)).ToList();
+                if (carried.Count == 0)
+                {
+                    _toolCarriers.Remove(carrierId);
+                    continue;
+                }
+
+                foreach (var tool in carried)
+                {
+                    var atShed = string.Equals(tool.StoredAt, place, StringComparison.Ordinal);
+                    var carriedTooLong = tool.LentAt is { } since && (now - since).TotalDays >= ToolObligation.MaxCarryDays;
+                    if ((atShed || carriedTooLong) && ToolLending.SetDown(_mutableObjects, tool.Id, carrierId, place))
+                    {
+                        if (atShed)
+                        {
+                            ToolLoans.PutAway++;
+                        }
+                        else
+                        {
+                            ToolLoans.SetDownAway++;
+                        }
+                    }
                 }
             }
         }

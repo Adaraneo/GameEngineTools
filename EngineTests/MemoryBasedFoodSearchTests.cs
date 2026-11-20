@@ -181,6 +181,44 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AnOwnerHoldingAHandedBackTool_PutsItIntoItsShedOnArrivingThere_WithoutAnyAction()
+        {
+            var (borrower, owner, provider, orchestrator) = LendingScene();
+            var away = BuildPerson(TavernId, new ActionCommitted(Now, owner.Id, Idle, WTimeSpan.FromMinutes(5)));
+            var walking = BuildPerson(HomeId, new ActionCommitted(Now, borrower.Id, MoveToOwner, WTimeSpan.FromMinutes(20)));
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { walking, away });
+            Assert.AreEqual(owner.Id, provider.FindObject("spade_1")!.HeldBy, "Handed over away from the shed: the owner holds it.");
+
+            var home = BuildPerson(HomeId, new ActionCommitted(Now, owner.Id, Idle, WTimeSpan.FromMinutes(5)));
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(6), new IHuman[] { home });
+
+            var spade = provider.FindObject("spade_1")!;
+            Assert.IsNull(spade.HeldBy, "On arriving at the shed the tool goes back there.");
+            Assert.AreEqual(HomeId, spade.LocationId);
+            Assert.IsNull(spade.LentAt);
+            Assert.AreEqual(1, orchestrator.ToolLoans.PutAway);
+        }
+
+        [TestMethod]
+        public void AnOwnerWhoNeverPassesTheShed_PutsAHandedBackToolDownWhereHeStands_AfterTheCarryLimit()
+        {
+            var (borrower, owner, provider, orchestrator) = LendingScene();
+            var away = BuildPerson(TavernId, new ActionCommitted(Now, owner.Id, Idle, WTimeSpan.FromMinutes(5)));
+            var walking = BuildPerson(HomeId, new ActionCommitted(Now, borrower.Id, MoveToOwner, WTimeSpan.FromMinutes(20)));
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { walking, away });
+
+            orchestrator.OnTick(Now + WTimeSpan.FromHours(15), new IHuman[] { away });
+            Assert.AreEqual(owner.Id, provider.FindObject("spade_1")!.HeldBy, "Within the carry limit he still holds it.");
+
+            orchestrator.OnTick(Now + WTimeSpan.FromDays(3), new IHuman[] { away });
+
+            var spade = provider.FindObject("spade_1")!;
+            Assert.IsNull(spade.HeldBy);
+            Assert.AreEqual(TavernId, spade.LocationId);
+            Assert.AreEqual(1, orchestrator.ToolLoans.SetDownAway);
+        }
+
+        [TestMethod]
         public void MoveToOwner_AnOwnerTooFarToAfford_IsNotWalkedTo_AndTheBorrowerIsToldToWaitBeforeTryingAgain()
         {
             var (borrower, owner, provider, _) = LendingScene();

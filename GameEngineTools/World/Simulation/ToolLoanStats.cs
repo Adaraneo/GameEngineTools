@@ -30,6 +30,9 @@ namespace GameEngineTools.World.Simulation
         /// <summary>Lent tools the borrower handed to the owner where both stood.</summary>
         public int HandedBack { get; internal set; }
 
+        /// <summary>Handed-back tools an owner put back into their shed on arriving there.</summary>
+        public int PutAway { get; internal set; }
+
         /// <summary>Handed-back tools an owner put down where he stood because their shed was too far to carry them to.</summary>
         public int SetDownAway { get; internal set; }
 
