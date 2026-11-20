@@ -200,6 +200,36 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AnOwnerStandingWhereHisToolLiesAwayFromItsShed_EventuallyNoticesAndTakesItBack_ButNeverOneInItsShedOrSomeoneElses()
+        {
+            var ownerId = new HumanId(Guid.NewGuid());
+            var strangerId = new HumanId(Guid.NewGuid());
+            var owner = BuildPerson(HomeId, new ActionCommitted(Now, ownerId, Idle, WTimeSpan.FromMinutes(5)));
+            var lying = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "lying_1", TavernId, ownerId) with { LocationId = HomeId };
+            var inShed = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "shed_1", HomeId, ownerId);
+            var foreign = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "foreign_1", TavernId, strangerId) with { LocationId = HomeId };
+            var provider = new ConsumingWorldObjectProvider(new[] { lying, inShed, foreign }, Array.Empty<string>());
+            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), provider);
+
+            for (var i = 0; i < 600 && orchestrator.ToolLoans.TakenBack == 0; i++)
+            {
+                orchestrator.OnTick(Now + WTimeSpan.FromMinutes(30 * i), new IHuman[] { owner });
+            }
+
+            Assert.AreEqual(1, orchestrator.ToolLoans.TakenBack, "A soft chance, not a certainty: it takes a while, but a standing owner gets there.");
+            Assert.AreEqual(ownerId, provider.FindObject("lying_1")!.HeldBy);
+            Assert.IsNull(provider.FindObject("shed_1")!.HeldBy, "A tool in its own shed is not 'lying about'.");
+            Assert.IsNull(provider.FindObject("foreign_1")!.HeldBy, "Someone else's tool is not taken.");
+        }
+
+        [TestMethod]
+        public void TheNoticeChance_IsSmallPerTick_AndRisesWithConscientiousness()
+        {
+            Assert.IsTrue(ToolObligation.NoticeChance(0.0) > 0.0 && ToolObligation.NoticeChance(1.0) < 0.2);
+            Assert.IsTrue(ToolObligation.NoticeChance(0.9) > ToolObligation.NoticeChance(0.1));
+        }
+
+        [TestMethod]
         public void AnOwnerWhoNeverPassesTheShed_PutsAHandedBackToolDownWhereHeStands_AfterTheCarryLimit()
         {
             var (borrower, owner, provider, orchestrator) = LendingScene();
@@ -1225,7 +1255,17 @@ namespace EngineTests
 
             public bool RemoveObject(string locationId, string objectId) => _objects.RemoveAll(o => o.Id == objectId) > 0;
 
-            public bool SetHeldBy(string locationId, string objectId, HumanId? holder) => true;
+            public bool SetHeldBy(string locationId, string objectId, HumanId? holder)
+            {
+                var index = _objects.FindIndex(o => o.Id == objectId);
+                if (index < 0)
+                {
+                    return false;
+                }
+
+                _objects[index] = _objects[index] with { HeldBy = holder };
+                return true;
+            }
 
             public IEnumerable<WorldObject> GetHeldBy(HumanId holder) => _objects.Where(o => o.HeldBy == holder);
 

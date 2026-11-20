@@ -27,6 +27,21 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <summary>World days an owner carries a handed-back tool before putting it down where he stands (a design pick).</summary>
         public const double MaxCarryDays = 1.0;
 
+        /// <summary>Chance per scene tick that an owner standing where his own tool lies takes it back: base and the part added by Conscientiousness [0..1] (design picks).</summary>
+        public const double NoticeChanceBase = 0.02;
+
+        /// <summary>The part of the notice chance that rises with Conscientiousness (a design pick).</summary>
+        public const double NoticeChanceConscientiousness = 0.06;
+
+        /// <summary>Tools one person carries at most: two hands (a design pick standing in for a hands model).</summary>
+        public const int MaxCarriedTools = 2;
+
+        /// <summary>Gets the chance per tick that a person with the given Conscientiousness notices and takes back his own tool lying here.</summary>
+        public static double NoticeChance(double conscientiousness)
+        {
+            return NoticeChanceBase + (NoticeChanceConscientiousness * Math.Clamp(conscientiousness, 0.0, 1.0));
+        }
+
         /// <summary>Gets the canonical <c>What</c> of the episode that says the tool is owed back.</summary>
         public static string What(string toolId)
         {

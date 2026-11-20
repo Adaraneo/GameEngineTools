@@ -376,6 +376,7 @@ namespace GameEngineTools.World.Simulation
             RouteToolRequests(now, living);
             RouteToolReturns(now, living);
             HandBackToOwners(now, living);
+            NoticeOwnTools(now, living);
             PutAwayCarriedTools(now, living);
             ReportOverdueLoans(now, living);
 
@@ -1474,6 +1475,44 @@ namespace GameEngineTools.World.Simulation
 
         // Owners who may hold a handed-back tool, fed by each hand-over; not persisted, like the other scene runtime sets.
         private readonly HashSet<HumanId> _toolCarriers = new();
+
+        /// <summary>
+        /// An owner who stands where his own tool lies away from its shed may notice it in passing and take it back, with a chance that rises with Conscientiousness (<see cref="ToolObligation.NoticeChance"/>); it costs no action, so it is not a rule and not crowded out by a need.
+        /// </summary>
+        private void NoticeOwnTools(WDateTime now, IReadOnlyList<IHuman> chars)
+        {
+            if (_mutableObjects is null)
+            {
+                return;
+            }
+
+            foreach (var character in chars)
+            {
+                if (_locationService.GetLocation(character.Id) is not { } place)
+                {
+                    continue;
+                }
+
+                var lying = _mutableObjects.GetObjectsAt(place).FirstOrDefault(
+                    o => o.Category == WorldObjectCategory.Tool && o.IsPickable && o.IsAvailable && o.HeldBy is null && o.LentTo is null
+                         && o.OwnerId == character.Id && o.StoredAt is { } shed && !string.Equals(shed, place, StringComparison.Ordinal));
+                if (lying is null || _rng.NextDouble() >= ToolObligation.NoticeChance(character.Personality.BigFive.Conscientiousness))
+                {
+                    continue;
+                }
+
+                if (_mutableObjects.GetHeldBy(character.Id).Count(o => o.Category == WorldObjectCategory.Tool) >= ToolObligation.MaxCarriedTools)
+                {
+                    continue;
+                }
+
+                if (_mutableObjects.SetHeldBy(place, lying.Id, character.Id) && ToolLending.MarkCarried(_mutableObjects, lying.Id, character.Id, now))
+                {
+                    _toolCarriers.Add(character.Id);
+                    ToolLoans.TakenBack++;
+                }
+            }
+        }
 
         /// <summary>An owner who holds a handed-back tool puts it away without a separate action: on arriving at its shed it goes back there, and one carried past <see cref="ToolObligation.MaxCarryDays"/> is put down where the owner stands.</summary>
         private void PutAwayCarriedTools(WDateTime now, IReadOnlyList<IHuman> chars)
