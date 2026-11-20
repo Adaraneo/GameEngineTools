@@ -1507,7 +1507,7 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
-                if (_mutableObjects.SetHeldBy(place, lying.Id, character.Id) && ToolLending.MarkCarried(_mutableObjects, lying.Id, character.Id, now))
+                if (ToolLending.TakeBack(_mutableObjects, lying, character.Id, now))
                 {
                     _toolCarriers.Add(character.Id);
                     ToolLoans.TakenBack++;

@@ -246,6 +246,26 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void TakeBack_PutsHisOwnToolLyingAwayFromItsShedIntoHisHandInOneWrite_AndRefusesTheRest()
+        {
+            var (db, provider) = NewWorld();
+            using (db)
+            {
+                Assert.IsFalse(ToolLending.TakeBack(provider, provider.FindObject("spade_1")!, Owner, Now), "It lies in its own shed.");
+                Assert.IsTrue(provider.SetHeldBy("farm", "spade_1", Owner));
+                Assert.IsTrue(ToolLending.SetDown(provider, "spade_1", Owner, "home"));
+                var lying = provider.GetObjectsAt("home").Single();
+
+                Assert.IsFalse(ToolLending.TakeBack(provider, lying, Stranger, Now), "Not his tool.");
+                Assert.IsTrue(ToolLending.TakeBack(provider, lying, Owner, Now));
+                var taken = provider.FindObject("spade_1")!;
+                Assert.AreEqual(Owner, taken.HeldBy);
+                Assert.IsTrue(ToolLending.IsHandedBack(taken, Owner), "Carried back like a handed-back tool, with no second step that could be lost.");
+                Assert.IsFalse(ToolLending.TakeBack(provider, taken, Owner, Now), "Already in his hand.");
+            }
+        }
+
+        [TestMethod]
         public void TheOwnerCanLendATool_HeHoldsHimself_ButNotOneSomeoneElseHolds()
         {
             var (db, provider) = NewWorld();

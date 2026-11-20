@@ -41,6 +41,21 @@ namespace GameEngineTools.World.Work
             return true;
         }
 
+        /// <summary>The owner takes his own tool lying away from its shed into his hand in one write (<c>LentAt</c> keeps the hour, so it is carried back like a handed-back one). False when it is not his, is lent, is held, or lies in its shed.</summary>
+        public static bool TakeBack(IMutableWorldObjectProvider provider, WorldObject tool, HumanId owner, GameEngineTools.World.Utils.Time.WDateTime now)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+            ArgumentNullException.ThrowIfNull(tool);
+            if (tool.OwnerId != owner || tool.LentTo is not null || tool.HeldBy is not null || tool.StoredAt is not { } shed || string.Equals(shed, tool.LocationId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            provider.RemoveObject(tool.LocationId, tool.Id);
+            provider.AddObject(tool with { HeldBy = owner, LentAt = now });
+            return true;
+        }
+
         /// <summary>Notes that the owner took his own tool from somewhere other than its shed: <c>LentAt</c> keeps the hour, so it is carried back like a handed-back one. False when it is not his, is lent, is not in his hand or lies in its shed.</summary>
         public static bool MarkCarried(IMutableWorldObjectProvider provider, string toolId, HumanId holder, GameEngineTools.World.Utils.Time.WDateTime now)
         {
