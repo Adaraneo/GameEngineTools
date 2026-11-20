@@ -1555,7 +1555,7 @@ namespace GameEngineTools.World.Simulation
                             _toolReturnFailures.Remove(character.Id);
                             CommitMove(character, toShed, now);
                         }
-                        else if (ToolLending.IsHandedBack(carried) && ToolLending.SetDown(_mutableObjects!, carried.Id, character.Id, currentLocation))
+                        else if (ToolLending.IsHandedBack(carried, character.Id) && ToolLending.SetDown(_mutableObjects!, carried.Id, character.Id, currentLocation))
                         {
                             // A shed too far to afford: the owner puts the handed-back tool down where he stands (mostly at home), free to be lent again.
                             ToolLoans.SetDownAway++;

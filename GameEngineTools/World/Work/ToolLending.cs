@@ -38,11 +38,13 @@ namespace GameEngineTools.World.Work
             return true;
         }
 
-        /// <summary>Whether the tool is in its owner's hand after a hand-back (not lent, <c>LentAt</c> still set): it is carried to its shed, not kept.</summary>
-        public static bool IsHandedBack(WorldObject tool)
+        /// <summary>Whether the tool, held by <paramref name="holder"/>, is in its owner's hand after a hand-back (not lent, <c>LentAt</c> still set): it is carried to its shed, not kept.</summary>
+        public static bool IsHandedBack(WorldObject tool, HumanId holder)
         {
             ArgumentNullException.ThrowIfNull(tool);
-            return tool.LentTo is null && tool.LentAt is not null && tool.HeldBy is not null && tool.HeldBy == tool.OwnerId;
+
+            // The holder is passed in: a list of a person's held objects does not carry HeldBy.
+            return tool.LentTo is null && tool.LentAt is not null && tool.OwnerId == holder;
         }
 
         /// <summary>The holder puts the tool down where they stand; it lies there, free to be lent or taken again. False when the tool is unknown or not in <paramref name="holder"/>'s hand.</summary>

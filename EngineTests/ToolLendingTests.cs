@@ -202,11 +202,11 @@ namespace EngineTests
             var (db, provider) = NewWorld();
             using (db)
             {
-                Assert.IsFalse(ToolLending.IsHandedBack(provider.FindObject("spade_1")!));
+                Assert.IsFalse(ToolLending.IsHandedBack(provider.FindObject("spade_1")!, Owner));
                 Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, "farm", Now));
-                Assert.IsFalse(ToolLending.IsHandedBack(provider.FindObject("spade_1")!), "Still lent.");
+                Assert.IsFalse(ToolLending.IsHandedBack(provider.FindObject("spade_1")!, Owner), "Still lent.");
                 Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm", Now));
-                Assert.IsTrue(ToolLending.IsHandedBack(provider.FindObject("spade_1")!));
+                Assert.IsTrue(ToolLending.IsHandedBack(provider.FindObject("spade_1")!, Owner));
 
                 db.ExecuteScript("INSERT INTO Locations (Id, DisplayName, Type) VALUES ('home', 'Home', 'Private');");
                 Assert.IsFalse(ToolLending.SetDown(provider, "spade_1", Stranger, "home"), "Only the holder sets it down.");
@@ -215,7 +215,7 @@ namespace EngineTests
                 Assert.IsNull(spade.HeldBy);
                 Assert.IsNull(spade.LentAt);
                 Assert.AreEqual("home", spade.LocationId);
-                Assert.IsFalse(ToolLending.IsHandedBack(spade));
+                Assert.IsFalse(ToolLending.IsHandedBack(spade, Owner));
             }
         }
 

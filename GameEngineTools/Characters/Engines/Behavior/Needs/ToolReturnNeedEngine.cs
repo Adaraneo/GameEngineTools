@@ -39,7 +39,7 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
             // A borrowed tool goes back to the owner it came from, not to the shed, and only after it has been kept a while.
             var lent = tool.LentTo == context.HumanContext.Id;
-            var handedBack = ToolLending.IsHandedBack(tool);
+            var handedBack = ToolLending.IsHandedBack(tool, context.HumanContext.Id);
             if ((lent || handedBack) && tool.LentAt is { } lentAt && (context.Now - lentAt).TotalHours < ToolObligation.MinHoldHours)
             {
                 return BehaviorNeedOutput.Empty;

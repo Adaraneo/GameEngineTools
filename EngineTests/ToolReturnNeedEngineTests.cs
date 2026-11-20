@@ -138,7 +138,8 @@ namespace EngineTests
         {
             var engine = new ToolReturnNeedEngine();
             var later = new WDateTime(0) + WTimeSpan.FromHours(5);
-            WorldObject HandedBack(string shed) => Spade(shed) with { OwnerId = Self, LentAt = new WDateTime(0) };
+            // A person's held objects come without HeldBy, so the holder must not be read from it.
+            WorldObject HandedBack(string shed) => Spade(shed) with { OwnerId = Self, LentAt = new WDateTime(0), HeldBy = null };
 
             Assert.AreEqual(0, engine.Evaluate(Ctx(false, HandedBack("farm"))).Candidates.Count, "Just handed back: held for a while.");
             Assert.AreEqual(MoveToStorage, engine.Evaluate(Ctx(true, HandedBack("farm")) with { Now = later }).Candidates.Single().Name, "On shift too: the tool is not his to keep in hand.");
