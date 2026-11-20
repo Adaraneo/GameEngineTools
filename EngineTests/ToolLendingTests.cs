@@ -33,6 +33,7 @@ namespace EngineTests
             var db = new SqliteWorldDatabase(":memory:");
             WorldDatabaseSeeder.Initialize(db);
             db.ExecuteScript("INSERT INTO Locations (Id, DisplayName, Type) VALUES ('farm', 'Farm', 'Social');");
+            db.ExecuteScript("INSERT INTO Locations (Id, DisplayName, Type) VALUES ('home', 'Home', 'Private');");
             var provider = new SqliteWorldObjectProvider(db);
             provider.AddObject(WorkObjects.Spawn(TestWork.Catalog, "spade", "spade_1", "farm", Owner));
             return (db, provider);
@@ -176,23 +177,32 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void HandBack_PutsTheToolInTheOwnersHand_OnlyFromTheBorrowersHand()
+        public void HandBack_PutsTheToolInTheOwnersHandAwayFromItsShed_AndBackInTheShedAtIt_OnlyFromTheBorrowersHand()
         {
             var (db, provider) = NewWorld();
             using (db)
             {
-                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm", Now), "Not lent: nothing to hand back.");
+                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Neighbour, "home", Now), "Not lent: nothing to hand back.");
                 Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, "farm", Now));
-                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Stranger, "farm", Now), "Only the borrower hands it back.");
+                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Stranger, "home", Now), "Only the borrower hands it back.");
 
-                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm", Now));
+                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "home", Now));
                 var spade = provider.FindObject("spade_1")!;
                 Assert.IsNull(spade.LentTo);
                 Assert.AreEqual(Owner, spade.HeldBy);
-                Assert.AreEqual("farm", spade.LocationId);
+                Assert.AreEqual("home", spade.LocationId);
                 Assert.AreEqual(0, provider.GetHeldBy(Neighbour).Count());
                 Assert.AreEqual("spade_1", provider.GetHeldBy(Owner).Single().Id);
-                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm", Now), "The loan is over.");
+                Assert.IsFalse(ToolLending.HandBack(provider, "spade_1", Neighbour, "home", Now), "The loan is over.");
+
+                // At its own shed the tool goes straight back into it.
+                ToolLending.SetDown(provider, "spade_1", Owner, "farm");
+                Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, "farm", Now));
+                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm", Now));
+                var put = provider.FindObject("spade_1")!;
+                Assert.IsNull(put.HeldBy);
+                Assert.IsNull(put.LentAt);
+                Assert.AreEqual("farm", put.LocationId);
             }
         }
 
@@ -205,10 +215,9 @@ namespace EngineTests
                 Assert.IsFalse(ToolLending.IsHandedBack(provider.FindObject("spade_1")!, Owner));
                 Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, "farm", Now));
                 Assert.IsFalse(ToolLending.IsHandedBack(provider.FindObject("spade_1")!, Owner), "Still lent.");
-                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm", Now));
+                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "home", Now));
                 Assert.IsTrue(ToolLending.IsHandedBack(provider.FindObject("spade_1")!, Owner));
 
-                db.ExecuteScript("INSERT INTO Locations (Id, DisplayName, Type) VALUES ('home', 'Home', 'Private');");
                 Assert.IsFalse(ToolLending.SetDown(provider, "spade_1", Stranger, "home"), "Only the holder sets it down.");
                 Assert.IsTrue(ToolLending.SetDown(provider, "spade_1", Owner, "home"));
                 var spade = provider.FindObject("spade_1")!;
@@ -226,7 +235,7 @@ namespace EngineTests
             using (db)
             {
                 Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Neighbour, "farm", Now));
-                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "farm", Now));
+                Assert.IsTrue(ToolLending.HandBack(provider, "spade_1", Neighbour, "home", Now));
                 Assert.AreEqual(Owner, provider.FindObject("spade_1")!.HeldBy);
 
                 Assert.IsTrue(ToolLending.Lend(provider, "spade_1", Owner, Stranger, "farm", Now), "A tool in the owner's hand is lent on.");

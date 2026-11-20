@@ -24,7 +24,7 @@ namespace GameEngineTools.World.Work
             return true;
         }
 
-        /// <summary>Ends the loan by the borrower handing the tool to its owner where both stand; the owner then holds it (<c>LentAt</c> keeps the hour of the hand-over) and carries it to its shed. False when the tool is not lent to <paramref name="borrower"/> or is not in their hand.</summary>
+        /// <summary>Ends the loan by the borrower handing the tool to its owner where both stand; at the tool's own shed it is put back there, anywhere else the owner holds it (<c>LentAt</c> keeps the hour of the hand-over) and carries it to its shed. False when the tool is not lent to <paramref name="borrower"/> or is not in their hand.</summary>
         public static bool HandBack(IMutableWorldObjectProvider provider, string toolId, HumanId borrower, string location, GameEngineTools.World.Utils.Time.WDateTime now)
         {
             ArgumentNullException.ThrowIfNull(provider);
@@ -34,7 +34,10 @@ namespace GameEngineTools.World.Work
             }
 
             provider.RemoveObject(tool.LocationId, tool.Id);
-            provider.AddObject(tool with { LentTo = null, LentAt = now, HeldBy = owner, LocationId = location });
+
+            // Handed over at its own shed the tool is simply put back there; elsewhere the owner holds it and carries it on.
+            var atShed = string.Equals(tool.StoredAt, location, StringComparison.Ordinal);
+            provider.AddObject(tool with { LentTo = null, LentAt = atShed ? null : now, HeldBy = atShed ? null : owner, LocationId = location });
             return true;
         }
 

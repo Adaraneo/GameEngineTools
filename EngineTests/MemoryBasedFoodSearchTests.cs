@@ -149,7 +149,7 @@ namespace EngineTests
         }
 
         [TestMethod]
-        public void ABorrowerOffShift_WhoStandsWhereTheOwnerStands_HandsTheToolOver_AndTheOwnerHoldsIt()
+        public void ABorrowerOffShift_WhoStandsWhereTheOwnerStands_HandsTheToolOver_AndItGoesBackIntoItsShed()
         {
             var (borrower, owner, provider, orchestrator) = LendingScene();
 
@@ -157,7 +157,8 @@ namespace EngineTests
 
             var spade = provider.FindObject("spade_1")!;
             Assert.IsNull(spade.LentTo);
-            Assert.AreEqual(owner.Id, spade.HeldBy, "The owner holds it and carries it to the shed.");
+            Assert.IsNull(spade.HeldBy, "Handed over at its own shed, the tool is simply put back there.");
+            Assert.IsNull(spade.LentAt);
             Assert.AreEqual(HomeId, spade.LocationId);
             Assert.AreEqual(1, orchestrator.ToolLoans.HandedBack);
             Assert.AreEqual(0, orchestrator.ToolLoans.Returned, "A handover is counted apart from a return to the shed.");
@@ -205,7 +206,8 @@ namespace EngineTests
             orchestrator.OnTick(Now + WTimeSpan.FromHours(5), new IHuman[] { walking, owner });
 
             Assert.AreEqual(0, walking.Received.OfType<ToolReturnDeferred>().Count());
-            Assert.AreEqual(owner.Id, provider.FindObject("spade_1")!.HeldBy);
+            Assert.IsNull(provider.FindObject("spade_1")!.LentTo);
+            Assert.IsNull(provider.FindObject("spade_1")!.HeldBy, "Handed over at its own shed, it is put back there.");
         }
 
         [TestMethod]
