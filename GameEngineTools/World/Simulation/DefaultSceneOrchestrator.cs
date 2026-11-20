@@ -1147,7 +1147,7 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
-                var tool = _objectProvider.GetAllObjects().FirstOrDefault(o => o.IsAvailable && o.HeldBy is null && o.LentTo is null && typeIds.Contains(o.TypeId ?? string.Empty)
+                var tool = _objectProvider.GetAllObjects().FirstOrDefault(o => o.IsAvailable && NotHeldByAnother(o, seekerId) && o.LentTo is null && typeIds.Contains(o.TypeId ?? string.Empty)
                     && o.OwnerId is { } ownerId && ownerId != seekerId && !AskedTooRecently(seekerId, ownerId, now)
                     && chars.Any(c => c.Id == ownerId && _locationService.GetLocation(c.Id) == location));
                 if (tool is not null && chars.FirstOrDefault(c => c.Id == tool.OwnerId) is { } owner)
@@ -1178,7 +1178,7 @@ namespace GameEngineTools.World.Simulation
             }
 
             var tools = _objectProvider.GetAllObjects()
-                .Where(o => o.IsAvailable && o.HeldBy is null && typeIds.Contains(o.TypeId ?? string.Empty))
+                .Where(o => o.IsAvailable && NotHeldByAnother(o, seeker.Id) && typeIds.Contains(o.TypeId ?? string.Empty))
                 .ToList();
             if (tools.Any(o => o.LocationId == location && WorkObjects.CanUse(o, seeker.Id)))
             {
@@ -1299,6 +1299,12 @@ namespace GameEngineTools.World.Simulation
             }
 
             return places;
+        }
+
+        /// <summary>A tool nobody holds, or one its owner holds (the owner can still lend it on); the seeker's own held tool is not "to be found".</summary>
+        private static bool NotHeldByAnother(WorldObject tool, HumanId seeker)
+        {
+            return tool.HeldBy is null || (tool.HeldBy == tool.OwnerId && tool.OwnerId != seeker);
         }
 
         /// <summary>Where the seeker looks for a person: where they live if the seeker knows them, else where they are now (the seeker asks around).</summary>

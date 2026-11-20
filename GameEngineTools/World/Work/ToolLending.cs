@@ -10,11 +10,11 @@ namespace GameEngineTools.World.Work
     /// <summary>Lending an owned tool: only its owner can lend it, only to someone else, and only while it is not already lent; the tool is handed over into the borrower's hand, who may use it (<see cref="WorkObjects.CanUse"/>) and puts it down at its shed, which ends the loan.</summary>
     public static class ToolLending
     {
-        /// <summary>Lends the tool to the borrower, who takes it in hand where they stand; false (nothing changes) when it is unknown, not owned by <paramref name="owner"/>, already lent, held by someone, or the borrower is the owner.</summary>
+        /// <summary>Lends the tool to the borrower, who takes it in hand where they stand; false (nothing changes) when it is unknown, not owned by <paramref name="owner"/>, already lent, held by someone other than the owner (the owner may hand on a tool they hold), or the borrower is the owner.</summary>
         public static bool Lend(IMutableWorldObjectProvider provider, string toolId, HumanId owner, HumanId borrower, string borrowerLocation, GameEngineTools.World.Utils.Time.WDateTime now)
         {
             ArgumentNullException.ThrowIfNull(provider);
-            if (provider.FindObject(toolId) is not { } tool || tool.OwnerId != owner || tool.LentTo is not null || tool.HeldBy is not null || borrower == owner)
+            if (provider.FindObject(toolId) is not { } tool || tool.OwnerId != owner || tool.LentTo is not null || (tool.HeldBy is not null && tool.HeldBy != owner) || borrower == owner)
             {
                 return false;
             }
