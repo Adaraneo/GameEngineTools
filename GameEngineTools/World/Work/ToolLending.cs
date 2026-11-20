@@ -24,8 +24,8 @@ namespace GameEngineTools.World.Work
             return true;
         }
 
-        /// <summary>Ends the loan by the borrower handing the tool to its owner where both stand; the owner then holds it (and carries it to its shed). False when the tool is not lent to <paramref name="borrower"/> or is not in their hand.</summary>
-        public static bool HandBack(IMutableWorldObjectProvider provider, string toolId, HumanId borrower, string location)
+        /// <summary>Ends the loan by the borrower handing the tool to its owner where both stand; the owner then holds it (<c>LentAt</c> keeps the hour of the hand-over) and carries it to its shed. False when the tool is not lent to <paramref name="borrower"/> or is not in their hand.</summary>
+        public static bool HandBack(IMutableWorldObjectProvider provider, string toolId, HumanId borrower, string location, GameEngineTools.World.Utils.Time.WDateTime now)
         {
             ArgumentNullException.ThrowIfNull(provider);
             if (provider.FindObject(toolId) is not { LentTo: { } lentTo, OwnerId: { } owner } tool || lentTo != borrower || tool.HeldBy != borrower)
@@ -34,7 +34,28 @@ namespace GameEngineTools.World.Work
             }
 
             provider.RemoveObject(tool.LocationId, tool.Id);
-            provider.AddObject(tool with { LentTo = null, LentAt = null, HeldBy = owner, LocationId = location });
+            provider.AddObject(tool with { LentTo = null, LentAt = now, HeldBy = owner, LocationId = location });
+            return true;
+        }
+
+        /// <summary>Whether the tool is in its owner's hand after a hand-back (not lent, <c>LentAt</c> still set): it is carried to its shed, not kept.</summary>
+        public static bool IsHandedBack(WorldObject tool)
+        {
+            ArgumentNullException.ThrowIfNull(tool);
+            return tool.LentTo is null && tool.LentAt is not null && tool.HeldBy is not null && tool.HeldBy == tool.OwnerId;
+        }
+
+        /// <summary>The holder puts the tool down where they stand; it lies there, free to be lent or taken again. False when the tool is unknown or not in <paramref name="holder"/>'s hand.</summary>
+        public static bool SetDown(IMutableWorldObjectProvider provider, string toolId, HumanId holder, string location)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+            if (provider.FindObject(toolId) is not { } tool || tool.HeldBy != holder)
+            {
+                return false;
+            }
+
+            provider.RemoveObject(tool.LocationId, tool.Id);
+            provider.AddObject(tool with { LentTo = null, LentAt = null, HeldBy = null, LocationId = location });
             return true;
         }
 

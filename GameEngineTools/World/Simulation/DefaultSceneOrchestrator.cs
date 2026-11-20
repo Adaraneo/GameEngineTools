@@ -1459,7 +1459,7 @@ namespace GameEngineTools.World.Simulation
                         continue;
                     }
 
-                    if (!ToolObligation.ReturnsNow(onShift, ToolObligation.StrengthFor(borrower.Snapshot.Memory.Episodes, tool.Id)) || !ToolLending.HandBack(_mutableObjects, tool.Id, borrowerId, place))
+                    if (!ToolObligation.ReturnsNow(onShift, ToolObligation.StrengthFor(borrower.Snapshot.Memory.Episodes, tool.Id)) || !ToolLending.HandBack(_mutableObjects, tool.Id, borrowerId, place, now))
                     {
                         continue;
                     }
@@ -1554,6 +1554,11 @@ namespace GameEngineTools.World.Simulation
                         {
                             _toolReturnFailures.Remove(character.Id);
                             CommitMove(character, toShed, now);
+                        }
+                        else if (ToolLending.IsHandedBack(carried) && ToolLending.SetDown(_mutableObjects!, carried.Id, character.Id, currentLocation))
+                        {
+                            // A shed too far to afford: the owner puts the handed-back tool down where he stands (mostly at home), free to be lent again.
+                            ToolLoans.SetDownAway++;
                         }
                         else
                         {

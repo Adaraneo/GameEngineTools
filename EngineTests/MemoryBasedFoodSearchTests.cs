@@ -385,6 +385,25 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void MoveToStorage_AnOwnerWhoCannotAffordTheShed_PutsAHandedBackToolDownWhereHeStands_AndItIsFreeAgain()
+        {
+            var ownerId = new HumanId(Guid.NewGuid());
+            var owner = BuildPerson(HomeId, new ActionCommitted(Now, ownerId, MoveToStorage, WTimeSpan.FromMinutes(20)));
+            var spade = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "spade_1", HomeId, ownerId) with { HeldBy = ownerId, StoredAt = TavernId, LentAt = Now };
+            var provider = new ConsumingWorldObjectProvider(new[] { spade }, Array.Empty<string>());
+
+            var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 100000.0) }), provider, new SceneOrchestratorOptions { EnableTravelTime = true });
+            orchestrator.OnTick(Now, new IHuman[] { owner });
+
+            var tool = provider.FindObject("spade_1")!;
+            Assert.IsNull(tool.HeldBy, "A shed a day away: the tool is put down, not carried about.");
+            Assert.AreEqual(HomeId, tool.LocationId);
+            Assert.IsNull(tool.LentAt);
+            Assert.AreEqual(1, orchestrator.ToolLoans.SetDownAway);
+            Assert.AreEqual(0, orchestrator.ToolLoans.ReturnsDeferred);
+        }
+
+        [TestMethod]
         public void MoveToTool_ARememberedToolIsWalkedToBeforeAskingAround()
         {
             var facts = new[] { new ObjectLocationFact("far_spade", MarketId, Now, 0.85, WorldObjectCategory.Tool, "spade") };

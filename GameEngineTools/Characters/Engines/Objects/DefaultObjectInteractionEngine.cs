@@ -218,7 +218,12 @@ namespace GameEngineTools.Characters.Engines.Objects
                         // data.LocationId = where the character is NOW (the drop location).
                         // The object may still be cached under its original location — find it.
                         var heldObj = _objectProvider.FindObject(data.ObjectId);
-                        if (heldObj is not null && heldObj.LocationId != data.LocationId)
+                        if (heldObj is not null && ToolLending.IsHandedBack(heldObj))
+                        {
+                            // A handed-back tool put down at its shed ends the owner's holding.
+                            ToolLending.SetDown(_objectProvider, heldObj.Id, ctx.Id, data.LocationId);
+                        }
+                        else if (heldObj is not null && heldObj.LocationId != data.LocationId)
                         {
                             // Object is moving to a new location: remove from original, add at drop location.
                             _objectProvider.RemoveObject(heldObj.LocationId, data.ObjectId);

@@ -134,6 +134,18 @@ namespace EngineTests
         }
 
         [TestMethod]
+        public void AnOwnerHoldingAHandedBackTool_KeepsItAWhile_ThenCarriesItToTheShedEvenOnShift()
+        {
+            var engine = new ToolReturnNeedEngine();
+            var later = new WDateTime(0) + WTimeSpan.FromHours(5);
+            WorldObject HandedBack(string shed) => Spade(shed) with { OwnerId = Self, LentAt = new WDateTime(0) };
+
+            Assert.AreEqual(0, engine.Evaluate(Ctx(false, HandedBack("farm"))).Candidates.Count, "Just handed back: held for a while.");
+            Assert.AreEqual(MoveToStorage, engine.Evaluate(Ctx(true, HandedBack("farm")) with { Now = later }).Candidates.Single().Name, "On shift too: the tool is not his to keep in hand.");
+            Assert.AreEqual(InteractWithObject, engine.Evaluate(Ctx(true, HandedBack(Loc)) with { Now = later }).Candidates.Single().Name, "At the shed it is put down.");
+        }
+
+        [TestMethod]
         public void TheWalkBack_IsMoreUrgentTheStrongerTheMemoryThatTheToolIsOwed()
         {
             var engine = new ToolReturnNeedEngine();

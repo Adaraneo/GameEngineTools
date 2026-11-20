@@ -9,9 +9,10 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
     using GameEngineTools.Characters.Engines.Objects;
     using GameEngineTools.World.Objects;
     using GameEngineTools.World.Utils.Time;
+    using GameEngineTools.World.Work;
     using static ActionNames;
 
-    /// <summary>Brings a carried tool back: its own to the shed, to put it down there, a borrowed one to its owner, to hand it over; off the work shift, or on it when the memory that the tool is owed back is strong.</summary>
+    /// <summary>Brings a carried tool back: its own to the shed, to put it down there, a borrowed one to its owner, to hand it over; off the work shift, or on it when the memory that the tool is owed back is strong (an owner holding a handed-back tool carries it on at any time, after a short hold).</summary>
     internal sealed class ToolReturnNeedEngine : IBehaviorNeedEngine
     {
         // Design picks: the walk back ranks under ordinary work; putting the tool down once at the shed is an instant act, so it goes first (a year-run showed a borrowed tool never put down at 58 against hunger, thirst and work).
@@ -38,14 +39,15 @@ namespace GameEngineTools.Characters.Engines.Behavior.Needs
 
             // A borrowed tool goes back to the owner it came from, not to the shed, and only after it has been kept a while.
             var lent = tool.LentTo == context.HumanContext.Id;
-            if (lent && tool.LentAt is { } lentAt && (context.Now - lentAt).TotalHours < ToolObligation.MinHoldHours)
+            var handedBack = ToolLending.IsHandedBack(tool);
+            if ((lent || handedBack) && tool.LentAt is { } lentAt && (context.Now - lentAt).TotalHours < ToolObligation.MinHoldHours)
             {
                 return BehaviorNeedOutput.Empty;
             }
 
-            // The memory that the tool is owed back; on the work shift only a strongly felt one brings the tool back.
+            // The memory that the tool is owed back; on the work shift only a strongly felt one brings the tool back, while an owner carries a handed-back tool to its shed whatever the shift.
             var strength = ToolObligation.StrengthFor(snapshot.Memory.Episodes, tool.Id);
-            if (!ToolObligation.ReturnsNow(snapshot.Schedule?.ActiveSlot is { PreferredAction: Work }, strength))
+            if (!ToolObligation.ReturnsNow(snapshot.Schedule?.ActiveSlot is { PreferredAction: Work }, strength, handedBack))
             {
                 return BehaviorNeedOutput.Empty;
             }

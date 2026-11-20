@@ -63,10 +63,10 @@ namespace GameEngineTools.Characters.Engines.Objects
             return strength is { } value && value >= OnShiftStrength;
         }
 
-        /// <summary>Gets whether a borrower brings the tool back now: off the work shift, or on it when the obligation is strongly felt.</summary>
-        public static bool ReturnsNow(bool onWorkShift, double? strength)
+        /// <summary>Gets whether a carried tool is brought back now: off the work shift, on it when the obligation is strongly felt, or always for an owner who holds a handed-back tool (it is not his to keep in hand).</summary>
+        public static bool ReturnsNow(bool onWorkShift, double? strength, bool ownerHoldingHandedBack = false)
         {
-            return !onWorkShift || FeltOnShift(strength);
+            return ownerHoldingHandedBack || !onWorkShift || FeltOnShift(strength);
         }
     }
 }
