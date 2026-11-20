@@ -1501,7 +1501,8 @@ namespace GameEngineTools.World.Simulation
                     continue;
                 }
 
-                if (_mutableObjects.GetHeldBy(character.Id).Count(o => o.Category == WorldObjectCategory.Tool) >= ToolObligation.MaxCarriedTools)
+                // Two hands, in a first approximation: only tools already being carried back count; the tools held for work do not (a farmer carries several).
+                if (_mutableObjects.GetHeldBy(character.Id).Count(o => ToolLending.IsHandedBack(o, character.Id)) >= ToolObligation.MaxCarriedTools)
                 {
                     continue;
                 }

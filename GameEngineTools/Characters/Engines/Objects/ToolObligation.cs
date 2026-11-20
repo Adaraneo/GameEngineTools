@@ -33,7 +33,7 @@ namespace GameEngineTools.Characters.Engines.Objects
         /// <summary>The part of the notice chance that rises with Conscientiousness (a design pick).</summary>
         public const double NoticeChanceConscientiousness = 0.06;
 
-        /// <summary>Tools one person carries at most: two hands (a design pick standing in for a hands model).</summary>
+        /// <summary>Tools one person carries back at most at a time: two hands (a design pick standing in for a hands model; tools held for work are not counted).</summary>
         public const int MaxCarriedTools = 2;
 
         /// <summary>Gets the chance per tick that a person with the given Conscientiousness notices and takes back his own tool lying here.</summary>

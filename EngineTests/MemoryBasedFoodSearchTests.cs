@@ -208,7 +208,10 @@ namespace EngineTests
             var lying = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "lying_1", TavernId, ownerId) with { LocationId = HomeId };
             var inShed = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "shed_1", HomeId, ownerId);
             var foreign = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "spade", "foreign_1", TavernId, strangerId) with { LocationId = HomeId };
-            var provider = new ConsumingWorldObjectProvider(new[] { lying, inShed, foreign }, Array.Empty<string>());
+            // Two tools held for work do not stop him: only tools already being carried back count toward the two hands.
+            var work1 = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "sickle", "work_1", TavernId, ownerId) with { HeldBy = ownerId };
+            var work2 = GameEngineTools.World.Work.WorkObjects.Spawn(EngineTests.Utils.TestWork.Catalog, "flail", "work_2", TavernId, ownerId) with { HeldBy = ownerId };
+            var provider = new ConsumingWorldObjectProvider(new[] { lying, inShed, foreign, work1, work2 }, Array.Empty<string>());
             var orchestrator = BuildOrchestrator(BuildMap(new[] { (HomeId, TavernId, 50.0) }), provider);
 
             for (var i = 0; i < 600 && orchestrator.ToolLoans.TakenBack == 0; i++)
